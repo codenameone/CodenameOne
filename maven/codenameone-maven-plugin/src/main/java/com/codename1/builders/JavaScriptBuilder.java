@@ -168,7 +168,11 @@ public class JavaScriptBuilder extends Executor {
                         }
                     });
             jsOutputZip = new File(buildDir, request.getMainClass() + "-js.zip");
-            zipDirectory(distDir, jsOutputZip, distDir.getName());
+            // Zip the dist FLAT. The bundle is meant to be unpacked directly
+            // into a web root, so a "<MainClass>-js/" wrapper only forces every
+            // consumer to flatten it first. (The old cloud/TeaVM bundle was flat
+            // too, so this also keeps deployment scripts working across both.)
+            zipDirectory(distDir, jsOutputZip, null);
             log("Wrote browser bundle to " + jsOutputZip);
             return true;
         } catch (BuildException ex) {
@@ -196,6 +200,49 @@ public class JavaScriptBuilder extends Executor {
             throw new IOException("Application source jar is missing: " + sourceZip);
         }
         unzip(sourceZip, stageClasses, stageClasses, stageClasses);
+    }
+
+    /**
+     * Strip optional parts of the port webapp from the staged copy, so the
+     * translator never copies them into the app's bundle.
+     *
+     * <p>video.js + RecordRTC (~944KB) are only ever pulled in by
+     * {@code VideoJS.init()}, which {@code HTML5Implementation.captureVideo()}
+     * calls behind a try/catch: without them it logs "VideoJS is not loaded,
+     * using default captureVideo behaviour. Add the javascript.includeVideoJS
+     * build hint..." and falls back. So the hint already described an opt-in
+     * that nothing on the build side implemented -- every app paid for the
+     * library whether or not it captured video. Honour the hint.
+     *
+     * <p>samplerate.min.js (~485KB) is unconditional dead weight: nothing
+     * loads it by path. js/fontmetrics.js only probes for an already-defined
+     * {@code Samplerate} global ("use libsamplerate if it is available"), and
+     * no script tag, ScriptTool call or bridge ever defines one.
+     */
+    private void pruneOptionalPortAssets(File webApp, BuildRequest request) {
+        File js = new File(webApp, "js");
+        if (!js.isDirectory()) {
+            return;
+        }
+        String includeVideoJs = request.getArg("javascript.includeVideoJS", "false");
+        if (!"true".equalsIgnoreCase(includeVideoJs)) {
+            File videojs = new File(js, "videojs");
+            if (videojs.isDirectory()) {
+                delTree(videojs, true);
+                if (videojs.exists()) {
+                    log("WARNING: could not delete " + videojs + "; it will ship in the bundle");
+                } else {
+                    debug("Omitting js/videojs (set the javascript.includeVideoJS "
+                            + "build hint to bundle the video capture libraries)");
+                }
+            }
+        }
+        File samplerate = new File(js, "samplerate.min.js");
+        if (samplerate.isFile() && !samplerate.delete()) {
+            // Not fatal -- the bundle just carries a dead 485KB file -- but say
+            // so rather than silently shipping what we claim to have pruned.
+            log("WARNING: could not delete " + samplerate + "; it will ship in the bundle");
+        }
     }
 
     private File locateJavaScriptPortSources(BuildRequest request) {
@@ -266,6 +313,7 @@ public class JavaScriptBuilder extends Executor {
                         delTree(stagedWebApp, true);
                     }
                     jsPortWebApp = dest;
+                    pruneOptionalPortAssets(dest, request);
                 }
                 return stageClasses;
             } finally {
@@ -889,7 +937,13 @@ public class JavaScriptBuilder extends Executor {
             return;
         }
         String rel = base.relativize(current.toPath()).toString().replace(File.separatorChar, '/');
-        String entryName = rootEntryName + "/" + rel;
+        // A null/empty root means "no wrapper directory", so the zip unpacks
+        // straight into a web root -- which is what a deployable bundle should
+        // do. Anything else nests the whole app under one directory that every
+        // consumer then has to flatten by hand.
+        String entryName = (rootEntryName == null || rootEntryName.isEmpty())
+                ? rel
+                : rootEntryName + "/" + rel;
         ZipEntry entry = new ZipEntry(entryName);
         zos.putNextEntry(entry);
         FileInputStream fis = new FileInputStream(current);

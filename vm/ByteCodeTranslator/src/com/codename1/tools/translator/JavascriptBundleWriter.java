@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codename1.tools.translator;
 
 import java.io.File;
@@ -34,8 +57,30 @@ final class JavascriptBundleWriter {
         writeWorker(outputDirectory);
         writeBrowserBridge(outputDirectory);
         writeIndex(outputDirectory);
-        writeProtocol(outputDirectory);
-        writeJsoBridgeManifest(outputDirectory, classes);
+        // vm_protocol.md and jso-bridge-dispatch-ids.txt are developer
+        // artifacts, and this output directory becomes the app's PUBLIC web
+        // root. vm_protocol.md documents the worker boundary and is checked in
+        // at vm/ByteCodeTranslator/src/javascript/vm_protocol.md, so copying it
+        // into every deployed app just published documentation that nobody
+        // reads from there. jso-bridge-dispatch-ids.txt is a sidecar for the
+        // OPT-IN dispatch-id mangler (-Dparparvm.js.manglesigs=1) and nothing
+        // reads the emitted file at all. Emit both only when asked.
+        if (emitDiagnostics()) {
+            writeProtocol(outputDirectory);
+            writeJsoBridgeManifest(outputDirectory, classes);
+        }
+    }
+
+    /**
+     * {@code -Dparparvm.js.diagnostics=1} (or {@code =true}) re-enables the
+     * developer-only artifacts alongside the bundle. The value is parsed rather
+     * than merely tested for presence, so an explicit {@code =0} / {@code
+     * =false} still keeps them out of what is, for this target, a public web
+     * root.
+     */
+    static boolean emitDiagnostics() {
+        String v = System.getProperty("parparvm.js.diagnostics");
+        return "1".equals(v) || "true".equalsIgnoreCase(v);
     }
 
     /**

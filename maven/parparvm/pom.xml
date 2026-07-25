@@ -218,11 +218,79 @@
                                            property="cn1.jsport.webapp.present"/>
                                 <fail unless="cn1.jsport.webapp.present"
                                       message="JavaScript-port webapp not found at ${codename1.javascriptport.webapp.dir} (expected port.js). Build from a full Codename One checkout, or point the build at the webapp with -Dcodename1.javascriptport.webapp.dir=/path/to/Ports/JavaScriptPort/src/main/webapp."/>
+                                <!-- Ant's jar task treats an existing archive as up to date when
+                                     it is newer than every input file, so on an incremental build
+                                     a change to the include/exclude list below is silently
+                                     ignored and a stale jar ships. Delete it first. -->
+                                <delete file="${project.build.directory}/bundle/JavaScriptPort.jar" quiet="true"/>
                                 <jar destfile="${project.build.directory}/bundle/JavaScriptPort.jar">
                                     <fileset dir="${project.build.directory}/javascript-port-classes"/>
                                     <zipfileset dir="${codename1.javascriptport.webapp.dir}" prefix="webapp">
                                         <exclude name="index.html"/>
                                         <exclude name="WEB-INF/**"/>
+                                        <!-- Demo/test fixtures used by the port's own in-repo test
+                                             app. They are NOT referenced by any port or core class,
+                                             yet the translator copies webapp/assets into every app
+                                             it builds, so shipping them here put ~3.6MB of dead
+                                             weight (a 2.1MB leather theme, a 666KB sample video)
+                                             into every JavaScript app's public web root. They stay
+                                             in the source tree, so in-repo builds and the
+                                             javascript-screenshots suite still see them.
+                                             Kept: the native themes installNativeTheme() can open
+                                             from the bundle. The JS port defaults to the LEGACY
+                                             pair (android_holo_light.res on an Android user agent,
+                                             iOS7Theme.res elsewhere) so existing screenshot
+                                             baselines stay comparable; iPhoneTheme.res is the
+                                             ios.themeMode=legacy opt-in. The modern themes
+                                             (iOSModernTheme.res / AndroidMaterialTheme.res) live in
+                                             Themes/ and are staged per target, not from here. -->
+                                        <exclude name="assets/leather.res"/>
+                                        <exclude name="assets/chrome.res"/>
+                                        <exclude name="assets/video.mp4"/>
+                                        <exclude name="assets/test.json"/>
+                                        <exclude name="assets/Page.html"/>
+                                        <exclude name="assets/Handlee-Regular.ttf"/>
+                                        <!-- The port test app's own theme (1.4MB). Real apps ship
+                                             their own theme.res at the bundle root, and
+                                             getResourceAsStream() deliberately prefers the root for
+                                             theme.res / CN1Resource.res, so this copy is never read
+                                             (confirmed against a running app: the root theme.res is
+                                             fetched, this one never is). Shipping it also keeps a
+                                             shadowing hazard alive for no benefit. -->
+                                        <exclude name="assets/theme.res"/>
+                                        <!-- No theme-resolution path yields tzone_theme.res; the one
+                                             mention of it in the port is inside a comment. -->
+                                        <exclude name="assets/tzone_theme.res"/>
+                                        <!-- The native themes come from Themes/ below instead of
+                                             from these copies, which drift: the webapp's
+                                             iPhoneTheme.res already differs from the Themes/ one. -->
+                                        <exclude name="assets/iOS7Theme.res"/>
+                                        <exclude name="assets/iPhoneTheme.res"/>
+                                        <exclude name="assets/android_holo_light.res"/>
+                                    </zipfileset>
+                                    <!-- Native themes, straight from the single source of truth in
+                                         Themes/ (kept in sync from the CSS sources by
+                                         .github/workflows/native-themes-sync.yml), the same way
+                                         maven/ios folds iOSModernTheme.res into nativeios.jar and
+                                         maven/javase copies the whole set onto its classpath.
+
+                                         All six ship because HTML5Implementation.
+                                         resolveNativeThemeResource() picks between them at RUNTIME
+                                         from the browser user agent plus the ios.themeMode /
+                                         and.themeMode / nativeTheme / javascript.native.theme
+                                         hints, so the build cannot know which one an app will
+                                         need: "modern" resolves to iOSModernTheme.res in an
+                                         iOS-like browser and AndroidMaterialTheme.res everywhere
+                                         else, and "legacy" to iPhoneTheme.res or androidTheme.res.
+                                         Shipping only some of them is why opting in used to fall
+                                         back to the legacy theme instead of applying. -->
+                                    <zipfileset dir="${project.basedir}/../../Themes" prefix="webapp/assets">
+                                        <include name="iOS7Theme.res"/>
+                                        <include name="iPhoneTheme.res"/>
+                                        <include name="iOSModernTheme.res"/>
+                                        <include name="androidTheme.res"/>
+                                        <include name="android_holo_light.res"/>
+                                        <include name="AndroidMaterialTheme.res"/>
                                     </zipfileset>
                                 </jar>
                                 <zip destfile="${project.build.directory}/${project.build.finalName}-bundle.jar">

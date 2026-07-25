@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codename1.tools.translator;
 
 import org.junit.jupiter.api.Test;
@@ -32,8 +55,10 @@ class JavascriptCn1CoreCompletenessTest {
         Path distDir = translateCn1CoreSlice(config);
         assertTrue(Files.exists(distDir.resolve("translated_app.js")),
                 "Translator should emit translated JS for the Codename One core slice");
-        assertTrue(Files.exists(distDir.resolve("vm_protocol.md")),
-                "Translator should emit the VM protocol artifact for the Codename One core slice");
+        // vm_protocol.md is a developer artifact and is no longer written into
+        // the bundle by default (it would ship into the app's public web root);
+        // -Dparparvm.js.diagnostics brings it back. "Did the translator run"
+        // is already covered by translated_app.js above.
 
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
         assertTrue(translatedApp.contains("JsCodenameOneCoreSliceApp"),
