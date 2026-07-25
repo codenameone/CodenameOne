@@ -1,0 +1,7 @@
+# The floating action button shadow has run-to-run anti-aliasing jitter on the
+# iOS GL simulator. Three independent runs differed in at most 4 channel values
+# across 0.279% of the frame while all geometry and the other 167 screenshots
+# matched. Keep the pre-tightening gate for this screen only; a real layout,
+# color, or missing-button regression still exceeds these narrow bounds.
+maxChannelDelta=4
+maxMismatchPercent=0.30
