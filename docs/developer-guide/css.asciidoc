@@ -216,7 +216,7 @@ Rounded borders can be achieved in a few different ways. The easiest methods are
 * **The `cn1-pill-border` style**. This will render a pill-shaped border in the background natively. This also doesn't require generation of an image border
 * **The `border-radius` property**. This will round the corners of the border. If the style can be achieved using the `RoundRectBorder` in CodenameOne, then it will use that border. If not, this will cause the style to be generated as an image border
 
-A border generated from `border-radius` follows the CSS box model, so the radius rounds the component without changing its size. A radius that is larger than the component scales down to fit it. This differs from a `RoundRectBorder` you create in Java, which grows the component to twice the radius so the corners are always drawn in full. Use `cn1-pill-border` when a shape has to stay a pill at any height.
+A border generated from `border-radius` follows the CSS box model, so the radius rounds the component without changing its size. A radius larger than the component scales down to fit it. This differs from a `RoundRectBorder` you create in Java, which grows the component to twice the radius so the corners are always drawn in full. Use `cn1-pill-border` when a shape has to stay a pill at any height.
 
 **Examples using `cn1-round-border`**
 
