@@ -12,7 +12,7 @@ import com.codename1.flutter.Widget;
  * convenience factories. This pass records the transform parameters and renders
  * the child untransformed; applying the matrix at paint time is deferred.
  */
-public class Transform extends StatelessWidget {
+public class Transform extends Widget {
 
     private Object transform;
     private Object origin;
@@ -103,9 +103,35 @@ public class Transform extends StatelessWidget {
         return t;
     }
 
+    /// The horizontal scale in effect: scaleX when given, else the uniform scale, else 1.
+    public double effectiveScaleX() {
+        if (scaleX != null) {
+            return scaleX.doubleValue();
+        }
+        return scale != null ? scale.doubleValue() : 1.0;
+    }
+
+    /// The vertical scale in effect: scaleY when given, else the uniform scale, else 1.
+    public double effectiveScaleY() {
+        if (scaleY != null) {
+            return scaleY.doubleValue();
+        }
+        return scale != null ? scale.doubleValue() : 1.0;
+    }
+
+    /// The rotation in radians, or null when this is not a rotation.
+    public Double effectiveAngle() {
+        return angle;
+    }
+
+    /// The translation, or null when this is not a translation.
+    public com.codename1.flutter.Offset effectiveOffset() {
+        return offset instanceof com.codename1.flutter.Offset
+                ? (com.codename1.flutter.Offset) offset : null;
+    }
+
     @Override
-    public Widget build(BuildContext context) {
-        com.codename1.flutter.FlutterErrorReport.unimplemented("Transform", "scale, rotation and translation are ignored");
-        return child;
+    public com.codename1.flutter.Element createElement() {
+        return new TransformRenderElement(this);
     }
 }

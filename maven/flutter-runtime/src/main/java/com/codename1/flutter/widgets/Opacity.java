@@ -10,7 +10,7 @@ import com.codename1.flutter.Widget;
  * this pass renders the child at full opacity, with alpha compositing deferred
  * to the paint layer.
  */
-public class Opacity extends StatelessWidget {
+public class Opacity extends Widget {
 
     private double opacity = 1.0;
     private Widget child;
@@ -35,8 +35,7 @@ public class Opacity extends StatelessWidget {
     }
 
     @Override
-    public Widget build(BuildContext context) {
-        com.codename1.flutter.FlutterErrorReport.unimplemented("Opacity", "opacity is ignored; the child paints fully opaque");
-        return child;
+    public com.codename1.flutter.Element createElement() {
+        return new OpacityRenderElement(this);
     }
 }
