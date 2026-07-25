@@ -28,6 +28,8 @@ public abstract class Element implements BuildContext {
     boolean mounted;
     BuildOwner owner;
     RenderHost host;
+    /** Ancestor-lookup continuation for a route root — see {@link #ancestorOf}. */
+    private Element contextFallback;
 
     protected Element(Widget widget) {
         this.widget = widget;
@@ -69,33 +71,59 @@ public abstract class Element implements BuildContext {
     // BuildContext
     // ------------------------------------------------------------------
 
+    /**
+     * The next element up for a {@code BuildContext} ancestor lookup: the
+     * structural parent, or — at the root of a tree pushed as a route — the
+     * context that pushed it.
+     *
+     * <p>In Flutter a route's page builds below the Navigator, so it inherits
+     * the whole app above it. Here a pushed route mounts as a fresh
+     * element-tree root (its own CN1 Form), so its structural parent chain
+     * ends immediately and every {@code Foo.of(context)} in the page would
+     * resolve to null. The fallback restores the inheritance without joining
+     * the two trees structurally — the render/host logic (which decides, for
+     * instance, whether a Scaffold owns the Form's Toolbar) still sees a
+     * genuine root.</p>
+     */
+    private static Element ancestorOf(Element e) {
+        return e.parent != null ? e.parent : e.contextFallback;
+    }
+
+    /**
+     * Links this root element's ancestor lookups to the context that pushed
+     * it. Set by the Navigator when mounting a route.
+     */
+    public void contextFallback(Element e) {
+        this.contextFallback = e;
+    }
+
     @Override
     public <W extends Widget> W findAncestorWidgetOfExactType(Class<W> widgetType) {
-        Element a = parent;
+        Element a = ancestorOf(this);
         while (a != null) {
             if (a.widget != null && a.widget.getClass() == widgetType) {
                 return widgetType.cast(a.widget);
             }
-            a = a.parent;
+            a = ancestorOf(a);
         }
         return null;
     }
 
     @Override
     public <W extends Widget> W dependOnInheritedWidgetOfExactType(Class<W> type) {
-        Element a = parent;
+        Element a = ancestorOf(this);
         while (a != null) {
             if (a.widget != null && type.isInstance(a.widget)) {
                 return type.cast(a.widget);
             }
-            a = a.parent;
+            a = ancestorOf(a);
         }
         return null;
     }
 
     @Override
     public Object providerValueOfType(Class<?> type) {
-        Element a = parent;
+        Element a = ancestorOf(this);
         while (a != null) {
             if (a.widget instanceof InheritedValueProvider) {
                 Object v = ((InheritedValueProvider) a.widget).providedValueFor(type);
@@ -103,7 +131,7 @@ public abstract class Element implements BuildContext {
                     return v;
                 }
             }
-            a = a.parent;
+            a = ancestorOf(a);
         }
         return null;
     }

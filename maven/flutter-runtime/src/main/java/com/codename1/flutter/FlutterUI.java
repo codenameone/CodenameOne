@@ -41,13 +41,23 @@ public final class FlutterUI {
      * are reachable.
      */
     public static RenderHost mountInNewForm(Widget root) {
+        return mountInNewForm(root, null);
+    }
+
+    /**
+     * As {@link #mountInNewForm(Widget)}, but the new tree's ancestor lookups
+     * continue from {@code contextFallback} once its own root is reached —
+     * how a pushed route inherits the app's Theme, Localizations and providers
+     * despite living in its own Form. See {@code Element.contextFallback}.
+     */
+    public static RenderHost mountInNewForm(Widget root, Element contextFallback) {
         assertEdt();
         Form f = new Form(new BorderLayout());
         RenderHost host = new RenderHost();
         host.form(f);
         Container c = new Container(new FlutterRootLayout(host));
         host.container(c);
-        mount(root, host, new BuildOwner());
+        mount(root, host, new BuildOwner(), contextFallback);
         f.add(BorderLayout.CENTER, c);
         return host;
     }
@@ -141,10 +151,22 @@ public final class FlutterUI {
      * tests (with a componentless RenderHost).
      */
     public static Element mount(Widget root, RenderHost host, BuildOwner owner) {
+        return mount(root, host, owner, null);
+    }
+
+    /**
+     * As {@link #mount(Widget, RenderHost, BuildOwner)}, with an ancestor-lookup
+     * continuation for the new root. It must be linked before the mount, since
+     * the first build runs there and may already do a {@code Foo.of(context)}.
+     */
+    public static Element mount(Widget root, RenderHost host, BuildOwner owner, Element contextFallback) {
         assertEdt();
         Element rootElement = root.createElement();
         host.rootElement(rootElement);
         rootElement.bootstrap(owner, host);
+        if (contextFallback != null) {
+            rootElement.contextFallback(contextFallback);
+        }
         rootElement.mount(null, 0);
         return rootElement;
     }

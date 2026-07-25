@@ -7,6 +7,8 @@ import com.codename1.flutter.rendering.Size;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.accessibility.AccessibilityAction;
+import com.codename1.ui.accessibility.AccessibilityRole;
 
 import dart.runtime.Funcs;
 
@@ -44,13 +46,54 @@ public class GestureOverlayRenderElement extends RenderElement {
             // headless unit tests: no CN1 components can exist
             return null;
         }
-        return new OverlayComponent();
+        Component c = new OverlayComponent();
+        publishSemantics(c);
+        return c;
+    }
+
+    @Override
+    protected void updateComponent(Component c) {
+        publishSemantics(c);
     }
 
     @Override
     protected Size performLayout(BoxConstraints constraints) {
         // The parent hands us tight constraints matching the child's bounds.
         return constraints.smallest();
+    }
+
+    /**
+     * Publishes the tap target to the accessibility tree.
+     *
+     * <p>The overlay is the only component that knows a subtree is tappable —
+     * the child it covers is ordinary content — so without this a
+     * GestureDetector/InkWell is invisible to screen readers and to anything
+     * driving the UI through semantics. Mirrors Flutter, which gives a
+     * GestureDetector with an onTap the button role and a tap action.</p>
+     */
+    private void publishSemantics(Component c) {
+        GestureDetector g = gesture();
+        if (g == null || g.getOnTap() == null) {
+            return;
+        }
+        try {
+            c.getSemantics()
+                    .setRole(AccessibilityRole.BUTTON)
+                    .addAction(new AccessibilityAction(AccessibilityAction.ACTIVATE, null,
+                            new AccessibilityAction.Handler() {
+                                @Override
+                                public boolean perform(Component component, Object argument) {
+                                    GestureDetector target = gesture();
+                                    if (target == null || target.getOnTap() == null) {
+                                        return false;
+                                    }
+                                    fire(target.getOnTap());
+                                    return true;
+                                }
+                            }));
+        } catch (Throwable t) {
+            // semantics are best-effort; never fail a build over them
+        }
     }
 
     class OverlayComponent extends Component {

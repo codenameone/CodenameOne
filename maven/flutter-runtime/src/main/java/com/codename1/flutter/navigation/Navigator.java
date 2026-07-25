@@ -120,7 +120,7 @@ public class Navigator extends StatelessWidget {
         RouteEntry e = new RouteEntry(route);
         if (Display.isInitialized()) {
             e.previousForm = Display.getInstance().getCurrent();
-            RenderHost host = FlutterUI.mountInNewForm(new RouteWidget(route));
+            RenderHost host = FlutterUI.mountInNewForm(new RouteWidget(route), pushingElement(context));
             e.form = host.form();
             e.rootElement = host.rootElement();
             Toolbar tb = e.form.getToolbar();
@@ -169,6 +169,80 @@ public class Navigator extends StatelessWidget {
         return stack.size();
     }
 
+    // --- Named routes ---------------------------------------------------------
+    // Flutter resolves a route NAME against the app's table: the `routes` map
+    // first, then onGenerateRoute, then onUnknownRoute. MaterialApp publishes
+    // its table here on build so a pushNamed from anywhere below can resolve it
+    // — the gallery reaches every one of its demos this way
+    // (Navigator.of(context).restorablePushNamed('/demo/<slug>')).
+
+    private static Object routesTable;
+    private static Funcs.Func1<RouteSettings, Route> generateRoute;
+    private static Funcs.Func1<RouteSettings, Route> unknownRoute;
+
+    /** Publishes the app's route table; called by MaterialApp on build. */
+    public static void installRouteTable(Object routes,
+            Funcs.Func1<RouteSettings, Route> onGenerateRoute,
+            Funcs.Func1<RouteSettings, Route> onUnknownRoute) {
+        routesTable = routes;
+        generateRoute = onGenerateRoute;
+        unknownRoute = onUnknownRoute;
+    }
+
+    /** Test / hot-restart hook: forgets the installed route table. */
+    public static void resetRouteTable() {
+        routesTable = null;
+        generateRoute = null;
+        unknownRoute = null;
+    }
+
+    /**
+     * Resolves a route name the way Flutter does — the {@code routes} map
+     * first, then {@code onGenerateRoute}, then {@code onUnknownRoute} — or
+     * null when nothing claims the name.
+     */
+    @SuppressWarnings("unchecked")
+    public static Route resolveRoute(String name, Object arguments) {
+        RouteSettings settings = new RouteSettings();
+        settings.name(name);
+        settings.arguments(arguments);
+
+        if (routesTable instanceof java.util.Map) {
+            Object builder = ((java.util.Map<Object, Object>) routesTable).get(name);
+            if (builder instanceof Funcs.Func1) {
+                MaterialPageRoute<Object> route = new MaterialPageRoute<Object>();
+                route.builder((Funcs.Func1<BuildContext, Widget>) builder);
+                route.settings(settings);
+                return route;
+            }
+        }
+        Route r = generateRoute != null ? generateRoute.call(settings) : null;
+        if (r == null && unknownRoute != null) {
+            r = unknownRoute.call(settings);
+        }
+        return r;
+    }
+
+    /**
+     * Resolves a route name and pushes it, returning whether anything was
+     * pushed. An unresolvable name is logged rather than thrown: a dead link
+     * in one corner of an app should not take the app down.
+     */
+    public static boolean pushNamed(BuildContext context, String name, Object arguments) {
+        Route route = resolveRoute(name, arguments);
+        if (route instanceof MaterialPageRoute) {
+            push(context, (MaterialPageRoute) route);
+            return true;
+        }
+        try {
+            com.codename1.io.Log.p("Flutter runtime: no route for '" + name + "'"
+                    + (route == null ? "" : " (unsupported route type " + route.getClass().getName() + ")"));
+        } catch (Throwable t) {
+            // headless: Log has no storage backend
+        }
+        return false;
+    }
+
     /**
      * Test / hot-restart hook: forgets all pushed routes without unmounting.
      */
@@ -186,14 +260,147 @@ public class Navigator extends StatelessWidget {
         public void pop(Object result) {
             Navigator.pop(null);
         }
+
+        @Override
+        public Object pushNamed(String routeName, Object arguments) {
+            Navigator.pushNamed(null, routeName, arguments);
+            return null;
+        }
+
+        @Override
+        public String restorablePushNamed(String routeName, Object arguments) {
+            Navigator.pushNamed(null, routeName, arguments);
+            // restoration is not persisted; the id is informational
+            return routeName == null ? "" : routeName;
+        }
+
+        @Override
+        public Object pushReplacementNamed(String routeName, Object arguments, Object result) {
+            Navigator.pop(null);
+            Navigator.pushNamed(null, routeName, arguments);
+            return null;
+        }
+
+        @Override
+        public Object push(Object route) {
+            if (route instanceof MaterialPageRoute) {
+                Navigator.push(null, (MaterialPageRoute) route);
+            }
+            return null;
+        }
+
+        @Override
+        public String restorablePush(
+                Funcs.Func2<BuildContext, Object, Object> routeBuilder, Object arguments) {
+            return Navigator.restorablePush(null, routeBuilder, arguments);
+        }
+
+        @Override
+        public Object maybePop(Object result) {
+            return Boolean.valueOf(Navigator.maybePop(null));
+        }
+
+        @Override
+        public boolean canPop() {
+            return !stack.isEmpty();
+        }
+
+        @Override
+        public void popUntil(Funcs.Func1<Route<Object>, Boolean> predicate) {
+            // Pop down to the first route the predicate accepts. With the base
+            // runApp route off the stack, an always-false predicate unwinds to it.
+            while (!stack.isEmpty()) {
+                Route<Object> top = (Route<Object>) stack.get(stack.size() - 1).route;
+                Boolean stop = predicate == null ? null : predicate.call(top);
+                if (stop != null && stop.booleanValue()) {
+                    return;
+                }
+                Navigator.pop(null);
+            }
+        }
     };
 
     /**
      * The nearest navigator's mutable state ({@code Navigator.of(context)}).
-     * There is one navigator per process, so the handle is context-independent.
+     * There is one navigator per process, but the handle REMEMBERS the calling
+     * context: a route pushed through it inherits that context's scopes (see
+     * {@code Element.contextFallback}), which is what makes Theme.of and
+     * Localizations.of resolve inside the pushed page.
      */
     public static NavigatorState of(BuildContext context, Boolean rootNavigator) {
-        return STATE;
+        if (context == null) {
+            return STATE;
+        }
+        return new BoundState(context);
+    }
+
+    /** The element a push should inherit from, or null when unknown. */
+    private static com.codename1.flutter.Element pushingElement(BuildContext context) {
+        return context instanceof com.codename1.flutter.Element
+                ? (com.codename1.flutter.Element) context : null;
+    }
+
+    /** A {@link NavigatorState} that pushes on behalf of a specific context. */
+    private static final class BoundState extends NavigatorState {
+
+        private final BuildContext context;
+
+        BoundState(BuildContext context) {
+            this.context = context;
+        }
+
+        @Override
+        public void pop(Object result) {
+            Navigator.pop(context);
+        }
+
+        @Override
+        public Object pushNamed(String routeName, Object arguments) {
+            Navigator.pushNamed(context, routeName, arguments);
+            return null;
+        }
+
+        @Override
+        public String restorablePushNamed(String routeName, Object arguments) {
+            Navigator.pushNamed(context, routeName, arguments);
+            return routeName == null ? "" : routeName;
+        }
+
+        @Override
+        public Object pushReplacementNamed(String routeName, Object arguments, Object result) {
+            Navigator.pop(context);
+            Navigator.pushNamed(context, routeName, arguments);
+            return null;
+        }
+
+        @Override
+        public Object push(Object route) {
+            if (route instanceof MaterialPageRoute) {
+                Navigator.push(context, (MaterialPageRoute) route);
+            }
+            return null;
+        }
+
+        @Override
+        public String restorablePush(
+                Funcs.Func2<BuildContext, Object, Object> routeBuilder, Object arguments) {
+            return Navigator.restorablePush(context, routeBuilder, arguments);
+        }
+
+        @Override
+        public Object maybePop(Object result) {
+            return Boolean.valueOf(Navigator.maybePop(context));
+        }
+
+        @Override
+        public boolean canPop() {
+            return !stack.isEmpty();
+        }
+
+        @Override
+        public void popUntil(Funcs.Func1<Route<Object>, Boolean> predicate) {
+            STATE.popUntil(predicate);
+        }
     }
 
     /**

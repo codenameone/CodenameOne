@@ -44,6 +44,7 @@ public class MaterialApp extends StatelessWidget {
     private Locale locale;
     private SystemUiOverlayStyle systemOverlayStyle;
     private Funcs.Func1<RouteSettings, Route> onGenerateRoute;
+    private Funcs.Func1<RouteSettings, Route> onUnknownRoute;
     private ScrollBehavior scrollBehavior;
     private Funcs.Func2<DartList<Locale>, DartIterable<Locale>, Locale> localeListResolutionCallback;
 
@@ -142,6 +143,14 @@ public class MaterialApp extends StatelessWidget {
      */
     public void onGenerateRoute(Funcs.Func1<RouteSettings, Route> v) {
         this.onGenerateRoute = v;
+    }
+
+    /**
+     * The last-resort route factory for a name neither {@link #routes} nor
+     * {@link #onGenerateRoute} could build — Flutter's {@code onUnknownRoute}.
+     */
+    public void onUnknownRoute(Funcs.Func1<RouteSettings, Route> v) {
+        this.onUnknownRoute = v;
     }
 
     /** The app-wide scroll behavior — Flutter's {@code scrollBehavior}. */
@@ -264,14 +273,17 @@ public class MaterialApp extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        // Publish the app's route table so Navigator.pushNamed(...) from anywhere
+        // below can resolve a name the same way this build does.
+        com.codename1.flutter.navigation.Navigator.installRouteTable(routes, onGenerateRoute, onUnknownRoute);
+
         Widget content = home;
         // A routing-based app (no home widget) renders its initial route — Flutter
         // calls onGenerateRoute with the initialRoute (default "/") and mounts the
         // resulting route's page. new_gallery relies on this entirely.
-        if (content == null && onGenerateRoute != null) {
-            RouteSettings settings = new RouteSettings();
-            settings.name(initialRoute != null ? initialRoute : "/");
-            Route route = onGenerateRoute.call(settings);
+        if (content == null) {
+            Route route = com.codename1.flutter.navigation.Navigator.resolveRoute(
+                    initialRoute != null ? initialRoute : "/", null);
             if (route instanceof MaterialPageRoute) {
                 Funcs.Func1<BuildContext, Widget> b = ((MaterialPageRoute) route).getBuilder();
                 if (b != null) {
