@@ -272,17 +272,25 @@ final class SettingsDiagnostics {
     }
 
     /**
-     * Counts components that would actually put ink on the screen. A collapsed
-     * layout (every text component measuring zero) and a healthy one are hard
-     * to tell apart from a colour histogram but differ sharply here.
+     * Counts leaf components that would actually put ink on the screen -
+     * visible and occupying a non-empty rectangle. A collapsed layout (every
+     * text component measuring zero) and a healthy one are hard to tell apart
+     * from a colour histogram but differ sharply here, so the count is only
+     * worth reading if hidden and zero-sized components stay out of it.
+     *
+     * A container that is hidden or has collapsed to nothing takes its whole
+     * subtree with it: its children cannot paint through it.
      */
     private static int countVisibleLeaves(Container root) {
         int count = 0;
         for (int iter = 0; iter < root.getComponentCount(); iter++) {
             Component child = root.getComponentAt(iter);
+            if (!child.isVisible() || child.getWidth() <= 0 || child.getHeight() <= 0) {
+                continue;
+            }
             if (child instanceof Container) {
                 count += countVisibleLeaves((Container) child);
-            } else if (child.getWidth() > 0 && child.getHeight() > 0) {
+            } else {
                 count++;
             }
         }
