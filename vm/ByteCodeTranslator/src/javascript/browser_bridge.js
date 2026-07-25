@@ -2396,11 +2396,16 @@
       var result = (0, eval)(src);
       return result == null ? null : String(result);
     } catch (err) {
+      // Log for the developer, then rethrow. The old in-worker
+      // ``@JSBody(script="eval(js)")`` let a broken script propagate into
+      // Java, and the host-call dispatcher turns a thrown handler error into
+      // an error callback -- so rethrowing keeps that contract instead of
+      // silently reporting success for a script that never ran.
       try {
         console.error('cn1 execute("javascript:") failed: '
             + (err && err.message ? err.message : err));
       } catch (ignored) { /* console unavailable */ }
-      return null;
+      throw err;
     }
   });
 
