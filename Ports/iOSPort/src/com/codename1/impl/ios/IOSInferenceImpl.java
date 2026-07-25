@@ -29,13 +29,13 @@ import com.codename1.ai.inference.Tensor;
 import com.codename1.ai.inference.TensorInfo;
 import com.codename1.ai.inference.TensorType;
 import com.codename1.impl.InferenceImpl;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.io.JSONParser;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
 
 import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
@@ -363,7 +363,7 @@ public final class IOSInferenceImpl extends InferenceImpl {
         }
         InputStream input;
         if (source.getKind() == ModelSource.FILE) {
-            input = new FileInputStream(source.getPath());
+            input = FileSystemStorage.getInstance().openInputStream(source.getPath());
         } else {
             input = Display.getInstance().getResourceAsStream(
                     IOSInferenceImpl.class, source.getPath());
