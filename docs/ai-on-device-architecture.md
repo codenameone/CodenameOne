@@ -107,6 +107,16 @@ Catalyst. The builders omit those package dependencies from a Mac-native
 build; language and inference consequently use their explicit unsupported
 stubs there.
 
+Google ML Kit's iOS binary frameworks contain device `arm64` and simulator
+`x86_64` slices, but no `arm64` simulator slice. Catalog entries declare that
+constraint independently from Catalyst support. When one of those entries is
+selected, both builders set
+`EXCLUDED_ARCHS[sdk=iphonesimulator*]=arm64` on the generated application and
+Pods projects. The repository's iOS UI and native-test runners also select
+`ARCHS=x86_64`, so Apple Silicon hosts use the supported simulator slice
+without requiring an application build hint. TensorFlow Lite's XCFramework
+does include an `arm64` simulator slice and does not trigger this fallback.
+
 ## Image and camera contract
 
 `VisionImage` owns defensive copies of its input. It accepts encoded JPEG or

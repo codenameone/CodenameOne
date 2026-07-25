@@ -625,6 +625,18 @@ case "$HOST_ARCH" in
   arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
   *) BUILD_ARCH="arm64" ;;
 esac
+SIMULATOR_EXCLUDED_ARCHS="armv7 armv7s"
+FORCE_SIMULATOR_ARCH="false"
+PODFILE_LOCK="$(dirname "$WORKSPACE_PATH")/Podfile.lock"
+if [ -f "$PODFILE_LOCK" ] && grep -q "GoogleMLKit/" "$PODFILE_LOCK"; then
+  # Google ML Kit's iOS binaries contain a device arm64 slice and an
+  # x86_64 simulator slice, but no arm64 simulator slice. Xcode otherwise
+  # selects arm64 on Apple Silicon and the linker rejects the device object.
+  BUILD_ARCH="x86_64"
+  SIMULATOR_EXCLUDED_ARCHS="arm64 armv7 armv7s"
+  FORCE_SIMULATOR_ARCH="true"
+  ri_log "Google ML Kit detected; selecting its supported x86_64 simulator slice"
+fi
 
 # A shared/stable derived-data dir can be supplied via CN1_IOS_DERIVED_DATA so the compiled
 # app + core are reused by a later step in the same job (e.g. the native test build) and across
@@ -652,12 +664,12 @@ XCODE_BUILD_CMD=(
   -destination-timeout 120
   -derivedDataPath "$DERIVED_DATA_DIR"
 )
-if [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ]; then
-  ri_log "Forcing simulator ARCHS=$BUILD_ARCH for generic build destination"
+if [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ] || [ "$FORCE_SIMULATOR_ARCH" = "true" ]; then
+  ri_log "Forcing simulator ARCHS=$BUILD_ARCH"
   XCODE_BUILD_CMD+=(
     "ARCHS=$BUILD_ARCH"
     "ONLY_ACTIVE_ARCH=YES"
-    "EXCLUDED_ARCHS=armv7 armv7s"
+    "EXCLUDED_ARCHS=$SIMULATOR_EXCLUDED_ARCHS"
   )
 fi
 # Optimize the translated C (Xcode's Debug config defaults to -O0). With -O0 the

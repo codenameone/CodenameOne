@@ -91,6 +91,7 @@ public final class PlatformFeatureCatalog {
                 .requiresMethod("com/codename1/ai/vision/VisionBackends", "mlKit")
                 .iosPod("GoogleMLKit/TextRecognition")
                 .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS text-recognition backend"));
 
         e.add(new Entry("com/codename1/ai/vision/BarcodeScanner")
@@ -101,6 +102,7 @@ public final class PlatformFeatureCatalog {
                 .requiresMethod("com/codename1/ai/vision/VisionBackends", "mlKit")
                 .iosPod("GoogleMLKit/BarcodeScanning")
                 .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS barcode backend"));
 
         e.add(new Entry("com/codename1/ai/vision/FaceDetector")
@@ -111,6 +113,7 @@ public final class PlatformFeatureCatalog {
                 .requiresMethod("com/codename1/ai/vision/VisionBackends", "mlKit")
                 .iosPod("GoogleMLKit/FaceDetection")
                 .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS face-detection backend"));
 
         e.add(new Entry("com/codename1/ai/vision/ImageLabeler")
@@ -121,6 +124,7 @@ public final class PlatformFeatureCatalog {
                 .requiresMethod("com/codename1/ai/vision/VisionBackends", "mlKit")
                 .iosPod("GoogleMLKit/ImageLabeling")
                 .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS image-labeling backend"));
 
         e.add(new Entry("com/codename1/ai/vision/PoseDetector")
@@ -131,6 +135,7 @@ public final class PlatformFeatureCatalog {
                 .requiresMethod("com/codename1/ai/vision/VisionBackends", "mlKit")
                 .iosPod("GoogleMLKit/PoseDetection")
                 .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS pose-detection backend"));
 
         e.add(new Entry("com/codename1/ai/vision/SelfieSegmenter")
@@ -142,6 +147,7 @@ public final class PlatformFeatureCatalog {
                 .requiresMethod("com/codename1/ai/vision/VisionBackends", "mlKit")
                 .iosPod("GoogleMLKit/SegmentationSelfie")
                 .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS selfie-segmentation backend"));
 
         e.add(new Entry("com/codename1/ai/vision/DocumentScanner")
@@ -161,16 +167,19 @@ public final class PlatformFeatureCatalog {
         e.add(new Entry("com/codename1/ai/language/LanguageIdentifier")
                 .iosPod("GoogleMLKit/LanguageID")
                 .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
                 .androidGradle("com.google.mlkit:language-id:17.0.6")
                 .description("On-device language identification"));
         e.add(new Entry("com/codename1/ai/language/Translator")
                 .iosPod("GoogleMLKit/Translate")
                 .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
                 .androidGradle("com.google.mlkit:translate:17.0.3")
                 .description("On-device translation"));
         e.add(new Entry("com/codename1/ai/language/SmartReply")
                 .iosPod("GoogleMLKit/SmartReply")
                 .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
                 .androidGradle("com.google.mlkit:smart-reply:17.0.4")
                 .description("On-device smart reply"));
 
@@ -336,6 +345,7 @@ public final class PlatformFeatureCatalog {
         private final List<String> androidFeatures = new ArrayList<String>();
         private final List<String[]> androidMetaData = new ArrayList<String[]>();
         private boolean iosDependenciesSupportMacCatalyst = true;
+        private boolean iosDependenciesSupportArm64Simulator = true;
         private boolean requiresBigUpload;
         private String description = "";
 
@@ -395,6 +405,11 @@ public final class PlatformFeatureCatalog {
 
         Entry iosDependenciesUnsupportedOnMacCatalyst() {
             iosDependenciesSupportMacCatalyst = false;
+            return this;
+        }
+
+        Entry iosDependenciesUnsupportedOnArm64Simulator() {
+            iosDependenciesSupportArm64Simulator = false;
             return this;
         }
 
@@ -462,6 +477,15 @@ public final class PlatformFeatureCatalog {
          */
         public boolean iosDependenciesSupportMacCatalyst() {
             return iosDependenciesSupportMacCatalyst;
+        }
+
+        /**
+         * Whether this entry's CocoaPod/SPM payload has an arm64 iOS
+         * Simulator slice. Dependencies that return {@code false} still
+         * support the x86_64 simulator.
+         */
+        public boolean iosDependenciesSupportArm64Simulator() {
+            return iosDependenciesSupportArm64Simulator;
         }
 
         public List<String> iosFrameworks() {

@@ -56,6 +56,10 @@ class PlatformFeatureCatalogTest {
             foundTextPod |= e.iosPods().contains("GoogleMLKit/TextRecognition");
             assertFalse(e.iosPods().contains("GoogleMLKit/FaceDetection"),
                     "Unused vision features must not be bundled");
+            if (!e.iosPods().isEmpty()) {
+                assertFalse(e.iosDependenciesSupportArm64Simulator(),
+                        "Google ML Kit binaries require the x86_64 iOS simulator");
+            }
         }
         assertTrue(foundTextPod);
     }
@@ -191,6 +195,8 @@ class PlatformFeatureCatalogTest {
         assertTrue(e.iosSpmSpecs().isEmpty());
         assertFalse(e.iosDependenciesSupportMacCatalyst(),
                 "The official TensorFlow Lite Objective-C XCFramework has no Catalyst slice");
+        assertTrue(e.iosDependenciesSupportArm64Simulator(),
+                "TensorFlow Lite's XCFramework includes an arm64 simulator slice");
     }
 
     @Test

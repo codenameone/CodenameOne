@@ -799,6 +799,7 @@ public class IPhoneBuilder extends Executor {
         // SPM specs, plist defaults and Android perms -- so the user
         // doesn't have to declare them by hand.
         final PlatformFeatureCatalog.Accumulator aiAcc = new PlatformFeatureCatalog.Accumulator();
+        boolean excludeArm64Simulator = false;
 
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
@@ -1034,14 +1035,19 @@ public class IPhoneBuilder extends Executor {
             boolean projectPrefersSpm = dependencyConfig.usesSwiftPackages() && !dependencyConfig.usesCocoaPods();
             StringBuilder spmPackages = new StringBuilder(request.getArg("ios.spm.packages", ""));
             for (PlatformFeatureCatalog.Entry entry : aiAcc.hits()) {
-                // Google ML Kit and TensorFlowLiteObjC publish iOS/device and
-                // simulator slices, but not Mac Catalyst slices. Keep the
-                // framework-only Apple Vision implementation enabled for
-                // macNative while leaving language/inference on their safe
-                // unsupported native stubs.
+                // Third-party AI packages may omit Catalyst or arm64
+                // simulator slices. Keep framework-only Apple Vision enabled
+                // for macNative and record the simulator constraint for the
+                // generated Xcode and Pods projects.
                 boolean includeApplePackageDependencies =
                         !macNativeBuilder.isEnabled()
                         || entry.iosDependenciesSupportMacCatalyst();
+                if (includeApplePackageDependencies
+                        && !entry.iosDependenciesSupportArm64Simulator()
+                        && (!entry.iosPods().isEmpty()
+                        || !entry.iosSpmSpecs().isEmpty())) {
+                    excludeArm64Simulator = true;
+                }
                 boolean handledViaSpm = false;
                 if (includeApplePackageDependencies
                         && projectPrefersSpm
@@ -3117,6 +3123,9 @@ public class IPhoneBuilder extends Executor {
                         targetStr = "8.0";
                     }
                     addMinDeploymentTarget(targetStr);
+                    String simulatorArchitectureSettings = excludeArm64Simulator
+                            ? "      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'\n"
+                            : "";
                     deploymentTargetStr = "begin\n"
                             + "  xcproj.targets.find{|e|e.name=='" + request.getMainClass() + "'}.build_configurations.each{|config| \n"
                             + "    config.build_settings['PRODUCT_BUNDLE_IDENTIFIER']='"+request.getPackageName()+"'\n"
@@ -3133,6 +3142,7 @@ public class IPhoneBuilder extends Executor {
                             + "    next if target.respond_to?(:product_type) && target.product_type == 'com.apple.product-type.app-extension'\n"
                             + "    target.build_configurations.each do |config|\n"
                             + "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '" + getDeploymentTarget(request) + "'\n"
+                            + simulatorArchitectureSettings
                             + "    end\n"
                             + "  end\n"
                             + "  xcproj.save\n"
@@ -3483,6 +3493,14 @@ public class IPhoneBuilder extends Executor {
 
                     if (useMetal) {
                         buildSettings += "      config.build_settings['CLANG_ENABLE_MODULES'] = \"YES\"\n";
+                    }
+                    if (excludeArm64Simulator) {
+                        // Google ML Kit's binary frameworks contain device
+                        // arm64 and simulator x86_64 slices. Apply the same
+                        // exclusion to every pod target so CocoaPods doesn't
+                        // drop its conflicting per-pod setting while merging
+                        // the aggregate xcconfig.
+                        buildSettings += "      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = \"arm64\"\n";
                     }
 
 
