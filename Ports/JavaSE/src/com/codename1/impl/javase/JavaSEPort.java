@@ -2944,6 +2944,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
         private BufferedImage updateBufferSize(BufferedImage buffer) {
+            BufferedImage previous = buffer;
             if (getScreenCoordinates() == null) {
                 java.awt.Dimension d = getSize();
                 if (buffer == null || buffer.getWidth() != (int)(d.width * retinaScale) || buffer.getHeight() != (int)(d.height*retinaScale)) {
@@ -2955,9 +2956,39 @@ public class JavaSEPort extends CodenameOneImplementation {
                     buffer = createBufferedImage();
                 }
             }
+            if (previous != null && buffer != previous) {
+                invalidateScreenAfterSurfaceSwap();
+            }
             return buffer;
         }
-        
+
+        /**
+         * A replacement buffer starts out blank - TYPE_INT_RGB, so literally
+         * black - and nothing else marks the form dirty. The next
+         * {@code paintDirty()} only refills the components that happen to be in
+         * the dirty list, so unless something coincidentally repaints the whole
+         * form the window is left as an unpainted black surface with a stray
+         * component or two floating in it (issue #5443). Nothing on the screen
+         * survived the swap, so everything is dirty: say so.
+         *
+         * <p>Queued rather than repainted inline because this runs in the
+         * middle of acquiring the paint graphics - the EDT may be iterating the
+         * dirty list right now - and from the AWT thread inside blit().</p>
+         */
+        private void invalidateScreenAfterSurfaceSwap() {
+            if (!Display.isInitialized()) {
+                return;
+            }
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    Form f = getCurrentForm();
+                    if (f != null) {
+                        f.repaint();
+                    }
+                }
+            });
+        }
+
         private void updateEdtBufferSize() {
             edtBuffer = updateBufferSize(edtBuffer);
         }

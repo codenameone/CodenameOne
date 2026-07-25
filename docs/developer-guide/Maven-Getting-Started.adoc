@@ -330,6 +330,18 @@ Settings shields you from the details of how it installs extensions. For extensi
 You shouldn't need to worry about this, as it happens seamlessly. If you're curious, you can look at the `<dependencies>` section of your common/pom.xml file to see the added `<dependency>` tag after you install an extension.
 ****
 
+[#settings-window-renders-nothing]
+===== If the Settings window opens blank
+
+Settings is a Codename One app hosted in a native window, so a window that opens but shows nothing can come from the window layer, the display scale, the theme, or font loading. Capture the render state and attach it to a bug report rather than guessing:
+
+[source,shell]
+----
+mvn cn1:settings -Dsettings.diagnostics=cn1-settings-diagnostics.txt
+----
+
+The file records the OS and JDK, the HiDPI scale the JVM reports, the window and canvas geometry, the size Codename One laid the form out at, and the colours and font metrics resolved for the theme. Add `-Dsettings.screenshot=shot.png` to also write the window contents; a second `shot.onscreen.png` captures the pixels actually on screen, which can differ from the offscreen paint. The launch log is at `~/.codenameoneSettings/settings.log`.
+
 ==== Installing legacy cn1libs
 
 The recommended approach for installing add-ons is to use <<managing-addons-in-control-center,Codename One Settings>> or <<maven-dependency-example,add the Maven dependency to `common/pom.xml`>>. In some situations neither method is available. For example, you might have a legacy cn1lib file that isn't listed in the extension catalog or deployed to Maven Central.
