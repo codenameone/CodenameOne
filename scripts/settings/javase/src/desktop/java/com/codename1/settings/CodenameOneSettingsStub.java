@@ -45,6 +45,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
@@ -296,18 +297,33 @@ public class CodenameOneSettingsStub implements Runnable, WindowListener {
         // handoff in this direction can deadlock. A timeout is not a failure
         // to report - a wedged EDT is exactly the kind of thing this dump
         // exists to catch, so say so in the file.
+        //
+        // Exactly one of the two writers may touch the file. A merely slow EDT
+        // can run its probe after the timeout has already written the fallback,
+        // and overwriting it would throw away the stack dump naming whatever
+        // the EDT was stuck on - the reason the fallback exists.
         final CountDownLatch done = new CountDownLatch(1);
+        final AtomicBoolean claimed = new AtomicBoolean(false);
         Display.getInstance().callSerially(() -> {
             try {
-                SettingsDiagnostics.write(target, frm);
+                if (claimed.compareAndSet(false, true)) {
+                    SettingsDiagnostics.write(target, frm);
+                }
             } finally {
                 done.countDown();
             }
         });
         try {
-            if (!done.await(10, TimeUnit.SECONDS)) {
-                SettingsDiagnostics.writeUnresponsiveEdt(target, frm);
+            if (done.await(10, TimeUnit.SECONDS)) {
+                return;
             }
+            if (!claimed.compareAndSet(false, true)) {
+                // The EDT claimed the report just as we timed out and is still
+                // writing it; let it finish rather than racing it to the file.
+                done.await(10, TimeUnit.SECONDS);
+                return;
+            }
+            SettingsDiagnostics.writeUnresponsiveEdt(target, frm);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         }
