@@ -90,34 +90,12 @@ public abstract class Element implements BuildContext {
     }
 
     /**
-     * Whether {@code o} is an instance of {@code type}, checked by
-     * {@code Class.isInstance} and, failing that, by walking the object's own
-     * superclass chain.
-     *
-     * <p>The whole inherited-widget mechanism rests on this one predicate, and
-     * a backend where the reflective form answers incorrectly takes every
-     * {@code Foo.of(context)} down with it. The superclass walk needs no
-     * reflection beyond {@code getClass()}/{@code getSuperclass()} and answers
-     * the same question, so the two together are far harder to break than
-     * either alone.</p>
+     * Whether {@code o} is an instance of {@code type} — the single predicate
+     * the whole inherited-widget mechanism rests on, kept in one place so any
+     * future portability question about it has exactly one answer to change.
      */
     public static boolean isInstanceOf(Class<?> type, Object o) {
-        if (type == null || o == null) {
-            return false;
-        }
-        try {
-            if (type.isInstance(o)) {
-                return true;
-            }
-        } catch (Throwable ignore) {
-            // fall through to the explicit walk
-        }
-        for (Class<?> c = o.getClass(); c != null; c = c.getSuperclass()) {
-            if (c == type) {
-                return true;
-            }
-        }
-        return false;
+        return type != null && o != null && type.isInstance(o);
     }
 
     /**
