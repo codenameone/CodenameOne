@@ -203,6 +203,8 @@ public class AnimationController extends Animation<Double> {
     public void stop(Boolean canceled) {
         running = false;
         generation++;
+        // Leave the frame clock immediately; it stops itself once nothing is running.
+        FrameDriver.remove(this);
     }
 
     public void reset() {
@@ -248,27 +250,32 @@ public class AnimationController extends Animation<Double> {
     }
 
     private void scheduleTick(final int gen) {
-        CN.setTimeout(16, new Runnable() {
-            @Override
-            public void run() {
-                tick(gen);
-            }
-        });
+        // Join the shared frame clock rather than chaining a timer of our own: N
+        // animations then cost one wakeup and one build flush per frame between them.
+        FrameDriver.add(this);
     }
 
-    private void tick(int gen) {
-        if (gen != generation || !running) {
+    /**
+     * Advances this animation to the current time. Called once per frame by
+     * {@link FrameDriver}; finishing removes it from the clock.
+     */
+    void advance() {
+        if (!running) {
+            FrameDriver.remove(this);
             return;
         }
+        int gen = generation;
         long elapsed = now() - runStartTime;
         double t = runDurationMs == 0 ? 1.0 : (double) elapsed / (double) runDurationMs;
         if (t >= 1.0) {
             finishRun(gen);
+            if (!running) {
+                FrameDriver.remove(this);
+            }
             return;
         }
         currentValue = runStartValue + (runTargetValue - runStartValue) * t;
         notifyListeners();
-        scheduleTick(gen);
     }
 
     private void finishRun(int gen) {
