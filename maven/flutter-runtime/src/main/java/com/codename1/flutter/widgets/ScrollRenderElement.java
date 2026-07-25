@@ -139,6 +139,7 @@ public abstract class ScrollRenderElement extends RenderElement {
     private Size layoutVertical(BoxConstraints constraints) {
         RenderElement c = contentRender();
         double width = constraints.hasBoundedWidth() ? constraints.maxWidth() : 0;
+        viewport(width, constraints.hasBoundedHeight() ? constraints.maxHeight() : 0);
         Size cs = Size.ZERO;
         if (c != null) {
             cs = c.layout(constraints.hasBoundedWidth()
@@ -157,10 +158,21 @@ public abstract class ScrollRenderElement extends RenderElement {
         return constraints.constrain(new Size(width, height));
     }
 
+    /**
+     * The viewport this scrollable presents, reported BEFORE the content is
+     * laid out. Content that needs to size itself against the viewport (a
+     * PageView's pages take a fraction of it) cannot read {@code size()} — that
+     * is only assigned after this layout returns, so it would see a stale or
+     * zero extent.
+     */
+    protected void viewport(double width, double height) {
+    }
+
     /** The vertical contract with the axes swapped. */
     private Size layoutHorizontal(BoxConstraints constraints) {
         RenderElement c = contentRender();
         double height = constraints.hasBoundedHeight() ? constraints.maxHeight() : 0;
+        viewport(constraints.hasBoundedWidth() ? constraints.maxWidth() : 0, height);
         Size cs = Size.ZERO;
         if (c != null) {
             cs = c.layout(constraints.hasBoundedHeight()

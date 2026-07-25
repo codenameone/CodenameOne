@@ -46,6 +46,15 @@ public class PageViewRenderElement extends ScrollRenderElement {
         return true;
     }
 
+    private double viewportW;
+    private double viewportH;
+
+    @Override
+    protected void viewport(double width, double height) {
+        viewportW = width;
+        viewportH = height;
+    }
+
     /** The fraction of the viewport one page occupies (Flutter's default is 1). */
     private double viewportFraction() {
         PageController c = pageView().getController();
@@ -115,22 +124,23 @@ public class PageViewRenderElement extends ScrollRenderElement {
         }
 
         /**
-         * Measures the VIEWPORT, not the incoming constraints: inside a scroll
-         * boundary the main axis is unbounded by construction, so a page has to
-         * read the pane's own size to know what a fraction of the viewport is.
+         * Sizes against the VIEWPORT, not the incoming constraints: inside a
+         * scroll boundary the main axis is unbounded by construction, so a page
+         * has to know the pane's extent to take a fraction of it. The extent
+         * comes from {@link #viewport}, reported before this layout runs —
+         * {@code size()} is not assigned yet at this point.
          */
         @Override
         protected Size performLayout(BoxConstraints constraints) {
-            Size viewport = PageViewRenderElement.this.size();
             double fraction = viewportFraction();
             double w;
             double h;
             if (horizontal()) {
-                w = viewport.width() * fraction;
-                h = constraints.hasBoundedHeight() ? constraints.maxHeight() : viewport.height();
+                w = viewportW * fraction;
+                h = constraints.hasBoundedHeight() ? constraints.maxHeight() : viewportH;
             } else {
-                h = viewport.height() * fraction;
-                w = constraints.hasBoundedWidth() ? constraints.maxWidth() : viewport.width();
+                h = viewportH * fraction;
+                w = constraints.hasBoundedWidth() ? constraints.maxWidth() : viewportW;
             }
             RenderElement c = renderChild();
             if (c != null) {

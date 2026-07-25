@@ -1,18 +1,17 @@
 package com.codename1.flutter.widgets;
 
-import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.Widget;
 import com.codename1.flutter.rendering.CustomPainter;
 import com.codename1.flutter.rendering.Size;
 
 /**
  * Provides a canvas for a {@link CustomPainter} to paint on, behind and/or in
- * front of an optional {@code child} — Flutter's {@code CustomPaint}. This pass
- * renders the child (or reserves {@code size} when there is none); driving the
- * painter's {@code paint(Canvas, Size)} is deferred to the paint layer.
+ * front of an optional {@code child} — Flutter's {@code CustomPaint}. The
+ * painters run against a Codename One {@code Graphics} through
+ * {@link com.codename1.flutter.rendering.GraphicsCanvas}; see
+ * {@link CustomPaintRenderElement}.
  */
-public class CustomPaint extends StatelessWidget {
+public class CustomPaint extends Widget {
 
     private CustomPainter painter;
     private CustomPainter foregroundPainter;
@@ -45,15 +44,22 @@ public class CustomPaint extends StatelessWidget {
         return painter;
     }
 
+    /** The painter drawn OVER the child — Flutter's {@code foregroundPainter}. */
+    public CustomPainter getForegroundPainter() {
+        return foregroundPainter;
+    }
+
+    /** The box the painter asks for when there is no child, in logical pixels. */
+    public Size getSize() {
+        return size;
+    }
+
     public Widget getChild() {
         return child;
     }
 
     @Override
-    public Widget build(BuildContext context) {
-        if (child != null) {
-            return child;
-        }
-        return new SizedBox();
+    public com.codename1.flutter.Element createElement() {
+        return new CustomPaintRenderElement(this);
     }
 }
