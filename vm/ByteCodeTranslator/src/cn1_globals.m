@@ -997,7 +997,7 @@ static void cn1GraceAuditLegacy(CODENAME_ONE_THREAD_STATE);
 // page/extent index it classifies against).
 static int cn1GcVerifyActive;
 void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE);
-void cn1GcVerifyChild(JAVA_OBJECT child);
+void cn1GcVerifyChild(JAVA_OBJECT child, void* markSite);
 void cn1GcVerifyPoisonSlot(JAVA_OBJECT o, int slotSize);
 JAVA_BOOLEAN cn1GcVerifyQuarantineFree(JAVA_OBJECT obj);
 #endif
@@ -3991,7 +3991,11 @@ static void cn1GcVerifyCensus(JAVA_OBJECT o, int m) {
 
 // The verify-mode substitute for marking: called from gcMarkObject for every
 // reference field of every surviving object.
-void cn1GcVerifyChild(JAVA_OBJECT child) {
+// markSite is captured by the CALLER (gcMarkObject), where the return address
+// is the instruction inside the generated mark function that read this field.
+// Reading it here instead would name gcMarkObject itself -- one frame too deep,
+// and useless for mapping a violation back to a field.
+void cn1GcVerifyChild(JAVA_OBJECT child, void* markSite) {
     CN1BibopPage* pg = 0;
     int idx = -1;
     cn1GcVerifyChecked++;
@@ -4045,6 +4049,13 @@ void cn1GcVerifyChild(JAVA_OBJECT child) {
         return;
     }
     cn1GcVerifyReported++;
+    // The holder's own mark function is the frame markSite points into (for an
+    // array element it is gcMarkArrayObject, the array's mark function), so the
+    // offset is small and positive -- which is also what makes the address
+    // usable: add it to the mark function's symbol to reach the exact field.
+    void* holderFn = (cn1GcVerifyHolder != JAVA_NULL
+                      && cn1GcVerifyHolder->__codenameOneParentClsReference != 0)
+        ? (void*)cn1GcVerifyHolder->__codenameOneParentClsReference->markFunction : (void*)0;
     const char* what = st == CN1_GC_VS_FREE_SLOT ? "FREED BiBOP slot"
                      : st == CN1_GC_VS_STALE_SLOT ? "RECYCLED page slot (above bump cursor)"
                      : st == CN1_GC_VS_DEAD_AGE ? "object AGED OUT by this sweep (mark below the free threshold)"
@@ -4054,7 +4065,7 @@ void cn1GcVerifyChild(JAVA_OBJECT child) {
         "            holder  = %p class=%s mark=%d (epoch%+d) heapPos=%d\n"
         "            field   -> %p class=%s mark=%d heapPos=%d\n"
         "            victim  = %s%s\n"
-        "            markSite= %p (address of the generated mark function's call site)\n",
+        "            markSite= %p = %s+%ld (the field read, inside the holder's mark function)\n",
         currentGcMarkValue,
         (void*)cn1GcVerifyHolder, cn1GcVerifyClsName(cn1GcVerifyHolder),
         cn1GcVerifyHolder != JAVA_NULL ? cn1GcVerifyHolder->__codenameOneGcMark : 0,
@@ -4065,7 +4076,8 @@ void cn1GcVerifyChild(JAVA_OBJECT child) {
         child->__codenameOneGcMark, child->__heapPosition,
         what,
         pg != 0 ? " (page-resident)" : "",
-        __builtin_return_address(0));
+        markSite, holderFn != 0 ? "markFn" : "?",
+        holderFn != 0 ? (long)((char*)markSite - (char*)holderFn) : 0L);
     fflush(stderr);
 }
 
@@ -5023,7 +5035,11 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // conservative-resolve guard below -- that guard SKIPS exactly the dangling
     // pointers the verifier exists to catch.
     if(cn1GcVerifyActive) {
-        cn1GcVerifyChild(obj);
+        // Capture the call site HERE: this frame's return address is inside the
+        // generated mark function (or gcMarkArrayObject for an element), which
+        // is what addr2line/atos needs to name the field. cn1GcVerifyChild
+        // cannot obtain it -- from there this frame is in the way.
+        cn1GcVerifyChild(obj, __builtin_return_address(0));
         return;
     }
 #endif
