@@ -77,6 +77,14 @@ public class PageViewRenderElement extends ScrollRenderElement {
             }
         }
         if (horizontal()) {
+            // A viewportFraction below 1 CENTRES the current page: Flutter rests the
+            // scroll at -(1-f)*viewport/2, so page 0 sits inset with its neighbour
+            // peeking. Without this leading gap the first page is flush against the
+            // leading edge and all the slack piles up on the trailing side.
+            if (viewportFraction() < 1) {
+                items.insert(0, new PageGap());
+                items.add(new PageGap());
+            }
             Row row = new Row();
             row.crossAxisAlignment(CrossAxisAlignment.stretch);
             row.mainAxisSize(MainAxisSize.min);
@@ -88,6 +96,33 @@ public class PageViewRenderElement extends ScrollRenderElement {
         col.mainAxisSize(MainAxisSize.min);
         col.children(items);
         return col;
+    }
+
+    /**
+     * The leading/trailing slack that centres the resting page.
+     *
+     * <p>Measured at LAYOUT time, not build time: {@code buildContent} runs before the
+     * viewport is known, so a gap sized during the build would always compute to zero.
+     * Same reason the pages themselves size from {@link #viewport}.</p>
+     */
+    private final class PageGap extends Widget {
+        @Override
+        public Element createElement() {
+            return new PageGapElement(this);
+        }
+    }
+
+    private final class PageGapElement extends RenderElement {
+        PageGapElement(PageGap widget) {
+            super(widget);
+        }
+
+        @Override
+        protected Size performLayout(BoxConstraints constraints) {
+            double slack = viewportW * (1 - viewportFraction()) / 2;
+            return new Size(Math.max(0, slack),
+                    constraints.hasBoundedHeight() ? constraints.maxHeight() : 0);
+        }
     }
 
     /**
