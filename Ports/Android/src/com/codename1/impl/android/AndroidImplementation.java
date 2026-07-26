@@ -11965,6 +11965,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return new SocketImpl().listen(port, true);
     }
 
+    /**
+     * A debuggable package is one built for development: the flag is set by the
+     * build for a debug variant and cleared for a release variant, so this reads the
+     * distinction straight off the installed application rather than guessing.
+     */
+    @Override
+    public boolean isDebuggableBuild() {
+        Context ctx = getContext();
+        if (ctx == null) {
+            return false;
+        }
+        ApplicationInfo info = ctx.getApplicationInfo();
+        return info != null && (info.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+    }
+
     @Override
     public String getHostOrIP() {
         try {

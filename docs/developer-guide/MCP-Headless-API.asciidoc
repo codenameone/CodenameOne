@@ -4,7 +4,7 @@ The Model Context Protocol (MCP) headless API lets an application expose itself 
 
 The API reuses the accessibility semantics tree. The same immutable tree that describes the screen to VoiceOver and TalkBack also describes it to the agent, so any application is drivable without extra code. Application specific data and actions are exposed through the existing `com.codename1.ai.Tool` contract.
 
-The API is supported by the JavaSE port, which powers the simulator and the desktop tooling. It's not part of a packaged application build, and it's inert on mobile and web targets.
+The socket transport runs anywhere the port can bind the loopback interface, which includes an application running on a device, so an agent can attach to a build on a phone as well as to the simulator. It's blocked on a release build; see <<Development builds only>>. The stdio transport needs process standard input and so is supported by the JavaSE port, which powers the simulator and the desktop tooling.
 
 == The MCP menu
 
@@ -33,6 +33,29 @@ A tool that a host launches as a subprocess can serve over standard input and ou
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-start-stdio,indent=0]
 
 The stdio transport is the standard MCP local transport, exchanging newline delimited JSON-RPC messages. While it runs, application logging is redirected away from standard output so it can't corrupt the protocol stream. The stdio transport lives in the JavaSE port because it needs process standard input, which isn't available on every target.
+
+[[Development builds only]]
+== Development builds only
+
+The socket server refuses to bind on a release build and throws an `IllegalStateException` instead.
+
+The reason is what an attached agent can do. It reads the screen and drives the user interface, and the loopback interface is shared by everything on the device rather than being private to one application. On a phone that means any other installed application can connect to the port and drive yours. That's a reasonable trade while you're developing, because it's how an agent attaches to a running build, and a poor one in an application a user installs.
+
+A development build is a debuggable Android package, a development provisioned iOS build, or the simulator and the desktop tooling. Anything else counts as a release build, so a port that can't tell the difference withholds the server rather than exposing it.
+
+Nothing binds a port unless the application calls a starter, and an application that never calls one has no server at all. The gate matters for the case where a starter is left in the code by accident, which is the way a debugging facility usually reaches production.
+
+The same distinction is available to application code, so a starter can be left in place and simply not fire in a shipped build:
+
+[source,java]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-guard-start,indent=0]
+
+A build that ships to devices you control, such as a kiosk fleet, a test lab, or a managed enterprise deployment, can lift the block deliberately:
+
+[source,java]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-allow-release,indent=0]
+
+Treat that call the way you'd treat any other decision to expose a control surface, because the device itself becomes the boundary.
 
 == Built-in user interface tools
 

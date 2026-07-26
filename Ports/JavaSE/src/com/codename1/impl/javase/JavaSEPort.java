@@ -9723,6 +9723,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         // differentiate simulator from JavaSE port and detect designer
         return designMode || getSkin() != null || widthLabel != null;
     }
+
+    /// The JavaSE port is the development environment: the simulator, the designer and the
+    /// desktop tooling all run on it. A desktop application packaged for distribution runs
+    /// on it too, which is why this is the port where the answer is a judgement rather than
+    /// a fact read off the build - and the judgement matches the historical behaviour of
+    /// the tooling that already serves agents from here.
+    @Override
+    public boolean isDebuggableBuild() {
+        return true;
+    }
     
     /**
      * @inheritDoc

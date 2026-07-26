@@ -10859,6 +10859,45 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_listenSocketLoopback___int(CN1_THREAD
     return (JAVA_LONG)JAVA_NULL;
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDebuggableBuild___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_SIMULATOR
+    // Nothing ships from the simulator, so it is always a development build. It also has
+    // no provisioning profile to inspect, which is what the device path relies on.
+    return JAVA_TRUE;
+#else
+    POOL_BEGIN();
+    JAVA_BOOLEAN result = JAVA_FALSE;
+    // get-task-allow is the entitlement that lets a debugger attach. Development and
+    // ad-hoc profiles carry it; App Store and enterprise distribution profiles do not, so
+    // it is the honest "is this a build I am working on" signal, and unlike the Xcode
+    // DEBUG macro it does not depend on which configuration the build server compiled.
+    NSString* path = [[NSBundle mainBundle] pathForResource:@"embedded" ofType:@"mobileprovision"];
+    if(path != nil) {
+        NSData* data = [NSData dataWithContentsOfFile:path];
+        if(data != nil) {
+            // The profile is CMS signed, so it is not parseable as a plist; the embedded
+            // XML is plain text inside it. Latin-1 never fails on arbitrary bytes.
+            NSString* text = [[NSString alloc] initWithData:data encoding:NSISOLatin1StringEncoding];
+            if(text != nil) {
+                NSRange key = [text rangeOfString:@"get-task-allow"];
+                if(key.location != NSNotFound) {
+                    NSUInteger from = key.location + key.length;
+                    NSUInteger avail = [text length] - from;
+                    NSUInteger span = avail < 64 ? avail : 64;
+                    NSRange after = NSMakeRange(from, span);
+                    if([text rangeOfString:@"<true/>" options:0 range:after].location != NSNotFound) {
+                        result = JAVA_TRUE;
+                    }
+                }
+                [text release];
+            }
+        }
+    }
+    POOL_END();
+    return result;
+#endif
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getHostOrIP__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     POOL_BEGIN();
     JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [SocketImpl getIP]);

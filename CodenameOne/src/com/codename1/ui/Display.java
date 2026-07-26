@@ -6695,6 +6695,22 @@ public final class Display extends CN1Constants {
         return impl.isSimulator();
     }
 
+    /// Whether this build is a development build rather than a release build headed for
+    /// an app store: a debuggable Android package, a development provisioned iOS build,
+    /// or the simulator and desktop tooling.
+    ///
+    /// This is broader than [#isSimulator()], which is true only in the simulator. Use it
+    /// to gate a facility that belongs in a build you are working on but not in one a user
+    /// installs. A port that cannot tell reports a release build, so the answer errs
+    /// towards withholding the facility.
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a development build
+    public boolean isDebuggableBuild() {
+        return impl.isDebuggableBuild();
+    }
+
     /// Creates an audio media that can be played in the background.
     ///
     /// #### Parameters

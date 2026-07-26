@@ -2793,6 +2793,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return serverSocketAvailable;
     }
 
+    private boolean debuggableBuild = true;
+
+    /// Lets a test choose which side of the release build gate it is on.
+    public void setDebuggableBuild(boolean debuggableBuild) {
+        this.debuggableBuild = debuggableBuild;
+    }
+
+    @Override
+    public boolean isDebuggableBuild() {
+        return debuggableBuild;
+    }
+
     /// There is no real network in these tests, so a loopback accept is the same
     /// simulated queue as a wildcard one. The distinction under test is the API contract
     /// (callers asking for loopback get a socket, and a port that cannot bind loopback

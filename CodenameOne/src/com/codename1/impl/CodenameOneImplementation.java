@@ -9931,6 +9931,22 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// Whether this build is a development build rather than a release build headed for
+    /// an app store: a debuggable Android package, a development provisioned iOS build,
+    /// or the simulator and desktop tooling.
+    ///
+    /// Facilities that are appropriate while developing but not in a shipped app can gate
+    /// themselves on this. A port that cannot tell should leave the default in place:
+    /// answering "release" is the safe direction, because it withholds a development
+    /// facility rather than exposing one in production.
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a development build
+    public boolean isDebuggableBuild() {
+        return false;
+    }
+
     /// Listens on the given port, bound to the loopback interface only, and blocks until
     /// a connection arrives - the accept semantics of [#listenSocket(int)], with a
     /// narrower bind.

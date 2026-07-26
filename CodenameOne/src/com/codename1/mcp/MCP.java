@@ -23,13 +23,16 @@
 package com.codename1.mcp;
 
 import com.codename1.ai.Tool;
+import com.codename1.ui.Display;
 
 /// Public entry point for the Codename One MCP headless API. Invoking a starter here is
 /// the enablement; there is no build hint or property to toggle. A single server
 /// instance exists per process.
 ///
-/// This API is supported by the Codename One JavaSE port, which powers the simulator and
-/// the desktop tooling. It is not part of a packaged application build.
+/// The stdio transport is supported by the Codename One JavaSE port, which powers the
+/// simulator and the desktop tooling. The socket transport also serves a build running on
+/// a device, on any port that can bind the loopback interface. It is blocked on a release
+/// build - see [#setAllowOnReleaseBuilds(boolean)].
 ///
 /// #### Typical usage
 ///
@@ -47,6 +50,8 @@ public final class MCP {
     private static MCPServer server;
     private static StdioTransportFactory stdioTransportFactory;
     private static SocketTransportFactory socketTransportFactory;
+    /// Lifts the release build block; see [#setAllowOnReleaseBuilds(boolean)].
+    private static boolean allowOnReleaseBuilds;
 
     private MCP() {
     }
@@ -125,7 +130,11 @@ public final class MCP {
 
     /// Starts a loopback socket server so an agent can attach to this running process.
     /// Requires a platform socket transport factory (registered by the JavaSE port).
+    ///
+    /// Refuses to bind on a RELEASE build, throwing [IllegalStateException] - see
+    /// [#setAllowOnReleaseBuilds(boolean)] for why, and for the deliberate override.
     public static synchronized MCPServer startSocketServer(int port) {
+        checkAllowedOnThisBuild();
         // Ports that did not register a transport of their own fall back to the portable
         // one, which binds loopback through com.codename1.io.Socket - so attaching to a
         // running app on a device or simulator works, not only on the desktop.
@@ -138,6 +147,49 @@ public final class MCP {
         MCPServer s = getServer();
         s.start(socketTransportFactory.createSocketTransport(port));
         return s;
+    }
+
+    /// Permits the socket server to bind on a RELEASE build. Off by default, and turning
+    /// it on should be a deliberate, reviewed decision.
+    ///
+    /// The reason for the default: an attached agent can read the screen and drive the
+    /// user interface, and the loopback interface is shared by everything on the device,
+    /// not private to one application. On a phone that means any OTHER app installed
+    /// alongside yours can connect to the port and drive your application. That is a fine
+    /// trade while developing - it is how an agent attaches to a running app - and a poor
+    /// one in an app a user installs.
+    ///
+    /// A development build is detected as a debuggable Android package, a development
+    /// provisioned iOS build, or the simulator and desktop tooling. Anything else is
+    /// treated as a release build, so a port that cannot tell withholds the server rather
+    /// than exposing it.
+    ///
+    /// Set this only for a build that ships to a controlled fleet - a kiosk, a test lab,
+    /// an enterprise deployment - where the device itself is trusted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `allow`: true to permit the socket server on a release build
+    public static synchronized void setAllowOnReleaseBuilds(boolean allow) {
+        allowOnReleaseBuilds = allow;
+    }
+
+    /// Whether the socket server may bind on a release build.
+    public static synchronized boolean isAllowedOnReleaseBuilds() {
+        return allowOnReleaseBuilds;
+    }
+
+    /// Throws unless this build may serve MCP over a socket.
+    private static void checkAllowedOnThisBuild() {
+        if (allowOnReleaseBuilds || Display.getInstance().isDebuggableBuild()) {
+            return;
+        }
+        throw new IllegalStateException(
+                "The MCP socket server is blocked on a release build. An attached agent can "
+                        + "read the screen and drive the UI, and any other app on the device "
+                        + "can reach the loopback port. Use a development build, or call "
+                        + "MCP.setAllowOnReleaseBuilds(true) if this build ships to a "
+                        + "controlled fleet.");
     }
 
     /// Stops the shared server if it is running.
