@@ -122,15 +122,24 @@ public class HealthSensors {
                     .setServiceUuid(wanted.get(i).getServiceUuid()));
         }
         BleScan scan = Bluetooth.getInstance().getLE().startScan(bleSettings,
-                new ScanListener() {
+                makeScanListener(wanted, listener));
+        return new SensorScan(scan);
+    }
+
+    /// Built in a static method so the listener carries no synthetic
+    /// reference to this object (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static ScanListener makeScanListener(
+            final List<HealthSensorProfile> wanted,
+            final SensorDiscoveryListener listener) {
+        return new ScanListener() {
             public void peripheralDiscovered(ScanResult result) {
                 HealthSensor sensor = toSensor(result, wanted);
                 if (sensor != null) {
                     listener.sensorDiscovered(sensor);
                 }
             }
-        });
-        return new SensorScan(scan);
+        };
     }
 
     /// Which of the wanted profiles a discovered device actually

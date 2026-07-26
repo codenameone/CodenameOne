@@ -269,7 +269,16 @@ public class HealthStore {
         }
         SampleQuery q = new SampleQuery().addType(type)
                 .setTimeRange(range).setLimit(1);
-        readSamplePage(q).onResult(new com.codename1.util.AsyncResult<SamplePage>() {
+        readSamplePage(q).onResult(makeAnyDataCallback(out));
+        return out;
+    }
+
+    /// Built in a static method so the callback carries no synthetic
+    /// reference to the enclosing store (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static com.codename1.util.AsyncResult<SamplePage>
+            makeAnyDataCallback(final AsyncResource<Boolean> out) {
+        return new com.codename1.util.AsyncResult<SamplePage>() {
             public void onReady(SamplePage value, Throwable err) {
                 if (err != null) {
                     out.error(err);
@@ -277,8 +286,7 @@ public class HealthStore {
                     out.complete(Boolean.valueOf(!value.isEmpty()));
                 }
             }
-        });
-        return out;
+        };
     }
 
     // ==================================================================
@@ -347,14 +355,15 @@ public class HealthStore {
                 }
                 collected.addAll(page.getSamples());
                 String next = page.getNextPageToken();
-                if (next == null || collected.size() >= query.getLimit()) {
-                    if (collected.size() > query.getLimit()) {
-                        // Trim rather than hand back more than was asked
-                        // for: a caller that sized a buffer from the limit
-                        // would otherwise overflow it.
-                        while (collected.size() > query.getLimit()) {
-                            collected.remove(collected.size() - 1);
-                        }
+                int limit = query.getLimit();
+                if (next == null || collected.size() >= limit) {
+                    // Trim rather than hand back more than was asked for:
+                    // a caller that sized a buffer from the limit would
+                    // otherwise overflow it. Flattening a series can push
+                    // the count past the limit even when the platform
+                    // honoured it.
+                    while (collected.size() > limit) {
+                        collected.remove(collected.size() - 1);
                     }
                     out.complete(collected);
                     return;
@@ -638,10 +647,10 @@ public class HealthStore {
                         q.getStartMillis(), q.getEndMillis());
         converted.setRecordingMethod(q.getRecordingMethod());
         Map<String, String> meta = q.getMetadata();
-        for (java.util.Iterator<String> it = meta.keySet().iterator();
-                it.hasNext();) {
-            String k = it.next();
-            converted.putMetadata(k, meta.get(k));
+        for (java.util.Iterator<Map.Entry<String, String>> it =
+                meta.entrySet().iterator(); it.hasNext();) {
+            Map.Entry<String, String> e = it.next();
+            converted.putMetadata(e.getKey(), e.getValue());
         }
         return converted;
     }
@@ -887,6 +896,14 @@ public class HealthStore {
                     + " HealthBackgroundListener.");
             return null;
         }
+        return adaptBackgroundListener(bg);
+    }
+
+    /// Wraps a background listener as a change listener from a static
+    /// method, so the adapter holds no reference to the store (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static HealthChangeListener adaptBackgroundListener(
+            final HealthBackgroundListener bg) {
         return new HealthChangeListener() {
             public void healthDataChanged(HealthChangeBatch batch) {
                 bg.healthDataChanged(batch);
