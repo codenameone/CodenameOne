@@ -292,6 +292,7 @@ public final class HealthUnit {
     /// - `IllegalArgumentException`: if either unit is null or the two
     ///   measure different dimensions. Crossing dimensions is a coding
     ///   error and is surfaced as one.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public static double convert(double value, HealthUnit from, HealthUnit to) {
         if (from == null || to == null) {
             throw new IllegalArgumentException("null unit in conversion");
@@ -325,6 +326,7 @@ public final class HealthUnit {
 
     /// Returns [#getSymbol()], so string concatenation in log statements
     /// and error messages reads naturally.
+    @Override
     public String toString() {
         return symbol;
     }

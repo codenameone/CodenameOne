@@ -235,6 +235,20 @@ com_codename1_impl_ios_IOSNative_hkIsWorkoutSessionSupported___R_boolean(
 #endif
 }
 
+JAVA_BOOLEAN
+com_codename1_impl_ios_IOSNative_hkIsTypeSupported___java_lang_String_R_boolean(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT typeId) {
+    if (typeId == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    // The map is the authority. Deriving support from the portable type's
+    // canonical unit instead would advertise types HealthKit has never
+    // heard of, and the failure would surface only at query time.
+    NSString *portableId = toNSString(threadStateData, typeId);
+    return [cn1hkTypeMap() objectForKey:portableId] != nil
+            ? JAVA_TRUE : JAVA_FALSE;
+}
+
 JAVA_INT
 com_codename1_impl_ios_IOSNative_hkShareAuthorizationStatus___java_lang_String_R_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT typeId) {
@@ -450,6 +464,13 @@ com_codename1_impl_ios_IOSNative_hkIsWorkoutSessionSupported___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return JAVA_FALSE;
 }
+
+JAVA_BOOLEAN
+com_codename1_impl_ios_IOSNative_hkIsTypeSupported___java_lang_String_R_boolean(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT typeId) {
+    return JAVA_FALSE;
+}
+
 
 JAVA_INT
 com_codename1_impl_ios_IOSNative_hkShareAuthorizationStatus___java_lang_String_R_int(

@@ -70,6 +70,7 @@ final class BleSensorSession extends SensorSession {
     void start(final AsyncResource<SensorSession> out) {
         setState(SensorSessionState.CONNECTING);
         peripheral.connect().onResult(new AsyncResult<BlePeripheral>() {
+            @Override
             public void onReady(BlePeripheral value, Throwable err) {
                 if (err != null) {
                     failStart(out, err);
@@ -83,6 +84,7 @@ final class BleSensorSession extends SensorSession {
     private void discover(final AsyncResource<SensorSession> out) {
         peripheral.discoverServices().onResult(
                 new AsyncResult<List<GattService>>() {
+            @Override
             public void onReady(List<GattService> value, Throwable err) {
                 if (err != null) {
                     failStart(out, err);
@@ -119,6 +121,7 @@ final class BleSensorSession extends SensorSession {
     /// perfectly good strap, and refusing to stream over a missing
     /// optional characteristic would be worse than not knowing the
     /// battery level.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     private void readOptionalMetadata(GattService service) {
         GattService battery = peripheral.getService(BATTERY_SERVICE);
         if (battery != null) {
@@ -127,6 +130,7 @@ final class BleSensorSession extends SensorSession {
             if (level != null) {
                 peripheral.readCharacteristic(level).onResult(
                         new AsyncResult<byte[]>() {
+                    @Override
                     public void onReady(byte[] value, Throwable err) {
                         if (err == null && value != null
                                 && value.length > 0) {
@@ -143,6 +147,7 @@ final class BleSensorSession extends SensorSession {
             if (loc != null) {
                 peripheral.readCharacteristic(loc).onResult(
                         new AsyncResult<byte[]>() {
+                    @Override
                     public void onReady(byte[] value, Throwable err) {
                         if (err == null && value != null
                                 && value.length > 0) {
@@ -183,6 +188,8 @@ final class BleSensorSession extends SensorSession {
                                 + " session", err));
     }
 
+    @Override
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public AsyncResource<Boolean> resetEnergyExpended() {
         AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         if (getProfile() != HealthSensorProfile.HEART_RATE) {
@@ -206,6 +213,7 @@ final class BleSensorSession extends SensorSession {
         return peripheral.writeCharacteristic(cp, new byte[] { 0x01 }, true);
     }
 
+    @Override
     public void stop() {
         if (getState() == SensorSessionState.STOPPED) {
             return;

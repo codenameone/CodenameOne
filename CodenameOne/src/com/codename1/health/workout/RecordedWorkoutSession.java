@@ -59,18 +59,22 @@ final class RecordedWorkoutSession extends WorkoutSession {
         super(configuration);
     }
 
+    @Override
     protected void doStart(AsyncResource<Boolean> out) {
         out.complete(Boolean.TRUE);
     }
 
+    @Override
     protected void doPause(AsyncResource<Boolean> out) {
         out.complete(Boolean.TRUE);
     }
 
+    @Override
     protected void doResume(AsyncResource<Boolean> out) {
         out.complete(Boolean.TRUE);
     }
 
+    @Override
     protected void doAddSamples(List<HealthSample> samples,
             AsyncResource<Boolean> out) {
         synchronized (collected) {
@@ -79,12 +83,14 @@ final class RecordedWorkoutSession extends WorkoutSession {
         out.complete(Boolean.TRUE);
     }
 
+    @Override
     protected void doDiscard() {
         synchronized (collected) {
             collected.clear();
         }
     }
 
+    @Override
     protected void doEnd(final AsyncResource<WorkoutSample> out) {
         final WorkoutSample workout = WorkoutSample.create(
                 getConfiguration().getActivityType(), getStartedAtMillis(),
@@ -109,6 +115,7 @@ final class RecordedWorkoutSession extends WorkoutSession {
             return;
         }
         store.write(toWrite).onResult(new AsyncResult<HealthWriteResult>() {
+            @Override
             public void onReady(HealthWriteResult value, Throwable err) {
                 if (err != null) {
                     setState(WorkoutSessionState.FAILED);

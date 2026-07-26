@@ -83,11 +83,6 @@ public class HealthSensors {
 
     private final List<SensorSession> active = new ArrayList<SensorSession>();
 
-    /// Created by the framework; obtain the shared instance from
-    /// [com.codename1.health.Health#getSensors()].
-    public HealthSensors() {
-    }
-
     /// `true` when this device can talk to BLE sensors at all -- that is,
     /// when Bluetooth LE is supported by the port and the hardware.
     public boolean isSupported() {
@@ -117,9 +112,9 @@ public class HealthSensors {
                 ? HealthSensorProfile.values() : s.getProfiles();
 
         ScanSettings bleSettings = new ScanSettings();
-        for (int i = 0; i < wanted.size(); i++) {
+        for (HealthSensorProfile wantedItem : wanted) {
             bleSettings.addFilter(new ScanFilter()
-                    .setServiceUuid(wanted.get(i).getServiceUuid()));
+                    .setServiceUuid(wantedItem.getServiceUuid()));
         }
         BleScan scan = Bluetooth.getInstance().getLE().startScan(bleSettings,
                 makeScanListener(wanted, listener));
@@ -133,6 +128,7 @@ public class HealthSensors {
             final List<HealthSensorProfile> wanted,
             final SensorDiscoveryListener listener) {
         return new ScanListener() {
+            @Override
             public void peripheralDiscovered(ScanResult result) {
                 HealthSensor sensor = toSensor(result, wanted);
                 if (sensor != null) {
@@ -155,8 +151,7 @@ public class HealthSensors {
                 : result.getAdvertisementData().getServiceUuids();
         List<HealthSensorProfile> matched =
                 new ArrayList<HealthSensorProfile>();
-        for (int i = 0; i < wanted.size(); i++) {
-            HealthSensorProfile p = wanted.get(i);
+        for (HealthSensorProfile p : wanted) {
             if (advertised.contains(p.getServiceUuid())) {
                 matched.add(p);
             }
@@ -241,6 +236,7 @@ public class HealthSensors {
             final SensorDiscoveryListener listener,
             final HealthException error) {
         com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 listener.scanFailed(error);
             }

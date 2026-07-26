@@ -175,6 +175,7 @@ public final class NutritionSample extends SessionSample {
         return this;
     }
 
+    @Override
     public String toString() {
         return "NutritionSample[" + (foodName == null ? "food" : foodName)
                 + ", " + nutrients.size() + " nutrients]";

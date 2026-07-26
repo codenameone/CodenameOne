@@ -70,6 +70,7 @@ public final class SleepStageInterval {
         return endMillis - startMillis;
     }
 
+    @Override
     public String toString() {
         return stage + "[" + startMillis + ".." + endMillis + "]";
     }

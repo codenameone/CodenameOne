@@ -180,4 +180,96 @@ public class HealthBridgeTokenTableTest {
                 + " resync rather than silently miss data",
                 body.contains("changesTokenExpired"));
     }
+
+    /**
+     * Health Connect rejects a page size above 5000 rather than clamping
+     * it, so an unbounded read that passed its own default straight
+     * through would throw before reading anything.
+     */
+    @Test
+    public void readsStayWithinTheHealthConnectPageLimit() throws Exception {
+        String src = source();
+        assertTrue("the page ceiling must be declared",
+                src.contains("MAX_PAGE_SIZE = 5000"));
+        int start = src.indexOf("private suspend fun appendRecords(");
+        assertTrue(start > 0);
+        String body = src.substring(start, src.indexOf("\n    }", start));
+        assertTrue("the page size must be capped",
+                body.contains("minOf(remaining, MAX_PAGE_SIZE)"));
+        assertTrue("and further pages must be followed, or a caller asking"
+                + " for more than one page silently loses the rest",
+                body.contains("pageToken"));
+    }
+
+    /**
+     * Extracts the tokens one Kotlin {@code when} maps to a record class.
+     */
+    private static java.util.Set<String> whenTokens(String fn)
+            throws Exception {
+        String src = source();
+        int start = src.indexOf(fn);
+        assertTrue(fn + " must exist in the bridge", start > 0);
+        String body = src.substring(start, src.indexOf("\n    }", start));
+        java.util.Set<String> out = new java.util.TreeSet<String>();
+        Matcher m = Pattern.compile("\"([a-z0-9_]+)\"").matcher(body);
+        while (m.find()) {
+            out.add(m.group(1));
+        }
+        return out;
+    }
+
+    /**
+     * The portable layer decides what to advertise as supported on Android
+     * from a list in HealthWire, and the bridge decides what it can
+     * actually do from its own {@code when}. When those drift the store
+     * advertises a type, passes validation, and then fails at read time
+     * with an invalid-argument error -- which is a worse answer than
+     * saying the type is unsupported up front.
+     */
+    @Test
+    public void healthWireAdvertisesExactlyWhatTheBridgeCanRead()
+            throws Exception {
+        java.util.Set<String> bridge = whenTokens("private fun recordClassFor(");
+        // recordClassFor also carries the session types, which register for
+        // change notifications and can be deleted but have no value form.
+        bridge.remove("sleep");
+        bridge.remove("workout");
+        assertEquals("HealthWire.ANDROID_READABLE must match the bridge",
+                bridge, wireTokens("ANDROID_READABLE"));
+    }
+
+    @Test
+    public void healthWireAdvertisesExactlyWhatTheBridgeCanWrite()
+            throws Exception {
+        assertEquals("HealthWire.ANDROID_WRITABLE must match the bridge",
+                whenTokens("private fun toRecord("),
+                wireTokens("ANDROID_WRITABLE"));
+    }
+
+    /** Reads one of HealthWire's comma-delimited capability lists. */
+    private static java.util.Set<String> wireTokens(String field)
+            throws Exception {
+        java.io.File f = new java.io.File("../../CodenameOne/src/com/"
+                + "codename1/impl/health/HealthWire.java");
+        assertTrue("HealthWire.java must be readable at " + f.getPath(),
+                f.isFile());
+        byte[] buf = new byte[(int) f.length()];
+        java.io.DataInputStream in =
+                new java.io.DataInputStream(new java.io.FileInputStream(f));
+        try {
+            in.readFully(buf);
+        } finally {
+            in.close();
+        }
+        String src = new String(buf, StandardCharsets.UTF_8);
+        int start = src.indexOf("ANDROID_" + field.substring(8));
+        assertTrue(field + " must exist", start > 0);
+        String body = src.substring(start, src.indexOf(";", start));
+        java.util.Set<String> out = new java.util.TreeSet<String>();
+        Matcher m = Pattern.compile("([a-z0-9_]{3,})").matcher(body);
+        while (m.find()) {
+            out.add(m.group(1));
+        }
+        return out;
+    }
 }

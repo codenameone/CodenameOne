@@ -1901,6 +1901,18 @@ public class AndroidGradleBuilder extends Executor {
                         + "permissions-rationale screen must link to it. Set "
                         + "android.health.privacyPolicyUrl=<https://...>.",
                         new RuntimeException("privacy policy url unset"));
+            } else {
+                // Emit the URL as the string resource
+                // HealthPermissionsRationaleActivity looks up. Validating
+                // the hint without emitting it would leave the rationale
+                // screen with nothing to show, which is the exact
+                // disclosure the check above claims to enforce.
+                additionalKeyVals += "    <string name=\""
+                        + HealthManifestFragments.POLICY_URL_RESOURCE
+                        + "\">"
+                        + xmlize(request.getArg(
+                                "android.health.privacyPolicyUrl", ""))
+                        + "</string>\n";
             }
             if (targetSDKVersionInt < 30) {
                 // <queries> is only emitted from API 30, and without it the
@@ -2292,11 +2304,22 @@ public class AndroidGradleBuilder extends Executor {
             }
             // connect-client needs Kotlin 1.9+; the builder's default of
             // 1.7.22 will not compile it.
-            if (compareVersions(request.getArg("android.kotlinVersion",
-                    "1.7.22"), "1.9.22") < 0) {
-                request.putArgument("android.kotlinVersion", "1.9.22");
-                log("Health Connect requires Kotlin 1.9.22 or newer;"
-                        + " raising android.kotlinVersion");
+            //
+            // The argument raised here is requireKotlinStdlib, because that
+            // is the one the Gradle generator actually reads. Setting
+            // android.kotlinVersion looks right and does nothing: the
+            // generator never consults it, so a non-Gradle-8 project would
+            // still be pinned to 1.7.22 and fail compiling the bridge.
+            String kotlinFloor = "1.9.22";
+            String declaredKotlin =
+                    request.getArg("requireKotlinStdlib", "").trim();
+            if (declaredKotlin.length() == 0
+                    || compareVersions(declaredKotlin, kotlinFloor) < 0) {
+                request.putArgument("requireKotlinStdlib", kotlinFloor);
+                log("Health Connect requires Kotlin " + kotlinFloor
+                        + " or newer; raising requireKotlinStdlib from "
+                        + (declaredKotlin.length() == 0
+                                ? "the default" : declaredKotlin));
             }
         }
 

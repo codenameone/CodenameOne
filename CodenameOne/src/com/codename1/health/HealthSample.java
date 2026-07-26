@@ -177,6 +177,7 @@ public abstract class HealthSample {
     /// Two samples are equal when they carry the same platform
     /// identifier. Samples that have not been written yet have no
     /// identifier and are therefore only equal to themselves.
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -188,10 +189,12 @@ public abstract class HealthSample {
         return id != null && id.equals(other.id);
     }
 
+    @Override
     public int hashCode() {
         return id == null ? System.identityHashCode(this) : id.hashCode();
     }
 
+    @Override
     public String toString() {
         return getClass().getName() + "[" + type.getId() + " "
                 + startMillis + ".." + endMillis + "]";

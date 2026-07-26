@@ -190,6 +190,17 @@ final class HealthManifestFragments {
     }
 
     /**
+     * Name of the generated string resource carrying the privacy policy
+     * URL.
+     *
+     * <p>Shared with {@code HealthPermissionsRationaleActivity}, which
+     * resolves it by name at runtime. A rename on one side alone leaves the
+     * rationale screen blank, so the name lives here rather than being
+     * spelled out in two places.</p>
+     */
+    static final String POLICY_URL_RESOURCE = "cn1_health_privacy_policy";
+
+    /**
      * The Health Connect permission suffix for one token, or {@code null}
      * when the token is unknown. Exposed so the Kotlin bridge's own copy of
      * this table can be pinned against it -- see

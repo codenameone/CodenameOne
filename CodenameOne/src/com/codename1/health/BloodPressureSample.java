@@ -134,6 +134,7 @@ public final class BloodPressureSample extends HealthSample {
         this.measurementLocation = measurementLocation;
     }
 
+    @Override
     public String toString() {
         return "BloodPressureSample["
                 + (int) systolic.getValue(HealthUnit.MILLIMETER_OF_MERCURY)

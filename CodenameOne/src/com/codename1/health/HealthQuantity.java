@@ -75,6 +75,7 @@ public final class HealthQuantity {
 
     /// This quantity re-expressed in `unit`. Returns `this` when the unit
     /// already matches.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public HealthQuantity in(HealthUnit unit) {
         if (unit == this.unit) {
             return this;
@@ -87,6 +88,8 @@ public final class HealthQuantity {
     /// are not `equals`, because making them so would give a class with
     /// floating-point-dependent equality and a hash code that cannot be
     /// consistent with it.
+    @Override
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -100,11 +103,13 @@ public final class HealthQuantity {
                         == Double.doubleToLongBits(other.value);
     }
 
+    @Override
     public int hashCode() {
         long bits = Double.doubleToLongBits(value);
         return 31 * ((int) (bits ^ (bits >>> 32))) + unit.getSymbol().hashCode();
     }
 
+    @Override
     public String toString() {
         return value + " " + unit.getSymbol();
     }

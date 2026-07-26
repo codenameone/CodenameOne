@@ -142,6 +142,7 @@ public final class SeriesSample extends HealthSample {
         return q;
     }
 
+    @Override
     public String toString() {
         return "SeriesSample[" + getType().getId() + " x" + values.length
                 + " " + unit.getSymbol() + " " + getStartMillis() + ".."

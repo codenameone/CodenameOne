@@ -29,13 +29,10 @@ import com.codename1.health.HealthAggregationStyle;
 import com.codename1.health.HealthAuthorizationStatus;
 import com.codename1.health.HealthDataType;
 import com.codename1.health.HealthDeleteRequest;
-import com.codename1.health.HealthQuantity;
 import com.codename1.health.HealthSample;
 import com.codename1.health.HealthStore;
 import com.codename1.health.HealthTimeRange;
-import com.codename1.health.HealthUnit;
 import com.codename1.health.HealthWriteResult;
-import com.codename1.health.QuantitySample;
 import com.codename1.health.SampleQuery;
 import com.codename1.health.SamplePage;
 import com.codename1.util.AsyncResource;
@@ -69,34 +66,36 @@ public class LocalHealthStore extends HealthStore {
     private final List<HealthSample> samples = new ArrayList<HealthSample>();
     private long nextId = 1;
 
-    /// Creates an empty local store.
-    public LocalHealthStore() {
-    }
-
+    @Override
     public boolean isSupported() {
         return true;
     }
 
     /// Every type is available locally: there is no platform to restrict
     /// what can be stored.
+    @Override
     public boolean isTypeSupported(HealthDataType type) {
         return type != null;
     }
 
+    @Override
     public List<HealthDataType> getSupportedTypes() {
         return HealthDataType.values();
     }
 
+    @Override
     public boolean isWritable(HealthDataType type) {
         return type != null;
     }
 
+    @Override
     public boolean isDeletable(HealthDataType type) {
         return type != null;
     }
 
     /// Every metric is computed here in shared code rather than delegated
     /// to a platform engine.
+    @Override
     public List<AggregateMetric> getSupportedMetrics(HealthDataType type) {
         List<AggregateMetric> out = new ArrayList<AggregateMetric>();
         if (type == null) {
@@ -118,16 +117,19 @@ public class LocalHealthStore extends HealthStore {
 
     /// There is no permission model on a local store, so both directions
     /// are honestly reported as authorized rather than as unknown.
+    @Override
     public HealthAuthorizationStatus getReadAuthorizationStatus(
             HealthDataType type) {
         return HealthAuthorizationStatus.AUTHORIZED;
     }
 
+    @Override
     public HealthAuthorizationStatus getWriteAuthorizationStatus(
             HealthDataType type) {
         return HealthAuthorizationStatus.AUTHORIZED;
     }
 
+    @Override
     protected void doRequestAuthorization(
             List<com.codename1.health.HealthAccess> access,
             AsyncResource<Boolean> out) {
@@ -138,14 +140,14 @@ public class LocalHealthStore extends HealthStore {
     // reads
     // ------------------------------------------------------------------
 
+    @Override
     protected void doReadSamples(SampleQuery query,
             AsyncResource<SamplePage> out) {
         HealthTimeRange range =
                 query.getTimeRange().resolve(System.currentTimeMillis());
         List<HealthSample> matched = new ArrayList<HealthSample>();
         synchronized (samples) {
-            for (int i = 0; i < samples.size(); i++) {
-                HealthSample s = samples.get(i);
+            for (HealthSample s : samples) {
                 if (matches(s, query, range)) {
                     matched.add(s);
                 }
@@ -185,6 +187,7 @@ public class LocalHealthStore extends HealthStore {
     private static void sort(List<HealthSample> list,
             final boolean descending) {
         Collections.sort(list, new Comparator<HealthSample>() {
+            @Override
             public int compare(HealthSample a, HealthSample b) {
                 long d = a.getStartMillis() - b.getStartMillis();
                 int r = d < 0 ? -1 : (d > 0 ? 1 : 0);
@@ -197,155 +200,27 @@ public class LocalHealthStore extends HealthStore {
     // aggregates
     // ------------------------------------------------------------------
 
+    @Override
     protected void doAggregate(AggregateQuery query, long[] boundaries,
             AsyncResource<List<AggregateResult>> out) {
-        HealthTimeRange range =
-                query.getTimeRange().resolve(System.currentTimeMillis());
-        List<AggregateResult> results = new ArrayList<AggregateResult>();
-        for (int b = 0; b + 1 < boundaries.length; b++) {
-            long start = boundaries[b];
-            long end = boundaries[b + 1];
-            AggregateResult bucket = new AggregateResult(start, end);
-            for (int t = 0; t < query.getTypes().size(); t++) {
-                aggregateInto(bucket, query, query.getTypes().get(t), start,
-                        end, range);
-            }
-            results.add(bucket);
-        }
-        out.complete(results);
-    }
-
-    /// Computes one type's metrics over one bucket.
-    ///
-    /// Buckets with no data are left empty rather than filled with zeros,
-    /// which is what lets a chart draw a gap where the user's phone was in
-    /// a drawer instead of a flat line at zero.
-    private void aggregateInto(AggregateResult bucket, AggregateQuery query,
-            HealthDataType type, long start, long end,
-            HealthTimeRange range) {
-        HealthUnit unit = query.getUnit() != null ? query.getUnit()
-                : type.getCanonicalUnit();
-        List<QuantitySample> inBucket = new ArrayList<QuantitySample>();
-        long durationMillis = 0;
-        int count = 0;
+        List<HealthSample> snapshot;
         synchronized (samples) {
-            for (int i = 0; i < samples.size(); i++) {
-                HealthSample s = samples.get(i);
-                if (s.getType() != type) {
-                    continue;
-                }
-                if (s.getStartMillis() >= end
-                        || s.getEndMillis() < start) {
-                    continue;
-                }
-                if (s.getStartMillis() < range.getStartMillis()
-                        || s.getStartMillis() >= range.getEndMillis()) {
-                    continue;
-                }
-                if (!sourceAllowed(s, query)) {
-                    continue;
-                }
-                count++;
-                durationMillis += Math.max(1, s.getDurationMillis());
-                if (s instanceof QuantitySample) {
-                    inBucket.add((QuantitySample) s);
-                }
-            }
+            snapshot = new ArrayList<HealthSample>(samples);
         }
-        bucket.setSampleCount(type, count);
-        if (count == 0) {
-            return;
-        }
-        List<AggregateMetric> metrics = query.getMetrics();
-        for (int m = 0; m < metrics.size(); m++) {
-            AggregateMetric metric = metrics.get(m);
-            if (metric == AggregateMetric.COUNT) {
-                bucket.put(type, metric,
-                        new HealthQuantity(count, HealthUnit.COUNT));
-                continue;
-            }
-            if (metric == AggregateMetric.DURATION) {
-                bucket.put(type, metric, new HealthQuantity(durationMillis,
-                        HealthUnit.MILLISECOND));
-                continue;
-            }
-            if (inBucket.isEmpty() || unit == null) {
-                continue;
-            }
-            bucket.put(type, metric,
-                    new HealthQuantity(compute(metric, inBucket, unit), unit));
-        }
+        out.complete(aggregateSamples(query, boundaries, snapshot));
     }
 
-    private boolean sourceAllowed(HealthSample s, AggregateQuery query) {
-        List<String> sources = query.getSources();
-        if (sources.isEmpty()) {
-            return true;
-        }
-        return s.getSource() != null
-                && sources.contains(s.getSource().getBundleId());
-    }
-
-    /// Applies one metric to the samples in a bucket.
-    ///
-    /// The average is duration-weighted, so a heart rate held across ten
-    /// minutes counts for more than a single spot reading -- an
-    /// unweighted mean over irregularly-sampled data is the classic way to
-    /// make a chart disagree with the platform's own summary.
-    private static double compute(AggregateMetric metric,
-            List<QuantitySample> in, HealthUnit unit) {
-        if (metric == AggregateMetric.TOTAL) {
-            double sum = 0;
-            for (int i = 0; i < in.size(); i++) {
-                sum += in.get(i).getValue(unit);
-            }
-            return sum;
-        }
-        if (metric == AggregateMetric.MINIMUM) {
-            double min = Double.MAX_VALUE;
-            for (int i = 0; i < in.size(); i++) {
-                min = Math.min(min, in.get(i).getValue(unit));
-            }
-            return min;
-        }
-        if (metric == AggregateMetric.MAXIMUM) {
-            double max = -Double.MAX_VALUE;
-            for (int i = 0; i < in.size(); i++) {
-                max = Math.max(max, in.get(i).getValue(unit));
-            }
-            return max;
-        }
-        if (metric == AggregateMetric.LATEST) {
-            QuantitySample latest = in.get(0);
-            for (int i = 1; i < in.size(); i++) {
-                if (in.get(i).getStartMillis() > latest.getStartMillis()) {
-                    latest = in.get(i);
-                }
-            }
-            return latest.getValue(unit);
-        }
-        // AVERAGE, duration-weighted.
-        double weighted = 0;
-        double totalWeight = 0;
-        for (int i = 0; i < in.size(); i++) {
-            QuantitySample s = in.get(i);
-            double weight = Math.max(1, s.getDurationMillis());
-            weighted += s.getValue(unit) * weight;
-            totalWeight += weight;
-        }
-        return totalWeight == 0 ? 0 : weighted / totalWeight;
-    }
 
     // ------------------------------------------------------------------
     // writes
     // ------------------------------------------------------------------
 
+    @Override
     protected void doWrite(List<HealthSample> toWrite,
             AsyncResource<HealthWriteResult> out) {
         HealthWriteResult result = new HealthWriteResult();
         synchronized (samples) {
-            for (int i = 0; i < toWrite.size(); i++) {
-                HealthSample s = toWrite.get(i);
+            for (HealthSample s : toWrite) {
                 String id = "local-" + (nextId++);
                 s.setId(id);
                 samples.add(s);
@@ -356,6 +231,7 @@ public class LocalHealthStore extends HealthStore {
         out.complete(result);
     }
 
+    @Override
     protected void doDelete(HealthDeleteRequest request,
             AsyncResource<Integer> out) {
         int removed = 0;

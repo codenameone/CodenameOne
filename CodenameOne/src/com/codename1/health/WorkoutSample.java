@@ -106,6 +106,7 @@ public final class WorkoutSample extends SessionSample {
         this.activeDurationMillis = activeDurationMillis;
     }
 
+    @Override
     public String toString() {
         return "WorkoutSample[" + activityType + " " + getStartMillis()
                 + ".." + getEndMillis() + "]";

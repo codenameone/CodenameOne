@@ -121,6 +121,7 @@ public class IPhoneBuilder extends Executor {
     // pull in HealthKit or its entitlement.
     private boolean usesHealth;
     private boolean usesHealthStore;
+    private boolean usesHealthRead;
     private boolean usesHealthWrite;
     private boolean usesHealthObserver;
     private boolean usesHealthWorkout;
@@ -968,6 +969,20 @@ public class IPhoneBuilder extends Executor {
                         if (method.startsWith("write")
                                 || method.startsWith("delete")) {
                             usesHealthWrite = true;
+                        }
+                        // Reading needs NSHealthShareUsageDescription and
+                        // writing needs NSHealthUpdateUsageDescription.
+                        // They are not interchangeable: iOS kills the app
+                        // when it reads without the share string, so a
+                        // read-only app that declared only the update
+                        // string must not be waved through.
+                        if (method.startsWith("read")
+                                || method.startsWith("aggregate")
+                                || method.startsWith("subscribe")
+                                || method.startsWith("drainChanges")
+                                || method.startsWith("hasAnyData")
+                                || method.startsWith("requestAuthorization")) {
+                            usesHealthRead = true;
                         }
                         if (method.startsWith("subscribe")
                                 || method.startsWith("drainChanges")) {
@@ -2523,6 +2538,15 @@ public class IPhoneBuilder extends Executor {
                       + "does not inject a placeholder: Apple reviews this "
                       + "text against your app's behaviour and rejects "
                       + "generic copy.");
+                }
+                if (usesHealthRead && share == null) {
+                    throw new BuildException(
+                        "This app reads health data (com.codename1.health "
+                      + "read/aggregate/subscribe) but declares no "
+                      + "ios.NSHealthShareUsageDescription build hint. "
+                      + "iOS terminates the app when it reads HealthKit "
+                      + "without it; the update string does not cover "
+                      + "reads.");
                 }
                 if (usesHealthWrite && update == null) {
                     throw new BuildException(

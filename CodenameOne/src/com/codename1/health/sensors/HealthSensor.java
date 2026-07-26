@@ -86,6 +86,7 @@ public final class HealthSensor {
         return profiles.contains(profile);
     }
 
+    @Override
     public String toString() {
         return "HealthSensor[" + (name == null ? id : name) + " "
                 + profiles + "]";

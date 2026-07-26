@@ -35,16 +35,19 @@ import com.codename1.health.sensors.HealthSensors;
 import com.codename1.io.Log;
 
 /**
- * Exercises the health API from main sources so the build server's class
- * scanner detects it and produces a real health-enabled build.
+ * Exercises the health API so the build server's class scanner detects it
+ * and produces a real health-enabled build.
  *
- * <p>This is what turns the CI smoke build into a genuine test of the
- * native layers: referencing {@code com.codename1.health} outside the
- * sensors subpackage is what makes IPhoneBuilder link HealthKit, flip
- * {@code CN1_INCLUDE_HEALTH} and demand the privacy strings, and what makes
- * AndroidGradleBuilder inject the Health Connect dependency, the manifest
- * fragments and the Kotlin bridge. Without a main-source reference the
- * scanner sees nothing and both bridges silently go untested.</p>
+ * <p>This file deliberately lives outside the Hello Codename One source
+ * root. {@code health-android.yml} copies it in before building, and
+ * nothing else does. Referencing {@code com.codename1.health} outside the
+ * sensors subpackage is what makes AndroidGradleBuilder inject the Health
+ * Connect dependency, the manifest fragments and the Kotlin bridge -- and
+ * it also raises {@code minSdkVersion} to 26, which is why it must not sit
+ * in the shared app. The conformance suite runs at the framework's normal
+ * floor, and at 26 the platform supplies {@code java.time} instead of the
+ * desugared library, which silently changes behaviour for every unrelated
+ * test in the suite.</p>
  *
  * <p>Nothing here opens a real health session; it only touches the API
  * surface so the code paths compile and link on device.</p>

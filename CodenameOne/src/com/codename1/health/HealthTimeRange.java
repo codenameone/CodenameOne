@@ -23,7 +23,6 @@
 package com.codename1.health;
 
 import java.util.Calendar;
-import java.util.Date;
 import java.util.TimeZone;
 
 /// A half-open span of time, `[start, end)`, in epoch milliseconds UTC.
@@ -174,6 +173,7 @@ public final class HealthTimeRange {
                 Math.max(startMillis, nowMillis), false);
     }
 
+    @Override
     public String toString() {
         return "[" + startMillis + ", "
                 + (openEnded ? "now" : String.valueOf(endMillis)) + ")";

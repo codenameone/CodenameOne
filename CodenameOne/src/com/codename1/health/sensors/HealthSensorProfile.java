@@ -151,6 +151,7 @@ public final class HealthSensorProfile {
         return Collections.unmodifiableList(ALL);
     }
 
+    @Override
     public String toString() {
         return name;
     }

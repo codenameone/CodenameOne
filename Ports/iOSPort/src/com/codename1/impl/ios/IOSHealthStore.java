@@ -62,9 +62,13 @@ class IOSHealthStore extends HealthStore {
         return nativeInstance.hkIsAvailable();
     }
 
+    /// Asks the native type map rather than inferring from the portable
+    /// type. Several quantity types carry a canonical unit but have no
+    /// HealthKit identifier, and advertising those made them pass shared
+    /// validation only for the query to fail as unsupported.
     public boolean isTypeSupported(HealthDataType type) {
         return type != null && isSupported()
-                && type.getCanonicalUnit() != null;
+                && nativeInstance.hkIsTypeSupported(type.getId());
     }
 
     public List<HealthDataType> getSupportedTypes() {

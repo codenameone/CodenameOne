@@ -171,6 +171,7 @@ public final class BloodPressureMeasurement {
         return timestampMillis;
     }
 
+    @Override
     public String toString() {
         return "BloodPressureMeasurement[" + (int) systolicMmHg + "/"
                 + (int) diastolicMmHg + " mmHg]";

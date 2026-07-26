@@ -73,6 +73,7 @@ public final class CategorySample extends HealthSample {
         return value;
     }
 
+    @Override
     public String toString() {
         return "CategorySample[" + getType().getId() + "=" + value + " "
                 + getStartMillis() + ".." + getEndMillis() + "]";

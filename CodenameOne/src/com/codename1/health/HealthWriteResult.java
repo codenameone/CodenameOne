@@ -34,10 +34,6 @@ public final class HealthWriteResult {
     private final List<String> sampleIds = new ArrayList<String>();
     private final List<String> rejections = new ArrayList<String>();
 
-    /// Creates an empty result. Populated by [HealthStore] and ports.
-    public HealthWriteResult() {
-    }
-
     /// How many samples were stored.
     public int getWrittenCount() {
         return sampleIds.size();
@@ -75,6 +71,7 @@ public final class HealthWriteResult {
         }
     }
 
+    @Override
     public String toString() {
         return "HealthWriteResult[" + sampleIds.size() + " written, "
                 + rejections.size() + " rejected]";

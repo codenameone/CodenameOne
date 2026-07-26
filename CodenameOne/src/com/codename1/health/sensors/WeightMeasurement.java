@@ -160,6 +160,7 @@ public final class WeightMeasurement {
         return timestampMillis;
     }
 
+    @Override
     public String toString() {
         return "WeightMeasurement[" + weightKg + " kg]";
     }

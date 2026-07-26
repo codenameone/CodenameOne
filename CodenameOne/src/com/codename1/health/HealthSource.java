@@ -78,6 +78,7 @@ public final class HealthSource {
         return deviceManufacturer;
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -90,10 +91,12 @@ public final class HealthSource {
                 : bundleId.equals(other.bundleId);
     }
 
+    @Override
     public int hashCode() {
         return bundleId == null ? 0 : bundleId.hashCode();
     }
 
+    @Override
     public String toString() {
         return name == null ? String.valueOf(bundleId)
                 : name + " (" + bundleId + ")";

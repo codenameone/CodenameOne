@@ -1,0 +1,162 @@
+---
+name: Health (Health Connect) integration
+
+# Scoped to the health feature. The load-bearing artifact here is
+# CN1HealthConnectBridge.kt: it is a plugin *resource* compiled by the app's
+# own Gradle build, so no job in this repository compiles it. Without this
+# workflow a Kotlin syntax error, a wrong androidx.health.connect API or a
+# record class that does not exist ships straight to customers.
+#
+# The health smoke source deliberately lives outside the Hello Codename One
+# source root and is copied in here. Referencing com.codename1.health raises
+# minSdkVersion to 26, and at 26 the platform supplies java.time instead of
+# the desugared library -- which changes behaviour for unrelated tests. The
+# shared conformance suite must keep running at the framework's normal floor.
+'on':
+  pull_request:
+    paths:
+      - '.github/workflows/health-android.yml'
+      - 'CodenameOne/src/com/codename1/health/**'
+      - 'CodenameOne/src/com/codename1/impl/health/**'
+      - 'Ports/Android/src/com/codename1/impl/android/AndroidHealth*.java'
+      - 'Ports/Android/src/com/codename1/impl/android/HealthConnectDelegate.java'
+      - 'Ports/Android/src/com/codename1/health/**'
+      - 'maven/codenameone-maven-plugin/src/main/resources/com/codename1/builders/health/**'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/HealthManifestFragments.java'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/HealthListenerBindings.java'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
+      - 'scripts/hellocodenameone/health-smoke/**'
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/health-android.yml'
+      - 'CodenameOne/src/com/codename1/health/**'
+      - 'CodenameOne/src/com/codename1/impl/health/**'
+      - 'Ports/Android/src/com/codename1/impl/android/AndroidHealth*.java'
+      - 'Ports/Android/src/com/codename1/impl/android/HealthConnectDelegate.java'
+      - 'Ports/Android/src/com/codename1/health/**'
+      - 'maven/codenameone-maven-plugin/src/main/resources/com/codename1/builders/health/**'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/HealthManifestFragments.java'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/HealthListenerBindings.java'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
+      - 'scripts/hellocodenameone/health-smoke/**'
+
+jobs:
+  health-android:
+    name: Health Connect Android
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-health-android-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-health-android-
+            ${{ runner.os }}-m2-
+      - name: Cache Gradle
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-health-${{ hashFiles('scripts/hellocodenameone/**/build.gradle*', 'Ports/Android/build.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-health-
+            ${{ runner.os }}-gradle-
+      - name: Setup workspace
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+      - name: Build Android port
+        run: ./scripts/build-android-port.sh -q -DskipTests
+      - name: Make the smoke app a health app
+        run: |
+          set -euo pipefail
+          dest=scripts/hellocodenameone/common/src/main/java/com/codenameone/examples/hellocodenameone
+          mkdir -p "$dest"
+          cp scripts/hellocodenameone/health-smoke/HealthSmokeDemo.java "$dest/"
+          # The android.health.* hints are already in the checked-in
+          # settings and stay inert until this file is copied in: the
+          # builder only demands them once the class scanner sees a
+          # com.codename1.health reference. They cannot be derived from
+          # bytecode -- the scanner never sees a field read, so
+          # HealthDataType.STEPS is invisible to it.
+      # This is the step that earns the workflow. build-android-app.sh runs
+      # gradlew assembleDebug, which is the only place
+      # CN1HealthConnectBridge.kt is ever compiled against a real
+      # androidx.health.connect artifact.
+      - name: Build Hello Codename One Android app (health-enabled)
+        id: build-android-app
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          ./scripts/build-android-app.sh -q -DskipTests
+      - name: Assert Health Connect wiring was injected
+        run: |
+          set -euo pipefail
+          dir="${{ steps.build-android-app.outputs.gradle_project_dir }}"
+          echo "Gradle project: $dir"
+          find "$dir" -name 'CN1HealthConnectBridge.kt' | grep -q . \
+            || { echo "::error::Health Connect bridge not copied into project"; exit 1; }
+          grep -Rqs --include='build.gradle*' "androidx.health.connect:connect-client" "$dir" \
+            || { echo "::error::connect-client dependency not injected"; exit 1; }
+          grep -Rqs --include=AndroidManifest.xml \
+            "android.permission.health.READ_STEPS" "$dir" \
+            || { echo "::error::per-type read permission missing from manifest"; exit 1; }
+          grep -Rqs --include=AndroidManifest.xml \
+            "android.permission.health.WRITE_STEPS" "$dir" \
+            || { echo "::error::per-type write permission missing from manifest"; exit 1; }
+          grep -Rqs --include=AndroidManifest.xml \
+            "com.google.android.apps.healthdata" "$dir" \
+            || { echo "::error::Health Connect package query missing from manifest"; exit 1; }
+          # READ_HEART_RATE is a prefix of READ_HEART_RATE_VARIABILITY, so a
+          # substring match would pass even when dedup is broken. Match the
+          # closing quote to prove the exact permission was emitted.
+          grep -Rqs --include=AndroidManifest.xml \
+            'android.permission.health.READ_HEART_RATE"' "$dir" \
+            || { echo "::error::exact READ_HEART_RATE permission missing"; exit 1; }
+          echo "Health Connect wiring present."
+      - name: Assert the bridge reached the dex
+        run: |
+          set -euo pipefail
+          dir="${{ steps.build-android-app.outputs.gradle_project_dir }}"
+          apk="$(find "$dir" -name '*debug*.apk' | head -1)"
+          [ -n "$apk" ] || { echo "::error::no debug APK produced"; exit 1; }
+          work="$(mktemp -d)"
+          unzip -qo "$apk" -d "$work"
+          dexdump="$(find "$ANDROID_HOME/build-tools" -name dexdump | sort | tail -1)"
+          found=0
+          for dex in "$work"/*.dex; do
+            if "$dexdump" -f "$dex" 2>/dev/null \
+                | grep -q "Lcom/codename1/health/CN1HealthConnectBridge;"; then
+              found=1
+              break
+            fi
+          done
+          [ "$found" = 1 ] \
+            || { echo "::error::bridge compiled but was shrunk out of the dex"; exit 1; }
+          echo "Bridge present in the dex."
+      - name: Upload build output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: health-android-artifacts
+          path: |
+            ${{ steps.build-android-app.outputs.gradle_project_dir }}/app/build/outputs/apk/debug/*.apk
+            ${{ steps.build-android-app.outputs.gradle_project_dir }}/app/src/main/AndroidManifest.xml
+            ${{ steps.build-android-app.outputs.gradle_project_dir }}/app/src/main/java/com/codename1/health/CN1HealthConnectBridge.kt
+          if-no-files-found: warn
+          retention-days: 14

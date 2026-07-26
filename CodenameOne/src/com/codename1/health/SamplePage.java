@@ -86,6 +86,7 @@ public final class SamplePage {
         return samples.isEmpty();
     }
 
+    @Override
     public String toString() {
         return "SamplePage[" + samples.size() + " samples"
                 + (nextPageToken == null ? "" : ", more") + "]";

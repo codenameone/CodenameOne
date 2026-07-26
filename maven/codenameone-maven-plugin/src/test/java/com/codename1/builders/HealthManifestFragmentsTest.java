@@ -277,4 +277,16 @@ class HealthManifestFragmentsTest {
         assertTrue(rules.contains("HealthConnectDelegate"));
         assertTrue(rules.contains("-keepnames class com.example.StepWatcher"));
     }
+
+    /**
+     * The rationale activity resolves this resource by name at runtime, so
+     * the two spellings have to agree. When they drift the screen a user
+     * reaches by asking why the app wants their health data comes up blank,
+     * and nothing fails until then.
+     */
+    @Test
+    public void policyUrlResourceMatchesTheRationaleActivity() {
+        assertEquals("cn1_health_privacy_policy",
+                HealthManifestFragments.POLICY_URL_RESOURCE);
+    }
 }

@@ -92,6 +92,7 @@ public final class QuantitySample extends HealthSample {
         return quantity.getValue(unit);
     }
 
+    @Override
     public String toString() {
         return "QuantitySample[" + getType().getId() + " " + quantity
                 + " " + getStartMillis() + ".." + getEndMillis() + "]";

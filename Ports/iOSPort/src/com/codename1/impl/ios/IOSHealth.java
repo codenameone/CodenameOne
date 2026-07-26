@@ -25,6 +25,7 @@ package com.codename1.impl.ios;
 import com.codename1.health.Health;
 import com.codename1.health.HealthAvailability;
 import com.codename1.health.HealthStore;
+import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
 import java.util.ArrayList;
@@ -122,7 +123,7 @@ public final class IOSHealth extends Health {
         }
         // granted reflects only that the sheet completed. HealthKit will
         // not say what the user chose for reads, so neither do we.
-        r.complete(Boolean.valueOf(granted));
+        completeOnEdt(r, Boolean.valueOf(granted));
     }
 
     static void nativeHkSamples(int requestId, String tsv) {
@@ -130,7 +131,7 @@ public final class IOSHealth extends Health {
         if (r == null) {
             return;
         }
-        r.complete(com.codename1.impl.health.HealthWire
+        completeOnEdt(r, com.codename1.impl.health.HealthWire
                 .decodeSamplePage(tsv));
     }
 
@@ -139,7 +140,7 @@ public final class IOSHealth extends Health {
         if (r == null) {
             return;
         }
-        r.complete(com.codename1.impl.health.HealthWire
+        completeOnEdt(r, com.codename1.impl.health.HealthWire
                 .decodeWriteResult(uuids));
     }
 
@@ -149,7 +150,53 @@ public final class IOSHealth extends Health {
         if (r == null) {
             return;
         }
-        r.error(IOSHealthStore.toException(errorCode, message));
+        failOnEdt(r, IOSHealthStore.toException(errorCode, message));
+    }
+
+    /// Completes on the EDT.
+    ///
+    /// These callbacks arrive on CN1Health.m's own GCD health queue, and
+    /// AsyncResource runs its callbacks on whatever thread completes it.
+    /// Completing directly would hand every application handler a
+    /// background thread, breaking the guarantee HealthStore makes that
+    /// results arrive on the EDT -- and any handler touching a Component
+    /// would race the renderer rather than fail loudly.
+    private static void completeOnEdt(AsyncResource r, Object value) {
+        Display.getInstance().callSerially(new Complete(r, value));
+    }
+
+    private static void failOnEdt(AsyncResource r, Throwable error) {
+        Display.getInstance().callSerially(new Fail(r, error));
+    }
+
+    /// Named rather than anonymous so SpotBugs does not see an inner class
+    /// holding the enclosing reference, and so the translator keeps it.
+    private static final class Complete implements Runnable {
+        private final AsyncResource resource;
+        private final Object value;
+
+        Complete(AsyncResource resource, Object value) {
+            this.resource = resource;
+            this.value = value;
+        }
+
+        public void run() {
+            resource.complete(value);
+        }
+    }
+
+    private static final class Fail implements Runnable {
+        private final AsyncResource resource;
+        private final Throwable error;
+
+        Fail(AsyncResource resource, Throwable error) {
+            this.resource = resource;
+            this.error = error;
+        }
+
+        public void run() {
+            resource.error(error);
+        }
     }
 
     static {

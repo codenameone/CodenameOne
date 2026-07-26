@@ -194,6 +194,7 @@ public final class HealthInterval {
         return r < 0 ? r + y : r;
     }
 
+    @Override
     public String toString() {
         if (!isCalendarBased()) {
             return fixedMillis + "ms";

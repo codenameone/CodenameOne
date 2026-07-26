@@ -25,6 +25,7 @@ package com.codename1.health;
 import com.codename1.io.Preferences;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.AsyncResult;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -172,8 +173,7 @@ public class HealthStore {
             return out;
         }
         List<HealthAccess> deduped = new ArrayList<HealthAccess>();
-        for (int i = 0; i < access.length; i++) {
-            HealthAccess a = access[i];
+        for (HealthAccess a : access) {
             if (a == null) {
                 continue;
             }
@@ -237,9 +237,9 @@ public class HealthStore {
         }
         List<HealthAccess> list = new ArrayList<HealthAccess>();
         if (access != null) {
-            for (int i = 0; i < access.length; i++) {
-                if (access[i] != null) {
-                    list.add(access[i]);
+            for (HealthAccess a : access) {
+                if (a != null) {
+                    list.add(a);
                 }
             }
         }
@@ -276,9 +276,10 @@ public class HealthStore {
     /// Built in a static method so the callback carries no synthetic
     /// reference to the enclosing store (SpotBugs
     /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
-    private static com.codename1.util.AsyncResult<SamplePage>
+    private static AsyncResult<SamplePage>
             makeAnyDataCallback(final AsyncResource<Boolean> out) {
-        return new com.codename1.util.AsyncResult<SamplePage>() {
+        return new AsyncResult<SamplePage>() {
+            @Override
             public void onReady(SamplePage value, Throwable err) {
                 if (err != null) {
                     out.error(err);
@@ -332,12 +333,12 @@ public class HealthStore {
                 .setFlattenSeries(query.isFlattenSeries())
                 .setSleepSessionGapMillis(query.getSleepSessionGapMillis());
         List<HealthDataType> types = query.getTypes();
-        for (int i = 0; i < types.size(); i++) {
-            copy.addType(types.get(i));
+        for (HealthDataType type : types) {
+            copy.addType(type);
         }
         List<String> sources = query.getSources();
-        for (int i = 0; i < sources.size(); i++) {
-            copy.addSource(sources.get(i));
+        for (String source : sources) {
+            copy.addSource(source);
         }
         return copy;
     }
@@ -347,7 +348,8 @@ public class HealthStore {
             final AsyncResource<List<HealthSample>> out, String pageToken) {
         query.setPageToken(pageToken);
         readSamplePage(query).onResult(
-                new com.codename1.util.AsyncResult<SamplePage>() {
+                new AsyncResult<SamplePage>() {
+            @Override
             public void onReady(SamplePage page, Throwable err) {
                 if (err != null) {
                     out.error(err);
@@ -390,7 +392,8 @@ public class HealthStore {
             return out;
         }
         final AsyncResource<SamplePage> raw = new AsyncResource<SamplePage>();
-        raw.onResult(new com.codename1.util.AsyncResult<SamplePage>() {
+        raw.onResult(new AsyncResult<SamplePage>() {
+            @Override
             public void onReady(SamplePage page, Throwable err) {
                 if (err != null) {
                     out.error(err);
@@ -419,8 +422,7 @@ public class HealthStore {
             throws HealthException {
         List<HealthSample> in = page.getSamples();
         List<HealthSample> outSamples = new ArrayList<HealthSample>(in.size());
-        for (int i = 0; i < in.size(); i++) {
-            HealthSample s = in.get(i);
+        for (HealthSample s : in) {
             if (query.isFlattenSeries() && s instanceof SeriesSample) {
                 SeriesSample series = (SeriesSample) s;
                 for (int j = 0; j < series.size(); j++) {
@@ -435,6 +437,7 @@ public class HealthStore {
                 page.isTruncated());
     }
 
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     private HealthSample normalize(HealthSample s, SampleQuery query)
             throws HealthException {
         if (!(s instanceof QuantitySample)) {
@@ -487,6 +490,149 @@ public class HealthStore {
         }
         doAggregate(query, bucketBoundaries(query), out);
         return out;
+    }
+
+    /// Aggregates raw samples into the query's buckets.
+    ///
+    /// This is the one implementation of the arithmetic. Ports that have a
+    /// native aggregation API can override [#doAggregate] and use it; ports
+    /// that do not get this for free, which is what stops a total computed
+    /// on iOS from disagreeing with the same total computed on Android
+    /// because two implementations rounded differently.
+    protected final List<AggregateResult> aggregateSamples(
+            AggregateQuery query, long[] boundaries,
+            List<HealthSample> samples) {
+        HealthTimeRange range =
+                query.getTimeRange().resolve(System.currentTimeMillis());
+        List<AggregateResult> results = new ArrayList<AggregateResult>();
+        for (int b = 0; b + 1 < boundaries.length; b++) {
+            long start = boundaries[b];
+            long end = boundaries[b + 1];
+            AggregateResult bucket = new AggregateResult(start, end);
+            for (HealthDataType type : query.getTypes()) {
+                aggregateInto(bucket, query, type, start, end, range,
+                        samples);
+            }
+            results.add(bucket);
+        }
+        return results;
+    }
+
+    /// Computes one type's metrics over one bucket.
+    ///
+    /// Buckets with no data are left empty rather than filled with zeros,
+    /// which is what lets a chart draw a gap where the user's phone was in
+    /// a drawer instead of a flat line at zero.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
+    private static void aggregateInto(AggregateResult bucket,
+            AggregateQuery query, HealthDataType type, long start, long end,
+            HealthTimeRange range, List<HealthSample> samples) {
+        HealthUnit unit = query.getUnit() != null ? query.getUnit()
+                : type.getCanonicalUnit();
+        List<QuantitySample> inBucket = new ArrayList<QuantitySample>();
+        long durationMillis = 0;
+        int count = 0;
+        for (HealthSample s : samples) {
+            if (s.getType() != type) {
+                continue;
+            }
+            if (s.getStartMillis() >= end || s.getEndMillis() < start) {
+                continue;
+            }
+            if (s.getStartMillis() < range.getStartMillis()
+                    || s.getStartMillis() >= range.getEndMillis()) {
+                continue;
+            }
+            if (!sourceAllowed(s, query)) {
+                continue;
+            }
+            count++;
+            durationMillis += Math.max(1, s.getDurationMillis());
+            if (s instanceof QuantitySample) {
+                inBucket.add((QuantitySample) s);
+            }
+        }
+        bucket.setSampleCount(type, count);
+        if (count == 0) {
+            return;
+        }
+        List<AggregateMetric> metrics = query.getMetrics();
+        for (AggregateMetric metric : metrics) {
+            if (metric == AggregateMetric.COUNT) {
+                bucket.put(type, metric,
+                        new HealthQuantity(count, HealthUnit.COUNT));
+                continue;
+            }
+            if (metric == AggregateMetric.DURATION) {
+                bucket.put(type, metric, new HealthQuantity(durationMillis,
+                        HealthUnit.MILLISECOND));
+                continue;
+            }
+            if (inBucket.isEmpty() || unit == null) {
+                continue;
+            }
+            bucket.put(type, metric,
+                    new HealthQuantity(compute(metric, inBucket, unit), unit));
+        }
+    }
+
+    private static boolean sourceAllowed(HealthSample s,
+            AggregateQuery query) {
+        List<String> sources = query.getSources();
+        if (sources.isEmpty()) {
+            return true;
+        }
+        return s.getSource() != null
+                && sources.contains(s.getSource().getBundleId());
+    }
+
+    /// Applies one metric to the samples in a bucket.
+    ///
+    /// The average is duration-weighted, so a heart rate held across ten
+    /// minutes counts for more than a single spot reading -- an
+    /// unweighted mean over irregularly-sampled data is the classic way to
+    /// make a chart disagree with the platform's own summary.
+    private static double compute(AggregateMetric metric,
+            List<QuantitySample> in, HealthUnit unit) {
+        if (metric == AggregateMetric.TOTAL) {
+            double sum = 0;
+            for (QuantitySample inItem : in) {
+                sum += inItem.getValue(unit);
+            }
+            return sum;
+        }
+        if (metric == AggregateMetric.MINIMUM) {
+            double min = Double.MAX_VALUE;
+            for (QuantitySample inItem : in) {
+                min = Math.min(min, inItem.getValue(unit));
+            }
+            return min;
+        }
+        if (metric == AggregateMetric.MAXIMUM) {
+            double max = -Double.MAX_VALUE;
+            for (QuantitySample inItem : in) {
+                max = Math.max(max, inItem.getValue(unit));
+            }
+            return max;
+        }
+        if (metric == AggregateMetric.LATEST) {
+            QuantitySample latest = in.get(0);
+            for (int i = 1; i < in.size(); i++) {
+                if (in.get(i).getStartMillis() > latest.getStartMillis()) {
+                    latest = in.get(i);
+                }
+            }
+            return latest.getValue(unit);
+        }
+        // AVERAGE, duration-weighted.
+        double weighted = 0;
+        double totalWeight = 0;
+        for (QuantitySample s : in) {
+            double weight = Math.max(1, s.getDurationMillis());
+            weighted += s.getValue(unit) * weight;
+            totalWeight += weight;
+        }
+        return totalWeight == 0 ? 0 : weighted / totalWeight;
     }
 
     /// Computes the bucket boundaries for a query, as `n+1` timestamps
@@ -556,8 +702,8 @@ public class HealthStore {
         }
         List<HealthSample> prepared = new ArrayList<HealthSample>();
         try {
-            for (int i = 0; i < samples.size(); i++) {
-                prepared.add(validateForWrite(samples.get(i)));
+            for (HealthSample sample : samples) {
+                prepared.add(validateForWrite(sample));
             }
         } catch (HealthException ex) {
             out.error(ex);
@@ -582,19 +728,20 @@ public class HealthStore {
         AsyncResource<HealthWriteResult> chunkResult =
                 new AsyncResource<HealthWriteResult>();
         chunkResult.onResult(
-                new com.codename1.util.AsyncResult<HealthWriteResult>() {
+                new AsyncResult<HealthWriteResult>() {
+            @Override
             public void onReady(HealthWriteResult value, Throwable err) {
                 if (err != null) {
                     out.error(err);
                     return;
                 }
                 List<String> ids = value.getSampleIds();
-                for (int i = 0; i < ids.size(); i++) {
-                    accumulated.addSampleId(ids.get(i));
+                for (String id : ids) {
+                    accumulated.addSampleId(id);
                 }
                 List<String> rejects = value.getRejections();
-                for (int i = 0; i < rejects.size(); i++) {
-                    accumulated.addRejection(rejects.get(i));
+                for (String reject : rejects) {
+                    accumulated.addRejection(reject);
                 }
                 writeChunk(all, nextFrom, accumulated, out);
             }
@@ -602,6 +749,7 @@ public class HealthStore {
         doWrite(chunk, chunkResult);
     }
 
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     private HealthSample validateForWrite(HealthSample sample)
             throws HealthException {
         if (sample == null) {
@@ -647,9 +795,7 @@ public class HealthStore {
                         q.getStartMillis(), q.getEndMillis());
         converted.setRecordingMethod(q.getRecordingMethod());
         Map<String, String> meta = q.getMetadata();
-        for (java.util.Iterator<Map.Entry<String, String>> it =
-                meta.entrySet().iterator(); it.hasNext();) {
-            Map.Entry<String, String> e = it.next();
+        for (Map.Entry<String, String> e : meta.entrySet()) {
             converted.putMetadata(e.getKey(), e.getValue());
         }
         return converted;
@@ -725,6 +871,7 @@ public class HealthStore {
 
     private HealthSubscription register(SubscriptionRequest request,
             HealthChangeListener listener) {
+        ensureSubscriptionsRestored();
         if (request == null) {
             throw new IllegalArgumentException(
                     "subscribe needs a request");
@@ -732,7 +879,10 @@ public class HealthStore {
         try {
             request.validate();
         } catch (HealthException ex) {
-            throw new IllegalArgumentException(ex.getMessage());
+            IllegalArgumentException wrapped =
+                    new IllegalArgumentException(ex.getMessage());
+            wrapped.initCause(ex);
+            throw wrapped;
         }
         HealthSubscription sub = new HealthSubscription(this,
                 request.getId(), request.getTypes(), isPushDelivery());
@@ -755,12 +905,28 @@ public class HealthStore {
         return sub;
     }
 
+    /// Restores persisted subscriptions once, before anything reads or
+    /// mutates the registry.
+    ///
+    /// Deliberately lazy rather than eager: restoring calls into
+    /// `doSubscribe`, so it cannot run until the port is fully built.
+    private void ensureSubscriptionsRestored() {
+        synchronized (subscriptions) {
+            if (subscriptionsRestored) {
+                return;
+            }
+            subscriptionsRestored = true;
+        }
+        restoreSubscriptions();
+    }
+
     /// Cancels a subscription and discards its persisted cursor.
     /// Idempotent.
     public final void unsubscribe(String subscriptionId) {
         if (subscriptionId == null) {
             return;
         }
+        ensureSubscriptionsRestored();
         HealthSubscription sub;
         synchronized (subscriptions) {
             sub = subscriptions.remove(subscriptionId);
@@ -779,6 +945,7 @@ public class HealthStore {
 
     /// Every currently registered subscription.
     public final List<HealthSubscription> getSubscriptions() {
+        ensureSubscriptionsRestored();
         synchronized (subscriptions) {
             return new ArrayList<HealthSubscription>(subscriptions.values());
         }
@@ -794,6 +961,7 @@ public class HealthStore {
     /// closed.
     public final AsyncResource<Integer> drainChanges() {
         AsyncResource<Integer> out = new AsyncResource<Integer>();
+        ensureSubscriptionsRestored();
         if (!isSupported()) {
             out.complete(Integer.valueOf(0));
             return out;
@@ -849,6 +1017,7 @@ public class HealthStore {
             final HealthChangeListener listener, final HealthChangeBatch batch,
             final HealthSubscription subscription) {
         return new Runnable() {
+            @Override
             public void run() {
                 try {
                     listener.healthDataChanged(batch);
@@ -905,12 +1074,21 @@ public class HealthStore {
     private static HealthChangeListener adaptBackgroundListener(
             final HealthBackgroundListener bg) {
         return new HealthChangeListener() {
+            @Override
             public void healthDataChanged(HealthChangeBatch batch) {
                 bg.healthDataChanged(batch);
             }
         };
     }
 
+    /// Guards the one-shot restore in [#ensureSubscriptionsRestored].
+    private boolean subscriptionsRestored;
+
+    /// Volatile because the build-generated factory is installed once
+    /// during startup and then read from whatever thread the platform
+    /// delivers a background batch on. A lock here would serialise
+    /// delivery for a field that is written exactly once.
+    @SuppressWarnings("PMD.AvoidUsingVolatile")
     private static volatile HealthBackgroundListenerFactory
             backgroundListenerFactory;
 
@@ -947,10 +1125,17 @@ public class HealthStore {
 
     /// Re-registers every subscription persisted by a previous launch.
     ///
-    /// **Ports must call this from their constructor.** It is what makes a
-    /// subscription survive the process being killed: without it, an app
-    /// relaunched into the background by iOS has no idea it was ever
-    /// watching anything.
+    /// This is what makes a subscription survive the process being killed:
+    /// without it, an app relaunched into the background has no idea it was
+    /// ever watching anything.
+    ///
+    /// It runs on its own, the first time anything touches subscriptions --
+    /// see [#ensureSubscriptionsRestored]. It used to be documented as
+    /// something ports had to call from their constructor, which no port
+    /// did, so persisted subscriptions were silently never restored on any
+    /// platform. A constructor could not have called it safely anyway: it
+    /// dispatches to `doSubscribe`, which a subclass has not finished
+    /// initialising at that point.
     protected final void restoreSubscriptions() {
         String stored = Preferences.get(PREF_SUBS, "");
         if (stored.length() == 0) {
@@ -958,8 +1143,8 @@ public class HealthStore {
         }
         String[] entries = com.codename1.util.StringUtil
                 .tokenize(stored, '\n').toArray(new String[0]);
-        for (int i = 0; i < entries.length; i++) {
-            SubscriptionRequest req = parseSubscription(entries[i]);
+        for (String entrie : entries) {
+            SubscriptionRequest req = parseSubscription(entrie);
             if (req == null) {
                 continue;
             }
@@ -1004,13 +1189,13 @@ public class HealthStore {
     private void rememberSubscription(SubscriptionRequest request) {
         StringBuilder sb = new StringBuilder();
         List<String> kept = readStoredEntries(request.getId());
-        for (int i = 0; i < kept.size(); i++) {
-            sb.append(kept.get(i)).append('\n');
+        for (String keptItem : kept) {
+            sb.append(keptItem).append('\n');
         }
         sb.append(request.getId());
         List<HealthDataType> types = request.getTypes();
-        for (int i = 0; i < types.size(); i++) {
-            sb.append('\t').append(types.get(i).getId());
+        for (HealthDataType type : types) {
+            sb.append('\t').append(type.getId());
         }
         Preferences.set(PREF_SUBS, sb.toString());
     }
@@ -1035,8 +1220,7 @@ public class HealthStore {
         }
         List<String> entries = com.codename1.util.StringUtil
                 .tokenize(stored, '\n');
-        for (int i = 0; i < entries.size(); i++) {
-            String e = entries.get(i);
+        for (String e : entries) {
             if (e.trim().length() == 0) {
                 continue;
             }
@@ -1073,9 +1257,96 @@ public class HealthStore {
 
     /// Computes bucketed aggregates. `boundaries` holds `n+1` timestamps
     /// bounding `n` buckets, already daylight-saving correct.
+    ///
+    /// Unlike the rest of the port SPI this does **not** default to
+    /// NOT_SUPPORTED. Neither HealthKit nor Health Connect gives us an
+    /// aggregation we can use directly for every metric this API exposes,
+    /// so the default reads the raw samples and runs the shared arithmetic
+    /// in [#aggregateSamples]. A port only overrides this when its native
+    /// aggregation is genuinely better -- and if it does, it owes the same
+    /// answers.
     protected void doAggregate(AggregateQuery query, long[] boundaries,
             AsyncResource<List<AggregateResult>> out) {
-        failNotSupported(out);
+        aggregateByReadingSamples(query, boundaries, out);
+    }
+
+    /// The fallback aggregation: read every requested type over the query's
+    /// range, then bucket the samples locally.
+    ///
+    /// Reads one type at a time because HealthKit accepts only one type per
+    /// query, and it is the narrower contract of the two.
+    protected final void aggregateByReadingSamples(AggregateQuery query,
+            long[] boundaries, AsyncResource<List<AggregateResult>> out) {
+        if (boundaries.length < 2) {
+            out.complete(new ArrayList<AggregateResult>());
+            return;
+        }
+        HealthTimeRange range =
+                query.getTimeRange().resolve(System.currentTimeMillis());
+        new AggregateFallback(this, query, boundaries, out,
+                new ArrayList<HealthDataType>(query.getTypes()), range)
+                .next();
+    }
+
+    /// Drives the fallback one type at a time, accumulating as it goes.
+    ///
+    /// Named rather than anonymous so the EDT hop carries no implicit
+    /// reference to the enclosing store.
+    private static final class AggregateFallback
+            implements AsyncResult<List<HealthSample>> {
+
+        private final HealthStore store;
+        private final AggregateQuery query;
+        private final long[] boundaries;
+        private final AsyncResource<List<AggregateResult>> out;
+        private final List<HealthDataType> types;
+        private final HealthTimeRange range;
+        private final List<HealthSample> collected =
+                new ArrayList<HealthSample>();
+        private int index;
+
+        AggregateFallback(HealthStore store, AggregateQuery query,
+                long[] boundaries, AsyncResource<List<AggregateResult>> out,
+                List<HealthDataType> types, HealthTimeRange range) {
+            this.store = store;
+            this.query = query;
+            this.boundaries = boundaries;
+            this.out = out;
+            this.types = types;
+            this.range = range;
+        }
+
+        void next() {
+            if (index >= types.size()) {
+                out.complete(store.aggregateSamples(query, boundaries,
+                        collected));
+                return;
+            }
+            SampleQuery q = new SampleQuery()
+                    .addType(types.get(index))
+                    .setTimeRange(HealthTimeRange.between(
+                            range.getStartMillis(), range.getEndMillis()));
+            for (String source : query.getSources()) {
+                q.addSource(source);
+            }
+            index++;
+            store.readSamples(q).onResult(this);
+        }
+
+        @Override
+        public void onReady(List<HealthSample> value,
+                Throwable error) {
+            if (error != null) {
+                // One unreadable type must not silently produce a total
+                // that looks complete. The whole aggregate fails.
+                out.error(error);
+                return;
+            }
+            if (value != null) {
+                collected.addAll(value);
+            }
+            next();
+        }
     }
 
     /// Writes a chunk no larger than [#getMaxWriteBatchSize()], already
@@ -1128,8 +1399,7 @@ public class HealthStore {
 
     private void requireSupportedTypes(List<HealthDataType> types)
             throws HealthException {
-        for (int i = 0; i < types.size(); i++) {
-            HealthDataType t = types.get(i);
+        for (HealthDataType t : types) {
             if (!isTypeSupported(t)) {
                 throw new HealthException(HealthError.TYPE_NOT_SUPPORTED,
                         t.getId() + " is not available on this platform");

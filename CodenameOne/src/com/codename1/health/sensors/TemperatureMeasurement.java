@@ -123,6 +123,7 @@ public final class TemperatureMeasurement {
         return timestampMillis;
     }
 
+    @Override
     public String toString() {
         return "TemperatureMeasurement[" + celsius + " degC]";
     }

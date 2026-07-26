@@ -80,13 +80,47 @@ public final class HealthWire {
     /// type with no Health Connect equivalent can never appear in a
     /// payload, and claiming to support it would produce queries the
     /// bridge cannot answer.
+    /// Types the Health Connect bridge can actually read.
+    ///
+    /// Not every portable type: having a Health Connect *permission* is not
+    /// the same as having a record shape the bridge can turn into a sample.
+    /// Reporting the wider set made the store advertise types that passed
+    /// validation and then failed at read time with an invalid-argument
+    /// error, which is a worse answer than "not supported here".
+    ///
+    /// Kept in step with `CN1HealthConnectBridge.recordClassFor` by
+    /// `HealthBridgeTokenTableTest`, which parses the Kotlin and fails the
+    /// build when the two drift.
+    private static final String ANDROID_READABLE =
+            ",steps,distance_walking_running,distance_cycling,"
+            + "distance_swimming,flights_climbed,elevation_gained,"
+            + "active_energy,wheelchair_pushes,hydration,heart_rate,"
+            + "resting_heart_rate,oxygen_saturation,respiratory_rate,"
+            + "body_temperature,basal_body_temperature,vo2_max,"
+            + "blood_glucose,body_mass,lean_body_mass,bone_mass,"
+            + "body_fat_percentage,height,power,speed,cycling_cadence,"
+            + "running_cadence,";
+
+    /// Types the bridge can write. Narrower than the readable set: the
+    /// series-shaped types have no single-value write form.
+    private static final String ANDROID_WRITABLE =
+            ",steps,distance_walking_running,distance_cycling,"
+            + "distance_swimming,flights_climbed,elevation_gained,"
+            + "active_energy,wheelchair_pushes,hydration,body_mass,"
+            + "lean_body_mass,bone_mass,body_fat_percentage,height,"
+            + "resting_heart_rate,oxygen_saturation,respiratory_rate,"
+            + "body_temperature,basal_body_temperature,vo2_max,"
+            + "blood_glucose,heart_rate,";
+
     public static boolean isAndroidSupported(HealthDataType type) {
-        // Every type in HealthDataType has a Health Connect record, by
-        // construction: the builder's permission table is derived from the
-        // same list, and a type with no Health Connect equivalent would
-        // have no permission to declare and so could never be requested.
-        // Keep this in step if a platform-specific type is ever added.
-        return type != null;
+        return type != null
+                && ANDROID_READABLE.indexOf("," + type.getId() + ",") >= 0;
+    }
+
+    /// Whether the Health Connect bridge can write `type`.
+    public static boolean isAndroidWritable(HealthDataType type) {
+        return type != null
+                && ANDROID_WRITABLE.indexOf("," + type.getId() + ",") >= 0;
     }
 
     // ------------------------------------------------------------------
@@ -96,8 +130,7 @@ public final class HealthWire {
     /// Encodes samples as tab-separated lines for a write.
     public static String encodeSamples(List<HealthSample> samples) {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < samples.size(); i++) {
-            HealthSample s = samples.get(i);
+        for (HealthSample s : samples) {
             if (!(s instanceof QuantitySample)) {
                 // Sessions and categories are encoded by the port-specific
                 // bridges, which know their platform's record shapes.

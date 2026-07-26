@@ -52,14 +52,17 @@ public class LocalHealth extends Health {
         this.store = store == null ? new LocalHealthStore() : store;
     }
 
+    @Override
     public boolean isSupported() {
         return true;
     }
 
+    @Override
     public HealthAvailability getAvailability() {
         return HealthAvailability.LOCAL_ONLY;
     }
 
+    @Override
     public HealthStore getStore() {
         return store;
     }

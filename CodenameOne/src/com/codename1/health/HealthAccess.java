@@ -80,6 +80,8 @@ public final class HealthAccess {
         return write;
     }
 
+    @Override
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -91,10 +93,12 @@ public final class HealthAccess {
         return type == other.type && write == other.write;
     }
 
+    @Override
     public int hashCode() {
         return type.getId().hashCode() * 31 + (write ? 1 : 0);
     }
 
+    @Override
     public String toString() {
         return (write ? "write " : "read ") + type.getId();
     }

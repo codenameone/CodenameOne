@@ -83,6 +83,7 @@ public final class WorkoutEvent {
         return label;
     }
 
+    @Override
     public String toString() {
         return "WorkoutEvent[" + kind + " @" + timestampMillis + "]";
     }

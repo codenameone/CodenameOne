@@ -145,6 +145,7 @@ public final class HealthChangeBatch {
                 && deletedSampleIds.isEmpty();
     }
 
+    @Override
     public String toString() {
         return "HealthChangeBatch[" + subscriptionId + " +" + added.size()
                 + " -" + deletedSampleIds.size()

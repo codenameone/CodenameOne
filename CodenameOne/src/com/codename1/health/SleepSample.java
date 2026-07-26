@@ -102,8 +102,8 @@ public final class SleepSample extends SessionSample {
     /// [SleepStage#UNKNOWN], because none of those tell you anything a
     /// hypnogram could show.
     public boolean hasStageDetail() {
-        for (int i = 0; i < stages.size(); i++) {
-            SleepStage s = stages.get(i).getStage();
+        for (SleepStageInterval stage : stages) {
+            SleepStage s = stage.getStage();
             if (s == SleepStage.LIGHT || s == SleepStage.DEEP
                     || s == SleepStage.REM || s == SleepStage.AWAKE
                     || s == SleepStage.OUT_OF_BED) {
@@ -116,8 +116,7 @@ public final class SleepSample extends SessionSample {
     /// The total time in `stage`, summed across every span.
     public long getDurationMillis(SleepStage stage) {
         long total = 0;
-        for (int i = 0; i < stages.size(); i++) {
-            SleepStageInterval iv = stages.get(i);
+        for (SleepStageInterval iv : stages) {
             if (iv.getStage() == stage) {
                 total += iv.getDurationMillis();
             }
@@ -136,8 +135,7 @@ public final class SleepSample extends SessionSample {
             return getDurationMillis();
         }
         long total = 0;
-        for (int i = 0; i < stages.size(); i++) {
-            SleepStageInterval iv = stages.get(i);
+        for (SleepStageInterval iv : stages) {
             SleepStage s = iv.getStage();
             if (s != SleepStage.AWAKE && s != SleepStage.AWAKE_IN_BED
                     && s != SleepStage.OUT_OF_BED) {
@@ -147,6 +145,7 @@ public final class SleepSample extends SessionSample {
         return total;
     }
 
+    @Override
     public String toString() {
         return "SleepSample[" + getStartMillis() + ".." + getEndMillis()
                 + " stages=" + stages.size() + "]";

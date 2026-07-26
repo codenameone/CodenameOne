@@ -218,10 +218,24 @@ class CN1HealthConnectBridge(private val context: Context)
             ?: throw IllegalArgumentException(
                 "Health Connect reads are not implemented for '" + token
                     + "' in this build")
-        requireClient().readRecords(
-            ReadRecordsRequest(type, timeRangeFilter = filter,
-                pageSize = limit)
-        ).records.forEach { appendOne(sb, it, token) }
+        // Health Connect rejects a pageSize above MAX_PAGE_SIZE outright, so
+        // a caller wanting more records than one page holds is served by
+        // walking pages rather than by failing the read. Without this an
+        // ordinary unbounded query throws before it reads anything.
+        var remaining = if (limit > 0) limit else Int.MAX_VALUE
+        var pageToken: String? = null
+        while (remaining > 0) {
+            val page = requireClient().readRecords(
+                ReadRecordsRequest(type, timeRangeFilter = filter,
+                    pageSize = minOf(remaining, MAX_PAGE_SIZE),
+                    pageToken = pageToken))
+            page.records.forEach { appendOne(sb, it, token) }
+            remaining -= page.records.size
+            pageToken = page.pageToken
+            if (pageToken == null || page.records.isEmpty()) {
+                break
+            }
+        }
     }
 
     /**
@@ -603,6 +617,12 @@ class CN1HealthConnectBridge(private val context: Context)
         "sleep", "workout" -> null
         else -> recordClassFor(token)
     }
+
+    /**
+     * Health Connect's own ceiling on `ReadRecordsRequest.pageSize`. A
+     * larger value is not clamped by the library, it is rejected.
+     */
+    private val MAX_PAGE_SIZE = 5000
 
     private fun recordClassFor(token: String) = when (token) {
         "steps" -> StepsRecord::class

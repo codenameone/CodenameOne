@@ -211,8 +211,7 @@ public final class SampleQuery {
                     "limit must be positive, got " + limit);
         }
         if (unit != null) {
-            for (int i = 0; i < types.size(); i++) {
-                HealthDataType t = types.get(i);
+            for (HealthDataType t : types) {
                 HealthUnit canonical = t.getCanonicalUnit();
                 if (canonical == null) {
                     throw new HealthException(HealthError.UNIT_MISMATCH,

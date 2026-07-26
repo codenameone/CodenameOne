@@ -45,9 +45,10 @@ package com.codename1.health.sensors;
 public final class CyclingPowerMeasurement {
 
     private static final int FLAG_PEDAL_BALANCE = 0x0001;
-    private static final int FLAG_PEDAL_BALANCE_REFERENCE = 0x0002;
+    // 0x0002 pedal-power-balance reference and 0x0008 accumulated-torque
+    // source are single-bit qualifiers on the two fields below rather than
+    // presence flags, so they shift nothing and are not read here.
     private static final int FLAG_ACCUMULATED_TORQUE = 0x0004;
-    private static final int FLAG_ACCUMULATED_TORQUE_SOURCE = 0x0008;
     private static final int FLAG_WHEEL_REVOLUTIONS = 0x0010;
     private static final int FLAG_CRANK_REVOLUTIONS = 0x0020;
     private static final int FLAG_EXTREME_FORCE = 0x0040;
@@ -183,6 +184,7 @@ public final class CyclingPowerMeasurement {
         return crankRevolutions >= 0;
     }
 
+    @Override
     public String toString() {
         return "CyclingPowerMeasurement[" + instantaneousPowerWatts + " W]";
     }

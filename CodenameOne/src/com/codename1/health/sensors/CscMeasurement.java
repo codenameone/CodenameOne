@@ -116,6 +116,7 @@ public final class CscMeasurement {
         return crankRevolutions >= 0;
     }
 
+    @Override
     public String toString() {
         return "CscMeasurement[wheel=" + wheelRevolutions + " crank="
                 + crankRevolutions + "]";

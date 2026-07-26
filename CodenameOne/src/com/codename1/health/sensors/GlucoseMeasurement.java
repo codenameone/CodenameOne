@@ -211,6 +211,7 @@ public final class GlucoseMeasurement {
         return sampleLocation == SAMPLE_LOCATION_CONTROL_SOLUTION;
     }
 
+    @Override
     public String toString() {
         return "GlucoseMeasurement[#" + sequenceNumber + " " + mmolPerLiter
                 + " mmol/L]";

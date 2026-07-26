@@ -312,6 +312,7 @@ public final class HealthDataType {
         return Collections.unmodifiableList(ALL);
     }
 
+    @Override
     public String toString() {
         return id;
     }

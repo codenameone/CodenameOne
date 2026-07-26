@@ -1323,6 +1323,11 @@ public final class IOSNative {
     // exist -- still link.
     native boolean hkIsAvailable();
     native boolean hkIsWorkoutSessionSupported();
+    /// Whether the native layer can map this portable type onto a
+    /// HealthKit type at all. Asked rather than assumed: a type with a
+    /// canonical unit is not necessarily one HealthKit knows, and
+    /// advertising it means a query that passes validation and then fails.
+    native boolean hkIsTypeSupported(String typeIdentifier);
     /// Meaningful for WRITE types only. HealthKit deliberately never
     /// discloses read authorization, so there is no read equivalent --
     /// adding one would require inventing an answer.

@@ -118,6 +118,7 @@ public final class HealthSubscription {
         active = false;
     }
 
+    @Override
     public String toString() {
         return "HealthSubscription[" + id + " " + types.size() + " types"
                 + (pushDelivery ? ", push" : ", poll")

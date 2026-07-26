@@ -70,6 +70,7 @@ public final class HealthAnchor {
         return token;
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -81,10 +82,12 @@ public final class HealthAnchor {
         return token == null ? other.token == null : token.equals(other.token);
     }
 
+    @Override
     public int hashCode() {
         return token == null ? 0 : token.hashCode();
     }
 
+    @Override
     public String toString() {
         return "HealthAnchor[" + (token == null ? "none"
                 : token.length() + " chars") + "]";

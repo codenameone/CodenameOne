@@ -86,12 +86,14 @@ class AndroidHealthStore extends HealthStore {
         return out;
     }
 
+    /// Narrower than readable: the series-shaped types have no
+    /// single-value write form in the bridge.
     public boolean isWritable(HealthDataType type) {
-        return isTypeSupported(type);
+        return isTypeSupported(type) && HealthWire.isAndroidWritable(type);
     }
 
     public boolean isDeletable(HealthDataType type) {
-        return isTypeSupported(type);
+        return isTypeSupported(type) && HealthWire.isAndroidWritable(type);
     }
 
     /// Health Connect computes these natively; anything else is derived
@@ -303,22 +305,13 @@ class AndroidHealthStore extends HealthStore {
                 });
     }
 
-    protected void doAggregate(final AggregateQuery query,
-            final long[] boundaries,
-            AsyncResource<List<AggregateResult>> out) {
-        if (failIfNoBridge(out)) {
-            return;
-        }
-        delegate().aggregate(
-                HealthWire.encodeAggregateQuery(query, boundaries),
-                new Bridged<List<AggregateResult>>(out) {
-                    List<AggregateResult> convert(String payload)
-                            throws Exception {
-                        return HealthWire.decodeAggregates(payload, query,
-                                boundaries);
-                    }
-                });
-    }
+    // doAggregate is deliberately not overridden. The bridge returned an
+    // empty payload here and relied on the base class to aggregate the raw
+    // samples instead -- but an empty payload decodes to buckets with no
+    // values, so the fallback never ran and every aggregate came back
+    // empty. Inheriting the base implementation is what actually gets the
+    // shared arithmetic, and it keeps one implementation of it rather than
+    // two that can disagree.
 
     protected void doWrite(List<HealthSample> samples,
             AsyncResource<HealthWriteResult> out) {

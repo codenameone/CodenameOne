@@ -202,8 +202,7 @@ public class SensorSession {
                             + "measurement"));
             return;
         }
-        for (int i = 0; i < samples.size(); i++) {
-            HealthSample s = samples.get(i);
+        for (HealthSample s : samples) {
             synchronized (latest) {
                 latest.put(s.getType().getId(), s);
             }
@@ -217,6 +216,7 @@ public class SensorSession {
     /// A single notification can yield several samples: a cycling power
     /// meter reports power and crank data in one packet, from which both
     /// power and cadence are derived.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     private List<HealthSample> decode(byte[] value, long at) {
         List<HealthSample> out = new ArrayList<HealthSample>(2);
         if (profile == HealthSensorProfile.HEART_RATE) {
@@ -420,9 +420,10 @@ public class SensorSession {
     private static Runnable makeSampleRunnable(final SensorSession session,
             final Object[] listeners, final HealthSample sample) {
         return new Runnable() {
+            @Override
             public void run() {
-                for (int i = 0; i < listeners.length; i++) {
-                    ((SensorSampleListener) listeners[i])
+                for (Object listener : listeners) {
+                    ((SensorSampleListener) listener)
                             .sensorSample(session, sample);
                 }
             }
@@ -432,9 +433,10 @@ public class SensorSession {
     private static Runnable makeStateRunnable(final SensorSession session,
             final Object[] listeners, final SensorSessionState state) {
         return new Runnable() {
+            @Override
             public void run() {
-                for (int i = 0; i < listeners.length; i++) {
-                    ((SensorSampleListener) listeners[i])
+                for (Object listener : listeners) {
+                    ((SensorSampleListener) listener)
                             .sensorStateChanged(session, state);
                 }
             }
@@ -444,15 +446,17 @@ public class SensorSession {
     private static Runnable makeErrorRunnable(final SensorSession session,
             final Object[] listeners, final HealthException error) {
         return new Runnable() {
+            @Override
             public void run() {
-                for (int i = 0; i < listeners.length; i++) {
-                    ((SensorSampleListener) listeners[i])
+                for (Object listener : listeners) {
+                    ((SensorSampleListener) listener)
                             .sensorError(session, error);
                 }
             }
         };
     }
 
+    @Override
     public String toString() {
         return "SensorSession[" + profile.getName() + " " + sensorId + " "
                 + state + "]";

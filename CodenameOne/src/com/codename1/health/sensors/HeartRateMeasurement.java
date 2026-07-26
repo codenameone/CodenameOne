@@ -182,6 +182,7 @@ public final class HeartRateMeasurement {
         return rrIntervalsRaw[i] * RR_UNIT_MILLIS;
     }
 
+    @Override
     public String toString() {
         return "HeartRateMeasurement[" + heartRate + " bpm, rr="
                 + rrIntervalsRaw.length

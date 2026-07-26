@@ -63,11 +63,6 @@ public class WorkoutManager {
 
     private WorkoutSession activeSession;
 
-    /// Created by the framework; obtain the shared instance from
-    /// [com.codename1.health.Health#getWorkouts()].
-    public WorkoutManager() {
-    }
-
     /// Whether the operating system provides a real workout session that
     /// keeps the app alive and owns the recording.
     ///

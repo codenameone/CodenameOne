@@ -158,10 +158,8 @@ public final class AggregateQuery {
             throw new HealthException(HealthError.INVALID_ARGUMENT,
                     "an aggregate query needs a time range");
         }
-        for (int i = 0; i < types.size(); i++) {
-            HealthDataType t = types.get(i);
-            for (int j = 0; j < metrics.size(); j++) {
-                AggregateMetric m = metrics.get(j);
+        for (HealthDataType t : types) {
+            for (AggregateMetric m : metrics) {
                 if (!isMeaningful(t, m)) {
                     throw new HealthException(HealthError.INVALID_ARGUMENT,
                             m + " is not meaningful for " + t.getId()

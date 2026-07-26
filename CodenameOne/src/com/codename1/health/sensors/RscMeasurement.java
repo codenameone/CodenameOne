@@ -127,6 +127,7 @@ public final class RscMeasurement {
         return running;
     }
 
+    @Override
     public String toString() {
         return "RscMeasurement[" + speedMetersPerSecond + " m/s, "
                 + cadenceStepsPerMinute + " spm]";

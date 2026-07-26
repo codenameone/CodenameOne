@@ -242,8 +242,8 @@ public abstract class WorkoutSession {
             out.complete(Boolean.TRUE);
             return out;
         }
-        for (int i = 0; i < samples.size(); i++) {
-            rollUp(samples.get(i));
+        for (HealthSample sample : samples) {
+            rollUp(sample);
         }
         doAddSamples(samples, out);
         return out;
@@ -472,9 +472,10 @@ public abstract class WorkoutSession {
     private static Runnable makeStateRunnable(final WorkoutSession session,
             final Object[] listeners, final WorkoutSessionState state) {
         return new Runnable() {
+            @Override
             public void run() {
-                for (int i = 0; i < listeners.length; i++) {
-                    ((WorkoutSessionListener) listeners[i])
+                for (Object listener : listeners) {
+                    ((WorkoutSessionListener) listener)
                             .workoutStateChanged(session, state);
                 }
             }
@@ -484,9 +485,10 @@ public abstract class WorkoutSession {
     private static Runnable makeStatsRunnable(final WorkoutSession session,
             final Object[] listeners, final HealthDataType type) {
         return new Runnable() {
+            @Override
             public void run() {
-                for (int i = 0; i < listeners.length; i++) {
-                    ((WorkoutSessionListener) listeners[i])
+                for (Object listener : listeners) {
+                    ((WorkoutSessionListener) listener)
                             .workoutStatisticsUpdated(session, type);
                 }
             }
@@ -496,9 +498,10 @@ public abstract class WorkoutSession {
     private static Runnable makeEventRunnable(final WorkoutSession session,
             final Object[] listeners, final WorkoutEvent event) {
         return new Runnable() {
+            @Override
             public void run() {
-                for (int i = 0; i < listeners.length; i++) {
-                    ((WorkoutSessionListener) listeners[i])
+                for (Object listener : listeners) {
+                    ((WorkoutSessionListener) listener)
                             .workoutEvent(session, event);
                 }
             }
@@ -508,9 +511,10 @@ public abstract class WorkoutSession {
     private static Runnable makeFailedRunnable(final WorkoutSession session,
             final Object[] listeners, final HealthException error) {
         return new Runnable() {
+            @Override
             public void run() {
-                for (int i = 0; i < listeners.length; i++) {
-                    ((WorkoutSessionListener) listeners[i])
+                for (Object listener : listeners) {
+                    ((WorkoutSessionListener) listener)
                             .workoutFailed(session, error);
                 }
             }
