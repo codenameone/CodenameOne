@@ -217,12 +217,34 @@ requires the verifier to catch it. It does, immediately:
 |---|---|
 | `CN1_GC_VERIFY_SOFT=1` | report every violating cycle instead of aborting on the first |
 | `CN1_GC_VERIFY_LOG=1` | one line per cycle even when clean (holders, refs checked, reclaim counts, referenced-child age histogram) |
-| `CN1_GC_VERIFY_AGING=1` | ALSO hold previous-epoch survivors to the invariant. Not a gate -- unreachable objects are entitled to dangle -- but a census of landmines, because this collector resurrects unreachable objects routinely (see `CN1_GC_TRACE_MARK`) |
+| `CN1_GC_VERIFY_AGING=1` | ALSO hold previous-epoch survivors to the invariant. **Perturbs the collector** -- it roughly doubles the post-sweep walk, and the extra GC-thread time changes page ageing enough to move other counters by orders of magnitude (measured: early-freed slots 0 vs 205,958 from the same binary). Read it as a rough survey, never as production behaviour, and confirm anything it suggests in the default mode |
 | `CN1_GC_VERIFY_ALL=1` | walk every object, including ones already given up on. Investigation only |
 | `CN1_GC_VERIFY_CENSUS=<class>` | per-cycle age histogram of every resident object of a class. Use it to confirm a driver's hazard set actually ages out instead of being pinned |
 | `CN1_GC_VERIFY_DUMP=<class>` | print holder/child marks for holders of a class |
 | `CN1_GC_TRACE_MARK=<class>` | name the mark pass that re-marks a class each cycle -- the answer to "what is still keeping this alive?", most often `conservative-native-stack`. Add `-DCN1_BIBOP_VALIDATE` to also get the drain parent |
 | `CN1_GC_FAULT=nograce` | fault injection: disable the grace-subtree pass |
+| `CN1_GC_FAULT=earlyfree` | fault injection: restore the pre-fix O(1) page-reclaim bound, which freed slots the per-slot walk keeps |
+| `CN1_GC_DEBUG_EARLY=1` | when `earlyFreed` is nonzero, dump the first few offending pages (epoch, `gcGraceEpoch`, `gcLastMarkedEpoch`, the slot's mark and class) -- which of the page's ageing bounds went stale is the whole diagnosis |
+
+Every run prints a summary at exit, and the harness requires `passes` to be
+nonzero -- a workload that never completes a collection cycle never runs the
+verifier, so a clean result from it would mean only that nothing was checked:
+
+```
+[GC-VERIFY] SUMMARY passes=5 refs=952340 violations=0 earlyFreed=0 resurrected=0 resurrectedDangling=0
+```
+
+- `earlyFreed` -- slots the O(1) whole-page reclaim dropped that the per-slot
+  walk would have KEPT. That shortcut claims a byte-identical outcome, so any
+  nonzero value is the two rules disagreeing about when an object dies, which
+  is how a kept object ends up referencing reclaimed memory. Must be 0.
+- `resurrected` / `resurrectedDangling` -- objects marked live again after
+  ageing past the sweep's keep threshold (overwhelmingly by the conservative
+  native-stack scan revisiting a returned frame's leftover word), and how many
+  of those still referenced reclaimed memory. The second must be 0; the first
+  is informational, and is normally 0 or 1 because a stale word that revives an
+  object usually keeps marking it every cycle rather than letting it age out
+  and come back.
 
 The mode is deliberately asymmetric about uncertainty: a reference it cannot
 place (allocated after the snapshot, unmapped, mid-construction body) is
