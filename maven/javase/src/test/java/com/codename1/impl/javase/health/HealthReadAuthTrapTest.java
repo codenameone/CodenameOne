@@ -1,0 +1,245 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.javase.health;
+
+import com.codename1.health.HealthAuthorizationStatus;
+import com.codename1.health.HealthDataType;
+import com.codename1.health.HealthError;
+import com.codename1.health.HealthException;
+import com.codename1.health.HealthQuantity;
+import com.codename1.health.HealthSample;
+import com.codename1.health.HealthTimeRange;
+import com.codename1.health.HealthUnit;
+import com.codename1.health.QuantitySample;
+import com.codename1.health.SampleQuery;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * The single highest-value behaviour the health simulator reproduces.
+ *
+ * <p>HealthKit deliberately refuses to disclose read authorization: a denied
+ * read looks exactly like having no data, so that an app cannot infer what a
+ * user is choosing to hide. A developer testing only against a permissive
+ * store will not meet this until review or production. These cases pin that
+ * the simulator reproduces it faithfully, and that switching to Health
+ * Connect's behaviour makes the same script fail loudly instead.</p>
+ */
+class HealthReadAuthTrapTest {
+
+    private SimulatedHealthStore store;
+
+    @BeforeEach
+    void createStore() {
+        store = new SimulatedHealthStore();
+        QuantitySample s = QuantitySample.create(HealthDataType.HEART_RATE,
+                new HealthQuantity(62, HealthUnit.COUNT_PER_MINUTE),
+                1_767_225_600_000L);
+        List<HealthSample> seed = new ArrayList<HealthSample>();
+        seed.add(s);
+        store.seed(seed);
+    }
+
+    private SampleQuery heartRateQuery() {
+        return new SampleQuery().addType(HealthDataType.HEART_RATE)
+                .setTimeRange(HealthTimeRange.between(1_767_000_000_000L,
+                        1_768_000_000_000L));
+    }
+
+    private static Throwable errorOf(AsyncResource<?> r) {
+        final Throwable[] err = new Throwable[1];
+        r.except(new SuccessCallback<Throwable>() {
+            public void onSucess(Throwable t) {
+                err[0] = t;
+            }
+        });
+        return err[0];
+    }
+
+    /** The permissive baseline: data is there and comes back. */
+    @Test
+    void grantedReadReturnsData() {
+        store.setReadPermission(HealthDataType.HEART_RATE,
+                SimulatedHealthStore.ReadAuthScript.GRANTED);
+        List<HealthSample> read = store.readSamples(heartRateQuery()).get();
+        assertEquals(1, read.size());
+    }
+
+    /**
+     * The trap, end to end: authorization "succeeds", the status is
+     * UNKNOWN, and the query returns empty <em>with no error</em>. An app
+     * that reports "you denied access" here would be guessing.
+     */
+    @Test
+    void iosDeniedReadIsIndistinguishableFromHavingNoData() {
+        store.setReadAuthorizationPolicy(
+                SimulatedHealthStore.ReadAuthPolicy.IOS_OPAQUE);
+        store.setReadPermission(HealthDataType.HEART_RATE,
+                SimulatedHealthStore.ReadAuthScript.DENIED_SILENT);
+
+        AsyncResource<Boolean> auth = store.requestAuthorization(
+                com.codename1.health.HealthAccess.read(
+                        HealthDataType.HEART_RATE));
+        assertEquals(Boolean.TRUE, auth.get(),
+                "the authorization flow completes even when nothing was"
+                        + " granted -- true means 'the user was asked'");
+
+        assertEquals(HealthAuthorizationStatus.UNKNOWN,
+                store.getReadAuthorizationStatus(HealthDataType.HEART_RATE),
+                "iOS never discloses read authorization");
+
+        AsyncResource<List<HealthSample>> read =
+                store.readSamples(heartRateQuery());
+        assertNull(errorOf(read), "a denied read must not surface an error");
+        assertTrue(read.get().isEmpty(),
+                "a denied read is silently empty");
+    }
+
+    /**
+     * The other half of the trap: a genuinely empty store produces exactly
+     * the same observations, which is why the two cannot be told apart and
+     * why the API offers no hasReadPermission.
+     */
+    @Test
+    void grantedButNoDataIsObservationallyIdenticalToDenial() {
+        store.setReadAuthorizationPolicy(
+                SimulatedHealthStore.ReadAuthPolicy.IOS_OPAQUE);
+        store.setReadPermission(HealthDataType.HEART_RATE,
+                SimulatedHealthStore.ReadAuthScript.GRANTED_BUT_NO_DATA);
+
+        assertEquals(HealthAuthorizationStatus.UNKNOWN,
+                store.getReadAuthorizationStatus(HealthDataType.HEART_RATE));
+        AsyncResource<List<HealthSample>> read =
+                store.readSamples(heartRateQuery());
+        assertNull(errorOf(read));
+        assertTrue(read.get().isEmpty());
+    }
+
+    /** Health Connect answers honestly and fails loudly. */
+    @Test
+    void androidDeniedReadFailsWithUnauthorized() {
+        store.setReadAuthorizationPolicy(
+                SimulatedHealthStore.ReadAuthPolicy.ANDROID_EXPLICIT);
+        store.setReadPermission(HealthDataType.HEART_RATE,
+                SimulatedHealthStore.ReadAuthScript.DENIED_SILENT);
+
+        assertEquals(HealthAuthorizationStatus.DENIED,
+                store.getReadAuthorizationStatus(HealthDataType.HEART_RATE),
+                "Health Connect read permission is an ordinary grant");
+
+        Throwable err = errorOf(store.readSamples(heartRateQuery()));
+        assertNotNull(err);
+        assertEquals(HealthError.UNAUTHORIZED,
+                ((HealthException) err).getError());
+    }
+
+    /**
+     * IOS_OPAQUE is the default precisely because it is the surprising
+     * behaviour -- a developer must meet it in the simulator, not in
+     * review.
+     */
+    @Test
+    void iosOpaqueIsTheDefaultPolicy() {
+        assertEquals(SimulatedHealthStore.ReadAuthPolicy.IOS_OPAQUE,
+                new SimulatedHealthStore().getReadAuthorizationPolicy());
+    }
+
+    /** Write authorization is truthfully reportable on both platforms. */
+    @Test
+    void writeAuthorizationIsAlwaysAnswerable() {
+        store.setWritePermission(HealthDataType.BODY_MASS,
+                HealthAuthorizationStatus.DENIED);
+        assertEquals(HealthAuthorizationStatus.DENIED,
+                store.getWriteAuthorizationStatus(HealthDataType.BODY_MASS));
+        store.setWritePermission(HealthDataType.BODY_MASS,
+                HealthAuthorizationStatus.AUTHORIZED);
+        assertEquals(HealthAuthorizationStatus.AUTHORIZED,
+                store.getWriteAuthorizationStatus(HealthDataType.BODY_MASS));
+    }
+
+    /** A denied write fails, unlike a denied read. */
+    @Test
+    void deniedWriteFails() {
+        store.setWritePermission(HealthDataType.BODY_MASS,
+                HealthAuthorizationStatus.DENIED);
+        QuantitySample w = QuantitySample.create(HealthDataType.BODY_MASS,
+                new HealthQuantity(70, HealthUnit.KILOGRAM),
+                1_767_225_600_000L);
+        Throwable err = errorOf(store.write(w));
+        assertNotNull(err, "a denied write is reportable and must fail");
+        assertEquals(HealthError.UNAUTHORIZED,
+                ((HealthException) err).getError());
+    }
+
+    /** Fault injection is one-shot, so a test can assert recovery. */
+    @Test
+    void primedFailureFiresOnceThenRecovers() {
+        store.setReadPermission(HealthDataType.HEART_RATE,
+                SimulatedHealthStore.ReadAuthScript.GRANTED);
+        store.failNext("query", HealthError.DATABASE_INACCESSIBLE,
+                "device locked");
+
+        Throwable err = errorOf(store.readSamples(heartRateQuery()));
+        assertNotNull(err);
+        assertEquals(HealthError.DATABASE_INACCESSIBLE,
+                ((HealthException) err).getError());
+
+        assertEquals(1, store.readSamples(heartRateQuery()).get().size(),
+                "the next call must succeed");
+    }
+
+    /**
+     * An unavailable provider fails every operation with NOT_SUPPORTED
+     * rather than pretending the store is simply empty.
+     */
+    @Test
+    void unavailableStoreFailsRatherThanReturningEmpty() {
+        store.setAvailable(false);
+        assertFalse(store.isSupported());
+        Throwable err = errorOf(store.readSamples(heartRateQuery()));
+        assertNotNull(err);
+        assertEquals(HealthError.NOT_SUPPORTED,
+                ((HealthException) err).getError());
+    }
+
+    @Test
+    void resetScriptsRestoresDefaultsWithoutDiscardingData() {
+        store.setAvailable(false);
+        store.setAllReadPermissions(
+                SimulatedHealthStore.ReadAuthScript.DENIED_ERROR);
+        store.resetScripts();
+
+        assertTrue(store.isSupported());
+        assertEquals(SimulatedHealthStore.ReadAuthPolicy.IOS_OPAQUE,
+                store.getReadAuthorizationPolicy());
+        assertEquals(1, store.readSamples(heartRateQuery()).get().size(),
+                "resetScripts must not discard seeded data");
+    }
+}

@@ -14942,7 +14942,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public com.codename1.health.Health getHealth() {
         if (health == null) {
-            health = new com.codename1.impl.health.LocalHealth();
+            health = HealthSimulatorHooks.createSimulatedHealth();
         }
         return health;
     }
