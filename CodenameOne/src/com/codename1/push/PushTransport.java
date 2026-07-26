@@ -23,80 +23,70 @@
  */
 package com.codename1.push;
 
-/**
- * Low-level native push integration for a CN1Lib or private provider.
- *
- * <p>A custom transport owns the provider SDK and native registration flow.
- * When installed with {@link PushClient.Builder#transport(PushTransport)},
- * BuildCloud registration is disabled. The matching
- * {@link PushRegistrationSink} is responsible for synchronizing tokens with
- * the application's server.</p>
- *
- * <p>The transport must invoke exactly one registration result callback for
- * each {@link #register(Callback)} attempt, report token rotations through
- * {@link Callback#registered(PushSubscription)}, and pass complete schema-3
- * JSON envelopes to {@link Callback#message(String)}. The callback accepts
- * calls from native threads; {@link PushClient} moves application callbacks to
- * the EDT.</p>
- */
+///
+/// Low-level native push integration for a CN1Lib or private provider.
+///
+/// <p>A custom transport owns the provider SDK and native registration flow.
+/// When installed with {@link PushClient.Builder#transport(PushTransport)},
+/// BuildCloud registration is disabled. The matching
+/// {@link PushRegistrationSink} is responsible for synchronizing tokens with
+/// the application's server.</p>
+///
+/// <p>The transport must invoke exactly one registration result callback for
+/// each {@link #register(Callback)} attempt, report token rotations through
+/// {@link Callback#registered(PushSubscription)}, and pass complete schema-3
+/// JSON envelopes to {@link Callback#message(String)}. The callback accepts
+/// calls from native threads; {@link PushClient} moves application callbacks to
+/// the EDT.</p>
 public interface PushTransport {
-    /**
-     * Returns the stable provider identifier stored with subscriptions.
-     *
-     * @return a non-empty identifier such as {@code company-push}
-     */
+    ///
+    /// Returns the stable provider identifier stored with subscriptions.
+    ///
+    /// @return a non-empty identifier such as {@code company-push}
     String getId();
 
-    /**
-     * Tests whether this transport is available on the current device.
-     *
-     * @return {@code true} when registration can be attempted
-     */
+    ///
+    /// Tests whether this transport is available on the current device.
+    ///
+    /// @return {@code true} when registration can be attempted
     boolean isSupported();
 
-    /**
-     * Starts or refreshes native registration.
-     *
-     * @param callback the callback used for registration and incoming messages
-     */
+    ///
+    /// Starts or refreshes native registration.
+    ///
+    /// @param callback the callback used for registration and incoming messages
     void register(Callback callback);
 
-    /**
-     * Removes the native subscription.
-     *
-     * @param callback the callback that must receive {@link Callback#unregistered()}
-     *                 when removal completes
-     */
+    ///
+    /// Removes the native subscription.
+    ///
+    /// @param callback the callback that must receive {@link Callback#unregistered()}
+    ///                 when removal completes
     void unregister(Callback callback);
 
-    /**
-     * Receives events emitted by a custom transport.
-     */
+    ///
+    /// Receives events emitted by a custom transport.
     interface Callback {
-        /**
-         * Reports initial registration or a later token rotation.
-         *
-         * @param subscription the current subscription
-         */
+        ///
+        /// Reports initial registration or a later token rotation.
+        ///
+        /// @param subscription the current subscription
         void registered(PushSubscription subscription);
 
-        /**
-         * Confirms that native unregistration completed.
-         */
+        ///
+        /// Confirms that native unregistration completed.
         void unregistered();
 
-        /**
-         * Delivers a complete schema-3 JSON envelope.
-         *
-         * @param envelopeJson the encoded envelope
-         */
+        ///
+        /// Delivers a complete schema-3 JSON envelope.
+        ///
+        /// @param envelopeJson the encoded envelope
         void message(String envelopeJson);
 
-        /**
-         * Reports a registration or transport error.
-         *
-         * @param error the error details
-         */
+        ///
+        /// Reports a registration or transport error.
+        ///
+        /// @param error the error details
         void failed(PushError error);
     }
 }

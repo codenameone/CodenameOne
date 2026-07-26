@@ -21,13 +21,12 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-/**
- * Typed push notification registration, delivery, and custom transport APIs.
- *
- * <p>Applications use {@link com.codename1.push.PushClient} and
- * {@link com.codename1.push.PushListener}. The older
- * {@link com.codename1.push.PushCallback} contract remains for compatibility
- * and generated native plumbing; new applications should not implement it on
- * their main class.</p>
- */
+///
+/// Typed push notification registration, delivery, and custom transport APIs.
+///
+/// <p>Applications use {@link com.codename1.push.PushClient} and
+/// {@link com.codename1.push.PushListener}. The older
+/// {@link com.codename1.push.PushCallback} contract remains for compatibility
+/// and generated native plumbing; new applications should not implement it on
+/// their main class.</p>
 package com.codename1.push;

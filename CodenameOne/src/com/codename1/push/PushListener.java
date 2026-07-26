@@ -23,45 +23,41 @@
  */
 package com.codename1.push;
 
-/**
- * Receives registration, message, and error events from a {@link PushClient}.
- *
- * <p>All methods run on the Codename One EDT. The listener is retained by the
- * client and remains active until unregistration completes. It is installed
- * before native registration starts, so a synchronous custom transport cannot
- * outrun the listener.</p>
- *
- * <p>Messages received before a client is active are replayed after
- * {@link PushClient#register()}. Operating systems may delay or suppress
- * background and silent delivery; an application should refresh authoritative
- * state when it resumes instead of treating push as a durable data channel.</p>
- */
+///
+/// Receives registration, message, and error events from a {@link PushClient}.
+///
+/// <p>All methods run on the Codename One EDT. The listener is retained by the
+/// client and remains active until unregistration completes. It is installed
+/// before native registration starts, so a synchronous custom transport cannot
+/// outrun the listener.</p>
+///
+/// <p>Messages received before a client is active are replayed after
+/// {@link PushClient#register()}. Operating systems may delay or suppress
+/// background and silent delivery; an application should refresh authoritative
+/// state when it resumes instead of treating push as a durable data channel.</p>
 public interface PushListener {
-    /**
-     * Called when the native provider creates or rotates a subscription.
-     *
-     * <p>This method may run more than once during the life of an installation.
-     * Replace any previously stored token rather than assuming it is permanent.</p>
-     *
-     * @param subscription the current subscription
-     */
+    ///
+    /// Called when the native provider creates or rotates a subscription.
+    ///
+    /// <p>This method may run more than once during the life of an installation.
+    /// Replace any previously stored token rather than assuming it is permanent.</p>
+    ///
+    /// @param subscription the current subscription
     void onRegistration(PushSubscription subscription);
 
-    /**
-     * Called for a parsed schema-3 message.
-     *
-     * <p>For a visible background notification, this normally runs when the
-     * user opens the notification. Foreground and silent delivery varies by
-     * platform and OS state.</p>
-     *
-     * @param message the immutable message envelope
-     */
+    ///
+    /// Called for a parsed schema-3 message.
+    ///
+    /// <p>For a visible background notification, this normally runs when the
+    /// user opens the notification. Foreground and silent delivery varies by
+    /// platform and OS state.</p>
+    ///
+    /// @param message the immutable message envelope
     void onMessage(PushMessage message);
 
-    /**
-     * Called when registration or envelope processing fails.
-     *
-     * @param error a stable error code, diagnostic message, and retry hint
-     */
+    ///
+    /// Called when registration or envelope processing fails.
+    ///
+    /// @param error a stable error code, diagnostic message, and retry hint
     void onError(PushError error);
 }
