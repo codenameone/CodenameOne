@@ -3828,6 +3828,10 @@ static int cn1GcVerifyReported = 0;
 // gcMarkObject's hook reads it) is set only while cn1GcVerifyHeap drives mark
 // functions on the GC thread.
 static JAVA_OBJECT cn1GcVerifyHolder = JAVA_NULL;
+// Where the shared per-field reporter is being driven from. The two callers
+// examine the heap at different moments and a report that names the wrong one
+// sends a reader looking at the wrong phase of the collector.
+static const char* cn1GcVerifyWhen = "after sweep";
 // CN1_GC_VERIFY_ALL=1: diagnostic mode that also walks objects the sweep did NOT
 // keep. Dead-to-dead dangling is legal, so this is for investigation only --
 // never a gate.
@@ -4107,6 +4111,11 @@ void cn1GcResurrectAudit(CODENAME_ONE_THREAD_STATE) {
     if(cn1GcResCount == 0) return;
     long before = cn1GcVerifyViolations;
     int reported = cn1GcVerifyReported;
+    // This runs at the END OF THE MARK, not after the sweep, so it classifies
+    // against the snapshot the mark built -- correct here, because the memory
+    // it looks for was reclaimed by EARLIER cycles. Label the shared reporter
+    // accordingly; "after sweep" would point a reader at the wrong phase.
+    cn1GcVerifyWhen = "at mark end (resurrection audit)";
     cn1GcVerifyActive = 1;
     for(int i = 0 ; i < cn1GcResCount ; i++) {
         JAVA_OBJECT o = cn1GcResRing[i];
@@ -4131,6 +4140,7 @@ void cn1GcResurrectAudit(CODENAME_ONE_THREAD_STATE) {
     }
     cn1GcVerifyActive = 0;
     cn1GcVerifyHolder = JAVA_NULL;
+    cn1GcVerifyWhen = "after sweep";
     cn1GcVerifyReported = reported;
     cn1GcVerifyViolations = before;   // counted separately from the post-sweep gate
     cn1GcResCount = 0;
@@ -4220,12 +4230,12 @@ void cn1GcVerifyChild(JAVA_OBJECT child, void* markSite) {
                      : st == CN1_GC_VS_DEAD_AGE ? "object AGED OUT by this sweep (mark below the free threshold)"
                      : "FREED legacy block (quarantined)";
     fprintf(stderr,
-        "[GC-VERIFY] DANGLING REFERENCE after sweep at epoch %d\n"
+        "[GC-VERIFY] DANGLING REFERENCE %s at epoch %d\n"
         "            holder  = %p class=%s mark=%d (epoch%+d) heapPos=%d\n"
         "            field   -> %p class=%s mark=%d heapPos=%d\n"
         "            victim  = %s%s\n"
         "            markSite= %p = %s+%ld (the field read, inside the holder's mark function)\n",
-        currentGcMarkValue,
+        cn1GcVerifyWhen, currentGcMarkValue,
         (void*)cn1GcVerifyHolder, cn1GcVerifyClsName(cn1GcVerifyHolder),
         cn1GcVerifyHolder != JAVA_NULL ? cn1GcVerifyHolder->__codenameOneGcMark : 0,
         cn1GcVerifyHolder != JAVA_NULL
