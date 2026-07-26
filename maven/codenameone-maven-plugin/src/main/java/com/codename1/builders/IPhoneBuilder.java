@@ -115,6 +115,17 @@ public class IPhoneBuilder extends Executor {
     private boolean usesNfc;
     private boolean usesBluetooth;
     private boolean usesBluetoothPeripheral;
+
+    // See AndroidGradleBuilder for why the store flag is separate from the
+    // umbrella one: com.codename1.health.sensors is pure BLE and must not
+    // pull in HealthKit or its entitlement.
+    private boolean usesHealth;
+    private boolean usesHealthStore;
+    private boolean usesHealthWrite;
+    private boolean usesHealthObserver;
+    private boolean usesHealthWorkout;
+    private final java.util.List<String> healthBackgroundListeners =
+            new java.util.ArrayList<String>();
     private boolean usesCn1Camera;
     private boolean usesCn1Ar;
     // Set when the app references com.codename1.car.* (Apple CarPlay support). Gates the
@@ -799,6 +810,16 @@ public class IPhoneBuilder extends Executor {
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
                 @Override
+                public void implementsInterface(String cls, String iface) {
+                    if ("com/codename1/health/HealthBackgroundListener".equals(iface)) {
+                        String fqcn = cls.replace('/', '.');
+                        if (!healthBackgroundListeners.contains(fqcn)) {
+                            healthBackgroundListeners.add(fqcn);
+                        }
+                    }
+                }
+
+                @Override
                 public void usesClass(String cls) {
                     if (cls == null) return;
                     aiAcc.consume(cls);
@@ -858,6 +879,20 @@ public class IPhoneBuilder extends Executor {
                         usesBluetooth = true;
                         if (cls.indexOf("com/codename1/bluetooth/le/server/") == 0) {
                             usesBluetoothPeripheral = true;
+                        }
+                    }
+                    // First-class health (com.codename1.health.*). The
+                    // store flag is what gates HealthKit, its entitlement
+                    // and the privacy-string requirement; the sensors
+                    // subpackage is ordinary BLE and must not trigger any
+                    // of that.
+                    if (cls.indexOf("com/codename1/health/") == 0) {
+                        usesHealth = true;
+                        if (cls.indexOf("com/codename1/health/sensors/") != 0) {
+                            usesHealthStore = true;
+                        }
+                        if (cls.indexOf("com/codename1/health/workout/") == 0) {
+                            usesHealthWorkout = true;
                         }
                     }
                     // Low-level camera API (com.codename1.camera.*). Gated on
@@ -927,6 +962,20 @@ public class IPhoneBuilder extends Executor {
 
                 @Override
                 public void usesClassMethod(String cls, String method) {
+                    if (cls.indexOf("com/codename1/health/HealthStore") == 0) {
+                        // Writing needs a separate privacy string from
+                        // reading, and observers need a separate
+                        // entitlement, so both are detected rather than
+                        // assumed from mere health usage.
+                        if (method.startsWith("write")
+                                || method.startsWith("delete")) {
+                            usesHealthWrite = true;
+                        }
+                        if (method.startsWith("subscribe")
+                                || method.startsWith("drainChanges")) {
+                            usesHealthObserver = true;
+                        }
+                    }
                     if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0
                             || (cls.indexOf("com/codename1/calendar/CalendarManager") == 0
                             && (method.indexOf("getLocalSource") >= 0
@@ -2443,6 +2492,104 @@ public class IPhoneBuilder extends Executor {
                                 : modes + ",bluetooth-peripheral";
                     }
                     request.putArgument("ios.background_modes", modes);
+                }
+            }
+
+            // First-class health (com.codename1.health.*). Gated on
+            // usesHealthStore, NOT usesHealth: an app that only streams a
+            // heart-rate strap through com.codename1.health.sensors is
+            // doing ordinary BLE and must not acquire HealthKit, its
+            // entitlement, or an App Store health-data review.
+            if (usesHealthStore) {
+                String share = request.getArg(
+                        "ios.NSHealthShareUsageDescription", null);
+                String update = request.getArg(
+                        "ios.NSHealthUpdateUsageDescription", null);
+
+                // Deliberately a hard failure rather than a defaulted
+                // placeholder. Apple reviews health purpose strings against
+                // what the app actually does, so a generic string is
+                // precisely what gets the app rejected -- injecting one
+                // would also be a privacy claim made in the developer's
+                // name. Compare the camera/bluetooth entries in
+                // AiDependencyTable, which do default their strings.
+                if (share == null && update == null) {
+                    throw new BuildException(
+                        "This app uses com.codename1.health but declares no "
+                      + "HealthKit privacy strings.\n"
+                      + "  Add ios.NSHealthShareUsageDescription=<why your "
+                      + "app reads health data>\n"
+                      + "  and/or ios.NSHealthUpdateUsageDescription=<why "
+                      + "your app writes it>\n"
+                      + "to codenameone_settings.properties. Codename One "
+                      + "does not inject a placeholder: Apple reviews this "
+                      + "text against your app's behaviour and rejects "
+                      + "generic copy.");
+                }
+                if (usesHealthWrite && update == null) {
+                    throw new BuildException(
+                        "This app writes health data (com.codename1.health "
+                      + "write/delete) but declares no "
+                      + "ios.NSHealthUpdateUsageDescription build hint. "
+                      + "HealthKit write authorization cannot be requested "
+                      + "without it.");
+                }
+
+                String hk = "HealthKit.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = hk;
+                } else if (!addLibs.toLowerCase().contains("healthkit")) {
+                    addLibs = addLibs + ";" + hk;
+                }
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define CN1_INCLUDE_HEALTH",
+                            "#define CN1_INCLUDE_HEALTH");
+                } catch (Exception ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_HEALTH", ex);
+                }
+
+                // HealthKit is entitlement-gated, unlike CoreBluetooth --
+                // this has no Bluetooth precedent. The profile must also
+                // carry the capability; without it the failure surfaces
+                // much later as an opaque codesign error.
+                if (request.getArg(
+                        "ios.entitlements.com.apple.developer.healthkit",
+                        null) == null) {
+                    request.putArgument(
+                        "ios.entitlements.com.apple.developer.healthkit",
+                        "true");
+                }
+                boolean bgDelivery = usesHealthObserver
+                        || "true".equalsIgnoreCase(request.getArg(
+                                "ios.health.backgroundDelivery", "false"));
+                if (bgDelivery && request.getArg(
+                        "ios.entitlements.com.apple.developer.healthkit"
+                        + ".background-delivery", null) == null) {
+                    request.putArgument(
+                        "ios.entitlements.com.apple.developer.healthkit"
+                        + ".background-delivery", "true");
+                }
+                if ("true".equalsIgnoreCase(request.getArg(
+                        "ios.health.recalibrateEstimates", "false"))
+                        && request.getArg(
+                            "ios.entitlements.com.apple.developer.healthkit"
+                            + ".recalibrate-estimates", null) == null) {
+                    request.putArgument(
+                        "ios.entitlements.com.apple.developer.healthkit"
+                        + ".recalibrate-estimates", "true");
+                }
+                if ("true".equalsIgnoreCase(
+                        request.getArg("ios.health.required", "false"))) {
+                    String caps = request.getArg(
+                            "ios.UIRequiredDeviceCapabilities", "");
+                    if (!caps.contains("healthkit")) {
+                        request.putArgument("ios.UIRequiredDeviceCapabilities",
+                                caps.length() == 0 ? "healthkit"
+                                        : caps + "," + "healthkit");
+                    }
                 }
             }
 

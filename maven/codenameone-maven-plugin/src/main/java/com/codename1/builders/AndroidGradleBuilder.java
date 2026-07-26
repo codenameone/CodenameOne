@@ -372,6 +372,23 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesBluetoothPeripheral;
     private boolean usesBluetoothClassic;
 
+    // Health. usesHealthStore is deliberately distinct from usesHealth:
+    // com.codename1.health.sensors is pure com.codename1.bluetooth.le and
+    // needs no Health Connect at all, so a heart-rate-strap app must not be
+    // treated as a health-data app.
+    private boolean usesHealth;
+    private boolean usesHealthStore;
+    private boolean usesHealthWorkout;
+    private final java.util.List<String> healthBackgroundListeners =
+            new java.util.ArrayList<String>();
+
+    // Computed while the permissions are assembled but consumed later, at
+    // the points where <queries>, the <application> body and the gradle
+    // dependency list are actually built.
+    private String healthQueriesFragment = "";
+    private String healthApplicationFragment = "";
+    private String healthGradleDependency = "";
+
     private boolean integrateMoPub = false;
 
     private static final boolean isMac;
@@ -1322,6 +1339,16 @@ public class AndroidGradleBuilder extends Executor {
 
         try {
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
+                @Override
+                public void implementsInterface(String cls, String iface) {
+                    if ("com/codename1/health/HealthBackgroundListener".equals(iface)) {
+                        String fqcn = cls.replace('/', '.');
+                        if (!healthBackgroundListeners.contains(fqcn)) {
+                            healthBackgroundListeners.add(fqcn);
+                        }
+                    }
+                }
+
 
 
                 @Override
@@ -1472,6 +1499,17 @@ public class AndroidGradleBuilder extends Executor {
                     // (Scan* handles vs the GATT/stream types); the
                     // usesClassMethod hook below catches facade-only
                     // callers.
+                    if (cls.indexOf("com/codename1/health/") == 0) {
+                        usesHealth = true;
+                        if (cls.indexOf("com/codename1/health/sensors/") != 0) {
+                            // Anything outside the sensors subpackage means
+                            // a real platform health store is in play.
+                            usesHealthStore = true;
+                        }
+                        if (cls.indexOf("com/codename1/health/workout/") == 0) {
+                            usesHealthWorkout = true;
+                        }
+                    }
                     if (cls.indexOf("com/codename1/bluetooth/") == 0) {
                         usesBluetooth = true;
                         if (cls.indexOf("com/codename1/bluetooth/le/server/") == 0) {
@@ -1818,6 +1856,87 @@ public class AndroidGradleBuilder extends Executor {
                     neverForLocation, bleRequired, targetSDKVersionInt);
         }
 
+        // First-class health (com.codename1.health.*). Gated on
+        // usesHealthStore, NOT usesHealth: com.codename1.health.sensors is
+        // pure BLE and must not drag in Health Connect or a Google Play
+        // health-permissions review.
+        if (usesHealthStore) {
+            String readHint = request.getArg("android.health.read", "");
+            String writeHint = request.getArg("android.health.write", "");
+            if (readHint.length() == 0 && writeHint.length() == 0) {
+                // The scanner cannot infer these: a data type is referenced
+                // as a constant, and field reads are not recorded. Play
+                // also requires declaring exactly the types you use.
+                error("This app uses com.codename1.health but declares no "
+                        + "health data types. Health Connect permissions are "
+                        + "per-data-type and cannot be inferred from "
+                        + "bytecode, so list them explicitly:\n"
+                        + "  android.health.read=steps,heart_rate,sleep\n"
+                        + "  android.health.write=steps\n"
+                        + "Known tokens: "
+                        + HealthManifestFragments.knownTokens(),
+                        new RuntimeException("android.health.read unset"));
+            }
+            java.util.List<String> readTokens =
+                    HealthManifestFragments.parseTypeList(readHint);
+            java.util.List<String> writeTokens =
+                    HealthManifestFragments.parseTypeList(writeHint);
+            java.util.List<String> unknown =
+                    HealthManifestFragments.unknownTokens(readTokens);
+            unknown.addAll(HealthManifestFragments.unknownTokens(writeTokens));
+            if (!unknown.isEmpty()) {
+                error("Unknown health data type(s) " + unknown
+                        + " in android.health.read / android.health.write. "
+                        + "Known tokens: "
+                        + HealthManifestFragments.knownTokens(),
+                        new RuntimeException("unknown health token"));
+            }
+            if (request.getArg("android.health.privacyPolicyUrl", "")
+                    .length() == 0) {
+                // Play requires a privacy policy for health permissions and
+                // the rationale screen has to link to it, so a missing URL
+                // means a rejected app rather than a broken build later.
+                error("Google Play requires a privacy policy for apps that "
+                        + "request Health Connect permissions, and the "
+                        + "permissions-rationale screen must link to it. Set "
+                        + "android.health.privacyPolicyUrl=<https://...>.",
+                        new RuntimeException("privacy policy url unset"));
+            }
+            if (targetSDKVersionInt < 30) {
+                // <queries> is only emitted from API 30, and without it the
+                // provider is invisible to package visibility.
+                error("Health Connect requires android.targetSDKVersion 30 "
+                        + "or higher so the provider <queries> entry is "
+                        + "emitted; this app targets "
+                        + targetSDKVersionInt + ".",
+                        new RuntimeException("targetSdk too low"));
+            }
+            log("Health Connect fragments version "
+                    + HealthManifestFragments.FRAGMENT_VERSION);
+            xPermissions = HealthManifestFragments.injectPermissions(
+                    xPermissions, readTokens, writeTokens,
+                    "true".equalsIgnoreCase(request.getArg(
+                            "android.health.background", "false")),
+                    "true".equalsIgnoreCase(request.getArg(
+                            "android.health.history", "false")),
+                    usesHealthWorkout, targetSDKVersionInt);
+            healthQueriesFragment =
+                    HealthManifestFragments.injectQueries("");
+            healthApplicationFragment =
+                    HealthManifestFragments.injectApplicationEntries("",
+                            usesHealthWorkout, targetSDKVersionInt);
+
+            // Health Connect ships as an AndroidX library with a Kotlin
+            // coroutine API; the port itself never references it (see
+            // HealthConnectDelegate) but the app module must resolve it.
+            healthGradleDependency = "    implementation "
+                    + "'androidx.health.connect:connect-client:"
+                    + request.getArg("android.health.connectVersion",
+                            "1.1.0-alpha07") + "'\n";
+            minSDK = maxInt("26", minSDK);
+            log("Health Connect raises minSdkVersion to " + minSDK);
+        }
+
         boolean useFCM = pushPermission && "fcm".equalsIgnoreCase(request.getArg("android.messagingService", "fcm"));
         if (useFCM) {
             request.putArgument("android.fcm.minPlayServicesVersion", "12.0.1");
@@ -2130,6 +2249,26 @@ public class AndroidGradleBuilder extends Executor {
             throw new BuildException("Failed to extract android port sources from "+androidPortSrcJar, ex);
         }
 
+        // Health background-listener bindings: generated rather than
+        // resolved reflectively, so each listener is reached through a
+        // direct constructor call that shrinking and obfuscation follow.
+        String healthBindingsSource =
+                HealthListenerBindings.generate(healthBackgroundListeners);
+        if (healthBindingsSource != null) {
+            File bindingsFile = new File(srcDir,
+                    HealthListenerBindings.sourcePath());
+            bindingsFile.getParentFile().mkdirs();
+            try {
+                createFile(bindingsFile, healthBindingsSource.getBytes(
+                        StandardCharsets.UTF_8));
+            } catch (Exception ex) {
+                throw new BuildException(
+                        "Failed to write the health listener bindings", ex);
+            }
+            log("Generated health background-listener bindings for "
+                    + healthBackgroundListeners);
+        }
+
         // Android Auto glue: when the app references com.codename1.car, copy the injected
         // CarAppService / Session / Screen + the CarBridge converter (typed against androidx.car.app)
         // into the generated project and add the car-app gradle dependency. These ship as real .java
@@ -2379,7 +2518,9 @@ public class AndroidGradleBuilder extends Executor {
         }
         xQueries = "";
         if (targetSDKVersionInt >= 30) {
-            xQueries = "<queries>\n" + request.getArg("android.manifest.queries", "") + "</queries>\n";
+            xQueries = "<queries>\n"
+                    + request.getArg("android.manifest.queries", "")
+                    + healthQueriesFragment + "</queries>\n";
         }
 
         //Delete the Facebook implemetation if this app does not use FB.
@@ -3457,6 +3598,7 @@ public class AndroidGradleBuilder extends Executor {
                 + foregroundServiceEntry
                 + shareReceiverActivity
                 + locationServices
+                + healthApplicationFragment
                 + mediaService
                 + remoteControlService
                 + hceService
@@ -4676,6 +4818,10 @@ public class AndroidGradleBuilder extends Executor {
                         : "")
                 + facebookProguard
                 + " " + request.getArg("android.proguardKeep", "") + "\n"
+                + (usesHealthStore
+                        ? HealthManifestFragments.proguardKeepRules(
+                                healthBackgroundListeners)
+                        : "")
                 + googlePlayObfuscation
                 + "-keep class com.google.mygson.**{\n"
                 + "*;\n"
@@ -4707,6 +4853,7 @@ public class AndroidGradleBuilder extends Executor {
 
         request.putArgument("var.android.playServicesVersion", playServicesVersion);
         String additionalDependencies = request.getArg("gradleDependencies", "");
+        additionalDependencies += healthGradleDependency;
         if (facebookSupported) {
             minSDK = maxInt("15", minSDK);
 
@@ -5425,6 +5572,17 @@ public class AndroidGradleBuilder extends Executor {
 
     private String createOnCreateCode(BuildRequest request) {
         String retVal = "";
+
+        // Install the generated health background-listener bindings. These
+        // construct each listener with a direct `new`, so nothing is
+        // resolved reflectively after the OS relaunches the app in the
+        // background -- see HealthListenerBindings for why that matters on
+        // shrunk and obfuscated builds.
+        String healthBindings = HealthListenerBindings.installStatement(
+                healthBackgroundListeners);
+        if (healthBindings != null) {
+            retVal += healthBindings;
+        }
 
         if (request.getArg("android.includeGPlayServices", "true").equals("true") || playServicesLocation) {
             retVal += "Display.getInstance().setProperty(\"IncludeGPlayServices\", \"true\");\n";

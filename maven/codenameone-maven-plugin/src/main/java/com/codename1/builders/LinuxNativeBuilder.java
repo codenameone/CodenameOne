@@ -267,6 +267,10 @@ public class LinuxNativeBuilder extends Executor {
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
                 @Override
+                public void implementsInterface(String cls, String iface) {
+                }
+
+                @Override
                 public void usesClass(String cls) {
                     if (cls != null && cls.startsWith("com/codename1/bluetooth/")) {
                         usesBluetoothHolder[0] = true;

@@ -394,6 +394,19 @@ public abstract class Executor {
         public void usesClass(String cls);
 
         public void usesClassMethod(String cls, String method);
+
+        /**
+         * Reports that {@code cls} declares {@code iface} among its
+         * implemented interfaces.
+         *
+         * <p>{@link #usesClass(String)} is also called for the interface,
+         * but it only says that the interface was referenced somewhere --
+         * it drops which class did the implementing. Builders that need to
+         * generate a binding to an app-supplied callback need the
+         * implementor, so that a direct constructor call can be emitted
+         * instead of resolving a name reflectively at runtime.</p>
+         */
+        public void implementsInterface(String cls, String iface);
     }
 
     public static interface InternalClassRemapper {
@@ -473,6 +486,7 @@ public abstract class Executor {
                             scanner.usesClass(superName);
                             for (String s : interfaces) {
                                 scanner.usesClass(s);
+                                scanner.implementsInterface(string, s);
                             }
                         }
 
