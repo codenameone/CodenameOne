@@ -108,7 +108,9 @@ public final class PushClient {
     ///
     /// <p>This method is idempotent. Calling it from each invocation of the
     /// application's {@code start()} method requests registration only once.
-    /// Registration completes asynchronously through
+    /// A native token persisted before this client becomes active is replayed
+    /// immediately, then the platform is asked to refresh it. Registration
+    /// otherwise completes asynchronously through
     /// {@link PushListener#onRegistration(PushSubscription)} or
     /// {@link PushListener#onError(PushError)}. Messages queued before activation
     /// are replayed before this method requests a new native token.</p>
@@ -151,6 +153,10 @@ public final class PushClient {
             receive(message);
         }
         if (transport == null) {
+            String persistedDeviceId = Preferences.get("push_key", null);
+            if (persistedDeviceId != null && persistedDeviceId.trim().length() > 0) {
+                compatibilityCallback.registeredForPush(persistedDeviceId);
+            }
             Display.getInstance().registerPush();
         } else {
             transport.register(new TransportCallback());

@@ -44,6 +44,7 @@ class PushClientTransportTest extends UITestBase {
 
     @BeforeEach
     void clearManagedRegistrationState() {
+        Preferences.delete("push_key");
         Preferences.delete("push_v3_subscription");
         implementation.clearQueuedRequests();
     }
@@ -55,6 +56,7 @@ class PushClientTransportTest extends UITestBase {
         }
         activeClient = null;
         CodenameOneImplementation.setPushCallback(null);
+        Preferences.delete("push_key");
         Preferences.delete("push_v3_subscription");
         implementation.clearQueuedRequests();
     }
@@ -135,6 +137,24 @@ class PushClientTransportTest extends UITestBase {
         assertEquals("DELETE", requests.get(1).getHttpMethod());
         assertTrue(requests.get(1).getUrl().endsWith(
                 "/subscriptions/managed-subscription"));
+    }
+
+    @FormTest
+    void managedRegistrationReplaysTokenPersistedBeforeClientActivation() {
+        Preferences.set("push_key", "cn1-fcm-persisted-token");
+        RecordingListener listener = new RecordingListener();
+        PushClient client = track(PushClient.builder("managed-app")
+                .listener(listener).build());
+
+        client.register();
+
+        assertNotNull(listener.registration);
+        assertEquals("fcm", listener.registration.getTransportId());
+        assertEquals("persisted-token", listener.registration.getToken());
+        List<ConnectionRequest> requests = implementation.getQueuedRequests();
+        assertEquals(1, requests.size());
+        assertTrue(requests.get(0).isPost());
+        assertTrue(requests.get(0).getUrl().endsWith("/subscriptions"));
     }
 
     @FormTest
