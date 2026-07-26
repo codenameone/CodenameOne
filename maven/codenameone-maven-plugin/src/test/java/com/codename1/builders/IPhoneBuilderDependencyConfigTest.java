@@ -187,6 +187,10 @@ class IPhoneBuilderDependencyConfigTest {
         assertEquals("CoreML.framework;Accelerate.framework;Metal.framework",
                 value);
 
+        value = (String) method.invoke(null, "Vision.framework",
+                new String[] {"NaturalLanguage.framework"});
+        assertEquals("Vision.framework;NaturalLanguage.framework", value);
+
         value = (String) method.invoke(null, "ThirdPartyVision.framework",
                 new String[] {"Vision.framework"});
         assertEquals("ThirdPartyVision.framework;Vision.framework", value);

@@ -2563,6 +2563,8 @@ public class IPhoneBuilder extends Executor {
                     throw new BuildException(
                             "Failed to enable INCLUDE_CN1_LANGUAGE", ex);
                 }
+                addLibs = appendFrameworks(addLibs,
+                        "NaturalLanguage.framework");
             }
 
             if (usesCn1Inference) {
