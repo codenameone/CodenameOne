@@ -7,6 +7,10 @@
     NSString* errorMessage;
     int errorCode;
     BOOL connected;
+    /// Accepted server-side sockets do raw descriptor I/O rather than going through
+    /// NSStream: they are serviced on a background thread whose run loop never runs, and
+    /// a scheduled CFStream would simply never deliver anything. -1 when unused.
+    int rawFd;
 }
 
 -(BOOL)connect:(NSString*)host port:(int)port timeout:(int)timeout;

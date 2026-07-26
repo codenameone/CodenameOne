@@ -1,6 +1,7 @@
 #import "SocketImpl.h"
 #include <ifaddrs.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -8,6 +9,14 @@
 #import "CodenameOne_GLViewController.h"
 
 @implementation SocketImpl
+
+-(id)init {
+    self = [super init];
+    if(self != nil) {
+        rawFd = -1;   // stream-backed unless an accept installs a descriptor
+    }
+    return self;
+}
 
 static void _yield() {
 #ifdef NEW_CODENAME_ONE_VM
@@ -86,6 +95,13 @@ static void _resume() {
 }
 
 -(int)getAvailableInput{
+    if(rawFd >= 0) {
+        int pending = 0;
+        if(ioctl(rawFd, FIONREAD, &pending) < 0) {
+            return 0;
+        }
+        return pending;
+    }
     //return availableValue;
     return [inputStream hasBytesAvailable] ? 1 : 0;
 }
@@ -127,7 +143,20 @@ static void _resume() {
 -(NSData*)readFromStream{
     uint8_t buffer[8192];
     int len;
-    
+
+    if(rawFd >= 0) {
+        // Blocking recv: the caller is a reader thread and expects to wait for data,
+        // and returning nil in a spin would burn the CPU.
+        _yield();
+        ssize_t r = recv(rawFd, buffer, sizeof(buffer), 0);
+        _resume();
+        if(r > 0) {
+            return [NSData dataWithBytes:buffer length:r];
+        }
+        connected = NO;
+        return nil;
+    }
+
     if([inputStream hasBytesAvailable]) {
         len = [inputStream read:buffer maxLength:sizeof(buffer)];
         if (len > 0) {
@@ -138,10 +167,30 @@ static void _resume() {
 }
 
 -(void)writeToStream:(NSData*)param{
+    if(rawFd >= 0) {
+        const uint8_t* bytes = (const uint8_t*)[param bytes];
+        size_t remaining = [param length];
+        while(remaining > 0) {
+            ssize_t w = send(rawFd, bytes, remaining, 0);
+            if(w <= 0) {
+                connected = NO;
+                return;
+            }
+            bytes += w;
+            remaining -= w;
+        }
+        return;
+    }
     [outputStream write:[param bytes] maxLength:[param length]];
 }
 
 -(void)disconnect{
+    if(rawFd >= 0) {
+        close(rawFd);
+        rawFd = -1;
+        connected = NO;
+        return;
+    }
     if(inputStream != nil) {
         [outputStream close];
         [outputStream removeFromRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
@@ -226,40 +275,12 @@ static NSMutableDictionary* _cn1LoopbackListeners = nil;
         return NO;
     }
 
-    CFReadStreamRef readStream = NULL;
-    CFWriteStreamRef writeStream = NULL;
-    CFStreamCreatePairWithSocket(NULL, (CFSocketNativeHandle)clientFd, &readStream, &writeStream);
-    if(readStream == NULL || writeStream == NULL) {
-        close(clientFd);
-        errorMessage = @"Could not wrap the accepted socket";
-        errorCode = -1;
-        connected = NO;
-        return NO;
-    }
-    // Hand ownership of the descriptor to the streams so closing them closes it.
-    CFReadStreamSetProperty(readStream, kCFStreamPropertyShouldCloseNativeSocket, kCFBooleanTrue);
-    CFWriteStreamSetProperty(writeStream, kCFStreamPropertyShouldCloseNativeSocket, kCFBooleanTrue);
-
-    inputStream = (BRIDGE_CAST NSInputStream *)readStream;
-    outputStream = (BRIDGE_CAST NSOutputStream *)writeStream;
-    [inputStream setDelegate:self];
-    [outputStream setDelegate:self];
-    [inputStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
-    [outputStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
-    [inputStream open];
-    [outputStream open];
-    while ([outputStream streamStatus] == NSStreamStatusOpening) {
-        _yield();
-        usleep(10000);
-        _resume();
-    }
-    while ([inputStream streamStatus] == NSStreamStatusOpening) {
-        _yield();
-        usleep(10000);
-        _resume();
-    }
-    connected = ![self isInputShutdown] && ![self isOutputShutdown];
-    return connected;
+    // Serve this socket with raw descriptor I/O. An accepted connection is read on a
+    // background thread whose run loop never runs, so a scheduled CFStream would open
+    // but never deliver a byte.
+    rawFd = clientFd;
+    connected = YES;
+    return YES;
 }
 
 -(BOOL)isConnected{
