@@ -40,12 +40,20 @@ for d in $DRIVERS; do
         continue
     fi
     if out="$(./target/bin/$d-verify 2>&1)"; then
+        # passes=0 means the workload never finished a collection cycle, so the
+        # verifier never ran and "no violations" would mean only that nothing
+        # was ever checked. Treat a vacuous pass as a failure -- that is the
+        # same hollow-gate problem the self-test below exists to prevent.
+        passes="$(printf '%s' "$out" | sed -n 's/.*SUMMARY passes=\([0-9]*\).*/\1/p' | tail -1)"
         if printf '%s' "$out" | grep -q 'GC-VERIFY. DANGLING'; then
             echo "FAILED (verifier reported a dangling reference)"
             printf '%s\n' "$out" | grep -A 4 'DANGLING' | head -20
             fail=1
+        elif [ -z "$passes" ] || [ "$passes" -eq 0 ]; then
+            echo "FAILED (vacuous: 0 verify passes -- the workload never completed a GC cycle)"
+            fail=1
         else
-            echo "clean"
+            echo "clean ($passes verify passes)"
         fi
     else
         echo "FAILED (exit $?)"

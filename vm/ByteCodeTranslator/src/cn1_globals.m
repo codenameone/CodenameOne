@@ -3797,6 +3797,13 @@ static int cn1GcVerifyHolderKept(int m) {
 }
 static const char* cn1GcVerifyDump = 0;   // CN1_GC_VERIFY_DUMP=<class substring>
 static int cn1GcVerifyDumpCount = 0;
+// Completed verify passes. A driver that never finishes a collection cycle
+// never runs one, and its "no violations" result means only that nothing was
+// ever checked -- so this is reported at exit and the harness requires it to be
+// nonzero. (GcStress, for one, exits before its single cycle reaches the sweep.)
+static long cn1GcVerifyPasses = 0;
+static long cn1GcVerifyTotalRefs = 0;
+static long cn1GcVerifyTotalViolations = 0;
 long cn1GcVerifyFreedSlots = 0;   // page slots reclaimed since the last verify pass
 long cn1GcVerifyFreedLegacy = 0;  // legacy blocks quarantined since the last verify pass
 
@@ -3873,12 +3880,20 @@ void cn1GcVerifyPoisonSlot(JAVA_OBJECT o, int slotSize) {
 JAVA_BOOLEAN cn1GcVerifyQuarantineFree(JAVA_OBJECT obj) {
     pthread_mutex_lock(&cn1GcQMutex);
     if(cn1GcQRing == 0) {
-        cn1GcQRing = (JAVA_OBJECT*)calloc(CN1_GC_VERIFY_QUARANTINE, sizeof(JAVA_OBJECT));
-        cn1GcQSet = (JAVA_OBJECT*)calloc(CN1_GC_QSET_SIZE, sizeof(JAVA_OBJECT));
-        if(cn1GcQRing == 0 || cn1GcQSet == 0) {
+        // Build both tables in locals and publish them together. Assigning the
+        // globals as they are allocated would, on a half-failed allocation,
+        // leave cn1GcQRing set and cn1GcQSet null -- and the next call, seeing a
+        // non-null ring, would skip this block and dereference the null set.
+        JAVA_OBJECT* ring = (JAVA_OBJECT*)calloc(CN1_GC_VERIFY_QUARANTINE, sizeof(JAVA_OBJECT));
+        JAVA_OBJECT* set = (JAVA_OBJECT*)calloc(CN1_GC_QSET_SIZE, sizeof(JAVA_OBJECT));
+        if(ring == 0 || set == 0) {
+            free(ring);   // free(0) is a no-op; neither pointer is published
+            free(set);
             pthread_mutex_unlock(&cn1GcQMutex);
             return JAVA_FALSE;   // no quarantine memory: fall back to a real free
         }
+        cn1GcQRing = ring;
+        cn1GcQSet = set;
     }
     long sz = 0;
 #if defined(__APPLE__)
@@ -4000,6 +4015,18 @@ void cn1GcVerifyChild(JAVA_OBJECT child, void* markSite) {
     int idx = -1;
     cn1GcVerifyChecked++;
     int st = cn1GcVerifyClassify(child, &pg, &idx);
+    if(st == CN1_GC_VS_UNKNOWN) {
+        // NOT PLACED -- and this is the one branch that must never touch the
+        // object. An unplaceable value is exactly the case where the address
+        // may be unmapped (a mid-construction body, a stale field), so every
+        // read below, down to the age histogram and the class name in the dump
+        // path, would fault. Skipping such references is the documented
+        // contract; returning here is what makes it true.
+        cn1GcVerifyStatus[st]++;
+        return;
+    }
+    // Everything past this point has been placed in a live page, a live extent
+    // or the quarantine, all of which are mapped for the duration of this pass.
     if(st == CN1_GC_VS_OK) {
         // The memory is still mapped and still looks like an object -- but the
         // sweep frees on AGE (mark < epoch-1), and physical reclamation lags
@@ -4041,7 +4068,7 @@ void cn1GcVerifyChild(JAVA_OBJECT child, void* markSite) {
                     child->__heapPosition, st);
         }
     }
-    if(st == CN1_GC_VS_OK || st == CN1_GC_VS_UNKNOWN) {
+    if(st == CN1_GC_VS_OK) {
         return;
     }
     cn1GcVerifyViolations++;
@@ -4087,8 +4114,18 @@ void cn1GcVerifyChild(JAVA_OBJECT child, void* markSite) {
 // after the sweep, before the collector hands the world back, so the freed
 // memory it is looking for has had the least possible chance of being
 // recycled into something plausible again.
+static void cn1GcVerifySummary(void) {
+    fprintf(stderr, "[GC-VERIFY] SUMMARY passes=%ld refs=%ld violations=%ld\n",
+            cn1GcVerifyPasses, cn1GcVerifyTotalRefs, cn1GcVerifyTotalViolations);
+    fflush(stderr);
+}
+
 void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
     cn1GcFaultInit();
+    if(cn1GcVerifyPasses == 0) {
+        atexit(cn1GcVerifySummary);
+    }
+    cn1GcVerifyPasses++;
     extern void cn1GcBuildRootSnapshots(void);
     extern int cn1ConsSnapEpochReset(void);
     // Force a rebuild: the cached snapshot predates this sweep and still lists
@@ -4165,6 +4202,8 @@ void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
     }
     cn1GcVerifyActive = 0;
     cn1GcVerifyHolder = JAVA_NULL;
+    cn1GcVerifyTotalRefs += cn1GcVerifyChecked;
+    cn1GcVerifyTotalViolations += cn1GcVerifyViolations;
     long freedSlots = cn1GcVerifyFreedSlots;
     long freedLegacy = cn1GcVerifyFreedLegacy;
     cn1GcVerifyFreedSlots = 0;

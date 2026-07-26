@@ -50,6 +50,7 @@ public class GcVerifyApp {
         long a, b, c, d, e, f, g, h, i2, j, k, l;
     }
 
+    static final int ROUNDS = 8;
     static final int KEEP = 512;
     static final int LEGACY_ELEMENTS = 65;   // > CN1_BIBOP_MAX_OBJECT once boxed in an array
 
@@ -60,14 +61,17 @@ public class GcVerifyApp {
     static long scrubSink;
 
     public static void main(String[] args) throws Exception {
-        for (int round = 0; round < 12; round++) {
+        for (int round = 0; round < ROUNDS; round++) {
+            // HAZARD 1 -- page heap, allocated DURING a concurrent mark. This is
+            // the shape that breaks a missing grace pass, and the timing is the
+            // whole point: System.gc() is asynchronous, so the nodes below are
+            // created while the mark is running, each taking the only reference
+            // to an older object and then being dropped. The slices with a sleep
+            // in between are what spread the allocation across the mark rather
+            // than racing past it in a burst.
             refill(round);
-
-            // Hazard 1 -- page heap, DURING a mark. System.gc() is asynchronous,
-            // so these fresh nodes land while the collector is marking: some
-            // after the grace pass has already visited their page.
             System.gc();
-            for (int slice = 0; slice < 24; slice++) {
+            for (int slice = 0; slice < 40; slice++) {
                 for (int i = 0; i < 8; i++) {
                     Node n = new Node();
                     int j = (slice * 8 + i) & (KEEP - 1);
@@ -76,31 +80,38 @@ public class GcVerifyApp {
                     sink[0] = n;
                     sink[0] = null;
                 }
-                Thread.sleep(2);
+                Thread.sleep(3);
             }
+            // Quiet phase: no Node allocation at all across the next cycle, so
+            // nothing re-traces that size class and the dropped nodes' children
+            // age past the sweep's free threshold. Filler drives the collection
+            // trigger without touching the hazard.
+            for (int i = 0; i < 120000; i++) {
+                Filler f = new Filler();
+                f.b = i;
+                sink[i & 15] = f;
+            }
+            System.gc();
+            Thread.sleep(150);
 
-            // Hazard 2 -- legacy path, in a QUIET window. Outside a mark the
-            // SATB barriers are disarmed, so nothing logs the reference as it
-            // moves into an object the collector has never seen.
+            // HAZARD 2 -- legacy path, in a QUIET window. Outside a mark the SATB
+            // barriers are disarmed, so nothing logs the reference as it moves
+            // into an object above CN1_BIBOP_MAX_OBJECT that the collector has
+            // never seen.
             refill(round);
             settle();
             transferToLegacy();
             settle();
             settle();
 
-            // Hazard 3 -- retained map whose values are separately allocated
-            // arrays, dropped wholesale. This is the reporter's dictionary
-            // shape: entries mature into the legacy heap while their payload
-            // arrays stay page-resident, so the two halves of the collector
-            // must agree about when the pair dies.
+            // HAZARD 3 -- a retained map whose values are separately allocated
+            // arrays, dropped wholesale: the reporter's dictionary shape. Entries
+            // mature into the legacy heap while their payload arrays stay
+            // page-resident, so the two halves of the collector have to agree
+            // about when the pair dies.
             dict = new Hashtable();
             for (int i = 0; i < 4000; i++) {
                 dict.put("k" + i, new byte[64]);
-            }
-            for (int i = 0; i < 40000; i++) {
-                Filler f = new Filler();
-                f.b = i;
-                sink[i & 15] = f;
             }
             settle();
         }

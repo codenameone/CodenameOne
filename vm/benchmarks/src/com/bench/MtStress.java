@@ -65,5 +65,17 @@ public class MtStress {
         long total = 0;
         for (int t = 0; t < THREADS; t++) total += results[t];
         System.out.println("DONE " + total);
+
+        // Give the collector one complete cycle over the heap this workload
+        // built. Without it a -DCN1_GC_VERIFY build of this driver exits before
+        // any sweep finishes, so the verifier never runs and a clean result
+        // means only that nothing was ever checked. Prints nothing, so the
+        // byte-identical comparison against the host JVM is unaffected.
+        System.gc();
+        try {
+            Thread.sleep(250);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

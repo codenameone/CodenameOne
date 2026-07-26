@@ -171,6 +171,13 @@ class GcHeapIntegrityIntegrationTest {
                         + violationExcerpt(clean.output));
         assertTrue(clean.output.contains("GC_VERIFY_APP_DONE"),
                 "The workload should run to completion. Output: " + clean.output);
+        // A workload that never finishes a collection cycle never runs the
+        // verifier, and "no violations" would then mean only that nothing was
+        // ever checked -- the same hollow result the fault injection below
+        // exists to rule out.
+        assertTrue(verifyPasses(clean.output) > 0,
+                "The verifier never ran: the workload completed no GC cycle, so the clean "
+                        + "result above checked nothing. Output: " + tail(clean.output));
         assertEquals(javaResult, extractLine(clean.output, "RESULT="),
                 "JavaSE and ParparVM should agree on the workload result");
 
@@ -219,6 +226,24 @@ class GcHeapIntegrityIntegrationTest {
             output = reader.lines().collect(Collectors.joining("\n"));
         }
         return new Run(process.waitFor(), output);
+    }
+
+    /** Completed verify passes, from the summary the verified build prints at exit. */
+    private long verifyPasses(String output) {
+        for (String line : output.split("\\R")) {
+            int at = line.indexOf("SUMMARY passes=");
+            if (at >= 0) {
+                String rest = line.substring(at + "SUMMARY passes=".length());
+                int end = 0;
+                while (end < rest.length() && Character.isDigit(rest.charAt(end))) {
+                    end++;
+                }
+                if (end > 0) {
+                    return Long.parseLong(rest.substring(0, end));
+                }
+            }
+        }
+        return 0;
     }
 
     /** The verifier's own report is the useful part of a failure message. */
