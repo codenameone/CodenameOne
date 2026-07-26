@@ -2109,8 +2109,8 @@ public class Resources {
             //bottomOnlyMode(input.readBoolean());
             // round rect border with top-left, top-right, bottom-right, bottom-left corners
             // specified independently
-            case 0xff15:
-                return RoundRectBorder.create().
+            case 0xff15: {
+                RoundRectBorder roundRect = RoundRectBorder.create().
                         stroke(input.readFloat(), input.readBoolean()).
                         strokeColor(input.readInt()).
                         strokeOpacity(input.readInt()).
@@ -2125,6 +2125,13 @@ public class Resources {
                         topRightMode(input.readBoolean()).
                         bottomRightMode(input.readBoolean()).
                         bottomLeftMode(input.readBoolean());
+                // CSS box model sizing was added in resource format 1.16, themes written
+                // before that were all generated with the legacy pill sizing
+                if (minorVersion >= 16) {
+                    roundRect.cssBoxModel(input.readBoolean());
+                }
+                return roundRect;
+            }
 
             case 0xff16:
                 // CSS border

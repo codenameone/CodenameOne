@@ -57,6 +57,16 @@
  * --accent-pressed to "state-pressed". Keep light/dark variants in
  * sync (-dark suffix) so an app override affecting only the light
  * constant doesn't desynchronise dark mode.
+ *
+ * border-radius sizing: a rule with border-radius and no round/pill
+ * background type compiles to a RoundRectBorder flagged as CSS box
+ * model, so the radius rounds the box the padding below asks for
+ * instead of growing it to twice the radius (the RoundRectBorder
+ * default that hand written code still gets). A radius bigger than the
+ * box scales down to fit, per the CSS corner overlap rule. Size every
+ * UIID here through padding/margin and treat the radius as decoration.
+ * A shape that must stay a pill at any height wants cn1-pill-border,
+ * not a large border-radius.
  */
 
 #Constants {

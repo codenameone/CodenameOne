@@ -100,9 +100,11 @@ public class Border {
     private boolean bezierCorners;
     
     private boolean topOnlyMode;
-    
+
     private boolean bottomOnlyMode;
-    
+
+    private boolean cssBoxModel;
+
     /**
      * @return the key
      */
@@ -357,6 +359,20 @@ public class Border {
      */
     public boolean isBottomOnlyMode() {
         return bottomOnlyMode;
+    }
+
+    /**
+     * @return the cssBoxModel
+     */
+    public boolean isCssBoxModel() {
+        return cssBoxModel;
+    }
+
+    /**
+     * @param cssBoxModel the cssBoxModel to set
+     */
+    public void setCssBoxModel(boolean cssBoxModel) {
+        this.cssBoxModel = cssBoxModel;
     }
 
     /**
