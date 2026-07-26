@@ -64,5 +64,18 @@ public class GcStress {
             System.out.println("ROUND " + round + " checksum=" + c);
         }
         System.out.println("DONE " + c);
+
+        // Give the collector one complete cycle over the heap this workload
+        // built. This driver's own churn triggers collections, but whether the
+        // last one reaches its sweep before the process exits is a race -- so a
+        // -DCN1_GC_VERIFY build verified 1 cycle or 0 depending on the run.
+        // Prints nothing, so the byte-identical comparison against the host JVM
+        // is unaffected.
+        System.gc();
+        try {
+            Thread.sleep(250);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

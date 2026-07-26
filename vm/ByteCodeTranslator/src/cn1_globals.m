@@ -1401,6 +1401,14 @@ void codenameOneGCMark() {
 #ifdef CN1_GC_VERIFY
         // Fault injection (CN1_GC_FAULT=nograce): skip this pass entirely, which
         // reproduces the defect #5442 fixed. Used to prove the verifier fails.
+        //
+        // Resolve the switch HERE, at its first use. Leaving it to
+        // cn1GcVerifyHeap would initialize it only after a sweep, so the first
+        // cycle of every run would trace grace subtrees normally -- and a
+        // workload that completes a single cycle would never inject the defect
+        // at all, reporting a gate that "cannot fail" purely because it was
+        // never faulted. cn1GcFaultInit is idempotent and GC-thread only.
+        cn1GcFaultInit();
         extern int cn1GcFaultNoGrace;
         CN1BibopPage* gp = cn1GcFaultNoGrace ? (CN1BibopPage*)0
                          : atomic_load_explicit(&bibopAllPages, memory_order_acquire);
@@ -4125,7 +4133,7 @@ static void cn1GcVerifySummary(void) {
 }
 
 void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
-    cn1GcFaultInit();
+    cn1GcFaultInit();   // idempotent; the mark's grace pass already resolved it
     if(cn1GcVerifyPasses == 0) {
         atexit(cn1GcVerifySummary);
     }
