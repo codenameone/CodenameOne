@@ -1190,6 +1190,11 @@
         "tags_set": false,
         "canonical_set": false,
         "syndicated_at": "2026-07-26T06:29:18+00:00"
+      },
+      "devto": {
+        "id": 4235252,
+        "url": "https://dev.to/codenameone/codename-one-settings-is-now-a-standalone-tool-1aj",
+        "syndicated_at": "2026-07-26T06:52:04+00:00"
       }
     }
   }
