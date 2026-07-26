@@ -240,6 +240,13 @@ jobs:
           CN1SS_FAIL_ON_MISMATCH: '1'
           CN1SS_ALLOWED_MISSING: '0'
           CN1SS_PORT_ID: ios-gl
+          # Google ML Kit excludes arm64 simulators, so this job uses ParparVM's
+          # x86 path. On a contended runner the allocation benchmark remained
+          # active after the generic 720s idle limit, with less than three
+          # minutes left under the 35-minute absolute cap. Keep strict missing-
+          # screenshot gating, but allow the active benchmark to complete.
+          CN1SS_SUITE_IDLE_TIMEOUT_SECONDS: '1200'
+          CN1SS_SUITE_TIMEOUT_SECONDS: '3000'
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
@@ -251,9 +258,9 @@ jobs:
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "" \
             "${{ steps.build-ios-app.outputs.scheme }}"
-        # The script enforces both a 35-minute absolute suite limit and a
-        # 12-minute no-progress limit. This outer cap also includes its
-        # native rebuild and cleanup, so it must leave those phases headroom.
+        # This job uses a 50-minute absolute suite limit and a 20-minute
+        # no-progress limit. The outer cap also includes its native rebuild
+        # and cleanup, so it leaves those phases headroom.
         timeout-minutes: 65
 
       - name: Upload iOS OpenGL port status
