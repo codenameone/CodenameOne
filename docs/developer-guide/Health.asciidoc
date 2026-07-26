@@ -10,7 +10,8 @@ Codename One ships a cross-platform health API under `com.codename1.health` that
 | Read samples and aggregates | yes | yes | yes | yes | yes (scripted) | local only
 | Write samples | yes | yes | yes | yes | yes | local only
 | Read-authorization introspection | no | no | no | yes | yes | n/a
-| Background push delivery | yes | yes | yes | *no* | yes | no
+| Background push delivery | *no* | *no* | *no* | *no* | yes | no
+| Change delivery while running | yes | yes | yes | yes | yes | yes
 | Live workout session | yes | recorded | yes | recorded | recorded | recorded
 | Automatic sensor collection in a workout | yes | no | yes | no | no | no
 | Bluetooth health sensors | yes | yes | limited | yes | yes | yes
@@ -100,9 +101,13 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 The subscription id keys the persisted cursor that records how far you have read. Reuse it across launches and app updates and you resume exactly where you left off; change it and the framework treats it as new and resynchronizes from scratch. Hard-code it, and version it explicitly (`"steps-v1"`) if you ever want a clean start.
 
-**iOS is real push.** The OS relaunches your app in the background, possibly with no UI at all. Keep the work small -- `HealthChangeBatch.getDeadlineMillis()` is around five seconds -- and check `Display.getInstance().isMinimized()` before touching anything visual. Accumulate into `Preferences` and do the real work on next foreground.
+**No platform wakes your app for health data today.** `isPushDelivery()` answers `false` everywhere, and that is the honest answer rather than a placeholder: nothing arrives while your app is closed, so your app has to ask.
 
-**Android has no push at all.** Health Connect never wakes your app; Google's own guidance is to poll. The framework drains changes at app start, on foreground, and whenever you call `drainChanges()`. Wire that into your background-fetch handler if you need better than foreground-only, and check `isPushDelivery()` rather than assuming.
+On Android this is permanent. Health Connect has no push mechanism at all and Google's own guidance is to poll. On iOS, HealthKit does offer `HKObserverQuery` with background relaunch, but this release does not register one, so iOS behaves the same way as Android for now. `isPushDelivery()` is the query to branch on; it will start answering `true` on iOS when observers land, and code that already polls will simply poll less often.
+
+**Draining is what delivers changes.** The framework drains at app start, on foreground, and whenever you call `drainChanges()`. Wire that into your background-fetch handler if foreground-only is not good enough.
+
+The two backends drain differently, and the difference is visible to you. Android uses Health Connect change tokens, so a drain reports deletions as well as additions and never re-reports a sample you have already seen. iOS re-reads each subscribed type over the window since the last drain: additions arrive, deletions do not, and a sample edited in place looks like a new one. Both advance their cursor only after your listener returns, so a crash re-reads rather than skips.
 
 Handle `isResyncRequired()`. A Health Connect change token expires after 30 days and an iOS anchor can be rejected after a restore from backup; when that happens the batch carries no data and you must do a full time-range read to catch up.
 
@@ -217,7 +222,9 @@ The simulator's data is synthetic and seeded, not recorded from anyone. That's i
 
 *Totals are double on Android.* A phone and a watch are both writing the same type. HealthKit de-duplicates overlapping sources and Health Connect doesn't; pin the query with `addSource(...)`.
 
-*Background delivery never fires on Android.* It never will -- Health Connect has no push. Call `drainChanges()` from your background-fetch handler and check `isPushDelivery()`.
+*Background delivery never fires.* No platform pushes health data to a closed app in this release -- see the subscriptions section. Call `drainChanges()` from your background-fetch handler and branch on `isPushDelivery()` rather than assuming.
+
+*Deleting a sample by id does nothing.* Health Connect deletes by record class plus id, so `HealthDeleteRequest.byId(...)` takes the data type alongside the identifier. Passing the type of a different sample deletes nothing and reports success.
 
 *The weekly chart is off by a day twice a year.* You are bucketing by a fixed 24 hours across a daylight-saving transition. Use `HealthInterval.calendarDays(1, tz)`.
 

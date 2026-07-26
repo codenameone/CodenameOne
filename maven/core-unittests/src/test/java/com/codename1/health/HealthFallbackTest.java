@@ -122,7 +122,7 @@ class HealthFallbackTest extends UITestBase {
                 new HealthQuantity(70, HealthUnit.KILOGRAM), 1000L);
         assertFailedWith(HealthError.NOT_SUPPORTED, store.write(s));
         assertFailedWith(HealthError.NOT_SUPPORTED,
-                store.delete(HealthDeleteRequest.byId("x")));
+                store.delete(HealthDeleteRequest.byId(HealthDataType.STEPS, "x")));
     }
 
     @Test

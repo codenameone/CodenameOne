@@ -190,6 +190,16 @@ final class HealthManifestFragments {
     }
 
     /**
+     * The Health Connect permission suffix for one token, or {@code null}
+     * when the token is unknown. Exposed so the Kotlin bridge's own copy of
+     * this table can be pinned against it -- see
+     * {@code HealthBridgeTokenTableTest}.
+     */
+    static String permissionSuffix(String token) {
+        return PERMISSION_SUFFIX.get(token);
+    }
+
+    /**
      * The full Health Connect permission name for one token, or
      * {@code null} when the token is unknown.
      */

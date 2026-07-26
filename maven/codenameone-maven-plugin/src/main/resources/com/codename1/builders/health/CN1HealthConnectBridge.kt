@@ -26,14 +26,45 @@ import android.content.Context
 import android.content.Intent
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import androidx.health.connect.client.changes.DeletionChange
+import androidx.health.connect.client.changes.UpsertionChange
+import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.BasalBodyTemperatureRecord
+import androidx.health.connect.client.records.BloodGlucoseRecord
+import androidx.health.connect.client.records.BodyFatRecord
+import androidx.health.connect.client.records.BodyTemperatureRecord
+import androidx.health.connect.client.records.BoneMassRecord
+import androidx.health.connect.client.records.CyclingPedalingCadenceRecord
+import androidx.health.connect.client.records.DistanceRecord
+import androidx.health.connect.client.records.ElevationGainedRecord
+import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.FloorsClimbedRecord
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.HeightRecord
+import androidx.health.connect.client.records.HydrationRecord
+import androidx.health.connect.client.records.LeanBodyMassRecord
+import androidx.health.connect.client.records.OxygenSaturationRecord
+import androidx.health.connect.client.records.PowerRecord
 import androidx.health.connect.client.records.Record
+import androidx.health.connect.client.records.RespiratoryRateRecord
+import androidx.health.connect.client.records.RestingHeartRateRecord
+import androidx.health.connect.client.records.SleepSessionRecord
+import androidx.health.connect.client.records.SpeedRecord
+import androidx.health.connect.client.records.StepsCadenceRecord
 import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.Vo2MaxRecord
 import androidx.health.connect.client.records.WeightRecord
+import androidx.health.connect.client.records.WheelchairPushesRecord
 import androidx.health.connect.client.request.ChangesTokenRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import androidx.health.connect.client.units.BloodGlucose
+import androidx.health.connect.client.units.Energy
+import androidx.health.connect.client.units.Length
 import androidx.health.connect.client.units.Mass
+import androidx.health.connect.client.units.Percentage
+import androidx.health.connect.client.units.Temperature
+import androidx.health.connect.client.units.Volume
 import com.codename1.impl.android.HealthConnectDelegate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -132,7 +163,8 @@ class CN1HealthConnectBridge(private val context: Context)
         run(cb) {
             val granted = requireClient().permissionController
                 .getGrantedPermissions()
-            granted.joinToString(",") { toToken(it) }
+            granted.flatMap { toTokens(it) }.distinct()
+                .joinToString(",")
         }
     }
 
@@ -151,7 +183,8 @@ class CN1HealthConnectBridge(private val context: Context)
             val granted = PermissionController
                 .createRequestPermissionResultContract()
                 .parseResult(resultCode, data)
-            granted.joinToString(",") { toToken(it) }
+            granted.flatMap { toTokens(it) }.distinct()
+                .joinToString(",")
         } catch (t: Throwable) {
             ""
         }
@@ -177,37 +210,156 @@ class CN1HealthConnectBridge(private val context: Context)
     /** Reads one portable type and appends it in the shared line format. */
     private suspend fun appendRecords(sb: StringBuilder, token: String,
                                       filter: TimeRangeFilter, limit: Int) {
-        when (token) {
-            "steps" -> requireClient().readRecords(
-                ReadRecordsRequest(StepsRecord::class,
-                    timeRangeFilter = filter, pageSize = limit)
-            ).records.forEach {
-                line(sb, it.metadata.id, token, it.startTime.toEpochMilli(),
-                    it.endTime.toEpochMilli(), it.count.toDouble(), "count")
+        // A type this bridge cannot read is rejected rather than returned
+        // as an empty page: the caller cannot tell an empty page apart from
+        // "you have no data", which is the one answer a health API must
+        // never guess at.
+        val type = readableRecordClassFor(token)
+            ?: throw IllegalArgumentException(
+                "Health Connect reads are not implemented for '" + token
+                    + "' in this build")
+        requireClient().readRecords(
+            ReadRecordsRequest(type, timeRangeFilter = filter,
+                pageSize = limit)
+        ).records.forEach { appendOne(sb, it, token) }
+    }
+
+    /**
+     * Emits one record in the shared line format, tagged with `token`.
+     *
+     * The token is supplied rather than derived because the relation is
+     * many-to-one: Health Connect has a single `DistanceRecord` behind the
+     * walking, cycling and swimming distance types, so a read must label
+     * its lines with the type that was actually asked for or the portable
+     * layer discards them as the wrong type.
+     *
+     * Returns false for record shapes with no single-value form, which the
+     * caller reports rather than silently dropping.
+     */
+    private fun appendOne(sb: StringBuilder, record: Record,
+                          token: String): Boolean {
+        when (record) {
+            is StepsRecord -> interval(sb, record, token,
+                record.startTime, record.endTime,
+                record.count.toDouble(), "count")
+
+            is DistanceRecord -> interval(sb, record, token,
+                record.startTime, record.endTime,
+                record.distance.inMeters, "m")
+
+            is FloorsClimbedRecord -> interval(sb, record, token,
+                record.startTime, record.endTime,
+                record.floors, "count")
+
+            is ElevationGainedRecord -> interval(sb, record, token,
+                record.startTime, record.endTime,
+                record.elevation.inMeters, "m")
+
+            is ActiveCaloriesBurnedRecord -> interval(sb, record, token,
+                record.startTime, record.endTime,
+                record.energy.inKilocalories, "kcal")
+
+            is WheelchairPushesRecord -> interval(sb, record, token,
+                record.startTime, record.endTime,
+                record.count.toDouble(), "count")
+
+            is HydrationRecord -> interval(sb, record, token,
+                record.startTime, record.endTime,
+                record.volume.inLiters, "L")
+
+            is WeightRecord -> instant(sb, record, token, record.time,
+                record.weight.inKilograms, "kg")
+
+            is LeanBodyMassRecord -> instant(sb, record, token, record.time,
+                record.mass.inKilograms, "kg")
+
+            is BoneMassRecord -> instant(sb, record, token, record.time,
+                record.mass.inKilograms, "kg")
+
+            is BodyFatRecord -> instant(sb, record, token, record.time,
+                record.percentage.value, "%")
+
+            is HeightRecord -> instant(sb, record, token, record.time,
+                record.height.inMeters, "m")
+
+            is RestingHeartRateRecord -> instant(sb, record, token,
+                record.time,
+                record.beatsPerMinute.toDouble(), "count/min")
+
+            is OxygenSaturationRecord -> instant(sb, record, token,
+                record.time,
+                record.percentage.value, "%")
+
+            is RespiratoryRateRecord -> instant(sb, record, token, record.time,
+                record.rate, "count/min")
+
+            is BasalBodyTemperatureRecord -> instant(sb, record, token,
+                record.time,
+                record.temperature.inCelsius, "degC")
+
+            is BodyTemperatureRecord -> instant(sb, record, token, record.time,
+                record.temperature.inCelsius, "degC")
+
+            is Vo2MaxRecord -> instant(sb, record, token, record.time,
+                record.vo2MillilitersPerMinuteKilogram, "mL/(kg*min)")
+
+            is BloodGlucoseRecord -> instant(sb, record, token, record.time,
+                record.level.inMillimolesPerLiter, "mmol/L")
+
+            // Series records hold many samples in one record and the
+            // portable layer flattens by default, so emit one line per
+            // sample rather than per record.
+            is HeartRateRecord -> record.samples.forEach {
+                sample(sb, record, token, it.time.toEpochMilli(),
+                    it.beatsPerMinute.toDouble(), "count/min")
             }
 
-            "heart_rate" -> requireClient().readRecords(
-                ReadRecordsRequest(HeartRateRecord::class,
-                    timeRangeFilter = filter, pageSize = limit)
-            ).records.forEach { record ->
-                // One Health Connect record holds many samples; the
-                // portable layer flattens by default, so emit one line per
-                // sample rather than per record.
-                record.samples.forEach { s ->
-                    line(sb, record.metadata.id, token,
-                        s.time.toEpochMilli(), s.time.toEpochMilli(),
-                        s.beatsPerMinute.toDouble(), "count/min")
-                }
+            is PowerRecord -> record.samples.forEach {
+                sample(sb, record, token, it.time.toEpochMilli(),
+                    it.power.inWatts, "W")
             }
 
-            "body_mass" -> requireClient().readRecords(
-                ReadRecordsRequest(WeightRecord::class,
-                    timeRangeFilter = filter, pageSize = limit)
-            ).records.forEach {
-                line(sb, it.metadata.id, token, it.time.toEpochMilli(),
-                    it.time.toEpochMilli(), it.weight.inKilograms, "kg")
+            is SpeedRecord -> record.samples.forEach {
+                sample(sb, record, token, it.time.toEpochMilli(),
+                    it.speed.inMetersPerSecond, "m/s")
             }
+
+            is CyclingPedalingCadenceRecord -> record.samples.forEach {
+                sample(sb, record, token, it.time.toEpochMilli(),
+                    it.revolutionsPerMinute, "count/min")
+            }
+
+            is StepsCadenceRecord -> record.samples.forEach {
+                sample(sb, record, token, it.time.toEpochMilli(),
+                    it.rate, "count/min")
+            }
+
+            else -> return false
         }
+        return true
+    }
+
+    // The record timestamps are passed in rather than read off a shared
+    // supertype: androidx.health.connect marks IntervalRecord and
+    // InstantaneousRecord internal, so they cannot be named here. Each
+    // branch above knows its concrete type, which is where the times come
+    // from.
+    private fun interval(sb: StringBuilder, r: Record, token: String,
+                         start: Instant, end: Instant, value: Double,
+                         unit: String) {
+        line(sb, r.metadata.id, token, start.toEpochMilli(),
+            end.toEpochMilli(), value, unit)
+    }
+
+    private fun instant(sb: StringBuilder, r: Record, token: String,
+                        at: Instant, value: Double, unit: String) {
+        line(sb, r.metadata.id, token, at.toEpochMilli(),
+            at.toEpochMilli(), value, unit)
+    }
+
+    private fun sample(sb: StringBuilder, r: Record, token: String,
+                       at: Long, value: Double, unit: String) {
+        line(sb, r.metadata.id, token, at, at, value, unit)
     }
 
     private fun line(sb: StringBuilder, id: String, type: String,
@@ -253,19 +405,87 @@ class CN1HealthConnectBridge(private val context: Context)
         if (f.size < 6) {
             return null
         }
+        val token = f[1]
         val start = Instant.ofEpochMilli(f[2].toLong())
         val end = Instant.ofEpochMilli(f[3].toLong())
         val value = f[4].toDouble()
         val zone = java.time.ZoneId.systemDefault().rules.getOffset(start)
-        return when (f[1]) {
+        return when (token) {
             "steps" -> StepsRecord(startTime = start, endTime = end,
                 startZoneOffset = zone, endZoneOffset = zone,
                 count = value.toLong())
 
+            "distance_walking_running", "distance_cycling",
+            "distance_swimming" -> DistanceRecord(startTime = start,
+                endTime = end, startZoneOffset = zone, endZoneOffset = zone,
+                distance = Length.meters(value))
+
+            "flights_climbed" -> FloorsClimbedRecord(startTime = start,
+                endTime = end, startZoneOffset = zone, endZoneOffset = zone,
+                floors = value)
+
+            "elevation_gained" -> ElevationGainedRecord(startTime = start,
+                endTime = end, startZoneOffset = zone, endZoneOffset = zone,
+                elevation = Length.meters(value))
+
+            "active_energy" -> ActiveCaloriesBurnedRecord(startTime = start,
+                endTime = end, startZoneOffset = zone, endZoneOffset = zone,
+                energy = Energy.kilocalories(value))
+
+            "wheelchair_pushes" -> WheelchairPushesRecord(startTime = start,
+                endTime = end, startZoneOffset = zone, endZoneOffset = zone,
+                count = value.toLong())
+
+            "hydration" -> HydrationRecord(startTime = start, endTime = end,
+                startZoneOffset = zone, endZoneOffset = zone,
+                volume = Volume.liters(value))
+
             "body_mass" -> WeightRecord(time = start, zoneOffset = zone,
                 weight = Mass.kilograms(value))
 
-            else -> null
+            "lean_body_mass" -> LeanBodyMassRecord(time = start,
+                zoneOffset = zone, mass = Mass.kilograms(value))
+
+            "bone_mass" -> BoneMassRecord(time = start, zoneOffset = zone,
+                mass = Mass.kilograms(value))
+
+            "body_fat_percentage" -> BodyFatRecord(time = start,
+                zoneOffset = zone, percentage = Percentage(value))
+
+            "height" -> HeightRecord(time = start, zoneOffset = zone,
+                height = Length.meters(value))
+
+            "resting_heart_rate" -> RestingHeartRateRecord(time = start,
+                zoneOffset = zone, beatsPerMinute = value.toLong())
+
+            "oxygen_saturation" -> OxygenSaturationRecord(time = start,
+                zoneOffset = zone, percentage = Percentage(value))
+
+            "respiratory_rate" -> RespiratoryRateRecord(time = start,
+                zoneOffset = zone, rate = value)
+
+            "body_temperature" -> BodyTemperatureRecord(time = start,
+                zoneOffset = zone, temperature = Temperature.celsius(value))
+
+            "basal_body_temperature" -> BasalBodyTemperatureRecord(
+                time = start, zoneOffset = zone,
+                temperature = Temperature.celsius(value))
+
+            "vo2_max" -> Vo2MaxRecord(time = start, zoneOffset = zone,
+                vo2MillilitersPerMinuteKilogram = value)
+
+            "blood_glucose" -> BloodGlucoseRecord(time = start,
+                zoneOffset = zone,
+                level = BloodGlucose.millimolesPerLiter(value))
+
+            "heart_rate" -> HeartRateRecord(startTime = start, endTime = end,
+                startZoneOffset = zone, endZoneOffset = zone,
+                samples = listOf(HeartRateRecord.Sample(time = start,
+                    beatsPerMinute = value.toLong())))
+
+            else -> throw IllegalArgumentException(
+                "Health Connect writes are not implemented for '" + token
+                    + "' in this build")
         }
     }
 
@@ -273,14 +493,35 @@ class CN1HealthConnectBridge(private val context: Context)
                                cb: HealthConnectDelegate.Callback) {
         run(cb) {
             val json = JSONObject(requestJson)
+            val types = json.getJSONArray("types")
+            // Health Connect deletes by record class, so the portable layer
+            // sends the type alongside the ids. Deleting the ids under a
+            // guessed class would delete nothing and still report success.
+            val classes = (0 until types.length())
+                .map { types.getString(it) }
+                .map { token ->
+                    recordClassFor(token) ?: throw IllegalArgumentException(
+                        "Health Connect deletes are not implemented for '"
+                            + token + "' in this build")
+                }
             if (json.has("ids")) {
                 val ids = json.getJSONArray("ids")
                 val list = (0 until ids.length()).map { ids.getString(it) }
-                requireClient().deleteRecords(StepsRecord::class, list,
-                    emptyList())
+                classes.forEach {
+                    requireClient().deleteRecords(it, list, emptyList())
+                }
                 list.size.toString()
             } else {
-                "0"
+                val filter = TimeRangeFilter.between(
+                    Instant.ofEpochMilli(json.getLong("start")),
+                    Instant.ofEpochMilli(json.getLong("end")))
+                classes.forEach {
+                    requireClient().deleteRecords(it, filter)
+                }
+                // Health Connect does not report how many records a range
+                // delete removed, so report the honest unknown rather than
+                // a fabricated count.
+                "-1"
             }
         }
     }
@@ -303,53 +544,212 @@ class CN1HealthConnectBridge(private val context: Context)
         run(cb) {
             val changes = requireClient().getChanges(token)
             val sb = StringBuilder()
-            sb.append(changes.nextChangesToken).append('\n')
+            sb.append(changes.nextChangesToken).append('\t')
+                .append(if (changes.changesTokenExpired) "1" else "0")
+                .append('\t')
+                .append(if (changes.hasMore) "1" else "0").append('\n')
+            // The page body was previously discarded, which silently threw
+            // away every change in the batch while still advancing the
+            // token, so the data could never be recovered on a later poll.
+            changes.changes.forEach { change ->
+                when (change) {
+                    is UpsertionChange -> appendChangedRecord(sb, "+",
+                        change.record)
+
+                    is DeletionChange -> sb.append("-").append('\t')
+                        .append(change.recordId).append('\n')
+
+                    else -> {}
+                }
+            }
             sb.toString()
         }
     }
 
+    /**
+     * Emits one upserted record as ordinary sample lines prefixed with
+     * `op`, so a drained change carries its values rather than only an id
+     * the caller would have to re-query for.
+     *
+     * A record shape with no single-value form is still reported, as an
+     * identity-only line, so the caller learns something changed instead
+     * of the change being dropped.
+     */
+    private fun appendChangedRecord(sb: StringBuilder, op: String,
+                                    record: Record) {
+        val token = TOKEN_FOR_RECORD[record.javaClass.simpleName]
+        val body = StringBuilder()
+        if (token == null || !appendOne(body, record, token)) {
+            sb.append(op).append("\t").append(record.metadata.id)
+                .append('\t').append(token ?: "").append('\n')
+            return
+        }
+        body.toString().split('\n').forEach {
+            if (it.isNotBlank()) {
+                sb.append(op).append('\t').append(it).append('\n')
+            }
+        }
+    }
+
+    /**
+     * Record classes the line format can carry values for.
+     *
+     * Session-shaped records are deliberately absent: a sleep session or a
+     * workout is not a single number and squeezing one into a value line
+     * would misreport it. They are still deletable and still register for
+     * change notifications, which is why the two maps differ.
+     */
+    private fun readableRecordClassFor(token: String) = when (token) {
+        "sleep", "workout" -> null
+        else -> recordClassFor(token)
+    }
+
     private fun recordClassFor(token: String) = when (token) {
         "steps" -> StepsRecord::class
+        "distance_walking_running", "distance_cycling",
+        "distance_swimming" -> DistanceRecord::class
+        "flights_climbed" -> FloorsClimbedRecord::class
+        "elevation_gained" -> ElevationGainedRecord::class
+        "active_energy" -> ActiveCaloriesBurnedRecord::class
+        "wheelchair_pushes" -> WheelchairPushesRecord::class
+        "hydration" -> HydrationRecord::class
         "heart_rate" -> HeartRateRecord::class
+        "resting_heart_rate" -> RestingHeartRateRecord::class
+        "oxygen_saturation" -> OxygenSaturationRecord::class
+        "respiratory_rate" -> RespiratoryRateRecord::class
+        "body_temperature" -> BodyTemperatureRecord::class
+        "basal_body_temperature" -> BasalBodyTemperatureRecord::class
+        "vo2_max" -> Vo2MaxRecord::class
+        "blood_glucose" -> BloodGlucoseRecord::class
         "body_mass" -> WeightRecord::class
+        "lean_body_mass" -> LeanBodyMassRecord::class
+        "bone_mass" -> BoneMassRecord::class
+        "body_fat_percentage" -> BodyFatRecord::class
+        "height" -> HeightRecord::class
+        "power" -> PowerRecord::class
+        "speed" -> SpeedRecord::class
+        "cycling_cadence" -> CyclingPedalingCadenceRecord::class
+        "running_cadence" -> StepsCadenceRecord::class
+        "sleep" -> SleepSessionRecord::class
+        "workout" -> ExerciseSessionRecord::class
         else -> null
     }
+
+    private val TOKEN_FOR_RECORD: Map<String, String> = mapOf(
+        "StepsRecord" to "steps",
+        "DistanceRecord" to "distance_walking_running",
+        "FloorsClimbedRecord" to "flights_climbed",
+        "ElevationGainedRecord" to "elevation_gained",
+        "ActiveCaloriesBurnedRecord" to "active_energy",
+        "WheelchairPushesRecord" to "wheelchair_pushes",
+        "HydrationRecord" to "hydration",
+        "HeartRateRecord" to "heart_rate",
+        "RestingHeartRateRecord" to "resting_heart_rate",
+        "OxygenSaturationRecord" to "oxygen_saturation",
+        "RespiratoryRateRecord" to "respiratory_rate",
+        "BodyTemperatureRecord" to "body_temperature",
+        "BasalBodyTemperatureRecord" to "basal_body_temperature",
+        "Vo2MaxRecord" to "vo2_max",
+        "BloodGlucoseRecord" to "blood_glucose",
+        "WeightRecord" to "body_mass",
+        "LeanBodyMassRecord" to "lean_body_mass",
+        "BoneMassRecord" to "bone_mass",
+        "BodyFatRecord" to "body_fat_percentage",
+        "HeightRecord" to "height",
+        "PowerRecord" to "power",
+        "SpeedRecord" to "speed",
+        "CyclingPedalingCadenceRecord" to "cycling_cadence",
+        "StepsCadenceRecord" to "running_cadence",
+        "SleepSessionRecord" to "sleep",
+        "ExerciseSessionRecord" to "workout")
+
+    /**
+     * Portable token to Health Connect permission suffix.
+     *
+     * This table must stay identical to `PERMISSION_SUFFIX` in
+     * `HealthManifestFragments`, which decides what the manifest declares.
+     * A token missing here but present there produces an app that holds a
+     * permission it can never ask for; the reverse produces a request for
+     * a permission the manifest never declared, which Health Connect
+     * rejects outright. `HealthBridgeTokenTableTest` parses this file and
+     * fails the build when the two drift.
+     */
+    private val PERMISSION_SUFFIX: Map<String, String> = mapOf(
+        "steps" to "STEPS",
+        "distance_walking_running" to "DISTANCE",
+        "distance_cycling" to "DISTANCE",
+        "distance_swimming" to "DISTANCE",
+        "flights_climbed" to "FLOORS_CLIMBED",
+        "elevation_gained" to "ELEVATION_GAINED",
+        "active_energy" to "ACTIVE_CALORIES_BURNED",
+        "basal_energy" to "BASAL_METABOLIC_RATE",
+        "exercise_time" to "EXERCISE",
+        "wheelchair_pushes" to "WHEELCHAIR_PUSHES",
+        "heart_rate" to "HEART_RATE",
+        "resting_heart_rate" to "RESTING_HEART_RATE",
+        "walking_heart_rate_average" to "HEART_RATE",
+        "heart_rate_variability_sdnn" to "HEART_RATE_VARIABILITY",
+        "oxygen_saturation" to "OXYGEN_SATURATION",
+        "respiratory_rate" to "RESPIRATORY_RATE",
+        "body_temperature" to "BODY_TEMPERATURE",
+        "basal_body_temperature" to "BASAL_BODY_TEMPERATURE",
+        "vo2_max" to "VO2_MAX",
+        "blood_pressure" to "BLOOD_PRESSURE",
+        "blood_glucose" to "BLOOD_GLUCOSE",
+        "body_mass" to "WEIGHT",
+        "lean_body_mass" to "LEAN_BODY_MASS",
+        "bone_mass" to "BONE_MASS",
+        "body_fat_percentage" to "BODY_FAT",
+        "body_mass_index" to "BODY_WATER_MASS",
+        "height" to "HEIGHT",
+        "waist_circumference" to "BODY_MEASUREMENTS",
+        "power" to "POWER",
+        "speed" to "SPEED",
+        "cycling_cadence" to "CYCLING_PEDALING_CADENCE",
+        "running_cadence" to "STEPS_CADENCE",
+        "hydration" to "HYDRATION",
+        "dietary_energy" to "NUTRITION",
+        "nutrition" to "NUTRITION",
+        "sleep" to "SLEEP",
+        "workout" to "EXERCISE",
+        "mindful_session" to "MINDFULNESS",
+        "menstruation_flow" to "MENSTRUATION",
+        "intermenstrual_bleeding" to "INTERMENSTRUAL_BLEEDING")
+
+    /**
+     * Health Connect permission suffix back to every portable token that
+     * maps onto it.
+     *
+     * The relation is many-to-one: one `READ_DISTANCE` grant covers the
+     * walking, cycling and swimming distance types. Reporting only one of
+     * them would make an app that asked for `distance_cycling` believe its
+     * request was refused, so a grant is reported for all of them.
+     */
+    private val TOKENS_FOR_SUFFIX: Map<String, List<String>> =
+        PERMISSION_SUFFIX.entries.groupBy({ it.value }, { it.key })
 
     /** Portable token to Health Connect permission string. */
     private fun toHealthPermission(token: String): String? {
         val write = token.startsWith("w:")
         val name = token.removePrefix("r:").removePrefix("w:")
-        val suffix = when (name) {
-            "steps" -> "STEPS"
-            "heart_rate" -> "HEART_RATE"
-            "body_mass" -> "WEIGHT"
-            "sleep" -> "SLEEP"
-            "workout" -> "EXERCISE"
-            "distance_walking_running", "distance_cycling",
-            "distance_swimming" -> "DISTANCE"
-            "active_energy" -> "ACTIVE_CALORIES_BURNED"
-            "blood_glucose" -> "BLOOD_GLUCOSE"
-            "blood_pressure" -> "BLOOD_PRESSURE"
-            "oxygen_saturation" -> "OXYGEN_SATURATION"
-            else -> return null
-        }
+        val suffix = PERMISSION_SUFFIX[name] ?: return null
         return "android.permission.health." +
             (if (write) "WRITE_" else "READ_") + suffix
     }
 
-    /** Health Connect permission string back to a portable token. */
-    private fun toToken(permission: String): String {
-        val write = permission.contains(".WRITE_")
-        val suffix = permission.substringAfterLast('_')
-        val name = when {
-            permission.endsWith("STEPS") -> "steps"
-            permission.endsWith("HEART_RATE") -> "heart_rate"
-            permission.endsWith("WEIGHT") -> "body_mass"
-            permission.endsWith("SLEEP") -> "sleep"
-            permission.endsWith("EXERCISE") -> "workout"
-            permission.endsWith("DISTANCE") -> "distance_walking_running"
-            else -> suffix.lowercase()
-        }
-        return (if (write) "w:" else "r:") + name
+    /**
+     * Health Connect permission string back to portable tokens.
+     *
+     * The suffix is taken by stripping the direction prefix, not by
+     * splitting on the last underscore: `READ_ACTIVE_CALORIES_BURNED`
+     * would otherwise yield `burned`.
+     */
+    private fun toTokens(permission: String): List<String> {
+        val name = permission.substringAfterLast('.')
+        val write = name.startsWith("WRITE_")
+        val suffix = name.removePrefix("READ_").removePrefix("WRITE_")
+        val prefix = if (write) "w:" else "r:"
+        val tokens = TOKENS_FOR_SUFFIX[suffix] ?: return emptyList()
+        return tokens.map { prefix + it }
     }
 }

@@ -26,6 +26,8 @@ import com.codename1.health.AggregateMetric;
 import com.codename1.health.AggregateQuery;
 import com.codename1.health.AggregateResult;
 import com.codename1.health.HealthAccess;
+import com.codename1.health.HealthAnchor;
+import com.codename1.health.HealthChangeBatch;
 import com.codename1.health.HealthAuthorizationStatus;
 import com.codename1.health.HealthDataType;
 import com.codename1.health.HealthDeleteRequest;
@@ -33,9 +35,11 @@ import com.codename1.health.HealthError;
 import com.codename1.health.HealthException;
 import com.codename1.health.HealthSample;
 import com.codename1.health.HealthStore;
+import com.codename1.health.HealthSubscription;
 import com.codename1.health.HealthWriteResult;
 import com.codename1.health.SampleQuery;
 import com.codename1.health.SamplePage;
+import com.codename1.impl.health.HealthChangePage;
 import com.codename1.impl.health.HealthWire;
 import com.codename1.util.AsyncResource;
 
@@ -344,5 +348,147 @@ class AndroidHealthStore extends HealthStore {
                         }
                     }
                 });
+    }
+
+    // ==================================================================
+    // change draining
+    // ==================================================================
+
+    /// Health Connect never wakes the app, so a subscription is only ever
+    /// as current as the last drain. Subscriptions are drained one at a
+    /// time rather than concurrently: each owns a change token that the
+    /// base class persists once its batch has been handled, and running
+    /// them in parallel would interleave those writes.
+    protected void doDrainChanges(List<HealthSubscription> subscriptions,
+            AsyncResource<Integer> out) {
+        if (failIfNoBridge(out)) {
+            return;
+        }
+        drainFrom(new ArrayList<HealthSubscription>(subscriptions), 0, 0,
+                out);
+    }
+
+    private void drainFrom(List<HealthSubscription> subs, int index,
+            int delivered, AsyncResource<Integer> out) {
+        if (index >= subs.size()) {
+            out.complete(Integer.valueOf(delivered));
+            return;
+        }
+        HealthSubscription sub = subs.get(index);
+        HealthAnchor anchor = sub.getAnchor();
+        String token = anchor == null ? null : anchor.toStorableString();
+        if (token == null || token.length() == 0) {
+            // The first drain only establishes a baseline. A Health
+            // Connect token describes changes from the moment it is
+            // issued, so there is nothing yet to report; firing the empty
+            // batch is what gets the token persisted for the next poll.
+            delegate().getChangesToken(typesCsv(sub),
+                    new DrainStep(subs, index, delivered, out, true));
+            return;
+        }
+        delegate().getChanges(token,
+                new DrainStep(subs, index, delivered, out, false));
+    }
+
+    private static String typesCsv(HealthSubscription sub) {
+        StringBuilder sb = new StringBuilder();
+        List<HealthDataType> types = sub.getTypes();
+        for (int i = 0; i < types.size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append(types.get(i).getId());
+        }
+        return sb.toString();
+    }
+
+    /// One step of the sequential drain: handles a single subscription's
+    /// bridge reply and then moves on to the next one.
+    private final class DrainStep
+            implements HealthConnectDelegate.Callback {
+
+        private final List<HealthSubscription> subs;
+        private final int index;
+        private final int delivered;
+        private final AsyncResource<Integer> out;
+        private final boolean baseline;
+
+        DrainStep(List<HealthSubscription> subs, int index, int delivered,
+                AsyncResource<Integer> out, boolean baseline) {
+            this.subs = subs;
+            this.index = index;
+            this.delivered = delivered;
+            this.out = out;
+            this.baseline = baseline;
+        }
+
+        public void onSuccess(final String payload) {
+            AndroidHealth.onEdt(new DeliverBatch(this, payload));
+        }
+
+        public void onError(final int code, final String message) {
+            // One failing subscription must not strand the others, and it
+            // must not advance its own cursor. Skipping it leaves the
+            // token where it was so the next drain retries the same range.
+            AndroidHealth.onEdt(new SkipOne(this));
+        }
+
+        void deliver(String payload) {
+            int count = delivered;
+            HealthSubscription sub = subs.get(index);
+            if (baseline) {
+                fireChanges(new HealthChangeBatch(sub.getId(),
+                        sub.getTypes(), null, null, false,
+                        HealthAnchor.of(payload.trim()), 0L, false));
+            } else {
+                HealthChangePage page =
+                        HealthWire.decodeChangePage(payload);
+                if (page == null) {
+                    // An unreadable reply leaves the cursor alone rather
+                    // than advancing past changes that were never seen.
+                    drainFrom(subs, index + 1, count, out);
+                    return;
+                }
+                fireChanges(new HealthChangeBatch(sub.getId(),
+                        sub.getTypes(), page.getAdded(),
+                        page.getDeletedIds(), page.isExpired(),
+                        HealthAnchor.of(page.getNextToken()), 0L,
+                        page.hasMore()));
+                count++;
+            }
+            drainFrom(subs, index + 1, count, out);
+        }
+
+        void skip() {
+            drainFrom(subs, index + 1, delivered, out);
+        }
+    }
+
+    /// Named rather than anonymous so the EDT hop carries no implicit
+    /// reference to the enclosing store.
+    private static final class DeliverBatch implements Runnable {
+        private final DrainStep step;
+        private final String payload;
+
+        DeliverBatch(DrainStep step, String payload) {
+            this.step = step;
+            this.payload = payload;
+        }
+
+        public void run() {
+            step.deliver(payload);
+        }
+    }
+
+    private static final class SkipOne implements Runnable {
+        private final DrainStep step;
+
+        SkipOne(DrainStep step) {
+            this.step = step;
+        }
+
+        public void run() {
+            step.skip();
+        }
     }
 }

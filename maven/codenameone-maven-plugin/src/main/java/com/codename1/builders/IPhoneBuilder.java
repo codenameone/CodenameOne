@@ -124,8 +124,6 @@ public class IPhoneBuilder extends Executor {
     private boolean usesHealthWrite;
     private boolean usesHealthObserver;
     private boolean usesHealthWorkout;
-    private final java.util.List<String> healthBackgroundListeners =
-            new java.util.ArrayList<String>();
     private boolean usesCn1Camera;
     private boolean usesCn1Ar;
     // Set when the app references com.codename1.car.* (Apple CarPlay support). Gates the
@@ -809,14 +807,14 @@ public class IPhoneBuilder extends Executor {
 
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
+                // Deliberately empty. The health background-listener
+                // bindings AndroidGradleBuilder generates exist because
+                // Health Connect delivery survives process death; iOS
+                // drains in-process instead (see
+                // IOSHealthStore.doDrainChanges), so there is no listener
+                // class to bind here.
                 @Override
                 public void implementsInterface(String cls, String iface) {
-                    if ("com/codename1/health/HealthBackgroundListener".equals(iface)) {
-                        String fqcn = cls.replace('/', '.');
-                        if (!healthBackgroundListeners.contains(fqcn)) {
-                            healthBackgroundListeners.add(fqcn);
-                        }
-                    }
                 }
 
                 @Override

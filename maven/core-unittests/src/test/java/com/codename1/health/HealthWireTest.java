@@ -22,6 +22,7 @@
  */
 package com.codename1.health;
 
+import com.codename1.impl.health.HealthChangePage;
 import com.codename1.impl.health.HealthWire;
 import org.junit.jupiter.api.Test;
 
@@ -158,9 +159,12 @@ class HealthWireTest {
     @Test
     void deleteRequestEncodesEitherIdsOrARange() {
         String byId = HealthWire.encodeDeleteRequest(
-                HealthDeleteRequest.byId("abc"));
+                HealthDeleteRequest.byId(HealthDataType.STEPS, "abc"));
         assertTrue(byId.contains("\"ids\""));
         assertTrue(byId.contains("abc"));
+        assertTrue(byId.contains("\"steps\""),
+                "the id form carries its type too: Health Connect deletes"
+                        + " by record class and cannot resolve a bare id");
 
         String byRange = HealthWire.encodeDeleteRequest(
                 HealthDeleteRequest.byRange(HealthDataType.STEPS,
@@ -209,5 +213,81 @@ class HealthWireTest {
                 HealthWire.decodeAggregates(payload, q, boundaries);
         assertEquals(1, buckets.size());
         assertTrue(buckets.get(0).isEmpty());
+    }
+
+    // ------------------------------------------------------------------
+    // change pages
+    // ------------------------------------------------------------------
+
+    @Test
+    void changePageCarriesAddedSamplesAndDeletedIds() {
+        String payload = "tok2\t0\t1\n"
+                + "+\tid1\tsteps\t1000\t2000\t100\tcount\t\n"
+                + "-\tid9\n"
+                + "+\tid2\tsteps\t3000\t4000\t200\tcount\t\n";
+        HealthChangePage page = HealthWire.decodeChangePage(payload);
+        assertNotNull(page);
+        assertEquals("tok2", page.getNextToken());
+        assertFalse(page.isExpired());
+        assertTrue(page.hasMore());
+        assertEquals(2, page.getAdded().size());
+        assertEquals(1, page.getDeletedIds().size());
+        assertEquals("id9", page.getDeletedIds().get(0));
+    }
+
+    /**
+     * The whole point of the header flag: a token that aged out means the
+     * changes are incomplete, and the caller has to resync rather than
+     * treat an empty-looking page as "nothing happened".
+     */
+    @Test
+    void expiredTokenIsReported() {
+        HealthChangePage page = HealthWire.decodeChangePage("tok\t1\t0\n");
+        assertNotNull(page);
+        assertTrue(page.isExpired());
+        assertTrue(page.getAdded().isEmpty());
+    }
+
+    /**
+     * An unreadable reply must not decode to an empty page. An empty page
+     * would advance the cursor past changes that were never seen, losing
+     * them permanently; a null tells the caller to leave the cursor alone.
+     */
+    @Test
+    void unreadableChangePayloadYieldsNullRatherThanAnEmptyPage() {
+        assertNull(HealthWire.decodeChangePage(null));
+        assertNull(HealthWire.decodeChangePage(""));
+        assertNull(HealthWire.decodeChangePage("no-newline-header"));
+        assertNull(HealthWire.decodeChangePage("tok\t0\n"),
+                "a header missing the hasMore field is not a valid page");
+    }
+
+    @Test
+    void undecodableChangeLinesAreSkippedButThePageSurvives() {
+        String payload = "tok\t0\t0\n"
+                + "+\tid1\tblood_unicorn\t1\t2\t7\tcount\t\n"
+                + "?\tid2\n"
+                + "+\tid3\tsteps\t1000\t2000\t100\tcount\t\n";
+        HealthChangePage page = HealthWire.decodeChangePage(payload);
+        assertNotNull(page);
+        assertEquals(1, page.getAdded().size());
+        assertTrue(page.getDeletedIds().isEmpty());
+    }
+
+    /**
+     * A delete needs a type because Health Connect deletes by record class
+     * plus id. Without one the request could only be honoured by guessing,
+     * which would delete nothing and still report success.
+     */
+    @Test
+    void deleteWithoutATypeIsRejected() {
+        HealthDeleteRequest r = HealthDeleteRequest.byId(null, "abc");
+        HealthException ex = assertThrows(HealthException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() throws Throwable {
+                        r.validate();
+                    }
+                });
+        assertSame(HealthError.INVALID_ARGUMENT, ex.getError());
     }
 }

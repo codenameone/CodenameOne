@@ -42,18 +42,32 @@ public final class HealthDeleteRequest {
     private final List<HealthDataType> types = new ArrayList<HealthDataType>();
     private HealthTimeRange timeRange;
 
-    /// Deletes specific samples by their platform identifiers.
-    public static HealthDeleteRequest byIds(List<String> sampleIds) {
+    /// Deletes specific samples of `type` by their platform identifiers.
+    ///
+    /// The type is required, not redundant: Health Connect deletes by
+    /// record class plus id and cannot resolve an id on its own, so a
+    /// request without one could only be honoured by guessing. Asking for
+    /// it here means the caller states what they are deleting rather than
+    /// the platform silently deleting nothing.
+    public static HealthDeleteRequest byIds(HealthDataType type,
+            List<String> sampleIds) {
         HealthDeleteRequest r = new HealthDeleteRequest();
+        if (type != null) {
+            r.types.add(type);
+        }
         if (sampleIds != null) {
             r.sampleIds.addAll(sampleIds);
         }
         return r;
     }
 
-    /// Deletes one sample by its platform identifier.
-    public static HealthDeleteRequest byId(String sampleId) {
+    /// Deletes one sample of `type` by its platform identifier.
+    public static HealthDeleteRequest byId(HealthDataType type,
+            String sampleId) {
         HealthDeleteRequest r = new HealthDeleteRequest();
+        if (type != null) {
+            r.types.add(type);
+        }
         if (sampleId != null) {
             r.sampleIds.add(sampleId);
         }
@@ -111,7 +125,7 @@ public final class HealthDeleteRequest {
     ///   ambiguously names both.
     public void validate() throws HealthException {
         boolean hasIds = !sampleIds.isEmpty();
-        boolean hasRange = !types.isEmpty() && timeRange != null;
+        boolean hasRange = timeRange != null;
         if (!hasIds && !hasRange) {
             throw new HealthException(HealthError.INVALID_ARGUMENT,
                     "a delete request needs either sample ids or a type"
@@ -121,6 +135,12 @@ public final class HealthDeleteRequest {
             throw new HealthException(HealthError.INVALID_ARGUMENT,
                     "a delete request must name either sample ids or a"
                             + " type and range, not both");
+        }
+        if (types.isEmpty()) {
+            throw new HealthException(HealthError.INVALID_ARGUMENT,
+                    "a delete request needs a data type: Health Connect"
+                            + " deletes by record class, so an id alone"
+                            + " cannot be resolved");
         }
     }
 }

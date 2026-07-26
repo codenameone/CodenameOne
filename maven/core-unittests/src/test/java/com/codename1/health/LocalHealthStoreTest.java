@@ -148,7 +148,8 @@ class LocalHealthStoreTest extends UITestBase {
         assertEquals(2, all.size());
 
         int removed = store.delete(
-                HealthDeleteRequest.byId(all.get(0).getId())).get()
+                HealthDeleteRequest.byId(HealthDataType.STEPS,
+                        all.get(0).getId())).get()
                 .intValue();
         assertEquals(1, removed);
         assertEquals(1, store.readSamples(allStepsIn(2026, 1, 1)).get().size());

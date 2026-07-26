@@ -27,9 +27,13 @@ import com.codename1.health.HealthAccess;
 import com.codename1.health.HealthAuthorizationStatus;
 import com.codename1.health.HealthDataType;
 import com.codename1.health.HealthError;
+import com.codename1.health.HealthAnchor;
+import com.codename1.health.HealthChangeBatch;
+import com.codename1.health.HealthDataType;
 import com.codename1.health.HealthException;
 import com.codename1.health.HealthSample;
 import com.codename1.health.HealthStore;
+import com.codename1.health.HealthSubscription;
 import com.codename1.health.HealthTimeRange;
 import com.codename1.health.HealthWriteResult;
 import com.codename1.health.SampleQuery;
@@ -89,13 +93,19 @@ class IOSHealthStore extends HealthStore {
         return new ArrayList<AggregateMetric>();
     }
 
-    /// HealthKit wakes the app when new data arrives.
+    /// HealthKit can wake the app through `HKObserverQuery`, but this
+    /// build does not register one yet, so nothing arrives while the app
+    /// is closed. Reporting false is the honest answer: an app that
+    /// branches on this needs to know it must drain for itself, and
+    /// claiming push here would make it skip exactly that.
     public boolean isPushDelivery() {
-        return true;
+        return false;
     }
 
+    /// Changes are delivered by draining, not by the OS relaunching the
+    /// app, so background delivery is not available on iOS in this build.
     public boolean isBackgroundDeliverySupported() {
-        return isSupported();
+        return false;
     }
 
     /// Truthful: HealthKit reports share (write) authorization.
@@ -207,5 +217,125 @@ class IOSHealthStore extends HealthStore {
             AsyncResource<HealthWriteResult> out) {
         int id = IOSHealth.takeId(out);
         nativeInstance.hkSaveSamples(id, HealthWire.encodeSamples(samples));
+    }
+
+    // ==================================================================
+    // change draining
+    // ==================================================================
+
+    /// Drains by re-reading each subscription's types over the window that
+    /// has elapsed since its last drain, with the anchor holding that
+    /// timestamp.
+    ///
+    /// This is not `HKAnchoredObjectQuery`: a real anchor would also
+    /// report deletions and would not re-read samples already seen. It is
+    /// what makes subscriptions work at all on iOS today, and the window
+    /// is closed only after the batch has been handled, so a crash re-reads
+    /// rather than skips. Deletions are not reported --
+    /// [#isPushDelivery()] and [#isBackgroundDeliverySupported()] both
+    /// answer false so an app can tell how much this is worth.
+    protected void doDrainChanges(List<HealthSubscription> subscriptions,
+            AsyncResource<Integer> out) {
+        drainFrom(new ArrayList<HealthSubscription>(subscriptions), 0, 0,
+                out);
+    }
+
+    private void drainFrom(final List<HealthSubscription> subs,
+            final int index, final int delivered,
+            final AsyncResource<Integer> out) {
+        if (index >= subs.size()) {
+            out.complete(Integer.valueOf(delivered));
+            return;
+        }
+        final HealthSubscription sub = subs.get(index);
+        final long now = System.currentTimeMillis();
+        long since = anchorMillis(sub, now);
+        List<HealthDataType> types = sub.getTypes();
+        if (types.isEmpty() || since >= now) {
+            drainFrom(subs, index + 1, delivered, out);
+            return;
+        }
+        readTypes(subs, index, delivered, out, types, 0,
+                new ArrayList<HealthSample>(), since, now);
+    }
+
+    /// HealthKit queries one type at a time, so a subscription over three
+    /// types is three reads accumulated into one batch.
+    private void readTypes(final List<HealthSubscription> subs,
+            final int index, final int delivered,
+            final AsyncResource<Integer> out,
+            final List<HealthDataType> types, final int typeIndex,
+            final List<HealthSample> collected, final long since,
+            final long now) {
+        if (typeIndex >= types.size()) {
+            HealthSubscription sub = subs.get(index);
+            fireChanges(new HealthChangeBatch(sub.getId(), sub.getTypes(),
+                    collected, null, false,
+                    HealthAnchor.of(String.valueOf(now)), 0L, false));
+            drainFrom(subs, index + 1, delivered + 1, out);
+            return;
+        }
+        SampleQuery q = new SampleQuery()
+                .addType(types.get(typeIndex))
+                .setTimeRange(HealthTimeRange.between(since, now));
+        readSamples(q).onResult(new ChangeRead(this, subs, index, delivered,
+                out, types, typeIndex, collected, since, now));
+    }
+
+    private static long anchorMillis(HealthSubscription sub, long now) {
+        HealthAnchor anchor = sub.getAnchor();
+        if (anchor == null) {
+            return now;
+        }
+        try {
+            return Long.parseLong(anchor.toStorableString().trim());
+        } catch (NumberFormatException ex) {
+            // A cursor written by an earlier build in another shape. Start
+            // the window here rather than re-reading the whole history.
+            return now;
+        }
+    }
+
+    /// Named rather than anonymous so the callback carries no implicit
+    /// reference to the enclosing store.
+    private static final class ChangeRead
+            implements com.codename1.util.AsyncResult<List<HealthSample>> {
+
+        private final IOSHealthStore store;
+        private final List<HealthSubscription> subs;
+        private final int index;
+        private final int delivered;
+        private final AsyncResource<Integer> out;
+        private final List<HealthDataType> types;
+        private final int typeIndex;
+        private final List<HealthSample> collected;
+        private final long since;
+        private final long now;
+
+        ChangeRead(IOSHealthStore store, List<HealthSubscription> subs,
+                int index, int delivered, AsyncResource<Integer> out,
+                List<HealthDataType> types, int typeIndex,
+                List<HealthSample> collected, long since, long now) {
+            this.store = store;
+            this.subs = subs;
+            this.index = index;
+            this.delivered = delivered;
+            this.out = out;
+            this.types = types;
+            this.typeIndex = typeIndex;
+            this.collected = collected;
+            this.since = since;
+            this.now = now;
+        }
+
+        public void onReady(List<HealthSample> page, Throwable error) {
+            // An unreadable type must not strand the rest of the batch.
+            // The window stays open, so the next drain retries it.
+            if (page != null && error == null) {
+                collected.addAll(page);
+            }
+            store.readTypes(subs, index, delivered, out, types,
+                    typeIndex + 1, collected, since, now);
+        }
     }
 }

@@ -142,6 +142,59 @@ public final class HealthWire {
         return new SamplePage(out, null, false);
     }
 
+    /// Decodes the change page produced by the Health Connect bridge.
+    ///
+    /// The first line carries the next token, whether the previous token
+    /// had expired and whether more pages remain. Every line after it is a
+    /// change: `+` followed by an ordinary sample line, or `-` followed by
+    /// the identifier of a deleted record.
+    ///
+    /// A change line this build cannot decode is skipped rather than
+    /// failing the page, matching [#decodeSamplePage(String)]. The page is
+    /// never silently emptied, though: an unreadable header yields a null
+    /// return so the caller can leave its cursor where it was rather than
+    /// advancing past changes it never saw.
+    public static HealthChangePage decodeChangePage(String payload) {
+        if (payload == null || payload.length() == 0) {
+            return null;
+        }
+        int nl = payload.indexOf(LINE);
+        if (nl < 0) {
+            return null;
+        }
+        String[] head = split(payload.substring(0, nl));
+        if (head.length < 3) {
+            return null;
+        }
+        HealthChangePage page = new HealthChangePage(head[0],
+                "1".equals(head[1]), "1".equals(head[2]));
+        int start = nl + 1;
+        while (start < payload.length()) {
+            int end = payload.indexOf(LINE, start);
+            if (end < 0) {
+                end = payload.length();
+            }
+            String line = payload.substring(start, end);
+            start = end + 1;
+            if (line.length() < 2) {
+                continue;
+            }
+            char op = line.charAt(0);
+            String body = line.substring(2);
+            if (op == '-') {
+                if (body.trim().length() > 0) {
+                    page.deletedIds.add(body.trim());
+                }
+            } else if (op == '+') {
+                HealthSample s = decodeSampleLine(body);
+                if (s != null) {
+                    page.added.add(s);
+                }
+            }
+        }
+        return page;
+    }
+
     private static HealthSample decodeSampleLine(String line) {
         if (line == null || line.trim().length() == 0) {
             return null;
@@ -253,9 +306,20 @@ public final class HealthWire {
 
     /// Encodes a delete request.
     public static String encodeDeleteRequest(HealthDeleteRequest request) {
-        StringBuilder sb = new StringBuilder("{");
+        // The type list is emitted for both shapes. Health Connect deletes by
+        // record class plus id and cannot resolve a bare id, so the id form
+        // needs the type just as much as the range form does.
+        StringBuilder sb = new StringBuilder("{\"types\":[");
+        List<HealthDataType> types = request.getTypes();
+        for (int i = 0; i < types.size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append('"').append(types.get(i).getId()).append('"');
+        }
+        sb.append(']');
         if (request.isById()) {
-            sb.append("\"ids\":[");
+            sb.append(",\"ids\":[");
             List<String> ids = request.getSampleIds();
             for (int i = 0; i < ids.size(); i++) {
                 if (i > 0) {
@@ -267,15 +331,7 @@ public final class HealthWire {
         } else {
             HealthTimeRange range = request.getTimeRange()
                     .resolve(System.currentTimeMillis());
-            sb.append("\"types\":[");
-            List<HealthDataType> types = request.getTypes();
-            for (int i = 0; i < types.size(); i++) {
-                if (i > 0) {
-                    sb.append(',');
-                }
-                sb.append('"').append(types.get(i).getId()).append('"');
-            }
-            sb.append("],\"start\":").append(range.getStartMillis())
+            sb.append(",\"start\":").append(range.getStartMillis())
               .append(",\"end\":").append(range.getEndMillis());
         }
         return sb.append('}').toString();
