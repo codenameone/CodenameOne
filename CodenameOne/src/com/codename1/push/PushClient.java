@@ -418,10 +418,7 @@ public final class PushClient {
     }
 
     private static final class ManagedUnregisterRequest extends ConnectionRequest {
-        private final String subscriptionId;
-
         ManagedUnregisterRequest(String appId, String subscriptionId) {
-            this.subscriptionId = subscriptionId;
             setUrl(endpoint("/subscriptions/") + subscriptionId);
             setHttpMethod("DELETE");
             addRequestHeader("X-CN1-Push-App", appId);
@@ -430,7 +427,8 @@ public final class PushClient {
 
         private void removePersistedId() {
             String persistedId = Preferences.get("push_v3_subscription", null);
-            if (subscriptionId.equals(persistedId)) {
+            if (persistedId != null
+                    && getUrl().endsWith("/subscriptions/" + persistedId)) {
                 Preferences.delete("push_v3_subscription");
             }
         }
