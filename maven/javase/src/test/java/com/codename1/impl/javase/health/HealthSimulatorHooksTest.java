@@ -121,7 +121,7 @@ class HealthSimulatorHooksTest {
         assertEquals("com.codename1.impl.javase.HealthSimulatorHooks"
                         + "#grantWriteDenyReadSilently",
                 p.getProperty("health.item3"));
-        assertEquals("Grant Write, Silently Deny Read",
+        assertEquals("Grant Write, Deny Read Without Error",
                 p.getProperty("health.label3"));
     }
 

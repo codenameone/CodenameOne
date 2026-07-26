@@ -25,18 +25,18 @@ Branch through the capability queries -- `Health.getAvailability()`, `HealthStor
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/HealthJava001Snippet.java[tag=health-java-001,indent=0]
 ----
 
-Check `getAvailability()` before anything else. On Android it distinguishes a working provider from one that is missing or out of date, and both of those are recoverable by the user through `openProviderSetup()`. On the desktop and JavaScript ports it returns `LOCAL_ONLY`, meaning reads and writes work and are durable but the data is only ever your own app's.
+Check `getAvailability()` before anything else. On Android it distinguishes a working provider from one that's missing or out of date, and both of those are recoverable by the user through `openProviderSetup()`. On the desktop and JavaScript ports it returns `LOCAL_ONLY`, meaning reads and writes work and are durable but the data is only ever your own app's.
 
 === Permissions, and the one thing that will surprise you
 
-**You cannot ask whether you are allowed to read.**
+**You can't ask whether you are allowed to read.**
 
-HealthKit deliberately refuses to disclose read authorization. A read the user denied returns an empty result, indistinguishable from having no data at all, because an app that could tell the two apart could infer that a user is hiding a pregnancy or a prescription. That is a privacy guarantee, not a gap in this API.
+HealthKit doesn't disclose read authorization. A read the user denied returns an empty result, indistinguishable from having no data at all, because an app that could tell the two apart could infer that a user is hiding a pregnancy or a prescription. That's a privacy guarantee, not a gap in this API.
 
 Three consequences follow, and all three are load-bearing:
 
 . `requestAuthorization(...)` resolving `true` means the user *has been asked*, not that anything was granted. On iOS the sheet completes identically whether they enabled every switch or none of them.
-. `getReadAuthorizationStatus(...)` returns `UNKNOWN` on iOS in every case. Android answers truthfully, because its read permissions are ordinary runtime grants; the Android port does not pretend otherwise, and neither should your UI.
+. `getReadAuthorizationStatus(...)` returns `UNKNOWN` on iOS in every case. Android answers, because its read permissions are ordinary runtime grants; the Android port doesn't pretend otherwise, and neither should your UI.
 . There is no `hasReadPermission()` anywhere in this API, because on iOS it would be a lie.
 
 [source,java]
@@ -44,9 +44,9 @@ Three consequences follow, and all three are load-bearing:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/HealthJava002Snippet.java[tag=health-java-002,indent=0]
 ----
 
-`hasAnyData(...)` is the only honest probe, and its name says exactly what it measures. Note also that on iOS your own writes stay readable to you even when read access was denied, so a `true` here does not prove you can see other apps' data.
+`hasAnyData(...)` is the only honest probe, and its name says exactly what it measures. Note also that on iOS your own writes stay readable to you even when read access was denied, so a `true` here doesn't prove you can see other apps' data.
 
-**Never tell a user "you denied access" on the strength of an empty result.** Say "no data available", and offer `openHealthSettings()`. Getting this wrong produces an app that accuses users of something they did not do.
+**Never tell a user "you denied access" on the strength of an empty result.** Say "no data available," and offer `openHealthSettings()`. Getting this wrong produces an app that accuses users of something they didn't do.
 
 Request the narrowest set of types you actually need, at the moment you need them. Both stores present every requested type on one sheet, and a long list at first launch is the most common reason people decline.
 
@@ -57,11 +57,11 @@ Request the narrowest set of types you actually need, at the moment you need the
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/HealthJava003Snippet.java[tag=health-java-003,indent=0]
 ----
 
-Values always come back in the type's canonical unit unless the query asks for another, so the two ports return identical objects. Reading a number out of a `HealthQuantity` requires naming the unit at the call site -- there is deliberately no zero-argument `getValue()` -- which removes the entire class of bug where pounds are read as kilograms and every downstream chart is silently wrong by a factor of 2.2.
+Values always come back in the type's canonical unit unless the query asks for another, so the two ports return identical objects. Reading a number out of a `HealthQuantity` requires naming the unit at the call site -- there is no zero-argument `getValue()` -- which removes the entire class of bug where pounds are read as kilograms and every downstream chart is wrong by a factor of 2.2.
 
-Always set a limit for high-frequency types. A year of continuous heart rate is on the order of half a million samples; the default cap of 10,000 exists so a naive query cannot exhaust the heap, and `readSamplePage(...)` is there for walking more than that.
+Always set a limit for high-frequency types. A year of continuous heart rate is on the order of half a million samples; the default cap of 10,000 exists so a naive query can't exhaust the heap, and `readSamplePage(...)` is there for walking more than that.
 
-Health Connect stores a heart-rate series as one record containing many samples, while HealthKit returns many independent samples. `SampleQuery.setFlattenSeries(boolean)` defaults to `true` so both platforms hand back plain `QuantitySample` objects; turn it off when you need the record identity in order to delete it, and expect iOS to return series of size 1.
+Health Connect stores a heart-rate series as one record containing many samples, while HealthKit returns many independent samples. `SampleQuery.setFlattenSeries(boolean)` defaults to `true` so both platforms hand back plain `QuantitySample` objects; turn it off when you need the record identity to delete it, and expect iOS to return series of size 1.
 
 === Aggregates and time buckets
 
@@ -72,11 +72,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 Two rules here are easy to get wrong and hard to notice.
 
-**A bucket with no data returns `null`, never zero.** A day on which no data was recorded and a day on which the user genuinely took no steps are different facts. Substituting zero turns "we don't know" into "you did nothing" and draws a flat line through every day the phone stayed in a drawer.
+**A bucket with no data returns `null`, never zero.** A day on which no data was recorded and a day on which the user genuinely took no steps are different facts. Substituting zero turns an absence of data into a claim that nothing happened and draws a flat line through every day the phone stayed in a drawer.
 
-**Use calendar buckets when your UI labels them with dates.** `HealthInterval.calendarDays(1, tz)` follows the calendar; a fixed `86_400_000` does not, and drifts against the dates the user sees twice a year at each daylight-saving transition. Calendar intervals require an explicit `TimeZone` -- nothing in this API reads the JVM default, because a server-side default of UTC would file a user's evening walk under the wrong day.
+**Use calendar buckets when your UI labels them with dates.** `HealthInterval.calendarDays(1, tz)` follows the calendar; a fixed `86_400_000` doesn't, and drifts against the dates the user sees twice a year at each daylight-saving transition. Calendar intervals require an explicit `TimeZone` -- nothing in this API reads the JVM default, because a server-side default of UTC would file a user's evening walk under the wrong day.
 
-WARNING: Aggregate totals are not comparable across platforms when several apps write the same type. When a phone and a watch both record steps for one walk, HealthKit's statistics engine de-duplicates the overlap and Health Connect does not, so the same query for the same person can return roughly double on Android. This API does not paper over that with a heuristic, because guessing which of two overlapping sources is authoritative is exactly the kind of silent wrongness health data cannot afford. Use `addSource(...)` to pin a query to the source you trust, and tell the user which device a figure came from.
+WARNING: Aggregate totals aren't comparable across platforms when several apps write the same type. When a phone and a watch both record steps for one walk, HealthKit's statistics engine de-duplicates the overlap and Health Connect doesn't, so the same query for the same person can return close to double on Android. This API leaves that visible rather than papering over it with a heuristic, because guessing which of two overlapping sources is authoritative is exactly the kind of quiet wrongness health data can't afford. Use `addSource(...)` to pin a query to the source you trust, and tell the user which device a figure came from.
 
 === Writing samples
 
@@ -85,11 +85,11 @@ WARNING: Aggregate totals are not comparable across platforms when several apps 
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/HealthJava005Snippet.java[tag=health-java-005,indent=0]
 ----
 
-Writes are validated before the platform is touched: a type this app cannot write, an instantaneous sample of a cumulative type such as `STEPS`, or a quantity whose unit measures the wrong dimension all fail immediately with a message naming the offending sample, rather than as an opaque platform error later. Large batches are chunked automatically to the platform's limit.
+Writes are validated before the platform is touched: a type this app can't write, an instantaneous sample of a cumulative type such as `STEPS`, or a quantity whose unit measures the wrong dimension all fail immediately with a message naming the offending sample, rather than as an opaque platform error later. Large batches are chunked automatically to the platform's limit.
 
 Set `RecordingMethod` on what you write. Other apps use it to decide how much to trust a value, and a manually typed weight is a different kind of evidence from one a scale reported.
 
-`HealthSample.getId()` is assigned by the platform, is scoped to this install, and does **not** survive a reinstall. Do not use it as a primary key on your server -- put your own identifier in `getMetadata()` and correlate on that.
+`HealthSample.getId()` is assigned by the platform, is scoped to this install, and won't survive a reinstall. Don't use it as a primary key on your server -- put your own identifier in `getMetadata()` and correlate on that.
 
 === Background delivery
 
@@ -98,7 +98,7 @@ Set `RecordingMethod` on what you write. Other apps use it to decide how much to
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/HealthJava006Snippet.java[tag=health-java-006,indent=0]
 ----
 
-The subscription id keys the persisted cursor that records how far you have read. Reuse it across launches and app updates and you resume exactly where you left off; change it and the framework treats it as new and resynchronizes from scratch. Hard-code it, and version it deliberately (`"steps-v1"`) if you ever want a clean start.
+The subscription id keys the persisted cursor that records how far you have read. Reuse it across launches and app updates and you resume exactly where you left off; change it and the framework treats it as new and resynchronizes from scratch. Hard-code it, and version it explicitly (`"steps-v1"`) if you ever want a clean start.
 
 **iOS is real push.** The OS relaunches your app in the background, possibly with no UI at all. Keep the work small -- `HealthChangeBatch.getDeadlineMillis()` is around five seconds -- and check `Display.getInstance().isMinimized()` before touching anything visual. Accumulate into `Preferences` and do the real work on next foreground.
 
@@ -106,7 +106,7 @@ The subscription id keys the persisted cursor that records how far you have read
 
 Handle `isResyncRequired()`. A Health Connect change token expires after 30 days and an iOS anchor can be rejected after a restore from backup; when that happens the batch carries no data and you must do a full time-range read to catch up.
 
-A `HealthBackgroundListener` must be a public top-level class with a public no-argument constructor. Unlike some older callback APIs in this framework you do **not** need to do anything to keep it from being stripped: the build server scans for implementations and generates a factory that constructs each one with a direct `new`, so shrinking and obfuscation both follow the reference correctly.
+A `HealthBackgroundListener` must be a public top-level class with a public no-argument constructor. Unlike some older callback APIs in this framework there is **no** need to do anything to keep it from being stripped: the build server scans for implementations and generates a factory that constructs each one with a direct `new`, so shrinking and obfuscation both follow the reference correctly.
 
 === Workouts
 
@@ -120,9 +120,9 @@ Two capabilities that are easy to conflate and that this API keeps separate:
 * `isLiveSessionSupported()` -- the OS runs a real session and keeps the app alive. True on watchOS, on iOS 26 and later, and on Wear OS.
 * `isSensorCollectionSupported()` -- the OS also gathers heart rate and energy into that session by itself.
 
-Where the second is false, **a workout records only what you feed it**. On an Android phone that is not a degraded fallback: Health Connect has no live-session concept, and inserting a session, batching your own data and updating it at the end is precisely the flow Google documents. Feed it with `addSamples(...)`, or by attaching a Bluetooth sensor.
+Where the second is false, **a workout records only what you feed it**. On an Android phone that isn't a degraded fallback: Health Connect has no live-session concept, and inserting a session, batching your own data and updating it at the end is precisely the flow Google documents. Feed it with `addSamples(...)`, or by attaching a Bluetooth sensor.
 
-`getStatistic(...)` returns `null` rather than a fabricated zero when nothing has been collected. Sessions are deliberately not restored after the process dies -- a killed workout is over, `end()` was never called, and nothing is written.
+`getStatistic(...)` returns `null` rather than a fabricated zero when nothing has been collected. Sessions aren't restored after the process dies -- a killed workout is over, `end()` was never called, and nothing is written.
 
 === Bluetooth health sensors
 
@@ -133,7 +133,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 `com.codename1.health.sensors` covers the adopted Bluetooth SIG profiles -- Heart Rate, Cycling Power, Cycling and Running Speed & Cadence, Health Thermometer, Weight Scale, Blood Pressure and Glucose -- so any conforming device works without per-vendor code.
 
-This layer is built entirely on `com.codename1.bluetooth.le` and needs no platform health store, so it works identically everywhere Bluetooth LE does, including the desktop and JavaScript ports where no health store exists at all. It needs **Bluetooth** permissions, not health ones, and the build server makes the same distinction: an app that uses only this package is not treated as a health-data app and gets neither a HealthKit entitlement nor a Google Play health-permissions review.
+This layer is built entirely on `com.codename1.bluetooth.le` and needs no platform health store, so it works identically everywhere Bluetooth LE does, including the desktop and JavaScript ports where no health store exists at all. It needs **Bluetooth** permissions, not health ones, and the build server makes the same distinction: an app that uses only this package isn't treated as a health-data app and gets neither a HealthKit entitlement nor a Google Play health-permissions review.
 
 Speed and cadence sensors transmit cumulative counters rather than rates, with counters and event timers that wrap every 32 or 64 seconds. The framework differences them for you; hand-rolling that arithmetic is the most commonly botched part of these profiles.
 
@@ -145,7 +145,7 @@ Speed and cadence sensors transmit cumulative counters rather than rates, with c
 
 === Build configuration
 
-Health data is the most heavily regulated data these APIs touch, and the build is deliberately strict about it.
+Health data is the most regulated data these APIs touch, and the build is strict about it.
 
 .iOS build hints
 [options="header"]
@@ -170,9 +170,9 @@ Health data is the most heavily regulated data these APIs touch, and the build i
 | `android.health.connectVersion` | Overrides the Health Connect client version.
 |===
 
-Codename One **does not** inject a placeholder privacy string for health, unlike camera or Bluetooth. Apple reviews health purpose strings against what the app actually does, so a generic placeholder is precisely what gets an app rejected -- it would not even achieve the "keeps the build working" goal. The build fails with a message naming the hint instead.
+Codename One **doesn't** inject a placeholder privacy string for health, unlike camera or Bluetooth. Apple reviews health purpose strings against what the app actually does, so a generic placeholder is precisely what gets an app rejected -- it would not even achieve the "keeps the build working" goal. The build fails with a message naming the hint instead.
 
-The Android data types cannot be inferred. A data type is referenced as a constant, which compiles to a field read, and the build server's class scanner records only type and method references -- so the permission set genuinely cannot be derived from your bytecode. Declaring it explicitly also matches Google Play policy, which requires you to request exactly what you use. Health Connect additionally raises `minSdkVersion` to 26 and requires `targetSdkVersion` 30 or higher.
+The Android data types can't be inferred. A data type is referenced as a constant, which compiles to a field read, and the build server's class scanner records only type and method references -- so the permission set genuinely can't be derived from your bytecode. Declaring it explicitly also matches Google Play policy, which requires you to request exactly what you use. Health Connect additionally raises `minSdkVersion` to 26 and requires `targetSdkVersion` 30 or higher.
 
 NOTE: HealthKit is entitlement-gated, unlike CoreBluetooth. The `com.apple.developer.healthkit` capability must be enabled for your App ID and present in the provisioning profile you build with, or the build fails at code-signing.
 
@@ -180,15 +180,15 @@ NOTE: HealthKit is entitlement-gated, unlike CoreBluetooth. The `com.apple.devel
 
 Read this section before shipping. Both stores enforce policies that go well beyond the technical permissions.
 
-**Apple.** HealthKit data may not be used for advertising or use-based data mining beyond health, fitness and medical research, and may not be shared with third parties without explicit consent for that specific sharing. A privacy policy URL in App Store Connect is mandatory -- HealthKit apps are rejected without one. HealthKit data may not be stored in iCloud. Purpose strings must be specific: "Reads your step count to show weekly activity trends", not "Needs health access".
+**Apple.** HealthKit data may not be used for advertising or use-based data mining beyond health, fitness and medical research, and may not be shared with third parties without explicit consent for that specific sharing. A privacy policy URL in App Store Connect is mandatory -- HealthKit apps are rejected without one. HealthKit data may not be stored in iCloud. Purpose strings must be specific: "Reads your step count to show weekly activity trends," not "Needs health access."
 
-**Google.** Health Connect access is gated by the Play Console health apps declaration form, and each permission is approved individually. Your app must implement a privacy-policy activity that is shown *before* the permission dialog -- Codename One declares it for you, and this is not optional: Health Connect silently declines to show its consent dialog to an app that lacks one. Play's Health Apps policy prohibits using the data for ads, for credit, insurance or employment decisions, or transferring it to a data broker.
+**Google.** Health Connect access is gated by the Play Console health apps declaration form, and each permission is approved individually. Your app must implement a privacy-policy activity that's shown *before* the permission dialog -- Codename One declares it for you, and this isn't optional: Health Connect declines to show its consent dialog to an app that lacks one. Play's Health Apps policy prohibits using the data for ads, for credit, insurance or employment decisions, or transferring it to a data broker.
 
 **What Codename One itself does.** The framework never uploads health data anywhere. The simulator's event log records data types and counts but never sample values. And the build fails rather than inventing a purpose string on your behalf.
 
 **Practical rules.** Request the narrowest type set, at the moment of use rather than at launch. Never persist samples to unencrypted `Storage`. Treat the on-device store as the source of truth and avoid server round-trips. Delete health data on account deletion.
 
-Finally, the read-authorization asymmetry is a privacy *feature*, not an obstacle. iOS hides read denial so that an app cannot infer what a user is concealing. Design your UI to respect that.
+Finally, the read-authorization asymmetry is a privacy *feature*, not an obstacle. iOS hides read denial so that an app can't infer what a user is concealing. Design your UI to respect that.
 
 === Simulating health
 
@@ -197,30 +197,30 @@ The simulator ships a scriptable health store under Simulate -> Health, and ever
 [options="header"]
 |===
 | Action | Effect
-| Grant / Deny All Permissions | The permissive and fully-denied cases
-| *Grant Write, Silently Deny Read* | Reproduces the iOS trap exactly
+| Grant / Deny All Permissions | The permissive and fully denied cases
+| *Grant Write, Deny Read Without Error* | Reproduces the iOS trap exactly
 | Load Demo Dataset (7 days) | Synthetic steps, heart rate, sleep and weight
 | Emulate HealthKit / Health Connect Permissions | Switches read-denial behaviour
 | Make Health Unavailable | Emulates a missing provider
 | `health:item10` / `health:item11` | Arm a one-shot query or save failure
 |===
 
-**Click "Grant Write, Silently Deny Read" before you ship.** It is the default-adjacent case real users will produce and the one a permissive store never shows you: authorization appears to succeed, the status reads `UNKNOWN`, and every query comes back empty with no error. If your UI shows an error or accuses the user of denying access, it is wrong.
+**Click "Grant Write, Deny Read Without Error" before you ship.** It's the default-adjacent case real users will produce and the one a permissive store never shows you: authorization appears to succeed, the status reads `UNKNOWN`, and every query comes back empty with no error. If your UI shows an error or accuses the user of denying access, it's wrong.
 
-The simulator's data is synthetic and seeded, not recorded from anyone. That is deliberate: unlike Bluetooth traces, where the sensitive parts are identifiers that can be scrubbed, the sensitive part of a health sample *is* the value being asserted on, and a resting heart rate together with sleep timing and step cadence is quasi-identifying.
+The simulator's data is synthetic and seeded, not recorded from anyone. That's intentional: unlike Bluetooth traces, where the sensitive parts are identifiers that can be scrubbed, the sensitive part of a health sample *is* the value being asserted on, and a resting heart rate together with sleep timing and step cadence is quasi-identifying.
 
 === Troubleshooting
 
-*My query returns empty even though I granted permission.* On iOS you cannot distinguish a denied read from an empty store -- this is by design. Use `hasAnyData(...)`, show "no data available" rather than an error, and offer `openHealthSettings()`. Reproduce it in the simulator with "Grant Write, Silently Deny Read".
+*A query returns empty even though permission was granted.* On iOS you can't distinguish a denied read from an empty store -- this is by design. Use `hasAnyData(...)`, show "no data available," rather than an error, and offer `openHealthSettings()`. Reproduce it in the simulator with "Grant Write, Deny Read Without Error."
 
-*My chart shows zero for days the user was active.* You are substituting zero for a `null` aggregate. An empty bucket means no data, not no steps.
+*The chart shows zero for days the user was active.* You are substituting zero for a `null` aggregate. An empty bucket means no data, not no steps.
 
-*My totals are double on Android.* A phone and a watch are both writing the same type. HealthKit de-duplicates overlapping sources and Health Connect does not; pin the query with `addSource(...)`.
+*Totals are double on Android.* A phone and a watch are both writing the same type. HealthKit de-duplicates overlapping sources and Health Connect doesn't; pin the query with `addSource(...)`.
 
 *Background delivery never fires on Android.* It never will -- Health Connect has no push. Call `drainChanges()` from your background-fetch handler and check `isPushDelivery()`.
 
-*My weekly chart is off by a day twice a year.* You are bucketing by a fixed 24 hours across a daylight-saving transition. Use `HealthInterval.calendarDays(1, tz)`.
+*The weekly chart is off by a day twice a year.* You are bucketing by a fixed 24 hours across a daylight-saving transition. Use `HealthInterval.calendarDays(1, tz)`.
 
-*The iOS build fails complaining about a usage description.* That is intentional -- add `ios.NSHealthShareUsageDescription` with text describing what your app actually does with the data.
+*The iOS build fails complaining about a usage description.* That's intentional -- add `ios.NSHealthShareUsageDescription` with text describing what your app actually does with the data.
 
 *The Health Connect permission dialog never appears.* Health Connect requires the permissions-rationale activity, which Codename One declares only when it detects health usage. Check that the build log mentions the health manifest fragments.
