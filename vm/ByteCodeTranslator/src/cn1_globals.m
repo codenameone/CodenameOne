@@ -58,6 +58,45 @@
 #define NSLog(...) printf(__VA_ARGS__); printf("\n")
 #endif
 
+#ifdef CN1_GC_VERIFY
+// QA-only heap verifier (see the block next to cn1ConservativeResolve). It
+// classifies references against the same page/extent index the conservative
+// root scan builds, so it is only meaningful in that (shipping) configuration.
+#ifndef CN1_CONSERVATIVE_GC_ROOTS
+#error "CN1_GC_VERIFY requires CN1_CONSERVATIVE_GC_ROOTS"
+#endif
+// malloc's size accounting supplies the extent of a legacy block to poison --
+// the object header does not record instance size.
+#if defined(__APPLE__)
+#include <malloc/malloc.h>
+#elif defined(__linux__)
+#include <malloc.h>
+#endif
+// Which mark pass is currently running. CN1_GC_TRACE_MARK reports it, which is
+// how "what is still keeping this object alive?" gets an answer -- most often
+// the conservative native-stack scan holding a dead frame's leftover word.
+const char* cn1GcMarkPhase = "?";
+// CN1_GC_FAULT=<name>: deliberately break one collector invariant so a run can
+// prove the verifier still has teeth. A gate nobody has ever watched fail is not
+// a gate. Supported: "nograce" -- skip the BiBOP grace-subtree pass, which is
+// exactly the defect that shipped in #5436 and was fixed in #5442.
+int cn1GcFaultNoGrace = 0;
+static void cn1GcFaultInit(void) {
+    static int done = 0;
+    if(done) return;
+    done = 1;
+    const char* f = getenv("CN1_GC_FAULT");
+    if(f == 0) return;
+    if(strcmp(f, "nograce") == 0) {
+        cn1GcFaultNoGrace = 1;
+        fprintf(stderr, "[GC-FAULT] grace-subtree pass DISABLED (fault injection)\n");
+    } else {
+        fprintf(stderr, "[GC-FAULT] unknown fault '%s'\n", f);
+    }
+    fflush(stderr);
+}
+#endif
+
 #if defined(__APPLE__) && defined(__OBJC__)
 #if TARGET_OS_SIMULATOR
 #define CN1_GC_ASSERT(condition, message) \
@@ -950,6 +989,18 @@ static CN1BibopPage* _Atomic bibopAllPages;
 static void cn1GraceAuditPreSweep(CODENAME_ONE_THREAD_STATE);
 #endif
 #endif
+#ifdef CN1_GRACE_AUDIT
+static void cn1GraceAuditLegacy(CODENAME_ONE_THREAD_STATE);
+#endif
+#ifdef CN1_GC_VERIFY
+// QA heap verifier (defined next to cn1ConservativeResolve, which supplies the
+// page/extent index it classifies against).
+static int cn1GcVerifyActive;
+void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE);
+void cn1GcVerifyChild(JAVA_OBJECT child);
+void cn1GcVerifyPoisonSlot(JAVA_OBJECT o, int slotSize);
+JAVA_BOOLEAN cn1GcVerifyQuarantineFree(JAVA_OBJECT obj);
+#endif
 #ifdef CN1_BIBOP_VALIDATE
 // Belt diagnostic: while set, gcMarkObject logs the class of each newly-marked object
 // (a reachable object the main drain missed) and its drain parent, to name the
@@ -1179,6 +1230,9 @@ void codenameOneGCMark() {
                 // signal-stop; building here first only makes it fresher).
                 cn1GcBuildRootSnapshots();
 #endif
+#ifdef CN1_GC_VERIFY
+    { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "precise-thread-stack"; }
+#endif
                 for(int stackIter = 0 ; stackIter < stackSize ; stackIter++) {
                     struct elementStruct* current = &t->threadObjectStack[stackIter];
                     if (current->type < CN1_TYPE_INVALID || current->type > CN1_TYPE_PRIMITIVE) {
@@ -1232,10 +1286,16 @@ void codenameOneGCMark() {
                 // object is reachable from whichever frame holds it, so the boundary
                 // between a legacy caller and a frameless callee (or vice versa) is
                 // covered: the conservative scan walks the WHOLE native stack regardless.
+#ifdef CN1_GC_VERIFY
+    { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "conservative-native-stack"; }
+#endif
                 cn1GcScanThreadNativeStack(d, t);
 #ifdef CN1_CONSERVATIVE_GC_SELFCHECK
                 cn1GcSelfCheckThreadStack(t, stackSize);
 #endif
+#endif
+#ifdef CN1_GC_VERIFY
+    { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "statics"; }
 #endif
                 markStatics(d);
                 // Drain the worklist before unblocking the thread so that every object
@@ -1268,6 +1328,9 @@ void codenameOneGCMark() {
     //NSLog(@"Mark set %i objects to %i", marked, currentGcMarkValue);
     #endif
     // since they are immutable this probably doesn't need as much sync as the statics...
+#ifdef CN1_GC_VERIFY
+    { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "constant-pool"; }
+#endif
     for(int iter = 0 ; iter < CN1_CONSTANT_POOL_SIZE ; iter++) {
         gcMarkObject(d, (JAVA_OBJECT)constantPoolObjects[iter], JAVA_TRUE);
     }
@@ -1275,11 +1338,17 @@ void codenameOneGCMark() {
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // PHASE 3b: scan the GC thread's OWN native stack last -- a root could be live only
     // in a GC-thread C local. Marks for real; the drain below propagates it.
+#ifdef CN1_GC_VERIFY
+    { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "gc-own-stack"; }
+#endif
     cn1GcScanOwnStack(d);
 #endif
 
     // Drain the worklist that the calls above populated. gcMarkObject no longer recurses
     // through reference fields, so we need an explicit drain pass before sweep runs.
+#ifdef CN1_GC_VERIFY
+    { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "root-drain"; }
+#endif
     gcMarkDrain(d);
 
 #if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
@@ -1326,7 +1395,18 @@ void codenameOneGCMark() {
     // not re-queued the next epoch, and the sweep then freed objects reachable
     // only through those untraced fresh objects -> user-visible heap corruption.
     {
+#ifdef CN1_GC_VERIFY
+    { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "grace-pass"; }
+#endif
+#ifdef CN1_GC_VERIFY
+        // Fault injection (CN1_GC_FAULT=nograce): skip this pass entirely, which
+        // reproduces the defect #5442 fixed. Used to prove the verifier fails.
+        extern int cn1GcFaultNoGrace;
+        CN1BibopPage* gp = cn1GcFaultNoGrace ? (CN1BibopPage*)0
+                         : atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+#else
         CN1BibopPage* gp = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+#endif
         while(gp != 0) {
 #ifndef CN1_BIBOP_NO_FASTSWEEP
             if(__atomic_load_n(&gp->gcAllocedSinceSweep, __ATOMIC_RELAXED) == JAVA_FALSE) {
@@ -1353,6 +1433,42 @@ void codenameOneGCMark() {
     }
 #endif
 
+    // GRACE-SUBTREE MARKING, LEGACY HALF (same correctness argument as the page
+    // walk above, applied to the other heap).
+    //
+    // codenameOneGCSweep grants a fresh (gcMark == -1) legacy object exactly the
+    // BiBOP grace rule -- it promotes the object to the current epoch instead of
+    // freeing it -- so an older object reachable ONLY through such an object must
+    // be marked here or the same sweep frees it while it is still referenced.
+    // The page walk above cannot cover these: they are not page-resident.
+    // Everything above CN1_BIBOP_MAX_OBJECT lands here (the retained large
+    // byte[] blocks and Hashtable bucket arrays of issue 5425), as does every
+    // allocation the adaptive survivor-heavy bypass diverts off the page heap,
+    // and MATURED survivors, whose table entry is what the sweep consults.
+    //
+    // Only the entries already migrated into the table can be fresh here: a
+    // mutator's pending allocations are not swept at all until the mark that
+    // migrates them, and migration happens with the owning thread paused,
+    // upstream of this pass. Cost is one extra pass over an array the sweep
+    // already walks in full, and only fresh entries are traced.
+#ifndef CN1_DISABLE_LEGACY_GRACE
+    {
+#ifdef CN1_GC_VERIFY
+    { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "legacy-grace-pass"; }
+#endif
+        int gt = currentSizeOfAllObjectsInHeap;
+        for(int gi = 0 ; gi < gt ; gi++) {
+            JAVA_OBJECT go = allObjectsInHeap[gi];
+            if(go != JAVA_NULL && go->__codenameOneGcMark == -1
+               && go->__codenameOneParentClsReference != 0
+               && go->__codenameOneParentClsReference->markFunction != 0) {
+                gcMarkObject(d, go, JAVA_FALSE);
+            }
+        }
+        gcMarkDrain(d);
+    }
+#endif /* CN1_DISABLE_LEGACY_GRACE -- A/B escape hatch, mirrors CN1_DISABLE_SATB */
+
     if(atomic_load_explicit(&gcMarkOverflowSeen, memory_order_acquire)) {
         long __beltBefore = gcMarkNewObjectCount;
 #ifdef CN1_BIBOP_VALIDATE
@@ -1365,6 +1481,9 @@ void codenameOneGCMark() {
         // safe; residual incompleteness is handled by the drain-gap fix, not by looping.
 #if defined(CN1_GC_INSTRUMENT) && !defined(CN1_DISABLE_BIBOP)
         atomic_fetch_add_explicit(&cn1BibopBeltRuns, 1, memory_order_relaxed);
+#endif
+#ifdef CN1_GC_VERIFY
+    { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "overflow-belt"; }
 #endif
         gcMarkWorklistOverflow = JAVA_TRUE;   // force the BiBOP page-rescan path on
         gcMarkDrain(d);
@@ -1386,6 +1505,9 @@ void codenameOneGCMark() {
     // what keeps the barrier armed through those phases and closes the residual grace
     // window. Bounded by the live set (only genuinely-new marks reset the fixpoint).
     for(;;) {
+#ifdef CN1_GC_VERIFY
+    { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "satb-drain"; }
+#endif
         JAVA_OBJECT* batch;
         long n = cn1SatbTake(&batch);
         if(n == 0) break;                    // log empty at this instant
@@ -1719,6 +1841,12 @@ void codenameOneGCSweep() {
 #ifdef CN1_RESOLVE_DIAG
     { extern void cn1ResolveDiagReport(void); cn1ResolveDiagReport(); }
 #endif
+#ifdef CN1_GC_VERIFY
+    // The sweep is the only phase that frees memory, so this is the moment the
+    // "no survivor references reclaimed memory" invariant is either intact or
+    // permanently broken.
+    cn1GcVerifyHeap(threadStateData);
+#endif
 }
 
 JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
@@ -2050,6 +2178,25 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     p->freeList = 0;
     p->freeCount = 0;
     p->owned = JAVA_FALSE;
+#ifdef CN1_GC_VERIFY
+    // QA: a recycled page still holds the DEAD previous occupants' headers, so a
+    // reference that dangles into it would resolve to a plausible-looking object
+    // whose slot boundaries have since moved. Stamp every slot dead and poison
+    // its payload; the bump cursor is 0, so the verifier classifies any hit as a
+    // recycled slot regardless, and this additionally destroys stale payload.
+    {
+        int __hdr = (int)((sizeof(CN1BibopPage) + 15) & ~((size_t)15));
+        char* __s = (char*)p + __hdr;
+        int __n = (CN1_BIBOP_PAGE_SIZE - __hdr) / slotSize;
+        for(int __i = 0 ; __i < __n ; __i++) {
+            JAVA_OBJECT __o = (JAVA_OBJECT)(__s + (long)__i * slotSize);
+            __o->__codenameOneParentClsReference = 0;
+            __o->__heapPosition = CN1_BIBOP_HEAP_POS;
+            cn1GcVerifyPoisonSlot(__o, slotSize);
+            __atomic_store_n(&__o->__codenameOneGcMark, CN1_BIBOP_FREE_MARK, __ATOMIC_RELEASE);
+        }
+    }
+#endif
 #ifndef CN1_BIBOP_NO_FASTSWEEP
     // Relaxed atomic, not plain: the acquire-path format (cn1BibopAcquirePage)
     // reformats a FREE-pool page that is already in the registry, on a mutator
@@ -2923,6 +3070,25 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 // reclaim every slot (no finalizers) and route the page to freePool,
                 // where it is reformatted on reuse. Byte-identical outcome WITHOUT
                 // touching a single slot: just reset the page and pool it.
+#ifdef CN1_GC_VERIFY
+                // QA: this shortcut is where nearly all BiBOP memory is actually
+                // reclaimed -- it drops a whole page without writing a single
+                // slot, so every dead object keeps an intact-looking header and a
+                // dangling reference into it stays plausible indefinitely (the
+                // "corrupted word rather than crash" shape of issue 5425). Poison
+                // the slots before the page is pooled. Resetting the bump cursor
+                // below is what makes the verifier classify any surviving
+                // reference into this page as a recycled slot.
+                {
+                    extern long cn1GcVerifyFreedSlots;
+                    for(int __i = 0 ; __i < n ; __i++) {
+                        JAVA_OBJECT __o = cn1BibopSlot(page, __i);
+                        cn1GcVerifyPoisonSlot(__o, page->slotSize);
+                        __o->__codenameOneGcMark = CN1_BIBOP_FREE_MARK;
+                        cn1GcVerifyFreedSlots++;
+                    }
+                }
+#endif
                 atomic_store_explicit(&page->bumpIndex, 0, memory_order_relaxed);
                 page->freeList = 0;
                 page->freeCount = 0;
@@ -2983,6 +3149,13 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
 #endif
             } else if(m < V - 1) {
                 cn1BibopReclaimSlot(threadStateData, o);
+#ifdef CN1_GC_VERIFY
+                { extern long cn1GcVerifyFreedSlots; cn1GcVerifyFreedSlots++; }
+                // QA: destroy the payload before the slot joins the free list.
+                // The free-list link (first word) and the FREE sentinel below
+                // are written after, so the page structure is unaffected.
+                cn1GcVerifyPoisonSlot(o, page->slotSize);
+#endif
                 o->__codenameOneGcMark = CN1_BIBOP_FREE_MARK;
                 *(void**)o = fl; fl = o; freeCount++;
             } else {
@@ -3072,6 +3245,43 @@ static void cn1GraceAuditPreSweep(CODENAME_ONE_THREAD_STATE) {
     long recovered = gcMarkNewObjectCount - beforeFresh - freshMarked;
     if(missedFresh > 0 || recovered > 0) {
         fprintf(stderr, "[GRACE-AUDIT] epoch=%d missedFresh=%ld doomedChildren=%ld\n",
+                currentGcMarkValue, missedFresh, recovered);
+        fflush(stderr);
+    }
+    cn1GraceAuditLegacy(threadStateData);
+}
+#endif
+
+#ifdef CN1_GRACE_AUDIT
+// The LEGACY half of the same guarantee. codenameOneGCSweep grants a fresh
+// (gcMark == -1) legacy object exactly the BiBOP grace rule -- it promotes it to
+// the current epoch instead of freeing it -- but nothing traces its subtree, so
+// an older object reachable ONLY through it is freed while the graced object
+// still references it. Every object above CN1_BIBOP_MAX_OBJECT takes this path,
+// as does every allocation the adaptive survivor-heavy bypass diverts off the
+// page heap, so the class of workload issue 5425 reported is squarely on it.
+//
+// Same reporting contract as the BiBOP half: missedFresh counts graced legacy
+// objects nothing traced, doomedChildren counts objects that became marked ONLY
+// through them -- each one the sweep would otherwise free while referenced.
+static void cn1GraceAuditLegacy(CODENAME_ONE_THREAD_STATE) {
+    long missedFresh = 0;
+    long beforeFresh = gcMarkNewObjectCount;
+    int t = currentSizeOfAllObjectsInHeap;
+    for(int iter = 0 ; iter < t ; iter++) {
+        JAVA_OBJECT o = allObjectsInHeap[iter];
+        if(o != JAVA_NULL && o->__codenameOneGcMark == -1
+           && o->__codenameOneParentClsReference != 0
+           && o->__codenameOneParentClsReference->markFunction != 0) {
+            missedFresh++;
+            gcMarkObject(threadStateData, o, JAVA_FALSE);
+        }
+    }
+    long freshMarked = gcMarkNewObjectCount - beforeFresh;
+    gcMarkDrain(threadStateData);
+    long recovered = gcMarkNewObjectCount - beforeFresh - freshMarked;
+    if(missedFresh > 0 || recovered > 0) {
+        fprintf(stderr, "[GRACE-AUDIT-LEGACY] epoch=%d missedFresh=%ld doomedChildren=%ld\n",
                 currentGcMarkValue, missedFresh, recovered);
         fflush(stderr);
     }
@@ -3285,6 +3495,15 @@ static int cn1ConsExtCmp(const void* a, const void* b) {
 // the first build of the cycle is complete for correctness purposes. Nothing is
 // freed during mark (sweep runs after), so entries can never go stale mid-cycle.
 static int cn1ConsSnapEpoch = -1;
+#ifdef CN1_GC_VERIFY
+// The QA verifier runs AFTER the sweep, when the cycle's cached snapshot still
+// lists every object the sweep just reclaimed. Invalidate it so the next build
+// indexes the post-sweep heap.
+int cn1ConsSnapEpochReset(void) {
+    cn1ConsSnapEpoch = -1;
+    return 0;
+}
+#endif
 void cn1GcBuildRootSnapshots(void) {
     if(cn1ConsSnapEpoch == currentGcMarkValue) {
         return; // already built this cycle
@@ -3477,6 +3696,499 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
     }
     return JAVA_NULL;
 }
+
+#ifdef CN1_GC_VERIFY
+// =========================================================================
+// QA HEAP VERIFIER (-DCN1_GC_VERIFY). Never compiled into a shipping build.
+//
+// The collector's correctness hinges on a claim no checksum test can observe:
+// after a sweep, NO surviving object may reference memory the sweep reclaimed.
+// Every historical failure in this area (issue 5425 and the grace-pass bugs
+// around it) violated exactly that claim, and stayed invisible for hours or
+// days because the freed memory was immediately recycled into a plausible
+// replacement object -- a dangling reference kept reading a valid-looking
+// header, and the damage surfaced far away as corrupted String bytes or an
+// "impossible" NPE.
+//
+// This mode makes that claim directly testable by DESTROYING the plausible
+// replacement:
+//
+//   1. POISON. Every reclaimed BiBOP slot and every legacy block the sweep
+//      frees is stamped with a poison header + payload instead of being handed
+//      straight back to the mutator. Reading through a dangling reference no
+//      longer finds a well-formed object.
+//   2. QUARANTINE. Freed legacy blocks are NOT returned to the C allocator
+//      until CN1_GC_VERIFY_QUARANTINE later frees push them out of a ring, so
+//      the poisoned block stays mapped (and recognizable) instead of being
+//      reused or unmapped underneath a dangling reference.
+//   3. VERIFY. After every sweep, walk every surviving object through its
+//      generated mark function with the collector in "verify" mode: instead of
+//      marking, each reference field is classified against the page registry,
+//      the live-extent index and the quarantine set. A field pointing at a
+//      freed slot, a slot beyond its page's bump cursor, or a quarantined
+//      block is a use-after-free IN THE MAKING -- reported with the holder's
+//      class, the culprit field's mark call site and the victim's class, then
+//      aborted at the exact GC cycle that created it.
+//
+// The pass is deliberately ASYMMETRIC about uncertainty: a reference it cannot
+// place (allocated after the snapshot, unmapped, or a mid-construction body)
+// is SKIPPED. It reports only what it can prove, so a violation is never a
+// false alarm -- at the cost of catching some real defects a cycle later.
+// =========================================================================
+#define CN1_GC_POISON_MARK  (-77)
+#define CN1_GC_POISON_POS   (-77)
+#define CN1_GC_POISON_BYTE  0xDE
+#ifndef CN1_GC_VERIFY_QUARANTINE
+#define CN1_GC_VERIFY_QUARANTINE 65536
+#endif
+// Power-of-two set, sized well above the ring so probes stay short.
+#define CN1_GC_QSET_SIZE (CN1_GC_VERIFY_QUARANTINE * 4)
+
+typedef void (*cn1GcVerifyMarkFn)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force);
+
+static JAVA_OBJECT* cn1GcQRing = 0;        // quarantined blocks, insertion order
+static int cn1GcQRingPos = 0;
+static JAVA_OBJECT* cn1GcQSet = 0;         // open-addressed membership set
+static pthread_mutex_t cn1GcQMutex = PTHREAD_MUTEX_INITIALIZER;
+static long cn1GcVerifyViolations = 0;
+static long cn1GcVerifyChecked = 0;
+static int cn1GcVerifyReported = 0;
+// cn1GcVerifyActive (declared with the forward declarations above, because
+// gcMarkObject's hook reads it) is set only while cn1GcVerifyHeap drives mark
+// functions on the GC thread.
+static JAVA_OBJECT cn1GcVerifyHolder = JAVA_NULL;
+// CN1_GC_VERIFY_ALL=1: diagnostic mode that also walks objects the sweep did NOT
+// keep. Dead-to-dead dangling is legal, so this is for investigation only --
+// never a gate.
+static int cn1GcVerifyAllHolders = 0;
+static int cn1GcVerifyAging = 0;
+static long cn1GcVerifyStatus[6];
+static long cn1GcVerifyAge[5];            // referenced-child age histogram (epochs behind)
+static const char* cn1GcVerifyCensusCls = 0;
+static long cn1GcVerifyCensusAge[5];
+static void cn1GcVerifyCensus(JAVA_OBJECT o, int m);
+
+// Which survivors are held to the invariant.
+//
+// DEFAULT (the gate): objects carrying the CURRENT epoch. The sweep either
+// marked them reachable -- and marking traces children, so a dangling field is
+// a mark-completeness bug -- or promoted them by the grace rule, in which case
+// tracing their subtree was the grace pass's job. Either way a dangling field
+// is unambiguous, so the gate contains no judgement calls and cannot cry wolf.
+//
+// CN1_GC_VERIFY_AGING=1 additionally holds PREVIOUS-epoch survivors (garbage
+// aging out of the collector's one-cycle safety margin) to the same rule.
+// Those are landmines rather than proven defects: unreachable objects are
+// entitled to dangle, but this collector RESURRECTS unreachable objects
+// routinely -- a stale word left in a native stack frame conservatively marks
+// whatever it points at -- and resurrecting one makes the drain follow its
+// field into recycled memory. Use it to survey how many such objects a
+// workload leaves lying around, not as a pass/fail gate.
+//
+// CN1_GC_VERIFY_ALL=1 walks everything, including objects already given up on.
+static int cn1GcVerifyHolderKept(int m) {
+    if(cn1GcVerifyAllHolders) {
+        return m != CN1_BIBOP_FREE_MARK && m != CN1_GC_POISON_MARK;
+    }
+    if(m == currentGcMarkValue) {
+        return 1;
+    }
+    return cn1GcVerifyAging && m == currentGcMarkValue - 1;
+}
+static const char* cn1GcVerifyDump = 0;   // CN1_GC_VERIFY_DUMP=<class substring>
+static int cn1GcVerifyDumpCount = 0;
+long cn1GcVerifyFreedSlots = 0;   // page slots reclaimed since the last verify pass
+long cn1GcVerifyFreedLegacy = 0;  // legacy blocks quarantined since the last verify pass
+
+static inline int cn1GcQSlot(JAVA_OBJECT o) {
+    uintptr_t h = ((uintptr_t)o >> 4) * (uintptr_t)2654435761u;
+    return (int)(h & (CN1_GC_QSET_SIZE - 1));
+}
+
+// Caller holds cn1GcQMutex. Tombstone-free: removal happens only through
+// cn1GcQSetRemove, which repairs the probe chain by reinserting the tail.
+static void cn1GcQSetAdd(JAVA_OBJECT o) {
+    int i = cn1GcQSlot(o);
+    while(cn1GcQSet[i] != JAVA_NULL) {
+        if(cn1GcQSet[i] == o) return;
+        i = (i + 1) & (CN1_GC_QSET_SIZE - 1);
+    }
+    cn1GcQSet[i] = o;
+}
+
+static void cn1GcQSetRemove(JAVA_OBJECT o) {
+    int i = cn1GcQSlot(o);
+    while(cn1GcQSet[i] != JAVA_NULL) {
+        if(cn1GcQSet[i] == o) {
+            cn1GcQSet[i] = JAVA_NULL;
+            // Re-insert the rest of this probe chain so no entry is stranded.
+            int j = (i + 1) & (CN1_GC_QSET_SIZE - 1);
+            while(cn1GcQSet[j] != JAVA_NULL) {
+                JAVA_OBJECT moved = cn1GcQSet[j];
+                cn1GcQSet[j] = JAVA_NULL;
+                cn1GcQSetAdd(moved);
+                j = (j + 1) & (CN1_GC_QSET_SIZE - 1);
+            }
+            return;
+        }
+        i = (i + 1) & (CN1_GC_QSET_SIZE - 1);
+    }
+}
+
+static int cn1GcQSetContains(JAVA_OBJECT o) {
+    if(cn1GcQSet == 0) return 0;
+    int i = cn1GcQSlot(o);
+    while(cn1GcQSet[i] != JAVA_NULL) {
+        if(cn1GcQSet[i] == o) return 1;
+        i = (i + 1) & (CN1_GC_QSET_SIZE - 1);
+    }
+    return 0;
+}
+
+// Poison an object body, leaving the header (class pointer for forensics, the
+// poison mark, the poison heap position) intact. size 0 => header only.
+static void cn1GcPoisonBody(JAVA_OBJECT o, long size) {
+    long hdr = (long)sizeof(struct JavaObjectPrototype);
+    if(size > hdr) {
+        memset((char*)o + hdr, CN1_GC_POISON_BYTE, (size_t)(size - hdr));
+    }
+}
+
+// Poison a reclaimed BiBOP slot. The first word is the page free-list link and
+// the mark word is the FREE sentinel, so both are preserved; everything after
+// the header is destroyed so a dangling read cannot find plausible payload
+// (this is what turns "corrupted dictionary word" into a deterministic abort).
+void cn1GcVerifyPoisonSlot(JAVA_OBJECT o, int slotSize) {
+    long hdr = (long)sizeof(struct JavaObjectPrototype);
+    if((long)slotSize > hdr) {
+        memset((char*)o + hdr, CN1_GC_POISON_BYTE, (size_t)((long)slotSize - hdr));
+    }
+    o->__heapPosition = CN1_BIBOP_HEAP_POS;
+}
+
+// Replaces free() for legacy blocks. Stamps the poison header, poisons the
+// payload (malloc's own size accounting gives the extent -- the object header
+// does not record it) and parks the block in the quarantine ring. Returns the
+// block evicted from the ring, which the caller frees for real.
+JAVA_BOOLEAN cn1GcVerifyQuarantineFree(JAVA_OBJECT obj) {
+    pthread_mutex_lock(&cn1GcQMutex);
+    if(cn1GcQRing == 0) {
+        cn1GcQRing = (JAVA_OBJECT*)calloc(CN1_GC_VERIFY_QUARANTINE, sizeof(JAVA_OBJECT));
+        cn1GcQSet = (JAVA_OBJECT*)calloc(CN1_GC_QSET_SIZE, sizeof(JAVA_OBJECT));
+        if(cn1GcQRing == 0 || cn1GcQSet == 0) {
+            pthread_mutex_unlock(&cn1GcQMutex);
+            return JAVA_FALSE;   // no quarantine memory: fall back to a real free
+        }
+    }
+    long sz = 0;
+#if defined(__APPLE__)
+    sz = (long)malloc_size(obj);
+#elif defined(__linux__)
+    sz = (long)malloc_usable_size(obj);
+#endif
+    cn1GcVerifyFreedLegacy++;
+    cn1GcPoisonBody(obj, sz);
+    obj->__codenameOneGcMark = CN1_GC_POISON_MARK;
+    obj->__heapPosition = CN1_GC_POISON_POS;
+    JAVA_OBJECT evicted = cn1GcQRing[cn1GcQRingPos];
+    cn1GcQRing[cn1GcQRingPos] = obj;
+    cn1GcQSetAdd(obj);
+    cn1GcQRingPos++;
+    if(cn1GcQRingPos == CN1_GC_VERIFY_QUARANTINE) {
+        cn1GcQRingPos = 0;
+    }
+    if(evicted != JAVA_NULL) {
+        cn1GcQSetRemove(evicted);
+    }
+    pthread_mutex_unlock(&cn1GcQMutex);
+    if(evicted != JAVA_NULL) {
+        free(evicted);
+    }
+    return JAVA_TRUE;
+}
+
+#define CN1_GC_VS_OK        0
+#define CN1_GC_VS_UNKNOWN   1
+#define CN1_GC_VS_FREE_SLOT 2
+#define CN1_GC_VS_STALE_SLOT 3
+#define CN1_GC_VS_QUARANTINED 4
+#define CN1_GC_VS_DEAD_AGE  5
+
+// Classify a reference WITHOUT dereferencing anything it has not first proven
+// to be mapped. BiBOP pages are never unmapped (the registry is grow-only) and
+// quarantined blocks are held allocated, so both are safe to read once the
+// address has been placed.
+static int cn1GcVerifyClassify(JAVA_OBJECT o, CN1BibopPage** outPage, int* outIdx) {
+    uintptr_t v = (uintptr_t)o;
+    if(v == 0 || (v & (sizeof(void*) - 1)) != 0) return CN1_GC_VS_UNKNOWN;
+#ifndef CN1_DISABLE_BIBOP
+    if(cn1ConsPgN > 0) {
+        char* cand = (char*)(v & ~((uintptr_t)(CN1_BIBOP_PAGE_SIZE - 1)));
+        int lo = 0, hi = cn1ConsPgN - 1;
+        while(lo <= hi) {
+            int mid = (lo + hi) >> 1;
+            char* b = cn1ConsPg[mid].base;
+            if(b == cand) {
+                // cn1ConsPg[].base IS the page pointer; read geometry live so a
+                // page reformatted since the snapshot is judged by its current
+                // shape rather than a stale one.
+                CN1BibopPage* p = (CN1BibopPage*)cand;
+                long off = (long)((char*)o - cand);
+                int first = p->firstSlotOffset;
+                int ss = p->slotSize;
+                if(ss <= 0 || off < first) return CN1_GC_VS_UNKNOWN;
+                int idx = (int)((off - first) / ss);
+                if(idx < 0 || idx >= p->slotCount) return CN1_GC_VS_UNKNOWN;
+                if(outPage != 0) *outPage = p;
+                if(outIdx != 0) *outIdx = idx;
+                int bump = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
+                if(idx >= bump) return CN1_GC_VS_STALE_SLOT;
+                int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+                if(m == CN1_BIBOP_FREE_MARK) return CN1_GC_VS_FREE_SLOT;
+                return CN1_GC_VS_OK;
+            } else if(b < cand) lo = mid + 1; else hi = mid - 1;
+        }
+    }
+#endif
+    if(cn1GcQSetContains(o)) return CN1_GC_VS_QUARANTINED;
+    if(cn1ConsExtN > 0) {
+        int lo = 0, hi = cn1ConsExtN - 1, found = -1;
+        while(lo <= hi) {
+            int mid = (lo + hi) >> 1;
+            if(cn1ConsExt[mid].lo <= (char*)o) { found = mid; lo = mid + 1; }
+            else hi = mid - 1;
+        }
+        if(found >= 0 && (char*)o < cn1ConsExt[found].hi) return CN1_GC_VS_OK;
+    }
+    return CN1_GC_VS_UNKNOWN;
+}
+
+static const char* cn1GcVerifyClsName(JAVA_OBJECT o) {
+    if(o == JAVA_NULL) return "(null)";
+    struct clazz* c = o->__codenameOneParentClsReference;
+    if(c == 0) return "(unpublished)";
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+    if(!cn1ClazzRegistryContains((uintptr_t)c)) return "(unregistered)";
+#endif
+    return c->clsName ? c->clsName : "(unnamed)";
+}
+
+// CN1_GC_VERIFY_CENSUS=<class substring>: age histogram of every object of a
+// named class still resident in the heap, printed once per cycle. This is how a
+// driver author confirms the hazard it thinks it built actually exists -- an
+// object that never ages is being kept alive by something (very often the
+// conservative stack scan), and a driver in that state is testing nothing.
+static void cn1GcVerifyCensus(JAVA_OBJECT o, int m) {
+    if(cn1GcVerifyCensusCls == 0) return;
+    struct clazz* c = o->__codenameOneParentClsReference;
+    if(c == 0 || c->clsName == 0 || m == CN1_BIBOP_FREE_MARK || m == CN1_GC_POISON_MARK) return;
+    if(strstr(c->clsName, cn1GcVerifyCensusCls) == 0) return;
+    int age = m == -1 ? 0 : currentGcMarkValue - m;
+    if(age < 0) age = 0;
+    if(age > 4) age = 4;
+    cn1GcVerifyCensusAge[age]++;
+}
+
+// The verify-mode substitute for marking: called from gcMarkObject for every
+// reference field of every surviving object.
+void cn1GcVerifyChild(JAVA_OBJECT child) {
+    CN1BibopPage* pg = 0;
+    int idx = -1;
+    cn1GcVerifyChecked++;
+    int st = cn1GcVerifyClassify(child, &pg, &idx);
+    if(st == CN1_GC_VS_OK) {
+        // The memory is still mapped and still looks like an object -- but the
+        // sweep frees on AGE (mark < epoch-1), and physical reclamation lags
+        // that decision by however long it takes the object's page to be
+        // retired and swept. An object whose mark is already below the free
+        // threshold has been given up on: a kept object still referencing it is
+        // the same defect as referencing memory already handed back, just
+        // observed one step earlier. This is the check that catches a
+        // grace-kept parent whose subtree was never traced.
+        //
+        // Exclusions: mark==-1 (allocated after this cycle began), the class
+        // objects gcMarkObject itself skips, and registered immortals (removed
+        // from the heap table on purpose -- interned strings, static-final
+        // values -- whose marks are not maintained).
+        int cm = __atomic_load_n(&child->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+        if(cm != -1 && cm < currentGcMarkValue - 1
+           && child->__codenameOneParentClsReference != (&class__java_lang_Class)
+           && !cn1GcImmortalObjContains(child)) {
+            st = CN1_GC_VS_DEAD_AGE;
+        }
+    }
+    cn1GcVerifyStatus[st]++;
+    {
+        int __cm = child->__codenameOneGcMark;
+        int __age = __cm == -1 ? 0 : currentGcMarkValue - __cm;
+        if(__age < 0) __age = 0;
+        if(__age > 4) __age = 4;
+        cn1GcVerifyAge[__age]++;
+    }
+    if(cn1GcVerifyDump != 0 && cn1GcVerifyDumpCount < 12 && cn1GcVerifyHolder != JAVA_NULL) {
+        const char* hn = cn1GcVerifyClsName(cn1GcVerifyHolder);
+        if(strstr(hn, cn1GcVerifyDump) != 0) {
+            cn1GcVerifyDumpCount++;
+            fprintf(stderr, "[GC-VERIFY-DUMP] epoch=%d holder=%s mark=%d(%+d) -> child=%s mark=%d(%+d) heapPos=%d status=%d\n",
+                    currentGcMarkValue, hn, cn1GcVerifyHolder->__codenameOneGcMark,
+                    cn1GcVerifyHolder->__codenameOneGcMark - currentGcMarkValue,
+                    cn1GcVerifyClsName(child), child->__codenameOneGcMark,
+                    child->__codenameOneGcMark - currentGcMarkValue,
+                    child->__heapPosition, st);
+        }
+    }
+    if(st == CN1_GC_VS_OK || st == CN1_GC_VS_UNKNOWN) {
+        return;
+    }
+    cn1GcVerifyViolations++;
+    if(cn1GcVerifyReported >= 20) {
+        return;
+    }
+    cn1GcVerifyReported++;
+    const char* what = st == CN1_GC_VS_FREE_SLOT ? "FREED BiBOP slot"
+                     : st == CN1_GC_VS_STALE_SLOT ? "RECYCLED page slot (above bump cursor)"
+                     : st == CN1_GC_VS_DEAD_AGE ? "object AGED OUT by this sweep (mark below the free threshold)"
+                     : "FREED legacy block (quarantined)";
+    fprintf(stderr,
+        "[GC-VERIFY] DANGLING REFERENCE after sweep at epoch %d\n"
+        "            holder  = %p class=%s mark=%d (epoch%+d) heapPos=%d\n"
+        "            field   -> %p class=%s mark=%d heapPos=%d\n"
+        "            victim  = %s%s\n"
+        "            markSite= %p (address of the generated mark function's call site)\n",
+        currentGcMarkValue,
+        (void*)cn1GcVerifyHolder, cn1GcVerifyClsName(cn1GcVerifyHolder),
+        cn1GcVerifyHolder != JAVA_NULL ? cn1GcVerifyHolder->__codenameOneGcMark : 0,
+        cn1GcVerifyHolder != JAVA_NULL
+            ? cn1GcVerifyHolder->__codenameOneGcMark - currentGcMarkValue : 0,
+        cn1GcVerifyHolder != JAVA_NULL ? cn1GcVerifyHolder->__heapPosition : 0,
+        (void*)child, cn1GcVerifyClsName(child),
+        child->__codenameOneGcMark, child->__heapPosition,
+        what,
+        pg != 0 ? " (page-resident)" : "",
+        __builtin_return_address(0));
+    fflush(stderr);
+}
+
+// Walk every object that SURVIVED the sweep and validate its reference fields.
+// Holders come from both halves of the heap: every occupied BiBOP slot and
+// every live entry of the legacy table. Runs on the GC thread immediately
+// after the sweep, before the collector hands the world back, so the freed
+// memory it is looking for has had the least possible chance of being
+// recycled into something plausible again.
+void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
+    cn1GcFaultInit();
+    extern void cn1GcBuildRootSnapshots(void);
+    extern int cn1ConsSnapEpochReset(void);
+    // Force a rebuild: the cached snapshot predates this sweep and still lists
+    // the objects it just reclaimed.
+    cn1ConsSnapEpochReset();
+    cn1GcBuildRootSnapshots();
+    cn1GcVerifyViolations = 0;
+    cn1GcVerifyChecked = 0;
+    cn1GcVerifyReported = 0;
+    cn1GcVerifyAllHolders = getenv("CN1_GC_VERIFY_ALL") != 0;
+    cn1GcVerifyAging = getenv("CN1_GC_VERIFY_AGING") != 0;
+    cn1GcVerifyDump = getenv("CN1_GC_VERIFY_DUMP");
+    cn1GcVerifyDumpCount = 0;
+    memset(cn1GcVerifyAge, 0, sizeof(cn1GcVerifyAge));
+    cn1GcVerifyCensusCls = getenv("CN1_GC_VERIFY_CENSUS");
+    memset(cn1GcVerifyCensusAge, 0, sizeof(cn1GcVerifyCensusAge));
+    memset(cn1GcVerifyStatus, 0, sizeof(cn1GcVerifyStatus));
+    cn1GcVerifyActive = 1;
+    long holders = 0;
+#ifndef CN1_DISABLE_BIBOP
+    {
+        CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+        while(p != 0) {
+            int n = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
+            for(int i = 0 ; i < n ; i++) {
+                JAVA_OBJECT o = cn1BibopSlot(p, i);
+                int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+                cn1GcVerifyCensus(o, m);
+                // HOLDERS ARE EVERYTHING THE SWEEP KEPT -- not just what it
+                // proved reachable. The sweep keeps an object at the current epoch
+                // (marked, or promoted by the grace rule) AND one at the previous
+                // epoch (aging out), and the invariant under test covers both: the
+                // collector kept that object precisely because it would not commit
+                // to it being dead, so it must not be left pointing into memory the
+                // same sweep reclaimed. A kept object whose child was freed one
+                // epoch earlier is the exact signature of a keep-rule that did not
+                // trace the object's subtree.
+                //
+                // mark==-1 is excluded: allocated after the sweep began, its body
+                // can still be under construction; it is verified next cycle.
+                if(!cn1GcVerifyHolderKept(m)) continue;
+                struct clazz* c = o->__codenameOneParentClsReference;
+                if(c == 0 || c->markFunction == 0) continue;
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+                if(!cn1ClazzRegistryContains((uintptr_t)c)) continue;
+#endif
+                cn1GcVerifyHolder = o;
+                holders++;
+                ((cn1GcVerifyMarkFn)c->markFunction)(threadStateData, o, JAVA_FALSE);
+            }
+            p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
+        }
+    }
+#endif
+    {
+        int t = currentSizeOfAllObjectsInHeap;
+        for(int iter = 0 ; iter < t ; iter++) {
+            JAVA_OBJECT o = allObjectsInHeap[iter];
+            if(o == JAVA_NULL) continue;
+            if(o->__heapPosition != CN1_BIBOP_ADOPTED) {
+                cn1GcVerifyCensus(o, o->__codenameOneGcMark);   // else counted by the page walk
+            }
+            struct clazz* c = o->__codenameOneParentClsReference;
+            if(c == 0 || c->markFunction == 0) continue;
+            int lm = o->__codenameOneGcMark;
+            if(!cn1GcVerifyHolderKept(lm)) continue;
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+            if(!cn1ClazzRegistryContains((uintptr_t)c)) continue;
+#endif
+            cn1GcVerifyHolder = o;
+            holders++;
+            ((cn1GcVerifyMarkFn)c->markFunction)(threadStateData, o, JAVA_FALSE);
+        }
+    }
+    cn1GcVerifyActive = 0;
+    cn1GcVerifyHolder = JAVA_NULL;
+    long freedSlots = cn1GcVerifyFreedSlots;
+    long freedLegacy = cn1GcVerifyFreedLegacy;
+    cn1GcVerifyFreedSlots = 0;
+    cn1GcVerifyFreedLegacy = 0;
+    if(cn1GcVerifyViolations > 0) {
+        fprintf(stderr, "[GC-VERIFY] epoch=%d holders=%ld refs=%ld VIOLATIONS=%ld "
+                "(freeSlot=%ld recycledSlot=%ld quarantined=%ld agedOut=%ld)\n",
+                currentGcMarkValue, holders, cn1GcVerifyChecked, cn1GcVerifyViolations,
+                cn1GcVerifyStatus[CN1_GC_VS_FREE_SLOT], cn1GcVerifyStatus[CN1_GC_VS_STALE_SLOT],
+                cn1GcVerifyStatus[CN1_GC_VS_QUARANTINED], cn1GcVerifyStatus[CN1_GC_VS_DEAD_AGE]);
+        fflush(stderr);
+        // A dangling reference is never survivable state: everything observed
+        // after this point is reading recycled memory. Fail loudly, at the
+        // cycle that produced it, unless a run is explicitly collecting a
+        // census of every violating cycle.
+        if(getenv("CN1_GC_VERIFY_SOFT") == 0) {
+            abort();
+        }
+    } else if(cn1GcVerifyCensusCls != 0) {
+        fprintf(stderr, "[GC-CENSUS] epoch=%d %s age[0..4+]=%ld/%ld/%ld/%ld/%ld\n",
+                currentGcMarkValue, cn1GcVerifyCensusCls,
+                cn1GcVerifyCensusAge[0], cn1GcVerifyCensusAge[1], cn1GcVerifyCensusAge[2],
+                cn1GcVerifyCensusAge[3], cn1GcVerifyCensusAge[4]);
+        fflush(stderr);
+    } else if(getenv("CN1_GC_VERIFY_LOG") != 0) {
+        fprintf(stderr, "[GC-VERIFY] epoch=%d holders=%ld refs=%ld clean (ok=%ld unknown=%ld free=%ld stale=%ld quar=%ld dead=%ld) reclaimed=%ld/%ld age[0..4+]=%ld/%ld/%ld/%ld/%ld\n",
+                currentGcMarkValue, holders, cn1GcVerifyChecked,
+                cn1GcVerifyStatus[0], cn1GcVerifyStatus[1], cn1GcVerifyStatus[2],
+                cn1GcVerifyStatus[3], cn1GcVerifyStatus[4], cn1GcVerifyStatus[5],
+                freedSlots, freedLegacy,
+                cn1GcVerifyAge[0], cn1GcVerifyAge[1], cn1GcVerifyAge[2],
+                cn1GcVerifyAge[3], cn1GcVerifyAge[4]);
+        fflush(stderr);
+    }
+}
+#endif /* CN1_GC_VERIFY */
 
 // (b) Conservative range scan: read every aligned word in [lo,hi), resolve it, and MARK
 // it for real. gcMarkObject in the GC-thread serial context just pushes to the worklist
@@ -4042,6 +4754,15 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     totalAllocatedHeap -= *ptr;
     free(ptr);
 #else
+#ifdef CN1_GC_VERIFY
+    // QA: poison + quarantine rather than free, so a dangling reference reads a
+    // recognizably dead object instead of whatever the allocator recycles into
+    // the address next. Falls through to a real free only if the quarantine
+    // could not be allocated.
+    if(cn1GcVerifyQuarantineFree(obj)) {
+        return;
+    }
+#endif
     free(obj);
 #endif
 }
@@ -4295,6 +5016,17 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     if(obj == JAVA_NULL || CN1_IS_TAGGED(obj)) {
         return;
     }
+#ifdef CN1_GC_VERIFY
+    // QA verifier mode: cn1GcVerifyHeap drives the SAME generated mark functions
+    // the collector uses, so every reference field of every surviving object
+    // arrives here. Classify it instead of marking it. This must precede the
+    // conservative-resolve guard below -- that guard SKIPS exactly the dangling
+    // pointers the verifier exists to catch.
+    if(cn1GcVerifyActive) {
+        cn1GcVerifyChild(obj);
+        return;
+    }
+#endif
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // TOTAL pointer validation BEFORE ANY dereference. The drain follows the
     // reference fields of conservatively-kept objects, and a conservatively-kept
@@ -4491,6 +5223,34 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
                     __p ? __p->__codenameOneGcMark : -999);
             fflush(stderr);
             abort();
+        }
+    }
+#endif
+#ifdef CN1_GC_VERIFY
+    // CN1_GC_TRACE_MARK=<class substring>: name what is keeping a given class
+    // reachable, by reporting the drain parent that reached it.
+    {
+        static const char* __tm = (const char*)-1;
+        if(__tm == (const char*)-1) __tm = getenv("CN1_GC_TRACE_MARK");
+        if(__tm != 0 && markSnapshot > 0 && __cls->clsName != 0 && strstr(__cls->clsName, __tm) != 0) {
+            static int __tmCount = 0;
+            static int __tmEpoch = -1;
+            if(__tmEpoch != markVal) { __tmEpoch = markVal; __tmCount = 0; }
+            if(__tmCount < 4) {
+                __tmCount++;
+#ifdef CN1_BIBOP_VALIDATE
+                JAVA_OBJECT __p = gcMarkCurrentDrainObj;
+                const char* __pn = (__p != JAVA_NULL && __p->__codenameOneParentClsReference != 0
+                                    && __p->__codenameOneParentClsReference->clsName != 0)
+                        ? __p->__codenameOneParentClsReference->clsName : "(root/none)";
+#else
+                const char* __pn = "(build with -DCN1_BIBOP_VALIDATE for the drain parent)";
+#endif
+                extern const char* cn1GcMarkPhase;
+                fprintf(stderr, "[GC-TRACE-MARK] epoch=%d phase=%s marking %s (was %d) drainParent=%s\n",
+                        markVal, cn1GcMarkPhase, __cls->clsName, markSnapshot, __pn);
+                fflush(stderr);
+            }
         }
     }
 #endif
