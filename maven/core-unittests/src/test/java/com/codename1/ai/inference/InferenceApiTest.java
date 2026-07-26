@@ -84,6 +84,12 @@ class InferenceApiTest extends UITestBase {
                 ModelCache.safeName("model_v1"));
         assertTrue(ModelCache.safeName("model-v1_2")
                 .startsWith("model-v1_2-"));
+        StringBuilder longKey = new StringBuilder();
+        for (int i = 0; i < 512; i++) {
+            longKey.append('a');
+        }
+        assertTrue((ModelCache.safeName(longKey.toString())
+                + ".tflite.download").length() <= 255);
     }
 
     @Test

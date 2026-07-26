@@ -138,22 +138,35 @@ public final class IOSInferenceImpl extends InferenceImpl {
                                 + metadata.length + " input tensors but received "
                                 + inputs.length);
                     }
+                    int[] indices = new int[inputs.length];
                     for (int i = 0; i < inputs.length; i++) {
                         Tensor tensor = inputs[i];
                         int index = inputIndex(tensor, i, metadata);
                         TensorInfo expected = find(metadata, index);
+                        for (int previous = 0; previous < i; previous++) {
+                            if (indices[previous] == index) {
+                                throw new IllegalArgumentException(
+                                        "Model input " + expected.getName()
+                                                + " was supplied more than once");
+                            }
+                        }
+                        indices[i] = index;
                         if (tensor.getType() != expected.getType()) {
                             throw new IllegalArgumentException("Input "
                                     + expected.getName() + " expects "
                                     + expected.getType() + " but received "
                                     + tensor.getType());
                         }
+                    }
+                    for (int i = 0; i < inputs.length; i++) {
+                        Tensor tensor = inputs[i];
                         parse(IOSImplementation.nativeInstance.cn1InferenceCopyInput(
-                                id, index, encodeData(tensor.getType(),
+                                id, indices[i], encodeData(tensor.getType(),
                                         tensor.getDataUnsafe())));
                     }
                     parse(IOSImplementation.nativeInstance.cn1InferenceInvoke(id));
-                    TensorInfo[] outputs = checked.outputs;
+                    TensorInfo[] outputs = metadata(id, true);
+                    checked.outputs = outputs;
                     final Tensor[] result = new Tensor[outputs.length];
                     for (int i = 0; i < result.length; i++) {
                         TensorInfo output = outputs[i];

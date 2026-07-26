@@ -142,11 +142,28 @@ public final class AndroidInferenceImpl extends InferenceImpl {
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {
                 try {
-                    Object[] nativeInputs = new Object[interpreter.getInputTensorCount()];
-                    for (int i = 0; i < nativeInputs.length; i++) {
-                        org.tensorflow.lite.Tensor metadata = interpreter.getInputTensor(i);
-                        Tensor value = find(inputs, metadata.name(), i);
-                        nativeInputs[i] = toBuffer(value, metadata.dataType());
+                    int inputCount = interpreter.getInputTensorCount();
+                    if (inputs == null || inputs.length != inputCount) {
+                        throw new IllegalArgumentException("Expected "
+                                + inputCount + " input tensors but received "
+                                + (inputs == null ? 0 : inputs.length));
+                    }
+                    Object[] nativeInputs = new Object[inputCount];
+                    boolean[] resolved = new boolean[inputCount];
+                    for (int i = 0; i < inputs.length; i++) {
+                        Tensor value = inputs[i];
+                        int index = value.getName() == null ? i
+                                : inputIndex(interpreter, value.getName());
+                        org.tensorflow.lite.Tensor metadata =
+                                interpreter.getInputTensor(index);
+                        if (resolved[index]) {
+                            throw new IllegalArgumentException(
+                                    "Model input " + metadata.name()
+                                            + " was supplied more than once");
+                        }
+                        resolved[index] = true;
+                        nativeInputs[index] =
+                                toBuffer(value, metadata.dataType());
                     }
                     Map<Integer, Object> nativeOutputs = new HashMap<Integer, Object>();
                     ByteBuffer[] outputBuffers =
@@ -196,21 +213,6 @@ public final class AndroidInferenceImpl extends InferenceImpl {
             throw new IllegalArgumentException("Invalid LiteRT session handle");
         }
         return (Handle) value;
-    }
-
-    private static Tensor find(Tensor[] values, String name, int index) {
-        if (values == null) {
-            throw new IllegalArgumentException("No input tensors supplied");
-        }
-        for (int i = 0; i < values.length; i++) {
-            if (name != null && name.equals(values[i].getName())) {
-                return values[i];
-            }
-        }
-        if (index < values.length) {
-            return values[index];
-        }
-        throw new IllegalArgumentException("Missing model input " + name);
     }
 
     private static int inputIndex(Interpreter interpreter, String name) {

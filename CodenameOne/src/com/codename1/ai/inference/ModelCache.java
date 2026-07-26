@@ -43,6 +43,8 @@ import java.io.InputStream;
 /// model payload. Small first-party models can instead be packaged with
 /// {@link ModelSource#resource(String)}.
 public final class ModelCache {
+    private static final int MAX_READABLE_CACHE_KEY_LENGTH = 160;
+
     private ModelCache() {
     }
 
@@ -203,6 +205,9 @@ public final class ModelCache {
                     || (c >= '0' && c <= '9')
                     || c == '-' || c == '_';
             out.append(safe ? c : '_');
+        }
+        if (out.length() > MAX_READABLE_CACHE_KEY_LENGTH) {
+            out.setLength(MAX_READABLE_CACHE_KEY_LENGTH);
         }
         Hash hash = Hash.create(Hash.SHA256);
         for (int i = 0; i < value.length(); i++) {
