@@ -101,6 +101,45 @@ static void cn1MLKitAddFaceLandmark(NSMutableDictionary *landmarks,
 }
 #endif
 
+#if defined(CN1_HAS_MLKIT_POSE)
+static NSString *cn1MLKitPoseLandmarkName(MLKPoseLandmarkType type) {
+    if ([type isEqualToString:MLKPoseLandmarkTypeNose]) return @"nose";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftEyeInner]) return @"leftEyeInner";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftEye]) return @"leftEye";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftEyeOuter]) return @"leftEyeOuter";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightEyeInner]) return @"rightEyeInner";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightEye]) return @"rightEye";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightEyeOuter]) return @"rightEyeOuter";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftEar]) return @"leftEar";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightEar]) return @"rightEar";
+    if ([type isEqualToString:MLKPoseLandmarkTypeMouthLeft]) return @"leftMouth";
+    if ([type isEqualToString:MLKPoseLandmarkTypeMouthRight]) return @"rightMouth";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftShoulder]) return @"leftShoulder";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightShoulder]) return @"rightShoulder";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftElbow]) return @"leftElbow";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightElbow]) return @"rightElbow";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftWrist]) return @"leftWrist";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightWrist]) return @"rightWrist";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftPinkyFinger]) return @"leftPinky";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightPinkyFinger]) return @"rightPinky";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftIndexFinger]) return @"leftIndex";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightIndexFinger]) return @"rightIndex";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftThumb]) return @"leftThumb";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightThumb]) return @"rightThumb";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftHip]) return @"leftHip";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightHip]) return @"rightHip";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftKnee]) return @"leftKnee";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightKnee]) return @"rightKnee";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftAnkle]) return @"leftAnkle";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightAnkle]) return @"rightAnkle";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftHeel]) return @"leftHeel";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightHeel]) return @"rightHeel";
+    if ([type isEqualToString:MLKPoseLandmarkTypeLeftToe]) return @"leftFootIndex";
+    if ([type isEqualToString:MLKPoseLandmarkTypeRightToe]) return @"rightFootIndex";
+    return @"unknown";
+}
+#endif
+
 static NSDictionary *cn1VisionFaceLandmark(
         VNFaceLandmarkRegion2D *region, CGRect faceBounds) {
     if (region == nil || region.pointCount == 0
@@ -356,8 +395,7 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
         MLKPose *pose = result.firstObject;
         for (MLKPoseLandmark *landmark in pose.landmarks ?: @[]) {
             [items addObject:@{
-                @"name": [NSString stringWithFormat:@"%ld",
-                        (long)landmark.type],
+                @"name": cn1MLKitPoseLandmarkName(landmark.type),
                 @"x": @(landmark.position.x / image.size.width),
                 @"y": @(landmark.position.y / image.size.height),
                 @"confidence": @(landmark.inFrameLikelihood)
@@ -549,7 +587,12 @@ static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
             item[@"landmarks"] = landmarks;
             item[@"yaw"] = @((observation.yaw ?: @0).doubleValue
                     * 180.0 / M_PI);
-            item[@"pitch"] = @0;
+            if (@available(iOS 15.0, *)) {
+                item[@"pitch"] = @((observation.pitch ?: @0).doubleValue
+                        * 180.0 / M_PI);
+            } else {
+                item[@"pitch"] = @0;
+            }
             item[@"roll"] = @((observation.roll ?: @0).doubleValue
                     * 180.0 / M_PI);
             item[@"smilingProbability"] = @(-1);
