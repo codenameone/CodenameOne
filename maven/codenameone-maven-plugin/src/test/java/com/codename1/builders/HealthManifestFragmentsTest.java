@@ -1,0 +1,280 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.builders;
+
+import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * The Health Connect manifest fragments. The prefix hazards get dedicated
+ * cases because a loose duplicate check silently drops a permission, which
+ * surfaces only as a runtime SecurityException on a user's device.
+ */
+class HealthManifestFragmentsTest {
+
+    private static List<String> list(String... values) {
+        List<String> out = new ArrayList<String>();
+        for (String v : values) {
+            out.add(v);
+        }
+        return out;
+    }
+
+    private static int count(String haystack, String needle) {
+        int n = 0;
+        int i = haystack.indexOf(needle);
+        while (i >= 0) {
+            n++;
+            i = haystack.indexOf(needle, i + needle.length());
+        }
+        return n;
+    }
+
+    @Test
+    void readTokensBecomeReadPermissions() {
+        String out = HealthManifestFragments.injectPermissions("",
+                list("steps", "heart_rate"), list(), false, false, false, 34);
+        assertTrue(out.contains("android.permission.health.READ_STEPS"));
+        assertTrue(out.contains("android.permission.health.READ_HEART_RATE"));
+        assertFalse(out.contains("WRITE_STEPS"));
+    }
+
+    @Test
+    void writeTokensBecomeWritePermissions() {
+        String out = HealthManifestFragments.injectPermissions("",
+                list(), list("steps"), false, false, false, 34);
+        assertTrue(out.contains("android.permission.health.WRITE_STEPS"));
+        assertFalse(out.contains("READ_STEPS"));
+    }
+
+    /**
+     * READ_HEART_RATE is a strict prefix of READ_HEART_RATE_VARIABILITY.
+     * A substring-based duplicate check would emit only one of them.
+     */
+    @Test
+    void heartRatePrefixDoesNotSuppressHeartRateVariability() {
+        String out = HealthManifestFragments.injectPermissions("",
+                list("heart_rate", "heart_rate_variability_sdnn"),
+                list(), false, false, false, 34);
+        assertTrue(out.contains(
+                "\"android.permission.health.READ_HEART_RATE\""));
+        assertTrue(out.contains(
+                "\"android.permission.health.READ_HEART_RATE_VARIABILITY\""));
+    }
+
+    /** READ_EXERCISE is a strict prefix of READ_EXERCISE_ROUTE. */
+    @Test
+    void exercisePrefixDoesNotSuppressLongerPermissions() {
+        String out = HealthManifestFragments.injectPermissions("",
+                list("workout"), list(), false, false, false, 34);
+        assertTrue(out.contains("\"android.permission.health.READ_EXERCISE\""));
+    }
+
+    /**
+     * READ_HEALTH_DATA is a strict prefix of
+     * READ_HEALTH_DATA_IN_BACKGROUND and READ_HEALTH_DATA_HISTORY.
+     */
+    @Test
+    void backgroundAndHistoryPermissionsCoexist() {
+        String out = HealthManifestFragments.injectPermissions("",
+                list("steps"), list(), true, true, false, 34);
+        assertTrue(out.contains(
+                "READ_HEALTH_DATA_IN_BACKGROUND"));
+        assertTrue(out.contains("READ_HEALTH_DATA_HISTORY"));
+    }
+
+    /**
+     * A developer who already declared a permission through
+     * android.xpermissions must not get a duplicate.
+     */
+    @Test
+    void alreadyDeclaredPermissionIsNotDuplicated() {
+        String existing = "    <uses-permission android:name="
+                + "\"android.permission.health.READ_STEPS\" />\n";
+        String out = HealthManifestFragments.injectPermissions(existing,
+                list("steps"), list(), false, false, false, 34);
+        assertEquals(1, count(out,
+                "\"android.permission.health.READ_STEPS\""));
+    }
+
+    /**
+     * Three distance tokens map to one Health Connect permission, so the
+     * emitted set must be deduplicated.
+     */
+    @Test
+    void tokensSharingAPermissionEmitItOnce() {
+        String out = HealthManifestFragments.injectPermissions("",
+                list("distance_walking_running", "distance_cycling",
+                        "distance_swimming"),
+                list(), false, false, false, 34);
+        assertEquals(1, count(out,
+                "\"android.permission.health.READ_DISTANCE\""));
+    }
+
+    @Test
+    void workoutSessionsAddForegroundServiceAndActivityRecognition() {
+        String out = HealthManifestFragments.injectPermissions("",
+                list("workout"), list(), false, false, true, 34);
+        assertTrue(out.contains("android.permission.ACTIVITY_RECOGNITION"));
+        assertTrue(out.contains("android.permission.FOREGROUND_SERVICE"));
+        assertTrue(out.contains(
+                "android.permission.FOREGROUND_SERVICE_HEALTH"));
+    }
+
+    /** FOREGROUND_SERVICE_HEALTH only exists from API 34. */
+    @Test
+    void foregroundServiceHealthIsOmittedBelowApi34() {
+        String out = HealthManifestFragments.injectPermissions("",
+                list("workout"), list(), false, false, true, 33);
+        assertTrue(out.contains("android.permission.FOREGROUND_SERVICE"));
+        assertFalse(out.contains(
+                "android.permission.FOREGROUND_SERVICE_HEALTH"));
+    }
+
+    @Test
+    void queriesDeclareTheProviderExactlyOnce() {
+        String once = HealthManifestFragments.injectQueries("");
+        assertTrue(once.contains(HealthManifestFragments.PROVIDER_PACKAGE));
+        String twice = HealthManifestFragments.injectQueries(once);
+        assertEquals(1, count(twice,
+                HealthManifestFragments.PROVIDER_PACKAGE));
+    }
+
+    /**
+     * Health Connect refuses to show its consent dialog to an app with no
+     * rationale activity, so omitting this produces a permission request
+     * that silently never appears.
+     */
+    @Test
+    void rationaleActivityIsAlwaysDeclared() {
+        String out = HealthManifestFragments.injectApplicationEntries("",
+                false, 34);
+        assertTrue(out.contains(
+                HealthManifestFragments.RATIONALE_ACTIVITY));
+        assertTrue(out.contains(
+                "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"));
+    }
+
+    @Test
+    void permissionUsageAliasIsApi34Only() {
+        String modern = HealthManifestFragments.injectApplicationEntries("",
+                false, 34);
+        assertTrue(modern.contains("ViewPermissionUsageActivity"));
+        String older = HealthManifestFragments.injectApplicationEntries("",
+                false, 33);
+        assertFalse(older.contains("ViewPermissionUsageActivity"));
+    }
+
+    @Test
+    void workoutServiceIsOnlyDeclaredWhenWorkoutsAreUsed() {
+        assertFalse(HealthManifestFragments.injectApplicationEntries("",
+                false, 34).contains("HealthWorkoutService"));
+        String withWorkouts = HealthManifestFragments
+                .injectApplicationEntries("", true, 34);
+        assertTrue(withWorkouts.contains("HealthWorkoutService"));
+        assertTrue(withWorkouts.contains(
+                "android:foregroundServiceType=\"health\""));
+    }
+
+    /**
+     * The activity name legitimately appears twice in a single emission --
+     * once as the activity's own name and once as the alias's
+     * targetActivity -- so idempotence is that a second pass adds nothing,
+     * not that the name occurs once.
+     */
+    @Test
+    void applicationEntriesAreNotDuplicated() {
+        String once = HealthManifestFragments.injectApplicationEntries("",
+                true, 34);
+        String twice = HealthManifestFragments.injectApplicationEntries(once,
+                true, 34);
+        assertEquals(once, twice, "a second pass must add nothing");
+        assertEquals(1, count(twice, "<activity android:name="));
+        assertEquals(1, count(twice, "<service android:name="));
+    }
+
+    @Test
+    void unknownTokensAreReportedRatherThanSilentlySkipped() {
+        List<String> unknown = HealthManifestFragments.unknownTokens(
+                list("steps", "telepathy"));
+        assertEquals(1, unknown.size());
+        assertEquals("telepathy", unknown.get(0));
+        assertNull(HealthManifestFragments.permissionFor("telepathy", false));
+    }
+
+    @Test
+    void typeListParsingToleratesWhitespaceAndBlanks() {
+        List<String> parsed = HealthManifestFragments.parseTypeList(
+                " steps , heart_rate ,, ");
+        assertEquals(2, parsed.size());
+        assertEquals("steps", parsed.get(0));
+        assertEquals("heart_rate", parsed.get(1));
+        assertTrue(HealthManifestFragments.parseTypeList(null).isEmpty());
+    }
+
+    /**
+     * The token table duplicates HealthDataType, which the builder cannot
+     * depend on. This golden list is what makes a core-side addition that
+     * was not mirrored here fail CI rather than silently produce an app
+     * missing a permission.
+     */
+    @Test
+    void tokenSetMatchesTheGoldenList() {
+        String[] golden = {
+            "active_energy", "basal_body_temperature", "basal_energy",
+            "blood_glucose", "blood_pressure", "body_fat_percentage",
+            "body_mass", "body_mass_index", "body_temperature", "bone_mass",
+            "cycling_cadence", "dietary_energy", "distance_cycling",
+            "distance_swimming", "distance_walking_running",
+            "elevation_gained", "exercise_time", "flights_climbed",
+            "heart_rate", "heart_rate_variability_sdnn", "height",
+            "hydration", "intermenstrual_bleeding", "lean_body_mass",
+            "menstruation_flow", "mindful_session", "nutrition",
+            "oxygen_saturation", "power", "respiratory_rate",
+            "resting_heart_rate", "running_cadence", "sleep", "speed",
+            "steps", "vo2_max", "waist_circumference",
+            "walking_heart_rate_average", "wheelchair_pushes", "workout"
+        };
+        List<String> expected = list(golden);
+        List<String> actual = new ArrayList<String>(
+                HealthManifestFragments.knownTokens());
+        assertEquals(expected, actual,
+                "HealthDataType and this builder table have diverged; add"
+                        + " the new token here and to the golden list");
+    }
+
+    @Test
+    void keepRulesCoverGeneratedAndPlatformReachedClasses() {
+        String rules = HealthManifestFragments.proguardKeepRules(
+                list("com.example.StepWatcher"));
+        assertTrue(rules.contains(
+                HealthManifestFragments.RATIONALE_ACTIVITY));
+        assertTrue(rules.contains("CN1HealthConnectBridge"));
+        assertTrue(rules.contains("HealthConnectDelegate"));
+        assertTrue(rules.contains("-keepnames class com.example.StepWatcher"));
+    }
+}

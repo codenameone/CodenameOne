@@ -272,4 +272,70 @@ class AiDependencyTableTest {
         }
         return null;
     }
+
+    /**
+     * Entries match with startsWith, so the com/codename1/health/ prefix
+     * also matches the sensors subpackage. Anything Health-Connect- or
+     * HealthKit-specific therefore must NOT live on that entry: an app that
+     * only reads a heart-rate strap would otherwise pick up the
+     * androidx.health dependency and, on the Play side, a health-permissions
+     * review it has no business needing. The gradle dependency lives in
+     * AndroidGradleBuilder, gated on health usage outside the sensors
+     * subpackage.
+     */
+    @Test
+    void healthSensorsDoNotDragInHealthConnect() {
+        AiDependencyTable.Accumulator acc = new AiDependencyTable.Accumulator();
+        acc.consume("com/codename1/health/sensors/HealthSensors");
+        for (AiDependencyTable.Entry entry : acc.hits()) {
+            for (String gav : entry.androidGradleDeps()) {
+                assertFalse(gav.contains("androidx.health"),
+                        "a sensors-only app must not pull in Health Connect,"
+                                + " but matched entry contributed " + gav);
+            }
+        }
+    }
+
+    /**
+     * The health store entry carries no placeholder privacy strings.
+     * Apple reviews health purpose strings against what the app actually
+     * does, so a generic default is what gets an app rejected -- the build
+     * fails with an actionable message instead of inventing copy.
+     */
+    @Test
+    void healthEntryShipsNoPlaceholderPrivacyStrings() {
+        AiDependencyTable.Accumulator acc = new AiDependencyTable.Accumulator();
+        acc.consume("com/codename1/health/HealthStore");
+        boolean sawHealthEntry = false;
+        for (AiDependencyTable.Entry entry : acc.hits()) {
+            for (String[] plist : entry.iosPlistEntries()) {
+                assertFalse(plist[0].startsWith("NSHealth"),
+                        "no NSHealth* usage description may be defaulted,"
+                                + " but found " + plist[0]);
+            }
+            sawHealthEntry = true;
+        }
+        assertTrue(sawHealthEntry, "the health prefix should match an entry");
+    }
+
+    /**
+     * A sensors app still needs the Bluetooth privacy string, since it is
+     * doing ordinary BLE.
+     */
+    @Test
+    void healthSensorsStillGetBluetoothPrivacyString() {
+        AiDependencyTable.Accumulator acc = new AiDependencyTable.Accumulator();
+        acc.consume("com/codename1/health/sensors/HealthSensors");
+        boolean found = false;
+        for (AiDependencyTable.Entry entry : acc.hits()) {
+            for (String[] plist : entry.iosPlistEntries()) {
+                if ("NSBluetoothAlwaysUsageDescription".equals(plist[0])) {
+                    found = true;
+                }
+            }
+        }
+        assertTrue(found,
+                "a heart-rate-strap app performs BLE and needs the Bluetooth"
+                        + " usage description");
+    }
 }
