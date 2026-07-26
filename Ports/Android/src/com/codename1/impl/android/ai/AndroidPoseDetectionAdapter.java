@@ -33,6 +33,7 @@ import com.google.mlkit.vision.pose.PoseDetector;
 import com.google.mlkit.vision.pose.PoseLandmark;
 import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /** ML Kit pose detection; retained only for {@code PoseDetector} users. */
@@ -47,21 +48,31 @@ final class AndroidPoseDetectionAdapter extends AndroidVisionAdapter {
                  final int imageHeight, VisionOptions options,
                  AsyncResource<?> resource) {
         final AsyncResource<Pose> out = (AsyncResource<Pose>) resource;
+        final float minimumConfidence = options.getMinimumConfidence();
+        final int maximumResults = options.getMaximumResults();
         client.process(input).addOnSuccessListener(
                 new OnSuccessListener<com.google.mlkit.vision.pose.Pose>() {
             public void onSuccess(com.google.mlkit.vision.pose.Pose value) {
                 List<PoseLandmark> source = value.getAllPoseLandmarks();
-                Pose.Landmark[] landmarks = new Pose.Landmark[source.size()];
-                for (int i = 0; i < landmarks.length; i++) {
+                List<Pose.Landmark> result = new ArrayList<Pose.Landmark>();
+                for (int i = 0; i < source.size(); i++) {
                     PoseLandmark point = source.get(i);
-                    landmarks[i] = new Pose.Landmark(
-                            String.valueOf(point.getLandmarkType()),
+                    if (point.getInFrameLikelihood() < minimumConfidence) {
+                        continue;
+                    }
+                    result.add(new Pose.Landmark(
+                            landmarkName(point.getLandmarkType()),
                             new VisionPoint(
                                     point.getPosition().x / imageWidth,
                                     point.getPosition().y / imageHeight),
-                            point.getInFrameLikelihood());
+                            point.getInFrameLikelihood()));
+                    if (maximumResults > 0
+                            && result.size() >= maximumResults) {
+                        break;
+                    }
                 }
-                complete(out, new Pose(landmarks, METADATA));
+                complete(out, new Pose(result.toArray(
+                        new Pose.Landmark[result.size()]), METADATA));
             }
         }).addOnFailureListener(failure(out));
     }
@@ -69,5 +80,44 @@ final class AndroidPoseDetectionAdapter extends AndroidVisionAdapter {
     @Override
     void close() {
         client.close();
+    }
+
+    private static String landmarkName(int type) {
+        switch (type) {
+            case PoseLandmark.NOSE: return "nose";
+            case PoseLandmark.LEFT_EYE_INNER: return "leftEyeInner";
+            case PoseLandmark.LEFT_EYE: return "leftEye";
+            case PoseLandmark.LEFT_EYE_OUTER: return "leftEyeOuter";
+            case PoseLandmark.RIGHT_EYE_INNER: return "rightEyeInner";
+            case PoseLandmark.RIGHT_EYE: return "rightEye";
+            case PoseLandmark.RIGHT_EYE_OUTER: return "rightEyeOuter";
+            case PoseLandmark.LEFT_EAR: return "leftEar";
+            case PoseLandmark.RIGHT_EAR: return "rightEar";
+            case PoseLandmark.LEFT_MOUTH: return "leftMouth";
+            case PoseLandmark.RIGHT_MOUTH: return "rightMouth";
+            case PoseLandmark.LEFT_SHOULDER: return "leftShoulder";
+            case PoseLandmark.RIGHT_SHOULDER: return "rightShoulder";
+            case PoseLandmark.LEFT_ELBOW: return "leftElbow";
+            case PoseLandmark.RIGHT_ELBOW: return "rightElbow";
+            case PoseLandmark.LEFT_WRIST: return "leftWrist";
+            case PoseLandmark.RIGHT_WRIST: return "rightWrist";
+            case PoseLandmark.LEFT_PINKY: return "leftPinky";
+            case PoseLandmark.RIGHT_PINKY: return "rightPinky";
+            case PoseLandmark.LEFT_INDEX: return "leftIndex";
+            case PoseLandmark.RIGHT_INDEX: return "rightIndex";
+            case PoseLandmark.LEFT_THUMB: return "leftThumb";
+            case PoseLandmark.RIGHT_THUMB: return "rightThumb";
+            case PoseLandmark.LEFT_HIP: return "leftHip";
+            case PoseLandmark.RIGHT_HIP: return "rightHip";
+            case PoseLandmark.LEFT_KNEE: return "leftKnee";
+            case PoseLandmark.RIGHT_KNEE: return "rightKnee";
+            case PoseLandmark.LEFT_ANKLE: return "leftAnkle";
+            case PoseLandmark.RIGHT_ANKLE: return "rightAnkle";
+            case PoseLandmark.LEFT_HEEL: return "leftHeel";
+            case PoseLandmark.RIGHT_HEEL: return "rightHeel";
+            case PoseLandmark.LEFT_FOOT_INDEX: return "leftFootIndex";
+            case PoseLandmark.RIGHT_FOOT_INDEX: return "rightFootIndex";
+            default: return "unknown";
+        }
     }
 }

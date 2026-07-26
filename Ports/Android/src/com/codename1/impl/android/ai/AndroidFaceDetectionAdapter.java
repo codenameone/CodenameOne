@@ -83,7 +83,8 @@ final class AndroidFaceDetectionAdapter extends AndroidVisionAdapter {
                     result[i] = new Face(
                             normalized(value.getBoundingBox(),
                                     imageWidth, imageHeight),
-                            landmarks, value.getHeadEulerAngleY(), 0,
+                            landmarks, value.getHeadEulerAngleY(),
+                            value.getHeadEulerAngleX(),
                             value.getHeadEulerAngleZ(),
                             smile == null ? -1 : smile,
                             tracking == null ? -1 : tracking, METADATA);

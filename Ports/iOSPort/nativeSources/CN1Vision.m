@@ -439,6 +439,30 @@ static NSString *cn1AppleBarcodeFormat(NSString *symbology) {
     return @"UNKNOWN";
 }
 
+static NSString *cn1ApplePoseLandmarkName(
+        VNHumanBodyPoseObservationJointName name) {
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameNose]) return @"nose";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameLeftEye]) return @"leftEye";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameRightEye]) return @"rightEye";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameLeftEar]) return @"leftEar";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameRightEar]) return @"rightEar";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameLeftShoulder]) return @"leftShoulder";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameRightShoulder]) return @"rightShoulder";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameNeck]) return @"neck";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameLeftElbow]) return @"leftElbow";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameRightElbow]) return @"rightElbow";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameLeftWrist]) return @"leftWrist";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameRightWrist]) return @"rightWrist";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameLeftHip]) return @"leftHip";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameRightHip]) return @"rightHip";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameRoot]) return @"root";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameLeftKnee]) return @"leftKnee";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameRightKnee]) return @"rightKnee";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameLeftAnkle]) return @"leftAnkle";
+    if ([name isEqual:VNHumanBodyPoseObservationJointNameRightAnkle]) return @"rightAnkle";
+    return name ?: @"unknown";
+}
+
 static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
                                   int feature, int rotation) {
     NSError *error = nil;
@@ -567,7 +591,7 @@ static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
             for (NSString *name in points) {
                 VNRecognizedPoint *point = points[name];
                 [items addObject:@{
-                    @"name": name,
+                    @"name": cn1ApplePoseLandmarkName(name),
                     @"x": @(point.location.x),
                     @"y": @(1.0 - point.location.y),
                     @"confidence": @(point.confidence)

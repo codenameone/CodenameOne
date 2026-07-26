@@ -24,8 +24,13 @@ package com.codename1.ai.vision;
 
 /// Portable body-pose result. Landmark coordinates use the normalized
 /// top-left-origin image space defined by {@link VisionPoint}; confidence is
-/// in the range 0..1. Landmark names are backend-neutral where the native
-/// backend exposes a known joint name.
+/// in the range 0..1.
+///
+/// Common backend-neutral names include `nose`, `leftEye`, `rightEye`,
+/// `leftEar`, `rightEar`, and the `left`/`right` forms of `Shoulder`, `Elbow`,
+/// `Wrist`, `Hip`, `Knee`, and `Ankle`. A backend can additionally report
+/// finer eye, mouth, finger, heel, foot, `neck`, or `root` landmarks using the
+/// same lower-camel-case convention.
 public final class Pose {
     private final Landmark[] landmarks;
     private final VisionMetadata metadata;
@@ -77,7 +82,11 @@ public final class Pose {
             this.confidence = confidence;
         }
 
-        /// @return portable/native joint name
+        /// Returns the stable lower-camel-case joint name described by
+        /// {@link Pose}. Known native constants are normalized rather than
+        /// exposed as platform-specific numeric or symbolic identifiers.
+        ///
+        /// @return backend-neutral joint name, or `unknown` if unmapped
         public String getName() {
             return name;
         }

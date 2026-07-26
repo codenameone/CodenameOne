@@ -146,6 +146,9 @@ class InferenceApiTest extends UITestBase {
                 Tensor.floats("input", new int[] {1, 2},
                         new float[] {1, 2})
         });
+        assertThrows(IllegalStateException.class, () -> session.run(
+                new Tensor[] {Tensor.floats("input", new int[] {1, 2},
+                        new float[] {3, 4})}));
         assertThrows(IllegalStateException.class,
                 () -> session.resizeInput("input", new int[] {1, 4}));
         session.close();

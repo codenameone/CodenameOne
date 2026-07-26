@@ -112,14 +112,20 @@ public final class InferenceSession implements AutoCloseable {
     /// every output tensor. Named tensors are matched by name; unnamed tensors
     /// are matched by position. Calling {@link #close()} while this operation
     /// is pending prevents new work immediately but defers native release until
-    /// the returned resource succeeds or fails.
+    /// the returned resource succeeds or fails. A session accepts one run at a
+    /// time because the underlying native interpreter is mutable.
     ///
     /// @param inputs one tensor for each model input
     /// @return asynchronous output tensors in model output order
+    /// @throws IllegalStateException if the session is closed or already running
     public AsyncResource<Tensor[]> run(Tensor[] inputs) {
         final AsyncResource<Tensor[]> result;
         synchronized (this) {
             ensureOpen();
+            if (activeRuns > 0) {
+                throw new IllegalStateException(
+                        "Inference session is already running");
+            }
             activeRuns++;
             try {
                 result = implementation.run(handle,
