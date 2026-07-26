@@ -206,7 +206,17 @@ public final class Socket {
     /// #### Returns
     ///
     /// StopListening instance that allows the caller to stop listening
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: if this platform cannot bind a loopback server socket.
+    /// Thrown here rather than on the listener thread so a caller cannot walk away
+    /// believing it is listening when nothing ever bound.
     public static StopListening listenLoopback(final int port, final Class scClass) {
+        if (!isLoopbackServerSocketSupported()) {
+            throw new IllegalStateException("This platform cannot bind a loopback server "
+                    + "socket; check Socket.isLoopbackServerSocketSupported() first");
+        }
         return listenImpl(port, scClass, true);
     }
 

@@ -10853,6 +10853,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_listenSocketLoopback___int(CN1_THREAD
     if(b) {
         return (JAVA_LONG)impl;
     }
+    // ownership is transferred to Java only on success, so a failed bind or accept must
+    // release here or every retry leaks the peer
+    [impl release];
     return (JAVA_LONG)JAVA_NULL;
 }
 

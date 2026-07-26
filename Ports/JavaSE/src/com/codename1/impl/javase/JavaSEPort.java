@@ -17122,23 +17122,26 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     class ServerSockets {
         Map<Integer,ServerSocket> socks = new HashMap<Integer,ServerSocket>();
+        Map<Integer,ServerSocket> loopbackSocks = new HashMap<Integer,ServerSocket>();
 
         public synchronized ServerSocket get(int port) throws IOException {
             return get(port, false);
         }
 
         /// When loopbackOnly is set the socket binds 127.0.0.1 instead of the wildcard, so
-        /// the channel is not published on every network interface. The two are cached
-        /// separately: a port already bound wildcard must never be handed back to a caller
-        /// that asked for loopback.
+        /// the channel is not published on every network interface. The two are cached in
+        /// SEPARATE maps: a port already bound wildcard must never be handed back to a
+        /// caller that asked for loopback. Distinguishing them by sign within one map
+        /// would collide on port 0, the ephemeral-port request, where -0 == 0.
         public synchronized ServerSocket get(int port, boolean loopbackOnly) throws IOException {
-            Integer key = Integer.valueOf(loopbackOnly ? -port : port);
-            ServerSocket sock = socks.get(key);
+            Map<Integer,ServerSocket> cache = loopbackOnly ? loopbackSocks : socks;
+            Integer key = Integer.valueOf(port);
+            ServerSocket sock = cache.get(key);
             if (sock == null || sock.isClosed()) {
                 sock = loopbackOnly
                         ? new ServerSocket(port, 50, InetAddress.getLoopbackAddress())
                         : new ServerSocket(port);
-                socks.put(key, sock);
+                cache.put(key, sock);
             }
             return sock;
         }

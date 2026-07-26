@@ -85,7 +85,8 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
                     + "MCP agent cannot attach to it");
         }
         synchronized (MCPLoopbackSocketTransport.class) {
-            if (active != null && active != this) {
+            // Identity, not equality: is the open transport a DIFFERENT instance?
+            if (active != null && active != this) { // NOPMD identity is the question
                 throw new IOException("Another MCP socket transport is already open on port "
                         + active.port);
             }
@@ -107,7 +108,9 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
     /// Called when a client's session ends.
     void detach(InputStream is) {
         synchronized (lock) {
-            if (in == is) {
+            // Detach only if this is still the very same stream we attached, so a newer
+            // client is not torn down by a stale one finishing late.
+            if (in == is) { // NOPMD identity: same stream we attached?
                 in = null;
                 out = null;
                 lock.notifyAll();
@@ -118,7 +121,10 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
     @Override
     public String readMessage() throws IOException {
         while (true) {
-            InputStream stream;
+            // Borrowed reference: read the field under the lock, use it outside. The
+            // stream is owned by the connection callback and closed in close(); closing
+            // it here would end the session after a single message.
+            InputStream stream; // NOPMD borrowed, not owned by this method
             synchronized (lock) {
                 while (in == null && !closed) {
                     try {
@@ -176,7 +182,9 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
 
     @Override
     public void writeMessage(String message) throws IOException {
-        OutputStream stream;
+        // Borrowed reference (see readMessage): this writes one message, it does not own
+        // the session and must not close the stream.
+        OutputStream stream; // NOPMD borrowed, not owned by this method
         synchronized (lock) {
             stream = out;
         }
@@ -197,7 +205,9 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
     @Override
     public void close() {
         Socket.StopListening l;
-        InputStream is;
+        // Taken out of the field under the lock precisely so it can be closed below,
+        // outside the lock: closing is what unblocks a reader parked in read().
+        InputStream is; // NOPMD closed below, deliberately outside the lock
         synchronized (lock) {
             closed = true;
             l = listening;
@@ -208,7 +218,9 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
             lock.notifyAll();
         }
         synchronized (MCPLoopbackSocketTransport.class) {
-            if (active == this) {
+            // Clear the registration only if it is still ours; a transport opened after
+            // this one must keep its slot.
+            if (active == this) { // NOPMD identity: is the slot still ours?
                 active = null;
             }
         }
