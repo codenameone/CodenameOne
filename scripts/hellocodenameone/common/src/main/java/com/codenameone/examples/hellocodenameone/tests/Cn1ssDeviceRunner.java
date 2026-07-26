@@ -121,6 +121,13 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 && testClass instanceof ToastBarTopPositionScreenshotTest) {
             return 45000;
         }
+        if (!"HTML5".equals(Display.getInstance().getPlatformName())
+                && testClass instanceof VisionOnDeviceApiTest) {
+            // The first Apple Vision request may compile its detector model on
+            // a cold simulator. Keep the EDT free and allow that one-time
+            // native initialization a bounded minute.
+            return TEST_TIMEOUT_MS_NATIVE * 2;
+        }
         return "HTML5".equals(Display.getInstance().getPlatformName())
                 ? TEST_TIMEOUT_MS_HTML5
                 : TEST_TIMEOUT_MS_NATIVE;

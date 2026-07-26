@@ -20,10 +20,6 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-/*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- */
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ai.vision.BarcodeScanner;
@@ -41,7 +37,9 @@ import com.codename1.ai.vision.VisionOptions;
 import com.codename1.camera.CameraFrame;
 import com.codename1.camera.FrameFormat;
 import com.codename1.io.Log;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
+import com.codename1.util.SuccessCallback;
 
 /**
  * Cross-port, non-visual contract coverage for the built-in vision API.
@@ -63,36 +61,56 @@ public class VisionOnDeviceApiTest extends BaseTest {
             checkImageOwnership();
             checkOptions();
             checkAnalyzerCapabilitiesAndLifecycle();
-            checkNativeQrDecode();
-            done();
-            return true;
+            return checkNativeQrDecode();
         } catch (Throwable t) {
             fail("On-device vision API test failed: " + t);
             return false;
         }
     }
 
-    private void checkNativeQrDecode() throws Exception {
-        BarcodeScanner scanner = new BarcodeScanner();
-        try {
-            if (!scanner.isSupported()) {
-                Log.p("VisionOnDeviceApiTest: native QR assertion skipped; "
-                        + "barcode backend unsupported");
-                return;
-            }
-            String png = "iVBORw0KGgoAAAANSUhEUgAAAMAAAADAAQAAAAB6p1GqAAAA5UlEQVR4Xu2UQQ7DIAwEnVOewU8L/JRncIJ6TaqkJT17pbBSImBy2HhtpP+R/B58tMCkBSY9AyRRBX1vFauNA2R9akh72Wo4tgygqtHQRKJiCVzA7LKBjAUT6IhWT/V9bAnAGIMM9j0GrmBIcTx3/kDjbHZlmNdy/Q9H0NBkJVZEm3kAxlJkR9u1a7SuAEUEQx31CxIA4VSxWecBuCnKS9B5mQPYAGi3aQVxa0QOAH82ALGijqddX2BGm5lOdCD0PrqNCCTrNgRMArpFW5Gu3GTuA8YYZKtjul4ZruBOC0xaYNJzwRtNmtsMgNUTWwAAAABJRU5ErkJggg==";
-            Barcode[] values = scanner.process(VisionImage.encoded(
-                    Base64.decode(png.getBytes("UTF-8")))).get(30000);
-            check(values.length > 0, "native QR detector returned no result");
-            check("CN1-VISION-QR".equals(values[0].getValue()),
-                    "native QR payload mismatch");
-            check("QR_CODE".equals(values[0].getFormat()),
-                    "native QR format was not normalized");
-            check(values[0].getCorners().length == 4,
-                    "native QR detector did not return four corners");
-        } finally {
+    private boolean checkNativeQrDecode() throws Exception {
+        final BarcodeScanner scanner = new BarcodeScanner();
+        if (!scanner.isSupported()) {
+            Log.p("VisionOnDeviceApiTest: native QR assertion skipped; "
+                    + "barcode backend unsupported");
             scanner.close();
+            done();
+            return true;
         }
+        String png = "iVBORw0KGgoAAAANSUhEUgAAAMAAAADAAQAAAAB6p1GqAAAA5UlEQVR4Xu2UQQ7DIAwEnVOewU8L/JRncIJ6TaqkJT17pbBSImBy2HhtpP+R/B58tMCkBSY9AyRRBX1vFauNA2R9akh72Wo4tgygqtHQRKJiCVzA7LKBjAUT6IhWT/V9bAnAGIMM9j0GrmBIcTx3/kDjbHZlmNdy/Q9H0NBkJVZEm3kAxlJkR9u1a7SuAEUEQx31CxIA4VSxWecBuCnKS9B5mQPYAGi3aQVxa0QOAH82ALGijqddX2BGm5lOdCD0PrqNCCTrNgRMArpFW5Gu3GTuA8YYZKtjul4ZruBOC0xaYNJzwRtNmtsMgNUTWwAAAABJRU5ErkJggg==";
+        AsyncResource<Barcode[]> operation = scanner.process(
+                VisionImage.encoded(Base64.decode(png.getBytes("UTF-8"))));
+        operation.ready(new SuccessCallback<Barcode[]>() {
+            public void onSucess(Barcode[] values) {
+                try {
+                    check(values.length > 0,
+                            "native QR detector returned no result");
+                    check("CN1-VISION-QR".equals(values[0].getValue()),
+                            "native QR payload mismatch");
+                    check("QR_CODE".equals(values[0].getFormat()),
+                            "native QR format was not normalized");
+                    check(values[0].getCorners().length == 4,
+                            "native QR detector did not return four corners");
+                    done();
+                } catch (Throwable t) {
+                    fail("On-device vision API test failed: " + t);
+                } finally {
+                    scanner.close();
+                }
+            }
+        });
+        operation.except(new SuccessCallback<Throwable>() {
+            public void onSucess(Throwable error) {
+                try {
+                    fail("On-device vision API test failed: " + error);
+                } finally {
+                    scanner.close();
+                }
+            }
+        });
+        // Native completion is asynchronous. Returning lets the EDT service
+        // Apple Vision/ML Kit callbacks while the suite runner polls isDone().
+        return true;
     }
 
     private void checkImageOwnership() {
