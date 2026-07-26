@@ -23,7 +23,8 @@ mkdir -p target/bin
 # driver below; an inherited CN1_GC_VERIFY_SOFT would stop the self-test from
 # aborting. Either inverts a result instead of failing loudly.
 unset CN1_GC_FAULT CN1_GC_VERIFY_SOFT CN1_GC_VERIFY_AGING CN1_GC_VERIFY_ALL \
-      CN1_GC_VERIFY_LOG CN1_GC_VERIFY_CENSUS CN1_GC_VERIFY_DUMP CN1_GC_TRACE_MARK
+      CN1_GC_VERIFY_LOG CN1_GC_VERIFY_CENSUS CN1_GC_VERIFY_DUMP CN1_GC_TRACE_MARK \
+      CN1_GC_DEBUG_EARLY
 
 # Every workload that allocates enough to drive real collection cycles. The
 # point is coverage of ALLOCATION SHAPES, not of answers: page-heap churn,
@@ -53,7 +54,20 @@ for d in $DRIVERS; do
             echo "FAILED (vacuous: 0 verify passes -- the workload never completed a GC cycle)"
             fail=1
         else
-            echo "clean ($passes verify passes)"
+            early="$(printf '%s' "$out" | sed -n 's/.*earlyFreed=\([0-9]*\).*/\1/p' | tail -1)"
+            resd="$(printf '%s' "$out" | sed -n 's/.*resurrectedDangling=\([0-9]*\).*/\1/p' | tail -1)"
+            if [ "${early:-0}" -ne 0 ]; then
+                # The O(1) whole-page reclaim and the per-slot walk disagreed
+                # about when an object dies -- the pairing that leaves a kept
+                # object referencing reclaimed memory.
+                echo "FAILED ($early slot(s) freed a cycle early by the O(1) page reclaim)"
+                fail=1
+            elif [ "${resd:-0}" -ne 0 ]; then
+                echo "FAILED ($resd resurrected object(s) still referencing reclaimed memory)"
+                fail=1
+            else
+                echo "clean ($passes verify passes)"
+            fi
         fi
     else
         echo "FAILED (exit $?)"
@@ -80,6 +94,19 @@ elif printf '%s' "$faultOut" | grep -q 'DANGLING REFERENCE'; then
 else
     echo "BROKEN -- faulted run died (exit $faultExit) without a verifier report"
     printf '%s\n' "$faultOut" | tail -20
+    fail=1
+fi
+
+# Second self-test, for the early-free check added with the O(1) page-reclaim
+# fix. LargeArrayLoad is the workload that exposed it (26,924 slots freed a
+# cycle early), so with the old bound restored the gate above must reject it.
+printf '%-16s ' "self-test2"
+efOut="$(CN1_GC_FAULT=earlyfree ./target/bin/LargeArrayLoad-verify 2>&1)" || true
+efCount="$(printf '%s' "$efOut" | sed -n 's/.*earlyFreed=\([0-9]*\).*/\1/p' | tail -1)"
+if [ "${efCount:-0}" -gt 0 ]; then
+    echo "detected the injected early-free fault ($efCount slots)"
+else
+    echo "BROKEN -- restoring the pre-fix page-reclaim bound produced no early frees"
     fail=1
 fi
 
