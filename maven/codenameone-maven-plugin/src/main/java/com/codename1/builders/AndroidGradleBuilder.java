@@ -5603,7 +5603,7 @@ public class AndroidGradleBuilder extends Executor {
             while ((entry = zis.getNextEntry()) != null) {
                 debug("Extracting: " + entry);
                 if (entry.isDirectory()) {
-                    File d = new File(dir, entry.getName());
+                    File d = resolveArchiveEntry(dir, entry.getName());
                     d.mkdirs();
                     if (!addedSDKDir && sdkPath != null) {
                         if (is_windows) {
@@ -5628,7 +5628,7 @@ public class AndroidGradleBuilder extends Executor {
                     String sdkPathProperties = "sdk.dir=" + sdkPath + "\n";
                     // write the files to the disk
                     File destFile;
-                    destFile = new File(dir, entry.getName());
+                    destFile = resolveArchiveEntry(dir, entry.getName());
                     destFile.getParentFile().mkdirs();
                     FileOutputStream fos = new FileOutputStream(destFile);
                     fos.write(sdkPathProperties.getBytes(StandardCharsets.UTF_8));
@@ -5640,7 +5640,7 @@ public class AndroidGradleBuilder extends Executor {
                 byte[] data = new byte[8192];
                 // write the files to the disk
                 File destFile;
-                destFile = new File(dir, entry.getName());
+                destFile = resolveArchiveEntry(dir, entry.getName());
                 destFile.getParentFile().mkdirs();
                 FileOutputStream fos = new FileOutputStream(destFile);
                 dest = new BufferedOutputStream(fos, data.length);
@@ -5741,18 +5741,18 @@ public class AndroidGradleBuilder extends Executor {
 
     }
 
-    protected File placeXMLFile(ZipEntry entry, File xmlDir, File resDir) {
+    protected File placeXMLFile(ZipEntry entry, File xmlDir, File resDir) throws IOException {
         String name = entry.getName();
         if (name.endsWith("colors.xml")) {
             File parent = resDir.getParentFile();
             resDir = new File(parent, "res");
             File valsDir = new File(resDir, "values");
-            return new File(valsDir, entry.getName());
+            return resolveArchiveEntry(valsDir, entry.getName());
         } else if (name.endsWith("layout.xml")) {
             File parent = resDir.getParentFile();
             resDir = new File(parent, "res");
             File layDir = new File(resDir, "layout");
-            return new File(layDir, entry.getName());
+            return resolveArchiveEntry(layDir, entry.getName());
         } else {
             return super.placeXMLFile(entry, xmlDir, resDir);
         }
@@ -5861,11 +5861,11 @@ public class AndroidGradleBuilder extends Executor {
 
                 if (entry.isDirectory()) {
                     if (!entryName.startsWith("raw")) {
-                        File dir = new File(classesDir, entryName);
+                        File dir = resolveArchiveEntry(classesDir, entryName);
                         dir.mkdirs();
-                        dir = new File(resDir, entryName);
+                        dir = resolveArchiveEntry(resDir, entryName);
                         dir.mkdirs();
-                        dir = new File(sourceDir, entryName);
+                        dir = resolveArchiveEntry(sourceDir, entryName);
                         dir.mkdirs();
                     }
                     continue;
@@ -5877,24 +5877,26 @@ public class AndroidGradleBuilder extends Executor {
                 // write the files to the disk
                 File destFile;
                 if (entryName.endsWith(".class")) {
-                    destFile = new File(classesDir, entryName);
+                    destFile = resolveArchiveEntry(classesDir, entryName);
                 } else {
                     if (entryName.endsWith(".java") || entryName.endsWith(".kt") || entryName.endsWith(".swift") || entryName.endsWith(".m") || entryName.endsWith(".h")) {
-                        destFile = new File(sourceDir, entryName);
+                        destFile = resolveArchiveEntry(sourceDir, entryName);
                     } else {
                         if (entryName.endsWith(".jar") || entryName.endsWith(".a") || entryName.endsWith(".dylib") || entryName.endsWith(".andlib") || entryName.endsWith(".aar")) {
-                            destFile = new File(libsDir, entryName);
+                            destFile = resolveArchiveEntry(libsDir, entryName);
                         } else {
                             if (useXMLDir() && entryName.endsWith(".xml")) {
                                 destFile = placeXMLFile(entry, xmlDir, resDir);
                             } else if (entryName.startsWith("raw")) {
-                                destFile = new File(xmlDir.getParentFile(), entryName.toLowerCase());
+                                destFile = resolveArchiveEntry(xmlDir.getParentFile(),
+                                        entryName.toLowerCase());
                             } else if (entryName.contains("notification_sound")) {
-                                destFile = new File(xmlDir.getParentFile(), "raw/" + entryName.toLowerCase());
+                                destFile = resolveArchiveEntry(xmlDir.getParentFile(),
+                                        "raw/" + entryName.toLowerCase());
                             } else if ("google-services.json".equals(entryName)) {
-                                destFile = new File(libsDir.getParentFile(), entryName);
+                                destFile = resolveArchiveEntry(libsDir.getParentFile(), entryName);
                             } else {
-                                destFile = new File(resDir, entryName);
+                                destFile = resolveArchiveEntry(resDir, entryName);
                             }
                         }
                     }

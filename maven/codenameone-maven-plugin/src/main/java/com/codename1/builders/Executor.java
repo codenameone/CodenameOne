@@ -1309,11 +1309,11 @@ public abstract class Executor {
                 }
 
                 if (entry.isDirectory()) {
-                    File dir = new File(classesDir, entryName);
+                    File dir = resolveArchiveEntry(classesDir, entryName);
                     dir.mkdirs();
-                    dir = new File(resDir, entryName);
+                    dir = resolveArchiveEntry(resDir, entryName);
                     dir.mkdirs();
-                    dir = new File(sourceDir, entryName);
+                    dir = resolveArchiveEntry(sourceDir, entryName);
                     dir.mkdirs();
                     continue;
                 }
@@ -1328,22 +1328,22 @@ public abstract class Executor {
                         log("!!!!Skipping "+entryName);
                         continue;
                     } else {
-                        destFile = new File(classesDir, entryName);
+                        destFile = resolveArchiveEntry(classesDir, entryName);
                     }
                 } else {
                     if (entryName.endsWith(".java") || entryName.endsWith(".kt") || entryName.endsWith(".swift") || entryName.endsWith(".m") || entryName.endsWith(".h") || entryName.endsWith(".cs")) {
-                        destFile = new File(sourceDir, entryName);
+                        destFile = resolveArchiveEntry(sourceDir, entryName);
                     } else {
                         if (entryName.endsWith(".jar") || entryName.endsWith(".a") || entryName.endsWith(".dylib") || entryName.endsWith(".andlib") || entryName.endsWith(".aar") || entryName.endsWith(dll)) {
-                            destFile = new File(libsDir, entryName);
+                            destFile = resolveArchiveEntry(libsDir, entryName);
                         } else {
                             if (useXMLDir() && entryName.endsWith(".xml")) {
                                 destFile = placeXMLFile(entry, xmlDir, resDir);
                             } else {
                                 if(entryName.equals("codenameone_settings.properties")) {
-                                    destFile = new File(sourceDir.getParentFile(), entryName);
+                                    destFile = resolveArchiveEntry(sourceDir.getParentFile(), entryName);
                                 } else {
-                                    destFile = new File(resDir, entryName);
+                                    destFile = resolveArchiveEntry(resDir, entryName);
                                 }
                             }
                         }
@@ -1390,7 +1390,7 @@ public abstract class Executor {
 
                 if (entry.isDirectory()) {
                     currentDir = entryName;
-                    File dir = new File(destDir, entryName);
+                    File dir = resolveArchiveEntry(destDir, entryName);
                     dir.mkdirs();
                     continue;
                 }
@@ -1400,6 +1400,7 @@ public abstract class Executor {
 
                 // write the files to the disk
                 File destFile = filter.destFile(currentDir, entryName);
+                destFile = requireArchiveDestination(destDir, destFile, entryName);
                 destFile.getParentFile().mkdirs();
                 FileOutputStream fos = new FileOutputStream(destFile);
                 dest = new BufferedOutputStream(fos, data.length);
@@ -1416,7 +1417,7 @@ public abstract class Executor {
         }
     }
 
-    protected File placeXMLFile(ZipEntry entry, File xmlDir, File resDir) {
+    protected File placeXMLFile(ZipEntry entry, File xmlDir, File resDir) throws IOException {
         boolean putInXMLDir = false;
         String name = entry.getName();
         if (name.contains("/")) {
@@ -1431,10 +1432,43 @@ public abstract class Executor {
             name = name.substring(name.lastIndexOf("/") + 1, name.length());
         }
         if (putInXMLDir) {
-            return new File(xmlDir, name);
+            return resolveArchiveEntry(xmlDir, name);
         } else {
-            return new File(resDir, entry.getName());
+            return resolveArchiveEntry(resDir, entry.getName());
         }
+    }
+
+    /**
+     * Resolves an archive entry beneath its intended extraction directory.
+     * Entries that are absolute or escape through {@code ..} components are
+     * rejected before any directory or file is created.
+     *
+     * @param destinationDirectory extraction root
+     * @param entryName untrusted name read from the archive
+     * @return canonical destination contained by {@code destinationDirectory}
+     * @throws IOException if the entry escapes the extraction root
+     */
+    protected static File resolveArchiveEntry(File destinationDirectory,
+            String entryName) throws IOException {
+        if (new File(entryName).isAbsolute()) {
+            throw new IOException("Archive entry is absolute: " + entryName);
+        }
+        return requireArchiveDestination(destinationDirectory,
+                new File(destinationDirectory, entryName), entryName);
+    }
+
+    private static File requireArchiveDestination(File destinationDirectory,
+            File destinationFile, String entryName) throws IOException {
+        File canonicalDirectory = destinationDirectory.getCanonicalFile();
+        File canonicalDestination = destinationFile.getCanonicalFile();
+        String directoryPath = canonicalDirectory.getPath();
+        String directoryPrefix = directoryPath.endsWith(File.separator)
+                ? directoryPath : directoryPath + File.separator;
+        if (!canonicalDestination.getPath().startsWith(directoryPrefix)) {
+            throw new IOException("Archive entry escapes destination directory: "
+                    + entryName);
+        }
+        return canonicalDestination;
     }
 
     public int executeProcess(ProcessBuilder pb) throws Exception {
