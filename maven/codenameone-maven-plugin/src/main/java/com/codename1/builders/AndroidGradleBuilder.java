@@ -2269,6 +2269,37 @@ public class AndroidGradleBuilder extends Executor {
                     + healthBackgroundListeners);
         }
 
+        // Health Connect bridge: Kotlin, because androidx.health.connect
+        // exposes only suspend functions and the Android port compiles
+        // against an old android.jar with no AndroidX or Kotlin. Same
+        // pattern as the Android Auto glue below -- a real source resource
+        // copied into the generated project, never reflection.
+        if (usesHealthStore) {
+            File healthDir = new File(srcDir, "com/codename1/health");
+            healthDir.mkdirs();
+            InputStream hin = getResourceAsStream(
+                    "/com/codename1/builders/health/CN1HealthConnectBridge.kt");
+            if (hin == null) {
+                throw new BuildException(
+                        "Missing Health Connect bridge resource");
+            }
+            try {
+                copy(hin, new FileOutputStream(new File(healthDir,
+                        "CN1HealthConnectBridge.kt")));
+            } catch (IOException ex) {
+                throw new BuildException(
+                        "Failed to write the Health Connect bridge", ex);
+            }
+            // connect-client needs Kotlin 1.9+; the builder's default of
+            // 1.7.22 will not compile it.
+            if (compareVersions(request.getArg("android.kotlinVersion",
+                    "1.7.22"), "1.9.22") < 0) {
+                request.putArgument("android.kotlinVersion", "1.9.22");
+                log("Health Connect requires Kotlin 1.9.22 or newer;"
+                        + " raising android.kotlinVersion");
+            }
+        }
+
         // Android Auto glue: when the app references com.codename1.car, copy the injected
         // CarAppService / Session / Screen + the CarBridge converter (typed against androidx.car.app)
         // into the generated project and add the car-app gradle dependency. These ship as real .java
@@ -5582,6 +5613,16 @@ public class AndroidGradleBuilder extends Executor {
                 healthBackgroundListeners);
         if (healthBindings != null) {
             retVal += healthBindings;
+        }
+        if (usesHealthStore) {
+            // Publish the Kotlin bridge so AndroidHealth can reach Health
+            // Connect. Without this the health API degrades to reporting
+            // itself unsupported, exactly as com.codename1.car does when
+            // Android Auto is not bundled.
+            retVal += "com.codename1.impl.android.AndroidHealthSupport"
+                    + ".setDelegate(new com.codename1.health"
+                    + ".CN1HealthConnectBridge(com.codename1.impl.android"
+                    + ".AndroidNativeUtil.getContext()));\n";
         }
 
         if (request.getArg("android.includeGPlayServices", "true").equals("true") || playServicesLocation) {

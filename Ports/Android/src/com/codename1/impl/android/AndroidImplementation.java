@@ -7749,6 +7749,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return bluetooth;
     }
 
+    private com.codename1.health.Health health;
+
+    /// Returns the Health Connect-backed health entry point. The store
+    /// degrades to reporting itself unsupported when no bridge has been
+    /// injected, which is the case for apps that never reference
+    /// com.codename1.health.
+    @Override
+    public com.codename1.health.Health getHealth() {
+        if (health == null) {
+            health = new AndroidHealth();
+        }
+        return health;
+    }
+
     /**
      * This method returns the platform Location Control
      *
