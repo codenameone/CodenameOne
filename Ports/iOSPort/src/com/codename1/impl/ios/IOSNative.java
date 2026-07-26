@@ -1316,6 +1316,24 @@ public final class IOSNative {
     native int btL2capRead(long channelHandle, byte[] buffer, int offset,
             int len);
 
+    // --- Health (HealthKit) ---
+    // Implemented in nativeSources/CN1Health.m, gated on CN1_INCLUDE_HEALTH.
+    // The #else branch there provides no-op trampolines so a health-free
+    // app -- and the tvOS / Mac Catalyst slices, where HealthKit does not
+    // exist -- still link.
+    native boolean hkIsAvailable();
+    native boolean hkIsWorkoutSessionSupported();
+    /// Meaningful for WRITE types only. HealthKit deliberately never
+    /// discloses read authorization, so there is no read equivalent --
+    /// adding one would require inventing an answer.
+    native int hkShareAuthorizationStatus(String typeIdentifier);
+    native void hkRequestAuthorization(int requestId, String[] readTypes,
+            String[] shareTypes);
+    native void hkQuerySamples(int requestId, String typeIdentifier,
+            double startEpochMs, double endEpochMs, int limit,
+            boolean ascending);
+    native void hkSaveSamples(int requestId, String samplesTsv);
+
     /** Blocking write to an open L2CAP channel. Returns the byte count
      * written (possibly short), or -2 on error. */
     native int btL2capWrite(long channelHandle, byte[] buffer, int offset,
@@ -1399,6 +1417,13 @@ public final class IOSNative {
     native boolean checkCameraUsage();
     native boolean checkFaceIDUsage();
     native boolean checkLocationUsage();
+    /// Whether ios.NSHealthShareUsageDescription was declared. Lives here
+    /// rather than in CN1Health.m because it must answer even when health
+    /// is compiled out, so IOSImplementation can throw a build-hint
+    /// diagnostic instead of failing later in App Review.
+    native boolean checkHealthShareUsage();
+    /// Whether ios.NSHealthUpdateUsageDescription was declared.
+    native boolean checkHealthUpdateUsage();
     native boolean checkMicrophoneUsage();
     native boolean checkMotionUsage();
     native boolean checkPhotoLibraryAddUsage();

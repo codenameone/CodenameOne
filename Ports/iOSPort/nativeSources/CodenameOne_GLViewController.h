@@ -86,6 +86,11 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 //#define INCLUDE_SIRI_USAGE
 //#define INCLUDE_SPEECHRECOGNITION_USAGE
 //#define INCLUDE_NFCREADER_USAGE
+// Flipped automatically by IPhoneBuilder from the matching
+// ios.NSHealth*UsageDescription build hints, via the generic
+// NS<Key>UsageDescription -> INCLUDE_<KEY>_USAGE rule.
+//#define INCLUDE_HEALTHSHARE_USAGE
+//#define INCLUDE_HEALTHUPDATE_USAGE
 
 // CN1_INCLUDE_NFC gates the com.codename1.nfc native bridge (CoreNFC.framework
 // import, NFCNDEFReaderSession / NFCTagReaderSession code). IPhoneBuilder
@@ -180,6 +185,29 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 // unavailable on tvOS / watchOS; CN1Bluetooth.m compiles that section out
 // per target slice and isBlePeripheralSupported reports false there.
 //#define CN1_INCLUDE_BLUETOOTH
+
+// CN1_INCLUDE_HEALTH gates the com.codename1.health native bridge
+// (CN1Health.{h,m}: HKHealthStore queries, HKObserverQuery background
+// delivery and, on the watch slice, HKWorkoutSession). IPhoneBuilder
+// uncomments this only when the classpath scanner saw health classes
+// OUTSIDE com.codename1.health.sensors -- the sensor layer is ordinary
+// CoreBluetooth and must not pull HealthKit in. Apps that never touch
+// health data therefore ship without HealthKit symbols, need no
+// com.apple.developer.healthkit entitlement, and are not subject to
+// Apple's health-data review.
+//#define CN1_INCLUDE_HEALTH
+// HealthKit does not exist on tvOS and is unavailable to Mac Catalyst
+// apps. Undoing the define here, in the header every health translation
+// unit includes first, compiles the whole path out on those slices.
+#if TARGET_OS_TV || TARGET_OS_MACCATALYST
+#undef CN1_INCLUDE_HEALTH
+#endif
+// HKWorkoutSession and HKLiveWorkoutBuilder are watchOS-only. The iOS
+// slice records workouts through the portable RecordedWorkoutSession
+// instead, and isLiveSessionSupported() reports false there.
+#if TARGET_OS_WATCH && defined(CN1_INCLUDE_HEALTH)
+#define CN1_HEALTH_WORKOUT_SESSION 1
+#endif
 
 //#define INCLUDE_CN1_BACKGROUND_FETCH
 //#define INCLUDE_FACEBOOK_CONNECT

@@ -4612,6 +4612,30 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    private static IOSHealth health;
+
+    /// Returns the HealthKit-backed health entry point.
+    ///
+    /// Throws before constructing anything when the app declares no
+    /// HealthKit privacy strings, following the precedent set by
+    /// getLocationManager(). A missing usage description is a developer
+    /// bug that gets the app rejected from the App Store, so it must be
+    /// impossible to swallow into an AsyncResource error nobody reads.
+    @Override
+    public com.codename1.health.Health getHealth() {
+        if (!nativeInstance.checkHealthShareUsage()
+                && !nativeInstance.checkHealthUpdateUsage()) {
+            throw new com.codename1.health.HealthConfigurationException(
+                    IOSHealth.MISSING_USAGE_MESSAGE);
+        }
+        synchronized (IOSImplementation.class) {
+            if (health == null) {
+                health = new IOSHealth(nativeInstance);
+            }
+            return health;
+        }
+    }
+
     public LocationManager getLocationManager() {
         if (!nativeInstance.checkLocationUsage()) {
             throw new RuntimeException("Please add the ios.NSLocationUsageDescription or ios.NSLocationAlwaysUsageDescription build hint");

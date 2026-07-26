@@ -419,6 +419,26 @@ class WatchNativeBuilder {
         if (!isStandalone()) {
             plistString(sb, "WKCompanionAppBundleIdentifier", request.getPackageName());
         }
+        // HealthKit privacy strings. The watch slice has its own Info.plist and
+        // previously emitted none, so a health-enabled watch app would fail at
+        // runtime on the richest HealthKit target of all -- the watch is where
+        // heart rate and workouts actually come from.
+        String healthShare = request.getArg("ios.NSHealthShareUsageDescription", null);
+        if (healthShare != null) {
+            plistString(sb, "NSHealthShareUsageDescription", healthShare);
+        }
+        String healthUpdate = request.getArg("ios.NSHealthUpdateUsageDescription", null);
+        if (healthUpdate != null) {
+            plistString(sb, "NSHealthUpdateUsageDescription", healthUpdate);
+        }
+        // HKWorkoutSession keeps the app running while a workout records;
+        // without this background mode watchOS suspends it mid-run.
+        if ("true".equalsIgnoreCase(request.getArg(
+                "watchNative.health.workoutProcessing", "false"))) {
+            sb.append("    <key>WKBackgroundModes</key>\n    <array>\n")
+              .append("        <string>workout-processing</string>\n")
+              .append("    </array>\n");
+        }
         sb.append("</dict>\n</plist>\n");
         File plist = new File(appSrcDir, request.getMainClass() + "-Watch-Info.plist");
         owner.createFile(plist, sb.toString().getBytes(StandardCharsets.UTF_8));
