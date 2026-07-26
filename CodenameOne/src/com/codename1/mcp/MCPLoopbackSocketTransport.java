@@ -157,7 +157,8 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         }
     }
 
-    /// Reads one newline-delimited UTF-8 message. Returns null at end of stream.
+    /// Reads one newline-delimited UTF-8 message. Returns null at end of stream, which
+    /// includes a frame cut short by the client going away.
     ///
     /// Read byte at a time rather than through a buffered reader: a buffer would swallow
     /// bytes belonging to the next message, and this transport hands the same stream back
@@ -172,7 +173,12 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
                 return null;   // a read error on the client is a disconnect
             }
             if (b < 0) {
-                return buffer.size() == 0 ? null : toUtf8(buffer);
+                // End of stream with no delimiter: the frame is truncated, so this is a
+                // disconnect and not a message, however many bytes arrived first. Handing
+                // the partial frame up would have the server fail to parse it, then fail
+                // to answer it (the peer is already gone), and end the loop - when the
+                // whole point of this transport is to stay bound and await a reconnect.
+                return null;
             }
             if (b == '\n') {
                 return toUtf8(buffer);

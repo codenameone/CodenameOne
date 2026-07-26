@@ -133,6 +133,38 @@ class MCPLoopbackSocketTransportTest {
     }
 
     @Test
+    void aFrameCutShortByADisconnectIsNotDeliveredAsAMessage() throws Exception {
+        // A client that dies mid-frame leaves bytes with no delimiter. Delivering those
+        // would have the server parse a truncated request, fail to answer it (the peer is
+        // gone) and end the loop; the transport must read it as a plain disconnect and
+        // stay available, exactly as it does for a clean end of stream.
+        final MCPLoopbackSocketTransport t = new MCPLoopbackSocketTransport(47811);
+        transport = t;
+        t.attach(new ByteArrayInputStream("{\"id\":1,\"method\":\"init".getBytes("UTF-8")),
+                new ByteArrayOutputStream());
+
+        final String[] out = new String[1];
+        Thread reader = new Thread(() -> {
+            try {
+                out[0] = t.readMessage();
+            } catch (IOException ignored) {
+                // surfaces as a null message below
+            }
+        });
+        reader.start();
+        Thread.sleep(150);
+        assertTrue(reader.isAlive(),
+                "a truncated frame must leave the reader waiting for the next client, "
+                        + "not hand up a partial message");
+
+        t.attach(new ByteArrayInputStream("{\"id\":9}\n".getBytes("UTF-8")),
+                new ByteArrayOutputStream());
+        reader.join(3000);
+        assertEquals("{\"id\":9}", out[0],
+                "the next agent's whole message should be what finally arrives");
+    }
+
+    @Test
     void closeUnblocksAPendingRead() throws Exception {
         final MCPLoopbackSocketTransport t = new MCPLoopbackSocketTransport(47811);
         transport = t;
