@@ -210,8 +210,8 @@ static NSString *cn1hkUnitSymbol(NSString *portableId) {
 
 static void cn1hkReportError(JAVA_INT requestId, int code, NSString *msg) {
     com_codename1_impl_ios_IOSHealth_nativeHkRequestError___int_int_java_lang_String(
-        CN1_THREAD_GET_STATE_PASS_ARG requestId, code,
-        fromNSString(CN1_THREAD_GET_STATE_PASS_ARG msg));
+        getThreadLocalData(), requestId, code,
+        fromNSString(getThreadLocalData(), msg));
 }
 
 // ---------------------------------------------------------------------
@@ -219,13 +219,13 @@ static void cn1hkReportError(JAVA_INT requestId, int code, NSString *msg) {
 // ---------------------------------------------------------------------
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hkIsAvailable___R_boolean(
-        CODENAME_ONE_THREAD_STATE) {
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return [HKHealthStore isHealthDataAvailable] ? JAVA_TRUE : JAVA_FALSE;
 }
 
 JAVA_BOOLEAN
 com_codename1_impl_ios_IOSNative_hkIsWorkoutSessionSupported___R_boolean(
-        CODENAME_ONE_THREAD_STATE) {
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 #ifdef CN1_HEALTH_WORKOUT_SESSION
     return JAVA_TRUE;
 #else
@@ -237,9 +237,9 @@ com_codename1_impl_ios_IOSNative_hkIsWorkoutSessionSupported___R_boolean(
 
 JAVA_INT
 com_codename1_impl_ios_IOSNative_hkShareAuthorizationStatus___java_lang_String_R_int(
-        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT typeId) {
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT typeId) {
     cn1hkInit();
-    NSString *portableId = toNSString(CN1_THREAD_GET_STATE_PASS_ARG typeId);
+    NSString *portableId = toNSString(threadStateData, typeId);
     HKQuantityType *type = cn1hkQuantityType(portableId);
     if (type == nil) {
         return 0;
@@ -252,8 +252,8 @@ com_codename1_impl_ios_IOSNative_hkShareAuthorizationStatus___java_lang_String_R
 
 void
 com_codename1_impl_ios_IOSNative_hkRequestAuthorization___int_java_lang_String_1ARRAY_java_lang_String_1ARRAY(
-        CODENAME_ONE_THREAD_STATE, JAVA_INT requestId, JAVA_OBJECT readTypes,
-        JAVA_OBJECT shareTypes) {
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId,
+        JAVA_OBJECT readTypes, JAVA_OBJECT shareTypes) {
     cn1hkInit();
     // Convert while the Java frame is still live: once it returns, the
     // JAVA_OBJECTs are no longer rooted and must not be touched from the
@@ -261,24 +261,22 @@ com_codename1_impl_ios_IOSNative_hkRequestAuthorization___int_java_lang_String_1
     NSMutableSet *readSet = [NSMutableSet set];
     NSMutableSet *shareSet = [NSMutableSet set];
     if (readTypes != JAVA_NULL) {
-        org_xmlvm_runtime_XMLVMArray *arr =
-            (org_xmlvm_runtime_XMLVMArray *)readTypes;
+        JAVA_ARRAY arr = (JAVA_ARRAY)readTypes;
         JAVA_ARRAY_OBJECT *data = (JAVA_ARRAY_OBJECT *)arr->data;
         for (int i = 0; i < arr->length; i++) {
             HKQuantityType *t = cn1hkQuantityType(
-                toNSString(CN1_THREAD_GET_STATE_PASS_ARG data[i]));
+                toNSString(threadStateData, (JAVA_OBJECT)data[i]));
             if (t != nil) {
                 [readSet addObject:t];
             }
         }
     }
     if (shareTypes != JAVA_NULL) {
-        org_xmlvm_runtime_XMLVMArray *arr =
-            (org_xmlvm_runtime_XMLVMArray *)shareTypes;
+        JAVA_ARRAY arr = (JAVA_ARRAY)shareTypes;
         JAVA_ARRAY_OBJECT *data = (JAVA_ARRAY_OBJECT *)arr->data;
         for (int i = 0; i < arr->length; i++) {
             HKQuantityType *t = cn1hkQuantityType(
-                toNSString(CN1_THREAD_GET_STATE_PASS_ARG data[i]));
+                toNSString(threadStateData, (JAVA_OBJECT)data[i]));
             if (t != nil) {
                 [shareSet addObject:t];
             }
@@ -289,15 +287,14 @@ com_codename1_impl_ios_IOSNative_hkRequestAuthorization___int_java_lang_String_1
         [cn1hkStore requestAuthorizationToShareTypes:shareSet
                                            readTypes:readSet
             completion:^(BOOL success, NSError *error) {
-                CN1_THREAD_STATE_MULTI_THREADED;
-                // success means the sheet completed, NOT that anything was
+                    // success means the sheet completed, NOT that anything was
                 // granted -- the portable contract says the same.
                 com_codename1_impl_ios_IOSHealth_nativeHkAuthorizationResult___int_boolean_int_java_lang_String(
-                    CN1_THREAD_GET_STATE_PASS_ARG rid,
+                    getThreadLocalData(), rid,
                     success ? JAVA_TRUE : JAVA_FALSE,
                     error == nil ? -1 : CN1_HK_ERR_AUTH_DENIED,
                     error == nil ? JAVA_NULL
-                        : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
+                        : fromNSString(getThreadLocalData(),
                                        [error localizedDescription]));
             }];
     });
@@ -305,11 +302,11 @@ com_codename1_impl_ios_IOSNative_hkRequestAuthorization___int_java_lang_String_1
 
 void
 com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_double_int_boolean(
-        CODENAME_ONE_THREAD_STATE, JAVA_INT requestId, JAVA_OBJECT typeId,
-        JAVA_DOUBLE startMs, JAVA_DOUBLE endMs, JAVA_INT limit,
-        JAVA_BOOLEAN ascending) {
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId,
+        JAVA_OBJECT typeId, JAVA_DOUBLE startMs, JAVA_DOUBLE endMs,
+        JAVA_INT limit, JAVA_BOOLEAN ascending) {
     cn1hkInit();
-    NSString *portableId = [toNSString(CN1_THREAD_GET_STATE_PASS_ARG typeId) retain];
+    NSString *portableId = [toNSString(threadStateData, typeId) retain];
     JAVA_INT rid = requestId;
     double s = startMs, e = endMs;
     int lim = limit;
@@ -318,7 +315,6 @@ com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_do
     cn1hkAsync(^{
         HKQuantityType *type = cn1hkQuantityType(portableId);
         if (type == nil) {
-            CN1_THREAD_STATE_MULTI_THREADED;
             cn1hkReportError(rid, CN1_HK_ERR_NOT_SUPPORTED,
                              @"type unavailable on this iOS version");
             [portableId release];
@@ -338,7 +334,6 @@ com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_do
                sortDescriptors:@[sort]
                 resultsHandler:^(HKSampleQuery *query, NSArray *results,
                                  NSError *error) {
-            CN1_THREAD_STATE_MULTI_THREADED;
             if (error != nil) {
                 // A locked device makes the store unreadable, which is
                 // exactly when a background observer fires. It must stay
@@ -371,8 +366,8 @@ com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_do
                         : @""];
             }
             com_codename1_impl_ios_IOSHealth_nativeHkSamples___int_java_lang_String(
-                CN1_THREAD_GET_STATE_PASS_ARG rid,
-                fromNSString(CN1_THREAD_GET_STATE_PASS_ARG tsv));
+                getThreadLocalData(), rid,
+                fromNSString(getThreadLocalData(), tsv));
             [portableId release];
         }];
         [cn1hkStore executeQuery:q];
@@ -381,9 +376,10 @@ com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_do
 }
 
 void com_codename1_impl_ios_IOSNative_hkSaveSamples___int_java_lang_String(
-        CODENAME_ONE_THREAD_STATE, JAVA_INT requestId, JAVA_OBJECT tsv) {
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId,
+        JAVA_OBJECT tsv) {
     cn1hkInit();
-    NSString *payload = [toNSString(CN1_THREAD_GET_STATE_PASS_ARG tsv) retain];
+    NSString *payload = [toNSString(threadStateData, tsv) retain];
     JAVA_INT rid = requestId;
     cn1hkAsync(^{
         NSMutableArray *samples = [NSMutableArray array];
@@ -419,14 +415,13 @@ void com_codename1_impl_ios_IOSNative_hkSaveSamples___int_java_lang_String(
         }
         [cn1hkStore saveObjects:samples withCompletion:
             ^(BOOL success, NSError *error) {
-            CN1_THREAD_STATE_MULTI_THREADED;
             if (!success) {
                 cn1hkReportError(rid, CN1_HK_ERR_AUTH_DENIED,
                     error ? [error localizedDescription] : @"save failed");
             } else {
                 com_codename1_impl_ios_IOSHealth_nativeHkSaveResult___int_java_lang_String(
-                    CN1_THREAD_GET_STATE_PASS_ARG rid,
-                    fromNSString(CN1_THREAD_GET_STATE_PASS_ARG ids));
+                    getThreadLocalData(), rid,
+                    fromNSString(getThreadLocalData(), ids));
             }
             [payload release];
         }];
@@ -446,37 +441,38 @@ void com_codename1_impl_ios_IOSNative_hkSaveSamples___int_java_lang_String(
 // ---------------------------------------------------------------------
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hkIsAvailable___R_boolean(
-        CODENAME_ONE_THREAD_STATE) {
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return JAVA_FALSE;
 }
 
 JAVA_BOOLEAN
 com_codename1_impl_ios_IOSNative_hkIsWorkoutSessionSupported___R_boolean(
-        CODENAME_ONE_THREAD_STATE) {
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return JAVA_FALSE;
 }
 
 JAVA_INT
 com_codename1_impl_ios_IOSNative_hkShareAuthorizationStatus___java_lang_String_R_int(
-        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT typeId) {
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT typeId) {
     return 0;
 }
 
 void
 com_codename1_impl_ios_IOSNative_hkRequestAuthorization___int_java_lang_String_1ARRAY_java_lang_String_1ARRAY(
-        CODENAME_ONE_THREAD_STATE, JAVA_INT requestId, JAVA_OBJECT readTypes,
-        JAVA_OBJECT shareTypes) {
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId,
+        JAVA_OBJECT readTypes, JAVA_OBJECT shareTypes) {
 }
 
 void
 com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_double_int_boolean(
-        CODENAME_ONE_THREAD_STATE, JAVA_INT requestId, JAVA_OBJECT typeId,
-        JAVA_DOUBLE startMs, JAVA_DOUBLE endMs, JAVA_INT limit,
-        JAVA_BOOLEAN ascending) {
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId,
+        JAVA_OBJECT typeId, JAVA_DOUBLE startMs, JAVA_DOUBLE endMs,
+        JAVA_INT limit, JAVA_BOOLEAN ascending) {
 }
 
 void com_codename1_impl_ios_IOSNative_hkSaveSamples___int_java_lang_String(
-        CODENAME_ONE_THREAD_STATE, JAVA_INT requestId, JAVA_OBJECT tsv) {
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId,
+        JAVA_OBJECT tsv) {
 }
 
 #endif
