@@ -29,6 +29,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /// Class implementing the socket API
 ///
@@ -222,16 +223,21 @@ public final class Socket {
 
     private static StopListening listenImpl(final int port, final Class scClass, final boolean loopbackOnly) {
         class Listener implements StopListening, Runnable {
-            private boolean stopped;
+            /// Written by stop() on the caller's thread and read by the accept loop on
+            /// another, so it needs a memory barrier rather than a plain field. Without
+            /// one the loop can miss the write, and since closing the listening socket
+            /// makes the port's cache hand out a FRESH socket on the next call, the
+            /// listener would quietly resurrect itself instead of stopping.
+            private final AtomicBoolean stopped = new AtomicBoolean();
 
             @Override
             public void run() {
                 try {
-                    while (!stopped) {
+                    while (!stopped.get()) {
                         final Object connection = loopbackOnly
                                 ? Util.getImplementation().listenSocketLoopback(port)
                                 : Util.getImplementation().listenSocket(port);
-                        if (stopped) {
+                        if (stopped.get()) {
                             // stop() was called while this thread sat inside accept. The
                             // connection that unblocked it belongs to a listener the caller
                             // has already abandoned, so hand it back rather than serving it.
@@ -270,7 +276,7 @@ public final class Socket {
 
             @Override
             public void stop() {
-                stopped = true;
+                stopped.set(true);
                 // Closing the listening socket is what brings the thread back out of
                 // accept. Without it the flag is only noticed the next time a client
                 // connects, so the thread lingers, and a listener restarted on the same
