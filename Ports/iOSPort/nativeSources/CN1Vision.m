@@ -87,6 +87,68 @@ static NSDictionary *cn1MLKitRect(CGRect rect, CGSize size) {
     };
 }
 
+#if defined(CN1_HAS_MLKIT_FACE)
+static void cn1MLKitAddFaceLandmark(NSMutableDictionary *landmarks,
+        NSString *name, MLKFace *face, MLKFaceLandmarkType type,
+        CGSize imageSize) {
+    MLKFaceLandmark *landmark = [face landmarkOfType:type];
+    if (landmark != nil && imageSize.width > 0 && imageSize.height > 0) {
+        landmarks[name] = @{
+            @"x": @(landmark.position.x / imageSize.width),
+            @"y": @(landmark.position.y / imageSize.height)
+        };
+    }
+}
+#endif
+
+static NSDictionary *cn1VisionFaceLandmark(
+        VNFaceLandmarkRegion2D *region, CGRect faceBounds) {
+    if (region == nil || region.pointCount == 0
+            || region.normalizedPoints == NULL) {
+        return nil;
+    }
+    double x = 0;
+    double y = 0;
+    for (NSUInteger i = 0; i < region.pointCount; i++) {
+        x += region.normalizedPoints[i].x;
+        y += region.normalizedPoints[i].y;
+    }
+    x = faceBounds.origin.x
+            + faceBounds.size.width * x / region.pointCount;
+    y = faceBounds.origin.y
+            + faceBounds.size.height * y / region.pointCount;
+    return @{@"x": @(x), @"y": @(1.0 - y)};
+}
+
+static NSDictionary *cn1VisionFaceLandmarkEdge(
+        VNFaceLandmarkRegion2D *region, CGRect faceBounds, BOOL left) {
+    if (region == nil || region.pointCount == 0
+            || region.normalizedPoints == NULL) {
+        return nil;
+    }
+    CGPoint selected = region.normalizedPoints[0];
+    for (NSUInteger i = 1; i < region.pointCount; i++) {
+        CGPoint candidate = region.normalizedPoints[i];
+        if ((left && candidate.x < selected.x)
+                || (!left && candidate.x > selected.x)) {
+            selected = candidate;
+        }
+    }
+    double x = faceBounds.origin.x
+            + faceBounds.size.width * selected.x;
+    double y = faceBounds.origin.y
+            + faceBounds.size.height * selected.y;
+    return @{@"x": @(x), @"y": @(1.0 - y)};
+}
+
+static void cn1VisionAddFaceLandmark(NSMutableDictionary *landmarks,
+        NSString *name, VNFaceLandmarkRegion2D *region, CGRect faceBounds) {
+    NSDictionary *point = cn1VisionFaceLandmark(region, faceBounds);
+    if (point != nil) {
+        landmarks[name] = point;
+    }
+}
+
 static NSString *cn1VisionJSON(NSDictionary *value) {
     NSError *error = nil;
     NSData *data = [NSJSONSerialization dataWithJSONObject:value options:0 error:&error];
@@ -231,9 +293,25 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
         for (MLKFace *face in result ?: @[]) {
             NSMutableDictionary *item = [NSMutableDictionary
                     dictionaryWithDictionary:cn1MLKitRect(face.frame, image.size)];
+            NSMutableDictionary *landmarks = [NSMutableDictionary dictionary];
+            cn1MLKitAddFaceLandmark(landmarks, @"leftEye", face,
+                    MLKFaceLandmarkTypeLeftEye, image.size);
+            cn1MLKitAddFaceLandmark(landmarks, @"rightEye", face,
+                    MLKFaceLandmarkTypeRightEye, image.size);
+            cn1MLKitAddFaceLandmark(landmarks, @"noseBase", face,
+                    MLKFaceLandmarkTypeNoseBase, image.size);
+            cn1MLKitAddFaceLandmark(landmarks, @"mouthLeft", face,
+                    MLKFaceLandmarkTypeMouthLeft, image.size);
+            cn1MLKitAddFaceLandmark(landmarks, @"mouthRight", face,
+                    MLKFaceLandmarkTypeMouthRight, image.size);
+            item[@"landmarks"] = landmarks;
             item[@"yaw"] = @(face.headEulerAngleY);
             item[@"pitch"] = @(face.headEulerAngleX);
             item[@"roll"] = @(face.headEulerAngleZ);
+            item[@"smilingProbability"] = face.hasSmilingProbability
+                    ? @(face.smilingProbability) : @(-1);
+            item[@"trackingId"] = face.hasTrackingID
+                    ? @(face.trackingID) : @(-1);
             [items addObject:item];
         }
         return cn1VisionJSON(@{@"items": items});
@@ -430,11 +508,28 @@ static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
             NSMutableDictionary *item =
                     [NSMutableDictionary dictionaryWithDictionary:
                             cn1VisionRect(observation.boundingBox)];
+            NSMutableDictionary *landmarks = [NSMutableDictionary dictionary];
+            VNFaceLandmarks2D *faceLandmarks = observation.landmarks;
+            cn1VisionAddFaceLandmark(landmarks, @"leftEye",
+                    faceLandmarks.leftEye, observation.boundingBox);
+            cn1VisionAddFaceLandmark(landmarks, @"rightEye",
+                    faceLandmarks.rightEye, observation.boundingBox);
+            cn1VisionAddFaceLandmark(landmarks, @"noseBase",
+                    faceLandmarks.nose, observation.boundingBox);
+            NSDictionary *mouthLeft = cn1VisionFaceLandmarkEdge(
+                    faceLandmarks.outerLips, observation.boundingBox, YES);
+            NSDictionary *mouthRight = cn1VisionFaceLandmarkEdge(
+                    faceLandmarks.outerLips, observation.boundingBox, NO);
+            if (mouthLeft != nil) landmarks[@"mouthLeft"] = mouthLeft;
+            if (mouthRight != nil) landmarks[@"mouthRight"] = mouthRight;
+            item[@"landmarks"] = landmarks;
             item[@"yaw"] = @((observation.yaw ?: @0).doubleValue
                     * 180.0 / M_PI);
             item[@"pitch"] = @0;
             item[@"roll"] = @((observation.roll ?: @0).doubleValue
                     * 180.0 / M_PI);
+            item[@"smilingProbability"] = @(-1);
+            item[@"trackingId"] = @(-1);
             [items addObject:item];
         }
         return cn1VisionJSON(@{@"items": items});

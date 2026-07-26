@@ -123,13 +123,26 @@ static NSString *cn1InferenceOpenPath(NSString *path, BOOL deleteModelOnClose,
     NSError *error = nil;
     TFLInterpreter *interpreter = [[TFLInterpreter alloc]
             initWithModelPath:path options:options delegates:delegates error:&error];
-    if (interpreter == nil || error != nil) {
+    BOOL interpreterCreated = interpreter != nil && error == nil;
+    BOOL tensorsAllocated = interpreterCreated
+            && [interpreter allocateTensorsWithError:&error];
+    if ((!interpreterCreated || !tensorsAllocated)
+            && delegate != nil && allowFallback) {
+        delegate = nil;
+        error = nil;
+        interpreter = [[TFLInterpreter alloc]
+                initWithModelPath:path options:options delegates:@[] error:&error];
+        interpreterCreated = interpreter != nil && error == nil;
+        tensorsAllocated = interpreterCreated
+                && [interpreter allocateTensorsWithError:&error];
+    }
+    if (!interpreterCreated) {
         if (deleteModelOnClose) {
             [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
         }
         return cn1InferenceError(error, @"Could not create LiteRT interpreter");
     }
-    if (![interpreter allocateTensorsWithError:&error]) {
+    if (!tensorsAllocated) {
         if (deleteModelOnClose) {
             [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
         }

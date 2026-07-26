@@ -185,10 +185,14 @@ public final class IOSVisionImpl extends VisionImpl {
                 Face[] values = new Face[items.size()];
                 for (int i = 0; i < values.length; i++) {
                     Map value = (Map) items.get(i);
+                    Map<String, VisionPoint> landmarks =
+                            parseLandmarks(value.get("landmarks"));
                     values[i] = new Face(rect(value),
-                            new HashMap<String, VisionPoint>(),
+                            landmarks,
                             number(value, "yaw"), number(value, "pitch"),
-                            number(value, "roll"), -1, -1, metadata);
+                            number(value, "roll"),
+                            number(value, "smilingProbability", -1),
+                            integer(value, "trackingId", -1), metadata);
                 }
                 return (T) values;
             }
@@ -262,14 +266,40 @@ public final class IOSVisionImpl extends VisionImpl {
                 number(value, "width"), number(value, "height"));
     }
 
+    @SuppressWarnings("rawtypes")
+    private static Map<String, VisionPoint> parseLandmarks(Object value) {
+        Map<String, VisionPoint> out = new HashMap<String, VisionPoint>();
+        if (!(value instanceof Map)) {
+            return out;
+        }
+        Map source = (Map) value;
+        for (Object key : source.keySet()) {
+            Object point = source.get(key);
+            if (point instanceof Map) {
+                out.put(String.valueOf(key), new VisionPoint(
+                        number((Map) point, "x"),
+                        number((Map) point, "y")));
+            }
+        }
+        return out;
+    }
+
     private static float number(Map value, String key) {
+        return number(value, key, 0);
+    }
+
+    private static float number(Map value, String key, float fallback) {
         Object out = value.get(key);
-        return out instanceof Number ? ((Number) out).floatValue() : 0;
+        return out instanceof Number ? ((Number) out).floatValue() : fallback;
     }
 
     private static int integer(Map value, String key) {
+        return integer(value, key, 0);
+    }
+
+    private static int integer(Map value, String key, int fallback) {
         Object out = value.get(key);
-        return out instanceof Number ? ((Number) out).intValue() : 0;
+        return out instanceof Number ? ((Number) out).intValue() : fallback;
     }
 
     private static String string(Map value, String key) {
