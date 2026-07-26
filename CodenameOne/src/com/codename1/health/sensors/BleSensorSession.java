@@ -84,36 +84,38 @@ final class BleSensorSession extends SensorSession {
     private void discover(final AsyncResource<SensorSession> out) {
         peripheral.discoverServices().onResult(
                 new AsyncResult<List<GattService>>() {
-            @Override
-            public void onReady(List<GattService> value, Throwable err) {
-                if (err != null) {
-                    failStart(out, err);
-                    return;
-                }
-                GattService service =
-                        peripheral.getService(getProfile().getServiceUuid());
-                if (service == null) {
-                    failStart(out, new HealthException(
-                            HealthError.TYPE_NOT_SUPPORTED,
-                            "this device does not expose the "
-                                    + getProfile().getName() + " service"));
-                    return;
-                }
-                measurement = service.getCharacteristic(
-                        getProfile().getMeasurementUuid());
-                if (measurement == null) {
-                    failStart(out, new HealthException(
-                            HealthError.TYPE_NOT_SUPPORTED,
-                            "this device exposes the "
-                                    + getProfile().getName()
-                                    + " service but not its measurement"
-                                    + " characteristic"));
-                    return;
-                }
-                readOptionalMetadata(service);
-                subscribe(out);
-            }
-        });
+                    @Override
+                    public void onReady(List<GattService> value,
+                            Throwable err) {
+                        if (err != null) {
+                            failStart(out, err);
+                            return;
+                        }
+                        GattService service = peripheral.getService(
+                                getProfile().getServiceUuid());
+                        if (service == null) {
+                            failStart(out, new HealthException(
+                                    HealthError.TYPE_NOT_SUPPORTED,
+                                    "this device does not expose the "
+                                            + getProfile().getName()
+                                            + " service"));
+                            return;
+                        }
+                        measurement = service.getCharacteristic(
+                                getProfile().getMeasurementUuid());
+                        if (measurement == null) {
+                            failStart(out, new HealthException(
+                                    HealthError.TYPE_NOT_SUPPORTED,
+                                    "this device exposes the "
+                                            + getProfile().getName()
+                                            + " service but not its measurement"
+                                            + " characteristic"));
+                            return;
+                        }
+                        readOptionalMetadata(service);
+                        subscribe(out);
+                    }
+                });
     }
 
     /// Reads the extras a device may or may not expose. Failures here are
@@ -130,15 +132,15 @@ final class BleSensorSession extends SensorSession {
             if (level != null) {
                 peripheral.readCharacteristic(level).onResult(
                         new AsyncResult<byte[]>() {
-                    @Override
-                    public void onReady(byte[] value, Throwable err) {
-                        if (err == null && value != null
-                                && value.length > 0) {
-                            setBatteryPercent(
-                                    Integer.valueOf(value[0] & 0xFF));
-                        }
-                    }
-                });
+                            @Override
+                            public void onReady(byte[] value, Throwable err) {
+                                if (err == null && value != null
+                                        && value.length > 0) {
+                                    setBatteryPercent(
+                                            Integer.valueOf(value[0] & 0xFF));
+                                }
+                            }
+                        });
             }
         }
         if (getProfile() == HealthSensorProfile.HEART_RATE) {
@@ -147,14 +149,14 @@ final class BleSensorSession extends SensorSession {
             if (loc != null) {
                 peripheral.readCharacteristic(loc).onResult(
                         new AsyncResult<byte[]>() {
-                    @Override
-                    public void onReady(byte[] value, Throwable err) {
-                        if (err == null && value != null
-                                && value.length > 0) {
-                            setBodySensorLocation(value[0] & 0xFF);
-                        }
-                    }
-                });
+                            @Override
+                            public void onReady(byte[] value, Throwable err) {
+                                if (err == null && value != null
+                                        && value.length > 0) {
+                                    setBodySensorLocation(value[0] & 0xFF);
+                                }
+                            }
+                        });
             }
         }
     }

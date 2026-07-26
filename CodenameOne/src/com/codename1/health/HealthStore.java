@@ -349,30 +349,31 @@ public class HealthStore {
         query.setPageToken(pageToken);
         readSamplePage(query).onResult(
                 new AsyncResult<SamplePage>() {
-            @Override
-            public void onReady(SamplePage page, Throwable err) {
-                if (err != null) {
-                    out.error(err);
-                    return;
-                }
-                collected.addAll(page.getSamples());
-                String next = page.getNextPageToken();
-                int limit = query.getLimit();
-                if (next == null || collected.size() >= limit) {
-                    // Trim rather than hand back more than was asked for:
-                    // a caller that sized a buffer from the limit would
-                    // otherwise overflow it. Flattening a series can push
-                    // the count past the limit even when the platform
-                    // honoured it.
-                    while (collected.size() > limit) {
-                        collected.remove(collected.size() - 1);
+                    @Override
+                    public void onReady(SamplePage page, Throwable err) {
+                        if (err != null) {
+                            out.error(err);
+                            return;
+                        }
+                        collected.addAll(page.getSamples());
+                        String next = page.getNextPageToken();
+                        int limit = query.getLimit();
+                        if (next == null || collected.size() >= limit) {
+                            // Trim rather than hand back more than
+                            // was asked for: a caller that sized a
+                            // buffer from the limit would otherwise
+                            // overflow it. Flattening a series can push
+                            // the count past the limit even when the
+                            // platform honoured it.
+                            while (collected.size() > limit) {
+                                collected.remove(collected.size() - 1);
+                            }
+                            out.complete(collected);
+                            return;
+                        }
+                        readPageInto(query, collected, out, next);
                     }
-                    out.complete(collected);
-                    return;
-                }
-                readPageInto(query, collected, out, next);
-            }
-        });
+                });
     }
 
     /// Reads a single page of samples. Prefer this over
@@ -729,23 +730,24 @@ public class HealthStore {
                 new AsyncResource<HealthWriteResult>();
         chunkResult.onResult(
                 new AsyncResult<HealthWriteResult>() {
-            @Override
-            public void onReady(HealthWriteResult value, Throwable err) {
-                if (err != null) {
-                    out.error(err);
-                    return;
-                }
-                List<String> ids = value.getSampleIds();
-                for (String id : ids) {
-                    accumulated.addSampleId(id);
-                }
-                List<String> rejects = value.getRejections();
-                for (String reject : rejects) {
-                    accumulated.addRejection(reject);
-                }
-                writeChunk(all, nextFrom, accumulated, out);
-            }
-        });
+                    @Override
+                    public void onReady(HealthWriteResult value,
+                            Throwable err) {
+                        if (err != null) {
+                            out.error(err);
+                            return;
+                        }
+                        List<String> ids = value.getSampleIds();
+                        for (String id : ids) {
+                            accumulated.addSampleId(id);
+                        }
+                        List<String> rejects = value.getRejections();
+                        for (String reject : rejects) {
+                            accumulated.addRejection(reject);
+                        }
+                        writeChunk(all, nextFrom, accumulated, out);
+                    }
+                });
         doWrite(chunk, chunkResult);
     }
 
