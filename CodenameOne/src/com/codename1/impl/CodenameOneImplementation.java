@@ -9917,6 +9917,35 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Not supported");
     }
 
+    /// Whether this port can bind a server socket to the LOOPBACK interface only.
+    ///
+    /// Deliberately separate from [#isServerSocketAvailable()] and defaulting to false:
+    /// a port must implement loopback binding explicitly. Answering this with the
+    /// wildcard-binding implementation would publish on every network interface a
+    /// channel the caller asked to keep local.
+    ///
+    /// #### Returns
+    ///
+    /// true if [#listenSocketLoopback(int)] is implemented here
+    public boolean isLoopbackServerSocketAvailable() {
+        return false;
+    }
+
+    /// Listens on the given port, bound to the loopback interface only, and blocks until
+    /// a connection arrives — the accept semantics of [#listenSocket(int)], with a
+    /// narrower bind.
+    ///
+    /// #### Parameters
+    ///
+    /// - `port`: the port to listen on
+    ///
+    /// #### Returns
+    ///
+    /// connected socket instance, or null when the accept failed
+    public Object listenSocketLoopback(int port) {
+        throw new RuntimeException("Loopback server sockets are not supported on this platform");
+    }
+
     /// Returns the device host or ip address if available
     ///
     /// #### Returns

@@ -17,6 +17,7 @@
 -(void)writeToStream:(NSData*)param;
 -(void)disconnect;
 -(BOOL)listen:(int)param;
+-(BOOL)listenLoopback:(int)param;
 -(BOOL)isConnected;
 -(int)getErrorCode;
 -(BOOL)isSupported;

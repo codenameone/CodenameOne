@@ -2789,6 +2789,20 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isLoopbackServerSocketAvailable() {
+        return serverSocketAvailable;
+    }
+
+    /// There is no real network in these tests, so a loopback accept is the same
+    /// simulated queue as a wildcard one. The distinction under test is the API contract
+    /// (callers asking for loopback get a socket, and a port that cannot bind loopback
+    /// refuses), not the kernel-level bind.
+    @Override
+    public Object listenSocketLoopback(int port) {
+        return listenSocket(port);
+    }
+
+    @Override
     public void disconnectSocket(Object socket) {
         if (socket instanceof TestSocket) {
             ((TestSocket) socket).disconnect();

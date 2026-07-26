@@ -61,6 +61,22 @@ public final class Socket {
         return Util.getImplementation().isServerSocketAvailable();
     }
 
+    /// Returns true if this port can listen on the LOOPBACK interface only, so the
+    /// channel is reachable from the device itself but not from the network.
+    ///
+    /// This is a strictly narrower capability than [#isServerSocketSupported()], which
+    /// binds the wildcard address and therefore publishes the port on every network
+    /// interface. A port must implement loopback binding explicitly; there is no
+    /// fallback to a wildcard bind, because silently widening the reach of a channel a
+    /// caller asked to keep local would be the wrong failure.
+    ///
+    /// #### Returns
+    ///
+    /// true if [#listenLoopback(int, Class)] is usable on this port
+    public static boolean isLoopbackServerSocketSupported() {
+        return Util.getImplementation().isLoopbackServerSocketAvailable();
+    }
+
     /// Connect to a remote host
     ///
     /// #### Parameters
@@ -166,6 +182,35 @@ public final class Socket {
     /// @deprecated server sockets are only supported on Android and Desktop and as such
     /// we recommend against using them
     public static StopListening listen(final int port, final Class scClass) {
+        return listenImpl(port, scClass, false);
+    }
+
+    /// Listens on the given port on the LOOPBACK interface only, so the channel is
+    /// reachable from this device but not from the network. Otherwise identical to
+    /// [#listen(int, Class)]: `scClass` is instantiated per incoming connection and
+    /// must have a public no-argument constructor.
+    ///
+    /// Use this for anything that is local by nature — a debug or automation channel,
+    /// an on-device tool talking to a companion process. Callers that genuinely want to
+    /// serve the network should use [#listen(int, Class)] and say so.
+    ///
+    /// Fails (never falls back to a wildcard bind) when
+    /// [#isLoopbackServerSocketSupported()] is false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `port`: the device port
+    ///
+    /// - `scClass`: class of callback for each incoming connection
+    ///
+    /// #### Returns
+    ///
+    /// StopListening instance that allows the caller to stop listening
+    public static StopListening listenLoopback(final int port, final Class scClass) {
+        return listenImpl(port, scClass, true);
+    }
+
+    private static StopListening listenImpl(final int port, final Class scClass, final boolean loopbackOnly) {
         class Listener implements StopListening, Runnable {
             private boolean stopped;
 
@@ -173,7 +218,9 @@ public final class Socket {
             public void run() {
                 try {
                     while (!stopped) {
-                        final Object connection = Util.getImplementation().listenSocket(port);
+                        final Object connection = loopbackOnly
+                                ? Util.getImplementation().listenSocketLoopback(port)
+                                : Util.getImplementation().listenSocket(port);
                         final SocketConnection sc = (SocketConnection) scClass.newInstance();
                         if (connection != null) {
                             sc.setConnected(true);

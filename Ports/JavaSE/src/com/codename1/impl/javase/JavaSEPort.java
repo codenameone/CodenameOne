@@ -17122,23 +17122,26 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     class ServerSockets {
         Map<Integer,ServerSocket> socks = new HashMap<Integer,ServerSocket>();
-        
+
         public synchronized ServerSocket get(int port) throws IOException {
-            if (socks.containsKey(port)) {
-                ServerSocket sock = socks.get(port);
-                if (sock.isClosed()) {
-                    sock = new ServerSocket(port);
-                    socks.put(port, sock);
-                }
-                return sock;
-            } else {
-                ServerSocket sock = new ServerSocket(port);
-                socks.put(port, sock);
-                return sock;
-            }
+            return get(port, false);
         }
-        
-        
+
+        /// When loopbackOnly is set the socket binds 127.0.0.1 instead of the wildcard, so
+        /// the channel is not published on every network interface. The two are cached
+        /// separately: a port already bound wildcard must never be handed back to a caller
+        /// that asked for loopback.
+        public synchronized ServerSocket get(int port, boolean loopbackOnly) throws IOException {
+            Integer key = Integer.valueOf(loopbackOnly ? -port : port);
+            ServerSocket sock = socks.get(key);
+            if (sock == null || sock.isClosed()) {
+                sock = loopbackOnly
+                        ? new ServerSocket(port, 50, InetAddress.getLoopbackAddress())
+                        : new ServerSocket(port);
+                socks.put(key, sock);
+            }
+            return sock;
+        }
     }
     
     class SocketImpl {
@@ -17269,8 +17272,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public Object listen(int param) {
+            return listen(param, false);
+        }
+
+        public Object listen(int param, boolean loopbackOnly) {
             try {
-                ServerSocket serverSocketInstance = getServerSockets().get(param);
+                ServerSocket serverSocketInstance = getServerSockets().get(param, loopbackOnly);
                 socketInstance = serverSocketInstance.accept();
                 return this;
             } catch(Exception err) {
@@ -17302,6 +17309,16 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public Object listenSocket(int port) {
         return new SocketImpl().listen(port);
+    }
+
+    @Override
+    public boolean isLoopbackServerSocketAvailable() {
+        return true;
+    }
+
+    @Override
+    public Object listenSocketLoopback(int port) {
+        return new SocketImpl().listen(port, true);
     }
     
     @Override

@@ -10845,6 +10845,17 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_
     return (JAVA_LONG)JAVA_NULL;
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_listenSocketLoopback___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT port) {
+    POOL_BEGIN();
+    SocketImpl* impl = [[SocketImpl alloc] init];
+    BOOL b = [impl listenLoopback:port];
+    POOL_END();
+    if(b) {
+        return (JAVA_LONG)impl;
+    }
+    return (JAVA_LONG)JAVA_NULL;
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getHostOrIP__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     POOL_BEGIN();
     JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [SocketImpl getIP]);
@@ -12431,6 +12442,10 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString___java_lang_Stri
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port, JAVA_INT connectTimeout) {
     return com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_int(CN1_THREAD_STATE_PASS_ARG instanceObject, host, port, connectTimeout);
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_listenSocketLoopback___int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT port) {
+    return com_codename1_impl_ios_IOSNative_listenSocketLoopback___int(CN1_THREAD_STATE_PASS_ARG instanceObject, port);
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getHostOrIP___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {

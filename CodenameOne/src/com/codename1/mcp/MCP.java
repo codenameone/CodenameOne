@@ -78,14 +78,24 @@ public final class MCP {
         socketTransportFactory = factory;
     }
 
+    /// Whether the PORT supplied a transport of its own. Distinct from
+    /// [#isSocketSupported()], which also counts the portable fallback — the fallback
+    /// must not see itself as already installed.
+    static boolean hasPlatformSocketTransport() {
+        return socketTransportFactory != null;
+    }
+
     /// Whether an stdio transport is available on this platform.
     public static boolean isStdioSupported() {
         return stdioTransportFactory != null;
     }
 
-    /// Whether a loopback socket transport is available on this platform.
+    /// Whether a loopback socket transport is available on this platform — either one the
+    /// port registered itself, or the portable one, which needs
+    /// [com.codename1.io.Socket#isLoopbackServerSocketSupported()].
     public static boolean isSocketSupported() {
-        return socketTransportFactory != null;
+        return socketTransportFactory != null
+                || com.codename1.io.Socket.isLoopbackServerSocketSupported();
     }
 
     /// Returns the shared server, creating it on first use.
@@ -116,9 +126,14 @@ public final class MCP {
     /// Starts a loopback socket server so an agent can attach to this running process.
     /// Requires a platform socket transport factory (registered by the JavaSE port).
     public static synchronized MCPServer startSocketServer(int port) {
+        // Ports that did not register a transport of their own fall back to the portable
+        // one, which binds loopback through com.codename1.io.Socket — so attaching to a
+        // running app on a device or simulator works, not only on the desktop.
+        MCPLoopbackSocketTransport.registerIfPlatformHasNone();
         if (socketTransportFactory == null) {
             throw new IllegalStateException(
-                    "No socket MCP transport is available on this platform. Run on the JavaSE port.");
+                    "No socket MCP transport is available on this platform: it cannot bind a "
+                            + "loopback server socket.");
         }
         MCPServer s = getServer();
         s.start(socketTransportFactory.createSocketTransport(port));

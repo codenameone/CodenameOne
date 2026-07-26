@@ -1,5 +1,8 @@
 #import "SocketImpl.h"
 #include <ifaddrs.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
 #include <arpa/inet.h>
 #include "xmlvm.h"
 #import "CodenameOne_GLViewController.h"
@@ -152,7 +155,111 @@ static void _resume() {
 }
 
 -(BOOL)listen:(int)param{
+    // Wildcard-bound server sockets remain unsupported on iOS; only the loopback
+    // variant below is offered, so an app cannot accidentally publish a listening
+    // port to the network.
     return NO;
+}
+
+/// Listening sockets bound to loopback, keyed by port, kept across accepts so a caller
+/// can accept a sequence of connections the way the desktop and Android ports do.
+static NSMutableDictionary* _cn1LoopbackListeners = nil;
+
++(int)loopbackListenerForPort:(int)port errorOut:(NSString**)errorOut {
+    @synchronized([SocketImpl class]) {
+        if(_cn1LoopbackListeners == nil) {
+            _cn1LoopbackListeners = [[NSMutableDictionary alloc] init];
+        }
+        NSNumber* key = [NSNumber numberWithInt:port];
+        NSNumber* existing = [_cn1LoopbackListeners objectForKey:key];
+        if(existing != nil) {
+            return [existing intValue];
+        }
+        int fd = socket(AF_INET, SOCK_STREAM, 0);
+        if(fd < 0) {
+            *errorOut = @"Could not create a socket";
+            return -1;
+        }
+        int yes = 1;
+        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+        struct sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons((uint16_t)port);
+        // INADDR_LOOPBACK, never INADDR_ANY: this channel must not be reachable from
+        // the network, only from the device itself.
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        if(bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+            *errorOut = [NSString stringWithFormat:@"Could not bind port %i on loopback", port];
+            close(fd);
+            return -1;
+        }
+        if(listen(fd, 50) < 0) {
+            *errorOut = [NSString stringWithFormat:@"Could not listen on port %i", port];
+            close(fd);
+            return -1;
+        }
+        [_cn1LoopbackListeners setObject:[NSNumber numberWithInt:fd] forKey:key];
+        return fd;
+    }
+}
+
+-(BOOL)listenLoopback:(int)param{
+    NSString* bindError = nil;
+    int listenFd = [SocketImpl loopbackListenerForPort:param errorOut:&bindError];
+    if(listenFd < 0) {
+        errorMessage = bindError;
+        errorCode = -1;
+        connected = NO;
+        return NO;
+    }
+
+    // accept() blocks; hand the VM back this thread while it does.
+    int clientFd;
+    _yield();
+    clientFd = accept(listenFd, NULL, NULL);
+    _resume();
+    if(clientFd < 0) {
+        errorMessage = @"Accept failed";
+        errorCode = -1;
+        connected = NO;
+        return NO;
+    }
+
+    CFReadStreamRef readStream = NULL;
+    CFWriteStreamRef writeStream = NULL;
+    CFStreamCreatePairWithSocket(NULL, (CFSocketNativeHandle)clientFd, &readStream, &writeStream);
+    if(readStream == NULL || writeStream == NULL) {
+        close(clientFd);
+        errorMessage = @"Could not wrap the accepted socket";
+        errorCode = -1;
+        connected = NO;
+        return NO;
+    }
+    // Hand ownership of the descriptor to the streams so closing them closes it.
+    CFReadStreamSetProperty(readStream, kCFStreamPropertyShouldCloseNativeSocket, kCFBooleanTrue);
+    CFWriteStreamSetProperty(writeStream, kCFStreamPropertyShouldCloseNativeSocket, kCFBooleanTrue);
+
+    inputStream = (BRIDGE_CAST NSInputStream *)readStream;
+    outputStream = (BRIDGE_CAST NSOutputStream *)writeStream;
+    [inputStream setDelegate:self];
+    [outputStream setDelegate:self];
+    [inputStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+    [outputStream scheduleInRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+    [inputStream open];
+    [outputStream open];
+    while ([outputStream streamStatus] == NSStreamStatusOpening) {
+        _yield();
+        usleep(10000);
+        _resume();
+    }
+    while ([inputStream streamStatus] == NSStreamStatusOpening) {
+        _yield();
+        usleep(10000);
+        _resume();
+    }
+    connected = ![self isInputShutdown] && ![self isOutputShutdown];
+    return connected;
 }
 
 -(BOOL)isConnected{
