@@ -55,9 +55,17 @@ final class GattDateTime {
                 || second > 59) {
             return -1;
         }
+        // Field-at-a-time rather than clear() plus the six-argument set():
+        // the CLDC Calendar this framework targets has neither, and reads
+        // its instant through getTime().
         Calendar c = Calendar.getInstance(TimeZone.getDefault());
-        c.clear();
-        c.set(year, month - 1, day, hour, minute, second);
-        return c.getTimeInMillis();
+        c.set(Calendar.YEAR, year);
+        c.set(Calendar.MONTH, month - 1);
+        c.set(Calendar.DAY_OF_MONTH, day);
+        c.set(Calendar.HOUR_OF_DAY, hour);
+        c.set(Calendar.MINUTE, minute);
+        c.set(Calendar.SECOND, second);
+        c.set(Calendar.MILLISECOND, 0);
+        return c.getTime().getTime();
     }
 }

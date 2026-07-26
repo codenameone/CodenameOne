@@ -23,6 +23,7 @@
 package com.codename1.health;
 
 import java.util.Calendar;
+import java.util.Date;
 import java.util.TimeZone;
 
 /// A half-open span of time, `[start, end)`, in epoch milliseconds UTC.
@@ -92,9 +93,9 @@ public final class HealthTimeRange {
     /// Today, from local midnight to now, in `tz`.
     public static HealthTimeRange today(TimeZone tz) {
         Calendar c = Calendar.getInstance(tz);
-        long now = c.getTimeInMillis();
+        long now = millisOf(c);
         startOfDay(c);
-        return new HealthTimeRange(c.getTimeInMillis(), now, false);
+        return new HealthTimeRange(millisOf(c), now, false);
     }
 
     /// The last `count` calendar days in `tz`, from local midnight at the
@@ -106,16 +107,26 @@ public final class HealthTimeRange {
                     "calendarDays requires a positive count, got " + count);
         }
         Calendar c = Calendar.getInstance(tz);
-        long now = c.getTimeInMillis();
+        long now = millisOf(c);
         startOfDay(c);
         c.add(Calendar.DAY_OF_MONTH, -(count - 1));
-        return new HealthTimeRange(c.getTimeInMillis(), now, false);
+        return new HealthTimeRange(millisOf(c), now, false);
     }
 
     /// Everything from `startMillis` onwards. The end is resolved to the
     /// wall clock at the moment the query executes.
     public static HealthTimeRange since(long startMillis) {
         return new HealthTimeRange(startMillis, Long.MAX_VALUE, true);
+    }
+
+    /// Reads a calendar's instant.
+    ///
+    /// `Calendar.getTimeInMillis()` is protected in the CLDC profile this
+    /// framework targets, so the value has to come through `getTime()`.
+    /// The desktop JDK exposes it publicly, which is why this only shows up
+    /// in a device build.
+    private static long millisOf(Calendar c) {
+        return c.getTime().getTime();
     }
 
     private static void startOfDay(Calendar c) {

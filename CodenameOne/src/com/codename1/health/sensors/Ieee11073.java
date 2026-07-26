@@ -22,6 +22,8 @@
  */
 package com.codename1.health.sensors;
 
+import com.codename1.util.MathUtil;
+
 /// Decoders for the two IEEE 11073-20601 floating-point formats used by
 /// Bluetooth SIG medical characteristics.
 ///
@@ -61,7 +63,7 @@ final class Ieee11073 {
         if (mantissa > 0x07FF) {
             mantissa -= 0x1000;
         }
-        return mantissa * Math.pow(10, exponent);
+        return mantissa * MathUtil.pow(10, exponent);
     }
 
     /// Decodes a 32-bit FLOAT: a signed 8-bit exponent in the top byte and
@@ -82,6 +84,6 @@ final class Ieee11073 {
         if (mantissa > 0x007FFFFF) {
             mantissa -= 0x01000000;
         }
-        return mantissa * Math.pow(10, exponent);
+        return mantissa * MathUtil.pow(10, exponent);
     }
 }

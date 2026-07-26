@@ -23,6 +23,7 @@
 package com.codename1.health;
 
 import java.util.Calendar;
+import java.util.Date;
 import java.util.TimeZone;
 
 /// The bucket width of an [AggregateQuery] -- "per hour", "per calendar
@@ -151,13 +152,14 @@ public final class HealthInterval {
             return anchorMillis + floored;
         }
         Calendar c = Calendar.getInstance(timeZone);
-        c.setTimeInMillis(millis);
+        c.setTime(new Date(millis));
         if (calendarField == Calendar.MONTH) {
             c.set(Calendar.DAY_OF_MONTH, 1);
         } else if (calendarField == Calendar.WEEK_OF_YEAR) {
-            c.setFirstDayOfWeek(firstDayOfWeek);
-            // Walk back to the configured first day rather than using
-            // set(DAY_OF_WEEK, ...), which can jump forward.
+            // Walk back to the configured first day. This is done by hand
+            // rather than with setFirstDayOfWeek + set(DAY_OF_WEEK, ...):
+            // the CLDC Calendar has no setFirstDayOfWeek, and set(DAY_OF_WEEK)
+            // can jump forward rather than back.
             while (c.get(Calendar.DAY_OF_WEEK) != firstDayOfWeek) {
                 c.add(Calendar.DAY_OF_MONTH, -1);
             }
@@ -166,7 +168,7 @@ public final class HealthInterval {
         c.set(Calendar.MINUTE, 0);
         c.set(Calendar.SECOND, 0);
         c.set(Calendar.MILLISECOND, 0);
-        return c.getTimeInMillis();
+        return c.getTime().getTime();
     }
 
     /// The start of the bucket after the one starting at
@@ -178,13 +180,13 @@ public final class HealthInterval {
             return bucketStartMillis + fixedMillis;
         }
         Calendar c = Calendar.getInstance(timeZone);
-        c.setTimeInMillis(bucketStartMillis);
+        c.setTime(new Date(bucketStartMillis));
         if (calendarField == Calendar.WEEK_OF_YEAR) {
             c.add(Calendar.DAY_OF_MONTH, 7 * calendarAmount);
         } else {
             c.add(calendarField, calendarAmount);
         }
-        return c.getTimeInMillis();
+        return c.getTime().getTime();
     }
 
     private static long floorMod(long x, long y) {
