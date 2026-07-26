@@ -423,7 +423,17 @@ public class HealthStore {
             throws HealthException {
         List<HealthSample> in = page.getSamples();
         List<HealthSample> outSamples = new ArrayList<HealthSample>(in.size());
+        List<String> wanted = query.getSources();
         for (HealthSample s : in) {
+            // Applied here, not only in the ports, because a port that
+            // cannot express the filter natively would otherwise return
+            // every app's data and silently double-count phone and watch.
+            // A port that does filter natively simply has nothing left to
+            // drop.
+            if (!wanted.isEmpty() && (s.getSource() == null
+                    || !wanted.contains(s.getSource().getBundleId()))) {
+                continue;
+            }
             if (query.isFlattenSeries() && s instanceof SeriesSample) {
                 SeriesSample series = (SeriesSample) s;
                 for (int j = 0; j < series.size(); j++) {
@@ -531,6 +541,8 @@ public class HealthStore {
         HealthUnit unit = query.getUnit() != null ? query.getUnit()
                 : type.getCanonicalUnit();
         List<QuantitySample> inBucket = new ArrayList<QuantitySample>();
+        List<Double> weights = new ArrayList<Double>();
+        List<Double> durations = new ArrayList<Double>();
         long durationMillis = 0;
         int count = 0;
         for (HealthSample s : samples) {
@@ -548,9 +560,29 @@ public class HealthStore {
                 continue;
             }
             count++;
-            durationMillis += Math.max(1, s.getDurationMillis());
+            // Clip to the bucket. A two-hour workout spanning two hourly
+            // buckets contributes one hour to each, not two hours to both;
+            // adding the whole span to every bucket it touches inflates
+            // every summary around a boundary.
+            long overlap = Math.min(end, s.getEndMillis())
+                    - Math.max(start, s.getStartMillis());
+            if (overlap < 0) {
+                overlap = 0;
+            }
+            long span = s.getDurationMillis();
+            durationMillis += span <= 0 ? 1 : overlap;
             if (s instanceof QuantitySample) {
                 inBucket.add((QuantitySample) s);
+                // Cumulative quantities are divisible, so a sample that
+                // straddles a boundary contributes in proportion. Discrete
+                // ones are not -- half a heart rate is not a heart rate --
+                // so they count whole and only weight the average.
+                boolean cumulative = span > 0
+                        && type.getAggregationStyle()
+                                == HealthAggregationStyle.CUMULATIVE;
+                weights.add(Double.valueOf(cumulative
+                        ? (double) overlap / (double) span : 1.0));
+                durations.add(Double.valueOf(span <= 0 ? 1 : overlap));
             }
         }
         bucket.setSampleCount(type, count);
@@ -572,8 +604,9 @@ public class HealthStore {
             if (inBucket.isEmpty() || unit == null) {
                 continue;
             }
-            bucket.put(type, metric,
-                    new HealthQuantity(compute(metric, inBucket, unit), unit));
+            bucket.put(type, metric, new HealthQuantity(
+                    compute(metric, inBucket, unit, weights, durations),
+                    unit));
         }
     }
 
@@ -594,11 +627,13 @@ public class HealthStore {
     /// unweighted mean over irregularly-sampled data is the classic way to
     /// make a chart disagree with the platform's own summary.
     private static double compute(AggregateMetric metric,
-            List<QuantitySample> in, HealthUnit unit) {
+            List<QuantitySample> in, HealthUnit unit, List<Double> weights,
+            List<Double> durations) {
         if (metric == AggregateMetric.TOTAL) {
             double sum = 0;
-            for (QuantitySample inItem : in) {
-                sum += inItem.getValue(unit);
+            for (int i = 0; i < in.size(); i++) {
+                sum += in.get(i).getValue(unit)
+                        * weights.get(i).doubleValue();
             }
             return sum;
         }
@@ -625,12 +660,12 @@ public class HealthStore {
             }
             return latest.getValue(unit);
         }
-        // AVERAGE, duration-weighted.
+        // AVERAGE, weighted by the time each sample spent in this bucket.
         double weighted = 0;
         double totalWeight = 0;
-        for (QuantitySample s : in) {
-            double weight = Math.max(1, s.getDurationMillis());
-            weighted += s.getValue(unit) * weight;
+        for (int i = 0; i < in.size(); i++) {
+            double weight = Math.max(1, durations.get(i).doubleValue());
+            weighted += in.get(i).getValue(unit) * weight;
             totalWeight += weight;
         }
         return totalWeight == 0 ? 0 : weighted / totalWeight;
@@ -1152,11 +1187,13 @@ public class HealthStore {
             }
             HealthSubscription sub = new HealthSubscription(this,
                     req.getId(), req.getTypes(), isPushDelivery());
+            HealthAnchor restored = loadAnchor(req.getId());
+            sub.seedAnchor(restored);
             synchronized (subscriptions) {
                 subscriptions.put(req.getId(), sub);
             }
             if (isSupported()) {
-                doSubscribe(req, loadAnchor(req.getId()));
+                doSubscribe(req, restored);
             }
         }
     }
@@ -1327,7 +1364,12 @@ public class HealthStore {
             SampleQuery q = new SampleQuery()
                     .addType(types.get(index))
                     .setTimeRange(HealthTimeRange.between(
-                            range.getStartMillis(), range.getEndMillis()));
+                            range.getStartMillis(), range.getEndMillis()))
+                    // Without this the fallback inherits SampleQuery's
+                    // default page limit and quietly computes a month of
+                    // heart rate from its first 10,000 samples, reporting
+                    // a total that looks complete and is not.
+                    .setLimit(Integer.MAX_VALUE);
             for (String source : query.getSources()) {
                 q.addSource(source);
             }

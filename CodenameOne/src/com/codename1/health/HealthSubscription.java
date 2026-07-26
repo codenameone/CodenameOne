@@ -50,6 +50,17 @@ public final class HealthSubscription {
         this.types = copy;
     }
 
+    /// Seeds the cursor a previous launch persisted.
+    ///
+    /// Restoration without this leaves the handle with a null anchor, and
+    /// both drain implementations read the handle rather than the store's
+    /// preference, so Android would discard the persisted change token and
+    /// start a fresh baseline -- losing everything that accumulated while
+    /// the process was dead -- and iOS would resume with no window at all.
+    void seedAnchor(HealthAnchor restored) {
+        this.anchor = restored;
+    }
+
     /// The identifier this subscription was registered under.
     public String getId() {
         return id;

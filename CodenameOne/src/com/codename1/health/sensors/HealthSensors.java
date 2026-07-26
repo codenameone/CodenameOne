@@ -118,7 +118,9 @@ public class HealthSensors {
         }
         BleScan scan = Bluetooth.getInstance().getLE().startScan(bleSettings,
                 makeScanListener(wanted, listener));
-        return new SensorScan(scan);
+        SensorScan out = new SensorScan(scan);
+        out.scheduleTimeout(s.getTimeoutMillis());
+        return out;
     }
 
     /// Built in a static method so the listener carries no synthetic

@@ -92,8 +92,8 @@ public final class HealthWire {
     /// `HealthBridgeTokenTableTest`, which parses the Kotlin and fails the
     /// build when the two drift.
     private static final String ANDROID_READABLE =
-            ",steps,distance_walking_running,distance_cycling,"
-            + "distance_swimming,flights_climbed,elevation_gained,"
+            ",steps,distance_walking_running,"
+            + "flights_climbed,elevation_gained,"
             + "active_energy,wheelchair_pushes,hydration,heart_rate,"
             + "resting_heart_rate,oxygen_saturation,respiratory_rate,"
             + "body_temperature,basal_body_temperature,vo2_max,"
@@ -104,8 +104,8 @@ public final class HealthWire {
     /// Types the bridge can write. Narrower than the readable set: the
     /// series-shaped types have no single-value write form.
     private static final String ANDROID_WRITABLE =
-            ",steps,distance_walking_running,distance_cycling,"
-            + "distance_swimming,flights_climbed,elevation_gained,"
+            ",steps,distance_walking_running,"
+            + "flights_climbed,elevation_gained,"
             + "active_energy,wheelchair_pushes,hydration,body_mass,"
             + "lean_body_mass,bone_mass,body_fat_percentage,height,"
             + "resting_heart_rate,oxygen_saturation,respiratory_rate,"

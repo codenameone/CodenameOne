@@ -12,7 +12,7 @@ Codename One ships a cross-platform health API under `com.codename1.health` that
 | Read-authorization introspection | no | no | no | yes | yes | n/a
 | Background push delivery | *no* | *no* | *no* | *no* | yes | no
 | Change delivery while running | yes | yes | yes | yes | yes | yes
-| Live workout session | yes | recorded | yes | recorded | recorded | recorded
+| Live workout session | *recorded* | recorded | *recorded* | recorded | recorded | recorded
 | Automatic sensor collection in a workout | yes | no | yes | no | no | no
 | Bluetooth health sensors | yes | yes | limited | yes | yes | yes
 |===
@@ -122,7 +122,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 Two capabilities that are easy to conflate and that this API keeps separate:
 
-* `isLiveSessionSupported()` -- the OS runs a real session and keeps the app alive. True on watchOS, on iOS 26 and later, and on Wear OS.
+* `isLiveSessionSupported()` -- the OS runs a real session and keeps the app alive. **False everywhere in this release.** `HKWorkoutSession` exists on watchOS and on iOS 26 and later, and `androidx.health.services` exists on Wear OS, but neither is wired up yet, so every platform currently uses the recorded session described below. Branch on this query rather than on the OS version and your code will pick up native sessions when they land.
 * `isSensorCollectionSupported()` -- the OS also gathers heart rate and energy into that session by itself.
 
 Where the second is false, **a workout records only what you feed it**. On an Android phone that isn't a degraded fallback: Health Connect has no live-session concept, and inserting a session, batching your own data and updating it at the end is precisely the flow Google documents. Feed it with `addSamples(...)`, or by attaching a Bluetooth sensor.
@@ -142,7 +142,7 @@ This layer is built entirely on `com.codename1.bluetooth.le` and needs no platfo
 
 Speed and cadence sensors transmit cumulative counters rather than rates, with counters and event timers that wrap every 32 or 64 seconds. The framework differences them for you; hand-rolling that arithmetic is the most commonly botched part of these profiles.
 
-`SensorSessionOptions.setWriteToStore(...)` defaults to `false` on purpose. During a workout on watchOS or iOS 26 the OS is already recording heart rate into HealthKit, so a strap that also writes its own samples double-counts in every downstream average. Attach the session to the workout with `setWorkoutSession(...)` instead; turn write-through on for standalone measurements the OS knows nothing about, such as a weight from a scale.
+`SensorSessionOptions.setWriteToStore(...)` defaults to `false` on purpose. When the OS is recording heart rate into HealthKit during a workout, a strap that also writes its own samples double-counts in every downstream average. Attach the session to the workout with `setWorkoutSession(...)` instead; turn write-through on for standalone measurements the OS knows nothing about, such as a weight from a scale.
 
 === Nutrition
 

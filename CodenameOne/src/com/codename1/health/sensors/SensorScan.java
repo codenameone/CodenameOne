@@ -30,11 +30,28 @@ import com.codename1.bluetooth.le.BleScan;
 public final class SensorScan {
 
     private final BleScan delegate;
+    private java.util.Timer timeout;
     private boolean stopped;
 
     /// Wraps an underlying BLE scan. Created by [HealthSensors].
     SensorScan(BleScan delegate) {
         this.delegate = delegate;
+    }
+
+    /// Stops the scan automatically after `millis`.
+    ///
+    /// A BLE scan is one of the most expensive things an app can leave
+    /// running, and neither [com.codename1.bluetooth.le.BleScan] nor the
+    /// platform stops one on its own. Without this the documented
+    /// [SensorScanSettings#getTimeoutMillis()] -- including its default --
+    /// did nothing, and a scan ran until the app was killed.
+    void scheduleTimeout(long millis) {
+        if (millis <= 0) {
+            return;
+        }
+        // CLDC's Timer has no named/daemon constructor.
+        timeout = new java.util.Timer();
+        timeout.schedule(new StopTask(this), millis);
     }
 
     /// Stops the scan. Idempotent.
@@ -43,8 +60,27 @@ public final class SensorScan {
             return;
         }
         stopped = true;
+        if (timeout != null) {
+            timeout.cancel();
+            timeout = null;
+        }
         if (delegate != null) {
             delegate.stop();
+        }
+    }
+
+    /// Named rather than anonymous so the timer holds no synthetic
+    /// reference beyond the scan it stops.
+    private static final class StopTask extends java.util.TimerTask {
+        private final SensorScan scan;
+
+        StopTask(SensorScan scan) {
+            this.scan = scan;
+        }
+
+        @Override
+        public void run() {
+            scan.stop();
         }
     }
 

@@ -255,8 +255,19 @@ class IOSHealthStore extends HealthStore {
         final long now = System.currentTimeMillis();
         long since = anchorMillis(sub, now);
         List<HealthDataType> types = sub.getTypes();
-        if (types.isEmpty() || since >= now) {
+        if (types.isEmpty()) {
             drainFrom(subs, index + 1, delivered, out);
+            return;
+        }
+        if (since >= now) {
+            // A subscription with no cursor yet. Fire an empty batch so the
+            // anchor gets persisted and the next drain has a window to read
+            // over -- without this the branch repeats forever and the
+            // subscription never delivers anything at all.
+            fireChanges(new HealthChangeBatch(sub.getId(), sub.getTypes(),
+                    null, null, false,
+                    HealthAnchor.of(String.valueOf(now)), 0L, false));
+            drainFrom(subs, index + 1, delivered + 1, out);
             return;
         }
         readTypes(subs, index, delivered, out, types, 0,

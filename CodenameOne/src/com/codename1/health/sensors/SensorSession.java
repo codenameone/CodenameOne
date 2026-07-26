@@ -25,6 +25,8 @@ package com.codename1.health.sensors;
 import com.codename1.health.BloodPressureSample;
 import com.codename1.health.HealthDataType;
 import com.codename1.health.HealthError;
+import com.codename1.health.Health;
+import com.codename1.health.workout.WorkoutSession;
 import com.codename1.health.HealthException;
 import com.codename1.health.HealthQuantity;
 import com.codename1.health.HealthSample;
@@ -57,6 +59,9 @@ public class SensorSession {
     private final String sensorId;
     private final HealthSensorProfile profile;
     private final SensorSessionOptions options;
+    private final List<HealthSample> pendingWrites =
+            new ArrayList<HealthSample>();
+    private long pendingSince;
     private final List<SensorSampleListener> listeners =
             new ArrayList<SensorSampleListener>();
     private final Map<String, HealthSample> latest =
@@ -208,6 +213,57 @@ public class SensorSession {
             }
             fireSample(s);
         }
+        route(samples);
+    }
+
+    /// Sends decoded samples wherever the options said they should go.
+    ///
+    /// Both destinations were configurable and neither was read, so an
+    /// attached workout never saw a single reading and a write-through
+    /// session persisted nothing while reporting success.
+    private void route(List<HealthSample> samples) {
+        if (samples.isEmpty()) {
+            return;
+        }
+        WorkoutSession workout = options.getWorkoutSession();
+        if (workout != null) {
+            workout.addSamples(samples);
+        }
+        if (!options.isWriteToStore()) {
+            return;
+        }
+        // Batched rather than written per notification: a strap notifies
+        // about once a second, and a store round trip per reading would
+        // spend more time in the platform than in the app.
+        List<HealthSample> batch = null;
+        long now = System.currentTimeMillis();
+        synchronized (pendingWrites) {
+            if (pendingWrites.isEmpty()) {
+                pendingSince = now;
+            }
+            pendingWrites.addAll(samples);
+            if (now - pendingSince >= options.getStoreBatchMillis()) {
+                batch = new ArrayList<HealthSample>(pendingWrites);
+                pendingWrites.clear();
+            }
+        }
+        if (batch != null) {
+            Health.getInstance().getStore().write(batch);
+        }
+    }
+
+    /// Writes anything still buffered. Called when the session stops so a
+    /// short ride does not lose its last partial batch.
+    protected final void flushPendingWrites() {
+        List<HealthSample> batch;
+        synchronized (pendingWrites) {
+            if (pendingWrites.isEmpty()) {
+                return;
+            }
+            batch = new ArrayList<HealthSample>(pendingWrites);
+            pendingWrites.clear();
+        }
+        Health.getInstance().getStore().write(batch);
     }
 
     /// Decodes a payload into zero or more samples, or `null` when the
@@ -259,15 +315,16 @@ public class SensorSession {
                 }
             }
             if (m.hasWheelData()) {
-                double rpm = wheelTracker.update(m.getWheelRevolutions(),
+                // The wheel rate is deliberately not published. It is not
+                // cadence -- cadence is the crank, reported in the block
+                // below -- and a combination sensor sending both would
+                // otherwise emit two CYCLING_CADENCE samples per
+                // notification with very different values. Turning it into
+                // speed or distance needs a wheel circumference we do not
+                // have, and guessing the tyre size scales every distance
+                // the app ever reports.
+                wheelTracker.update(m.getWheelRevolutions(),
                         m.getLastWheelEventTime());
-                if (!Double.isNaN(rpm)) {
-                    // Without a wheel circumference we can only report the
-                    // rate; converting to speed would require guessing the
-                    // tyre size, and guessing wrong scales every distance.
-                    out.add(quantity(HealthDataType.CYCLING_CADENCE, rpm,
-                            HealthUnit.COUNT_PER_MINUTE, at));
-                }
             }
             return out;
         }

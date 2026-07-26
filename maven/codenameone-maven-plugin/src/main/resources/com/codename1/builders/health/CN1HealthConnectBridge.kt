@@ -55,6 +55,7 @@ import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.Vo2MaxRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.WheelchairPushesRecord
+import androidx.health.connect.client.records.metadata.DataOrigin
 import androidx.health.connect.client.request.ChangesTokenRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -198,18 +199,39 @@ class CN1HealthConnectBridge(private val context: Context)
             val end = Instant.ofEpochMilli(json.getLong("end"))
             val filter = TimeRangeFilter.between(start, end)
             val types = json.getJSONArray("types")
+            val sources = json.optJSONArray("sources")
+            val origins = if (sources == null) emptySet() else
+                (0 until sources.length())
+                    .map { DataOrigin(sources.getString(it)) }.toSet()
             val sb = StringBuilder()
+            // The limit is the caller's budget for the whole query, not per
+            // type. Spending it again on each type lets the reply exceed the
+            // advertised limit, and the shared layer then trims the combined
+            // block -- which can discard every record after the first type.
+            var budget = json.optInt("limit", 0)
+            if (budget <= 0) {
+                budget = Int.MAX_VALUE
+            }
             for (i in 0 until types.length()) {
-                appendRecords(sb, types.getString(i), filter,
-                    json.optInt("limit", 10000))
+                if (budget <= 0) {
+                    break
+                }
+                budget -= appendRecords(sb, types.getString(i), filter,
+                    budget, origins)
             }
             sb.toString()
         }
     }
 
-    /** Reads one portable type and appends it in the shared line format. */
+    /**
+     * Reads one portable type and appends it in the shared line format.
+     *
+     * Returns how many records were emitted so the caller can spend one
+     * shared limit across every requested type.
+     */
     private suspend fun appendRecords(sb: StringBuilder, token: String,
-                                      filter: TimeRangeFilter, limit: Int) {
+                                      filter: TimeRangeFilter, limit: Int,
+                                      origins: Set<DataOrigin>): Int {
         // A type this bridge cannot read is rejected rather than returned
         // as an empty page: the caller cannot tell an empty page apart from
         // "you have no data", which is the one answer a health API must
@@ -223,19 +245,27 @@ class CN1HealthConnectBridge(private val context: Context)
         // walking pages rather than by failing the read. Without this an
         // ordinary unbounded query throws before it reads anything.
         var remaining = if (limit > 0) limit else Int.MAX_VALUE
+        var emitted = 0
         var pageToken: String? = null
         while (remaining > 0) {
             val page = requireClient().readRecords(
                 ReadRecordsRequest(type, timeRangeFilter = filter,
+                    // Source filtering happens here rather than after the
+                    // fact: SampleQuery.addSource is how an app avoids
+                    // counting the same steps from both phone and watch,
+                    // and ignoring it silently inflates every total.
+                    dataOriginFilter = origins,
                     pageSize = minOf(remaining, MAX_PAGE_SIZE),
                     pageToken = pageToken))
             page.records.forEach { appendOne(sb, it, token) }
             remaining -= page.records.size
+            emitted += page.records.size
             pageToken = page.pageToken
             if (pageToken == null || page.records.isEmpty()) {
                 break
             }
         }
+        return emitted
     }
 
     /**
@@ -429,8 +459,10 @@ class CN1HealthConnectBridge(private val context: Context)
                 startZoneOffset = zone, endZoneOffset = zone,
                 count = value.toLong())
 
-            "distance_walking_running", "distance_cycling",
-            "distance_swimming" -> DistanceRecord(startTime = start,
+            // Only the generic distance type is written. Writing a
+            // cycling distance as a bare DistanceRecord would erase the
+            // modality, and it would read back as walking distance.
+            "distance_walking_running" -> DistanceRecord(startTime = start,
                 endTime = end, startZoneOffset = zone, endZoneOffset = zone,
                 distance = Length.meters(value))
 
@@ -626,8 +658,12 @@ class CN1HealthConnectBridge(private val context: Context)
 
     private fun recordClassFor(token: String) = when (token) {
         "steps" -> StepsRecord::class
-        "distance_walking_running", "distance_cycling",
-        "distance_swimming" -> DistanceRecord::class
+        // Health Connect has a single DistanceRecord with no modality
+        // field, so only the generic distance type maps onto it. Aliasing
+        // the cycling and swimming types here would return the same records
+        // under whichever label was asked for -- duplicating them when both
+        // are queried, and reporting a cycle as a run when only one is.
+        "distance_walking_running" -> DistanceRecord::class
         "flights_climbed" -> FloorsClimbedRecord::class
         "elevation_gained" -> ElevationGainedRecord::class
         "active_energy" -> ActiveCaloriesBurnedRecord::class

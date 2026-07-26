@@ -58,8 +58,14 @@ import java.util.Set;
 /// [HealthStore] contract holds on Android as everywhere else.
 class AndroidHealthStore extends HealthStore {
 
-    /// Refreshed after every authorization flow; empty until then.
+    /// Refreshed after every authorization flow, and once at startup
+    /// from Health Connect itself.
     private final Set<String> granted = new HashSet<String>();
+
+    /// True once the delegate has answered, so an empty set can be told
+    /// apart from "nothing granted".
+    private boolean grantsLoaded;
+    private boolean grantsRequested;
 
     private HealthConnectDelegate delegate() {
         return AndroidHealthSupport.getDelegate();
@@ -152,8 +158,11 @@ class AndroidHealthStore extends HealthStore {
         if (!isSupported() || type == null) {
             return HealthAuthorizationStatus.NOT_SUPPORTED;
         }
+        refreshGrants();
         synchronized (granted) {
-            if (granted.isEmpty()) {
+            if (!grantsLoaded) {
+                // The delegate has not answered yet. Saying DENIED here
+                // would be a guess; NOT_DETERMINED is the honest state.
                 return HealthAuthorizationStatus.NOT_DETERMINED;
             }
             return granted.contains((write ? "w:" : "r:") + type.getId())
@@ -162,9 +171,27 @@ class AndroidHealthStore extends HealthStore {
         }
     }
 
+    /// Asks Health Connect what is already granted, once per process.
+    ///
+    /// Without this the set starts empty after every restart and the
+    /// synchronous status API reports NOT_DETERMINED for permissions the
+    /// user granted long ago -- becoming accurate only after the app
+    /// presents the authorization flow again.
+    private void refreshGrants() {
+        HealthConnectDelegate d = delegate();
+        synchronized (granted) {
+            if (grantsRequested || d == null) {
+                return;
+            }
+            grantsRequested = true;
+        }
+        d.grantedPermissions(new GrantsCallback(this));
+    }
+
     private void rememberGrants(String csv) {
         synchronized (granted) {
             granted.clear();
+            grantsLoaded = true;
             if (csv == null) {
                 return;
             }
@@ -175,6 +202,35 @@ class AndroidHealthStore extends HealthStore {
                     granted.add(t);
                 }
             }
+        }
+    }
+
+    /// Receives the startup grant snapshot.
+    ///
+    /// Named rather than anonymous so SpotBugs does not flag an inner
+    /// class holding the enclosing reference.
+    private static final class GrantsCallback
+            implements HealthConnectDelegate.Callback {
+        private final AndroidHealthStore store;
+
+        GrantsCallback(AndroidHealthStore store) {
+            this.store = store;
+        }
+
+        public void onSuccess(String payload) {
+            store.rememberGrants(payload);
+        }
+
+        public void onError(int code, String message) {
+            // Leave the set unloaded so a later call retries rather than
+            // reporting DENIED for a grant we simply failed to read.
+            store.clearGrantsRequest();
+        }
+    }
+
+    void clearGrantsRequest() {
+        synchronized (granted) {
+            grantsRequested = false;
         }
     }
 

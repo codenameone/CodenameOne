@@ -99,14 +99,25 @@ final class RecordedWorkoutSession extends WorkoutSession {
         workout.setTitle(getConfiguration().getTitle());
         applyTotals(workout);
 
+        final HealthStore store = Health.getInstance().getStore();
+        // Only what this platform can actually store. Neither HealthKit nor
+        // the Health Connect bridge accepts a workout *session* through the
+        // sample write path yet, and sending one made shared validation
+        // reject the whole batch -- failing the session and discarding the
+        // child samples that would have been written perfectly well.
         List<HealthSample> toWrite = new ArrayList<HealthSample>();
-        toWrite.add(workout);
+        if (store.isWritable(HealthDataType.WORKOUT)) {
+            toWrite.add(workout);
+        }
         synchronized (collected) {
-            toWrite.addAll(collected);
+            for (HealthSample s : collected) {
+                if (store.isWritable(s.getType())) {
+                    toWrite.add(s);
+                }
+            }
         }
 
-        HealthStore store = Health.getInstance().getStore();
-        if (!store.isSupported()) {
+        if (!store.isSupported() || toWrite.isEmpty()) {
             // Nowhere to persist it, but the record itself is still real
             // and the caller may want to upload it themselves. Report the
             // workout rather than failing the whole session.
@@ -122,7 +133,10 @@ final class RecordedWorkoutSession extends WorkoutSession {
                     out.error(err);
                     return;
                 }
-                if (!value.getSampleIds().isEmpty()) {
+                if (!value.getSampleIds().isEmpty()
+                        && store.isWritable(HealthDataType.WORKOUT)) {
+                    // The first id belongs to the workout only when the
+                    // workout was part of the batch.
                     workout.setId(value.getSampleIds().get(0));
                 }
                 setState(WorkoutSessionState.ENDED);

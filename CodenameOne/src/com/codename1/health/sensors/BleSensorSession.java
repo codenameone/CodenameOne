@@ -27,6 +27,9 @@ import com.codename1.bluetooth.gatt.GattCharacteristic;
 import com.codename1.bluetooth.gatt.GattNotificationListener;
 import com.codename1.bluetooth.gatt.GattService;
 import com.codename1.bluetooth.le.BlePeripheral;
+import com.codename1.bluetooth.le.ConnectionEvent;
+import com.codename1.bluetooth.le.ConnectionListener;
+import com.codename1.bluetooth.le.ConnectionState;
 import com.codename1.health.HealthError;
 import com.codename1.health.HealthException;
 import com.codename1.util.AsyncResource;
@@ -58,6 +61,7 @@ final class BleSensorSession extends SensorSession {
 
     private final BlePeripheral peripheral;
     private GattCharacteristic measurement;
+    private Reconnector reconnectListener;
 
     BleSensorSession(String sensorId, HealthSensorProfile profile,
             SensorSessionOptions options, BlePeripheral peripheral) {
@@ -69,6 +73,14 @@ final class BleSensorSession extends SensorSession {
     /// measurements can start arriving.
     void start(final AsyncResource<SensorSession> out) {
         setState(SensorSessionState.CONNECTING);
+        if (getOptions().isAutoReconnect() && reconnectListener == null) {
+            // A strap that walks out of range mid-workout otherwise leaves
+            // the session marked STREAMING forever, receiving nothing and
+            // never retrying, which is the opposite of what the default
+            // promises.
+            reconnectListener = new Reconnector(this);
+            peripheral.addConnectionListener(reconnectListener);
+        }
         peripheral.connect().onResult(new AsyncResult<BlePeripheral>() {
             @Override
             public void onReady(BlePeripheral value, Throwable err) {
@@ -79,6 +91,46 @@ final class BleSensorSession extends SensorSession {
                 discover(out);
             }
         });
+    }
+
+    /// Re-runs discovery and subscription after an unexpected drop.
+    void reconnect() {
+        if (getState() == SensorSessionState.STOPPED
+                || !getOptions().isAutoReconnect()) {
+            return;
+        }
+        setState(SensorSessionState.CONNECTING);
+        peripheral.connect().onResult(new AsyncResult<BlePeripheral>() {
+            @Override
+            public void onReady(BlePeripheral value, Throwable err) {
+                if (err == null) {
+                    discover(null);
+                }
+                // A failed retry is not fatal: the listener fires again on
+                // the next transition, so the session keeps trying for as
+                // long as the caller leaves it running.
+            }
+        });
+    }
+
+    /// Watches for the link dropping while the session is still wanted.
+    ///
+    /// Named rather than anonymous so it can be removed again on stop and
+    /// so SpotBugs sees no synthetic outer reference.
+    private static final class Reconnector implements ConnectionListener {
+        private final BleSensorSession session;
+
+        Reconnector(BleSensorSession session) {
+            this.session = session;
+        }
+
+        @Override
+        public void connectionStateChanged(ConnectionEvent event) {
+            if (event.getState() == ConnectionState.DISCONNECTED
+                    && session.getState() != SensorSessionState.STOPPED) {
+                session.reconnect();
+            }
+        }
     }
 
     private void discover(final AsyncResource<SensorSession> out) {
@@ -166,6 +218,7 @@ final class BleSensorSession extends SensorSession {
         // characteristic's own properties, which matters here: blood
         // pressure, weight and temperature are indicate-only.
         peripheral.subscribe(measurement, new GattNotificationListener() {
+            @Override
             public void valueChanged(GattCharacteristic characteristic,
                     byte[] value) {
                 onMeasurement(value, System.currentTimeMillis());
@@ -220,7 +273,16 @@ final class BleSensorSession extends SensorSession {
         if (getState() == SensorSessionState.STOPPED) {
             return;
         }
+        if (reconnectListener != null) {
+            // Removed before the state changes, so the disconnect this
+            // method causes is not mistaken for a dropped link.
+            peripheral.removeConnectionListener(reconnectListener);
+            reconnectListener = null;
+        }
         setState(SensorSessionState.STOPPED);
+        // A short ride would otherwise lose whatever had not reached a
+        // batch boundary yet.
+        flushPendingWrites();
         peripheral.disconnect();
     }
 }
