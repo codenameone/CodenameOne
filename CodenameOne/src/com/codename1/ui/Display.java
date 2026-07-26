@@ -6696,8 +6696,9 @@ public final class Display extends CN1Constants {
     }
 
     /// Whether this build is a development build rather than a release build headed for
-    /// an app store. This is broader than [#isSimulator()], which is true only in the
-    /// simulator. Use it to gate a facility that belongs in a build you are working on but
+    /// an app store. This is broader than [#isSimulator()], which reports the JavaSE
+    /// simulator and designer specifically and is false on a device however the build was
+    /// signed. Use it to gate a facility that belongs in a build you are working on but
     /// not in one a user installs.
     ///
     /// What each port reports:

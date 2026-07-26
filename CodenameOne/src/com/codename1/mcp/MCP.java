@@ -159,10 +159,16 @@ public final class MCP {
     /// trade while developing - it is how an agent attaches to a running app - and a poor
     /// one in an app a user installs.
     ///
-    /// A development build is detected as a debuggable Android package, a development
-    /// provisioned iOS build, or the simulator and desktop tooling. Anything else is
-    /// treated as a release build, so a port that cannot tell withholds the server rather
-    /// than exposing it.
+    /// A development build is detected as a debuggable Android package or a development
+    /// provisioned iOS build. Any other target is treated as a release build, so a port
+    /// that cannot tell withholds the server rather than exposing it.
+    ///
+    /// The JavaSE port is the exception, and it matters here: it reports a development
+    /// build in every case, because it cannot distinguish the simulator, the designer and
+    /// the desktop tooling from a desktop application packaged for distribution. So this
+    /// gate does NOT protect a shipped desktop build, and a desktop application that wants
+    /// the server withheld from its own release has to decide that for itself. See
+    /// [com.codename1.ui.Display#isDebuggableBuild()].
     ///
     /// Set this only for a build that ships to a controlled fleet - a kiosk, a test lab,
     /// an enterprise deployment - where the device itself is trusted.
