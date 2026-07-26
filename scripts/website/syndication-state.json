@@ -1196,6 +1196,24 @@
         "url": "https://dev.to/codenameone/codename-one-settings-is-now-a-standalone-tool-1aj",
         "syndicated_at": "2026-07-26T06:52:04+00:00"
       }
+    },
+    "2026-07-24-1200-shai-javascript-free-open-source": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-07-26T06:56:32+00:00",
+        "account": "shai",
+        "source_slug": "javascript-free-open-source",
+        "scheduled_at": "2026-07-24T09:00:00+00:00"
+      }
+    },
+    "2026-07-25-1200-codenameone-calendar-is-not-add-event": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/company/5041007/admin/page-posts/published/",
+        "syndicated_at": "2026-07-26T06:57:20+00:00",
+        "account": "codenameone",
+        "source_slug": "calendar-is-not-add-event",
+        "scheduled_at": "2026-07-25T09:00:00+00:00"
+      }
     }
   }
 }

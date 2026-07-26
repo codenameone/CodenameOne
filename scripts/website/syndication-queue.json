@@ -24,38 +24,6 @@
       "queued_at": "2026-07-26T06:52:36+00:00"
     },
     {
-      "id": "linkedin:2026-07-24-1200-shai-javascript-free-open-source",
-      "site": "linkedin",
-      "kind": "social",
-      "slug": "2026-07-24-1200-shai-javascript-free-open-source",
-      "source_slug": "javascript-free-open-source",
-      "account": "shai",
-      "title": "The Codename One JavaScript port is now free and open source",
-      "canonical": "https://www.codenameone.com/blog/javascript-free-open-source/",
-      "cover_image_url": "https://www.codenameone.com/blog/javascript-free-open-source.jpg",
-      "body_text": "The Codename One JavaScript port is now open source and available on every plan, including Free.\n\nYou can also build the web target locally without a Codename One account. ParparVM is now the default compiler, with TeaVM still available through `javascript.port=teavm`.\n\nParparVM runs Java in a Web Worker and keeps browser integration in the port layer. Because we control the translator, runtime, port, and tests, shared framework changes now go through browser testing in our regular CI.\n\nThe local builder can also generate deployment proxies for Jakarta Servlet, `javax.servlet`, Node, PHP, AWS Lambda, Google Cloud Functions, and Cloudflare Workers.\n\nJavaScript builds were previously an Enterprise feature and a meaningful source of revenue. We expect this change to reduce that revenue, which made it a difficult decision for a small company.\n\nWe chose broader access because the port will improve faster when more applications build and test against it. I wrote about the architecture, local builds, deployment proxies, and how the community can help.\n\nhttps://www.codenameone.com/blog/javascript-free-open-source/",
-      "scheduled_at": "2026-07-24T09:00:00+00:00",
-      "scheduled_local": "2026-07-24T12:00+03:00",
-      "timezone": "Asia/Jerusalem",
-      "queued_at": "2026-07-26T06:52:36+00:00"
-    },
-    {
-      "id": "linkedin:2026-07-25-1200-codenameone-calendar-is-not-add-event",
-      "site": "linkedin",
-      "kind": "social",
-      "slug": "2026-07-25-1200-codenameone-calendar-is-not-add-event",
-      "source_slug": "calendar-is-not-add-event",
-      "account": "codenameone",
-      "title": "Calendar API with local calendars, cloud sync, and conflict handling",
-      "canonical": "https://www.codenameone.com/blog/calendar-is-not-add-event/",
-      "cover_image_url": "https://www.codenameone.com/blog/calendar-is-not-add-event.jpg",
-      "body_text": "The new `com.codename1.calendar` API supports local calendars, cloud providers, recurrence, tasks, offline changes, and conflict handling through one model:\n\n\u2022 Android Calendar Provider and Apple EventKit\n\u2022 Google Calendar and Tasks\n\u2022 Microsoft Graph and To Do\n\u2022 CalDAV and RFC 5545 import/export\n\u2022 version tokens, conflicts, delta sync, and offline mutation queues\n\nApplications query capabilities instead of platform names. The simulator uses an isolated in-memory calendar, so a test never edits the developer's real schedule.\n\nVersion tokens prevent a stale edit from silently overwriting a newer provider copy. Incremental sync uses provider delta tokens, while an optional local cache queues offline mutations for the next sync.\n\nProvider webhooks and OAuth credentials remain application and backend responsibilities.\n\nhttps://www.codenameone.com/blog/calendar-is-not-add-event/",
-      "scheduled_at": "2026-07-25T09:00:00+00:00",
-      "scheduled_local": "2026-07-25T12:00+03:00",
-      "timezone": "Asia/Jerusalem",
-      "queued_at": "2026-07-26T06:52:36+00:00"
-    },
-    {
       "id": "linkedin:2026-07-26-1200-codenameone-bluetooth-beyond-ble",
       "site": "linkedin",
       "kind": "social",
