@@ -3062,20 +3062,20 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         // sitting at a single (upper-bounded) epoch. That holds iff:
         //   * !gcAllocedSinceSweep  -> nothing was allocated into it since its last
         //       sweep, so it has NO fresh mark==-1 grace-candidate slots; and
-        //   * gcLastMarkedEpoch != V -> nothing on it was marked THIS cycle, so it holds
-        //       no live (reachable) object -- a reachable object is always marked, so an
-        //       unmarked-this-cycle occupant is unreachable garbage in grace-aging; and
+        //   * gcLastMarkedEpoch < V-1 -> nothing on it was marked THIS cycle OR THE
+        //       PREVIOUS one, so every occupant is below the per-slot walk's free
+        //       threshold. "!= V" is NOT sufficient and was the bug fixed here: it
+        //       admits a page whose newest slot is at V-1, which that walk keeps; and
         //   * !gcNeedsReclaim       -> no survivor carries a finalizer (monitors handled
         //       by the page's sticky gcHasMonitors flag); and
         //   * freeList == 0         -> the page is full (defensive: a homogeneous page
         //       can only reach here full -- a partial page, once adopted, is always
         //       allocated into before re-retire, which sets gcAllocedSinceSweep).
         // gcGraceEpoch is the upper bound on survivor epochs as of the last full walk.
-        // gcLastMarkedEpoch < V-1, not != V. The per-slot walk frees on m < V-1,
-        // so a slot marked at V-1 SURVIVES it; testing only != V let this
-        // shortcut drop whole pages holding such slots, freeing them a full
-        // cycle earlier than the rule it claims to reproduce. Measured on the
-        // issue-5425 workload: 232,882 slots freed early in one run.
+        // Why that bound matters, since this shortcut claims to reproduce the
+        // per-slot walk exactly: testing != V let it drop whole pages holding
+        // V-1 slots, freeing them a full cycle earlier than the walk would.
+        // Measured on the issue-5425 workload: 26,924 slots in one run.
         //
         // That is what left kept objects pointing into reclaimed memory. The
         // legacy sweep ages on the same m < V-1 rule, so a matured
@@ -3136,7 +3136,11 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                         if(__o->__codenameOneGcMark == V - 1) {
                             cn1GcVerifyEarlyFreed++;
                             static int __dbg = 0;
-                            if(getenv("CN1_GC_DEBUG_EARLY") && __dbg < 6) {
+                            // Cached: the earlyfree self-test drives tens of
+                            // thousands of these, and getenv scans the block.
+                            static int __dbgOn = -1;
+                            if(__dbgOn < 0) __dbgOn = getenv("CN1_GC_DEBUG_EARLY") ? 1 : 0;
+                            if(__dbgOn && __dbg < 6) {
                                 __dbg++;
                                 fprintf(stderr, "[EARLY] V=%d graceEpoch=%d lastMarked=%d "
                                         "slotMark=%d heapPos=%d cls=%s alloced=%d adopted=%d\n",
