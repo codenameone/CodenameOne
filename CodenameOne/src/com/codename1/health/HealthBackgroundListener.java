@@ -60,12 +60,17 @@ package com.codename1.health;
 /// }
 /// ```
 ///
-/// #### Keep the class reachable
+/// #### You do not need to keep the class reachable
 ///
-/// The class is instantiated by name, so nothing in your code refers to it
-/// directly and a dead-code eliminator may strip it. Reference it
-/// somewhere reachable -- the `subscribe` call itself is enough -- exactly
-/// as background location requires.
+/// The build server scans for implementations of this interface and
+/// generates a factory that constructs each one with a direct `new`
+/// expression, then registers it during app startup. Because the generated
+/// binding is a real reference rather than a string, dead-code elimination
+/// and obfuscation both follow it correctly -- so unlike some older
+/// callback APIs in this framework, there is nothing you have to do to
+/// stop your listener being stripped from a release build.
+///
+/// See [HealthBackgroundListenerFactory].
 public interface HealthBackgroundListener {
 
     /// Called with the changes accumulated since the last delivery.

@@ -837,37 +837,53 @@ public class HealthStore {
         };
     }
 
-    // The listener class name is persisted at registration so the
-    // subscription can survive the process being killed; when the OS
-    // relaunches us there is no Class literal to work from, so reflective
-    // resolution is unavoidable. Same reasoning as
-    // GeofenceManager.getListenerClass().
-    @SuppressWarnings("BanClassForName")
     private HealthChangeListener resolveBackgroundListener(String id) {
         String className = Preferences.get(PREF_LISTENER + id, null);
         if (className == null) {
             return null;
         }
-        try {
-            Object o = Class.forName(className).newInstance();
-            if (o instanceof HealthChangeListener) {
-                return (HealthChangeListener) o;
-            }
-            final HealthBackgroundListener bg = (HealthBackgroundListener) o;
-            return new HealthChangeListener() {
-                public void healthDataChanged(HealthChangeBatch batch) {
-                    bg.healthDataChanged(batch);
-                }
-            };
-        } catch (Throwable t) {
-            com.codename1.io.Log.p("Health: could not instantiate background"
-                    + " listener " + className + " for subscription " + id
-                    + ". It must be a public top-level class with a public"
-                    + " no-argument constructor, and must survive dead-code"
-                    + " elimination.");
-            com.codename1.io.Log.e(t);
+        HealthBackgroundListenerFactory f = backgroundListenerFactory;
+        if (f == null) {
+            // No generated bindings in this build. Nothing is lost: the
+            // caller returns without advancing the anchor, so the changes
+            // are redelivered once a listener is registered.
+            com.codename1.io.Log.p("Health: subscription " + id + " has a"
+                    + " background listener but this build contains no"
+                    + " generated bindings, so the delivery is deferred."
+                    + " This is expected in the simulator and in unit"
+                    + " tests; on device the build server generates them.");
             return null;
         }
+        final HealthBackgroundListener bg = f.create(className);
+        if (bg == null) {
+            com.codename1.io.Log.p("Health: no generated binding for"
+                    + " background listener " + className + " (subscription "
+                    + id + "). It must be a public top-level class with a"
+                    + " public no-argument constructor implementing"
+                    + " HealthBackgroundListener.");
+            return null;
+        }
+        return new HealthChangeListener() {
+            public void healthDataChanged(HealthChangeBatch batch) {
+                bg.healthDataChanged(batch);
+            }
+        };
+    }
+
+    private static volatile HealthBackgroundListenerFactory
+            backgroundListenerFactory;
+
+    /// Installs the build-generated factory that constructs background
+    /// listeners after a process relaunch.
+    ///
+    /// Called by code the build server injects into app startup, in the
+    /// same way the Android port's native bridges are registered. There is
+    /// deliberately no reflective fallback -- see
+    /// [HealthBackgroundListenerFactory] for why resolving a class by name
+    /// is the wrong mechanism on these targets.
+    public static void setBackgroundListenerFactory(
+            HealthBackgroundListenerFactory factory) {
+        backgroundListenerFactory = factory;
     }
 
     /// The persisted cursor for a subscription, or null to start fresh.
