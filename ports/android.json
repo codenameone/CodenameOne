@@ -1,48 +1,48 @@
 {
   "commit": "0bd3022695323abd475c1e9af985db84490413c8",
-  "generated_at": "2026-07-26T02:01:15Z",
+  "generated_at": "2026-07-26T04:52:39Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 302434910
+        "duration_ns": 242521492
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 34263398
+        "duration_ns": 27925976
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 299207833
+        "duration_ns": 283744708
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 187888992
+        "duration_ns": 153383372
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 150027666
+        "duration_ns": 106092774
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 4766325808
+        "duration_ns": 2818737244
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 144202012
+        "duration_ns": 137666196
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 155460035
+        "duration_ns": 151131168
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 764116730
+        "duration_ns": 540184526
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 306141223
+        "duration_ns": 240014788
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -51,7 +51,7 @@
     "suite_checksum": 0
   },
   "port": "android",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30183317281",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30188013192",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
