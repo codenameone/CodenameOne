@@ -241,6 +241,18 @@ class PushClientTransportTest extends UITestBase {
                 "{\"id\":\"subscription-1\"}".getBytes("UTF-8")));
     }
 
+    @Test
+    void subscriptionRejectsBlankTransportAndTokenValues() {
+        assertThrows(IllegalArgumentException.class, () -> new PushSubscription(
+                "", "token", "test", "installation", 0, null));
+        assertThrows(IllegalArgumentException.class, () -> new PushSubscription(
+                "   ", "token", "test", "installation", 0, null));
+        assertThrows(IllegalArgumentException.class, () -> new PushSubscription(
+                "fcm", "", "test", "installation", 0, null));
+        assertThrows(IllegalArgumentException.class, () -> new PushSubscription(
+                "fcm", "\t", "test", "installation", 0, null));
+    }
+
     private PushClient track(PushClient client) {
         activeClient = client;
         return client;

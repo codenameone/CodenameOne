@@ -54,11 +54,12 @@ public final class PushSubscription {
     ///                  the provider supplies no expiry
     /// @param capabilities immutable capability identifiers, or {@code null}
     /// @throws IllegalArgumentException if {@code transportId} or {@code token}
-    ///                                  is null
+    ///                                  is null or blank
     public PushSubscription(String transportId, String token, String platform,
             String installationId, long expiresAt, List<String> capabilities) {
-        if (transportId == null || token == null) {
-            throw new IllegalArgumentException("transportId and token are required");
+        if (transportId == null || transportId.trim().length() == 0
+                || token == null || token.trim().length() == 0) {
+            throw new IllegalArgumentException("transportId and token must not be blank");
         }
         this.transportId = transportId;
         this.token = token;

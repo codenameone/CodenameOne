@@ -875,9 +875,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             String messageId = message.optString("id", null);
             String notificationTag;
             if (collapseKey != null && collapseKey.length() > 0) {
-                notificationTag = "CN1_PUSH_V3_COLLAPSE:" + collapseKey;
+                notificationTag = v3NotificationTag("CN1_PUSH_V3_COLLAPSE:", collapseKey);
             } else if (messageId != null && messageId.length() > 0) {
-                notificationTag = "CN1_PUSH_V3_MESSAGE:" + messageId;
+                notificationTag = v3NotificationTag("CN1_PUSH_V3_MESSAGE:", messageId);
             } else {
                 notificationTag = "CN1_PUSH_V3_EPHEMERAL:" + System.currentTimeMillis()
                         + ":" + V3_NOTIFICATION_SEQUENCE.incrementAndGet();
@@ -885,6 +885,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             manager.notify(notificationTag, 0, builder.build());
         } catch (Exception error) {
             Log.e("Codename One", "Failed to handle a Push V3 envelope", error);
+        }
+    }
+
+    private static String v3NotificationTag(String prefix, String value) {
+        if (prefix.length() + value.length() <= 128) {
+            return prefix + value;
+        }
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder out = new StringBuilder(prefix.length() + digest.length * 2);
+            out.append(prefix);
+            for (byte item : digest) {
+                int unsigned = item & 0xff;
+                if (unsigned < 0x10) {
+                    out.append('0');
+                }
+                out.append(Integer.toHexString(unsigned));
+            }
+            return out.toString();
+        } catch (Exception error) {
+            return prefix + Integer.toHexString(value.hashCode());
         }
     }
     
@@ -10587,9 +10609,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             Log.d("Codename One", "Device doesn't have Android market/google play can't register for push!");
             return;
         }
-        String id = (String)metaData.get(com.codename1.push.Push.GOOGLE_PUSH_KEY);
-        if (id == null) {
-            id = Display.getInstance().getProperty("gcm.sender_id", null);
+        String id = "";
+        if (!huawei) {
+            id = (String)metaData.get(com.codename1.push.Push.GOOGLE_PUSH_KEY);
+            if (id == null) {
+                id = Display.getInstance().getProperty("gcm.sender_id", null);
+            }
         }
         Log.d("Codename One", "Sending async push request for id: " + id);
         ((CodenameOneActivity) getActivity()).registerForPush(id);
