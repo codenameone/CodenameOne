@@ -24,22 +24,6 @@
       "queued_at": "2026-07-26T06:52:36+00:00"
     },
     {
-      "id": "linkedin:2026-07-26-1200-codenameone-bluetooth-beyond-ble",
-      "site": "linkedin",
-      "kind": "social",
-      "slug": "2026-07-26-1200-codenameone-bluetooth-beyond-ble",
-      "source_slug": "bluetooth-beyond-ble",
-      "account": "codenameone",
-      "title": "Bluetooth support across every Codename One target",
-      "canonical": "https://www.codenameone.com/blog/bluetooth-beyond-ble/",
-      "cover_image_url": "https://www.codenameone.com/blog/bluetooth-beyond-ble.jpg",
-      "body_text": "Bluetooth is now part of the Codename One core API and works across every target, including JavaScript. The API covers:\n\n\u2022 BLE peripheral mode and local GATT servers\n\u2022 notifications and queued GATT operations\n\u2022 L2CAP byte streams\n\u2022 classic RFCOMM for scanners and printers\n\u2022 Web Bluetooth for browser builds\n\u2022 a simulator that can delay or fail the next radio operation\n\u2022 a native desktop backend for testing against real devices\n\nNot every role exists on every platform. Web Bluetooth uses the browser chooser and central GATT only. iOS does not expose arbitrary RFCOMM. Capability queries make those limits part of the API.\n\nThe builders inspect the roles an app references and add only the matching permissions and native pieces.\n\nhttps://www.codenameone.com/blog/bluetooth-beyond-ble/",
-      "scheduled_at": "2026-07-26T09:00:00+00:00",
-      "scheduled_local": "2026-07-26T12:00+03:00",
-      "timezone": "Asia/Jerusalem",
-      "queued_at": "2026-07-26T06:52:36+00:00"
-    },
-    {
       "id": "linkedin:2026-07-27-1200-shai-text-input-without-native-overlay",
       "site": "linkedin",
       "kind": "social",
