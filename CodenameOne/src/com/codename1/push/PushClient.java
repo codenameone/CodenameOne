@@ -129,7 +129,7 @@ public final class PushClient {
             return;
         }
         PushClient current = active.get();
-        if (current != null && current != this) {
+        if (current != null && !current.equals(this)) {
             registrationFailed();
             fireError(new PushError("active_client",
                     "Another PushClient is already active", false));
@@ -140,7 +140,7 @@ public final class PushClient {
             synchronized (pendingMessages) {
                 if (pendingMessages.isEmpty()) {
                     current = active.get();
-                    if (current != null && current != this) {
+                    if (current != null && !current.equals(this)) {
                         registrationFailed();
                         fireError(new PushError("active_client",
                                 "Another PushClient is already active", false));
