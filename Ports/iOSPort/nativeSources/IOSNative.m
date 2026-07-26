@@ -10875,25 +10875,46 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDebuggableBuild___R_boolean(CN1_
     if(path != nil) {
         NSData* data = [NSData dataWithContentsOfFile:path];
         if(data != nil) {
-            // The profile is CMS signed, so it is not parseable as a plist; the embedded
-            // XML is plain text inside it. Latin-1 never fails on arbitrary bytes.
-            NSString* text = [[NSString alloc] initWithData:data encoding:NSISOLatin1StringEncoding];
-            if(text != nil) {
-                NSRange key = [text rangeOfString:@"get-task-allow"];
-                if(key.location != NSNotFound) {
-                    NSUInteger from = key.location + key.length;
-                    NSUInteger avail = [text length] - from;
-                    NSUInteger span = avail < 64 ? avail : 64;
-                    NSRange after = NSMakeRange(from, span);
-                    if([text rangeOfString:@"<true/>" options:0 range:after].location != NSNotFound) {
-                        result = JAVA_TRUE;
+            // The profile is CMS signed, so the file as a whole is not a plist, but the
+            // payload it wraps is one. Cut it out and parse it properly.
+            //
+            // Do NOT do this by looking for "get-task-allow" and then hunting nearby for
+            // <true/>: the value that follows it is <false/> in a distribution profile, and
+            // the very next entitlement is often beta-reports-active, whose <true/> sits
+            // about 53 characters later. Any proximity window wide enough to be useful
+            // matches it, and the mistake lands on the unsafe side - a shipped build
+            // classified as debuggable.
+            NSData* startMarker = [@"<?xml" dataUsingEncoding:NSUTF8StringEncoding];
+            NSData* endMarker = [@"</plist>" dataUsingEncoding:NSUTF8StringEncoding];
+            NSRange whole = NSMakeRange(0, [data length]);
+            NSRange start = [data rangeOfData:startMarker options:0 range:whole];
+            if(start.location != NSNotFound) {
+                NSRange rest = NSMakeRange(start.location, [data length] - start.location);
+                NSRange end = [data rangeOfData:endMarker options:0 range:rest];
+                if(end.location != NSNotFound) {
+                    NSUInteger length = end.location + end.length - start.location;
+                    NSData* plistData = [data subdataWithRange:NSMakeRange(start.location, length)];
+                    id plist = [NSPropertyListSerialization propertyListWithData:plistData
+                                                                        options:NSPropertyListImmutable
+                                                                         format:NULL
+                                                                          error:NULL];
+                    if([plist isKindOfClass:[NSDictionary class]]) {
+                        id entitlements = [(NSDictionary*)plist objectForKey:@"Entitlements"];
+                        if([entitlements isKindOfClass:[NSDictionary class]]) {
+                            id allowed = [(NSDictionary*)entitlements objectForKey:@"get-task-allow"];
+                            if([allowed isKindOfClass:[NSNumber class]]) {
+                                result = [(NSNumber*)allowed boolValue] ? JAVA_TRUE : JAVA_FALSE;
+                            }
+                        }
                     }
                 }
-                [text release];
             }
         }
     }
     POOL_END();
+    // Every path that could not read an answer leaves result JAVA_FALSE: an unreadable or
+    // unexpected profile means "treat this as a release build", which withholds the
+    // facility rather than exposing it.
     return result;
 #endif
 }
