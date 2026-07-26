@@ -57,7 +57,8 @@ class PushMessageTest {
     void rejectsAnEnvelopeWithoutTheCurrentSchema() {
         IOException error = assertThrows(IOException.class,
                 () -> PushMessage.parse("{\"schema\":2,\"body\":\"old\"}"));
-        assertTrue(error.getMessage().contains("schema"));
+        assertTrue(error.getMessage().contains("schema 2"));
+        assertTrue(error.getMessage().contains("minimum supported schema is 3"));
     }
 
     @Test
@@ -118,5 +119,13 @@ class PushMessageTest {
 
         assertTrue(message.getData().isEmpty());
         assertTrue(!message.toMap().containsKey("data"));
+    }
+
+    @Test
+    void rejectsNonPositiveTimeToLive() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PushMessage.builder().ttlSeconds(0));
+        assertThrows(IllegalArgumentException.class,
+                () -> PushMessage.builder().ttlSeconds(-1));
     }
 }

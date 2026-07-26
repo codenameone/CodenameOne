@@ -72,7 +72,8 @@ public final class PushMessage {
         }
         Object schema = parsed.get("schema");
         if (!(schema instanceof Number) || ((Number) schema).intValue() < SCHEMA_VERSION) {
-            throw new IOException("Unsupported push envelope schema");
+            throw new IOException("Unsupported push envelope schema " + String.valueOf(schema)
+                    + "; minimum supported schema is " + SCHEMA_VERSION);
         }
         return new PushMessage(parsed);
     }
@@ -214,6 +215,9 @@ public final class PushMessage {
         /// @param value positive lifetime in seconds
         /// @return this builder
         public Builder ttlSeconds(int value) {
+            if (value <= 0) {
+                throw new IllegalArgumentException("Push TTL must be greater than zero");
+            }
             values.put("ttl", Integer.valueOf(value));
             return this;
         }

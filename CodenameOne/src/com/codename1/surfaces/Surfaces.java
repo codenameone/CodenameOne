@@ -27,6 +27,7 @@ import com.codename1.surfaces.spi.SurfaceBridge;
 import com.codename1.ui.Display;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -152,7 +153,7 @@ public final class Surfaces {
         if (b == null || !b.areWidgetsSupported() || kindId == null || timelineJson == null) {
             return;
         }
-        b.publishWidgetTimeline(kindId, timelineJson, new LinkedHashMap<String, byte[]>());
+        b.publishWidgetTimeline(kindId, timelineJson, Collections.<String, byte[]>emptyMap());
     }
 
     /// Asks the platform to re-render widgets from their already-published timelines.

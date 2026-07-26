@@ -128,34 +128,27 @@ public final class PushClient {
                     transport.getId() + " is unavailable", false));
             return;
         }
-        PushClient current = active.get();
-        if (current != null && !current.equals(this)) {
-            registrationFailed();
-            fireError(new PushError("active_client",
-                    "Another PushClient is already active", false));
-            return;
+        List<String> replay;
+        synchronized (pendingMessages) {
+            PushClient current = active.get();
+            if (current != null && !current.equals(this)) {
+                registrationFailed();
+                fireError(new PushError("active_client",
+                        "Another PushClient is already active", false));
+                return;
+            }
+            if (current == null && !active.compareAndSet(null, this)) {
+                registrationFailed();
+                fireError(new PushError("active_client",
+                        "Another PushClient became active during registration", false));
+                return;
+            }
+            CodenameOneImplementation.setPushCallback(compatibilityCallback);
+            replay = new ArrayList<String>(pendingMessages);
+            pendingMessages.clear();
         }
-        while (true) {
-            List<String> replay;
-            synchronized (pendingMessages) {
-                if (pendingMessages.isEmpty()) {
-                    current = active.get();
-                    if (current != null && !current.equals(this)) {
-                        registrationFailed();
-                        fireError(new PushError("active_client",
-                                "Another PushClient is already active", false));
-                        return;
-                    }
-                    active.compareAndSet(null, this);
-                    CodenameOneImplementation.setPushCallback(compatibilityCallback);
-                    break;
-                }
-                replay = new ArrayList<String>(pendingMessages);
-                pendingMessages.clear();
-            }
-            for (String message : replay) {
-                receive(message);
-            }
+        for (String message : replay) {
+            receive(message);
         }
         if (transport == null) {
             Display.getInstance().registerPush();
@@ -343,7 +336,10 @@ public final class PushClient {
         final Map<String, Object> body = new LinkedHashMap<String, Object>();
         body.put("provider", value.getTransportId());
         body.put("token", value.getToken());
-        body.put("installationId", installationId());
+        String subscriptionInstallationId = value.getInstallationId();
+        body.put("installationId", subscriptionInstallationId == null
+                || subscriptionInstallationId.length() == 0
+                ? installationId() : subscriptionInstallationId);
         ConnectionRequest request = new ConnectionRequest() {
             @Override
             protected void postResponse() {
@@ -422,7 +418,10 @@ public final class PushClient {
     }
 
     private static final class ManagedUnregisterRequest extends ConnectionRequest {
+        private final String subscriptionId;
+
         ManagedUnregisterRequest(String appId, String subscriptionId) {
+            this.subscriptionId = subscriptionId;
             setUrl(endpoint("/subscriptions/") + subscriptionId);
             setHttpMethod("DELETE");
             addRequestHeader("X-CN1-Push-App", appId);
@@ -431,8 +430,7 @@ public final class PushClient {
 
         private void removePersistedId() {
             String persistedId = Preferences.get("push_v3_subscription", null);
-            if (persistedId != null
-                    && getUrl().equals(endpoint("/subscriptions/") + persistedId)) {
+            if (subscriptionId.equals(persistedId)) {
                 Preferences.delete("push_v3_subscription");
             }
         }

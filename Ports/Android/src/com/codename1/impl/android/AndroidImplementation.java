@@ -839,6 +839,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         try {
             org.json.JSONObject message = new org.json.JSONObject(envelope);
+            // The pending-push file explicitly encodes whether a legacy type is present.
+            // A missing type is the sentinel for a typed V3 envelope and is replayed intact.
             appendNotification(null, envelope, context);
             if (message.optBoolean("silent", false)) {
                 return;
@@ -882,7 +884,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             manager.notify(notificationTag, 0, builder.build());
         } catch (Exception error) {
-            error.printStackTrace();
+            Log.e("Codename One", "Failed to handle a Push V3 envelope", error);
         }
     }
     
