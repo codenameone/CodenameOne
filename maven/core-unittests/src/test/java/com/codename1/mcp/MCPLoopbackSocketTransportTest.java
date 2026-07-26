@@ -90,6 +90,25 @@ class MCPLoopbackSocketTransportTest {
     }
 
     @Test
+    void keepsACarriageReturnThatIsNotPartOfTheDelimiter() throws Exception {
+        // Only CR immediately before LF is delimiter punctuation. A CR anywhere else is
+        // payload, and a transport must hand up the bytes it was given rather than edit
+        // them, however unlikely the sender.
+        MCPLoopbackSocketTransport t = attached("{\"a\":\"x\ry\"}\n");
+        assertEquals("{\"a\":\"x\ry\"}", t.readMessage(),
+                "a carriage return inside the payload must survive the framing");
+    }
+
+    @Test
+    void treatsOnlyTheFinalCarriageReturnAsDelimiterPunctuation() throws Exception {
+        // "\r\r\n" is one payload CR followed by a CRLF delimiter; consuming both CRs
+        // would corrupt the message, and consuming neither would leave a stray byte.
+        MCPLoopbackSocketTransport t = attached("ab\r\r\n");
+        assertEquals("ab\r", t.readMessage(),
+                "the trailing CRLF is the delimiter; the CR before it is content");
+    }
+
+    @Test
     void writesMessagesWithATrailingDelimiter() throws Exception {
         transport = new MCPLoopbackSocketTransport(47811);
         ByteArrayOutputStream toClient = new ByteArrayOutputStream();

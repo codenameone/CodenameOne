@@ -11864,7 +11864,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(peer == 0) {
             return null;
         }
-        return new Long(peer);
+        return Long.valueOf(peer);
     }
     
     @Override

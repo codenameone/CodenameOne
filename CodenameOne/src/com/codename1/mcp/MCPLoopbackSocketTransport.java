@@ -165,6 +165,10 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
     /// after a reconnect.
     private String readLine(InputStream stream) throws IOException {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        // A carriage return is only part of the delimiter when a newline follows it, so it
+        // is held back one byte rather than dropped. Dropping every CR would silently edit
+        // a payload that happened to contain one.
+        boolean pendingCarriageReturn = false;
         while (true) {
             int b;
             try {
@@ -180,12 +184,21 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
                 // whole point of this transport is to stay bound and await a reconnect.
                 return null;
             }
+            if (pendingCarriageReturn) {
+                pendingCarriageReturn = false;
+                if (b == '\n') {
+                    return toUtf8(buffer);          // the CR belonged to a CRLF delimiter
+                }
+                buffer.write('\r');                 // it belonged to the payload after all
+            }
+            if (b == '\r') {
+                pendingCarriageReturn = true;
+                continue;
+            }
             if (b == '\n') {
                 return toUtf8(buffer);
             }
-            if (b != '\r') {
-                buffer.write(b);
-            }
+            buffer.write(b);
         }
     }
 
