@@ -20,18 +20,16 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-/*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- */
 package com.codename1.ai.inference;
 
 import com.codename1.impl.InferenceImpl;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.junit.UITestBase;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.Test;
 
+import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -48,6 +46,58 @@ class InferenceApiTest extends UITestBase {
         assertArrayEquals(new float[] {1, 2}, (float[]) tensor.getData());
         assertThrows(IllegalArgumentException.class, () ->
                 Tensor.floats("bad", new int[] {3}, new float[] {1, 2}));
+        assertThrows(IllegalArgumentException.class, () ->
+                Tensor.bytes("overflow", TensorType.UINT8,
+                        new int[] {Integer.MAX_VALUE, 2}, new byte[] {1}));
+    }
+
+    @Test
+    void modelCacheCompletionIsSingleShot() {
+        AsyncResource<String> resource = new AsyncResource<String>();
+        ModelCache.Completion<String> completion =
+                new ModelCache.Completion<String>(resource);
+        completion.complete("first");
+        completion.fail(new RuntimeException("late failure"));
+        completion.complete("second");
+        flushSerialCalls();
+        assertEquals("first", resource.get());
+    }
+
+    @Test
+    void modelCacheRejectsInsecureAndMalformedRequests() {
+        assertThrows(IllegalArgumentException.class,
+                () -> ModelCache.fetch("http://example.com/model.tflite", "model"));
+        assertThrows(IllegalArgumentException.class,
+                () -> ModelCache.fetch("https://example.com/model.tflite", ""));
+        assertThrows(IllegalArgumentException.class,
+                () -> ModelCache.fetch("https://example.com/model.tflite", "model", "xyz"));
+        assertThrows(IllegalArgumentException.class,
+                () -> ModelCache.fetch("https://example.com/model.tflite", "model",
+                        "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"));
+    }
+
+    @Test
+    void modelCacheDiscardsPartialAndDigestMismatchFiles() throws Exception {
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        String temporary = fs.getAppHomePath() + "model-cache-test.download";
+        write(temporary, new byte[] {1, 2, 3});
+        ModelCache.prepareTemporary(fs, temporary);
+        assertFalse(fs.exists(temporary), "a previous partial download must not be resumed");
+
+        write(temporary, new byte[] {4, 5, 6});
+        assertThrows(java.io.IOException.class, () ->
+                ModelCache.verifyDownloaded(fs, temporary,
+                        "0000000000000000000000000000000000000000000000000000000000000000"));
+        assertFalse(fs.exists(temporary), "a digest mismatch must delete executable data");
+    }
+
+    private static void write(String path, byte[] value) throws Exception {
+        OutputStream output = FileSystemStorage.getInstance().openOutputStream(path);
+        try {
+            output.write(value);
+        } finally {
+            output.close();
+        }
     }
 
     @Test

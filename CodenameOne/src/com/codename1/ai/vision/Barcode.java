@@ -22,7 +22,11 @@
  */
 package com.codename1.ai.vision;
 
-/// Portable barcode observation.
+/// Portable barcode observation with normalized geometry. Format names are
+/// backend-neutral constants such as {@code QR_CODE}, {@code DATA_MATRIX},
+/// {@code CODE_128}, and {@code EAN_13}; unknown symbologies use
+/// {@code UNKNOWN}. Corner points are ordered around the code when supplied
+/// by the backend and may be empty when geometry is unavailable.
 public final class Barcode {
     private final String value;
     private final String format;
@@ -31,11 +35,24 @@ public final class Barcode {
     private final VisionPoint[] corners;
     private final VisionMetadata metadata;
 
+    /// Creates a barcode without backend metadata.
+    /// @param value decoded display value, or {@code null}
+    /// @param format normalized symbology name
+    /// @param rawBytes original payload bytes when available
+    /// @param bounds normalized top-left-origin bounds
+    /// @param corners normalized corner points
     public Barcode(String value, String format, byte[] rawBytes,
                    VisionRect bounds, VisionPoint[] corners) {
         this(value, format, rawBytes, bounds, corners, null);
     }
 
+    /// Creates a complete barcode observation.
+    /// @param value decoded display value, or {@code null}
+    /// @param format normalized symbology name
+    /// @param rawBytes original payload bytes when available
+    /// @param bounds normalized top-left-origin bounds
+    /// @param corners normalized corner points
+    /// @param metadata backend identity and optional diagnostic values
     public Barcode(String value, String format, byte[] rawBytes,
                    VisionRect bounds, VisionPoint[] corners,
                    VisionMetadata metadata) {
@@ -52,28 +69,34 @@ public final class Barcode {
         this.metadata = metadata;
     }
 
+    /// @return decoded display value, or {@code null} when decoding failed
     public String getValue() {
         return value;
     }
 
+    /// @return normalized symbology name, never a vendor numeric identifier
     public String getFormat() {
         return format;
     }
 
+    /// @return a defensive copy of payload bytes, or {@code null} if unavailable
     public byte[] getRawBytes() {
         return copy(rawBytes);
     }
 
+    /// @return normalized top-left-origin bounds
     public VisionRect getBounds() {
         return bounds;
     }
 
+    /// @return defensive copy of normalized corners; possibly empty
     public VisionPoint[] getCorners() {
         VisionPoint[] out = new VisionPoint[corners.length];
         System.arraycopy(corners, 0, out, 0, corners.length);
         return out;
     }
 
+    /// @return backend metadata, or {@code null} for manually created results
     public VisionMetadata getMetadata() {
         return metadata;
     }

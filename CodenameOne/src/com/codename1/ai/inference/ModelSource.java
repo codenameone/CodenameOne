@@ -22,7 +22,10 @@
  */
 package com.codename1.ai.inference;
 
-/// A `.tflite` model supplied as bytes, a filesystem path, or an app resource.
+/// Describes where an {@link InferenceSession} should obtain a `.tflite`
+/// model. Byte sources are defensively copied. File sources are especially
+/// useful with {@link ModelCache} because native ports can open the cached
+/// path without loading the full model into the Java heap.
 public final class ModelSource {
     public static final int BYTES = 1;
     public static final int FILE = 2;
@@ -38,6 +41,9 @@ public final class ModelSource {
         this.path = path;
     }
 
+    /// Creates an in-memory model source.
+    /// @param value complete model bytes, copied by this method
+    /// @return a byte-backed source
     public static ModelSource bytes(byte[] value) {
         if (value == null || value.length == 0) {
             throw new IllegalArgumentException("Model bytes must not be empty");
@@ -47,10 +53,16 @@ public final class ModelSource {
         return new ModelSource(BYTES, copy, null);
     }
 
+    /// Creates a source for an existing private filesystem path.
+    /// @param path path understood by {@code FileSystemStorage}
+    /// @return a file-backed source; the session never owns or deletes the file
     public static ModelSource file(String path) {
         return named(FILE, path);
     }
 
+    /// Creates a source for a model packaged in application resources.
+    /// @param path absolute classpath-style resource path
+    /// @return a resource-backed source
     public static ModelSource resource(String path) {
         return named(RESOURCE, path);
     }
@@ -62,10 +74,12 @@ public final class ModelSource {
         return new ModelSource(kind, null, path);
     }
 
+    /// @return {@link #BYTES}, {@link #FILE}, or {@link #RESOURCE}
     public int getKind() {
         return kind;
     }
 
+    /// @return a defensive copy of model bytes, or {@code null} for non-byte sources
     public byte[] getBytes() {
         if (bytes == null) {
             return null;
@@ -75,6 +89,7 @@ public final class ModelSource {
         return out;
     }
 
+    /// @return the file/resource path, or {@code null} for a byte source
     public String getPath() {
         return path;
     }

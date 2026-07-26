@@ -52,10 +52,13 @@ public final class ToolChoice {
         return new ToolChoice("named", toolName);
     }
 
+    /// @return portable choice mode: {@code auto}, {@code none},
+    /// {@code required}, or {@code named}
     public String getMode() {
         return mode;
     }
 
+    /// @return forced tool name for a named choice, otherwise {@code null}
     public String getForcedToolName() {
         return forcedToolName;
     }

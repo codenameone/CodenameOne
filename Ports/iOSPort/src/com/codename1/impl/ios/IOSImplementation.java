@@ -4777,9 +4777,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public com.codename1.impl.LanguageImpl createLanguageImpl() {
-        return nativeInstance.cn1LanguageIsSupported(0)
-                || nativeInstance.cn1LanguageIsSupported(1)
-                || nativeInstance.cn1LanguageIsSupported(2)
+        return nativeInstance.cn1LanguageIsSupported(0, false)
+                || nativeInstance.cn1LanguageIsSupported(1, false)
+                || nativeInstance.cn1LanguageIsSupported(2, false)
                 ? new IOSLanguageImpl() : null;
     }
 

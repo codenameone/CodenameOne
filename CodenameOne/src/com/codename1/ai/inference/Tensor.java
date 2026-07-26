@@ -22,13 +22,23 @@
  */
 package com.codename1.ai.inference;
 
-/// Named tensor value passed to or returned from an inference session.
+/// Immutable named tensor passed to or returned from an inference session.
+/// The primitive data array and shape are copied on construction and by their
+/// public getters, so callers can safely reuse or mutate their source arrays.
 public final class Tensor {
     private final String name;
     private final TensorType type;
     private final int[] shape;
     private final Object data;
 
+    /// Creates a tensor and validates that its type, shape, and primitive array
+    /// agree. Dynamic dimensions may be negative and skip the element-count
+    /// check; fixed shapes are overflow-checked.
+    ///
+    /// @param name model tensor name, or {@code null} for positional matching
+    /// @param type element type
+    /// @param shape tensor dimensions; an empty shape represents a scalar
+    /// @param data matching primitive array
     public Tensor(String name, TensorType type, int[] shape, Object data) {
         if (type == null || data == null) {
             throw new NullPointerException("type and data are required");
@@ -44,32 +54,51 @@ public final class Tensor {
         this.data = copyData(data);
     }
 
+    /// @return a FLOAT32 tensor with defensively copied data
     public static Tensor floats(String name, int[] shape, float[] data) {
         return new Tensor(name, TensorType.FLOAT32, shape, data);
     }
 
+    /// @return an INT32 tensor with defensively copied data
     public static Tensor ints(String name, int[] shape, int[] data) {
         return new Tensor(name, TensorType.INT32, shape, data);
     }
 
+    /// Creates a byte-array tensor for UINT8, INT8, or BOOL data.
+    /// @return a tensor with defensively copied data
     public static Tensor bytes(String name, TensorType type, int[] shape, byte[] data) {
         return new Tensor(name, type, shape, data);
     }
 
+    /// @return the model tensor name, or {@code null} for an unnamed tensor
     public String getName() {
         return name;
     }
 
+    /// @return the element type
     public TensorType getType() {
         return type;
     }
 
+    /// @return a defensive copy of tensor dimensions
     public int[] getShape() {
         return copy(shape);
     }
 
+    /// @return a defensive copy of the matching primitive data array
     public Object getData() {
         return copyData(data);
+    }
+
+    /// Returns the tensor's immutable backing primitive array to a port
+    /// implementation, avoiding an additional full-tensor copy at the native
+    /// boundary. Application code must use {@link #getData()}.
+    ///
+    /// @return the backing {@code float[]}, {@code int[]}, {@code long[]}, or
+    ///         {@code byte[]} matching {@link #getType()}
+    /// @hidden
+    public Object getDataUnsafe() {
+        return data;
     }
 
     private static void validateData(TensorType type, Object data) {
@@ -101,14 +130,18 @@ public final class Tensor {
         if (shape == null || shape.length == 0) {
             return 1;
         }
-        int out = 1;
+        long out = 1;
         for (int dimension : shape) {
             if (dimension < 0) {
                 return -1;
             }
             out *= dimension;
+            if (out > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException(
+                        "Tensor shape contains more than 2147483647 elements");
+            }
         }
-        return out;
+        return (int) out;
     }
 
     private static int dataLength(Object value) {

@@ -2,6 +2,7 @@ package com.codename1.builders;
 
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -144,6 +145,29 @@ class IPhoneBuilderDependencyConfigTest {
     @Test
     void rejectsUnknownDependencyManagerHint() {
         assertThrows(BuildException.class, () -> IOSDependencyManager.fromHint("gradle"));
+    }
+
+    @Test
+    void appendsEachRequiredAiFrameworkIndependently() throws Exception {
+        Method method = IPhoneBuilder.class.getDeclaredMethod(
+                "appendFrameworks", String.class, String[].class);
+        method.setAccessible(true);
+        String value = (String) method.invoke(null, "Vision.framework",
+                new String[] {"Vision.framework", "CoreImage.framework",
+                        "CoreVideo.framework"});
+        assertEquals("Vision.framework;CoreImage.framework;CoreVideo.framework",
+                value);
+
+        value = (String) method.invoke(null,
+                "CoreML.framework;Accelerate.framework",
+                new String[] {"CoreML.framework", "Metal.framework",
+                        "Accelerate.framework"});
+        assertEquals("CoreML.framework;Accelerate.framework;Metal.framework",
+                value);
+
+        value = (String) method.invoke(null, "ThirdPartyVision.framework",
+                new String[] {"Vision.framework"});
+        assertEquals("ThirdPartyVision.framework;Vision.framework", value);
     }
 
     private BuildRequest requestWithArgs(String... kvPairs) {

@@ -36,6 +36,8 @@ import java.util.List;
 
 /** ML Kit text recognition; retained only for {@code TextRecognizer} users. */
 final class AndroidTextRecognitionAdapter extends AndroidVisionAdapter {
+    private final TextRecognizer client = TextRecognition.getClient(
+            TextRecognizerOptions.DEFAULT_OPTIONS);
     @Override
     @SuppressWarnings("unchecked")
     void analyze(InputImage input, final int imageWidth,
@@ -43,8 +45,6 @@ final class AndroidTextRecognitionAdapter extends AndroidVisionAdapter {
                  AsyncResource<?> resource) {
         final AsyncResource<TextRecognitionResult> out =
                 (AsyncResource<TextRecognitionResult>) resource;
-        final TextRecognizer client = TextRecognition.getClient(
-                TextRecognizerOptions.DEFAULT_OPTIONS);
         client.process(input).addOnSuccessListener(new OnSuccessListener<Text>() {
             public void onSuccess(Text text) {
                 List<Text.TextBlock> source = text.getTextBlocks();
@@ -59,8 +59,12 @@ final class AndroidTextRecognitionAdapter extends AndroidVisionAdapter {
                 }
                 complete(out, new TextRecognitionResult(
                         text.getText(), blocks, METADATA));
-                client.close();
             }
-        }).addOnFailureListener(failure(out, client));
+        }).addOnFailureListener(failure(out));
+    }
+
+    @Override
+    void close() {
+        client.close();
     }
 }

@@ -40,6 +40,8 @@ abstract class AndroidVisionAdapter {
     abstract void analyze(InputImage input, int imageWidth, int imageHeight,
                           VisionOptions options, AsyncResource<?> out);
 
+    abstract void close();
+
     static VisionRect normalized(Rect rect, int imageWidth, int imageHeight) {
         if (rect == null) {
             return VisionRect.EMPTY;
@@ -58,8 +60,7 @@ abstract class AndroidVisionAdapter {
         });
     }
 
-    static OnFailureListener failure(final AsyncResource<?> out,
-                                     final AutoCloseable client) {
+    static OnFailureListener failure(final AsyncResource<?> out) {
         return new OnFailureListener() {
             public void onFailure(final Exception error) {
                 Display.getInstance().callSerially(new Runnable() {
@@ -69,10 +70,6 @@ abstract class AndroidVisionAdapter {
                                 error.getMessage(), error));
                     }
                 });
-                try {
-                    client.close();
-                } catch (Exception ignored) {
-                }
             }
         };
     }

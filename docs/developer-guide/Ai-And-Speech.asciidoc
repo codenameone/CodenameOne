@@ -342,9 +342,11 @@ each class the application actually uses:
 | Core Image perspective correction
 |===
 
-The optional iOS ML Kit pod is added only when both the analyzer and
-`VisionBackends.mlKit()` are referenced. Referencing one Android
-analyzer doesn't compile or package the other five adapters.
+The optional iOS ML Kit pod is added only when both the analyzer and its
+feature-specific selector are referenced. For example,
+`VisionBackends.mlKitBarcodeScanning()` adds only the barcode pod.
+Referencing one Android analyzer doesn't compile or package the other
+five adapters.
 
 === Portable LiteRT inference
 
@@ -368,9 +370,12 @@ the port boundary. Always close the session.
 
 Bundle small models as resources. For larger models use
 `ModelCache.fetch(url, cacheKey, sha256)`, which downloads over HTTPS,
-verifies the optional SHA-256 digest, and reuses the app-private cached
-file. The URL must use HTTPS. Treat the digest as required when the
-model isn't controlled by the same deployment pipeline as the app.
+verifies a SHA-256 digest when supplied, and reuses the app-private cached
+file. The URL must use HTTPS. Supply the digest for every third-party or
+remotely mutable model: an omitted digest provides transport security but
+does not pin the executable model payload. Interrupted downloads restart
+through a temporary `.download` file and are never promoted to the cache
+until verification succeeds.
 
 === On-device language services
 
@@ -386,8 +391,13 @@ SDKs.
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AiAndSpeechOnDeviceSnippet.java[tag=ai-and-speech-on-device-language,indent=0]
 ----
 
-`LanguageBackends.auto()` selects ML Kit on the supported Android and
-iOS targets. `LanguageBackends.mlKit()` makes that selection explicit.
+`LanguageBackends.auto()` selects ML Kit on Android and Apple's Natural
+Language framework for language identification on iOS. The Apple default
+keeps arm64 simulator builds native and adds no third-party dependency.
+`LanguageBackends.mlKitLanguageIdentification()` opts language
+identification into the ML Kit iOS pod. Translation and Smart Reply use
+their feature-scoped ML Kit components on both mobile platforms; those
+two iOS components currently require the x86_64 simulator slice.
 Mac native and the other unsupported targets return `false` from the
 language service `isSupported()` checks. Completion and failure callbacks
 arrive on the EDT.

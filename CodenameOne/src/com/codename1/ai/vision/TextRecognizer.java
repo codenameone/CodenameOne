@@ -24,10 +24,14 @@ package com.codename1.ai.vision;
 
 /// Creates reusable on-device OCR analyzers.
 public final class TextRecognizer extends AbstractVisionAnalyzer<TextRecognitionResult> {
+    /// Creates an analyzer using the platform default backend and options.
+    ///  VisionOptions
     public TextRecognizer() {
         this(null);
     }
 
+    /// Creates a reusable analyzer with explicit backend and result options.
+    ///  options configuration captured by this analyzer; null uses defaults
     public TextRecognizer(VisionOptions options) {
         super(VisionFeature.TEXT_RECOGNITION, options);
     }

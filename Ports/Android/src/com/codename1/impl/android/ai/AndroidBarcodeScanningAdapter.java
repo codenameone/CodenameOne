@@ -37,13 +37,13 @@ import java.util.List;
 
 /** ML Kit barcode scanning; retained only for {@code BarcodeScanner} users. */
 final class AndroidBarcodeScanningAdapter extends AndroidVisionAdapter {
+    private final BarcodeScanner client = BarcodeScanning.getClient();
     @Override
     @SuppressWarnings("unchecked")
     void analyze(InputImage input, final int imageWidth,
                  final int imageHeight, VisionOptions options,
                  AsyncResource<?> resource) {
         final AsyncResource<Barcode[]> out = (AsyncResource<Barcode[]>) resource;
-        final BarcodeScanner client = BarcodeScanning.getClient();
         client.process(input).addOnSuccessListener(
                 new OnSuccessListener<List<com.google.mlkit.vision.barcode.common.Barcode>>() {
             public void onSuccess(
@@ -68,9 +68,13 @@ final class AndroidBarcodeScanningAdapter extends AndroidVisionAdapter {
                             corners, METADATA);
                 }
                 complete(out, result);
-                client.close();
             }
-        }).addOnFailureListener(failure(out, client));
+        }).addOnFailureListener(failure(out));
+    }
+
+    @Override
+    void close() {
+        client.close();
     }
 
     private static String barcodeFormat(int format) {

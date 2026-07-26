@@ -27,6 +27,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ai.vision.BarcodeScanner;
+import com.codename1.ai.vision.Barcode;
 import com.codename1.ai.vision.DocumentScanner;
 import com.codename1.ai.vision.FaceDetector;
 import com.codename1.ai.vision.ImageLabeler;
@@ -40,15 +41,15 @@ import com.codename1.ai.vision.VisionOptions;
 import com.codename1.camera.CameraFrame;
 import com.codename1.camera.FrameFormat;
 import com.codename1.io.Log;
+import com.codename1.util.Base64;
 
 /**
  * Cross-port, non-visual contract coverage for the built-in vision API.
  *
- * <p>The test intentionally avoids running an analyzer against camera hardware
- * or a vendor model. It verifies the portable image/camera-frame ownership
- * contract and asks every native analyzer for its capability. This keeps the
- * suite deterministic while making every analyzer visible to the builders'
- * granular dependency scanner.</p>
+ * <p>In addition to portable ownership/lifecycle checks, supported mobile
+ * ports decode a bundled deterministic QR image. That assertion crosses the
+ * Java/native image boundary, native detector, JSON result mapping, format
+ * normalization, and geometry mapping without camera hardware.</p>
  */
 public class VisionOnDeviceApiTest extends BaseTest {
     @Override
@@ -62,11 +63,35 @@ public class VisionOnDeviceApiTest extends BaseTest {
             checkImageOwnership();
             checkOptions();
             checkAnalyzerCapabilitiesAndLifecycle();
+            checkNativeQrDecode();
             done();
             return true;
         } catch (Throwable t) {
             fail("On-device vision API test failed: " + t);
             return false;
+        }
+    }
+
+    private void checkNativeQrDecode() throws Exception {
+        BarcodeScanner scanner = new BarcodeScanner();
+        try {
+            if (!scanner.isSupported()) {
+                Log.p("VisionOnDeviceApiTest: native QR assertion skipped; "
+                        + "barcode backend unsupported");
+                return;
+            }
+            String png = "iVBORw0KGgoAAAANSUhEUgAAAMAAAADAAQAAAAB6p1GqAAAA5UlEQVR4Xu2UQQ7DIAwEnVOewU8L/JRncIJ6TaqkJT17pbBSImBy2HhtpP+R/B58tMCkBSY9AyRRBX1vFauNA2R9akh72Wo4tgygqtHQRKJiCVzA7LKBjAUT6IhWT/V9bAnAGIMM9j0GrmBIcTx3/kDjbHZlmNdy/Q9H0NBkJVZEm3kAxlJkR9u1a7SuAEUEQx31CxIA4VSxWecBuCnKS9B5mQPYAGi3aQVxa0QOAH82ALGijqddX2BGm5lOdCD0PrqNCCTrNgRMArpFW5Gu3GTuA8YYZKtjul4ZruBOC0xaYNJzwRtNmtsMgNUTWwAAAABJRU5ErkJggg==";
+            Barcode[] values = scanner.process(VisionImage.encoded(
+                    Base64.decode(png.getBytes("UTF-8")))).get(30000);
+            check(values.length > 0, "native QR detector returned no result");
+            check("CN1-VISION-QR".equals(values[0].getValue()),
+                    "native QR payload mismatch");
+            check("QR_CODE".equals(values[0].getFormat()),
+                    "native QR format was not normalized");
+            check(values[0].getCorners().length == 4,
+                    "native QR detector did not return four corners");
+        } finally {
+            scanner.close();
         }
     }
 

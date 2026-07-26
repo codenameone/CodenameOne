@@ -22,17 +22,29 @@
  */
 package com.codename1.ai.vision;
 
-/// Portable image classification label.
+/// Portable ranked image-classification label. Confidence is normalized to
+/// 0..1. The numeric index is a backend/model class index and should not be
+/// treated as stable across different backends; portable code should prefer
+/// the text label.
 public final class ImageLabel {
     private final String text;
     private final float confidence;
     private final int index;
     private final VisionMetadata metadata;
 
+    /// Creates a label without backend metadata.
+    /// @param text normalized label text
+    /// @param confidence provider confidence, normally from zero to one
+    /// @param index provider label index, or a negative value when unavailable
     public ImageLabel(String text, float confidence, int index) {
         this(text, confidence, index, null);
     }
 
+    /// Creates a label with backend diagnostics.
+    /// @param text normalized label text
+    /// @param confidence provider confidence, normally from zero to one
+    /// @param index provider label index, or a negative value when unavailable
+    /// @param metadata backend details, or {@code null}
     public ImageLabel(String text, float confidence, int index,
                       VisionMetadata metadata) {
         this.text = text == null ? "" : text;
@@ -41,18 +53,22 @@ public final class ImageLabel {
         this.metadata = metadata;
     }
 
+    /// @return human-readable class label
     public String getText() {
         return text;
     }
 
+    /// @return classification confidence in the range 0..1
     public float getConfidence() {
         return confidence;
     }
 
+    /// @return backend/model class index; not portable across models
     public int getIndex() {
         return index;
     }
 
+    /// @return backend metadata, or {@code null} when manually constructed
     public VisionMetadata getMetadata() {
         return metadata;
     }

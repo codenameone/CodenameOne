@@ -26,12 +26,17 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-/// Optional backend identity and backend-specific string values attached to a
-/// vision result. Portable code should use the typed result fields first.
+/// Optional backend identity and backend-specific diagnostic strings attached
+/// to a vision result. Portable application logic should use typed result
+/// fields first; metadata keys are intentionally not guaranteed across
+/// backends. The values map is immutable.
 public final class VisionMetadata {
     private final String backendId;
     private final Map<String, String> values;
 
+    /// Creates backend metadata with optional diagnostic values.
+    /// @param backendId stable portable backend id
+    /// @param values backend-specific string diagnostics, defensively copied
     public VisionMetadata(String backendId, Map<String, String> values) {
         this.backendId = backendId;
         this.values = values == null || values.isEmpty()
@@ -39,10 +44,13 @@ public final class VisionMetadata {
                 : Collections.unmodifiableMap(new HashMap<String, String>(values));
     }
 
+    /// Creates metadata containing only the selected backend id.
+    /// @param backendId stable portable backend id
     public VisionMetadata(String backendId) {
         this(backendId, null);
     }
 
+    /// @return stable backend identifier such as {@code apple-vision} or {@code ml-kit}
     public String getBackendId() {
         return backendId;
     }
@@ -51,6 +59,8 @@ public final class VisionMetadata {
         return values;
     }
 
+    /// @param key backend-defined diagnostic key
+    /// @return associated value, or {@code null}
     public String get(String key) {
         return values.get(key);
     }

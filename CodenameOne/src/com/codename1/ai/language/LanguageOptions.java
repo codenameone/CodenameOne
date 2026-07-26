@@ -22,25 +22,33 @@
  */
 package com.codename1.ai.language;
 
-/// Common options for on-device language services.
+/// Reusable options shared by language identification, translation, and
+/// Smart Reply operations.
 public final class LanguageOptions {
     private LanguageBackend backend = LanguageBackends.auto();
     private float minimumConfidence;
 
+    /// @param value backend selector; {@code null} restores automatic selection
+    /// @return this options object
     public LanguageOptions backend(LanguageBackend value) {
         backend = value == null ? LanguageBackends.auto() : value;
         return this;
     }
 
+    /// Sets the minimum language-identification confidence, clamped to 0..1.
+    /// @param value requested threshold
+    /// @return this options object
     public LanguageOptions minimumConfidence(float value) {
         minimumConfidence = Math.max(0, Math.min(1, value));
         return this;
     }
 
+    /// @return selected backend, never {@code null}
     public LanguageBackend getBackend() {
         return backend;
     }
 
+    /// @return language-identification threshold in the range 0..1
     public float getMinimumConfidence() {
         return minimumConfidence;
     }

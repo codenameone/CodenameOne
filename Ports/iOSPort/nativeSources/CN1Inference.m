@@ -37,6 +37,7 @@
 @property(nonatomic, strong) TFLInterpreter *interpreter;
 @property(nonatomic, strong) TFLDelegate *delegate;
 @property(nonatomic, copy) NSString *modelPath;
+@property(nonatomic) BOOL deleteModelOnClose;
 @end
 
 @implementation CN1InferenceHandle
@@ -88,15 +89,8 @@ static CN1InferenceHandle *cn1InferenceHandle(int handle) {
     }
 }
 
-static NSString *cn1InferenceOpen(NSData *model, int threads, int accelerator,
-                                  BOOL allowFallback) {
-    NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:
-            [NSString stringWithFormat:@"cn1-litert-%@.tflite",
-                    NSUUID.UUID.UUIDString]];
-    if (![model writeToFile:path atomically:YES]) {
-        return cn1InferenceJSON(@{@"error": @"Could not stage LiteRT model"});
-    }
-
+static NSString *cn1InferenceOpenPath(NSString *path, BOOL deleteModelOnClose,
+        int threads, int accelerator, BOOL allowFallback) {
     TFLInterpreterOptions *options = [[TFLInterpreterOptions alloc] init];
     if (threads > 0) options.numberOfThreads = (NSUInteger)threads;
     NSMutableArray<TFLDelegate *> *delegates = [NSMutableArray array];
@@ -110,13 +104,17 @@ static NSString *cn1InferenceOpen(NSData *model, int threads, int accelerator,
         if (delegate != nil) [delegates addObject:delegate];
 #endif
         if (delegate == nil && !allowFallback && accelerator != 0) {
-            [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+            if (deleteModelOnClose) {
+                [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+            }
             return cn1InferenceJSON(@{
                 @"error": @"Core ML delegate is unavailable on this device"
             });
         }
     } else if (accelerator == 2 && !allowFallback) {
-        [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+        if (deleteModelOnClose) {
+            [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+        }
         return cn1InferenceJSON(@{
             @"error": @"The iOS backend does not provide a GPU delegate"
         });
@@ -126,11 +124,15 @@ static NSString *cn1InferenceOpen(NSData *model, int threads, int accelerator,
     TFLInterpreter *interpreter = [[TFLInterpreter alloc]
             initWithModelPath:path options:options delegates:delegates error:&error];
     if (interpreter == nil || error != nil) {
-        [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+        if (deleteModelOnClose) {
+            [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+        }
         return cn1InferenceError(error, @"Could not create LiteRT interpreter");
     }
     if (![interpreter allocateTensorsWithError:&error]) {
-        [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+        if (deleteModelOnClose) {
+            [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+        }
         return cn1InferenceError(error, @"Could not allocate LiteRT tensors");
     }
 
@@ -138,6 +140,7 @@ static NSString *cn1InferenceOpen(NSData *model, int threads, int accelerator,
     value.interpreter = interpreter;
     value.delegate = delegate;
     value.modelPath = path;
+    value.deleteModelOnClose = deleteModelOnClose;
     cn1InferenceEnsureHandles();
     int handle;
     @synchronized (cn1InferenceHandles) {
@@ -145,6 +148,17 @@ static NSString *cn1InferenceOpen(NSData *model, int threads, int accelerator,
         cn1InferenceHandles[@(handle)] = value;
     }
     return cn1InferenceJSON(@{@"handle": @(handle)});
+}
+
+static NSString *cn1InferenceOpen(NSData *model, int threads, int accelerator,
+                                  BOOL allowFallback) {
+    NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:
+            [NSString stringWithFormat:@"cn1-litert-%@.tflite",
+                    NSUUID.UUID.UUIDString]];
+    if (![model writeToFile:path atomically:YES]) {
+        return cn1InferenceJSON(@{@"error": @"Could not stage LiteRT model"});
+    }
+    return cn1InferenceOpenPath(path, YES, threads, accelerator, allowFallback);
 }
 
 static NSString *cn1InferenceMetadata(int handle, BOOL outputs) {
@@ -186,65 +200,47 @@ static NSString *cn1InferenceMetadata(int handle, BOOL outputs) {
     return cn1InferenceJSON(@{@"items": items});
 }
 
-static NSString *cn1InferenceRun(int handle, NSString *inputsJSON) {
+static NSString *cn1InferenceCopyInput(int handle, int index, NSData *data) {
     CN1InferenceHandle *value = cn1InferenceHandle(handle);
     if (value == nil) {
         return cn1InferenceJSON(@{@"error": @"Unknown LiteRT handle"});
     }
     NSError *error = nil;
-    NSDictionary *root = [NSJSONSerialization JSONObjectWithData:
-            [inputsJSON dataUsingEncoding:NSUTF8StringEncoding]
-            options:0 error:&error];
-    if (root == nil || error != nil) {
-        return cn1InferenceError(error, @"Invalid LiteRT input JSON");
-    }
     TFLInterpreter *interpreter = value.interpreter;
-    for (NSDictionary *item in root[@"items"] ?: @[]) {
-        NSUInteger index = [item[@"index"] unsignedIntegerValue];
-        if (index >= interpreter.inputTensorCount) {
-            return cn1InferenceJSON(@{@"error": @"Invalid LiteRT input index"});
-        }
-        TFLTensor *tensor = [interpreter inputTensorAtIndex:index error:&error];
-        if (tensor == nil || error != nil) {
-            return cn1InferenceError(error, @"Could not read LiteRT input");
-        }
-        NSString *expectedType = cn1InferenceType(tensor.dataType);
-        if (![expectedType isEqualToString:item[@"type"]]) {
-            return cn1InferenceJSON(@{@"error": @"LiteRT input type mismatch"});
-        }
-        NSData *data = [[NSData alloc] initWithBase64EncodedString:item[@"data"]
-                                                           options:0];
-        if (data == nil || ![tensor copyData:data error:&error]) {
-            return cn1InferenceError(error, @"Could not copy LiteRT input");
-        }
+    if (index < 0 || (NSUInteger)index >= interpreter.inputTensorCount) {
+        return cn1InferenceJSON(@{@"error": @"Invalid LiteRT input index"});
     }
+    TFLTensor *tensor = [interpreter inputTensorAtIndex:(NSUInteger)index
+                                                  error:&error];
+    if (tensor == nil || error != nil || ![tensor copyData:data error:&error]) {
+        return cn1InferenceError(error, @"Could not copy LiteRT input");
+    }
+    return cn1InferenceJSON(@{@"ok": @(YES)});
+}
+
+static NSString *cn1InferenceInvoke(int handle) {
+    CN1InferenceHandle *value = cn1InferenceHandle(handle);
+    if (value == nil) {
+        return cn1InferenceJSON(@{@"error": @"Unknown LiteRT handle"});
+    }
+    NSError *error = nil;
+    TFLInterpreter *interpreter = value.interpreter;
     if (![interpreter invokeWithError:&error]) {
         return cn1InferenceError(error, @"LiteRT invocation failed");
     }
-    NSMutableArray *items = [NSMutableArray array];
-    for (NSUInteger i = 0; i < interpreter.outputTensorCount; i++) {
-        TFLTensor *tensor = [interpreter outputTensorAtIndex:i error:&error];
-        if (tensor == nil || error != nil) {
-            return cn1InferenceError(error, @"Could not read LiteRT output");
-        }
-        NSString *type = cn1InferenceType(tensor.dataType);
-        if (type == nil) {
-            return cn1InferenceJSON(@{@"error": @"Unsupported output tensor type"});
-        }
-        NSArray<NSNumber *> *shape = [tensor shapeWithError:&error];
-        NSData *data = [tensor dataWithError:&error];
-        if (shape == nil || data == nil || error != nil) {
-            return cn1InferenceError(error, @"Could not copy LiteRT output");
-        }
-        [items addObject:@{
-            @"index": @(i),
-            @"name": tensor.name ?: @"",
-            @"type": type,
-            @"shape": shape,
-            @"data": [data base64EncodedStringWithOptions:0]
-        }];
+    return cn1InferenceJSON(@{@"ok": @(YES)});
+}
+
+static NSData *cn1InferenceOutputData(int handle, int index) {
+    CN1InferenceHandle *value = cn1InferenceHandle(handle);
+    if (value == nil || index < 0
+            || (NSUInteger)index >= value.interpreter.outputTensorCount) {
+        return nil;
     }
-    return cn1InferenceJSON(@{@"items": items});
+    NSError *error = nil;
+    TFLTensor *tensor = [value.interpreter outputTensorAtIndex:(NSUInteger)index
+                                                        error:&error];
+    return tensor == nil || error != nil ? nil : [tensor dataWithError:&error];
 }
 
 static NSString *cn1InferenceResize(int handle, int index,
@@ -304,15 +300,54 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1InferenceMetadata___int_boolean_
 #endif
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1InferenceRun___int_java_lang_String_R_java_lang_String(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT handle,
-        JAVA_OBJECT inputsJSON) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1InferenceOpenFile___java_lang_String_int_int_boolean_R_java_lang_String(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path,
+        JAVA_INT threads, JAVA_INT accelerator, JAVA_BOOLEAN allowFallback) {
 #if defined(INCLUDE_CN1_INFERENCE) && !TARGET_OS_WATCH && !TARGET_OS_TV && defined(CN1_HAS_LITERT)
     return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
-            cn1InferenceRun(handle,
-                    toNSString(CN1_THREAD_GET_STATE_PASS_ARG inputsJSON)));
+            cn1InferenceOpenPath(
+                    toNSString(CN1_THREAD_GET_STATE_PASS_ARG path), NO,
+                    threads, accelerator, allowFallback));
 #else
     return JAVA_NULL;
+#endif
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1InferenceCopyInput___int_int_byte_1ARRAY_R_java_lang_String(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT handle,
+        JAVA_INT index, JAVA_OBJECT input) {
+#if defined(INCLUDE_CN1_INFERENCE) && !TARGET_OS_WATCH && !TARGET_OS_TV && defined(CN1_HAS_LITERT)
+    if (input == JAVA_NULL) {
+        return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
+                @"{\"error\":\"Input data is null\"}");
+    }
+    JAVA_ARRAY bytes = (JAVA_ARRAY)input;
+    NSData *data = [NSData dataWithBytes:bytes->data
+                                  length:(NSUInteger)bytes->length];
+    return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
+            cn1InferenceCopyInput(handle, index, data));
+#else
+    return JAVA_NULL;
+#endif
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1InferenceInvoke___int_R_java_lang_String(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT handle) {
+#if defined(INCLUDE_CN1_INFERENCE) && !TARGET_OS_WATCH && !TARGET_OS_TV && defined(CN1_HAS_LITERT)
+    return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG cn1InferenceInvoke(handle));
+#else
+    return JAVA_NULL;
+#endif
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_cn1InferenceOutputData___int_int_R_long(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT handle,
+        JAVA_INT index) {
+#if defined(INCLUDE_CN1_INFERENCE) && !TARGET_OS_WATCH && !TARGET_OS_TV && defined(CN1_HAS_LITERT)
+    NSData *data = cn1InferenceOutputData(handle, index);
+    return data == nil ? 0 : (JAVA_LONG)CFBridgingRetain(data);
+#else
+    return 0;
 #endif
 }
 
@@ -347,7 +382,7 @@ void com_codename1_impl_ios_IOSNative_cn1InferenceClose___int(
         value = cn1InferenceHandles[@(handle)];
         [cn1InferenceHandles removeObjectForKey:@(handle)];
     }
-    if (value.modelPath != nil) {
+    if (value.deleteModelOnClose && value.modelPath != nil) {
         [[NSFileManager defaultManager] removeItemAtPath:value.modelPath error:nil];
     }
 #endif

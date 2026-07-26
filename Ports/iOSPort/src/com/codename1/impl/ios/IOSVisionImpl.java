@@ -74,8 +74,9 @@ public final class IOSVisionImpl extends VisionImpl {
                             + (mlKit ? "ML Kit" : "Apple Vision")));
             return out;
         }
-        byte[] encoded = image.getEncodedBytes();
-        final byte[] input = encoded == null ? image.getPixels() : encoded;
+        byte[] encoded = image.getEncodedBytesUnsafe();
+        final byte[] input = encoded == null
+                ? image.getPixelsUnsafe() : encoded;
         final int width = encoded == null ? image.getWidth() : 0;
         final int height = encoded == null ? image.getHeight() : 0;
         final int frameFormat = encoded == null
@@ -158,9 +159,18 @@ public final class IOSVisionImpl extends VisionImpl {
                 Barcode[] values = new Barcode[items.size()];
                 for (int i = 0; i < values.length; i++) {
                     Map value = (Map) items.get(i);
+                    List points = value.get("corners") instanceof List
+                            ? (List) value.get("corners")
+                            : java.util.Collections.EMPTY_LIST;
+                    VisionPoint[] corners = new VisionPoint[points.size()];
+                    for (int p = 0; p < corners.length; p++) {
+                        Map point = (Map) points.get(p);
+                        corners[p] = new VisionPoint(number(point, "x"),
+                                number(point, "y"));
+                    }
                     values[i] = new Barcode(stringOrNull(value, "value"),
                             string(value, "format"), null, rect(value),
-                            new VisionPoint[0], metadata);
+                            corners, metadata);
                 }
                 return (T) values;
             }
@@ -195,8 +205,7 @@ public final class IOSVisionImpl extends VisionImpl {
                 return (T) new Pose(values, metadata);
             }
             case SELFIE_SEGMENTATION: {
-                String base64 = string(root, "data");
-                byte[] bytes = Base64.decode(base64.getBytes("UTF-8"));
+                byte[] bytes = nativeData(root);
                 float[] confidence = new float[bytes.length];
                 for (int i = 0; i < bytes.length; i++) {
                     confidence[i] = (bytes[i] & 0xff) / 255f;
@@ -205,9 +214,8 @@ public final class IOSVisionImpl extends VisionImpl {
                         integer(root, "height"), confidence, metadata);
             }
             case DOCUMENT_SCANNING: {
-                String base64 = string(root, "data");
                 return (T) new DocumentScanResult(new byte[][] {
-                        Base64.decode(base64.getBytes("UTF-8"))
+                        nativeData(root)
                 }, metadata);
             }
             default:
@@ -239,6 +247,27 @@ public final class IOSVisionImpl extends VisionImpl {
     private static String stringOrNull(Map value, String key) {
         Object out = value.get(key);
         return out == null ? null : String.valueOf(out);
+    }
+
+    private static byte[] nativeData(Map value) throws Exception {
+        Object peerValue = value.get("dataPeer");
+        if (peerValue instanceof Number) {
+            long peer = ((Number) peerValue).longValue();
+            if (peer == 0) {
+                throw new VisionException(VisionException.BACKEND_ERROR,
+                        "Apple Vision returned no binary result");
+            }
+            try {
+                byte[] out = new byte[IOSImplementation.nativeInstance
+                        .getNSDataSize(peer)];
+                IOSImplementation.nativeInstance.nsDataToByteArray(peer, out);
+                return out;
+            } finally {
+                IOSImplementation.nativeInstance.releasePeer(peer);
+            }
+        }
+        String base64 = string(value, "data");
+        return Base64.decode(base64.getBytes("UTF-8"));
     }
 
     @Override

@@ -22,8 +22,14 @@
  */
 package com.codename1.ai.inference;
 
-/// LiteRT session configuration.
+/// Configures how a reusable {@link InferenceSession} is created.
+///
+/// Accelerator requests are portable preferences rather than promises.
+/// With fallback enabled, a backend may execute on CPU when the requested
+/// delegate is unavailable. With fallback disabled, opening the session
+/// fails instead of silently changing the execution target.
 public final class InferenceOptions {
+    /// Execution targets understood by the portable inference API.
     public enum Accelerator {
         AUTO, CPU, GPU, NPU, CORE_ML
     }
@@ -32,29 +38,46 @@ public final class InferenceOptions {
     private int threads;
     private boolean allowFallback = true;
 
+    /// Requests an execution target for the model.
+    ///
+    /// @param value requested target; {@code null} restores {@link Accelerator#AUTO}
+    /// @return this options object
     public InferenceOptions accelerator(Accelerator value) {
         accelerator = value == null ? Accelerator.AUTO : value;
         return this;
     }
 
+    /// Sets the CPU worker count. Non-positive values let the native runtime
+    /// choose its default.
+    ///
+    /// @param value requested worker count
+    /// @return this options object
     public InferenceOptions threads(int value) {
         threads = Math.max(0, value);
         return this;
     }
 
+    /// Controls whether opening may fall back from an unavailable accelerator
+    /// to CPU execution.
+    ///
+    /// @param value {@code true} to permit CPU fallback
+    /// @return this options object
     public InferenceOptions allowFallback(boolean value) {
         allowFallback = value;
         return this;
     }
 
+    /// @return the requested accelerator, never {@code null}
     public Accelerator getAccelerator() {
         return accelerator;
     }
 
+    /// @return the requested CPU worker count, or a non-positive runtime default
     public int getThreads() {
         return threads;
     }
 
+    /// @return whether an unavailable accelerator may fall back to CPU
     public boolean isFallbackAllowed() {
         return allowFallback;
     }

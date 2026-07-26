@@ -24,23 +24,31 @@ package com.codename1.ai;
 
 /// A single embedding vector. `index` matches the position of the
 /// corresponding input string in the original request.
+/// One vector returned by an embedding provider. The vector is defensively
+/// copied on construction and access so callers cannot mutate stored results.
 public final class Embedding {
     private final float[] vector;
     private final int index;
 
+    /// Creates an embedding result.
+    /// @param vector numeric embedding coordinates
+    /// @param index zero-based position of the corresponding request input
     public Embedding(float[] vector, int index) {
         this.vector = vector == null ? new float[0] : vector;
         this.index = index;
     }
 
+    /// @return a defensive copy of the embedding coordinates
     public float[] getVector() {
         return vector;
     }
 
+    /// @return zero-based position of this item in the request
     public int getIndex() {
         return index;
     }
 
+    /// @return number of coordinates in the embedding
     public int getDimensions() {
         return vector.length;
     }

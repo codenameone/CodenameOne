@@ -22,35 +22,48 @@
  */
 package com.codename1.ai.vision;
 
-/// Common analyzer options; feature-specific options may extend this class.
+/// Common analyzer configuration. An analyzer captures the supplied options
+/// when constructed; reuse it for frames needing the same backend, confidence
+/// threshold, and result limit.
 public class VisionOptions {
     private VisionBackend backend = VisionBackends.auto();
     private float minimumConfidence;
     private int maximumResults;
 
+    /// @param value selector, or {@code null} to restore automatic selection
+    /// @return this options object
     public VisionOptions backend(VisionBackend value) {
         backend = value == null ? VisionBackends.auto() : value;
         return this;
     }
 
+    /// Sets the confidence threshold, clamped to 0..1.
+    /// @param value requested threshold
+    /// @return this options object
     public VisionOptions minimumConfidence(float value) {
         minimumConfidence = Math.max(0, Math.min(1, value));
         return this;
     }
 
+    /// Sets a non-negative result limit; zero means backend default/unlimited.
+    /// @param value requested limit
+    /// @return this options object
     public VisionOptions maximumResults(int value) {
         maximumResults = Math.max(0, value);
         return this;
     }
 
+    /// @return selected backend, never {@code null}
     public VisionBackend getBackend() {
         return backend;
     }
 
+    /// @return confidence threshold in the range 0..1
     public float getMinimumConfidence() {
         return minimumConfidence;
     }
 
+    /// @return non-negative result limit; zero means backend default/unlimited
     public int getMaximumResults() {
         return maximumResults;
     }

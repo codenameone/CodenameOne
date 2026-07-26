@@ -25,6 +25,7 @@
 
 #if defined(INCLUDE_CN1_LANGUAGE) && !TARGET_OS_WATCH && !TARGET_OS_TV
 #import <Foundation/Foundation.h>
+#import <NaturalLanguage/NaturalLanguage.h>
 #import "java_lang_String.h"
 
 #if __has_include(<MLKitLanguageID/MLKitLanguageID.h>)
@@ -58,7 +59,35 @@ static NSString *cn1LanguageError(NSError *error, NSString *fallback) {
     });
 }
 
-static NSString *cn1IdentifyLanguage(NSString *text, float threshold) {
+static NSString *cn1IdentifyLanguage(NSString *text, float threshold,
+                                     BOOL useMLKit) {
+    if (!useMLKit) {
+        if (@available(iOS 12.0, *)) {
+            NLLanguageRecognizer *recognizer =
+                    [[NLLanguageRecognizer alloc] init];
+            [recognizer processString:text ?: @""];
+            NSDictionary<NLLanguage, NSNumber *> *hypotheses =
+                    [recognizer languageHypothesesWithMaximum:20];
+            NSMutableArray *items = [NSMutableArray array];
+            [hypotheses enumerateKeysAndObjectsUsingBlock:
+                    ^(NLLanguage language, NSNumber *confidence, BOOL *stop) {
+                if (confidence.floatValue >= threshold) {
+                    [items addObject:@{
+                        @"language": language ?: @"und",
+                        @"confidence": confidence
+                    }];
+                }
+            }];
+            [items sortUsingComparator:^NSComparisonResult(
+                    NSDictionary *left, NSDictionary *right) {
+                return [right[@"confidence"] compare:left[@"confidence"]];
+            }];
+            return cn1LanguageJSON(@{@"items": items});
+        }
+        return cn1LanguageJSON(@{
+            @"error": @"Apple Natural Language requires iOS 12 or newer"
+        });
+    }
 #if defined(CN1_HAS_MLKIT_LANGUAGE_ID)
     MLKLanguageIdentificationOptions *options =
             [[MLKLanguageIdentificationOptions alloc]
@@ -179,11 +208,16 @@ static NSString *cn1SmartReply(NSString *conversationJSON) {
 }
 #endif
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_cn1LanguageIsSupported___int_R_boolean(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT feature) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_cn1LanguageIsSupported___int_boolean_R_boolean(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT feature,
+        JAVA_BOOLEAN useMLKit) {
 #if defined(INCLUDE_CN1_LANGUAGE) && !TARGET_OS_WATCH && !TARGET_OS_TV
     switch (feature) {
         case 0:
+            if (!useMLKit) {
+                if (@available(iOS 12.0, *)) return 1;
+                return 0;
+            }
 #if defined(CN1_HAS_MLKIT_LANGUAGE_ID)
             return 1;
 #else
@@ -209,14 +243,14 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_cn1LanguageIsSupported___int_R_boo
 #endif
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1LanguageIdentify___java_lang_String_float_R_java_lang_String(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1LanguageIdentify___java_lang_String_float_boolean_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text,
-        JAVA_FLOAT minimumConfidence) {
+        JAVA_FLOAT minimumConfidence, JAVA_BOOLEAN useMLKit) {
 #if defined(INCLUDE_CN1_LANGUAGE) && !TARGET_OS_WATCH && !TARGET_OS_TV
     return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
             cn1IdentifyLanguage(
                     toNSString(CN1_THREAD_GET_STATE_PASS_ARG text),
-                    minimumConfidence));
+                    minimumConfidence, useMLKit));
 #else
     return JAVA_NULL;
 #endif

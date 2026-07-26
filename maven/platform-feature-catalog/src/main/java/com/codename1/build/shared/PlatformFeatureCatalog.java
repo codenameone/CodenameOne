@@ -88,7 +88,8 @@ public final class PlatformFeatureCatalog {
                 .androidGradle("com.google.mlkit:text-recognition:16.0.0")
                 .description("Text recognition"));
         e.add(new Entry("com/codename1/ai/vision/TextRecognizer")
-                .requiresMethod("com/codename1/ai/vision/VisionBackends", "mlKit")
+                .requiresMethod("com/codename1/ai/vision/VisionBackends",
+                        "mlKitTextRecognition")
                 .iosPod("GoogleMLKit/TextRecognition")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
@@ -99,7 +100,8 @@ public final class PlatformFeatureCatalog {
                 .androidGradle("com.google.mlkit:barcode-scanning:17.2.0")
                 .description("Barcode scanning"));
         e.add(new Entry("com/codename1/ai/vision/BarcodeScanner")
-                .requiresMethod("com/codename1/ai/vision/VisionBackends", "mlKit")
+                .requiresMethod("com/codename1/ai/vision/VisionBackends",
+                        "mlKitBarcodeScanning")
                 .iosPod("GoogleMLKit/BarcodeScanning")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
@@ -110,7 +112,8 @@ public final class PlatformFeatureCatalog {
                 .androidGradle("com.google.mlkit:face-detection:16.1.5")
                 .description("Face detection"));
         e.add(new Entry("com/codename1/ai/vision/FaceDetector")
-                .requiresMethod("com/codename1/ai/vision/VisionBackends", "mlKit")
+                .requiresMethod("com/codename1/ai/vision/VisionBackends",
+                        "mlKitFaceDetection")
                 .iosPod("GoogleMLKit/FaceDetection")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
@@ -121,7 +124,8 @@ public final class PlatformFeatureCatalog {
                 .androidGradle("com.google.mlkit:image-labeling:17.0.7")
                 .description("Image labeling"));
         e.add(new Entry("com/codename1/ai/vision/ImageLabeler")
-                .requiresMethod("com/codename1/ai/vision/VisionBackends", "mlKit")
+                .requiresMethod("com/codename1/ai/vision/VisionBackends",
+                        "mlKitImageLabeling")
                 .iosPod("GoogleMLKit/ImageLabeling")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
@@ -132,7 +136,8 @@ public final class PlatformFeatureCatalog {
                 .androidGradle("com.google.mlkit:pose-detection:18.0.0-beta3")
                 .description("Pose detection"));
         e.add(new Entry("com/codename1/ai/vision/PoseDetector")
-                .requiresMethod("com/codename1/ai/vision/VisionBackends", "mlKit")
+                .requiresMethod("com/codename1/ai/vision/VisionBackends",
+                        "mlKitPoseDetection")
                 .iosPod("GoogleMLKit/PoseDetection")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
@@ -144,7 +149,8 @@ public final class PlatformFeatureCatalog {
                         "com.google.mlkit:segmentation-selfie:16.0.0-beta5")
                 .description("Selfie segmentation"));
         e.add(new Entry("com/codename1/ai/vision/SelfieSegmenter")
-                .requiresMethod("com/codename1/ai/vision/VisionBackends", "mlKit")
+                .requiresMethod("com/codename1/ai/vision/VisionBackends",
+                        "mlKitSelfieSegmentation")
                 .iosPod("GoogleMLKit/SegmentationSelfie")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
@@ -165,19 +171,29 @@ public final class PlatformFeatureCatalog {
                 .description("LiteRT inference"));
 
         e.add(new Entry("com/codename1/ai/language/LanguageIdentifier")
+                .iosFrameworks("NaturalLanguage")
+                .androidGradle("com.google.mlkit:language-id:17.0.6")
+                .description("On-device language identification"));
+        e.add(new Entry("com/codename1/ai/language/LanguageIdentifier")
+                .requiresMethod("com/codename1/ai/language/LanguageBackends",
+                        "mlKitLanguageIdentification")
                 .iosPod("GoogleMLKit/LanguageID")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
-                .androidGradle("com.google.mlkit:language-id:17.0.6")
-                .description("On-device language identification"));
+                .description("ML Kit iOS language-identification backend"));
+        // CN1Language.m contains the dependency-free Apple identifier beside
+        // the ML Kit adapters, so every target that compiles this source must
+        // link the small system NaturalLanguage framework.
         e.add(new Entry("com/codename1/ai/language/Translator")
                 .iosPod("GoogleMLKit/Translate")
+                .iosFrameworks("NaturalLanguage")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
                 .androidGradle("com.google.mlkit:translate:17.0.3")
                 .description("On-device translation"));
         e.add(new Entry("com/codename1/ai/language/SmartReply")
                 .iosPod("GoogleMLKit/SmartReply")
+                .iosFrameworks("NaturalLanguage")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
                 .androidGradle("com.google.mlkit:smart-reply:17.0.4")
@@ -335,7 +351,7 @@ public final class PlatformFeatureCatalog {
     public static final class Entry {
         private final String classPrefix;
         private String methodOwner;
-        private String methodPrefix;
+        private String methodName;
         private final List<String> iosPods = new ArrayList<String>();
         private final List<IosSpm> iosSpm = new ArrayList<IosSpm>();
         private final List<String> iosFrameworks = new ArrayList<String>();
@@ -379,16 +395,16 @@ public final class PlatformFeatureCatalog {
                 return true;
             }
             for (String method : methods) {
-                if (method.startsWith(methodOwner + "#" + methodPrefix)) {
+                if (method.equals(methodOwner + "#" + methodName)) {
                     return true;
                 }
             }
             return false;
         }
 
-        Entry requiresMethod(String owner, String methodNamePrefix) {
+        Entry requiresMethod(String owner, String methodName) {
             this.methodOwner = owner;
-            this.methodPrefix = methodNamePrefix;
+            this.methodName = methodName;
             return this;
         }
 

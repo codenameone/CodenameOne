@@ -22,12 +22,18 @@
  */
 package com.codename1.ai.inference;
 
-/// Failure while loading or executing a LiteRT model.
+/// Reports model validation, delegate selection, allocation, or invocation
+/// failures from the portable inference API.
 public class InferenceException extends RuntimeException {
+    /// Creates an inference failure with a user-readable explanation.
+    /// @param message failure explanation
     public InferenceException(String message) {
         super(message);
     }
 
+    /// Creates an inference failure that preserves the native/port cause.
+    /// @param message failure explanation
+    /// @param cause originating error
     public InferenceException(String message, Throwable cause) {
         super(message, cause);
     }

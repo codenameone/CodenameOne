@@ -22,15 +22,24 @@
  */
 package com.codename1.ai.vision;
 
-/// Corrected document pages returned as encoded images.
+/// Corrected document pages returned as encoded image data. Pages are ordered
+/// as detected and both construction and access make defensive copies, so the
+/// result can safely cross asynchronous boundaries. The still-image scanner is
+/// currently Apple-only; Android's ML Kit document API owns an interactive
+/// camera flow and does not implement this analyzer contract.
 public final class DocumentScanResult {
     private final byte[][] pages;
     private final VisionMetadata metadata;
 
+    /// Creates a corrected document scan without backend metadata.
+    /// @param pages encoded corrected page images, deeply defensively copied
     public DocumentScanResult(byte[][] pages) {
         this(pages, null);
     }
 
+    /// Creates a corrected document scan with backend diagnostics.
+    /// @param pages encoded corrected page images, deeply defensively copied
+    /// @param metadata backend details, or {@code null}
     public DocumentScanResult(byte[][] pages, VisionMetadata metadata) {
         if (pages == null) {
             this.pages = new byte[0][];
@@ -48,10 +57,13 @@ public final class DocumentScanResult {
         this.metadata = metadata;
     }
 
+    /// @return number of corrected pages
     public int getPageCount() {
         return pages.length;
     }
 
+    /// @param index zero-based page index
+    /// @return defensive copy of that page's encoded image
     public byte[] getPage(int index) {
         byte[] page = pages[index];
         byte[] out = new byte[page.length];
@@ -59,6 +71,7 @@ public final class DocumentScanResult {
         return out;
     }
 
+    /// @return backend metadata, or {@code null} for manually created results
     public VisionMetadata getMetadata() {
         return metadata;
     }

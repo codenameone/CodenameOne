@@ -22,25 +22,40 @@
  */
 package com.codename1.ai.language;
 
-/// Backend selectors for language identification, translation, and smart reply.
+/// Selects native backends for language identification, translation, and
+/// Smart Reply. Automatic selection uses ML Kit on Android, Apple Natural
+/// Language for iOS identification, and feature-scoped ML Kit components for
+/// iOS translation and Smart Reply.
 public final class LanguageBackends {
     private static final LanguageBackend AUTO = new Named("auto");
     private static final LanguageBackend ML_KIT = new Named("ml-kit");
-    private static final LanguageBackend LITE_RT = new Named("litert");
+    private static final LanguageBackend APPLE_NATURAL_LANGUAGE =
+            new Named("apple-natural-language");
 
     private LanguageBackends() {
     }
 
+    /// @return the platform-recommended dependency-minimal backend
     public static LanguageBackend auto() {
         return AUTO;
     }
 
-    public static LanguageBackend mlKit() {
-        return ML_KIT;
+    /// Selects Apple's dependency-free Natural Language framework for
+    /// language identification. This backend is available on iOS 12 and
+    /// newer and is not available on Android.
+    ///
+    /// @return the Apple Natural Language backend selector
+    public static LanguageBackend appleNaturalLanguage() {
+        return APPLE_NATURAL_LANGUAGE;
     }
 
-    public static LanguageBackend liteRt() {
-        return LITE_RT;
+    /// Selects ML Kit specifically for language identification. Calling this
+    /// method lets the builder add the Language ID pod only when the
+    /// application opts out of the Apple-native iOS default.
+    ///
+    /// @return the ML Kit language-identification selector
+    public static LanguageBackend mlKitLanguageIdentification() {
+        return ML_KIT;
     }
 
     private static final class Named implements LanguageBackend {

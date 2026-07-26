@@ -22,20 +22,25 @@
  */
 package com.codename1.ai.language;
 
-/// Language identification candidate.
+/// One ranked BCP-47 language candidate returned by
+/// {@link LanguageIdentifier#identify(String, LanguageOptions)}.
 public final class LanguageCandidate {
     private final String languageTag;
     private final float confidence;
 
+    /// @param languageTag BCP-47 tag, or {@code und} when undetermined
+    /// @param confidence backend confidence in the range 0..1
     public LanguageCandidate(String languageTag, float confidence) {
         this.languageTag = languageTag;
         this.confidence = confidence;
     }
 
+    /// @return BCP-47 language tag
     public String getLanguageTag() {
         return languageTag;
     }
 
+    /// @return backend confidence in the range 0..1
     public float getConfidence() {
         return confidence;
     }

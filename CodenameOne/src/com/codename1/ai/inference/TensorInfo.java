@@ -22,13 +22,20 @@
  */
 package com.codename1.ai.inference;
 
-/// Immutable model input/output metadata.
+/// Immutable metadata for one model input or output. Shapes may contain a
+/// negative dynamic dimension until the input has been resized and tensors
+/// reallocated.
 public final class TensorInfo {
     private final String name;
     private final TensorType type;
     private final int[] shape;
     private final int index;
 
+    /// Creates tensor metadata.
+    /// @param name runtime tensor name, possibly empty
+    /// @param type element type
+    /// @param shape current tensor dimensions
+    /// @param index native model index
     public TensorInfo(String name, TensorType type, int[] shape, int index) {
         this.name = name;
         this.type = type;
@@ -36,18 +43,22 @@ public final class TensorInfo {
         this.index = index;
     }
 
+    /// @return the runtime tensor name
     public String getName() {
         return name;
     }
 
+    /// @return the tensor element type
     public TensorType getType() {
         return type;
     }
 
+    /// @return a defensive copy of current dimensions
     public int[] getShape() {
         return copy(shape);
     }
 
+    /// @return the zero-based model input or output index
     public int getIndex() {
         return index;
     }

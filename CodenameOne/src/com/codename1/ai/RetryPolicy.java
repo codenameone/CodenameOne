@@ -60,23 +60,34 @@ public final class RetryPolicy {
 
     /// 4 attempts, starting at 500 ms, doubling, capped at 30 s, with
     /// jitter. Good default for chat workloads.
+    /// @return recommended transient-failure policy
     public static RetryPolicy exponentialBackoff() {
         return new RetryPolicy(4, 500L, 30000L, 2.0, true);
     }
 
     /// No retries -- failures are returned to the caller as-is.
+    /// @return single-attempt policy
     public static RetryPolicy none() {
         return new RetryPolicy(1, 0L, 0L, 1.0, false);
     }
 
+    /// Creates a bounded exponential retry policy.
+    /// @param maxAttempts total attempts including the initial call
+    /// @param initialDelayMs delay before the first retry
+    /// @param maxDelayMs upper bound for computed delays
+    /// @param multiplier growth factor applied after each attempt
+    /// @param jitter whether to randomize each delay from zero to its bound
+    /// @return normalized retry policy
     public static RetryPolicy custom(int maxAttempts, long initialDelayMs,
                                      long maxDelayMs, double multiplier, boolean jitter) {
         return new RetryPolicy(maxAttempts, initialDelayMs, maxDelayMs, multiplier, jitter);
     }
 
-    /// Inspect a thrown exception and decide whether to retry. Apps
-    /// can override to add provider-specific rules (e.g. retry on a
-    /// custom 5xx code).
+    /// Inspects a thrown exception and decides whether this policy permits
+    /// another attempt.
+    /// @param t operation failure
+    /// @param attemptsSoFar attempts already made, including the failed one
+    /// @return {@code true} for a transient failure within the attempt limit
     public boolean shouldRetry(Throwable t, int attemptsSoFar) {
         if (attemptsSoFar >= maxAttempts) {
             return false;
@@ -96,6 +107,9 @@ public final class RetryPolicy {
 
     /// Returns the delay to wait before the next attempt, honouring
     /// `Retry-After` from rate-limit exceptions when present.
+    /// @param t failure that triggered the retry
+    /// @param attemptIndex zero-based retry index
+    /// @return delay in milliseconds
     public long computeDelayMs(Throwable t, int attemptIndex /* 0-based */) {
         if (t instanceof LlmException
                 && ((LlmException) t).getType() == LlmException.ErrorType.RATE_LIMIT) {
@@ -120,6 +134,7 @@ public final class RetryPolicy {
         return (long) delay;
     }
 
+    /// @return total allowed attempts including the initial call
     public int getMaxAttempts() {
         return maxAttempts;
     }

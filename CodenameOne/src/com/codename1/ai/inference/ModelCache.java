@@ -34,14 +34,22 @@ import com.codename1.util.AsyncResource;
 import java.io.IOException;
 import java.io.InputStream;
 
-/// Downloads large LiteRT models once and exposes the cached file as a
-/// {@link ModelSource}. Small models can instead be packaged directly with
+/// Downloads a large model into app-private storage and exposes it as a
+/// file-backed {@link ModelSource}. Downloads require HTTPS, use a temporary
+/// file, and are promoted atomically only after optional digest verification.
+///
+/// Supply a SHA-256 digest for third-party or remotely mutable models. Without
+/// a digest HTTPS authenticates the connection but does not pin the executable
+/// model payload. Small first-party models can instead be packaged with
 /// {@link ModelSource#resource(String)}.
 public final class ModelCache {
     private ModelCache() {
     }
 
     /// Fetches a model into the app-private {@code ai-models} directory.
+    /// A stale {@code .download} file is deleted and restarted rather than
+    /// resumed because the portable network layer cannot prove that a server's
+    /// partial response still represents the pinned model.
     ///
     /// @param url HTTPS URL of the model
     /// @param cacheKey stable cache name, independent of the URL
@@ -55,11 +63,13 @@ public final class ModelCache {
         if (cacheKey == null || cacheKey.length() == 0) {
             throw new IllegalArgumentException("cacheKey must not be empty");
         }
-        if (sha256 != null && sha256.length() != 64) {
+        if (sha256 != null && !isSha256(sha256)) {
             throw new IllegalArgumentException("SHA-256 must contain 64 hex characters");
         }
 
         final AsyncResource<ModelSource> out = new AsyncResource<ModelSource>();
+        final Completion<ModelSource> completion =
+                new Completion<ModelSource>(out);
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             @Override
             public void run() {
@@ -70,20 +80,20 @@ public final class ModelCache {
                 final String target = directory + fileName;
                 try {
                     if (fs.exists(target) && verify(target, sha256)) {
-                        complete(out, ModelSource.file(target));
+                        completion.complete(ModelSource.file(target));
                         return;
                     }
                     if (fs.exists(target)) {
                         fs.delete(target);
                     }
                 } catch (IOException error) {
-                    fail(out, error);
+                    completion.fail(error);
                     return;
                 }
                 Display.getInstance().callSerially(new Runnable() {
                     @Override
                     public void run() {
-                        download(out, url, sha256, target, fileName);
+                        download(completion, url, sha256, target, fileName);
                     }
                 });
             }
@@ -91,18 +101,22 @@ public final class ModelCache {
         return out;
     }
 
+    /// Fetches a model without content pinning. Prefer the three-argument
+    /// overload for any model that is not versioned by the app itself.
+    ///
+    /// @param url HTTPS model URL
+    /// @param cacheKey stable cache name
+    /// @return asynchronous cached file source
     public static AsyncResource<ModelSource> fetch(String url, String cacheKey) {
         return fetch(url, cacheKey, null);
     }
 
-    private static void download(final AsyncResource<ModelSource> out,
+    private static void download(final Completion<ModelSource> completion,
                                  String url, final String sha256,
                                  final String target, final String fileName) {
         final FileSystemStorage fs = FileSystemStorage.getInstance();
         final String temporary = target + ".download";
-        if (fs.exists(temporary)) {
-            fs.delete(temporary);
-        }
+        prepareTemporary(fs, temporary);
         final ConnectionRequest request = new ConnectionRequest();
         request.setPost(false);
         request.setFailSilently(true);
@@ -117,17 +131,14 @@ public final class ModelCache {
                     @Override
                     public void run() {
                         try {
-                            if (!verify(temporary, sha256)) {
-                                fs.delete(temporary);
-                                throw new IOException("Downloaded model SHA-256 does not match");
-                            }
+                            verifyDownloaded(fs, temporary, sha256);
                             if (fs.exists(target)) {
                                 fs.delete(target);
                             }
                             fs.rename(temporary, fileName);
-                            complete(out, ModelSource.file(target));
+                            completion.complete(ModelSource.file(target));
                         } catch (IOException error) {
-                            fail(out, error);
+                            completion.fail(error);
                         }
                     }
                 });
@@ -140,7 +151,7 @@ public final class ModelCache {
                     fs.delete(temporary);
                 }
                 Throwable error = event.getError();
-                fail(out, error == null
+                completion.fail(error == null
                         ? new IOException("Model download failed with HTTP "
                                 + event.getResponseCode())
                         : error);
@@ -169,6 +180,20 @@ public final class ModelCache {
         }
     }
 
+    static void prepareTemporary(FileSystemStorage fs, String temporary) {
+        if (fs.exists(temporary)) {
+            fs.delete(temporary);
+        }
+    }
+
+    static void verifyDownloaded(FileSystemStorage fs, String temporary,
+                                 String expected) throws IOException {
+        if (!verify(temporary, expected)) {
+            fs.delete(temporary);
+            throw new IOException("Downloaded model SHA-256 does not match");
+        }
+    }
+
     private static String safeName(String value) {
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < value.length(); i++) {
@@ -181,21 +206,53 @@ public final class ModelCache {
         return out.toString();
     }
 
-    private static <T> void complete(final AsyncResource<T> out, final T value) {
-        Display.getInstance().callSerially(new Runnable() {
-            @Override
-            public void run() {
-                out.complete(value);
+    private static boolean isSha256(String value) {
+        if (value.length() != 64) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
+                    || (c >= 'A' && c <= 'F'))) {
+                return false;
             }
-        });
+        }
+        return true;
     }
 
-    private static void fail(final AsyncResource<?> out, final Throwable error) {
-        Display.getInstance().callSerially(new Runnable() {
-            @Override
-            public void run() {
-                out.error(new InferenceException("Could not cache LiteRT model", error));
+    static final class Completion<T> {
+        private final AsyncResource<T> resource;
+        private boolean done;
+
+        Completion(AsyncResource<T> resource) {
+            this.resource = resource;
+        }
+
+        synchronized void complete(final T value) {
+            if (done) {
+                return;
             }
-        });
+            done = true;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    resource.complete(value);
+                }
+            });
+        }
+
+        synchronized void fail(final Throwable error) {
+            if (done) {
+                return;
+            }
+            done = true;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    resource.error(new InferenceException(
+                            "Could not cache LiteRT model", error));
+                }
+            });
+        }
     }
 }

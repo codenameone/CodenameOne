@@ -26,15 +26,19 @@ import com.codename1.impl.LanguageImpl;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
-/// On-device short reply suggestions for a conversation.
+/// Produces short reply suggestions for a chronological conversation without
+/// uploading its messages. ML Kit may return no suggestions when the language
+/// or conversation context is unsupported.
 public final class SmartReply {
     private SmartReply() {
     }
 
+    /// @return whether automatic Smart Reply is available
     public static boolean isSupported() {
         return isSupported(new LanguageOptions());
     }
 
+    /// @return whether the selected backend supports Smart Reply
     public static boolean isSupported(LanguageOptions options) {
         LanguageOptions actual = options == null
                 ? new LanguageOptions() : options;
@@ -43,6 +47,9 @@ public final class SmartReply {
                 "smart-reply", actual.getBackend().getId());
     }
 
+    /// @param conversation chronological messages, oldest first
+    /// @param options backend options, or {@code null}
+    /// @return asynchronous suggestions, possibly an empty array
     public static AsyncResource<String[]> suggest(SmartReplyMessage[] conversation,
                                                    LanguageOptions options) {
         LanguageOptions actual = options == null ? new LanguageOptions() : options;

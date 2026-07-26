@@ -24,10 +24,14 @@ package com.codename1.ai.vision;
 
 /// Creates reusable on-device face analyzers.
 public final class FaceDetector extends AbstractVisionAnalyzer<Face[]> {
+    /// Creates an analyzer using the platform default backend and options.
+    ///  VisionOptions
     public FaceDetector() {
         this(null);
     }
 
+    /// Creates a reusable analyzer with explicit backend and result options.
+    ///  options configuration captured by this analyzer; null uses defaults
     public FaceDetector(VisionOptions options) {
         super(VisionFeature.FACE_DETECTION, options);
     }

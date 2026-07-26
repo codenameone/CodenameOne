@@ -41,6 +41,8 @@ import com.google.mlkit.vision.common.InputImage;
  */
 public final class AndroidVisionImpl extends VisionImpl {
     private volatile boolean closed;
+    private AndroidVisionAdapter adapter;
+    private VisionFeature adapterFeature;
 
     @Override
     public boolean isSupported(VisionFeature feature, String backendId) {
@@ -67,9 +69,7 @@ public final class AndroidVisionImpl extends VisionImpl {
             return out;
         }
         try {
-            AndroidVisionAdapter adapter = (AndroidVisionAdapter)
-                    Class.forName(adapterClass(feature)).newInstance();
-            adapter.analyze(decoded.input, decoded.width, decoded.height,
+            adapter(feature).analyze(decoded.input, decoded.width, decoded.height,
                     options, (AsyncResource) out);
         } catch (Throwable error) {
             out.error(new VisionException(VisionException.BACKEND_ERROR,
@@ -79,8 +79,24 @@ public final class AndroidVisionImpl extends VisionImpl {
         return out;
     }
 
+    private synchronized AndroidVisionAdapter adapter(VisionFeature feature)
+            throws Exception {
+        if (closed) {
+            throw new IllegalStateException("Vision backend is closed");
+        }
+        if (adapter == null) {
+            adapter = (AndroidVisionAdapter) Class.forName(
+                    adapterClass(feature)).newInstance();
+            adapterFeature = feature;
+        } else if (adapterFeature != feature) {
+            throw new IllegalStateException(
+                    "A vision backend instance cannot analyze multiple features");
+        }
+        return adapter;
+    }
+
     private static DecodedInput decode(VisionImage image) {
-        byte[] encoded = image.getEncodedBytes();
+        byte[] encoded = image.getEncodedBytesUnsafe();
         if (encoded != null) {
             Bitmap bitmap = BitmapFactory.decodeByteArray(
                     encoded, 0, encoded.length);
@@ -88,7 +104,7 @@ public final class AndroidVisionImpl extends VisionImpl {
                     InputImage.fromBitmap(bitmap, image.getRotationDegrees()),
                     bitmap.getWidth(), bitmap.getHeight());
         }
-        byte[] pixels = image.getPixels();
+        byte[] pixels = image.getPixelsUnsafe();
         int width = image.getWidth();
         int height = image.getHeight();
         if (pixels == null || width <= 0 || height <= 0) {
@@ -171,7 +187,11 @@ public final class AndroidVisionImpl extends VisionImpl {
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
         closed = true;
+        if (adapter != null) {
+            adapter.close();
+            adapter = null;
+        }
     }
 }

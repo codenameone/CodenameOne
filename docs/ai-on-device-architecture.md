@@ -22,7 +22,7 @@ Native backends are:
 | Target | Vision | Language | `.tflite` inference |
 | --- | --- | --- | --- |
 | Android | ML Kit | ML Kit | LiteRT |
-| iOS | Apple Vision/Core Image; optional ML Kit | ML Kit | TensorFlow Lite Objective-C; optional Core ML delegate |
+| iOS | Apple Vision/Core Image; optional ML Kit | Apple Natural Language for identification; ML Kit for translation, Smart Reply, and optional identification | TensorFlow Lite Objective-C; optional Core ML delegate |
 | Mac native | Apple Vision/Core Image through Mac Catalyst | Unsupported fallback | Unsupported fallback |
 | JavaSE, JavaScript, native Windows/Linux | Unsupported fallback | Unsupported fallback | Unsupported fallback |
 | watchOS, tvOS | Unsupported fallback | Unsupported fallback | Unsupported fallback |
@@ -92,11 +92,13 @@ needed by a referenced analyzer. It adds a Google ML Kit vision pod only
 when it observes both:
 
 1. the concrete analyzer class; and
-2. a call to `VisionBackends.mlKit()`.
+2. a call to the matching feature-specific selector, such as
+   `VisionBackends.mlKitTextRecognition()`.
 
-On iOS, language entry points map directly to independent
-`GoogleMLKit/LanguageID`, `GoogleMLKit/Translate`, and
-`GoogleMLKit/SmartReply` pods. `InferenceSession` selects
+On iOS, language identification defaults to the system Natural Language
+framework. Calling `LanguageBackends.mlKitLanguageIdentification()` opts
+into `GoogleMLKit/LanguageID`; translation and Smart Reply map independently
+to `GoogleMLKit/Translate` and `GoogleMLKit/SmartReply`. `InferenceSession` selects
 `TensorFlowLiteObjC/CoreML`.
 
 The native implementation is disabled for watchOS and tvOS. Mac native uses
@@ -124,8 +126,9 @@ implementation; device and arm64-simulator builds retain the NEON path.
 
 `VisionImage` owns defensive copies of its input. It accepts encoded JPEG or
 PNG, NV21, and RGBA8888. Android feeds raw NV21 directly to ML Kit and
-converts RGBA to a bitmap. Apple converts the raw formats to an encoded image
-inside `CN1Vision.m`.
+converts RGBA to a bitmap. Apple creates a `CGImage` directly from NV21 or
+RGBA memory and passes it to Vision or ML Kit without an intermediate JPEG
+encode/decode.
 
 `VisionImage.fromCameraFrame()` is safe beyond the
 `FrameListener.onFrame()` callback because it copies the callback-owned
@@ -141,8 +144,10 @@ actual backend id without exposing platform classes.
 
 `InferenceSession` supports named typed tensors, multiple inputs and outputs,
 input resizing, and reusable native sessions. Model sources are bytes,
-resources, private files, or the HTTPS-only `ModelCache`. The cache can verify
-a SHA-256 digest before publishing a downloaded model.
+resources, private files, or the HTTPS-only `ModelCache`. File sources are
+opened by path without copying the model through the Java heap. The cache can
+verify a SHA-256 digest before publishing a downloaded model; callers should
+always supply the digest for mutable or third-party downloads.
 
 All native sessions and analyzers must be closed. Expensive open, analysis,
 and inference work runs off the EDT; completion and error delivery return to

@@ -24,8 +24,8 @@ package com.codename1.impl.android.ai;
 
 import com.codename1.ai.language.LanguageOptions;
 import com.codename1.util.AsyncResource;
-import com.google.android.gms.tasks.Continuation;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.SuccessContinuation;
 import com.google.android.gms.tasks.Task;
 import com.google.mlkit.nl.translate.Translation;
 import com.google.mlkit.nl.translate.Translator;
@@ -44,9 +44,9 @@ final class AndroidTranslationAdapter extends AndroidLanguageAdapter {
                         .setTargetLanguage(targetLanguage).build();
         final Translator client =
                 Translation.getClient(translatorOptions);
-        client.downloadModelIfNeeded().continueWithTask(
-                new Continuation<Void, Task<String>>() {
-            public Task<String> then(Task<Void> ignored) {
+        client.downloadModelIfNeeded().onSuccessTask(
+                new SuccessContinuation<Void, String>() {
+            public Task<String> then(Void ignored) {
                 return client.translate(text);
             }
         }).addOnSuccessListener(new OnSuccessListener<String>() {

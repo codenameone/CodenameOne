@@ -38,12 +38,16 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
     }
 
     @Override
+    /// @return whether this analyzer's feature/backend is available and open
     public final boolean isSupported() {
         VisionImpl impl = implementation();
         return impl != null && impl.isSupported(feature, options.getBackend().getId());
     }
 
     @Override
+    /// Starts one analysis using the retained native backend.
+    /// @param image immutable encoded or raw input
+    /// @return asynchronous typed result
     public final AsyncResource<T> process(VisionImage image) {
         if (image == null) {
             throw new NullPointerException("image");
@@ -62,6 +66,7 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
     }
 
     @Override
+    /// Idempotently releases the retained native backend.
     public final void close() {
         closed = true;
         if (implementation != null) {

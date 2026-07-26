@@ -20,10 +20,6 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-/*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- */
 package com.codename1.ai.vision;
 
 import com.codename1.camera.FrameFormat;
@@ -78,7 +74,8 @@ class VisionApiTest extends UITestBase {
         RecordingVisionImpl backend = new RecordingVisionImpl();
         implementation.setVisionImpl(backend);
         VisionOptions options = new VisionOptions()
-                .backend(VisionBackends.mlKit()).minimumConfidence(.6f);
+                .backend(VisionBackends.mlKitBarcodeScanning())
+                .minimumConfidence(.6f);
         TextRecognizer recognizer = new TextRecognizer(options);
         TextRecognitionResult result = await(recognizer.process(
                 VisionImage.encoded(new byte[] {1})));

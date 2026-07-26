@@ -120,9 +120,32 @@ static MLKVisionImage *cn1MLKitImage(UIImage *image, int rotation) {
 }
 #endif
 
-static NSString *cn1MLKitVisionPerform(NSData *data, int feature, int rotation) {
+#if defined(CN1_HAS_MLKIT_BARCODE)
+static NSString *cn1MLKitBarcodeFormat(MLKBarcodeFormat format) {
+    switch (format) {
+        case MLKBarcodeFormatAztec: return @"AZTEC";
+        case MLKBarcodeFormatCodaBar: return @"CODABAR";
+        case MLKBarcodeFormatCode39: return @"CODE_39";
+        case MLKBarcodeFormatCode93: return @"CODE_93";
+        case MLKBarcodeFormatCode128: return @"CODE_128";
+        case MLKBarcodeFormatDataMatrix: return @"DATA_MATRIX";
+        case MLKBarcodeFormatEAN8: return @"EAN_8";
+        case MLKBarcodeFormatEAN13: return @"EAN_13";
+        case MLKBarcodeFormatITF: return @"ITF";
+        case MLKBarcodeFormatPDF417: return @"PDF417";
+        case MLKBarcodeFormatQRCode: return @"QR_CODE";
+        case MLKBarcodeFormatUPCA: return @"UPC_A";
+        case MLKBarcodeFormatUPCE: return @"UPC_E";
+        default: return @"UNKNOWN";
+    }
+}
+#endif
+
+static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
+                                       int feature, int rotation) {
 #if defined(CN1_HAS_MLKIT_VISION)
-    UIImage *image = [UIImage imageWithData:data];
+    UIImage *image = rawImage == NULL ? [UIImage imageWithData:data]
+            : [UIImage imageWithCGImage:rawImage];
     if (image == nil) {
         return cn1VisionJSON(@{@"error": @"Could not decode ML Kit image"});
     }
@@ -174,8 +197,16 @@ static NSString *cn1MLKitVisionPerform(NSData *data, int feature, int rotation) 
             NSMutableDictionary *item = [NSMutableDictionary
                     dictionaryWithDictionary:cn1MLKitRect(barcode.frame, image.size)];
             item[@"value"] = barcode.rawValue ?: [NSNull null];
-            item[@"format"] = [NSString stringWithFormat:@"%ld",
-                    (long)barcode.format];
+            item[@"format"] = cn1MLKitBarcodeFormat(barcode.format);
+            NSMutableArray *corners = [NSMutableArray array];
+            for (NSValue *pointValue in barcode.cornerPoints ?: @[]) {
+                CGPoint point = pointValue.CGPointValue;
+                [corners addObject:@{
+                    @"x": @(point.x / image.size.width),
+                    @"y": @(point.y / image.size.height)
+                }];
+            }
+            item[@"corners"] = corners;
             [items addObject:item];
         }
         return cn1VisionJSON(@{@"items": items});
@@ -293,7 +324,7 @@ static NSString *cn1MLKitVisionPerform(NSData *data, int feature, int rotation) 
         return cn1VisionJSON(@{
             @"width": @(width),
             @"height": @(height),
-            @"data": [packed base64EncodedStringWithOptions:0]
+            @"dataPeer": @((uint64_t)CFBridgingRetain(packed))
         });
 #endif
     }
@@ -314,10 +345,29 @@ static CGImagePropertyOrientation cn1CGOrientation(int rotation) {
     }
 }
 
-static NSString *cn1VisionPerform(NSData *data, int feature, int rotation) {
+static NSString *cn1AppleBarcodeFormat(NSString *symbology) {
+    NSString *value = symbology.uppercaseString;
+    if ([value containsString:@"QR"]) return @"QR_CODE";
+    if ([value containsString:@"DATAMATRIX"]) return @"DATA_MATRIX";
+    if ([value containsString:@"PDF417"]) return @"PDF417";
+    if ([value containsString:@"CODE128"]) return @"CODE_128";
+    if ([value containsString:@"CODE93"]) return @"CODE_93";
+    if ([value containsString:@"CODE39"]) return @"CODE_39";
+    if ([value containsString:@"EAN13"]) return @"EAN_13";
+    if ([value containsString:@"EAN8"]) return @"EAN_8";
+    if ([value containsString:@"UPCE"]) return @"UPC_E";
+    if ([value containsString:@"ITF"]) return @"ITF";
+    if ([value containsString:@"AZTEC"]) return @"AZTEC";
+    return @"UNKNOWN";
+}
+
+static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
+                                  int feature, int rotation) {
     NSError *error = nil;
-    VNImageRequestHandler *handler =
-            [[VNImageRequestHandler alloc] initWithData:data
+    VNImageRequestHandler *handler = rawImage == NULL
+            ? [[VNImageRequestHandler alloc] initWithData:data
+                    orientation:cn1CGOrientation(rotation) options:@{}]
+            : [[VNImageRequestHandler alloc] initWithCGImage:rawImage
                     orientation:cn1CGOrientation(rotation) options:@{}];
 
     if (feature == 0) {
@@ -356,7 +406,17 @@ static NSString *cn1VisionPerform(NSData *data, int feature, int rotation) {
                     [NSMutableDictionary dictionaryWithDictionary:
                             cn1VisionRect(observation.boundingBox)];
             item[@"value"] = observation.payloadStringValue ?: [NSNull null];
-            item[@"format"] = observation.symbology ?: @"UNKNOWN";
+            item[@"format"] = cn1AppleBarcodeFormat(observation.symbology);
+            item[@"corners"] = @[
+                @{@"x": @(observation.topLeft.x),
+                  @"y": @(1.0 - observation.topLeft.y)},
+                @{@"x": @(observation.topRight.x),
+                  @"y": @(1.0 - observation.topRight.y)},
+                @{@"x": @(observation.bottomRight.x),
+                  @"y": @(1.0 - observation.bottomRight.y)},
+                @{@"x": @(observation.bottomLeft.x),
+                  @"y": @(1.0 - observation.bottomLeft.y)}
+            ];
             [items addObject:item];
         }
         return cn1VisionJSON(@{@"items": items});
@@ -448,11 +508,12 @@ static NSString *cn1VisionPerform(NSData *data, int feature, int rotation) {
             return cn1VisionJSON(@{
                 @"width": @(width),
                 @"height": @(height),
-                @"data": [packed base64EncodedStringWithOptions:0]
+                @"dataPeer": @((uint64_t)CFBridgingRetain(packed))
             });
         }
     } else if (feature == 6) {
-        UIImage *image = [UIImage imageWithData:data];
+        UIImage *image = rawImage == NULL ? [UIImage imageWithData:data]
+                : [UIImage imageWithCGImage:rawImage];
         if (image == nil) {
             return cn1VisionJSON(@{@"error": @"Could not decode document image"});
         }
@@ -481,7 +542,7 @@ static NSString *cn1VisionPerform(NSData *data, int feature, int rotation) {
         CGImageRelease(outputImage);
         NSData *jpeg = UIImageJPEGRepresentation(output, 0.92);
         return cn1VisionJSON(@{
-            @"data": [jpeg base64EncodedStringWithOptions:0]
+            @"dataPeer": @((uint64_t)CFBridgingRetain(jpeg))
         });
     }
     return cn1VisionJSON(@{@"error": @"Vision feature is unavailable on this OS"});
@@ -559,17 +620,17 @@ static uint8_t cn1VisionClamp(int value) {
 }
 
 /*
- * Converts the two raw CameraFrame formats to JPEG so both Apple Vision and
- * the optional ML Kit path consume identical, orientation-neutral data.
+ * Converts the two raw CameraFrame formats to an uncompressed CGImage so
+ * Vision and ML Kit avoid a lossy JPEG encode/decode cycle on every frame.
  * format mirrors FrameFormat: 0=JPEG/encoded, 1=NV21, 2=RGBA8888.
  */
-static NSData *cn1VisionEncodeInput(NSData *data, int width, int height,
-                                    int format) {
+static CGImageRef cn1VisionCreateRawImage(NSData *data, int width, int height,
+                                         int format) {
     if (format == 0) {
-        return data;
+        return NULL;
     }
     if (width <= 0 || height <= 0) {
-        return nil;
+        return NULL;
     }
     NSUInteger pixelCount = (NSUInteger)width * (NSUInteger)height;
     const uint8_t *source = data.bytes;
@@ -577,12 +638,12 @@ static NSData *cn1VisionEncodeInput(NSData *data, int width, int height,
     uint8_t *dest = rgba.mutableBytes;
     if (format == 2) {
         if (data.length < pixelCount * 4) {
-            return nil;
+            return NULL;
         }
         memcpy(dest, source, pixelCount * 4);
     } else if (format == 1) {
         if (data.length < pixelCount + pixelCount / 2) {
-            return nil;
+            return NULL;
         }
         for (int y = 0; y < height; y++) {
             int uvRow = width * height + (y >> 1) * width;
@@ -603,7 +664,7 @@ static NSData *cn1VisionEncodeInput(NSData *data, int width, int height,
             }
         }
     } else {
-        return nil;
+        return NULL;
     }
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
     CGDataProviderRef provider = CGDataProviderCreateWithCFData(
@@ -611,14 +672,9 @@ static NSData *cn1VisionEncodeInput(NSData *data, int width, int height,
     CGImageRef cgImage = CGImageCreate(width, height, 8, 32, width * 4,
             colorSpace, kCGBitmapByteOrderDefault | kCGImageAlphaLast,
             provider, NULL, false, kCGRenderingIntentDefault);
-    UIImage *image = cgImage == NULL ? nil
-            : [UIImage imageWithCGImage:cgImage];
-    NSData *encoded = image == nil ? nil
-            : UIImageJPEGRepresentation(image, 0.95);
-    if (cgImage != NULL) CGImageRelease(cgImage);
     CGDataProviderRelease(provider);
     CGColorSpaceRelease(colorSpace);
-    return encoded;
+    return cgImage;
 }
 #endif
 
@@ -634,14 +690,17 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1VisionAnalyze___byte_1ARRAY_int_
     }
     JAVA_ARRAY bytes = (JAVA_ARRAY) encodedImage;
     NSData *data = [NSData dataWithBytes:bytes->data length:(NSUInteger) bytes->length];
-    data = cn1VisionEncodeInput(data, width, height, frameFormat);
-    if (data == nil) {
+    CGImageRef rawImage = cn1VisionCreateRawImage(
+            data, width, height, frameFormat);
+    if (frameFormat != 0 && rawImage == NULL) {
         return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
                 @"{\"error\":\"Invalid raw vision image\"}");
     }
-    return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
-            mlKit ? cn1MLKitVisionPerform(data, feature, rotation)
-                  : cn1VisionPerform(data, feature, rotation));
+    NSString *result = mlKit
+            ? cn1MLKitVisionPerform(data, rawImage, feature, rotation)
+            : cn1VisionPerform(data, rawImage, feature, rotation);
+    if (rawImage != NULL) CGImageRelease(rawImage);
+    return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG result);
 #else
     return JAVA_NULL;
 #endif

@@ -27,7 +27,12 @@ import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
 
-/// Reusable LiteRT model session.
+/// Reusable, native on-device session for a TensorFlow Lite model.
+///
+/// Opening and execution are asynchronous because model allocation and
+/// delegates can be expensive. Metadata and resize operations are synchronous.
+/// A session is not usable after {@link #close()}; applications should retain
+/// and reuse one session instead of reopening the model for every input.
 public final class InferenceSession implements AutoCloseable {
     private final InferenceImpl implementation;
     private final Object handle;
@@ -38,11 +43,20 @@ public final class InferenceSession implements AutoCloseable {
         this.handle = handle;
     }
 
+    /// Tests whether the current port includes a native LiteRT runtime.
+    ///
+    /// @return {@code true} when sessions can be opened on this target
     public static boolean isSupported() {
         InferenceImpl impl = Display.getInstance().getInferenceBackend();
         return impl != null && impl.isSupported();
     }
 
+    /// Opens and allocates a model session off the EDT.
+    ///
+    /// @param source bytes, resource, or file containing a `.tflite` model
+    /// @param options execution options; {@code null} uses defaults
+    /// @return an asynchronous session, failed with {@link InferenceException}
+    ///         when the model or requested accelerator cannot be used
     public static AsyncResource<InferenceSession> open(ModelSource source,
                                                        InferenceOptions options) {
         if (source == null) {
@@ -69,27 +83,45 @@ public final class InferenceSession implements AutoCloseable {
         return out;
     }
 
+    /// Returns the model's current input metadata. Shapes reflect the most
+    /// recent successful {@link #resizeInput(String, int[])} call.
+    ///
+    /// @return a defensive copy of the input metadata array
     public TensorInfo[] getInputs() {
         ensureOpen();
         return implementation.getInputs(handle);
     }
 
+    /// @return a defensive copy of the model's current output metadata
     public TensorInfo[] getOutputs() {
         ensureOpen();
         return implementation.getOutputs(handle);
     }
 
+    /// Copies input tensors to native memory, invokes the model, and returns
+    /// every output tensor. Named tensors are matched by name; unnamed tensors
+    /// are matched by position.
+    ///
+    /// @param inputs one tensor for each model input
+    /// @return asynchronous output tensors in model output order
     public AsyncResource<Tensor[]> run(Tensor[] inputs) {
         ensureOpen();
         return implementation.run(handle, inputs == null ? new Tensor[0] : inputs);
     }
 
+    /// Resizes an input and reallocates native tensors before the next run.
+    ///
+    /// @param name model input name, or {@code null} for the first input
+    /// @param shape new non-negative dimensions
     public void resizeInput(String name, int[] shape) {
         ensureOpen();
         implementation.resizeInput(handle, name, shape);
     }
 
     @Override
+    /// Releases the interpreter, delegates, and any temporary staged model.
+    /// The original file supplied by {@link ModelSource#file(String)} is never
+    /// deleted. Calling this method more than once has no effect.
     public void close() {
         if (!closed) {
             closed = true;

@@ -41,6 +41,14 @@ public final class Face {
     private final int trackingId;
     private final VisionMetadata metadata;
 
+    /// Creates a detected face without backend metadata.
+    /// @param bounds face bounds in the oriented image coordinate space
+    /// @param landmarks named feature points, defensively copied
+    /// @param yaw horizontal Euler angle in degrees
+    /// @param pitch vertical Euler angle in degrees
+    /// @param roll in-plane Euler angle in degrees
+    /// @param smilingProbability smile confidence, or a negative value when unavailable
+    /// @param trackingId stable streaming id, or a negative value when unavailable
     public Face(VisionRect bounds, Map<String, VisionPoint> landmarks,
                 float yaw, float pitch, float roll,
                 float smilingProbability, int trackingId) {
@@ -48,6 +56,15 @@ public final class Face {
                 trackingId, null);
     }
 
+    /// Creates a detected face with backend diagnostics.
+    /// @param bounds face bounds in the oriented image coordinate space
+    /// @param landmarks named feature points, defensively copied
+    /// @param yaw horizontal Euler angle in degrees
+    /// @param pitch vertical Euler angle in degrees
+    /// @param roll in-plane Euler angle in degrees
+    /// @param smilingProbability smile confidence, or a negative value when unavailable
+    /// @param trackingId stable streaming id, or a negative value when unavailable
+    /// @param metadata backend details, or {@code null}
     public Face(VisionRect bounds, Map<String, VisionPoint> landmarks,
                 float yaw, float pitch, float roll,
                 float smilingProbability, int trackingId,
@@ -64,34 +81,42 @@ public final class Face {
         this.metadata = metadata;
     }
 
+    /// @return normalized top-left-origin face bounds
     public VisionRect getBounds() {
         return bounds;
     }
 
+    /// @return immutable named landmark map; possibly empty
     public Map<String, VisionPoint> getLandmarks() {
         return landmarks;
     }
 
+    /// @return left/right head rotation in degrees, or 0 if unavailable
     public float getYaw() {
         return yaw;
     }
 
+    /// @return up/down head rotation in degrees, or 0 if unavailable
     public float getPitch() {
         return pitch;
     }
 
+    /// @return in-plane head rotation in degrees, or 0 if unavailable
     public float getRoll() {
         return roll;
     }
 
+    /// @return smile probability in 0..1, or -1 when unavailable
     public float getSmilingProbability() {
         return smilingProbability;
     }
 
+    /// @return stream tracking identifier, or -1 when unavailable
     public int getTrackingId() {
         return trackingId;
     }
 
+    /// @return backend metadata, or {@code null} when manually constructed
     public VisionMetadata getMetadata() {
         return metadata;
     }

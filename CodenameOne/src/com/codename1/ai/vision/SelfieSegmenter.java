@@ -24,10 +24,14 @@ package com.codename1.ai.vision;
 
 /// Creates reusable foreground/person segmentation analyzers.
 public final class SelfieSegmenter extends AbstractVisionAnalyzer<SegmentationMask> {
+    /// Creates an analyzer using the platform default backend and options.
+    ///  VisionOptions
     public SelfieSegmenter() {
         this(null);
     }
 
+    /// Creates a reusable analyzer with explicit backend and result options.
+    ///  options configuration captured by this analyzer; null uses defaults
     public SelfieSegmenter(VisionOptions options) {
         super(VisionFeature.SELFIE_SEGMENTATION, options);
     }

@@ -39,20 +39,18 @@ import java.util.Map;
 
 /** ML Kit face detection; retained only for {@code FaceDetector} users. */
 final class AndroidFaceDetectionAdapter extends AndroidVisionAdapter {
+    private final FaceDetector client = FaceDetection.getClient(
+            new FaceDetectorOptions.Builder()
+                    .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+                    .setClassificationMode(
+                            FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
+                    .enableTracking().build());
     @Override
     @SuppressWarnings("unchecked")
     void analyze(InputImage input, final int imageWidth,
                  final int imageHeight, VisionOptions options,
                  AsyncResource<?> resource) {
         final AsyncResource<Face[]> out = (AsyncResource<Face[]>) resource;
-        FaceDetectorOptions detectorOptions =
-                new FaceDetectorOptions.Builder()
-                        .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
-                        .setClassificationMode(
-                                FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-                        .enableTracking().build();
-        final FaceDetector client =
-                FaceDetection.getClient(detectorOptions);
         client.process(input).addOnSuccessListener(
                 new OnSuccessListener<List<com.google.mlkit.vision.face.Face>>() {
             public void onSuccess(
@@ -88,9 +86,13 @@ final class AndroidFaceDetectionAdapter extends AndroidVisionAdapter {
                             tracking == null ? -1 : tracking, METADATA);
                 }
                 complete(out, result);
-                client.close();
             }
-        }).addOnFailureListener(failure(out, client));
+        }).addOnFailureListener(failure(out));
+    }
+
+    @Override
+    void close() {
+        client.close();
     }
 
     private static void addLandmark(Map<String, VisionPoint> out, String name,

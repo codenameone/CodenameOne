@@ -335,10 +335,14 @@ retains only the Android text adapter/artifact; it does not pull
 barcode, face, labeling, pose, or segmentation. `LanguageIdentifier`,
 `Translator`, and `SmartReply` likewise select independent artifacts.
 On iOS, an ML Kit vision pod is selected only when both its analyzer
-and `VisionBackends.mlKit()` are referenced. LiteRT is selected only by
+and its matching feature-specific selector are referenced. For example,
+`VisionBackends.mlKitBarcodeScanning()` selects only the barcode pod.
+LiteRT is selected only by
 `InferenceSession`.
 
-Call `isSupported()` before exposing a feature. Vision has native backends
+Language identification defaults to Apple Natural Language on iOS and ML
+Kit on Android. Translation and Smart Reply use feature-scoped ML Kit
+components. Call `isSupported()` before exposing a feature. Vision has native backends
 on Android, iOS, and Mac native. Language services and LiteRT inference
 have native backends on Android and iOS. JavaSE, JavaScript, native
 Windows/Linux, watchOS, and tvOS return unsupported; Mac native returns

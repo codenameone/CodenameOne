@@ -26,15 +26,19 @@ import com.codename1.impl.LanguageImpl;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
-/// On-device translation with lazily installed language-pair models.
+/// Translates text on device with lazily installed language-pair models.
+/// The first request for a pair may take longer while ML Kit downloads the
+/// model; download failures are reported through the returned resource.
 public final class Translator {
     private Translator() {
     }
 
+    /// @return whether automatic on-device translation is available
     public static boolean isSupported() {
         return isSupported(new LanguageOptions());
     }
 
+    /// @return whether the selected backend supports translation
     public static boolean isSupported(LanguageOptions options) {
         LanguageOptions actual = options == null ? new LanguageOptions() : options;
         LanguageImpl impl = Display.getInstance().getLanguageBackend();
@@ -42,6 +46,11 @@ public final class Translator {
                 actual.getBackend().getId());
     }
 
+    /// @param text source text
+    /// @param sourceLanguage BCP-47/ML Kit source language tag
+    /// @param targetLanguage BCP-47/ML Kit target language tag
+    /// @param options backend options, or {@code null}
+    /// @return asynchronous translated text
     public static AsyncResource<String> translate(String text, String sourceLanguage,
                                                    String targetLanguage,
                                                    LanguageOptions options) {

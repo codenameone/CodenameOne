@@ -22,15 +22,23 @@
  */
 package com.codename1.ai.vision;
 
-/// Portable body-pose result.
+/// Portable body-pose result. Landmark coordinates use the normalized
+/// top-left-origin image space defined by {@link VisionPoint}; confidence is
+/// in the range 0..1. Landmark names are backend-neutral where the native
+/// backend exposes a known joint name.
 public final class Pose {
     private final Landmark[] landmarks;
     private final VisionMetadata metadata;
 
+    /// Creates a pose without backend metadata.
+    /// @param landmarks detected named body landmarks, defensively copied
     public Pose(Landmark[] landmarks) {
         this(landmarks, null);
     }
 
+    /// Creates a pose with backend diagnostics.
+    /// @param landmarks detected named body landmarks, defensively copied
+    /// @param metadata backend details, or {@code null}
     public Pose(Landmark[] landmarks, VisionMetadata metadata) {
         if (landmarks == null) {
             this.landmarks = new Landmark[0];
@@ -41,35 +49,45 @@ public final class Pose {
         this.metadata = metadata;
     }
 
+    /// @return defensive copy of detected body landmarks
     public Landmark[] getLandmarks() {
         Landmark[] out = new Landmark[landmarks.length];
         System.arraycopy(landmarks, 0, out, 0, landmarks.length);
         return out;
     }
 
+    /// @return backend metadata, or {@code null} when manually constructed
     public VisionMetadata getMetadata() {
         return metadata;
     }
 
+    /// One named body joint with normalized position and confidence.
     public static final class Landmark {
         private final String name;
         private final VisionPoint position;
         private final float confidence;
 
+        /// Creates one detected body joint.
+        /// @param name joint name
+        /// @param position normalized joint position
+        /// @param confidence in-frame confidence in 0..1
         public Landmark(String name, VisionPoint position, float confidence) {
             this.name = name;
             this.position = position;
             this.confidence = confidence;
         }
 
+        /// @return portable/native joint name
         public String getName() {
             return name;
         }
 
+        /// @return normalized top-left-origin joint position
         public VisionPoint getPosition() {
             return position;
         }
 
+        /// @return in-frame confidence in the range 0..1
         public float getConfidence() {
             return confidence;
         }

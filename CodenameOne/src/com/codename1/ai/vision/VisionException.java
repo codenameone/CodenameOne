@@ -32,16 +32,24 @@ public class VisionException extends RuntimeException {
 
     private final int code;
 
+    /// Creates a classified vision failure.
+    /// @param code portable failure code defined by this class
+    /// @param message user-readable failure description
     public VisionException(int code, String message) {
         super(message);
         this.code = code;
     }
 
+    /// Creates a classified vision failure with its native or port cause.
+    /// @param code portable failure code defined by this class
+    /// @param message user-readable failure description
+    /// @param cause originating detector or image-conversion error
     public VisionException(int code, String message, Throwable cause) {
         super(message, cause);
         this.code = code;
     }
 
+    /// @return one of this class's portable failure-code constants
     public int getCode() {
         return code;
     }

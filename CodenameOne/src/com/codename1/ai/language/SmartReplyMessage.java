@@ -29,6 +29,11 @@ public final class SmartReplyMessage {
     private final boolean localUser;
     private final long timestampMillis;
 
+    /// Creates one conversation turn used to generate reply suggestions.
+    /// @param text message body; {@code null} becomes an empty string
+    /// @param participantId stable speaker id used to group conversation turns
+    /// @param localUser whether this message was written by the current user
+    /// @param timestampMillis message time in Unix epoch milliseconds
     public SmartReplyMessage(String text, String participantId,
                              boolean localUser, long timestampMillis) {
         this.text = text == null ? "" : text;
@@ -37,18 +42,22 @@ public final class SmartReplyMessage {
         this.timestampMillis = timestampMillis;
     }
 
+    /// @return message text supplied to the local model
     public String getText() {
         return text;
     }
 
+    /// @return stable participant identifier used to group remote speakers
     public String getParticipantId() {
         return participantId;
     }
 
+    /// @return whether this message was authored by the device user
     public boolean isLocalUser() {
         return localUser;
     }
 
+    /// @return conversation timestamp in milliseconds since the epoch
     public long getTimestampMillis() {
         return timestampMillis;
     }

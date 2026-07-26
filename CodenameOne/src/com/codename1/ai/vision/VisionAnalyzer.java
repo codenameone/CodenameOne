@@ -24,10 +24,18 @@ package com.codename1.ai.vision;
 
 import com.codename1.util.AsyncResource;
 
-/// Reusable, closable analyzer for still images or camera frames.
+/// Reusable, closable on-device analyzer for still images or camera frames.
+/// Implementations may retain native detectors and models between calls, so
+/// create one analyzer per stream/workflow and close it when finished.
 public interface VisionAnalyzer<T> extends AutoCloseable {
+    /// Tests the exact feature/backend pair configured for this analyzer.
+    /// @return {@code true} when the current target supports it
     boolean isSupported();
+    /// Starts one asynchronous analysis without uploading the image.
+    /// @param image encoded or raw input
+    /// @return asynchronous typed result delivered on the EDT
     AsyncResource<T> process(VisionImage image);
+    /// Releases native detector/model resources; further processing fails.
     @Override
     void close();
 }

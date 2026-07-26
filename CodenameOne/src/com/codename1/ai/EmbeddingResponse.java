@@ -26,11 +26,17 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/// Immutable provider response containing embeddings, token accounting, and
+/// the model name reported by the service.
 public final class EmbeddingResponse {
     private final List<Embedding> data;
     private final Usage usage;
     private final String modelUsed;
 
+    /// Creates a normalized embedding response.
+    /// @param data embedding items in provider response order; {@code null} becomes empty
+    /// @param usage provider token accounting, or {@code null} when omitted
+    /// @param modelUsed model identifier returned by the provider
     public EmbeddingResponse(List<Embedding> data, Usage usage, String modelUsed) {
         this.data = data == null ? Collections.<Embedding>emptyList()
                 : Collections.unmodifiableList(new ArrayList<Embedding>(data));
@@ -38,14 +44,17 @@ public final class EmbeddingResponse {
         this.modelUsed = modelUsed;
     }
 
+    /// @return immutable embedding items in request order
     public List<Embedding> getData() {
         return data;
     }
 
+    /// @return provider token accounting, or {@code null} when unavailable
     public Usage getUsage() {
         return usage;
     }
 
+    /// @return provider-reported model identifier, or {@code null} when omitted
     public String getModelUsed() {
         return modelUsed;
     }

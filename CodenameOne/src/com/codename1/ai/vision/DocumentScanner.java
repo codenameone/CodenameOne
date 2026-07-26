@@ -24,10 +24,14 @@ package com.codename1.ai.vision;
 
 /// Creates reusable document-boundary and perspective-correction analyzers.
 public final class DocumentScanner extends AbstractVisionAnalyzer<DocumentScanResult> {
+    /// Creates an analyzer using the platform default backend and options.
+    ///  VisionOptions
     public DocumentScanner() {
         this(null);
     }
 
+    /// Creates a reusable analyzer with explicit backend and result options.
+    ///  options configuration captured by this analyzer; null uses defaults
     public DocumentScanner(VisionOptions options) {
         super(VisionFeature.DOCUMENT_SCANNING, options);
     }

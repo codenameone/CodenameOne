@@ -20,19 +20,12 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-/*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- */
 package com.codename1.ai.vision;
 
-/// Vision backend selectors. {@code auto()} chooses Apple Vision on iOS and
-/// ML Kit on Android. Unsupported ports report that through the analyzer.
+/// Vision backend selectors. {@link #auto()} chooses Apple Vision on iOS and
+/// ML Kit on Android. Feature-specific ML Kit methods are separate so one
+/// selector never adds unrelated OCR, barcode, face, pose, labeling, or
+/// segmentation pods.
 public final class VisionBackends {
     private static final VisionBackend AUTO = new NamedBackend("auto");
     private static final VisionBackend APPLE = new NamedBackend("apple-vision");
@@ -41,15 +34,52 @@ public final class VisionBackends {
     private VisionBackends() {
     }
 
+    /// @return the dependency-minimal platform default
     public static VisionBackend auto() {
         return AUTO;
     }
 
+    /// Selects Apple Vision/Core Image without adding a third-party dependency.
+    /// @return Apple-native backend selector
     public static VisionBackend appleVision() {
         return APPLE;
     }
 
-    public static VisionBackend mlKit() {
+    /// Selects ML Kit for text recognition on iOS. Android already uses ML
+    /// Kit for the automatic backend.
+    ///
+    /// @return the ML Kit backend selector
+    public static VisionBackend mlKitTextRecognition() {
+        return ML_KIT;
+    }
+
+    /// Selects ML Kit for barcode scanning on iOS.
+    /// @return the ML Kit backend selector
+    public static VisionBackend mlKitBarcodeScanning() {
+        return ML_KIT;
+    }
+
+    /// Selects ML Kit for face detection on iOS.
+    /// @return the ML Kit backend selector
+    public static VisionBackend mlKitFaceDetection() {
+        return ML_KIT;
+    }
+
+    /// Selects ML Kit for image labeling on iOS.
+    /// @return the ML Kit backend selector
+    public static VisionBackend mlKitImageLabeling() {
+        return ML_KIT;
+    }
+
+    /// Selects ML Kit for pose detection on iOS.
+    /// @return the ML Kit backend selector
+    public static VisionBackend mlKitPoseDetection() {
+        return ML_KIT;
+    }
+
+    /// Selects ML Kit for selfie segmentation on iOS.
+    /// @return the ML Kit backend selector
+    public static VisionBackend mlKitSelfieSegmentation() {
         return ML_KIT;
     }
 

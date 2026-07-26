@@ -37,17 +37,16 @@ import java.nio.ByteBuffer;
  * ML Kit selfie segmentation; retained only for {@code SelfieSegmenter} users.
  */
 final class AndroidSelfieSegmentationAdapter extends AndroidVisionAdapter {
+    private final Segmenter client = Segmentation.getClient(
+            new SelfieSegmenterOptions.Builder()
+                    .setDetectorMode(SelfieSegmenterOptions.STREAM_MODE)
+                    .build());
     @Override
     @SuppressWarnings("unchecked")
     void analyze(InputImage input, int imageWidth, int imageHeight,
                  VisionOptions options, AsyncResource<?> resource) {
         final AsyncResource<SegmentationMask> out =
                 (AsyncResource<SegmentationMask>) resource;
-        final Segmenter client = Segmentation.getClient(
-                new SelfieSegmenterOptions.Builder()
-                        .setDetectorMode(
-                                SelfieSegmenterOptions.SINGLE_IMAGE_MODE)
-                        .build());
         client.process(input).addOnSuccessListener(
                 new OnSuccessListener<
                         com.google.mlkit.vision.segmentation.SegmentationMask>() {
@@ -61,8 +60,12 @@ final class AndroidSelfieSegmentationAdapter extends AndroidVisionAdapter {
                 complete(out, new SegmentationMask(
                         value.getWidth(), value.getHeight(), confidence,
                         METADATA));
-                client.close();
             }
-        }).addOnFailureListener(failure(out, client));
+        }).addOnFailureListener(failure(out));
+    }
+
+    @Override
+    void close() {
+        client.close();
     }
 }

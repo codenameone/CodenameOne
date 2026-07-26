@@ -22,7 +22,10 @@
  */
 package com.codename1.ai.language;
 
-/// Identifies an on-device language implementation.
+/// Identifies a native language-service implementation. Obtain instances from
+/// {@link LanguageBackends}; builder dependency selection relies on calls to
+/// those selector methods.
 public interface LanguageBackend {
+    /// @return stable backend identifier passed to the current platform port
     String getId();
 }

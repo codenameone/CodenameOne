@@ -29,18 +29,14 @@ import com.codename1.ai.inference.Tensor;
 import com.codename1.ai.inference.TensorInfo;
 import com.codename1.ai.inference.TensorType;
 import com.codename1.impl.InferenceImpl;
-import com.codename1.io.FileSystemStorage;
 import com.codename1.io.JSONParser;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
-import com.codename1.util.Base64;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -48,9 +44,13 @@ import java.util.Map;
 public final class IOSInferenceImpl extends InferenceImpl {
     private static final class Handle {
         final int id;
+        TensorInfo[] inputs;
+        TensorInfo[] outputs;
 
-        Handle(int id) {
+        Handle(int id, TensorInfo[] inputs, TensorInfo[] outputs) {
             this.id = id;
+            this.inputs = inputs;
+            this.outputs = outputs;
         }
     }
 
@@ -73,11 +73,25 @@ public final class IOSInferenceImpl extends InferenceImpl {
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {
                 try {
-                    Map root = parse(IOSImplementation.nativeInstance.cn1InferenceOpen(
-                            loadModel(source), options.getThreads(),
-                            options.getAccelerator().ordinal(),
-                            options.isFallbackAllowed()));
-                    final Handle handle = new Handle(integer(root, "handle"));
+                    String opened = source.getKind() == ModelSource.FILE
+                            ? IOSImplementation.nativeInstance.cn1InferenceOpenFile(
+                                    source.getPath(), options.getThreads(),
+                                    options.getAccelerator().ordinal(),
+                                    options.isFallbackAllowed())
+                            : IOSImplementation.nativeInstance.cn1InferenceOpen(
+                                    loadModel(source), options.getThreads(),
+                                    options.getAccelerator().ordinal(),
+                                    options.isFallbackAllowed());
+                    Map root = parse(opened);
+                    int id = integer(root, "handle");
+                    final Handle handle;
+                    try {
+                        handle = new Handle(id,
+                                metadata(id, false), metadata(id, true));
+                    } catch (Throwable metadataError) {
+                        IOSImplementation.nativeInstance.cn1InferenceClose(id);
+                        throw metadataError;
+                    }
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
                             out.complete(handle);
@@ -92,12 +106,12 @@ public final class IOSInferenceImpl extends InferenceImpl {
 
     @Override
     public TensorInfo[] getInputs(Object handle) {
-        return metadata(checked(handle), false);
+        return copy(checked(handle).inputs);
     }
 
     @Override
     public TensorInfo[] getOutputs(Object handle) {
-        return metadata(checked(handle), true);
+        return copy(checked(handle).outputs);
     }
 
     @Override
@@ -115,19 +129,52 @@ public final class IOSInferenceImpl extends InferenceImpl {
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {
                 try {
-                    TensorInfo[] metadata = metadata(checked, false);
-                    Map root = parse(IOSImplementation.nativeInstance.cn1InferenceRun(
-                            id, inputsJson(inputs, metadata)));
-                    List items = list(root, "items");
-                    final Tensor[] result = new Tensor[items.size()];
+                    TensorInfo[] metadata = checked.inputs;
+                    if (inputs.length != metadata.length) {
+                        throw new IllegalArgumentException("Expected "
+                                + metadata.length + " input tensors but received "
+                                + inputs.length);
+                    }
+                    for (int i = 0; i < inputs.length; i++) {
+                        Tensor tensor = inputs[i];
+                        int index = inputIndex(tensor, i, metadata);
+                        TensorInfo expected = find(metadata, index);
+                        if (tensor.getType() != expected.getType()) {
+                            throw new IllegalArgumentException("Input "
+                                    + expected.getName() + " expects "
+                                    + expected.getType() + " but received "
+                                    + tensor.getType());
+                        }
+                        parse(IOSImplementation.nativeInstance.cn1InferenceCopyInput(
+                                id, index, encodeData(tensor.getType(),
+                                        tensor.getDataUnsafe())));
+                    }
+                    parse(IOSImplementation.nativeInstance.cn1InferenceInvoke(id));
+                    TensorInfo[] outputs = checked.outputs;
+                    final Tensor[] result = new Tensor[outputs.length];
                     for (int i = 0; i < result.length; i++) {
-                        Map value = (Map) items.get(i);
-                        TensorType type = TensorType.valueOf(string(value, "type"));
-                        int[] shape = intArray(list(value, "shape"));
-                        byte[] bytes = Base64.decode(
-                                string(value, "data").getBytes("UTF-8"));
-                        result[i] = new Tensor(string(value, "name"), type, shape,
-                                decodeData(type, bytes, elementCount(shape)));
+                        TensorInfo output = outputs[i];
+                        long data = IOSImplementation.nativeInstance
+                                .cn1InferenceOutputData(id, output.getIndex());
+                        if (data == 0) {
+                            throw new InferenceException(
+                                    "Could not read LiteRT output "
+                                            + output.getName());
+                        }
+                        byte[] bytes;
+                        try {
+                            bytes = new byte[IOSImplementation.nativeInstance
+                                    .getNSDataSize(data)];
+                            IOSImplementation.nativeInstance.nsDataToByteArray(
+                                    data, bytes);
+                        } finally {
+                            IOSImplementation.nativeInstance.releasePeer(data);
+                        }
+                        int[] shape = output.getShape();
+                        result[i] = new Tensor(output.getName(),
+                                output.getType(), shape,
+                                decodeData(output.getType(), bytes,
+                                        elementCount(shape)));
                     }
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
@@ -144,7 +191,7 @@ public final class IOSInferenceImpl extends InferenceImpl {
     @Override
     public void resizeInput(Object handle, String name, int[] shape) {
         Handle checked = checked(handle);
-        TensorInfo[] inputs = metadata(checked, false);
+        TensorInfo[] inputs = checked.inputs;
         int index = -1;
         for (int i = 0; i < inputs.length; i++) {
             if (name == null || name.equals(inputs[i].getName())) {
@@ -158,6 +205,8 @@ public final class IOSInferenceImpl extends InferenceImpl {
         try {
             parse(IOSImplementation.nativeInstance.cn1InferenceResize(
                     checked.id, index, shape));
+            checked.inputs = metadata(checked.id, false);
+            checked.outputs = metadata(checked.id, true);
         } catch (Exception error) {
             throw new InferenceException("Could not resize input " + name, error);
         }
@@ -168,10 +217,10 @@ public final class IOSInferenceImpl extends InferenceImpl {
         IOSImplementation.nativeInstance.cn1InferenceClose(checked(handle).id);
     }
 
-    private static TensorInfo[] metadata(Handle handle, boolean outputs) {
+    private static TensorInfo[] metadata(int handle, boolean outputs) {
         try {
             Map root = parse(IOSImplementation.nativeInstance.cn1InferenceMetadata(
-                    handle.id, outputs));
+                    handle, outputs));
             List items = list(root, "items");
             TensorInfo[] result = new TensorInfo[items.size()];
             for (int i = 0; i < result.length; i++) {
@@ -194,29 +243,6 @@ public final class IOSInferenceImpl extends InferenceImpl {
         return (Handle) value;
     }
 
-    private static String inputsJson(Tensor[] inputs, TensorInfo[] metadata) {
-        if (inputs.length != metadata.length) {
-            throw new IllegalArgumentException("Expected " + metadata.length
-                    + " input tensors but received " + inputs.length);
-        }
-        List<Map<String, Object>> items = new ArrayList<Map<String, Object>>();
-        for (int i = 0; i < inputs.length; i++) {
-            Tensor tensor = inputs[i];
-            int index = inputIndex(tensor, i, metadata);
-            Map<String, Object> value = new HashMap<String, Object>();
-            value.put("index", Integer.valueOf(index));
-            value.put("name", tensor.getName());
-            value.put("type", tensor.getType().name());
-            value.put("shape", integerList(tensor.getShape()));
-            value.put("data", Base64.encode(encodeData(
-                    tensor.getType(), tensor.getData())));
-            items.add(value);
-        }
-        Map<String, Object> root = new HashMap<String, Object>();
-        root.put("items", items);
-        return JSONParser.mapToJson(root);
-    }
-
     private static int inputIndex(Tensor tensor, int fallback,
                                   TensorInfo[] metadata) {
         if (tensor.getName() != null) {
@@ -229,6 +255,15 @@ public final class IOSInferenceImpl extends InferenceImpl {
                     + tensor.getName());
         }
         return metadata[fallback].getIndex();
+    }
+
+    private static TensorInfo find(TensorInfo[] metadata, int index) {
+        for (int i = 0; i < metadata.length; i++) {
+            if (metadata[i].getIndex() == index) {
+                return metadata[i];
+            }
+        }
+        throw new IllegalArgumentException("Unknown model input index " + index);
     }
 
     private static byte[] encodeData(TensorType type, Object value) {
@@ -326,14 +361,6 @@ public final class IOSInferenceImpl extends InferenceImpl {
         return out;
     }
 
-    private static List<Integer> integerList(int[] values) {
-        List<Integer> out = new ArrayList<Integer>();
-        for (int i = 0; i < values.length; i++) {
-            out.add(Integer.valueOf(values[i]));
-        }
-        return out;
-    }
-
     private static int[] intArray(List values) {
         int[] out = new int[values.size()];
         for (int i = 0; i < out.length; i++) {
@@ -374,14 +401,10 @@ public final class IOSInferenceImpl extends InferenceImpl {
             return source.getBytes();
         }
         InputStream input;
-        if (source.getKind() == ModelSource.FILE) {
-            input = FileSystemStorage.getInstance().openInputStream(source.getPath());
-        } else {
-            input = Display.getInstance().getResourceAsStream(
-                    IOSInferenceImpl.class, source.getPath());
-            if (input == null) {
-                throw new IOException("Model resource not found: " + source.getPath());
-            }
+        input = Display.getInstance().getResourceAsStream(
+                IOSInferenceImpl.class, source.getPath());
+        if (input == null) {
+            throw new IOException("Model resource not found: " + source.getPath());
         }
         try {
             ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -394,6 +417,12 @@ public final class IOSInferenceImpl extends InferenceImpl {
         } finally {
             input.close();
         }
+    }
+
+    private static TensorInfo[] copy(TensorInfo[] value) {
+        TensorInfo[] out = new TensorInfo[value.length];
+        System.arraycopy(value, 0, out, 0, value.length);
+        return out;
     }
 
     private static void fail(final AsyncResource<?> out, final String message,

@@ -22,20 +22,27 @@
  */
 package com.codename1.ai.vision;
 
-/// Immutable point normalized to a top-left-origin 0..1 coordinate space.
+/// Immutable point in a normalized, top-left-origin coordinate space. X grows
+/// right and Y grows down; 0 and 1 correspond to image edges, independent of
+/// source pixel dimensions.
 public final class VisionPoint {
     private final float x;
     private final float y;
 
+    /// Creates a point in the oriented input image's top-left coordinate space.
+    /// @param x horizontal coordinate
+    /// @param y vertical coordinate
     public VisionPoint(float x, float y) {
         this.x = x;
         this.y = y;
     }
 
+    /// @return horizontal coordinate normalized to the oriented input width
     public float getX() {
         return x;
     }
 
+    /// @return downward vertical coordinate normalized to input height
     public float getY() {
         return y;
     }

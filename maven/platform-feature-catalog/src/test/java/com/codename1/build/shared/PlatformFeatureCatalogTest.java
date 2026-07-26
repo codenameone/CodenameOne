@@ -50,7 +50,8 @@ class PlatformFeatureCatalogTest {
     void explicitMlKitBackendAddsOnlyUsedFeaturePod() {
         PlatformFeatureCatalog.Accumulator acc = new PlatformFeatureCatalog.Accumulator();
         acc.consume("com/codename1/ai/vision/TextRecognizer");
-        acc.consumeMethod("com/codename1/ai/vision/VisionBackends", "mlKit");
+        acc.consumeMethod("com/codename1/ai/vision/VisionBackends",
+                "mlKitTextRecognition");
         boolean foundTextPod = false;
         for (PlatformFeatureCatalog.Entry e : acc.hits()) {
             foundTextPod |= e.iosPods().contains("GoogleMLKit/TextRecognition");
@@ -203,7 +204,8 @@ class PlatformFeatureCatalogTest {
     void thirdPartyAppleAiPackagesAreExcludedFromCatalyst() {
         PlatformFeatureCatalog.Accumulator acc = new PlatformFeatureCatalog.Accumulator();
         acc.consume("com/codename1/ai/vision/TextRecognizer");
-        acc.consumeMethod("com/codename1/ai/vision/VisionBackends", "mlKit");
+        acc.consumeMethod("com/codename1/ai/vision/VisionBackends",
+                "mlKitTextRecognition");
         acc.consume("com/codename1/ai/language/LanguageIdentifier");
         acc.consume("com/codename1/ai/inference/InferenceSession");
 
@@ -219,6 +221,27 @@ class PlatformFeatureCatalogTest {
             }
         }
         assertTrue(foundSystemVision);
+    }
+
+    @Test
+    void selectorMethodsAreMatchedExactlyAndLanguageIdDefaultsToApple() {
+        PlatformFeatureCatalog.Accumulator acc =
+                new PlatformFeatureCatalog.Accumulator();
+        acc.consume("com/codename1/ai/vision/TextRecognizer");
+        acc.consumeMethod("com/codename1/ai/vision/VisionBackends",
+                "mlKitTextRecognitionFuture");
+        for (PlatformFeatureCatalog.Entry entry : acc.hits()) {
+            assertTrue(entry.iosPods().isEmpty(),
+                    "A method-name prefix must not select an optional pod");
+        }
+
+        List<PlatformFeatureCatalog.Entry> language =
+                PlatformFeatureCatalog.matchesFor(
+                        "com/codename1/ai/language/LanguageIdentifier");
+        assertEquals(1, language.size());
+        assertTrue(language.get(0).iosPods().isEmpty());
+        assertTrue(language.get(0).iosFrameworks().contains("NaturalLanguage"));
+        assertTrue(language.get(0).iosDependenciesSupportArm64Simulator());
     }
 
     @Test

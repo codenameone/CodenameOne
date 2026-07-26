@@ -28,8 +28,11 @@ import com.codename1.camera.FrameListener;
 import com.codename1.ui.Display;
 import com.codename1.util.SuccessCallback;
 
-/// Connects a camera frame stream to an analyzer with keep-only-latest
-/// backpressure. The pipeline owns the analyzer and closes it on close.
+/// Connects a camera frame stream to a reusable analyzer with keep-only-latest
+/// backpressure. At most one analysis and one pending frame are retained, so a
+/// slow model cannot build an unbounded queue. Results and errors arrive on
+/// the EDT. The pipeline owns and closes the analyzer but not the camera
+/// session.
 public final class VisionPipeline<T> implements AutoCloseable {
     private final CameraSession session;
     private final VisionAnalyzer<T> analyzer;
@@ -39,6 +42,10 @@ public final class VisionPipeline<T> implements AutoCloseable {
     private boolean busy;
     private boolean closed;
 
+    /// Attaches immediately as the session's frame listener.
+    /// @param session active camera session whose frames should be analyzed
+    /// @param analyzer reusable analyzer owned by this pipeline
+    /// @param listener EDT result/error listener
     public VisionPipeline(CameraSession session, VisionAnalyzer<T> analyzer,
                           VisionPipelineListener<T> listener) {
         if (session == null || analyzer == null || listener == null) {
@@ -71,7 +78,22 @@ public final class VisionPipeline<T> implements AutoCloseable {
     }
 
     private void process(final VisionImage image) {
-        analyzer.process(image).ready(new SuccessCallback<T>() {
+        final com.codename1.util.AsyncResource<T> operation;
+        try {
+            operation = analyzer.process(image);
+            if (operation == null) {
+                throw new IllegalStateException("Vision analyzer returned no operation");
+            }
+        } catch (final Throwable error) {
+            onFinished(new Runnable() {
+                @Override
+                public void run() {
+                    listener.error(error);
+                }
+            });
+            return;
+        }
+        operation.ready(new SuccessCallback<T>() {
             @Override
             public void onSucess(final T value) {
                 onFinished(new Runnable() {
@@ -117,12 +139,18 @@ public final class VisionPipeline<T> implements AutoCloseable {
         });
     }
 
+    /// Returns whether a frame is currently being analyzed.
+    ///
+    /// @return {@code true} while an analysis is in flight
     public boolean isBusy() {
         synchronized (this) {
             return busy;
         }
     }
 
+    /// Stops accepting frames, detaches from the camera session, discards the
+    /// pending frame, and closes the analyzer. Calling this method more than
+    /// once has no effect.
     @Override
     public void close() {
         synchronized (this) {

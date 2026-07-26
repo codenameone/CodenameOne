@@ -338,6 +338,24 @@ public class IPhoneBuilder extends Executor {
         }
         return str + append;
     }
+
+    private static String appendFrameworks(String libraries,
+                                           String... frameworks) {
+        String out = libraries == null ? "" : libraries;
+        for (String framework : frameworks) {
+            boolean present = false;
+            for (String item : out.split(";")) {
+                if (framework.equalsIgnoreCase(item.trim())) {
+                    present = true;
+                    break;
+                }
+            }
+            if (!present) {
+                out = out.length() == 0 ? framework : out + ";" + framework;
+            }
+        }
+        return out;
+    }
     
     private int getDeploymentTargetInt(BuildRequest request) {
         String target = getDeploymentTarget(request);
@@ -2531,13 +2549,8 @@ public class IPhoneBuilder extends Executor {
                     throw new BuildException(
                             "Failed to enable INCLUDE_CN1_VISION", ex);
                 }
-                String visionLibs =
-                        "Vision.framework;CoreImage.framework;CoreVideo.framework";
-                if (addLibs == null || addLibs.length() == 0) {
-                    addLibs = visionLibs;
-                } else if (!addLibs.toLowerCase().contains("vision.framework")) {
-                    addLibs = addLibs + ";" + visionLibs;
-                }
+                addLibs = appendFrameworks(addLibs, "Vision.framework",
+                        "CoreImage.framework", "CoreVideo.framework");
             }
 
             if (usesCn1Language) {
@@ -2562,13 +2575,8 @@ public class IPhoneBuilder extends Executor {
                     throw new BuildException(
                             "Failed to enable INCLUDE_CN1_INFERENCE", ex);
                 }
-                String inferenceLibs =
-                        "CoreML.framework;Metal.framework;Accelerate.framework";
-                if (addLibs == null || addLibs.length() == 0) {
-                    addLibs = inferenceLibs;
-                } else if (!addLibs.toLowerCase().contains("coreml.framework")) {
-                    addLibs = addLibs + ";" + inferenceLibs;
-                }
+                addLibs = appendFrameworks(addLibs, "CoreML.framework",
+                        "Metal.framework", "Accelerate.framework");
             }
 
             // CarPlay: link CarPlay.framework (+ MediaPlayer for the now-playing template) and
@@ -3402,6 +3410,17 @@ public class IPhoneBuilder extends Executor {
                             + "        (ref && (ref.path || ref.name || ref.display_name)) || bf.display_name || '<unknown>'\n"
                             + "      end\n"
                             + "      raise \"Swift files/resources still present in Copy Bundle Resources: #{names.join(', ')}\"\n"
+                            + "    end\n"
+                            + "    arc_sources = ['CN1Vision.m', 'CN1Language.m', 'CN1Inference.m']\n"
+                            + "    main_target.source_build_phase.files.each do |bf|\n"
+                            + "      ref = bf.file_ref\n"
+                            + "      name = ref && File.basename(ref.path || ref.name || '')\n"
+                            + "      next unless arc_sources.include?(name)\n"
+                            + "      settings = bf.settings || {}\n"
+                            + "      flags = settings['COMPILER_FLAGS'].to_s.split\n"
+                            + "      flags << '-fobjc-arc' unless flags.include?('-fobjc-arc')\n"
+                            + "      settings['COMPILER_FLAGS'] = flags.join(' ')\n"
+                            + "      bf.settings = settings\n"
                             + "    end\n"
                             + "  end\n"
                             + "rescue => e\n"

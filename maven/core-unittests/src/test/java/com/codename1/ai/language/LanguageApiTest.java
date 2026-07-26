@@ -42,7 +42,7 @@ class LanguageApiTest extends UITestBase {
         RecordingLanguageImpl backend = new RecordingLanguageImpl();
         implementation.setLanguageImpl(backend);
         LanguageOptions options = new LanguageOptions()
-                .backend(LanguageBackends.mlKit())
+                .backend(LanguageBackends.mlKitLanguageIdentification())
                 .minimumConfidence(.4f);
 
         assertTrue(LanguageIdentifier.isSupported(options));

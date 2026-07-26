@@ -22,7 +22,9 @@
  */
 package com.codename1.ai.vision;
 
-/// Immutable normalized rectangle using a top-left origin.
+/// Immutable normalized rectangle using a top-left origin. X/Y identify the
+/// upper-left corner and width/height are fractions of the oriented input
+/// dimensions. {@link #EMPTY} represents unavailable geometry.
 public final class VisionRect {
     public static final VisionRect EMPTY = new VisionRect(0, 0, 0, 0);
 
@@ -31,6 +33,11 @@ public final class VisionRect {
     private final float width;
     private final float height;
 
+    /// Creates a rectangle in the oriented input image's top-left coordinate space.
+    /// @param x left coordinate
+    /// @param y top coordinate
+    /// @param width non-negative rectangle width
+    /// @param height non-negative rectangle height
     public VisionRect(float x, float y, float width, float height) {
         this.x = x;
         this.y = y;
@@ -38,18 +45,22 @@ public final class VisionRect {
         this.height = height;
     }
 
+    /// @return normalized left coordinate
     public float getX() {
         return x;
     }
 
+    /// @return normalized top coordinate
     public float getY() {
         return y;
     }
 
+    /// @return width as a fraction of oriented input width
     public float getWidth() {
         return width;
     }
 
+    /// @return height as a fraction of oriented input height
     public float getHeight() {
         return height;
     }

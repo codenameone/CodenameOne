@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -66,15 +67,38 @@ public final class AndroidInferenceImpl extends InferenceImpl {
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {
                 try {
+                    InferenceOptions.Accelerator accelerator =
+                            options.getAccelerator();
+                    if ((accelerator == InferenceOptions.Accelerator.GPU
+                            || accelerator == InferenceOptions.Accelerator.CORE_ML)
+                            && !options.isFallbackAllowed()) {
+                        throw new InferenceException(accelerator
+                                + " acceleration is unavailable on Android");
+                    }
                     ByteBuffer model = loadModel(source);
                     Interpreter.Options nativeOptions = new Interpreter.Options();
                     if (options.getThreads() > 0) {
                         nativeOptions.setNumThreads(options.getThreads());
                     }
-                    if (options.getAccelerator() == InferenceOptions.Accelerator.NPU) {
+                    if (accelerator == InferenceOptions.Accelerator.NPU) {
                         nativeOptions.setUseNNAPI(true);
                     }
-                    final Handle handle = new Handle(new Interpreter(model, nativeOptions));
+                    Interpreter interpreter;
+                    try {
+                        interpreter = new Interpreter(model, nativeOptions);
+                    } catch (Throwable acceleratedFailure) {
+                        if (accelerator != InferenceOptions.Accelerator.NPU
+                                || !options.isFallbackAllowed()) {
+                            throw acceleratedFailure;
+                        }
+                        Interpreter.Options cpuOptions = new Interpreter.Options();
+                        if (options.getThreads() > 0) {
+                            cpuOptions.setNumThreads(options.getThreads());
+                        }
+                        model.rewind();
+                        interpreter = new Interpreter(model, cpuOptions);
+                    }
+                    final Handle handle = new Handle(interpreter);
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
                             out.complete(handle);
@@ -216,7 +240,7 @@ public final class AndroidInferenceImpl extends InferenceImpl {
             throw new IllegalArgumentException("Input " + value.getName()
                     + " type does not match the model");
         }
-        Object data = value.getData();
+        Object data = value.getDataUnsafe();
         int byteCount;
         if (data instanceof float[]) byteCount = ((float[]) data).length * 4;
         else if (data instanceof int[]) byteCount = ((int[]) data).length * 4;
@@ -266,19 +290,23 @@ public final class AndroidInferenceImpl extends InferenceImpl {
     }
 
     private static ByteBuffer loadModel(ModelSource source) throws IOException {
+        if (source.getKind() == ModelSource.FILE) {
+            FileInputStream file = new FileInputStream(source.getPath());
+            try {
+                return file.getChannel().map(FileChannel.MapMode.READ_ONLY,
+                        0, file.getChannel().size());
+            } finally {
+                file.close();
+            }
+        }
         byte[] bytes;
         if (source.getKind() == ModelSource.BYTES) {
             bytes = source.getBytes();
         } else {
-            InputStream input;
-            if (source.getKind() == ModelSource.FILE) {
-                input = new FileInputStream(source.getPath());
-            } else {
-                input = Display.getInstance().getResourceAsStream(
-                        AndroidInferenceImpl.class, source.getPath());
-                if (input == null) {
-                    throw new IOException("Model resource not found: " + source.getPath());
-                }
+            InputStream input = Display.getInstance().getResourceAsStream(
+                    AndroidInferenceImpl.class, source.getPath());
+            if (input == null) {
+                throw new IOException("Model resource not found: " + source.getPath());
             }
             try {
                 ByteArrayOutputStream output = new ByteArrayOutputStream();

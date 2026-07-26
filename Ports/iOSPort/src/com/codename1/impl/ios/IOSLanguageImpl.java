@@ -36,7 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** iOS ML Kit language services. */
+/** iOS Natural Language and feature-scoped ML Kit language services. */
 public final class IOSLanguageImpl extends LanguageImpl {
     private static final int LANGUAGE_ID = 0;
     private static final int TRANSLATION = 1;
@@ -46,27 +46,34 @@ public final class IOSLanguageImpl extends LanguageImpl {
 
     @Override
     public boolean isSupported(String feature, String backendId) {
-        if (closed || (!"auto".equals(backendId) && !"ml-kit".equals(backendId))) {
+        if (closed || (!"auto".equals(backendId)
+                && !"ml-kit".equals(backendId)
+                && !"apple-natural-language".equals(backendId))) {
+            return false;
+        }
+        if (!"language-id".equals(feature)
+                && "apple-natural-language".equals(backendId)) {
             return false;
         }
         return IOSImplementation.nativeInstance.cn1LanguageIsSupported(
-                featureId(feature));
+                featureId(feature), "ml-kit".equals(backendId));
     }
 
     @Override
     public AsyncResource<LanguageCandidate[]> identify(
             final String text, String backendId, final LanguageOptions options) {
-        return identifyInBackground(text, options);
+        return identifyInBackground(text, "ml-kit".equals(backendId), options);
     }
 
     private static AsyncResource<LanguageCandidate[]> identifyInBackground(
-            final String text, final LanguageOptions options) {
+            final String text, final boolean mlKit,
+            final LanguageOptions options) {
         final AsyncResource<LanguageCandidate[]> out =
                 new AsyncResource<LanguageCandidate[]>();
         run(out, new NativeCall<LanguageCandidate[]>() {
             public LanguageCandidate[] call() throws Exception {
                 String json = IOSImplementation.nativeInstance.cn1LanguageIdentify(
-                        text, options.getMinimumConfidence());
+                        text, options.getMinimumConfidence(), mlKit);
                 Map root = parse(json);
                 List values = list(root, "items");
                 LanguageCandidate[] result = new LanguageCandidate[values.size()];

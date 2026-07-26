@@ -26,15 +26,20 @@ import com.codename1.impl.LanguageImpl;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
-/// On-device language identification.
+/// Identifies possible languages entirely on device. Results are ranked by
+/// descending backend confidence and filtered by
+/// {@link LanguageOptions#getMinimumConfidence()}.
 public final class LanguageIdentifier {
     private LanguageIdentifier() {
     }
 
+    /// @return whether automatic language identification is available
     public static boolean isSupported() {
         return isSupported(new LanguageOptions());
     }
 
+    /// @param options backend selection, or {@code null} for defaults
+    /// @return whether the selected backend is available on this target
     public static boolean isSupported(LanguageOptions options) {
         LanguageImpl impl = Display.getInstance().getLanguageBackend();
         LanguageOptions actual = options == null ? new LanguageOptions() : options;
@@ -42,6 +47,10 @@ public final class LanguageIdentifier {
                 actual.getBackend().getId());
     }
 
+    /// Identifies possible languages off the EDT without uploading text.
+    /// @param text non-null text to classify
+    /// @param options backend and confidence options, or {@code null}
+    /// @return asynchronous ranked candidates; may be empty for undetermined text
     public static AsyncResource<LanguageCandidate[]> identify(
             String text, LanguageOptions options) {
         LanguageOptions actual = options == null ? new LanguageOptions() : options;

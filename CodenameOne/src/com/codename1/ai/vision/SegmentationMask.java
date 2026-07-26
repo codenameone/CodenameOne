@@ -22,17 +22,28 @@
  */
 package com.codename1.ai.vision;
 
-/// Per-pixel foreground confidence mask.
+/// Dense per-pixel foreground confidence mask. The confidence array is
+/// row-major with exactly {@code width * height} values in the range 0..1.
+/// It is defensively copied on construction and access.
 public final class SegmentationMask {
     private final int width;
     private final int height;
     private final float[] confidence;
     private final VisionMetadata metadata;
 
+    /// Creates a row-major confidence mask without backend metadata.
+    /// @param width mask width in pixels
+    /// @param height mask height in pixels
+    /// @param confidence one foreground probability per pixel, defensively copied
     public SegmentationMask(int width, int height, float[] confidence) {
         this(width, height, confidence, null);
     }
 
+    /// Creates a row-major confidence mask with backend diagnostics.
+    /// @param width mask width in pixels
+    /// @param height mask height in pixels
+    /// @param confidence one foreground probability per pixel, defensively copied
+    /// @param metadata backend details, or {@code null}
     public SegmentationMask(int width, int height, float[] confidence,
                             VisionMetadata metadata) {
         if (width < 0 || height < 0
@@ -46,20 +57,24 @@ public final class SegmentationMask {
         this.metadata = metadata;
     }
 
+    /// @return mask width, which may differ from source image width
     public int getWidth() {
         return width;
     }
 
+    /// @return mask height, which may differ from source image height
     public int getHeight() {
         return height;
     }
 
+    /// @return defensive copy of row-major foreground confidences
     public float[] getConfidence() {
         float[] out = new float[confidence.length];
         System.arraycopy(confidence, 0, out, 0, confidence.length);
         return out;
     }
 
+    /// @return backend metadata, or {@code null} when manually constructed
     public VisionMetadata getMetadata() {
         return metadata;
     }

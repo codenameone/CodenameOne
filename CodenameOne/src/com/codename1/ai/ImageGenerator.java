@@ -50,6 +50,9 @@ import java.util.Map;
 /// ```
 public abstract class ImageGenerator {
 
+    /// Creates an OpenAI image generator.
+    /// @param apiKey OpenAI API key
+    /// @return configured generator
     public static ImageGenerator openai(String apiKey) {
         return new OpenAiImageGenerator(apiKey);
     }
@@ -57,6 +60,8 @@ public abstract class ImageGenerator {
     /// Replicate runs a wide catalog of third-party image models
     /// (SDXL, Flux, etc.) behind a uniform REST API. Pass the API
     /// token from `https://replicate.com/account`.
+    /// @param apiKey Replicate API token
+    /// @return configured generator
     public static ImageGenerator replicate(String apiKey) {
         return new ReplicateImageGenerator(apiKey);
     }
@@ -65,6 +70,7 @@ public abstract class ImageGenerator {
     /// `cn1-ai-stablediffusion`; without it this returns an
     /// `AsyncResource` that completes with
     /// `UnsupportedOperationException`.
+    /// @return optional on-device generator or an unsupported stub
     public static ImageGenerator onDevice() {
         // Lazy lookup so app code can compile even without the
         // cn1lib. The cn1lib registers an implementation via
@@ -82,6 +88,9 @@ public abstract class ImageGenerator {
         };
     }
 
+    /// Generates an image without blocking the EDT.
+    /// @param req provider-neutral generation request
+    /// @return asynchronous generated image
     public abstract AsyncResource<Image> generate(GenerateImageRequest req);
 
     // --------------------- OpenAI ---------------------

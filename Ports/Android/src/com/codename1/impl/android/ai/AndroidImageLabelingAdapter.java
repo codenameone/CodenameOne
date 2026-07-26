@@ -35,16 +35,18 @@ import java.util.List;
 
 /** ML Kit image labeling; retained only for {@code ImageLabeler} users. */
 final class AndroidImageLabelingAdapter extends AndroidVisionAdapter {
+    private ImageLabeler client;
     @Override
     @SuppressWarnings("unchecked")
     void analyze(InputImage input, int imageWidth, int imageHeight,
                  VisionOptions options, AsyncResource<?> resource) {
         final AsyncResource<ImageLabel[]> out =
                 (AsyncResource<ImageLabel[]>) resource;
-        final ImageLabeler client = ImageLabeling.getClient(
-                new ImageLabelerOptions.Builder()
-                        .setConfidenceThreshold(options.getMinimumConfidence())
-                        .build());
+        if (client == null) {
+            client = ImageLabeling.getClient(new ImageLabelerOptions.Builder()
+                    .setConfidenceThreshold(options.getMinimumConfidence())
+                    .build());
+        }
         client.process(input).addOnSuccessListener(
                 new OnSuccessListener<List<com.google.mlkit.vision.label.ImageLabel>>() {
             public void onSuccess(
@@ -57,8 +59,14 @@ final class AndroidImageLabelingAdapter extends AndroidVisionAdapter {
                             value.getConfidence(), value.getIndex(), METADATA);
                 }
                 complete(out, result);
-                client.close();
             }
-        }).addOnFailureListener(failure(out, client));
+        }).addOnFailureListener(failure(out));
+    }
+
+    @Override
+    void close() {
+        if (client != null) {
+            client.close();
+        }
     }
 }

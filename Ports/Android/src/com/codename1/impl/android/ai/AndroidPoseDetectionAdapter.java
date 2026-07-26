@@ -37,16 +37,16 @@ import java.util.List;
 
 /** ML Kit pose detection; retained only for {@code PoseDetector} users. */
 final class AndroidPoseDetectionAdapter extends AndroidVisionAdapter {
+    private final PoseDetector client = PoseDetection.getClient(
+            new PoseDetectorOptions.Builder()
+                    .setDetectorMode(PoseDetectorOptions.STREAM_MODE)
+                    .build());
     @Override
     @SuppressWarnings("unchecked")
     void analyze(InputImage input, final int imageWidth,
                  final int imageHeight, VisionOptions options,
                  AsyncResource<?> resource) {
         final AsyncResource<Pose> out = (AsyncResource<Pose>) resource;
-        final PoseDetector client = PoseDetection.getClient(
-                new PoseDetectorOptions.Builder()
-                        .setDetectorMode(PoseDetectorOptions.SINGLE_IMAGE_MODE)
-                        .build());
         client.process(input).addOnSuccessListener(
                 new OnSuccessListener<com.google.mlkit.vision.pose.Pose>() {
             public void onSuccess(com.google.mlkit.vision.pose.Pose value) {
@@ -62,8 +62,12 @@ final class AndroidPoseDetectionAdapter extends AndroidVisionAdapter {
                             point.getInFrameLikelihood());
                 }
                 complete(out, new Pose(landmarks, METADATA));
-                client.close();
             }
-        }).addOnFailureListener(failure(out, client));
+        }).addOnFailureListener(failure(out));
+    }
+
+    @Override
+    void close() {
+        client.close();
     }
 }
