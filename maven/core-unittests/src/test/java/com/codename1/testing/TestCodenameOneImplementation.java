@@ -1281,6 +1281,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         nativePickerTypeSupported = null;
         socketAvailable = true;
         serverSocketAvailable = false;
+        loopbackSupportedOnlyOnFirstQuery = false;
+        loopbackQueried = false;
+        debuggableBuild = true;
         appHomePath = "file://app/";
         hostOrIp = null;
         resetGalleryTracking();
@@ -2788,8 +2791,24 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
     }
 
+    private boolean loopbackSupportedOnlyOnFirstQuery;
+    private boolean loopbackQueried;
+
+    /// Reports loopback support to the first caller and withholds it from every caller
+    /// after that, which models the capability changing between a check and the use that
+    /// follows it. Lets a test drive the failure path of a caller that checks first.
+    public void setLoopbackSupportedOnlyOnFirstQuery(boolean onlyFirst) {
+        this.loopbackSupportedOnlyOnFirstQuery = onlyFirst;
+        this.loopbackQueried = false;
+    }
+
     @Override
     public boolean isLoopbackServerSocketAvailable() {
+        if (loopbackSupportedOnlyOnFirstQuery) {
+            boolean first = !loopbackQueried;
+            loopbackQueried = true;
+            return first;
+        }
         return serverSocketAvailable;
     }
 

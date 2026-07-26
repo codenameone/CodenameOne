@@ -99,7 +99,29 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
             }
             active = this;
         }
-        listening = Socket.listenLoopback(port, Connection.class);
+        try {
+            listening = Socket.listenLoopback(port, Connection.class);
+        } catch (RuntimeException ex) {
+            // Two things go wrong if this escapes. The process-wide registration would stay
+            // pointing at a transport that never started listening, so every later open()
+            // would refuse, believing an agent is already served. And the server's reader
+            // thread only handles IOException around open(), so a runtime exception would
+            // kill that thread before it could clear its running flag, leaving the server
+            // permanently "running" with nothing behind it.
+            clearActiveIfOurs();
+            IOException failure = new IOException("Failed to listen on loopback port " + port);
+            failure.initCause(ex);
+            throw failure;
+        }
+    }
+
+    /// Releases the process-wide registration, but only when it is still this transport's.
+    private void clearActiveIfOurs() {
+        synchronized (MCPLoopbackSocketTransport.class) {
+            if (active == this) { // NOPMD identity: is the slot still ours?
+                active = null;
+            }
+        }
     }
 
     /// Called from the connection callback thread when a client attaches. The previous
@@ -243,13 +265,8 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
             out = null;
             lock.notifyAll();
         }
-        synchronized (MCPLoopbackSocketTransport.class) {
-            // Clear the registration only if it is still ours; a transport opened after
-            // this one must keep its slot.
-            if (active == this) { // NOPMD identity: is the slot still ours?
-                active = null;
-            }
-        }
+        // Only if it is still ours: a transport opened after this one keeps its slot.
+        clearActiveIfOurs();
         if (l != null) {
             l.stop();
         }
