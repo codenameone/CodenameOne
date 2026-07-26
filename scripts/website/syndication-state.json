@@ -1242,6 +1242,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-07-26T15:05:19+00:00"
+      },
+      "devto": {
+        "id": 4237539,
+        "url": "https://dev.to/codenameone/widgets-live-activities-and-dynamic-island-from-one-java-api-5166",
+        "syndicated_at": "2026-07-26T15:40:22+00:00"
       }
     }
   }
