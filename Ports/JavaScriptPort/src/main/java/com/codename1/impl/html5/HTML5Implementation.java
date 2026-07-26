@@ -6448,6 +6448,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return bluetooth;
     }
 
+    private com.codename1.health.Health health;
+
+    /// Returns a local health store. There is no platform health provider
+    /// on this port, so the store reports
+    /// {@code HealthAvailability.LOCAL_ONLY}: reads and writes work and
+    /// are this app's own, but nothing else writes into it. The Bluetooth
+    /// sensor layer is unaffected and works fully.
+    @Override
+    public com.codename1.health.Health getHealth() {
+        if (health == null) {
+            health = new com.codename1.impl.health.LocalHealth();
+        }
+        return health;
+    }
+
     private com.codename1.media.VideoIO videoIO;
     private boolean videoIOResolved;
 

@@ -419,6 +419,21 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return bluetooth;
     }
 
+    private com.codename1.health.Health health;
+
+    /// Returns a local health store. There is no platform health provider
+    /// on this port, so the store reports
+    /// {@code HealthAvailability.LOCAL_ONLY}: reads and writes work and
+    /// are this app's own, but nothing else writes into it. The Bluetooth
+    /// sensor layer is unaffected and works fully.
+    @Override
+    public com.codename1.health.Health getHealth() {
+        if (health == null) {
+            health = new com.codename1.impl.health.LocalHealth();
+        }
+        return health;
+    }
+
     // WinRT Geolocator-backed location. getCurrentLocation reports OUT_OF_SERVICE
     // honestly when Windows location is disabled / denied.
     private com.codename1.location.LocationManager locationManager;

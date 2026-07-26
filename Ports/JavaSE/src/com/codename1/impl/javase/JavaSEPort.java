@@ -14931,6 +14931,22 @@ public class JavaSEPort extends CodenameOneImplementation {
         return bluetooth;
     }
 
+    private com.codename1.health.Health health;
+
+    /// Returns the simulator's health entry point. There is no desktop
+    /// HealthKit or Health Connect, so this is a local store reporting
+    /// {@code HealthAvailability.LOCAL_ONLY} -- reads, writes and
+    /// aggregates all work and are this app's own data. The Bluetooth
+    /// sensor layer is unaffected and works against both the simulated
+    /// stack and real hardware.
+    @Override
+    public com.codename1.health.Health getHealth() {
+        if (health == null) {
+            health = new com.codename1.impl.health.LocalHealth();
+        }
+        return health;
+    }
+
     /**
      * The first time the app reaches the NFC API in the simulator, write
      * placeholders for ios.NFCReaderUsageDescription if the developer has
