@@ -464,6 +464,14 @@ jobs:
           CN1SS_REPORT_TITLE: 'iOS Metal screenshot updates'
           CN1SS_SUCCESS_MESSAGE: '✅ Native iOS Metal screenshot tests passed.'
           CN1SS_COMMENT_LOG_PREFIX: '[run-ios-device-tests-metal]'
+          # The x86 simulator runs CommonWorkloadBenchmarkTest through
+          # ParparVM's non-NEON path. Its object-allocation block took 555s on
+          # an otherwise identical successful run, but exceeded the generic
+          # 720s idle gate on a contended runner while the hang sample showed
+          # active GC/allocation work. Allow that benchmark variance here;
+          # the suite's independent 35-minute absolute limit still catches a
+          # genuinely stuck app.
+          CN1SS_SUITE_IDLE_TIMEOUT_SECONDS: '1200'
           # Strict screenshot gating: fail on any pixel mismatch and on any
           # missing screenshot. The Metal backend must produce the full
           # baseline set; a test that hangs (e.g. the DialogTheme texture
