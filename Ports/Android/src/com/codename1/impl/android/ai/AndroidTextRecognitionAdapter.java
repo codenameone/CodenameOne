@@ -45,11 +45,14 @@ final class AndroidTextRecognitionAdapter extends AndroidVisionAdapter {
                  AsyncResource<?> resource) {
         final AsyncResource<TextRecognitionResult> out =
                 (AsyncResource<TextRecognitionResult>) resource;
+        final int maximumResults = options.getMaximumResults();
         client.process(input).addOnSuccessListener(new OnSuccessListener<Text>() {
             public void onSuccess(Text text) {
                 List<Text.TextBlock> source = text.getTextBlocks();
+                int count = maximumResults == 0 ? source.size()
+                        : Math.min(maximumResults, source.size());
                 TextRecognitionResult.TextBlock[] blocks =
-                        new TextRecognitionResult.TextBlock[source.size()];
+                        new TextRecognitionResult.TextBlock[count];
                 for (int i = 0; i < blocks.length; i++) {
                     Text.TextBlock block = source.get(i);
                     blocks[i] = new TextRecognitionResult.TextBlock(

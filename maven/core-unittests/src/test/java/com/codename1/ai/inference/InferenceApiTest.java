@@ -77,6 +77,16 @@ class InferenceApiTest extends UITestBase {
     }
 
     @Test
+    void modelCacheNamesDoNotAliasSanitizedKeys() {
+        assertNotEquals(ModelCache.safeName("model/v1"),
+                ModelCache.safeName("model?v1"));
+        assertNotEquals(ModelCache.safeName("model/v1"),
+                ModelCache.safeName("model_v1"));
+        assertTrue(ModelCache.safeName("model-v1_2")
+                .startsWith("model-v1_2-"));
+    }
+
+    @Test
     void modelCacheDiscardsPartialAndDigestMismatchFiles() throws Exception {
         FileSystemStorage fs = FileSystemStorage.getInstance();
         String temporary = fs.getAppHomePath() + "model-cache-test.download";

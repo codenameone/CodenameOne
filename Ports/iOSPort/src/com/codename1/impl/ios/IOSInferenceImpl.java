@@ -29,6 +29,7 @@ import com.codename1.ai.inference.Tensor;
 import com.codename1.ai.inference.TensorInfo;
 import com.codename1.ai.inference.TensorType;
 import com.codename1.impl.InferenceImpl;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.io.JSONParser;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
@@ -75,7 +76,9 @@ public final class IOSInferenceImpl extends InferenceImpl {
                 try {
                     String opened = source.getKind() == ModelSource.FILE
                             ? IOSImplementation.nativeInstance.cn1InferenceOpenFile(
-                                    source.getPath(), options.getThreads(),
+                                    FileSystemStorage.getInstance().toNativePath(
+                                            source.getPath()),
+                                    options.getThreads(),
                                     options.getAccelerator().ordinal(),
                                     options.isFallbackAllowed())
                             : IOSImplementation.nativeInstance.cn1InferenceOpen(

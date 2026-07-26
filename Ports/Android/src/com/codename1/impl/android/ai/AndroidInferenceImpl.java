@@ -29,6 +29,7 @@ import com.codename1.ai.inference.Tensor;
 import com.codename1.ai.inference.TensorInfo;
 import com.codename1.ai.inference.TensorType;
 import com.codename1.impl.InferenceImpl;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
@@ -291,7 +292,9 @@ public final class AndroidInferenceImpl extends InferenceImpl {
 
     private static ByteBuffer loadModel(ModelSource source) throws IOException {
         if (source.getKind() == ModelSource.FILE) {
-            FileInputStream file = new FileInputStream(source.getPath());
+            String nativePath = FileSystemStorage.getInstance().toNativePath(
+                    source.getPath());
+            FileInputStream file = new FileInputStream(nativePath);
             try {
                 return file.getChannel().map(FileChannel.MapMode.READ_ONLY,
                         0, file.getChannel().size());

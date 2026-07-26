@@ -51,11 +51,14 @@ final class AndroidFaceDetectionAdapter extends AndroidVisionAdapter {
                  final int imageHeight, VisionOptions options,
                  AsyncResource<?> resource) {
         final AsyncResource<Face[]> out = (AsyncResource<Face[]>) resource;
+        final int maximumResults = options.getMaximumResults();
         client.process(input).addOnSuccessListener(
                 new OnSuccessListener<List<com.google.mlkit.vision.face.Face>>() {
             public void onSuccess(
                     List<com.google.mlkit.vision.face.Face> values) {
-                Face[] result = new Face[values.size()];
+                int count = maximumResults == 0 ? values.size()
+                        : Math.min(maximumResults, values.size());
+                Face[] result = new Face[count];
                 for (int i = 0; i < result.length; i++) {
                     com.google.mlkit.vision.face.Face value = values.get(i);
                     Map<String, VisionPoint> landmarks =

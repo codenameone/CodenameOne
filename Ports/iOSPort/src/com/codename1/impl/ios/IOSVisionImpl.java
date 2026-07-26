@@ -43,6 +43,7 @@ import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
 
 import java.io.StringReader;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,7 +88,8 @@ public final class IOSVisionImpl extends VisionImpl {
             return out;
         }
         analyzeInBackground(out, feature, mlKit, input,
-                image.getRotationDegrees(), width, height, frameFormat);
+                image.getRotationDegrees(), width, height, frameFormat,
+                options.getMinimumConfidence(), options.getMaximumResults());
         return out;
     }
 
@@ -98,7 +100,9 @@ public final class IOSVisionImpl extends VisionImpl {
                                                  final int rotation,
                                                  final int width,
                                                  final int height,
-                                                 final int frameFormat) {
+                                                 final int frameFormat,
+                                                 final float minimumConfidence,
+                                                 final int maximumResults) {
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {
                 try {
@@ -110,7 +114,8 @@ public final class IOSVisionImpl extends VisionImpl {
                                 "Apple Vision returned no result");
                     }
                     final T value = parse(feature, json,
-                            mlKit ? "ml-kit" : "apple-vision");
+                            mlKit ? "ml-kit" : "apple-vision",
+                            minimumConfidence, maximumResults);
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
                             out.complete(value);
@@ -131,7 +136,8 @@ public final class IOSVisionImpl extends VisionImpl {
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static <T> T parse(VisionFeature feature, String json,
-                               String backendId) throws Exception {
+                               String backendId, float minimumConfidence,
+                               int maximumResults) throws Exception {
         Map root = new JSONParser().parseJSON(new StringReader(json));
         Object error = root.get("error");
         if (error != null) {
@@ -141,6 +147,7 @@ public final class IOSVisionImpl extends VisionImpl {
         if (items == null) {
             items = java.util.Collections.EMPTY_LIST;
         }
+        items = filterItems(items, minimumConfidence, maximumResults);
         VisionMetadata metadata = new VisionMetadata(backendId);
         switch (feature) {
             case TEXT_RECOGNITION: {
@@ -222,6 +229,32 @@ public final class IOSVisionImpl extends VisionImpl {
                 throw new VisionException(VisionException.UNSUPPORTED,
                         "Unknown Apple Vision feature " + feature);
         }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static List filterItems(List items, float minimumConfidence,
+                                    int maximumResults) {
+        if (items.isEmpty()
+                || (minimumConfidence <= 0 && maximumResults == 0)) {
+            return items;
+        }
+        List filtered = new ArrayList();
+        for (int i = 0; i < items.size(); i++) {
+            Object item = items.get(i);
+            if (minimumConfidence > 0 && item instanceof Map) {
+                Object confidence = ((Map) item).get("confidence");
+                if (confidence instanceof Number
+                        && ((Number) confidence).floatValue()
+                                < minimumConfidence) {
+                    continue;
+                }
+            }
+            filtered.add(item);
+            if (maximumResults > 0 && filtered.size() >= maximumResults) {
+                break;
+            }
+        }
+        return filtered;
     }
 
     private static VisionRect rect(Map value) {

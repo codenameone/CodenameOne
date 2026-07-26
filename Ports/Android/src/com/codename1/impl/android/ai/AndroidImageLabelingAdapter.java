@@ -42,6 +42,7 @@ final class AndroidImageLabelingAdapter extends AndroidVisionAdapter {
                  VisionOptions options, AsyncResource<?> resource) {
         final AsyncResource<ImageLabel[]> out =
                 (AsyncResource<ImageLabel[]>) resource;
+        final int maximumResults = options.getMaximumResults();
         if (client == null) {
             client = ImageLabeling.getClient(new ImageLabelerOptions.Builder()
                     .setConfidenceThreshold(options.getMinimumConfidence())
@@ -51,7 +52,9 @@ final class AndroidImageLabelingAdapter extends AndroidVisionAdapter {
                 new OnSuccessListener<List<com.google.mlkit.vision.label.ImageLabel>>() {
             public void onSuccess(
                     List<com.google.mlkit.vision.label.ImageLabel> values) {
-                ImageLabel[] result = new ImageLabel[values.size()];
+                int count = maximumResults == 0 ? values.size()
+                        : Math.min(maximumResults, values.size());
+                ImageLabel[] result = new ImageLabel[count];
                 for (int i = 0; i < result.length; i++) {
                     com.google.mlkit.vision.label.ImageLabel value =
                             values.get(i);

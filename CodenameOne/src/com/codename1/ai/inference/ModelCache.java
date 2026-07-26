@@ -194,15 +194,23 @@ public final class ModelCache {
         }
     }
 
-    private static String safeName(String value) {
+    static String safeName(String value) {
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
-            out.append((c >= 'a' && c <= 'z')
+            boolean safe = (c >= 'a' && c <= 'z')
                     || (c >= 'A' && c <= 'Z')
                     || (c >= '0' && c <= '9')
-                    || c == '-' || c == '_' ? c : '_');
+                    || c == '-' || c == '_';
+            out.append(safe ? c : '_');
         }
+        Hash hash = Hash.create(Hash.SHA256);
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            hash.update((byte) (c >>> 8));
+            hash.update((byte) c);
+        }
+        out.append('-').append(Hash.toHex(hash.digest()).substring(0, 32));
         return out.toString();
     }
 
