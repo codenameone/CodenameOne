@@ -70,14 +70,21 @@ public class LegacyGrace {
             }
             quiesce();
 
-            // THE HAZARD, in a strictly quiet window. Nothing but the parents is
-            // allocated here (256 * ~800 bytes, far below any collection
-            // trigger) and the preceding quiesce() drained any mark still in
-            // flight, so the SATB barriers are DISARMED: nothing logs the
-            // reference as it moves out of keep[] and into an object the
-            // collector has never seen. That is the whole point -- during a mark
-            // the barriers cover this move, so a driver that keeps the collector
-            // busy silently tests nothing.
+            // THE HAZARD, in a strictly quiet window. Two properties make it a
+            // hazard at all, and both are easy to lose:
+            //
+            // NOTHING ELSE IS ALLOCATED HERE. transfer() creates KEEP (10,000)
+            // arrays of LEGACY_ELEMENTS (65) references -- about 560 bytes each,
+            // 5.6 MB in total, against the collector's 24 MB allocation-volume
+            // trigger. Raising KEEP or LEGACY_ELEMENTS far enough to cross that
+            // budget would start a collection in the middle of the window and
+            // invalidate everything below.
+            //
+            // NO MARK IS IN FLIGHT. The preceding quiesce() drained one, so the
+            // SATB barriers are DISARMED and nothing logs the reference as it
+            // moves out of keep[] and into an object the collector has never
+            // seen. During a mark those barriers cover this exact move, so a
+            // driver that keeps the collector busy silently tests nothing.
             transfer();
 
             // Age the hazard out over three collections with no allocation at
