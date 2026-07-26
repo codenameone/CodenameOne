@@ -24,6 +24,9 @@ package com.codename1.impl.javase.bluetooth;
 
 import com.codename1.bluetooth.BluetoothError;
 import com.codename1.bluetooth.BluetoothUuid;
+import com.codename1.impl.javase.simulator.AutoScheduler;
+import com.codename1.impl.javase.simulator.ManualScheduler;
+import com.codename1.impl.javase.simulator.SimScheduler;
 
 /**
  * The scriptable facade of the JavaSE simulator's virtual Bluetooth world

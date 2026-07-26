@@ -22,6 +22,8 @@
  */
 package com.codename1.impl.javase.bluetooth;
 
+import com.codename1.impl.javase.simulator.ManualScheduler;
+
 import com.codename1.bluetooth.BluetoothError;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

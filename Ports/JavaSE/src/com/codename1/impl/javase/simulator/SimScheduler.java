@@ -20,18 +20,21 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.javase.bluetooth;
+package com.codename1.impl.javase.simulator;
 
 /**
- * The single execution lane of the simulated Bluetooth stack. Every state
- * mutation and every callback of {@link SimulatedBluetoothStack} runs
- * through one scheduler, which makes the whole simulation single-threaded
- * and deterministic.
+ * The single execution lane of a simulated subsystem. Every state mutation
+ * and every callback of the simulated stack runs through one scheduler,
+ * which makes the whole simulation single-threaded and deterministic.
  *
  * <p>Two implementations exist: {@link AutoScheduler} (a real daemon
  * thread, used by the running simulator) and {@link ManualScheduler}
  * (a virtual clock pumped explicitly, used by unit tests and anything
  * else that needs full determinism).</p>
+ *
+ * <p>Shared by the simulated Bluetooth stack and the simulated health
+ * store; anything else that needs deterministic callback ordering in the
+ * simulator should reuse it rather than growing its own lane.</p>
  */
 public interface SimScheduler {
 

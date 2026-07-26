@@ -63,6 +63,30 @@ import java.util.Properties;
  * {@code itemN} value is a {@code fqcn#staticMethodName} reference; the
  * matching {@code labelN} (optional) becomes the menu item text.</p>
  *
+ * <p><b>Multiple groups per file.</b> One resource can only exist once per
+ * classpath entry, so a port that ships more than one simulated subsystem
+ * cannot express them as separate files. Such a file declares a
+ * {@code groups=} list and prefixes every key with the group token:</p>
+ *
+ * <pre>
+ * groups=bluetooth,health
+ *
+ * bluetooth.name=Bluetooth
+ * bluetooth.namespace=bluetooth
+ * bluetooth.item1=com.example.bt.sim.Hooks#toggleAdapter
+ * bluetooth.label1=Toggle adapter
+ *
+ * health.name=Health
+ * health.namespace=health
+ * health.item1=com.example.health.sim.Hooks#grantAllPermissions
+ * health.label1=Grant all permissions
+ * </pre>
+ *
+ * <p>The two forms are mutually exclusive per file and the prefixed form is
+ * opt-in: a file without {@code groups=} is parsed exactly as before, so
+ * every existing cn1lib keeps working untouched. A group token that declares
+ * no {@code name} is skipped with a warning rather than failing the file.</p>
+ *
  * <p>Actions are resolved to {@code public static void method()} via reflection
  * using the same classloader that loaded {@link Display}. Invocations are
  * dispatched via {@link Display#callSeriallyAndWait(Runnable)} so menu clicks
@@ -137,13 +161,37 @@ public final class SimulatorHookLoader {
         } finally {
             in.close();
         }
-        String menuName = props.getProperty("name");
+        String groups = props.getProperty("groups");
+        if (groups == null || groups.trim().length() == 0) {
+            // Legacy single-group form: keys are unprefixed.
+            loadGroup(props, "", url, cl, out);
+            return;
+        }
+        String[] tokens = groups.split(",");
+        for (int i = 0; i < tokens.length; i++) {
+            String token = tokens[i].trim();
+            if (token.length() == 0) {
+                continue;
+            }
+            loadGroup(props, token + ".", url, cl, out);
+        }
+    }
+
+    /**
+     * Reads one group of hooks. {@code prefix} is either the empty string
+     * (legacy single-group file) or {@code "<token>."}.
+     */
+    private static void loadGroup(Properties props, String prefix, URL url,
+            ClassLoader cl, List<SimulatorHook> out) {
+        String menuName = props.getProperty(prefix + "name");
         if (menuName == null || menuName.trim().length() == 0) {
-            System.err.println("SimulatorHookLoader: " + url + " is missing required 'name' property; skipping");
+            System.err.println("SimulatorHookLoader: " + url + " is missing required '"
+                    + prefix + "name' property; skipping"
+                    + (prefix.length() == 0 ? "" : " group '" + prefix + "'"));
             return;
         }
         menuName = menuName.trim();
-        String namespace = props.getProperty("namespace");
+        String namespace = props.getProperty(prefix + "namespace");
         if (namespace == null || namespace.trim().length() == 0) {
             namespace = slugify(menuName);
         } else {
@@ -154,11 +202,11 @@ public final class SimulatorHookLoader {
         // first missing N. labelN is optional (no label = API-only hook).
         int index = 1;
         while (true) {
-            String action = props.getProperty("item" + index);
+            String action = props.getProperty(prefix + "item" + index);
             if (action == null || action.trim().length() == 0) {
                 break;
             }
-            String label = props.getProperty("label" + index);
+            String label = props.getProperty(prefix + "label" + index);
             if (label != null) {
                 label = label.trim();
                 if (label.length() == 0) {

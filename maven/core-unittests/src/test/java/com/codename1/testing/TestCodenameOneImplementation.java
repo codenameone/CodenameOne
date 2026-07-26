@@ -147,6 +147,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private boolean inCall;
     private LocationManager locationManager;
     private com.codename1.bluetooth.Bluetooth bluetooth;
+    private com.codename1.health.Health health;
     private L10NManager localizationManager;
     private ImageIO imageIO;
     private VideoIO videoIO;
@@ -1255,6 +1256,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         mediaRecorderBuilderHandler = null;
         locationManager = null;
         bluetooth = null;
+        health = null;
         localizationManager = null;
         imageIO = null;
         inAppPurchase = null;
@@ -1418,6 +1420,25 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
      */
     public void setBluetooth(com.codename1.bluetooth.Bluetooth bluetooth) {
         this.bluetooth = bluetooth;
+    }
+
+    /**
+     * Returns the scripted health entry point installed via
+     * {@link #setHealth(com.codename1.health.Health)}. Defaults to
+     * {@code null} so {@code Health.getInstance()} falls back to the no-op
+     * base instance, mirroring ports without health support.
+     */
+    @Override
+    public com.codename1.health.Health getHealth() {
+        return health;
+    }
+
+    /**
+     * Scripts the health stack returned by {@link #getHealth()}; cleared
+     * back to {@code null} by {@link #reset()}.
+     */
+    public void setHealth(com.codename1.health.Health health) {
+        this.health = health;
     }
 
     public void setLocalizationManager(L10NManager localizationManager) {

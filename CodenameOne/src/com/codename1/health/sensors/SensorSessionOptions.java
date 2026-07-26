@@ -1,0 +1,123 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.sensors;
+
+import com.codename1.health.workout.WorkoutSession;
+
+/// How a [SensorSession] should behave: reconnection, where samples go,
+/// and how stale a cached reading may be.
+public final class SensorSessionOptions {
+
+    private boolean autoReconnect = true;
+    private boolean writeToStore;
+    private int storeBatchMillis = 60000;
+    private WorkoutSession workoutSession;
+    private int staleSampleMillis = 10000;
+
+    /// Whether the session re-establishes a dropped link on its own.
+    /// Defaults to `true`, which is almost always right -- chest straps
+    /// drop out routinely as the wearer moves.
+    public SensorSessionOptions setAutoReconnect(boolean autoReconnect) {
+        this.autoReconnect = autoReconnect;
+        return this;
+    }
+
+    /// `true` when the session reconnects automatically.
+    public boolean isAutoReconnect() {
+        return autoReconnect;
+    }
+
+    /// Whether received samples are written through to the platform health
+    /// store. **Defaults to `false`, and that default is deliberate.**
+    ///
+    /// During a workout on watchOS -- and on iOS 26 and later -- the
+    /// operating system is already recording heart rate into HealthKit
+    /// itself. A strap that also writes its own heart-rate samples
+    /// produces two overlapping sets for the same minutes, and every
+    /// downstream average, maximum and chart is then computed over
+    /// double-counted data.
+    ///
+    /// If you are recording a workout, attach the session to it with
+    /// [#setWorkoutSession(WorkoutSession)] instead: samples land in the
+    /// workout's statistics and are persisted once, as part of the
+    /// workout, when it ends.
+    ///
+    /// Turning this on is right when you are logging a standalone
+    /// measurement the OS knows nothing about -- a weight from a scale, a
+    /// blood-pressure reading from a cuff.
+    public SensorSessionOptions setWriteToStore(boolean writeToStore) {
+        this.writeToStore = writeToStore;
+        return this;
+    }
+
+    /// `true` when samples are written through to the health store.
+    public boolean isWriteToStore() {
+        return writeToStore;
+    }
+
+    /// How long samples are batched before being written to the store.
+    /// Defaults to one minute. Writing every notification individually
+    /// would mean a store round trip per second per sensor.
+    public SensorSessionOptions setStoreBatchMillis(int storeBatchMillis) {
+        this.storeBatchMillis = storeBatchMillis;
+        return this;
+    }
+
+    /// The store write-batch interval in milliseconds.
+    public int getStoreBatchMillis() {
+        return storeBatchMillis;
+    }
+
+    /// Attaches this sensor to a workout, so its samples become part of
+    /// that workout's statistics and are persisted with it.
+    ///
+    /// This is the right way to feed a heart-rate strap into a recorded
+    /// workout -- see the warning on [#setWriteToStore(boolean)].
+    public SensorSessionOptions setWorkoutSession(
+            WorkoutSession workoutSession) {
+        this.workoutSession = workoutSession;
+        return this;
+    }
+
+    /// The attached workout, or null.
+    public WorkoutSession getWorkoutSession() {
+        return workoutSession;
+    }
+
+    /// How long a cached reading stays current, for
+    /// [SensorSession#getLatest(com.codename1.health.HealthDataType)].
+    /// Defaults to ten seconds.
+    ///
+    /// Past this age `getLatest` returns null rather than a stale value,
+    /// so a UI bound to it shows a dash instead of silently displaying the
+    /// heart rate from before the strap fell off.
+    public SensorSessionOptions setStaleSampleMillis(int staleSampleMillis) {
+        this.staleSampleMillis = staleSampleMillis;
+        return this;
+    }
+
+    /// The staleness threshold in milliseconds.
+    public int getStaleSampleMillis() {
+        return staleSampleMillis;
+    }
+}

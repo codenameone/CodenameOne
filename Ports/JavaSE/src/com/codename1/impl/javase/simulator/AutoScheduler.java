@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.javase.bluetooth;
+package com.codename1.impl.javase.simulator;
 
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -28,20 +28,39 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 /**
- * The wall-clock {@link SimScheduler} used when the simulator actually
- * runs: a single daemon thread named {@code cn1-bluetooth-sim}. This class
- * is the only place in the simulated stack that touches real time -- all
- * stack logic expresses time exclusively through
- * {@link SimScheduler#postDelayed(Runnable, long)}.
+ * The wall-clock {@link SimScheduler} used when a simulated subsystem
+ * actually runs: a single daemon thread. This class is the only place in a
+ * simulated stack that touches real time -- all stack logic expresses time
+ * exclusively through {@link SimScheduler#postDelayed(Runnable, long)}.
+ *
+ * <p>The thread name is a constructor argument so that a stack trace or a
+ * profiler names the subsystem that owns the lane; each simulated subsystem
+ * gets its own scheduler and therefore its own thread.</p>
  */
 public final class AutoScheduler implements SimScheduler {
 
+    private static final String DEFAULT_THREAD_NAME = "cn1-bluetooth-sim";
+
     private final ScheduledThreadPoolExecutor executor;
 
+    /**
+     * Creates a scheduler on the default {@code cn1-bluetooth-sim} thread.
+     * Retained so existing Bluetooth callers keep their thread name.
+     */
     public AutoScheduler() {
+        this(DEFAULT_THREAD_NAME);
+    }
+
+    /**
+     * Creates a scheduler whose daemon thread carries {@code threadName}.
+     * A null or blank name falls back to the default.
+     */
+    public AutoScheduler(String threadName) {
+        final String name = (threadName == null || threadName.trim().length() == 0)
+                ? DEFAULT_THREAD_NAME : threadName.trim();
         executor = new ScheduledThreadPoolExecutor(1, new ThreadFactory() {
             public Thread newThread(Runnable r) {
-                Thread t = new Thread(r, "cn1-bluetooth-sim");
+                Thread t = new Thread(r, name);
                 t.setDaemon(true);
                 return t;
             }

@@ -23,7 +23,7 @@
 package com.codename1.impl.javase;
 
 import com.codename1.bluetooth.BluetoothUuid;
-import com.codename1.impl.javase.bluetooth.ManualScheduler;
+import com.codename1.impl.javase.simulator.ManualScheduler;
 import com.codename1.impl.javase.bluetooth.SimulatedBluetoothStack;
 import com.codename1.impl.javase.bluetooth.VirtualCharacteristic;
 import com.codename1.impl.javase.bluetooth.VirtualPeripheral;
