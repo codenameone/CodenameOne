@@ -251,6 +251,8 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
         return cn1VisionJSON(@{@"error": @"Could not decode ML Kit image"});
     }
     MLKVisionImage *vision = cn1MLKitImage(image, rotation);
+    CGSize resultSize = (rotation == 90 || rotation == 270)
+            ? CGSizeMake(image.size.height, image.size.width) : image.size;
     __block NSError *requestError = nil;
     dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
 
@@ -269,7 +271,7 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
         NSMutableArray *items = [NSMutableArray array];
         for (MLKTextBlock *block in result.blocks ?: @[]) {
             NSMutableDictionary *item = [NSMutableDictionary
-                    dictionaryWithDictionary:cn1MLKitRect(block.frame, image.size)];
+                    dictionaryWithDictionary:cn1MLKitRect(block.frame, resultSize)];
             item[@"text"] = block.text ?: @"";
             item[@"confidence"] = @1;
             [items addObject:item];
@@ -296,15 +298,15 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
         NSMutableArray *items = [NSMutableArray array];
         for (MLKBarcode *barcode in result ?: @[]) {
             NSMutableDictionary *item = [NSMutableDictionary
-                    dictionaryWithDictionary:cn1MLKitRect(barcode.frame, image.size)];
+                    dictionaryWithDictionary:cn1MLKitRect(barcode.frame, resultSize)];
             item[@"value"] = barcode.rawValue ?: [NSNull null];
             item[@"format"] = cn1MLKitBarcodeFormat(barcode.format);
             NSMutableArray *corners = [NSMutableArray array];
             for (NSValue *pointValue in barcode.cornerPoints ?: @[]) {
                 CGPoint point = pointValue.CGPointValue;
                 [corners addObject:@{
-                    @"x": @(point.x / image.size.width),
-                    @"y": @(point.y / image.size.height)
+                    @"x": @(point.x / resultSize.width),
+                    @"y": @(point.y / resultSize.height)
                 }];
             }
             item[@"corners"] = corners;
@@ -331,18 +333,18 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
         NSMutableArray *items = [NSMutableArray array];
         for (MLKFace *face in result ?: @[]) {
             NSMutableDictionary *item = [NSMutableDictionary
-                    dictionaryWithDictionary:cn1MLKitRect(face.frame, image.size)];
+                    dictionaryWithDictionary:cn1MLKitRect(face.frame, resultSize)];
             NSMutableDictionary *landmarks = [NSMutableDictionary dictionary];
             cn1MLKitAddFaceLandmark(landmarks, @"leftEye", face,
-                    MLKFaceLandmarkTypeLeftEye, image.size);
+                    MLKFaceLandmarkTypeLeftEye, resultSize);
             cn1MLKitAddFaceLandmark(landmarks, @"rightEye", face,
-                    MLKFaceLandmarkTypeRightEye, image.size);
+                    MLKFaceLandmarkTypeRightEye, resultSize);
             cn1MLKitAddFaceLandmark(landmarks, @"noseBase", face,
-                    MLKFaceLandmarkTypeNoseBase, image.size);
+                    MLKFaceLandmarkTypeNoseBase, resultSize);
             cn1MLKitAddFaceLandmark(landmarks, @"mouthLeft", face,
-                    MLKFaceLandmarkTypeMouthLeft, image.size);
+                    MLKFaceLandmarkTypeMouthLeft, resultSize);
             cn1MLKitAddFaceLandmark(landmarks, @"mouthRight", face,
-                    MLKFaceLandmarkTypeMouthRight, image.size);
+                    MLKFaceLandmarkTypeMouthRight, resultSize);
             item[@"landmarks"] = landmarks;
             item[@"yaw"] = @(face.headEulerAngleY);
             item[@"pitch"] = @(face.headEulerAngleX);
@@ -396,8 +398,8 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
         for (MLKPoseLandmark *landmark in pose.landmarks ?: @[]) {
             [items addObject:@{
                 @"name": cn1MLKitPoseLandmarkName(landmark.type),
-                @"x": @(landmark.position.x / image.size.width),
-                @"y": @(landmark.position.y / image.size.height),
+                @"x": @(landmark.position.x / resultSize.width),
+                @"y": @(landmark.position.y / resultSize.height),
                 @"confidence": @(landmark.inFrameLikelihood)
             }];
         }
@@ -808,6 +810,9 @@ static CGImageRef cn1VisionCreateRawImage(NSData *data, int width, int height,
         }
         memcpy(dest, source, pixelCount * 4);
     } else if (format == 1) {
+        if ((width & 1) != 0 || (height & 1) != 0) {
+            return NULL;
+        }
         if (data.length < pixelCount + pixelCount / 2) {
             return NULL;
         }

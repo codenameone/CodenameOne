@@ -31,6 +31,7 @@ import com.codename1.ai.vision.VisionImage;
 import com.codename1.ai.vision.VisionOptions;
 import com.codename1.camera.FrameFormat;
 import com.codename1.impl.VisionImpl;
+import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import com.google.mlkit.vision.common.InputImage;
 
@@ -54,28 +55,37 @@ public final class AndroidVisionImpl extends VisionImpl {
 
     @Override
     @SuppressWarnings({"rawtypes", "unchecked"})
-    public <T> AsyncResource<T> analyze(VisionFeature feature, String backendId,
-                                         VisionImage image, VisionOptions options) {
-        AsyncResource<T> out = new AsyncResource<T>();
+    public <T> AsyncResource<T> analyze(final VisionFeature feature,
+                                         String backendId,
+                                         final VisionImage image,
+                                         final VisionOptions options) {
+        final AsyncResource<T> out = new AsyncResource<T>();
         if (!isSupported(feature, backendId)) {
             out.error(new VisionException(VisionException.UNSUPPORTED,
                     feature + " is not included in this Android build"));
             return out;
         }
-        DecodedInput decoded = decode(image);
-        if (decoded == null) {
-            out.error(new VisionException(VisionException.INVALID_IMAGE,
-                    "Vision input is not valid JPEG, PNG, NV21, or RGBA8888 data"));
-            return out;
-        }
-        try {
-            adapter(feature).analyze(decoded.input, decoded.width, decoded.height,
-                    options, (AsyncResource) out);
-        } catch (Throwable error) {
-            out.error(new VisionException(VisionException.BACKEND_ERROR,
-                    "Could not start the Android " + feature + " adapter",
-                    error));
-        }
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            public void run() {
+                try {
+                    DecodedInput decoded = decode(image);
+                    if (decoded == null) {
+                        error(out, new VisionException(
+                                VisionException.INVALID_IMAGE,
+                                "Vision input is not valid JPEG, PNG, NV21, "
+                                        + "or RGBA8888 data"));
+                        return;
+                    }
+                    adapter(feature).analyze(decoded.input, decoded.width,
+                            decoded.height, options, (AsyncResource) out);
+                } catch (Throwable cause) {
+                    error(out, new VisionException(
+                            VisionException.BACKEND_ERROR,
+                            "Could not start the Android " + feature
+                                    + " adapter", cause));
+                }
+            }
+        });
         return out;
     }
 
@@ -102,7 +112,8 @@ public final class AndroidVisionImpl extends VisionImpl {
                     encoded, 0, encoded.length);
             return bitmap == null ? null : new DecodedInput(
                     InputImage.fromBitmap(bitmap, image.getRotationDegrees()),
-                    bitmap.getWidth(), bitmap.getHeight());
+                    bitmap.getWidth(), bitmap.getHeight(),
+                    image.getRotationDegrees());
         }
         byte[] pixels = image.getPixelsUnsafe();
         int width = image.getWidth();
@@ -110,19 +121,25 @@ public final class AndroidVisionImpl extends VisionImpl {
         if (pixels == null || width <= 0 || height <= 0) {
             return null;
         }
+        long pixelCount = (long) width * (long) height;
+        if (pixelCount > Integer.MAX_VALUE) {
+            return null;
+        }
         if (image.getFormat() == FrameFormat.NV21) {
-            if (pixels.length < width * height * 3 / 2) {
+            if ((width & 1) != 0 || (height & 1) != 0
+                    || pixels.length < pixelCount + pixelCount / 2) {
                 return null;
             }
             return new DecodedInput(InputImage.fromByteArray(
                     pixels, width, height, image.getRotationDegrees(),
-                    InputImage.IMAGE_FORMAT_NV21), width, height);
+                    InputImage.IMAGE_FORMAT_NV21), width, height,
+                    image.getRotationDegrees());
         }
         if (image.getFormat() == FrameFormat.RGBA8888) {
-            if (pixels.length < width * height * 4) {
+            if (pixelCount * 4 > pixels.length) {
                 return null;
             }
-            int[] argb = new int[width * height];
+            int[] argb = new int[(int) pixelCount];
             for (int i = 0, p = 0; i < argb.length; i++, p += 4) {
                 argb[i] = ((pixels[p + 3] & 255) << 24)
                         | ((pixels[p] & 255) << 16)
@@ -132,13 +149,15 @@ public final class AndroidVisionImpl extends VisionImpl {
             Bitmap bitmap = Bitmap.createBitmap(
                     argb, width, height, Bitmap.Config.ARGB_8888);
             return new DecodedInput(InputImage.fromBitmap(
-                    bitmap, image.getRotationDegrees()), width, height);
+                    bitmap, image.getRotationDegrees()), width, height,
+                    image.getRotationDegrees());
         }
         Bitmap bitmap = BitmapFactory.decodeByteArray(
                 pixels, 0, pixels.length);
         return bitmap == null ? null : new DecodedInput(
                 InputImage.fromBitmap(bitmap, image.getRotationDegrees()),
-                bitmap.getWidth(), bitmap.getHeight());
+                bitmap.getWidth(), bitmap.getHeight(),
+                image.getRotationDegrees());
     }
 
     private static final class DecodedInput {
@@ -146,11 +165,25 @@ public final class AndroidVisionImpl extends VisionImpl {
         final int width;
         final int height;
 
-        DecodedInput(InputImage input, int width, int height) {
+        DecodedInput(InputImage input, int width, int height, int rotation) {
             this.input = input;
-            this.width = width;
-            this.height = height;
+            if (rotation == 90 || rotation == 270) {
+                this.width = height;
+                this.height = width;
+            } else {
+                this.width = width;
+                this.height = height;
+            }
         }
+    }
+
+    private static void error(final AsyncResource<?> out,
+                              final VisionException error) {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                out.error(error);
+            }
+        });
     }
 
     private static boolean isClassPresent(String className) {
