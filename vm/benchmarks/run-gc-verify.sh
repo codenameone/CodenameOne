@@ -18,6 +18,13 @@ cd "$(dirname "$0")"
 J8="${JDK_8_HOME:?set JDK_8_HOME}"
 mkdir -p target/bin
 
+# This script's result is decided by these variables, and anyone debugging the
+# collector has them exported. An inherited CN1_GC_FAULT would fail every
+# driver below; an inherited CN1_GC_VERIFY_SOFT would stop the self-test from
+# aborting. Either inverts a result instead of failing loudly.
+unset CN1_GC_FAULT CN1_GC_VERIFY_SOFT CN1_GC_VERIFY_AGING CN1_GC_VERIFY_ALL \
+      CN1_GC_VERIFY_LOG CN1_GC_VERIFY_CENSUS CN1_GC_VERIFY_DUMP CN1_GC_TRACE_MARK
+
 # Every workload that allocates enough to drive real collection cycles. The
 # point is coverage of ALLOCATION SHAPES, not of answers: page-heap churn,
 # monitors, finalizers, threads, oversized/legacy objects, adopted survivors.

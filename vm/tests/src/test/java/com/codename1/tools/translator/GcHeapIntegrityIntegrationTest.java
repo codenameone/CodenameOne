@@ -203,6 +203,13 @@ class GcHeapIntegrityIntegrationTest {
     private Run run(Path executable, Path workingDir, Map<String, String> env) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(executable.toString());
         builder.directory(workingDir.toFile());
+        // Both halves of this test are decided by environment variables, and a
+        // developer debugging the collector has exactly those variables exported
+        // (CN1_GC_VERIFY_SOFT downgrades the abort the faulted half asserts on,
+        // CN1_GC_FAULT injects the defect the clean half asserts is absent). An
+        // inherited knob would invert a result rather than fail loudly, so the
+        // child starts from a known state and gets only what this test sets.
+        builder.environment().keySet().removeIf(key -> key.startsWith("CN1_"));
         builder.environment().putAll(env);
         builder.redirectErrorStream(true);
         Process process = builder.start();
