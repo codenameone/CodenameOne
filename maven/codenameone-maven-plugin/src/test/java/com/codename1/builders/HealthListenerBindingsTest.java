@@ -119,4 +119,23 @@ class HealthListenerBindingsTest {
                         + "CN1HealthListenerBindings.java",
                 HealthListenerBindings.sourcePath());
     }
+
+    /**
+     * A nested listener is the common case -- developers put it inside the
+     * class that subscribes. The persisted key must stay the binary name,
+     * since that is what Class.getName() returns, but the constructor call
+     * needs the source name: `new Outer$Inner()` does not compile.
+     */
+    @Test
+    void nestedListenersUseSourceNamesInTheConstructorCall() {
+        String src = HealthListenerBindings.generate(
+                list("com.example.Outer$Inner"));
+        assertNotNull(src);
+        assertTrue(src.contains("\"com.example.Outer$Inner\".equals(className)"),
+                "the key must be the binary name Class.getName() returns");
+        assertTrue(src.contains("return new com.example.Outer.Inner();"),
+                "the constructor call must use the dotted source name");
+        assertFalse(src.contains("new com.example.Outer$Inner()"),
+                "new Outer$Inner() is not valid Java source");
+    }
 }

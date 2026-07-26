@@ -101,10 +101,17 @@ final class HealthListenerBindings {
         sb.append("    public HealthBackgroundListener create(String")
                 .append(" className) {\n");
         for (int i = 0; i < sorted.size(); i++) {
-            String fqcn = sorted.get(i);
-            sb.append("        if (\"").append(fqcn)
+            String binaryName = sorted.get(i);
+            // The key is the binary name, because that is what
+            // Class.getName() returns at runtime and what the subscription
+            // persisted. The constructor call needs the SOURCE name, where
+            // a nested class is separated by a dot rather than a dollar --
+            // `new Outer$Inner()` is not valid Java.
+            String sourceName = binaryName.replace('$', '.');
+            sb.append("        if (\"").append(binaryName)
                     .append("\".equals(className)) {\n");
-            sb.append("            return new ").append(fqcn).append("();\n");
+            sb.append("            return new ").append(sourceName)
+                    .append("();\n");
             sb.append("        }\n");
         }
         sb.append("        return null;\n");
