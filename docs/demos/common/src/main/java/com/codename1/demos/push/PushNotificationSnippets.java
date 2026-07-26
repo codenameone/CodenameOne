@@ -66,6 +66,15 @@ public class PushNotificationSnippets {
     public void start() {
         push.register();
     }
+
+    public void stop() {
+        // Keep the subscription and listener active while the app is paused.
+    }
+
+    public void disableNotifications() {
+        // Use only for an explicit user opt-out.
+        push.unregister();
+    }
     // end::push-notifications-java-001[]
 
     public PushMessage createMessage() {

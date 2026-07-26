@@ -188,6 +188,37 @@ class PushClientTransportTest extends UITestBase {
     }
 
     @FormTest
+    void repeatedLifecycleStartDoesNotRegisterTwice() {
+        FakeTransport transport = new FakeTransport();
+        PushClient client = track(PushClient.builder("custom-app")
+                .listener(new RecordingListener())
+                .registrationSink(new RecordingSink()).transport(transport).build());
+
+        client.register();
+        client.register();
+
+        assertEquals(1, transport.registrationAttempts);
+    }
+
+    @FormTest
+    void secondClientCannotSilentlyReplaceActiveListener() {
+        RecordingListener firstListener = new RecordingListener();
+        PushClient first = track(PushClient.builder("first-app").listener(firstListener)
+                .registrationSink(new RecordingSink()).transport(new FakeTransport()).build());
+        first.register();
+        RecordingListener secondListener = new RecordingListener();
+        PushClient second = PushClient.builder("second-app").listener(secondListener)
+                .registrationSink(new RecordingSink()).transport(new FakeTransport()).build();
+
+        second.register();
+        PushClient.dispatch("{\"schema\":3,\"id\":\"still-first\",\"silent\":true}");
+
+        assertEquals("still-first", firstListener.message.getId());
+        assertNotNull(secondListener.error);
+        assertEquals("active_client", secondListener.error.getCode());
+    }
+
+    @FormTest
     void unsupportedTransportDoesNotReplaceTheGlobalPushBinding() {
         RecordingListener listener = new RecordingListener();
         PushClient client = PushClient.builder("custom-app").listener(listener)
@@ -217,9 +248,11 @@ class PushClientTransportTest extends UITestBase {
 
     private static final class FakeTransport implements PushTransport {
         String pending;
+        int registrationAttempts;
         public String getId() { return "fake-native"; }
         public boolean isSupported() { return true; }
         public void register(Callback value) {
+            registrationAttempts++;
             value.registered(new PushSubscription(getId(), "opaque-token", "test",
                     "installation-1", 0, Collections.singletonList("silent")));
             if (pending != null) PushClient.dispatch(pending);

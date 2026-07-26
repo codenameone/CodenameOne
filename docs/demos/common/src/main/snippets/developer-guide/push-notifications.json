@@ -56,7 +56,7 @@
 {
   "externalUserId": "customer-4815",
   "tags": {
-    "plan": "pro",
+    "subscription": "active",
     "region": "emea",
     "testUser": "false"
   }

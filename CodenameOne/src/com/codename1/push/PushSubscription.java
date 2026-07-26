@@ -27,7 +27,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/// Opaque native registration material produced by a push transport.
+/**
+ * Immutable native registration produced by a push transport.
+ *
+ * <p>The token is opaque provider data. Applications should send the complete
+ * subscription to their server and must not parse, truncate, or use the token
+ * as a user identity. Providers can rotate tokens, so a later registration for
+ * the same installation replaces the earlier value.</p>
+ */
 public final class PushSubscription {
     private final String transportId;
     private final String token;
@@ -36,6 +43,20 @@ public final class PushSubscription {
     private final long expiresAt;
     private final List<String> capabilities;
 
+    /**
+     * Creates a subscription, primarily for custom {@link PushTransport}
+     * implementations.
+     *
+     * @param transportId stable provider identifier
+     * @param token opaque native provider token
+     * @param platform Codename One platform name
+     * @param installationId stable application installation identifier
+     * @param expiresAt expiration time in epoch milliseconds, or {@code 0} when
+     *                  the provider supplies no expiry
+     * @param capabilities immutable capability identifiers, or {@code null}
+     * @throws IllegalArgumentException if {@code transportId} or {@code token}
+     *                                  is null
+     */
     public PushSubscription(String transportId, String token, String platform,
             String installationId, long expiresAt, List<String> capabilities) {
         if (transportId == null || token == null) {
@@ -51,26 +72,56 @@ public final class PushSubscription {
                 : Collections.unmodifiableList(new ArrayList<String>(capabilities));
     }
 
+    /**
+     * Returns the provider identifier used for delivery routing.
+     *
+     * @return the transport identifier
+     */
     public String getTransportId() {
         return transportId;
     }
 
+    /**
+     * Returns the opaque native provider token.
+     *
+     * @return the native token
+     */
     public String getToken() {
         return token;
     }
 
+    /**
+     * Returns the Codename One platform name reported at registration.
+     *
+     * @return the platform name
+     */
     public String getPlatform() {
         return platform;
     }
 
+    /**
+     * Returns the stable ID for this application installation.
+     *
+     * @return the installation identifier
+     */
     public String getInstallationId() {
         return installationId;
     }
 
+    /**
+     * Returns the subscription expiry time.
+     *
+     * @return epoch milliseconds, or {@code 0} when no expiry is known
+     */
     public long getExpiresAt() {
         return expiresAt;
     }
 
+    /**
+     * Returns transport capability identifiers.
+     *
+     * @return an immutable, possibly empty list
+     */
     public List<String> getCapabilities() {
         return capabilities;
     }

@@ -318,6 +318,7 @@ public class AndroidGradleBuilder extends Executor {
     private boolean smsPermission;
     private boolean gpsPermission;
     private boolean pushPermission;
+    private int pushVersion;
     private boolean foregroundServicePermission;
     private boolean contactsReadPermission;
     private boolean calendarReadPermission;
@@ -330,6 +331,23 @@ public class AndroidGradleBuilder extends Executor {
 
 
     private boolean contactsPermission;
+
+    static boolean usesFcmPush(int detectedPushVersion, String messagingService,
+            boolean hasFirebaseConfiguration) {
+        return "fcm".equalsIgnoreCase(messagingService)
+                || (detectedPushVersion == 3
+                        && "auto".equalsIgnoreCase(messagingService)
+                        && hasFirebaseConfiguration);
+    }
+
+    static boolean usesHuaweiPush(int detectedPushVersion, String messagingService,
+            boolean hasHuaweiConfiguration) {
+        return detectedPushVersion == 3
+                && ("hms".equalsIgnoreCase(messagingService)
+                        || "huawei".equalsIgnoreCase(messagingService)
+                        || ("auto".equalsIgnoreCase(messagingService)
+                                && hasHuaweiConfiguration));
+    }
     private boolean wakeLock;
     private boolean recordAudio;
     private boolean mediaPlaybackPermission;
@@ -1358,6 +1376,11 @@ public class AndroidGradleBuilder extends Executor {
                     }
                     if (cls.indexOf("com/codename1/push") > -1) {
                         pushPermission = true;
+                        if ("com/codename1/push/PushClient".equals(cls)) {
+                            pushVersion = 3;
+                        } else if (pushVersion == 0) {
+                            pushVersion = 1;
+                        }
                         if (targetSDKVersionInt >= 28) {
                             foregroundServicePermission = true;
                         }
@@ -1821,9 +1844,19 @@ public class AndroidGradleBuilder extends Executor {
                     neverForLocation, bleRequired, targetSDKVersionInt);
         }
 
-        boolean useFCM = pushPermission && "fcm".equalsIgnoreCase(request.getArg("android.messagingService", "fcm"));
-        boolean useHMS = pushPermission && ("hms".equalsIgnoreCase(request.getArg("android.messagingService", "fcm"))
-                || "huawei".equalsIgnoreCase(request.getArg("android.messagingService", "fcm")));
+        String messagingService = request.getArg("android.messagingService",
+                pushVersion == 3 ? "auto" : "fcm");
+        boolean automaticPush = pushVersion == 3
+                && "auto".equalsIgnoreCase(messagingService);
+        boolean useFCM = pushPermission && usesFcmPush(pushVersion, messagingService,
+                googleServicesJson.exists());
+        boolean useHMS = pushPermission && usesHuaweiPush(pushVersion, messagingService,
+                agconnectServicesJson.exists());
+        if (pushPermission && automaticPush && !useFCM && !useHMS) {
+            error("PushClient requires google-services.json, agconnect-services.json, "
+                    + "or both in native/android.", new RuntimeException());
+            return false;
+        }
         if (useFCM) {
             request.putArgument("android.fcm.minPlayServicesVersion", "12.0.1");
         }
@@ -1914,8 +1947,21 @@ public class AndroidGradleBuilder extends Executor {
                         + "\n" + compile + " 'com.huawei.hms:push:"
                         + request.getArg("android.hms.pushVersion", "6.3.0.302") + "'\n");
             }
-            additionalMembers += "\n    @Override public void registerForPush(String ignored) {\n"
+            String preferFcm = useFCM
+                    ? "        if (com.google.android.gms.common.GoogleApiAvailability.getInstance()"
+                            + ".isGooglePlayServicesAvailable(activity) == "
+                            + "com.google.android.gms.common.ConnectionResult.SUCCESS) {"
+                            + " super.registerForPush(key); return; }\n"
+                    : "";
+            String stopFcm = useFCM
+                    ? "        if (com.google.android.gms.common.GoogleApiAvailability.getInstance()"
+                            + ".isGooglePlayServicesAvailable(activity) == "
+                            + "com.google.android.gms.common.ConnectionResult.SUCCESS) {"
+                            + " super.stopReceivingPush(); return; }\n"
+                    : "";
+            additionalMembers += "\n    @Override public void registerForPush(final String key) {\n"
                     + "        final android.app.Activity activity = this;\n"
+                    + preferFcm
                     + "        new Thread(new Runnable() { public void run() { try {\n"
                     + "            // Push Kit derives the app id from native/android/agconnect-services.json.\n"
                     + "            String appId = com.huawei.agconnect.config.AGConnectServicesConfig.fromContext(activity).getString(\"client/app_id\");\n"
@@ -1927,7 +1973,9 @@ public class AndroidGradleBuilder extends Executor {
                     + "            if (cb != null) com.codename1.ui.Display.getInstance().callSerially(new Runnable(){ public void run(){ cb.pushRegistrationError(ex.getMessage(), 0); }}); } }}).start();\n"
                     + "    }\n"
                     + "    @Override public void stopReceivingPush() {\n"
-                    + "        final android.app.Activity activity = this; new Thread(new Runnable(){ public void run(){ try {\n"
+                    + "        final android.app.Activity activity = this;\n"
+                    + stopFcm
+                    + "        new Thread(new Runnable(){ public void run(){ try {\n"
                     + "            String appId = com.huawei.agconnect.config.AGConnectServicesConfig.fromContext(activity).getString(\"client/app_id\");\n"
                     + "            com.huawei.hms.aaid.HmsInstanceId.getInstance(activity).deleteToken(appId, \"HCM\");\n"
                     + "        } catch (Exception ex) { ex.printStackTrace(); } }}).start();\n"
@@ -3431,17 +3479,21 @@ public class AndroidGradleBuilder extends Executor {
                 + "        </receiver>\n";
         if (!pushPermission) {
             pushManifestEntries = "";
-        } else if (useFCM) {
-            pushManifestEntries = "<service\n" +
-                    "          android:name=\"com.codename1.impl.android.CN1FirebaseMessagingService\" android:exported=\"true\">\n" +
-                    "          <intent-filter>\n" +
-                    "              <action android:name=\"com.google.firebase.MESSAGING_EVENT\" />\n" +
-                    "          </intent-filter>\n" +
-                    "      </service>\n";
-        } else if (useHMS) {
-            pushManifestEntries = "<service android:name=\".CN1HuaweiMessagingService\" android:exported=\"false\">\n"
-                    + "  <intent-filter><action android:name=\"com.huawei.push.action.MESSAGING_EVENT\" /></intent-filter>\n"
-                    + "</service>\n<meta-data android:name=\"push_kit_auto_init_enabled\" android:value=\"true\" />\n";
+        } else {
+            pushManifestEntries = "";
+            if (useFCM) {
+                pushManifestEntries += "<service\n"
+                        + "          android:name=\"com.codename1.impl.android.CN1FirebaseMessagingService\" android:exported=\"true\">\n"
+                        + "          <intent-filter>\n"
+                        + "              <action android:name=\"com.google.firebase.MESSAGING_EVENT\" />\n"
+                        + "          </intent-filter>\n"
+                        + "      </service>\n";
+            }
+            if (useHMS) {
+                pushManifestEntries += "<service android:name=\".CN1HuaweiMessagingService\" android:exported=\"false\">\n"
+                        + "  <intent-filter><action android:name=\"com.huawei.push.action.MESSAGING_EVENT\" /></intent-filter>\n"
+                        + "</service>\n<meta-data android:name=\"push_kit_auto_init_enabled\" android:value=\"true\" />\n";
+            }
         }
 
         String launchMode = request.getArg("android.activity.launchMode", "singleTop");

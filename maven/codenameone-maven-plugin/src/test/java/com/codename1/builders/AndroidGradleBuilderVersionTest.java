@@ -25,6 +25,7 @@ package com.codename1.builders;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AndroidGradleBuilderVersionTest {
@@ -34,5 +35,15 @@ class AndroidGradleBuilderVersionTest {
         assertTrue(AndroidGradleBuilder.compareVersions("8.1", "8.13") < 0);
         assertEquals(0, AndroidGradleBuilder.compareVersions("8.13", "8.13"));
         assertTrue(AndroidGradleBuilder.compareVersions("8.13.2", "8.13") > 0);
+    }
+
+    @Test
+    void typedPushAutoDetectsBothAndroidProviderConfigurations() {
+        assertTrue(AndroidGradleBuilder.usesFcmPush(3, "auto", true));
+        assertFalse(AndroidGradleBuilder.usesFcmPush(3, "auto", false));
+        assertTrue(AndroidGradleBuilder.usesHuaweiPush(3, "auto", true));
+        assertFalse(AndroidGradleBuilder.usesHuaweiPush(3, "auto", false));
+        assertTrue(AndroidGradleBuilder.usesFcmPush(1, "fcm", false));
+        assertFalse(AndroidGradleBuilder.usesHuaweiPush(1, "huawei", true));
     }
 }

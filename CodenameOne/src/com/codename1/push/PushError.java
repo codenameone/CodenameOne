@@ -23,26 +23,54 @@
  */
 package com.codename1.push;
 
-/// A registration or delivery error reported by a push transport.
+/**
+ * Describes a push registration or envelope-processing error.
+ *
+ * <p>The code is intended for application decisions and logging. The message
+ * is diagnostic text and may vary. A retryable error may be attempted again
+ * later with backoff; it is not a promise that an immediate retry will work.</p>
+ */
 public final class PushError {
     private final String code;
     private final String message;
     private final boolean retryable;
 
+    /**
+     * Creates an error.
+     *
+     * @param code stable machine-readable code
+     * @param message diagnostic message
+     * @param retryable whether retrying later may succeed
+     */
     public PushError(String code, String message, boolean retryable) {
         this.code = code;
         this.message = message;
         this.retryable = retryable;
     }
 
+    /**
+     * Returns the stable machine-readable error code.
+     *
+     * @return the error code
+     */
     public String getCode() {
         return code;
     }
 
+    /**
+     * Returns the diagnostic error text.
+     *
+     * @return the diagnostic message
+     */
     public String getMessage() {
         return message;
     }
 
+    /**
+     * Indicates whether retrying later may succeed.
+     *
+     * @return {@code true} for a potentially transient failure
+     */
     public boolean isRetryable() {
         return retryable;
     }
