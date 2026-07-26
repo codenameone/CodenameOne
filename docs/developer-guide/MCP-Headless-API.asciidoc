@@ -50,7 +50,7 @@ The same distinction is available to application code, so a starter can be left 
 [source,java]
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-guard-start,indent=0]
 
-A build that ships to devices you control, such as a kiosk fleet, a test lab, or a managed enterprise deployment, can lift the block deliberately:
+A build that ships to devices you control, such as a kiosk fleet, a test lab, or a managed enterprise deployment, can lift the block:
 
 [source,java]
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-allow-release,indent=0]

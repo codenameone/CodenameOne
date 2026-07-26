@@ -36,10 +36,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// screen and drives the UI, and loopback is shared by everything on the device, so on a
 /// shipped app any other installed app could drive it.
 ///
-/// These tests never bind a real socket: loopback support is turned OFF, so a start that
-/// gets past the gate fails to bind on the server's own reader thread, which only logs.
-/// The gate is therefore observable as the difference between throwing on the calling
-/// thread and returning a running server.
+/// The test implementation serves accepts from an in-memory queue rather than a real
+/// socket, so a start that gets past the gate reaches a running server without any port
+/// being bound. The gate is observable as the difference between throwing on the calling
+/// thread and returning that running server.
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class MCPReleaseBuildGateTest extends UITestBase {
 
@@ -52,19 +52,19 @@ class MCPReleaseBuildGateTest extends UITestBase {
     }
 
     /// Asserts the gate refused, and returns the message so a test can check it names the
-    /// reason rather than failing with something generic.
+    /// reason rather than failing with something generic. Loopback support is ON, so the
+    /// only reason to refuse is the gate.
     private String refusal(boolean debuggable) {
         implementation.setDebuggableBuild(debuggable);
-        implementation.setServerSocketAvailable(false);
+        implementation.setServerSocketAvailable(true);
         return assertThrows(IllegalStateException.class,
                 () -> MCP.startSocketServer(47899)).getMessage();
     }
 
-    /// Asserts the gate let the start through. Binding still fails (there is no loopback
-    /// support here) but that happens on the reader thread, so the call returns.
+    /// Asserts the gate let the start through, leaving a running server behind.
     private void assertPassesGate(boolean debuggable) {
         implementation.setDebuggableBuild(debuggable);
-        implementation.setServerSocketAvailable(false);
+        implementation.setServerSocketAvailable(true);
         assertNotNull(MCP.startSocketServer(47899), "start must return the shared server");
         assertTrue(MCP.isRunning(), "the server must be running once the gate is passed");
     }
@@ -105,14 +105,28 @@ class MCPReleaseBuildGateTest extends UITestBase {
     @Test
     void theGateIsCheckedBeforeTransportAvailability() {
         // Both failure modes apply at once here. The gate must win, otherwise a release
-        // build on a port that CAN bind would be reported as a platform limitation and
-        // then quietly succeed once the platform gained support.
+        // build would be reported as a mere platform limitation and would start serving
+        // the moment the platform gained loopback support.
         implementation.setDebuggableBuild(false);
-        implementation.setServerSocketAvailable(true);
+        implementation.setServerSocketAvailable(false);
         String message = assertThrows(IllegalStateException.class,
                 () -> MCP.startSocketServer(47898)).getMessage();
         assertTrue(message.contains(GATE),
                 "the build gate must be evaluated first, got: " + message);
         assertFalse(MCP.isRunning());
+    }
+
+    @Test
+    void aPlatformThatCannotBindLoopbackFailsOnTheCallingThread() {
+        // The portable transport must not register itself on a platform that cannot bind,
+        // because then the start would look like it succeeded and only fail later on the
+        // server's own thread, where a caller cannot see it.
+        implementation.setDebuggableBuild(true);
+        implementation.setServerSocketAvailable(false);
+        String message = assertThrows(IllegalStateException.class,
+                () -> MCP.startSocketServer(47897)).getMessage();
+        assertTrue(message.contains("No socket MCP transport"),
+                "an unbindable platform must say so synchronously, got: " + message);
+        assertFalse(MCP.isRunning(), "nothing must be left running after that refusal");
     }
 }

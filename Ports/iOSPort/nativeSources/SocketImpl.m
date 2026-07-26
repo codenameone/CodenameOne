@@ -175,7 +175,11 @@ static void _resume() {
         if(r > 0) {
             return [NSData dataWithBytes:buffer length:r];
         }
-        connected = NO;
+        // End of stream or a read error: close here rather than only marking the socket
+        // disconnected. The Java side closes a stream by calling disconnectSocket only
+        // while the socket still reports itself connected, so leaving the descriptor open
+        // once connected is NO would strand it for the life of the process.
+        [self closeRawDescriptor];
         return nil;
     }
 
@@ -193,9 +197,14 @@ static void _resume() {
         const uint8_t* bytes = (const uint8_t*)[param bytes];
         size_t remaining = [param length];
         while(remaining > 0) {
+            // send() blocks once the send buffer fills, so hand the thread back to the VM
+            // across it exactly as the accept and recv paths do; holding it would stall
+            // cooperative scheduling for as long as the peer is slow to drain.
+            _yield();
             ssize_t w = send(rawFd, bytes, remaining, 0);
+            _resume();
             if(w <= 0) {
-                connected = NO;
+                [self closeRawDescriptor];
                 return;
             }
             bytes += w;
@@ -206,11 +215,19 @@ static void _resume() {
     [outputStream write:[param bytes] maxLength:[param length]];
 }
 
--(void)disconnect{
+/// Closes the accepted descriptor once, and records the socket as disconnected. Callers
+/// reach this from either direction of the connection failing.
+-(void)closeRawDescriptor{
     if(rawFd >= 0) {
         close(rawFd);
         rawFd = -1;
-        connected = NO;
+    }
+    connected = NO;
+}
+
+-(void)disconnect{
+    if(rawFd >= 0) {
+        [self closeRawDescriptor];
         return;
     }
     if(inputStream != nil) {
@@ -300,6 +317,13 @@ static NSMutableDictionary* _cn1LoopbackListeners = nil;
     // Serve this socket with raw descriptor I/O. An accepted connection is read on a
     // background thread whose run loop never runs, so a scheduled CFStream would open
     // but never deliver a byte.
+    //
+    // Writing to a peer that has gone away raises SIGPIPE by default, and this process
+    // installs a SIGPIPE handler (CodenameOne_GLAppDelegate), so the ordinary case of a
+    // client disconnecting mid-write would surface as a signal rather than as the EPIPE
+    // the write path is written to handle. SO_NOSIGPIPE turns it into a plain error.
+    int noSigPipe = 1;
+    setsockopt(clientFd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, sizeof(noSigPipe));
     rawFd = clientFd;
     connected = YES;
     return YES;

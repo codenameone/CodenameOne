@@ -70,6 +70,13 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         if (MCP.hasPlatformSocketTransport()) {
             return;
         }
+        if (!Socket.isLoopbackServerSocketSupported()) {
+            // Registering regardless would be worse than not registering: the caller would
+            // see a transport, believe the server started, and only find out on the
+            // server's own thread that nothing can bind. Leaving the factory unset lets
+            // startSocketServer fail on the calling thread, where it can be handled.
+            return;
+        }
         MCP.setSocketTransportFactory(new MCP.SocketTransportFactory() {
             @Override
             public MCPTransport createSocketTransport(int port) {

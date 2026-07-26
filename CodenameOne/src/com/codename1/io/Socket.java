@@ -231,6 +231,15 @@ public final class Socket {
                         final Object connection = loopbackOnly
                                 ? Util.getImplementation().listenSocketLoopback(port)
                                 : Util.getImplementation().listenSocket(port);
+                        if (stopped) {
+                            // stop() was called while this thread sat inside accept. The
+                            // connection that unblocked it belongs to a listener the caller
+                            // has already abandoned, so hand it back rather than serving it.
+                            if (connection != null) {
+                                Util.getImplementation().disconnectSocket(connection);
+                            }
+                            break;
+                        }
                         final SocketConnection sc = (SocketConnection) scClass.newInstance();
                         if (connection != null) {
                             sc.setConnected(true);
