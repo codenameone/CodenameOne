@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/// Framing and session handling for the portable MCP socket transport — the one that
+/// Framing and session handling for the portable MCP socket transport - the one that
 /// lets an agent attach to an app running on a device, not only on the desktop.
 ///
 /// Drives the transport's own streams directly rather than through

@@ -79,7 +79,7 @@ public final class MCP {
     }
 
     /// Whether the PORT supplied a transport of its own. Distinct from
-    /// [#isSocketSupported()], which also counts the portable fallback — the fallback
+    /// [#isSocketSupported()], which also counts the portable fallback - the fallback
     /// must not see itself as already installed.
     static boolean hasPlatformSocketTransport() {
         return socketTransportFactory != null;
@@ -90,7 +90,7 @@ public final class MCP {
         return stdioTransportFactory != null;
     }
 
-    /// Whether a loopback socket transport is available on this platform — either one the
+    /// Whether a loopback socket transport is available on this platform - either one the
     /// port registered itself, or the portable one, which needs
     /// [com.codename1.io.Socket#isLoopbackServerSocketSupported()].
     public static boolean isSocketSupported() {
@@ -127,7 +127,7 @@ public final class MCP {
     /// Requires a platform socket transport factory (registered by the JavaSE port).
     public static synchronized MCPServer startSocketServer(int port) {
         // Ports that did not register a transport of their own fall back to the portable
-        // one, which binds loopback through com.codename1.io.Socket — so attaching to a
+        // one, which binds loopback through com.codename1.io.Socket - so attaching to a
         // running app on a device or simulator works, not only on the desktop.
         MCPLoopbackSocketTransport.registerIfPlatformHasNone();
         if (socketTransportFactory == null) {

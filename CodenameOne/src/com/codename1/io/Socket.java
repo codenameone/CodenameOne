@@ -190,7 +190,7 @@ public final class Socket {
     /// [#listen(int, Class)]: `scClass` is instantiated per incoming connection and
     /// must have a public no-argument constructor.
     ///
-    /// Use this for anything that is local by nature — a debug or automation channel,
+    /// Use this for anything that is local by nature - a debug or automation channel,
     /// an on-device tool talking to a companion process. Callers that genuinely want to
     /// serve the network should use [#listen(int, Class)] and say so.
     ///

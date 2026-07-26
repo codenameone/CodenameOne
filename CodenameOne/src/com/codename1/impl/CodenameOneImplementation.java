@@ -9932,7 +9932,7 @@ public abstract class CodenameOneImplementation {
     }
 
     /// Listens on the given port, bound to the loopback interface only, and blocks until
-    /// a connection arrives — the accept semantics of [#listenSocket(int)], with a
+    /// a connection arrives - the accept semantics of [#listenSocket(int)], with a
     /// narrower bind.
     ///
     /// #### Parameters

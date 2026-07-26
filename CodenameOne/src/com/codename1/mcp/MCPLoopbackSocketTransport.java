@@ -31,7 +31,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /// Loopback socket MCP transport built on the portable [com.codename1.io.Socket] API, so
-/// an agent can attach to a running app on ANY port that can bind the loopback interface —
+/// an agent can attach to a running app on ANY port that can bind the loopback interface -
 /// a device or simulator, not only the desktop.
 ///
 /// The channel is bound to loopback only. That is the security boundary: an attaching
@@ -40,7 +40,7 @@ import java.io.OutputStream;
 /// fallback; if the port cannot bind loopback this transport refuses to open.
 ///
 /// The listening socket stays bound across client sessions, so an agent may disconnect and
-/// reconnect — each drive call is typically its own short-lived connection — without the
+/// reconnect - each drive call is typically its own short-lived connection - without the
 /// server thread exiting.
 public final class MCPLoopbackSocketTransport implements MCPTransport {
     /// Lets [Connection], which the socket API instantiates reflectively via a public
