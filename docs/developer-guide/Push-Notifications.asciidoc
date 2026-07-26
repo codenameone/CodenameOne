@@ -26,7 +26,7 @@ The managed backend includes WNS delivery for explicit Windows targets. It doesn
 
 Credentials are encrypted in the BuildCloud secrets vault and are write-only. The setup UI shows whether each provider is configured but never reads a secret back. Rotate a credential by saving its replacement.
 
-Cloud builds detect `PushClient` usage and generate the typed native bootstrap automatically. On Android, include `google-services.json`, `agconnect-services.json`, or both. A build with both configurations uses FCM when Google Play services are available on the device and falls back to Huawei Push Kit otherwise. No provider-selection build hint is required. The `android.messagingService=fcm` and `android.messagingService=huawei` hints remain available only when an application intentionally needs to force one provider.
+Cloud builds detect `PushClient` usage and generate the typed native bootstrap automatically. On Android, include `google-services.json`, `agconnect-services.json`, or both. A build with both configurations uses FCM when Google Play Services are available on the device and falls back to Huawei Push Kit otherwise. No provider-selection build hint is required. The `android.messagingService=fcm` and `android.messagingService=huawei` hints remain available only when an application intentionally needs to force one provider.
 
 iOS enables push support automatically when `PushClient` is referenced; set `ios.includePush=false` only when an installed custom-provider adapter intentionally owns registration.
 
@@ -50,7 +50,7 @@ Registration is asynchronous. With managed delivery, the framework registers the
 
 ==== Listener lifecycle and early messages
 
-`PushClient.Builder.listener()` is mandatory, and `build()` fails immediately if it is missing. The client retains that listener until unregistration completes. Codename One does not locate listeners with reflection or `Class.forName()`: the application must build, retain, and register the client explicitly. Only one `PushClient` can be active in a process; a second client reports an `active_client` error instead of replacing the first listener.
+`PushClient.Builder.listener()` is mandatory, and `build()` fails immediately if it's missing. The client retains that listener until deregistration completes. Codename One doesn't locate listeners with reflection or `Class.forName()`: the application must build, retain, and register the client explicitly. Only one `PushClient` can be active in a process; a second client reports an `active_client` error instead of replacing the first listener.
 
 Every `PushListener` and `PushRegistrationSink` callback runs on the Codename One EDT:
 
@@ -58,7 +58,7 @@ Every `PushListener` and `PushRegistrationSink` callback runs on the Codename On
 * `onMessage()` receives one parsed schema-3 envelope. A foreground notification can arrive immediately. A visible background notification normally arrives after the user opens it.
 * `onError()` reports registration and envelope errors. Use `PushError.getCode()` for decisions; diagnostic text isn't a stable contract.
 
-Native ports preserve a cold-start notification until the runtime can deliver it. If the runtime starts before the application calls `register()`, `PushClient` keeps a bounded process-local queue and replays it after activation. If the application never registers its client, it has deliberately provided no listener and cannot expect application callbacks. Silent/background execution remains subject to each OS's power and scheduling rules, so refresh authoritative state whenever the application resumes.
+Native ports preserve a cold-start notification until the runtime can deliver it. If the runtime starts before the application calls `register()`, `PushClient` keeps a bounded process-local queue and replays it after activation. If the application never registers its client, it has provided no listener and can't expect application callbacks. Silent/background execution remains subject to each OS's power and scheduling rules, so refresh authoritative state whenever the application resumes.
 
 === Build a message
 
@@ -157,14 +157,14 @@ For a live activity use `live-update` or `live-end` with `id`, serialized `state
 
 === Use an application-owned push server
 
-A custom server is a low-level alternative to managed push, not a different URL for the BuildCloud protocol. A CN1Lib implements `PushTransport` around the private provider's native SDK. It obtains native registration material, reports token rotation, and forwards incoming data as the canonical schema-3 JSON envelope. A matching `PushRegistrationSink` stores and removes the subscription on your server:
+A custom server is a low-level alternative to managed push; it doesn't reuse the BuildCloud protocol at a different endpoint. A CN1Lib implements `PushTransport` around the private provider's native SDK. It obtains native registration material, reports token rotation, and forwards incoming data as the canonical schema-3 JSON envelope. A matching `PushRegistrationSink` stores and removes the subscription on your server:
 
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codename1/demos/push/PushNotificationSnippets.java[tag=push-notifications-java-003,indent=0]
 ----
 
-When a `PushTransport` implementation is present, `PushClient` never contacts BuildCloud. Your implementation owns all of these responsibilities:
+When a `PushTransport` implementation is present, `PushClient` never contacts BuildCloud. Your implementation owns these responsibilities:
 
 * `getId()` returns a stable provider ID that your server understands.
 * `isSupported()` checks whether the SDK can operate on this device.
@@ -173,9 +173,9 @@ When a `PushTransport` implementation is present, `PushClient` never contacts Bu
 * Incoming native messages call `Callback.message()` with one complete schema-3 envelope. Don't call the application listener directly and don't invent a second payload format.
 * Registration or transport failures call `Callback.failed()`. The callback is thread-safe; `PushClient` moves application-facing callbacks to the EDT.
 
-The registration sink should asynchronously upsert the subscription by `installationId` on your server and replace its token when it rotates. The server then sends through your provider's native API. It must preserve the schema-3 envelope so the same `PushListener`, deep-link handling, and surface commands work in managed and custom-server modes.
+The registration sink should asynchronously insert or update the subscription by `installationId` on your server and replace its token when it rotates. The server then sends through your provider's native API. It must preserve the schema-3 envelope so the same `PushListener`, deep-link handling, and surface commands work in managed and custom-server modes.
 
-The application still follows the normal lifecycle: retain one client, call `register()` from `start()`, and reserve `unregister()` for an actual opt-out. Installing a transport doesn't introduce reflection or automatic listener discovery.
+The application still follows the normal lifecycle: retain one client, call `register()` from `start()`, and reserve `unregister()` for an actual opt-out. This custom integration doesn't introduce reflection or automatic listener discovery.
 
 === Testing delivery behavior
 
