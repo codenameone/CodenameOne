@@ -247,7 +247,7 @@ class HealthManifestFragmentsTest {
         String[] golden = {
             "active_energy", "basal_body_temperature", "basal_energy",
             "blood_glucose", "blood_pressure", "body_fat_percentage",
-            "body_mass", "body_mass_index", "body_temperature", "bone_mass",
+            "body_mass", "body_temperature", "bone_mass",
             "cycling_cadence", "dietary_energy", "distance_cycling",
             "distance_swimming", "distance_walking_running",
             "elevation_gained", "exercise_time", "flights_climbed",
@@ -265,6 +265,28 @@ class HealthManifestFragmentsTest {
         assertEquals(expected, actual,
                 "HealthDataType and this builder table have diverged; add"
                         + " the new token here and to the golden list");
+    }
+
+    /**
+     * Health Connect has no BMI permission or record -- BMI is derived from
+     * weight and height, not stored. The table used to map it onto
+     * BODY_WATER_MASS, which is an unrelated body-composition datum: the
+     * app asked users for sensitive data it had no use for, still could not
+     * read either BMI input, and declared the wrong thing to Play. Leaving
+     * the token out makes the builder reject it with the list of tokens
+     * that do work.
+     */
+    @Test
+    void bodyMassIndexIsNotOfferedOnAndroid() {
+        assertFalse(HealthManifestFragments.knownTokens()
+                .contains("body_mass_index"));
+        assertNull(HealthManifestFragments.permissionSuffix(
+                "body_mass_index"));
+        assertEquals(list(new String[] { "body_mass_index" }),
+                HealthManifestFragments.unknownTokens(
+                        list(new String[] { "steps", "body_mass_index" })),
+                "the builder must reject it rather than silently declaring"
+                        + " an unrelated permission");
     }
 
     @Test

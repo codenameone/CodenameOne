@@ -224,6 +224,8 @@ The simulator's data is synthetic and seeded, not recorded from anyone. That's i
 
 *Background delivery never fires.* No platform pushes health data to a closed app in this release -- see the subscriptions section. Call `drainChanges()` from your background-fetch handler and branch on `isPushDelivery()` rather than assuming.
 
+*`BODY_MASS_INDEX` is rejected on Android.* Health Connect has no BMI permission or record -- BMI is derived, not stored -- so the build fails rather than requesting an unrelated body-composition permission on your behalf. Read `BODY_MASS` and `HEIGHT` and compute it. HealthKit does store BMI, so iOS is unaffected.
+
 *Deleting a sample by id does nothing.* Health Connect deletes by record class plus id, so `HealthDeleteRequest.byId(...)` takes the data type alongside the identifier. Naming the wrong type deletes nothing and still reports success.
 
 *The weekly chart is off by a day twice a year.* You are bucketing by a fixed 24 hours across a daylight-saving transition. Use `HealthInterval.calendarDays(1, tz)`.

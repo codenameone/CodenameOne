@@ -189,6 +189,16 @@ public class SensorSession {
         setState(SensorSessionState.STOPPED);
     }
 
+    /// Drops this session from [HealthSensors#getActiveSessions()].
+    ///
+    /// Without it a stopped or failed session stayed in the registry for
+    /// the manager's lifetime, so the list documented as "connected or
+    /// reconnecting" filled up with dead sessions and kept their
+    /// peripherals and listeners alive with them.
+    protected final void forgetFromManager() {
+        Health.getInstance().getSensors().sessionEnded(this);
+    }
+
     // ------------------------------------------------------------------
     // decoding -- shared by every transport
     // ------------------------------------------------------------------

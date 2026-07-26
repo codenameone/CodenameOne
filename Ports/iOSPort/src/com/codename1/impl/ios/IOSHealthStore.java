@@ -85,8 +85,12 @@ class IOSHealthStore extends HealthStore {
         return isTypeSupported(type);
     }
 
+    /// False: this build has no HealthKit delete native, so the store SPI
+    /// falls through to NOT_SUPPORTED. Saying otherwise made a
+    /// capability-gated delete fail for every valid input, which is worse
+    /// than the caller knowing up front.
     public boolean isDeletable(HealthDataType type) {
-        return isTypeSupported(type);
+        return false;
     }
 
     public List<AggregateMetric> getSupportedMetrics(HealthDataType type) {

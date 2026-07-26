@@ -33,6 +33,9 @@ public final class HealthSubscription {
     private final List<HealthDataType> types;
     private final HealthStore store;
     private final boolean pushDelivery;
+    private final boolean deliverSamples;
+    private final boolean includeDeletions;
+    private final int maxSamplesPerBatch;
     private HealthAnchor anchor;
     private long lastDeliveryMillis;
     private boolean active = true;
@@ -40,6 +43,17 @@ public final class HealthSubscription {
     /// Creates a handle. Called by [HealthStore].
     HealthSubscription(HealthStore store, String id,
             List<HealthDataType> types, boolean pushDelivery) {
+        this(store, id, types, pushDelivery, true, true, 0);
+    }
+
+    /// Creates a handle carrying the request's delivery options.
+    HealthSubscription(HealthStore store, String id,
+            List<HealthDataType> types, boolean pushDelivery,
+            boolean deliverSamples, boolean includeDeletions,
+            int maxSamplesPerBatch) {
+        this.deliverSamples = deliverSamples;
+        this.includeDeletions = includeDeletions;
+        this.maxSamplesPerBatch = maxSamplesPerBatch;
         this.store = store;
         this.id = id;
         this.pushDelivery = pushDelivery;
@@ -59,6 +73,21 @@ public final class HealthSubscription {
     /// the process was dead -- and iOS would resume with no window at all.
     void seedAnchor(HealthAnchor restored) {
         this.anchor = restored;
+    }
+
+    /// Whether batches carry sample payloads, from the request.
+    boolean isDeliverSamples() {
+        return deliverSamples;
+    }
+
+    /// Whether batches carry deleted ids, from the request.
+    boolean isIncludeDeletions() {
+        return includeDeletions;
+    }
+
+    /// The request's per-batch sample cap, or 0 for no cap.
+    int getMaxSamplesPerBatch() {
+        return maxSamplesPerBatch;
     }
 
     /// The identifier this subscription was registered under.

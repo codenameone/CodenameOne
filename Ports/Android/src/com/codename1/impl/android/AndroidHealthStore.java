@@ -330,6 +330,19 @@ class AndroidHealthStore extends HealthStore {
                             new IntentResultListener() {
                         public void onActivityResult(int requestCode,
                                 int resultCode, android.content.Intent data) {
+                            if (resultCode == android.app.Activity
+                                    .RESULT_CANCELED) {
+                                // Dismissal is not completion. Reporting
+                                // success here left callers unable to tell
+                                // a backed-out sheet from a finished flow,
+                                // which is the one distinction this API
+                                // promises to make on Android.
+                                out.error(new HealthException(
+                                        HealthError.USER_CANCELED,
+                                        "the Health Connect permission "
+                                                + "screen was dismissed"));
+                                return;
+                            }
                             String grants = d.parsePermissionResult(
                                     resultCode, data);
                             rememberGrants(grants);

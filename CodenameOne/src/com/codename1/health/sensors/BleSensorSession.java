@@ -230,17 +230,32 @@ final class BleSensorSession extends SensorSession {
                     return;
                 }
                 setState(SensorSessionState.STREAMING);
-                out.complete(BleSensorSession.this);
+                if (out != null) {
+                    out.complete(BleSensorSession.this);
+                }
             }
         });
     }
 
+    /// Reports a failed start.
+    ///
+    /// `out` is null on the reconnect path: nobody is waiting on a
+    /// resource that was already resolved when the session first started,
+    /// and completing it a second time -- or dereferencing it -- would
+    /// throw on the BLE callback thread.
     private void failStart(AsyncResource<SensorSession> out, Throwable err) {
         setState(SensorSessionState.FAILED);
-        out.error(err instanceof HealthException ? err
+        forgetFromManager();
+        HealthException wrapped = err instanceof HealthException
+                ? (HealthException) err
                 : new HealthException(HealthError.SENSOR_DISCONNECTED,
                         "could not start the " + getProfile().getName()
-                                + " session", err));
+                                + " session", err);
+        if (out != null) {
+            out.error(wrapped);
+        } else {
+            fireError(wrapped);
+        }
     }
 
     @Override
@@ -283,6 +298,7 @@ final class BleSensorSession extends SensorSession {
         // A short ride would otherwise lose whatever had not reached a
         // batch boundary yet.
         flushPendingWrites();
+        forgetFromManager();
         peripheral.disconnect();
     }
 }

@@ -257,9 +257,18 @@ class CN1HealthConnectBridge(private val context: Context)
                     dataOriginFilter = origins,
                     pageSize = minOf(remaining, MAX_PAGE_SIZE),
                     pageToken = pageToken))
-            page.records.forEach { appendOne(sb, it, token) }
-            remaining -= page.records.size
-            emitted += page.records.size
+            // Counted in emitted lines, not records. One heart-rate record
+            // holds many samples and appendOne flattens them, so a
+            // limit-1 request could otherwise return hundreds of lines.
+            var lines = 0
+            for (record in page.records) {
+                lines += appendOne(sb, record, token)
+                if (lines >= remaining) {
+                    break
+                }
+            }
+            remaining -= lines
+            emitted += lines
             pageToken = page.pageToken
             if (pageToken == null || page.records.isEmpty()) {
                 break
@@ -277,11 +286,12 @@ class CN1HealthConnectBridge(private val context: Context)
      * its lines with the type that was actually asked for or the portable
      * layer discards them as the wrong type.
      *
-     * Returns false for record shapes with no single-value form, which the
-     * caller reports rather than silently dropping.
+     * Returns how many lines were written, which is zero for record
+     * shapes with no single-value form -- the caller reports those rather
+     * than silently dropping them.
      */
     private fun appendOne(sb: StringBuilder, record: Record,
-                          token: String): Boolean {
+                          token: String): Int {
         when (record) {
             is StepsRecord -> interval(sb, record, token,
                 record.startTime, record.endTime,
@@ -378,9 +388,17 @@ class CN1HealthConnectBridge(private val context: Context)
                     it.rate, "count/min")
             }
 
-            else -> return false
+            else -> return 0
         }
-        return true
+        // One line per scalar record; a series contributes one per sample.
+        return when (record) {
+            is HeartRateRecord -> record.samples.size
+            is PowerRecord -> record.samples.size
+            is SpeedRecord -> record.samples.size
+            is CyclingPedalingCadenceRecord -> record.samples.size
+            is StepsCadenceRecord -> record.samples.size
+            else -> 1
+        }
     }
 
     // The record timestamps are passed in rather than read off a shared
@@ -625,7 +643,7 @@ class CN1HealthConnectBridge(private val context: Context)
                                     record: Record) {
         val token = TOKEN_FOR_RECORD[record.javaClass.simpleName]
         val body = StringBuilder()
-        if (token == null || !appendOne(body, record, token)) {
+        if (token == null || appendOne(body, record, token) == 0) {
             sb.append(op).append("\t").append(record.metadata.id)
                 .append('\t').append(token ?: "").append('\n')
             return
@@ -756,7 +774,6 @@ class CN1HealthConnectBridge(private val context: Context)
         "lean_body_mass" to "LEAN_BODY_MASS",
         "bone_mass" to "BONE_MASS",
         "body_fat_percentage" to "BODY_FAT",
-        "body_mass_index" to "BODY_WATER_MASS",
         "height" to "HEIGHT",
         "waist_circumference" to "BODY_MEASUREMENTS",
         "power" to "POWER",

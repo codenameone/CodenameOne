@@ -128,7 +128,14 @@ final class HealthManifestFragments {
         PERMISSION_SUFFIX.put("lean_body_mass", "LEAN_BODY_MASS");
         PERMISSION_SUFFIX.put("bone_mass", "BONE_MASS");
         PERMISSION_SUFFIX.put("body_fat_percentage", "BODY_FAT");
-        PERMISSION_SUFFIX.put("body_mass_index", "BODY_WATER_MASS");
+        // body_mass_index is deliberately absent. Health Connect has no BMI
+        // permission or record -- BMI is derived from weight and height --
+        // and the nearest-looking suffix, BODY_WATER_MASS, is an unrelated
+        // datum. Declaring it asked users for sensitive body-water access,
+        // granted neither input BMI actually needs, and misstated the Play
+        // health-data declaration. Leaving it out makes the builder reject
+        // the token with the list of ones that work, which is the honest
+        // answer: read weight and height and compute it.
         PERMISSION_SUFFIX.put("height", "HEIGHT");
         PERMISSION_SUFFIX.put("waist_circumference", "BODY_MEASUREMENTS");
         PERMISSION_SUFFIX.put("power", "POWER");

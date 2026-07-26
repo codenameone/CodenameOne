@@ -922,7 +922,9 @@ public class HealthStore {
             throw wrapped;
         }
         HealthSubscription sub = new HealthSubscription(this,
-                request.getId(), request.getTypes(), isPushDelivery());
+                request.getId(), request.getTypes(), isPushDelivery(),
+                request.isDeliverSamples(), request.isIncludeDeletions(),
+                request.getMaxSamplesPerBatch());
         synchronized (subscriptions) {
             HealthSubscription existing = subscriptions.get(request.getId());
             if (existing != null) {
@@ -1043,8 +1045,10 @@ public class HealthStore {
             return;
         }
         final HealthSubscription subscription = sub;
+        final HealthChangeBatch delivered = applyOptions(batch, sub);
         Display.getInstance().callSerially(
-                makeDeliveryRunnable(this, target, batch, subscription));
+                makeDeliveryRunnable(this, target, delivered,
+                        subscription));
     }
 
     /// Built in a static method so the `Runnable` carries no synthetic
@@ -1160,6 +1164,40 @@ public class HealthStore {
         }
     }
 
+    /// Applies the subscription's delivery options to a batch.
+    ///
+    /// These were settable on SubscriptionRequest and read by nothing, so
+    /// a notify-only subscription still received full sample payloads, an
+    /// excluded deletion was still delivered, and a per-batch cap was
+    /// ignored. Applied here so every port obeys them without knowing they
+    /// exist.
+    private static HealthChangeBatch applyOptions(HealthChangeBatch batch,
+            HealthSubscription sub) {
+        List<HealthSample> added = batch.getAdded();
+        List<String> deleted = batch.getDeletedSampleIds();
+        boolean changed = false;
+        if (!sub.isDeliverSamples() && !added.isEmpty()) {
+            added = new ArrayList<HealthSample>();
+            changed = true;
+        }
+        int cap = sub.getMaxSamplesPerBatch();
+        if (cap > 0 && added.size() > cap) {
+            added = new ArrayList<HealthSample>(added.subList(0, cap));
+            changed = true;
+        }
+        if (!sub.isIncludeDeletions() && !deleted.isEmpty()) {
+            deleted = new ArrayList<String>();
+            changed = true;
+        }
+        if (!changed) {
+            return batch;
+        }
+        return new HealthChangeBatch(batch.getSubscriptionId(),
+                batch.getTypes(), added, deleted, batch.isResyncRequired(),
+                batch.getAnchor(), batch.getDeadlineMillis(),
+                batch.hasMore());
+    }
+
     /// Re-registers every subscription persisted by a previous launch.
     ///
     /// This is what makes a subscription survive the process being killed:
@@ -1186,7 +1224,9 @@ public class HealthStore {
                 continue;
             }
             HealthSubscription sub = new HealthSubscription(this,
-                    req.getId(), req.getTypes(), isPushDelivery());
+                    req.getId(), req.getTypes(), isPushDelivery(),
+                    req.isDeliverSamples(), req.isIncludeDeletions(),
+                    req.getMaxSamplesPerBatch());
             HealthAnchor restored = loadAnchor(req.getId());
             sub.seedAnchor(restored);
             synchronized (subscriptions) {
