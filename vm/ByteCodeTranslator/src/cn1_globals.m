@@ -3875,8 +3875,12 @@ void cn1GcVerifyPoisonSlot(JAVA_OBJECT o, int slotSize) {
 
 // Replaces free() for legacy blocks. Stamps the poison header, poisons the
 // payload (malloc's own size accounting gives the extent -- the object header
-// does not record it) and parks the block in the quarantine ring. Returns the
-// block evicted from the ring, which the caller frees for real.
+// does not record it) and parks the block in the quarantine ring, releasing
+// whichever block that displaces.
+//
+// Returns TRUE when the block was quarantined and the caller must NOT free it,
+// FALSE when the quarantine could not be allocated and the caller should free
+// the block normally.
 JAVA_BOOLEAN cn1GcVerifyQuarantineFree(JAVA_OBJECT obj) {
     pthread_mutex_lock(&cn1GcQMutex);
     if(cn1GcQRing == 0) {
