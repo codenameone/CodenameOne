@@ -96,6 +96,9 @@ function deliverV3Push(obj) {
                   target = windowClients[i];
               }
           }
+          if (target === null && windowClients.length > 0 && !includesVisualPush(obj)) {
+              target = windowClients[0];
+          }
           var visualInBackground = includesVisualPush(obj)
                   && (target === null || !target.focused);
           if (target !== null && !visualInBackground) {

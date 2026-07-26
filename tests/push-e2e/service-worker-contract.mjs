@@ -164,6 +164,14 @@ result = await pushScenario({schema: 3, id: 'silent', silent: true, data: {revis
 assert.equal(result.posted.length, 0);
 assert.equal(result.notifications.length, 0, 'silent delivery must never create a notification');
 
+result = await pushScenario(
+        {schema: 3, id: 'silent-deep-link', silent: true, data: {revision: 8}},
+        [{url: 'https://fixture/orders/42', focused: false}]);
+assert.equal(result.posted.length, 1,
+        'silent delivery must reach an open same-origin deep-link client');
+assert.equal(result.posted[0].data.id, 'silent-deep-link');
+assert.equal(result.notifications.length, 0, 'silent delivery must never create a notification');
+
 result = await pushScenario({schema: 3, id: 'data-only', data: {revision: 8}}, []);
 assert.equal(result.posted.length, 0);
 assert.equal(result.notifications.length, 0,
