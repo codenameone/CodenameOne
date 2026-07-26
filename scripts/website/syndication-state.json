@@ -1195,6 +1195,10 @@
         "id": 4235252,
         "url": "https://dev.to/codenameone/codename-one-settings-is-now-a-standalone-tool-1aj",
         "syndicated_at": "2026-07-26T06:52:04+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/8ca7b53f4c47/edit",
+        "syndicated_at": "2026-07-26T15:01:54+00:00"
       }
     },
     "2026-07-24-1200-shai-javascript-free-open-source": {
@@ -1222,6 +1226,22 @@
         "account": "codenameone",
         "source_slug": "bluetooth-beyond-ble",
         "scheduled_at": "2026-07-26T09:00:00+00:00"
+      }
+    },
+    "widgets-live-activities-dynamic-island": {
+      "medium": {
+        "url": "https://medium.com/p/778cc67498dc/edit",
+        "syndicated_at": "2026-07-26T15:03:57+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cms1xjfqr00000bkm6mb51r21",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a65a8db6d1c6df67fb7193a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-26T15:05:19+00:00"
       }
     }
   }
