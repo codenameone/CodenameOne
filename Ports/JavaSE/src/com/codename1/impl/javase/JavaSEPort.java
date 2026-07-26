@@ -9724,11 +9724,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         return designMode || getSkin() != null || widthLabel != null;
     }
 
-    /// The JavaSE port is the development environment: the simulator, the designer and the
-    /// desktop tooling all run on it. A desktop application packaged for distribution runs
-    /// on it too, which is why this is the port where the answer is a judgement rather than
-    /// a fact read off the build - and the judgement matches the historical behaviour of
-    /// the tooling that already serves agents from here.
+    /// Always true, and deliberately so, but it is the weakest answer of any port.
+    ///
+    /// This port is the development environment - the simulator, the designer and the
+    /// desktop tooling all run on it, and that tooling already exposes itself to agents
+    /// from here. A desktop application packaged for distribution ALSO runs on it, and
+    /// nothing in the process distinguishes the two: there is no debuggable flag and no
+    /// provisioning profile to read, as there is on Android and iOS. Reporting a release
+    /// build here would take the MCP menu away from every desktop tool, which is a shipped
+    /// feature, so the port answers true and a packaged desktop app is not gated by it.
+    ///
+    /// A desktop application that needs to withhold something from its own release build
+    /// has to supply that signal itself.
     @Override
     public boolean isDebuggableBuild() {
         return true;
@@ -17155,6 +17162,21 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             return sock;
         }
+
+        /// Closes and forgets the socket, so a thread blocked in accept returns and a
+        /// later listener on this port binds a fresh one rather than sharing this.
+        public synchronized void close(int port, boolean loopbackOnly) {
+            Map<Integer,ServerSocket> cache = loopbackOnly ? loopbackSocks : socks;
+            ServerSocket sock = cache.remove(Integer.valueOf(port));
+            if (sock != null) {
+                try {
+                    sock.close();
+                } catch (IOException ignored) {
+                    // best effort: the point is to unblock accept, and a socket that
+                    // cannot be closed is already unusable
+                }
+            }
+        }
     }
     
     class SocketImpl {
@@ -17333,7 +17355,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Object listenSocketLoopback(int port) {
         return new SocketImpl().listen(port, true);
     }
-    
+
+    @Override
+    public void stopListeningSocket(int port, boolean loopbackOnly) {
+        getServerSockets().close(port, loopbackOnly);
+    }
+
     @Override
     public String getHostOrIP() {
         try {

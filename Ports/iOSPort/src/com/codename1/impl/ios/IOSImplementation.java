@@ -11859,6 +11859,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void stopListeningSocket(int port, boolean loopbackOnly) {
+        if(loopbackOnly) {
+            nativeInstance.stopListeningSocket(port);
+        }
+    }
+
+    @Override
     public Object listenSocketLoopback(int port) {
         long peer = nativeInstance.listenSocketLoopback(port);
         if(peer == 0) {

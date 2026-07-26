@@ -10859,6 +10859,12 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_listenSocketLoopback___int(CN1_THREAD
     return (JAVA_LONG)JAVA_NULL;
 }
 
+void com_codename1_impl_ios_IOSNative_stopListeningSocket___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT port) {
+    POOL_BEGIN();
+    [SocketImpl closeLoopbackListenerForPort:port];
+    POOL_END();
+}
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDebuggableBuild___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_SIMULATOR
     // Nothing ships from the simulator, so it is always a development build. It also has

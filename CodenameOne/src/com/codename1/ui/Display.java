@@ -6696,13 +6696,27 @@ public final class Display extends CN1Constants {
     }
 
     /// Whether this build is a development build rather than a release build headed for
-    /// an app store: a debuggable Android package, a development provisioned iOS build,
-    /// or the simulator and desktop tooling.
+    /// an app store. This is broader than [#isSimulator()], which is true only in the
+    /// simulator. Use it to gate a facility that belongs in a build you are working on but
+    /// not in one a user installs.
     ///
-    /// This is broader than [#isSimulator()], which is true only in the simulator. Use it
-    /// to gate a facility that belongs in a build you are working on but not in one a user
-    /// installs. A port that cannot tell reports a release build, so the answer errs
-    /// towards withholding the facility.
+    /// What each port reports:
+    ///
+    /// - Android: true when the package carries the debuggable flag, which a debug build
+    /// sets and a release build clears.
+    ///
+    /// - iOS: true when the provisioning profile grants get-task-allow, the entitlement
+    /// that permits a debugger to attach. Development and ad-hoc profiles carry it; App
+    /// Store and enterprise profiles do not.
+    ///
+    /// - JavaSE: ALWAYS true. That port runs the simulator, the designer and the desktop
+    /// tooling, and it cannot distinguish those from a desktop application packaged for
+    /// distribution, so a packaged desktop app also reports true. Do not rely on this
+    /// method alone to withhold something from a shipped DESKTOP build; combine it with
+    /// your own signal there.
+    ///
+    /// - Any other port: false, because it cannot tell. The answer errs towards treating a
+    /// build as a release and withholding the facility.
     ///
     /// #### Returns
     ///

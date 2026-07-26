@@ -11782,6 +11782,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             return sock;
         }
+
+        /**
+         * Closes and forgets the socket, so a thread blocked in accept returns and a
+         * later listener on this port binds a fresh one rather than sharing this.
+         */
+        public synchronized void close(int port, boolean loopbackOnly) {
+            Map<Integer,ServerSocket> cache = loopbackOnly ? loopbackSocks : socks;
+            ServerSocket sock = cache.remove(Integer.valueOf(port));
+            if (sock != null) {
+                try {
+                    sock.close();
+                } catch (IOException ignored) {
+                    // best effort: the point is to unblock accept, and a socket that
+                    // cannot be closed is already unusable
+                }
+            }
+        }
         
         
     }
@@ -11963,6 +11980,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Object listenSocketLoopback(int port) {
         return new SocketImpl().listen(port, true);
+    }
+
+    @Override
+    public void stopListeningSocket(int port, boolean loopbackOnly) {
+        getServerSockets().close(port, loopbackOnly);
     }
 
     /**

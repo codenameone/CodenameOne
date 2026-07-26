@@ -1282,6 +1282,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         socketAvailable = true;
         serverSocketAvailable = false;
         loopbackSupportedOnlyOnFirstQuery = false;
+        stoppedListeners.clear();
         loopbackQueried = false;
         debuggableBuild = true;
         appHomePath = "file://app/";
@@ -2789,6 +2790,21 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         } catch (InterruptedException e) {
             return null;
         }
+    }
+
+    private final java.util.List<String> stoppedListeners =
+            java.util.Collections.synchronizedList(new java.util.ArrayList<String>());
+
+    /// Records that a listener was asked to stop, as "port:loopbackOnly". Real ports close
+    /// the listening socket here; there is no socket to close in these tests, so what is
+    /// observable is that the call was made at all, and for the right listener.
+    @Override
+    public void stopListeningSocket(int port, boolean loopbackOnly) {
+        stoppedListeners.add(port + ":" + loopbackOnly);
+    }
+
+    public java.util.List<String> getStoppedListeners() {
+        return stoppedListeners;
     }
 
     private boolean loopbackSupportedOnlyOnFirstQuery;

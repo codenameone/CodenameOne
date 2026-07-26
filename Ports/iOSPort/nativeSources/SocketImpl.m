@@ -292,6 +292,23 @@ static NSMutableDictionary* _cn1LoopbackListeners = nil;
     }
 }
 
+/// Closes the listening socket for a port and forgets it, so a thread blocked in accept
+/// returns instead of waiting for a client that the caller no longer wants, and a later
+/// listener on the same port binds a fresh descriptor.
++(void)closeLoopbackListenerForPort:(int)port {
+    @synchronized([SocketImpl class]) {
+        if(_cn1LoopbackListeners == nil) {
+            return;
+        }
+        NSNumber* key = [NSNumber numberWithInt:port];
+        NSNumber* existing = [_cn1LoopbackListeners objectForKey:key];
+        if(existing != nil) {
+            close([existing intValue]);
+            [_cn1LoopbackListeners removeObjectForKey:key];
+        }
+    }
+}
+
 -(BOOL)listenLoopback:(int)param{
     NSString* bindError = nil;
     int listenFd = [SocketImpl loopbackListenerForPort:param errorOut:&bindError];

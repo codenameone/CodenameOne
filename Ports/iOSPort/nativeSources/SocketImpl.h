@@ -44,6 +44,9 @@
 -(void)disconnect;
 -(BOOL)listen:(int)param;
 -(BOOL)listenLoopback:(int)param;
+/// Closes the loopback listening socket for a port, bringing a thread blocked in accept
+/// back out instead of leaving it waiting for a client nobody wants any more.
++(void)closeLoopbackListenerForPort:(int)port;
 -(BOOL)isConnected;
 -(int)getErrorCode;
 -(BOOL)isSupported;

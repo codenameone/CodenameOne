@@ -41,7 +41,9 @@ The socket server refuses to bind on a release build and throws an `IllegalState
 
 The reason is what an attached agent can do. It reads the screen and drives the user interface, and the loopback interface is shared by everything on the device rather than being private to one application. On a phone that means any other installed application can connect to the port and drive yours. That's a reasonable trade while you're developing, because it's how an agent attaches to a running build, and a poor one in an application a user installs.
 
-A development build is a debuggable Android package, a development provisioned iOS build, or the simulator and the desktop tooling. Anything else counts as a release build, so a port that can't tell the difference withholds the server rather than exposing it.
+A development build is a debuggable Android package or a development provisioned iOS build. Any other target counts as a release build, so a port that can't tell the difference withholds the server rather than exposing it.
+
+The JavaSE port is the exception, and it's worth understanding before you rely on this. That port runs the simulator, the designer and the desktop tooling, and it can't distinguish those from a desktop application packaged for distribution: there's no debuggable flag and no provisioning profile to read. It reports a development build in every case, because reporting otherwise would take the MCP menu away from every desktop tool. A packaged desktop application is therefore not gated by this, and one that needs to withhold the server from its own release build has to supply that signal itself.
 
 Nothing binds a port unless the application calls a starter, and an application that never calls one has no server at all. The gate matters for the case where a starter is left in the code by accident, which is the way a debugging facility usually reaches production.
 

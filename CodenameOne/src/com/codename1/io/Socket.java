@@ -271,6 +271,12 @@ public final class Socket {
             @Override
             public void stop() {
                 stopped = true;
+                // Closing the listening socket is what brings the thread back out of
+                // accept. Without it the flag is only noticed the next time a client
+                // connects, so the thread lingers, and a listener restarted on the same
+                // port shares the cached socket -- letting this abandoned thread win the
+                // race for the first connection and drop it.
+                Util.getImplementation().stopListeningSocket(port, loopbackOnly);
             }
 
         }

@@ -9931,9 +9931,27 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// Closes the listening socket for the given port so a thread parked in accept comes
+    /// back, which is what makes stopping a listener actually stop it. Setting a flag
+    /// alone leaves that thread blocked until some client happens to connect, and that
+    /// late connection is then served or dropped by a listener the caller has abandoned.
+    ///
+    /// A port that does not implement this keeps the older behaviour, where stopping takes
+    /// effect on the next accept.
+    ///
+    /// #### Parameters
+    ///
+    /// - `port`: the port that was being listened on
+    ///
+    /// - `loopbackOnly`: true if the listener was created by [#listenSocketLoopback(int)]
+    public void stopListeningSocket(int port, boolean loopbackOnly) {
+    }
+
     /// Whether this build is a development build rather than a release build headed for
     /// an app store: a debuggable Android package, a development provisioned iOS build,
-    /// or the simulator and desktop tooling.
+    /// or a JavaSE process, which covers the simulator, the designer, the desktop tooling
+    /// and a packaged desktop application alike - see [#isDebuggableBuild()] on the JavaSE
+    /// port for why it cannot tell them apart.
     ///
     /// Facilities that are appropriate while developing but not in a shipped app can gate
     /// themselves on this. A port that cannot tell should leave the default in place:
