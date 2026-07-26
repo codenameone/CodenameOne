@@ -120,7 +120,22 @@ runs, then goes quiet across the next cycle. Gate:
 The fresh-page-stack grace scheme this audit was written against reported
 100-370 missed slots and 100-250 doomed children per cycle; the
 `gcAllocedSinceSweep`-pruned registry walk reports zero doomed across the
-suite. `StormAB` (sustained single-thread storm) and `LoadLoop` (repeated
+suite.
+
+`LegacyGrace` is the same hazard on the OTHER heap: objects above
+`CN1_BIBOP_MAX_OBJECT` never reach the page heap, so the page walk cannot see
+them, yet the legacy sweep grants them the identical one-cycle grace. It
+reports through `[GRACE-AUDIT-LEGACY]` lines with the same contract. Two things
+in that driver are load-bearing and easy to get wrong when writing a new one:
+the hazard must be built in a window with **no mark in flight** (during a mark
+the SATB barriers cover the very reference move being tested, so a driver that
+keeps the collector busy tests nothing), and the driver must **scrub its own
+native stack** afterwards, because the conservative root scan marks whatever a
+returned frame's leftover words still point at -- an un-scrubbed driver pins
+the hazard it just built and comes back green. `CN1_GC_VERIFY_CENSUS` (below)
+is how you confirm the hazard set actually ages instead of being retained.
+
+`StormAB` (sustained single-thread storm) and `LoadLoop` (repeated
 dictionary build/drop) are the matching wall-time/RSS A/B drivers.
 `TimerLatency` is the sleep/timer fidelity probe for the Thread.sleep
 signal-truncation defect (a single usleep was EINTR'd by the collector's
@@ -142,6 +157,81 @@ regressed).
 host JVM by design — ParparVM's initialization-failure semantics differ): a
 throwing `<clinit>` must release the class-init monitor so other threads
 don't deadlock. Build and run it directly with `translate-and-build.sh`.
+
+## Heap-integrity gate (`-DCN1_GC_VERIFY`, `run-gc-verify.sh`)
+
+The gauntlet proves the VM computes the right answer. It cannot prove the
+collector left the heap in a legal state, and that is the failure mode this
+subsystem actually has: a dangling reference reads whatever object recycled the
+slot, so nothing diverges at the point of the bug -- the damage surfaces later,
+somewhere else, as corrupted data (issue 5425's "non word" dictionary entries
+and its impossible NPE). Checksums are structurally blind to it.
+
+`-DCN1_GC_VERIFY` compiles in a QA-only mode that makes the invariant directly
+observable, by destroying the plausible replacement object:
+
+- **Poison.** Every reclaimed page slot and every legacy block the sweep frees
+  is stamped with a poison header and payload. This includes the O(1) all-dead
+  page reclaim, which is where nearly all page memory is actually reclaimed and
+  which normally drops a page without writing a single slot -- leaving every
+  dead object with an intact-looking header. That is exactly why a dangling
+  reference in this VM reads plausible data rather than crashing.
+- **Quarantine.** Freed legacy blocks go to a ring (`CN1_GC_VERIFY_QUARANTINE`,
+  default 65536) instead of back to the C allocator, so a poisoned block stays
+  mapped and recognizable rather than being reused or unmapped underneath a
+  dangling reference.
+- **Verify.** After every sweep, each surviving object is walked through its
+  own generated mark function with the collector in verify mode: instead of
+  marking, every reference field is classified against the page registry, the
+  live-extent index and the quarantine set. A field pointing into a freed slot,
+  a recycled page, or a quarantined block is reported with the holder's class,
+  the victim's class, the mark call site, and then aborted -- at the cycle that
+  created it.
+
+```bash
+./run-gc-verify.sh            # tortures + drivers + the self-test
+./run-gc-verify.sh GraceAudit # one driver
+```
+
+The gate holds CURRENT-EPOCH survivors to the invariant: the sweep either
+marked them reachable (marking traces children, so a dangling field is a
+mark-completeness bug) or promoted them by the grace rule (tracing the subtree
+was the grace pass's job). Both readings make a dangling field unambiguous, so
+the gate has no judgement calls in it.
+
+**The self-test is the point of the script.** A gate nobody has watched fail is
+not a gate, so the run finishes by re-injecting the exact defect #5442 fixed
+(`CN1_GC_FAULT=nograce` disables the grace-subtree pass, reproducing #5436) and
+requires the verifier to catch it. It does, immediately:
+
+```
+[GC-VERIFY] DANGLING REFERENCE after sweep at epoch 15
+            holder  = 0xd38070050 class=com.bench.GraceAudit.Node mark=15 (epoch+0) heapPos=-3
+            field   -> 0xd3806cfe0 class=com.bench.GraceAudit.Node mark=-7 heapPos=-3
+            victim  = RECYCLED page slot (above bump cursor) (page-resident)
+```
+
+### Diagnostics
+
+| variable | effect |
+|---|---|
+| `CN1_GC_VERIFY_SOFT=1` | report every violating cycle instead of aborting on the first |
+| `CN1_GC_VERIFY_LOG=1` | one line per cycle even when clean (holders, refs checked, reclaim counts, referenced-child age histogram) |
+| `CN1_GC_VERIFY_AGING=1` | ALSO hold previous-epoch survivors to the invariant. Not a gate -- unreachable objects are entitled to dangle -- but a census of landmines, because this collector resurrects unreachable objects routinely (see `CN1_GC_TRACE_MARK`) |
+| `CN1_GC_VERIFY_ALL=1` | walk every object, including ones already given up on. Investigation only |
+| `CN1_GC_VERIFY_CENSUS=<class>` | per-cycle age histogram of every resident object of a class. Use it to confirm a driver's hazard set actually ages out instead of being pinned |
+| `CN1_GC_VERIFY_DUMP=<class>` | print holder/child marks for holders of a class |
+| `CN1_GC_TRACE_MARK=<class>` | name the mark pass that re-marks a class each cycle -- the answer to "what is still keeping this alive?", most often `conservative-native-stack`. Add `-DCN1_BIBOP_VALIDATE` to also get the drain parent |
+| `CN1_GC_FAULT=nograce` | fault injection: disable the grace-subtree pass |
+
+The mode is deliberately asymmetric about uncertainty: a reference it cannot
+place (allocated after the snapshot, unmapped, mid-construction body) is
+skipped. It reports only what it can prove, so a violation is never a false
+alarm, at the cost of catching some real defects a cycle later than it could.
+
+Cost is a full extra heap walk per cycle plus poison writes, so it is a
+correctness gate, never a perf configuration -- run it alongside the gauntlet,
+not with it.
 
 ## Mandatory compiler flags
 
