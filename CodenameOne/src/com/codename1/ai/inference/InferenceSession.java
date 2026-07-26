@@ -37,6 +37,8 @@ public final class InferenceSession implements AutoCloseable {
     private final InferenceImpl implementation;
     private final Object handle;
     private boolean closed;
+    private int activeRuns;
+    private boolean closePending;
 
     private InferenceSession(InferenceImpl implementation, Object handle) {
         this.implementation = implementation;
@@ -88,43 +90,122 @@ public final class InferenceSession implements AutoCloseable {
     ///
     /// @return a defensive copy of the input metadata array
     public TensorInfo[] getInputs() {
-        ensureOpen();
-        return implementation.getInputs(handle);
+        synchronized (this) {
+            ensureOpen();
+            return implementation.getInputs(handle);
+        }
     }
 
-    /// @return a defensive copy of the model's current output metadata
+    /// Returns the model's current output metadata. Backends refresh this
+    /// information after an invocation so models with dynamically resolved
+    /// output dimensions report the shape used to decode the returned tensor.
+    ///
+    /// @return a defensive copy of the output metadata array
     public TensorInfo[] getOutputs() {
-        ensureOpen();
-        return implementation.getOutputs(handle);
+        synchronized (this) {
+            ensureOpen();
+            return implementation.getOutputs(handle);
+        }
     }
 
     /// Copies input tensors to native memory, invokes the model, and returns
     /// every output tensor. Named tensors are matched by name; unnamed tensors
-    /// are matched by position.
+    /// are matched by position. Calling {@link #close()} while this operation
+    /// is pending prevents new work immediately but defers native release until
+    /// the returned resource succeeds or fails.
     ///
     /// @param inputs one tensor for each model input
     /// @return asynchronous output tensors in model output order
     public AsyncResource<Tensor[]> run(Tensor[] inputs) {
-        ensureOpen();
-        return implementation.run(handle, inputs == null ? new Tensor[0] : inputs);
+        final AsyncResource<Tensor[]> result;
+        synchronized (this) {
+            ensureOpen();
+            activeRuns++;
+            try {
+                result = implementation.run(handle,
+                        inputs == null ? new Tensor[0] : inputs);
+                if (result == null) {
+                    throw new InferenceException(
+                            "Inference backend returned no asynchronous result");
+                }
+            } catch (RuntimeException error) {
+                activeRuns--;
+                throw error;
+            } catch (Error error) {
+                activeRuns--;
+                throw error;
+            }
+        }
+        final PendingRun pending = new PendingRun(this);
+        result.ready(new SuccessCallback<Tensor[]>() {
+            @Override
+            public void onSucess(Tensor[] value) {
+                pending.finish();
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable error) {
+                pending.finish();
+            }
+        });
+        return result;
     }
 
     /// Resizes an input and reallocates native tensors before the next run.
     ///
+    /// This method throws while an asynchronous {@link #run(Tensor[])} is
+    /// pending because native runtimes cannot safely reallocate tensors during
+    /// an invocation.
+    ///
     /// @param name model input name, or {@code null} for the first input
     /// @param shape new non-negative dimensions
+    /// @throws IllegalStateException if the session is closed or a run is pending
     public void resizeInput(String name, int[] shape) {
-        ensureOpen();
-        implementation.resizeInput(handle, name, shape);
+        synchronized (this) {
+            ensureOpen();
+            if (activeRuns > 0) {
+                throw new IllegalStateException(
+                        "Cannot resize inputs while inference is running");
+            }
+            implementation.resizeInput(handle, name, shape);
+        }
     }
 
-    @Override
     /// Releases the interpreter, delegates, and any temporary staged model.
     /// The original file supplied by {@link ModelSource#file(String)} is never
-    /// deleted. Calling this method more than once has no effect.
+    /// deleted. If a run is pending, release is deferred until that run
+    /// settles. Calling this method more than once has no effect.
+    @Override
     public void close() {
-        if (!closed) {
+        boolean release = false;
+        synchronized (this) {
+            if (closed) {
+                return;
+            }
             closed = true;
+            if (activeRuns == 0) {
+                release = true;
+            } else {
+                closePending = true;
+            }
+        }
+        if (release) {
+            implementation.close(handle);
+        }
+    }
+
+    private void runFinished() {
+        boolean release = false;
+        synchronized (this) {
+            if (activeRuns > 0) {
+                activeRuns--;
+            }
+            if (activeRuns == 0 && closePending) {
+                closePending = false;
+                release = true;
+            }
+        }
+        if (release) {
             implementation.close(handle);
         }
     }
@@ -132,6 +213,22 @@ public final class InferenceSession implements AutoCloseable {
     private void ensureOpen() {
         if (closed) {
             throw new IllegalStateException("Inference session is closed");
+        }
+    }
+
+    private static final class PendingRun {
+        private final InferenceSession session;
+        private boolean finished;
+
+        PendingRun(InferenceSession session) {
+            this.session = session;
+        }
+
+        synchronized void finish() {
+            if (!finished) {
+                finished = true;
+                session.runFinished();
+            }
         }
     }
 }

@@ -178,7 +178,7 @@ static NSString *cn1SmartReply(NSString *conversationJSON) {
         if (![value isKindOfClass:[NSDictionary class]]) continue;
         MLKTextMessage *message = [[MLKTextMessage alloc]
                 initWithText:value[@"text"] ?: @""
-                timestamp:[value[@"timestamp"] doubleValue]
+                timestamp:[value[@"timestamp"] doubleValue] / 1000.0
                 userID:value[@"participant"] ?: @"remote"
                 isLocalUser:[value[@"local"] boolValue]];
         [messages addObject:message];

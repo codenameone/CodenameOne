@@ -613,6 +613,10 @@ static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
             return cn1VisionJSON(@{@"error": @"Could not decode document image"});
         }
         CIImage *source = [CIImage imageWithCGImage:image.CGImage];
+        if (rotation != 0) {
+            source = [source imageByApplyingOrientation:
+                    cn1CGOrientation(rotation)];
+        }
         CIContext *context = [CIContext context];
         CIDetector *detector = [CIDetector detectorOfType:CIDetectorTypeRectangle
                                                  context:context

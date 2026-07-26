@@ -135,6 +135,30 @@ class InferenceApiTest extends UITestBase {
         assertThrows(IllegalStateException.class, session::getInputs);
     }
 
+    @Test
+    void sessionDefersCloseUntilPendingRunSettles() {
+        RecordingInferenceImpl backend = new RecordingInferenceImpl();
+        backend.pendingRun = new AsyncResource<Tensor[]>();
+        implementation.setInferenceImpl(backend);
+        InferenceSession session = await(InferenceSession.open(
+                ModelSource.bytes(new byte[] {1}), new InferenceOptions()));
+        AsyncResource<Tensor[]> run = session.run(new Tensor[] {
+                Tensor.floats("input", new int[] {1, 2},
+                        new float[] {1, 2})
+        });
+        assertThrows(IllegalStateException.class,
+                () -> session.resizeInput("input", new int[] {1, 4}));
+        session.close();
+        assertEquals(0, backend.closeCount);
+        backend.pendingRun.complete(new Tensor[] {
+                Tensor.floats("output", new int[] {1}, new float[] {3})
+        });
+        flushSerialCalls();
+        assertTrue(run.isDone());
+        assertEquals(1, backend.closeCount);
+        assertThrows(IllegalStateException.class, session::getInputs);
+    }
+
     private <T> T await(AsyncResource<T> resource) {
         final AtomicReference<T> value = new AtomicReference<T>();
         resource.ready(new SuccessCallback<T>() {
@@ -152,6 +176,7 @@ class InferenceApiTest extends UITestBase {
         final Object handle = new Object();
         String resizedName;
         int closeCount;
+        AsyncResource<Tensor[]> pendingRun;
 
         public boolean isSupported() {
             return true;
@@ -177,6 +202,9 @@ class InferenceApiTest extends UITestBase {
         }
 
         public AsyncResource<Tensor[]> run(Object value, Tensor[] inputs) {
+            if (pendingRun != null) {
+                return pendingRun;
+            }
             AsyncResource<Tensor[]> result = new AsyncResource<Tensor[]>();
             result.complete(new Tensor[] {
                     Tensor.floats("output", new int[] {1}, new float[] {3})
