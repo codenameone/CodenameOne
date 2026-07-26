@@ -306,8 +306,32 @@ public class HealthStore {
             return out;
         }
         final List<HealthSample> collected = new ArrayList<HealthSample>();
-        readPageInto(query, collected, out, null);
+        // Page through a copy. Paging has to carry a token on the query,
+        // and mutating the caller's object would leave the last token
+        // stuck on it -- so a query reused for a second read would
+        // silently resume mid-way through the first.
+        readPageInto(copyForPaging(query), collected, out, null);
         return out;
+    }
+
+    /// A shallow copy of `query` that paging may mutate freely.
+    private static SampleQuery copyForPaging(SampleQuery query) {
+        SampleQuery copy = new SampleQuery()
+                .setTimeRange(query.getTimeRange())
+                .setLimit(query.getLimit())
+                .setSortDescending(query.isSortDescending())
+                .setUnit(query.getUnit())
+                .setFlattenSeries(query.isFlattenSeries())
+                .setSleepSessionGapMillis(query.getSleepSessionGapMillis());
+        List<HealthDataType> types = query.getTypes();
+        for (int i = 0; i < types.size(); i++) {
+            copy.addType(types.get(i));
+        }
+        List<String> sources = query.getSources();
+        for (int i = 0; i < sources.size(); i++) {
+            copy.addSource(sources.get(i));
+        }
+        return copy;
     }
 
     private void readPageInto(final SampleQuery query,
