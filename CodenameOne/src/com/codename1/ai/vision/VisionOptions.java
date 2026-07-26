@@ -67,4 +67,10 @@ public class VisionOptions {
     public int getMaximumResults() {
         return maximumResults;
     }
+
+    VisionOptions snapshot() {
+        return new VisionOptions().backend(backend)
+                .minimumConfidence(minimumConfidence)
+                .maximumResults(maximumResults);
+    }
 }

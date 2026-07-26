@@ -131,9 +131,12 @@ public final class VisionPipeline<T> implements AutoCloseable {
                     pending = null;
                     busy = next != null;
                 }
-                notification.run();
-                if (next != null) {
-                    process(next);
+                try {
+                    notification.run();
+                } finally {
+                    if (next != null) {
+                        process(next);
+                    }
                 }
             }
         });

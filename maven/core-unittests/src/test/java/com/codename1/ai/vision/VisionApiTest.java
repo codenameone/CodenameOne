@@ -52,6 +52,9 @@ class VisionApiTest extends UITestBase {
         VisionImage image = VisionImage.pixels(new byte[] {1, 2, 3, 4},
                 1, 1, FrameFormat.RGBA8888, -90);
         assertEquals(270, image.getRotationDegrees());
+        assertThrows(IllegalArgumentException.class,
+                () -> VisionImage.pixels(new byte[] {1, 2, 3, 4},
+                        1, 1, FrameFormat.RGBA8888, 45));
     }
 
     @Test
@@ -75,14 +78,20 @@ class VisionApiTest extends UITestBase {
         implementation.setVisionImpl(backend);
         VisionOptions options = new VisionOptions()
                 .backend(VisionBackends.mlKitBarcodeScanning())
-                .minimumConfidence(.6f);
+                .minimumConfidence(.6f)
+                .maximumResults(3);
         TextRecognizer recognizer = new TextRecognizer(options);
+        options.backend(VisionBackends.auto())
+                .minimumConfidence(.1f)
+                .maximumResults(1);
         TextRecognitionResult result = await(recognizer.process(
                 VisionImage.encoded(new byte[] {1})));
         assertEquals("hello", result.getText());
         assertEquals(VisionFeature.TEXT_RECOGNITION, backend.feature);
         assertEquals("ml-kit", backend.backend);
-        assertSame(options, backend.options);
+        assertNotSame(options, backend.options);
+        assertEquals(.6f, backend.options.getMinimumConfidence());
+        assertEquals(3, backend.options.getMaximumResults());
         recognizer.close();
         assertEquals(1, backend.closeCount);
     }

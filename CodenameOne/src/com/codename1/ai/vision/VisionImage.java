@@ -64,8 +64,11 @@ public final class VisionImage {
     /// @param width unrotated pixel width
     /// @param height unrotated pixel height
     /// @param format supported raw frame format
-    /// @param rotationDegrees clockwise display rotation
+    /// @param rotationDegrees clockwise display rotation; only 0, 90, 180,
+    ///  or 270 degrees are supported
     /// @return immutable image input
+    /// @throws IllegalArgumentException if the data or dimensions are empty,
+    ///  or if the rotation is not a quarter turn
     public static VisionImage pixels(byte[] bytes, int width, int height,
                                      FrameFormat format, int rotationDegrees) {
         if (bytes == null || bytes.length == 0 || width <= 0 || height <= 0) {
@@ -77,6 +80,8 @@ public final class VisionImage {
     /// Copies a camera frame, including timestamp, format, and orientation.
     /// @param frame callback-owned frame
     /// @return detached immutable input safe for asynchronous analysis
+    /// @throws IllegalArgumentException if the frame reports a rotation other
+    ///  than 0, 90, 180, or 270 degrees
     public static VisionImage fromCameraFrame(CameraFrame frame) {
         if (frame == null) {
             throw new NullPointerException("frame");
@@ -126,7 +131,7 @@ public final class VisionImage {
         return height;
     }
 
-    /// @return normalized clockwise rotation in the range 0..359
+    /// @return normalized clockwise rotation: 0, 90, 180, or 270
     public int getRotationDegrees() {
         return rotationDegrees;
     }
@@ -152,6 +157,13 @@ public final class VisionImage {
 
     private static int normalizeRotation(int value) {
         int out = value % 360;
-        return out < 0 ? out + 360 : out;
+        if (out < 0) {
+            out += 360;
+        }
+        if (out % 90 != 0) {
+            throw new IllegalArgumentException(
+                    "Rotation must be 0, 90, 180, or 270 degrees");
+        }
+        return out;
     }
 }

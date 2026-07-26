@@ -166,21 +166,19 @@ public final class AndroidInferenceImpl extends InferenceImpl {
                                 toBuffer(value, metadata.dataType());
                     }
                     Map<Integer, Object> nativeOutputs = new HashMap<Integer, Object>();
-                    ByteBuffer[] outputBuffers =
-                            new ByteBuffer[interpreter.getOutputTensorCount()];
-                    for (int i = 0; i < outputBuffers.length; i++) {
-                        org.tensorflow.lite.Tensor metadata = interpreter.getOutputTensor(i);
-                        ByteBuffer buffer = ByteBuffer.allocateDirect(metadata.numBytes())
-                                .order(ByteOrder.nativeOrder());
-                        outputBuffers[i] = buffer;
-                        nativeOutputs.put(Integer.valueOf(i), buffer);
+                    int outputCount = interpreter.getOutputTensorCount();
+                    for (int i = 0; i < outputCount; i++) {
+                        // A null destination asks LiteRT to retain the result
+                        // in its tensor. This is required for outputs whose
+                        // shape is resolved or grows during invocation.
+                        nativeOutputs.put(Integer.valueOf(i), null);
                     }
                     interpreter.runForMultipleInputsOutputs(nativeInputs, nativeOutputs);
-                    final Tensor[] result = new Tensor[outputBuffers.length];
+                    final Tensor[] result = new Tensor[outputCount];
                     for (int i = 0; i < result.length; i++) {
                         org.tensorflow.lite.Tensor metadata = interpreter.getOutputTensor(i);
                         result[i] = fromBuffer(metadata.name(), metadata.shape(),
-                                metadata.dataType(), outputBuffers[i]);
+                                metadata.dataType(), metadata.asReadOnlyBuffer());
                     }
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {

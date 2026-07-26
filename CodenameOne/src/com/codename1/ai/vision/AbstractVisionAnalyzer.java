@@ -34,7 +34,8 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
 
     AbstractVisionAnalyzer(VisionFeature feature, VisionOptions options) {
         this.feature = feature;
-        this.options = options == null ? new VisionOptions() : options;
+        this.options = (options == null
+                ? new VisionOptions() : options).snapshot();
     }
 
     /// @return whether this analyzer's feature/backend is available and open
