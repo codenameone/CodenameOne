@@ -238,7 +238,10 @@ public final class PushMessage {
         /// @param key application-defined key
         /// @param value JSON-compatible value
         /// @return this builder
+        /// @throws IllegalArgumentException if key is null, empty, or has
+        ///         surrounding whitespace
         public Builder data(String key, Object value) {
+            requireMapKey(key, "Data key");
             if (value == null) {
                 data.remove(key);
             } else {
@@ -253,7 +256,10 @@ public final class PushMessage {
         ///                   {@code huawei}, {@code wns}, or {@code web}
         /// @param options JSON-compatible options, or {@code null} to remove
         /// @return this builder
+        /// @throws IllegalArgumentException if platformId is null, empty, or has
+        ///         surrounding whitespace
         public Builder platform(String platformId, Map<String, Object> options) {
+            requireMapKey(platformId, "Platform ID");
             if (options == null) {
                 platform.remove(platformId);
             } else {
@@ -261,6 +267,14 @@ public final class PushMessage {
             }
             return this;
         }
+
+        private static void requireMapKey(String value, String label) {
+            if (value == null || value.length() == 0 || !value.equals(value.trim())) {
+                throw new IllegalArgumentException(label
+                        + " must be non-empty and must not have surrounding whitespace");
+            }
+        }
+
         ///
         /// Sets a widget or live-surface command.
         ///

@@ -128,4 +128,20 @@ class PushMessageTest {
         assertThrows(IllegalArgumentException.class,
                 () -> PushMessage.builder().ttlSeconds(-1));
     }
+
+    @Test
+    void rejectsInvalidDataKeysAndPlatformIds() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PushMessage.builder().data(null, "value"));
+        assertThrows(IllegalArgumentException.class,
+                () -> PushMessage.builder().data("", null));
+        assertThrows(IllegalArgumentException.class,
+                () -> PushMessage.builder().data(" key ", "value"));
+        assertThrows(IllegalArgumentException.class,
+                () -> PushMessage.builder().platform(null, null));
+        assertThrows(IllegalArgumentException.class,
+                () -> PushMessage.builder().platform("", Collections.emptyMap()));
+        assertThrows(IllegalArgumentException.class,
+                () -> PushMessage.builder().platform(" fcm ", Collections.emptyMap()));
+    }
 }
