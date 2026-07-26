@@ -2,6 +2,7 @@
 
 import datetime as dt
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -99,11 +100,11 @@ class StateCommitRaceTest(unittest.TestCase):
             capture_output=True,
         )
 
-    def write_state_files(self, repo, state_text="{}\n"):
+    def write_state_files(self, repo, state_text="{}\n", queue_text="{}\n"):
         website = repo / "scripts" / "website"
         website.mkdir(parents=True, exist_ok=True)
         (website / "syndication-state.json").write_text(state_text, encoding="utf-8")
-        (website / "syndication-queue.json").write_text("{}\n", encoding="utf-8")
+        (website / "syndication-queue.json").write_text(queue_text, encoding="utf-8")
 
     def test_state_commit_rebases_when_default_branch_advanced(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -152,10 +153,131 @@ class StateCommitRaceTest(unittest.TestCase):
                 "concurrent\n", (verify / "README.md").read_text(encoding="utf-8")
             )
             self.assertEqual(
-                '{"recorded": true}\n',
+                {"recorded": True},
+                json.loads(
+                    (
+                        verify / "scripts" / "website" / "syndication-state.json"
+                    ).read_text(encoding="utf-8")
+                ),
+            )
+
+    def test_state_commit_merges_concurrent_platform_updates(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            remote = root / "remote.git"
+            seed = root / "seed"
+            runner = root / "runner"
+            concurrent = root / "concurrent"
+            verify = root / "verify"
+
+            self.git(root, "init", "--bare", "--initial-branch=master", str(remote))
+            self.git(root, "clone", str(remote), str(seed))
+            self.git(seed, "config", "user.name", "Test")
+            self.git(seed, "config", "user.email", "test@example.com")
+            self.write_state_files(
+                seed,
+                '{"posts": {"same-post": {}}}\n',
+                '{"tasks": []}\n',
+            )
+            self.git(seed, "add", ".")
+            self.git(seed, "commit", "-m", "initial")
+            self.git(seed, "push", "origin", "master")
+
+            self.git(root, "clone", str(remote), str(runner))
+            self.git(root, "clone", str(remote), str(concurrent))
+
+            self.write_state_files(
+                concurrent,
+                json.dumps(
+                    {
+                        "posts": {
+                            "same-post": {
+                                "hashnode": {
+                                    "url": "https://hashnode.example/same-post"
+                                }
+                            }
+                        }
+                    }
+                )
+                + "\n",
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "linkedin:same-post",
+                                "site": "linkedin",
+                            }
+                        ]
+                    }
+                )
+                + "\n",
+            )
+            self.git(concurrent, "config", "user.name", "Test")
+            self.git(concurrent, "config", "user.email", "test@example.com")
+            self.git(
+                concurrent,
+                "add",
+                "scripts/website/syndication-state.json",
+                "scripts/website/syndication-queue.json",
+            )
+            self.git(concurrent, "commit", "-m", "record hashnode")
+            self.git(concurrent, "push", "origin", "master")
+
+            self.write_state_files(
+                runner,
+                json.dumps(
+                    {
+                        "posts": {
+                            "same-post": {
+                                "devto": {"url": "https://dev.to/same-post"},
+                                "foojay": {"url": "https://foojay.io/same-post"},
+                            }
+                        }
+                    }
+                )
+                + "\n",
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "medium:same-post",
+                                "site": "medium",
+                            }
+                        ]
+                    }
+                )
+                + "\n",
+            )
+            subprocess.run(
+                ["bash", str(COMMIT_SCRIPT)],
+                cwd=runner,
+                check=True,
+                text=True,
+                capture_output=True,
+                env={
+                    "PATH": os.environ["PATH"],
+                    "GITHUB_REF_NAME": "master",
+                },
+            )
+
+            self.git(root, "clone", str(remote), str(verify))
+            state = json.loads(
                 (verify / "scripts" / "website" / "syndication-state.json").read_text(
                     encoding="utf-8"
-                ),
+                )
+            )
+            self.assertEqual(
+                {"devto", "foojay", "hashnode"},
+                set(state["posts"]["same-post"]),
+            )
+            queue = json.loads(
+                (verify / "scripts" / "website" / "syndication-queue.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(
+                {"linkedin:same-post", "medium:same-post"},
+                {task["id"] for task in queue["tasks"]},
             )
 
 
