@@ -35,8 +35,9 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /// Downloads a large model into app-private storage and exposes it as a
-/// file-backed {@link ModelSource}. Downloads require HTTPS, use a temporary
-/// file, and are promoted atomically only after optional digest verification.
+/// file-backed {@link ModelSource}. The initial request and every redirect
+/// require HTTPS. Downloads use a temporary file and are promoted atomically
+/// only after optional digest verification.
 ///
 /// Supply a SHA-256 digest for third-party or remotely mutable models. Without
 /// a digest HTTPS authenticates the connection but does not pin the executable
@@ -53,13 +54,13 @@ public final class ModelCache {
     /// resumed because the portable network layer cannot prove that a server's
     /// partial response still represents the pinned model.
     ///
-    /// @param url HTTPS URL of the model
+    /// @param url HTTPS URL of the model; every redirect must also use HTTPS
     /// @param cacheKey stable cache name, independent of the URL
     /// @param sha256 optional lowercase or uppercase SHA-256 hex digest
     /// @return asynchronous cached model source
     public static AsyncResource<ModelSource> fetch(
             final String url, final String cacheKey, final String sha256) {
-        if (url == null || !url.startsWith("https://")) {
+        if (!isHttpsUrl(url)) {
             throw new IllegalArgumentException("Model URL must use HTTPS");
         }
         if (cacheKey == null || cacheKey.length() == 0) {
@@ -119,7 +120,8 @@ public final class ModelCache {
         final FileSystemStorage fs = FileSystemStorage.getInstance();
         final String temporary = target + ".download";
         prepareTemporary(fs, temporary);
-        final ConnectionRequest request = new ConnectionRequest();
+        final ConnectionRequest request = new ModelDownloadRequest(
+                completion, fs, temporary);
         request.setPost(false);
         request.setFailSilently(true);
         request.setReadResponseForErrors(false);
@@ -231,6 +233,38 @@ public final class ModelCache {
             }
         }
         return true;
+    }
+
+    static boolean isHttpsUrl(String url) {
+        return url != null && url.regionMatches(true, 0,
+                "https://", 0, "https://".length());
+    }
+
+    static final class ModelDownloadRequest extends ConnectionRequest {
+        private final Completion<ModelSource> completion;
+        private final FileSystemStorage fs;
+        private final String temporary;
+
+        ModelDownloadRequest(Completion<ModelSource> completion,
+                             FileSystemStorage fs, String temporary) {
+            this.completion = completion;
+            this.fs = fs;
+            this.temporary = temporary;
+        }
+
+        @Override
+        public boolean onRedirect(String url) {
+            if (isHttpsUrl(url)) {
+                return false;
+            }
+            setKilled(true);
+            if (fs.exists(temporary)) {
+                fs.delete(temporary);
+            }
+            completion.fail(new IOException(
+                    "Model download redirect must use HTTPS"));
+            return true;
+        }
     }
 
     static final class Completion<T> {

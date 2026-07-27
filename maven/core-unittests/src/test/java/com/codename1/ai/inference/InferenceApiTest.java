@@ -77,6 +77,41 @@ class InferenceApiTest extends UITestBase {
     }
 
     @Test
+    void modelCacheRejectsInsecureRedirects() throws Exception {
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        String temporary = fs.getAppHomePath()
+                + "model-cache-redirect-test.download";
+        write(temporary, new byte[] {1, 2, 3});
+        AsyncResource<ModelSource> resource = new AsyncResource<ModelSource>();
+        AtomicReference<Throwable> error = new AtomicReference<Throwable>();
+        resource.except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable value) {
+                error.set(value);
+            }
+        });
+        ModelCache.ModelDownloadRequest request =
+                new ModelCache.ModelDownloadRequest(
+                        new ModelCache.Completion<ModelSource>(resource),
+                        fs, temporary);
+
+        assertFalse(request.onRedirect(
+                "https://cdn.example.com/model.tflite"));
+        assertTrue(request.onRedirect(
+                "http://cdn.example.com/model.tflite"));
+        flushSerialCalls();
+        assertFalse(fs.exists(temporary),
+                "a downgrade redirect must discard partial model data");
+        assertNotNull(error.get(),
+                "a downgrade redirect must fail the model resource");
+        assertTrue(error.get().getCause().getMessage().contains("HTTPS"));
+        assertTrue(ModelCache.isHttpsUrl(
+                "HTTPS://cdn.example.com/model.tflite"));
+        assertFalse(ModelCache.isHttpsUrl(
+                "http://cdn.example.com/model.tflite"));
+    }
+
+    @Test
     void modelCacheNamesDoNotAliasSanitizedKeys() {
         assertNotEquals(ModelCache.safeName("model/v1"),
                 ModelCache.safeName("model?v1"));

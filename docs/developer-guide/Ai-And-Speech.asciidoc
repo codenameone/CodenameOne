@@ -377,11 +377,12 @@ the port boundary. Always close the session.
 Bundle small models as resources. For larger models use
 `ModelCache.fetch(url, cacheKey, sha256)`, which downloads over HTTPS,
 verifies the supplied SHA-256 digest, and reuses the app-private cached
-file. The URL must use HTTPS. Supply the digest for every third-party or
-remotely mutable model: an omitted digest provides transport security but
-doesn't pin the executable model payload. Interrupted downloads restart
-through a temporary `.download` file and are never promoted to the cache
-until verification succeeds.
+file. The initial URL and every redirect must use HTTPS; a redirect to
+HTTP fails the resource and discards the temporary download. Supply the
+digest for every third-party or remotely mutable model: an omitted digest
+provides transport security but doesn't pin the executable model payload.
+Interrupted downloads restart through a temporary `.download` file and are
+never promoted to the cache until verification succeeds.
 
 === On-device language services
 
