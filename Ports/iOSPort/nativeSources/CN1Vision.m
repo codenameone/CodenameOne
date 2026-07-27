@@ -374,7 +374,8 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
         for (MLKImageLabel *label in result ?: @[]) {
             [items addObject:@{
                 @"text": label.text ?: @"",
-                @"confidence": @(label.confidence)
+                @"confidence": @(label.confidence),
+                @"index": @(label.index)
             }];
         }
         return cn1VisionJSON(@{@"items": items});
@@ -621,7 +622,8 @@ static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
             for (VNClassificationObservation *observation in request.results) {
                 [items addObject:@{
                     @"text": observation.identifier ?: @"",
-                    @"confidence": @(observation.confidence)
+                    @"confidence": @(observation.confidence),
+                    @"index": @(-1)
                 }];
             }
             return cn1VisionJSON(@{@"items": items});

@@ -113,9 +113,13 @@ public final class InferenceSession implements AutoCloseable {
     /// are matched by position. Calling {@link #close()} while this operation
     /// is pending prevents new work immediately but defers native release until
     /// the returned resource succeeds or fails. A session accepts one run at a
-    /// time because the underlying native interpreter is mutable.
+    /// time because the underlying native interpreter is mutable. The array
+    /// container is defensively copied before it is handed to the asynchronous
+    /// backend, so replacing an element after this method returns cannot change
+    /// the pending invocation. Each {@link Tensor} is itself immutable.
     ///
-    /// @param inputs one tensor for each model input
+    /// @param inputs one tensor for each model input; {@code null} is treated
+    /// as an empty input array
     /// @return asynchronous output tensors in model output order
     /// @throws IllegalStateException if the session is closed or already running
     public AsyncResource<Tensor[]> run(Tensor[] inputs) {
@@ -128,8 +132,10 @@ public final class InferenceSession implements AutoCloseable {
             }
             activeRuns++;
             try {
+                Tensor[] inputSnapshot = inputs == null
+                        ? new Tensor[0] : inputs.clone();
                 result = implementation.run(handle,
-                        inputs == null ? new Tensor[0] : inputs);
+                        inputSnapshot);
                 if (result == null) {
                     throw new InferenceException(
                             "Inference backend returned no asynchronous result");

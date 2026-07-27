@@ -63,7 +63,13 @@ public final class ImageLabel {
         return confidence;
     }
 
-    /// @return backend/model class index; not portable across models
+    /// Returns the backend/model class index when the selected classifier
+    /// exposes one. The index identifies a class in that specific model; it is
+    /// not portable across models or backends. Apple Vision does not expose a
+    /// numeric class index and therefore returns {@code -1}. Prefer
+    /// {@link #getText()} when writing backend-independent application logic.
+    ///
+    /// @return backend/model class index, or {@code -1} when unavailable
     public int getIndex() {
         return index;
     }

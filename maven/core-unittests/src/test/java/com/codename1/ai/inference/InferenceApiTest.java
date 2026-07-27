@@ -234,6 +234,33 @@ class InferenceApiTest extends UITestBase {
         assertThrows(IllegalStateException.class, session::getInputs);
     }
 
+    @Test
+    void sessionSnapshotsInputArrayBeforeAsyncInference() {
+        RecordingInferenceImpl backend = new RecordingInferenceImpl();
+        backend.pendingRun = new AsyncResource<Tensor[]>();
+        implementation.setInferenceImpl(backend);
+        InferenceSession session = await(InferenceSession.open(
+                ModelSource.bytes(new byte[] {1}), new InferenceOptions()));
+        Tensor original = Tensor.floats("input", new int[] {1, 2},
+                new float[] {1, 2});
+        Tensor replacement = Tensor.floats("replacement", new int[] {1, 2},
+                new float[] {9, 9});
+        Tensor[] callerInputs = new Tensor[] {original};
+
+        AsyncResource<Tensor[]> run = session.run(callerInputs);
+        callerInputs[0] = replacement;
+
+        assertNotSame(callerInputs, backend.receivedInputs);
+        assertSame(original, backend.receivedInputs[0],
+                "a pending backend must see the run() call-time inputs");
+        backend.pendingRun.complete(new Tensor[] {
+                Tensor.floats("output", new int[] {1}, new float[] {3})
+        });
+        flushSerialCalls();
+        assertTrue(run.isDone());
+        session.close();
+    }
+
     private <T> T await(AsyncResource<T> resource) {
         final AtomicReference<T> value = new AtomicReference<T>();
         resource.ready(new SuccessCallback<T>() {
@@ -252,6 +279,7 @@ class InferenceApiTest extends UITestBase {
         String resizedName;
         int closeCount;
         AsyncResource<Tensor[]> pendingRun;
+        Tensor[] receivedInputs;
 
         public boolean isSupported() {
             return true;
@@ -277,6 +305,7 @@ class InferenceApiTest extends UITestBase {
         }
 
         public AsyncResource<Tensor[]> run(Object value, Tensor[] inputs) {
+            receivedInputs = inputs;
             if (pendingRun != null) {
                 return pendingRun;
             }

@@ -201,7 +201,8 @@ public final class IOSVisionImpl extends VisionImpl {
                 for (int i = 0; i < values.length; i++) {
                     Map value = (Map) items.get(i);
                     values[i] = new ImageLabel(string(value, "text"),
-                            number(value, "confidence"), i, metadata);
+                            number(value, "confidence"),
+                            integer(value, "index", -1), metadata);
                 }
                 return (T) values;
             }
