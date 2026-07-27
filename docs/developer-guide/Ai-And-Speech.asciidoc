@@ -393,9 +393,9 @@ argument and rejects the unpinned two-argument overload. Supply the digest
 on every platform for every third-party or remotely mutable model.
 Interrupted downloads restart through a temporary `.download` file and are
 never promoted to the cache until verification succeeds. Concurrent calls for
-the same cache key and content identity share one download. A conflicting URL
-or digest for a cache key that is already downloading fails rather than
-writing to the same temporary file.
+the same cache key and content identity share one download. When a cache key
+already has an active download, a request with a conflicting URL or digest
+fails instead of sharing the temporary file.
 
 === On-device language services
 
