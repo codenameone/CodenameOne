@@ -46,4 +46,17 @@ class AndroidGradleBuilderVersionTest {
         assertTrue(AndroidGradleBuilder.usesFcmPush(1, "fcm", false));
         assertFalse(AndroidGradleBuilder.usesHuaweiPush(1, "huawei", true));
     }
+
+    @Test
+    void typedPushReplaysColdStartMessagesBeforeTheListenerIsInstalled() {
+        String typedReplay = AndroidGradleBuilder.pendingPushReplayCode(3);
+        assertTrue(typedReplay.contains("AndroidImplementation.firePendingPushes(new PushCallback()"));
+        assertTrue(typedReplay.contains("CodenameOneImplementation.getPushCallback()"));
+        assertTrue(typedReplay.contains("PushClient.dispatch(value)"));
+
+        String legacyReplay = AndroidGradleBuilder.pendingPushReplayCode(1);
+        assertTrue(legacyReplay.contains("AndroidImplementation.firePendingPushes("
+                + "com.codename1.impl.CodenameOneImplementation.getPushCallback(), this)"));
+        assertFalse(legacyReplay.contains("PushClient.dispatch"));
+    }
 }

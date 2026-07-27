@@ -348,6 +348,27 @@ public class AndroidGradleBuilder extends Executor {
                         || ("auto".equalsIgnoreCase(messagingService)
                                 && hasHuaweiConfiguration));
     }
+
+    static String pendingPushReplayCode(int detectedPushVersion) {
+        if (detectedPushVersion != 3) {
+            return "        if(com.codename1.impl.CodenameOneImplementation.getPushCallback() != null) {\n"
+                    + "            AndroidImplementation.firePendingPushes(com.codename1.impl.CodenameOneImplementation.getPushCallback(), this);\n"
+                    + "        }\n";
+        }
+        return "        AndroidImplementation.firePendingPushes(new PushCallback() {\n"
+                + "            public void push(String value) {\n"
+                + "                PushCallback callback = com.codename1.impl.CodenameOneImplementation.getPushCallback();\n"
+                + "                if(callback != null) {\n"
+                + "                    callback.push(value);\n"
+                + "                } else {\n"
+                + "                    PushClient.dispatch(value);\n"
+                + "                }\n"
+                + "            }\n"
+                + "            public void registeredForPush(String deviceId) {}\n"
+                + "            public void pushRegistrationError(String error, int errorCode) {}\n"
+                + "        }, this);\n";
+    }
+
     private boolean wakeLock;
     private boolean recordAudio;
     private boolean mediaPlaybackPermission;
@@ -4195,9 +4216,7 @@ public class AndroidGradleBuilder extends Executor {
         try {
             stubSourceCode +=
                     "        }\n"
-                            + "        if(com.codename1.impl.CodenameOneImplementation.getPushCallback() != null) {\n"
-                            + "            AndroidImplementation.firePendingPushes(com.codename1.impl.CodenameOneImplementation.getPushCallback(), this);\n"
-                            + "        }\n"
+                            + pendingPushReplayCode(pushVersion)
                             + localNotificationCode
                             + "        Display.getInstance().callSerially(new Runnable(){\n"
                             + "            boolean wasStopped = (currentForm == null);\n"
