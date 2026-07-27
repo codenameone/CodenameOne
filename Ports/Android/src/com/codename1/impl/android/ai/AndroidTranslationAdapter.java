@@ -30,6 +30,7 @@ import com.google.android.gms.tasks.Task;
 import com.google.mlkit.nl.translate.Translation;
 import com.google.mlkit.nl.translate.Translator;
 import com.google.mlkit.nl.translate.TranslatorOptions;
+import java.util.Locale;
 
 /** ML Kit translation; retained only for {@code Translator} users. */
 final class AndroidTranslationAdapter extends AndroidLanguageAdapter {
@@ -40,8 +41,9 @@ final class AndroidTranslationAdapter extends AndroidLanguageAdapter {
         final AsyncResource<String> out = new AsyncResource<String>();
         TranslatorOptions translatorOptions =
                 new TranslatorOptions.Builder()
-                        .setSourceLanguage(sourceLanguage)
-                        .setTargetLanguage(targetLanguage).build();
+                        .setSourceLanguage(normalizeLanguageTag(sourceLanguage))
+                        .setTargetLanguage(normalizeLanguageTag(targetLanguage))
+                        .build();
         final Translator client =
                 Translation.getClient(translatorOptions);
         client.downloadModelIfNeeded().onSuccessTask(
@@ -56,5 +58,9 @@ final class AndroidTranslationAdapter extends AndroidLanguageAdapter {
             }
         }).addOnFailureListener(failure(out, client));
         return out;
+    }
+
+    private static String normalizeLanguageTag(String languageTag) {
+        return languageTag.toLowerCase(Locale.ENGLISH);
     }
 }
