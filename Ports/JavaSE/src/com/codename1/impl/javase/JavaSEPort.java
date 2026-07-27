@@ -17311,13 +17311,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public Object listen(int param, boolean loopbackOnly) {
+            ServerSocket serverSocketInstance = null;
             try {
-                ServerSocket serverSocketInstance = getServerSockets().get(param, loopbackOnly);
+                serverSocketInstance = getServerSockets().get(param, loopbackOnly);
                 socketInstance = serverSocketInstance.accept();
                 return this;
             } catch(Exception err) {
                 errorMessage = err.toString();
-                err.printStackTrace();
+                // A closed socket here is the deliberate stop path: stopping a listener
+                // closes it precisely to bring this accept back. Printing a stack trace
+                // for that would put an alarming fake failure in the log every time a
+                // listener is stopped.
+                if(serverSocketInstance == null || !serverSocketInstance.isClosed()) {
+                    err.printStackTrace();
+                }
                 return null;
             }
         }

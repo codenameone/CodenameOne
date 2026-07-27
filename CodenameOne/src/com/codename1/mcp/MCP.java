@@ -129,7 +129,11 @@ public final class MCP {
     }
 
     /// Starts a loopback socket server so an agent can attach to this running process.
-    /// Requires a platform socket transport factory (registered by the JavaSE port).
+    ///
+    /// Uses the transport the port registered, if it has one - the JavaSE port registers a
+    /// java.net implementation. Any other port falls back to the portable transport, which
+    /// binds through [com.codename1.io.Socket], so this works on a device too. It fails,
+    /// on this thread, when the platform cannot bind a loopback server socket at all.
     ///
     /// Refuses to bind on a RELEASE build, throwing [IllegalStateException] - see
     /// [#setAllowOnReleaseBuilds(boolean)] for why, and for the deliberate override.
