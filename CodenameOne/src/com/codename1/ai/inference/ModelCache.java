@@ -36,8 +36,11 @@ import java.io.InputStream;
 import java.util.Hashtable;
 
 /// Downloads a large model into app-private storage and exposes it as a
-/// file-backed {@link ModelSource}. The initial request and every redirect
-/// require HTTPS. Downloads use a temporary file and are promoted atomically
+/// file-backed {@link ModelSource}. The initial request requires HTTPS.
+/// Ports that expose redirect responses reject any redirect to HTTP. Because
+/// iOS follows redirects below the portable network layer, iOS downloads
+/// require a SHA-256 digest so an unseen redirect cannot substitute the
+/// executable model payload. Downloads use a temporary file and are promoted
 /// only after optional digest verification.
 ///
 /// Supply a SHA-256 digest for third-party or remotely mutable models. Without
@@ -60,10 +63,14 @@ public final class ModelCache {
     /// one operation. A different URL or digest using that cache key while the
     /// first operation is active fails instead of racing on the temporary file.
     ///
-    /// @param url HTTPS URL of the model; every redirect must also use HTTPS
+    /// @param url initial HTTPS URL of the model; observable redirects must
+    /// also use HTTPS
     /// @param cacheKey stable cache name, independent of the URL
-    /// @param sha256 optional lowercase or uppercase SHA-256 hex digest
+    /// @param sha256 lowercase or uppercase SHA-256 hex digest; optional on
+    /// ports that expose redirects and required on iOS
     /// @return asynchronous cached model source
+    /// @throws IllegalArgumentException if the URL, cache key, or digest is
+    /// invalid, or if the digest is omitted on iOS
     public static AsyncResource<ModelSource> fetch(
             final String url, final String cacheKey, final String sha256) {
         if (!isHttpsUrl(url)) {
@@ -74,6 +81,11 @@ public final class ModelCache {
         }
         if (sha256 != null && !isSha256(sha256)) {
             throw new IllegalArgumentException("SHA-256 must contain 64 hex characters");
+        }
+        if (sha256 == null && requiresPinnedModelDigest()) {
+            throw new IllegalArgumentException(
+                    "iOS model downloads require a SHA-256 digest because "
+                    + "redirects are followed below the portable network layer");
         }
 
         final String fileName = safeName(cacheKey) + ".tflite";
@@ -114,14 +126,19 @@ public final class ModelCache {
         return out;
     }
 
-    /// Fetches a model without content pinning. Prefer the three-argument
-    /// overload for any model that is not versioned by the app itself.
+    /// Fetches a model without content pinning on ports that expose redirect
+    /// responses to the portable network layer. Prefer the three-argument
+    /// overload for any model that is not versioned by the app itself. iOS
+    /// rejects this overload because its native network stack follows
+    /// redirects before Codename One can validate their schemes.
     /// Concurrent unpinned calls share an operation only when their URL and
     /// cache key are identical.
     ///
     /// @param url HTTPS model URL
     /// @param cacheKey stable cache name
     /// @return asynchronous cached file source
+    /// @throws IllegalArgumentException if the URL or cache key is invalid,
+    /// or when called on iOS, where a digest is required
     public static AsyncResource<ModelSource> fetch(String url, String cacheKey) {
         return fetch(url, cacheKey, null);
     }
@@ -148,10 +165,8 @@ public final class ModelCache {
                     public void run() {
                         try {
                             verifyDownloaded(fs, temporary, sha256);
-                            if (fs.exists(target)) {
-                                fs.delete(target);
-                            }
-                            fs.rename(temporary, fileName);
+                            promoteDownloaded(fs, temporary, target,
+                                    fileName, sha256);
                             completion.complete(ModelSource.file(target));
                         } catch (IOException error) {
                             completion.fail(error);
@@ -210,6 +225,38 @@ public final class ModelCache {
         }
     }
 
+    static void promoteDownloaded(FileSystemStorage fs, String temporary,
+                                  String target, String fileName,
+                                  String expected) throws IOException {
+        try {
+            if (fs.exists(target)) {
+                fs.delete(target);
+                if (fs.exists(target)) {
+                    throw new IOException(
+                            "Could not replace existing cached model");
+                }
+            }
+            fs.rename(temporary, fileName);
+            if (!fs.exists(target)) {
+                throw new IOException(
+                        "Downloaded model could not be promoted to the cache");
+            }
+            if (!verify(target, expected)) {
+                fs.delete(target);
+                throw new IOException(
+                        "Promoted model SHA-256 does not match");
+            }
+            if (fs.exists(temporary)) {
+                fs.delete(temporary);
+            }
+        } catch (IOException error) {
+            if (fs.exists(temporary)) {
+                fs.delete(temporary);
+            }
+            throw error;
+        }
+    }
+
     static String safeName(String value) {
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < value.length(); i++) {
@@ -250,6 +297,10 @@ public final class ModelCache {
     static boolean isHttpsUrl(String url) {
         return url != null && url.regionMatches(true, 0,
                 "https://", 0, "https://".length());
+    }
+
+    static boolean requiresPinnedModelDigest() {
+        return "ios".equals(Display.getInstance().getPlatformName());
     }
 
     static FetchRegistration registerFetch(

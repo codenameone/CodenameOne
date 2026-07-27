@@ -380,10 +380,11 @@ the port boundary. Always close the session.
 Bundle small models as resources. For larger models use
 `ModelCache.fetch(url, cacheKey, sha256)`, which downloads over HTTPS,
 verifies the supplied SHA-256 digest, and reuses the app-private cached
-file. The initial URL and every redirect must use HTTPS; a redirect to
-HTTP fails the resource and discards the temporary download. Supply the
-digest for every third-party or remotely mutable model: an omitted digest
-provides transport security but doesn't pin the executable model payload.
+file. The initial URL must use HTTPS. Ports that expose redirect responses
+reject a redirect to HTTP and discard the temporary download. iOS follows
+redirects below the portable network layer, so iOS requires the SHA-256
+argument and rejects the unpinned two-argument overload. Supply the digest
+on every platform for every third-party or remotely mutable model.
 Interrupted downloads restart through a temporary `.download` file and are
 never promoted to the cache until verification succeeds. Concurrent calls for
 the same cache key and content identity share one download. A conflicting URL

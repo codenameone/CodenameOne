@@ -327,8 +327,10 @@ Translator.translate("Bonjour", "fr", "en", new LanguageOptions())
 `VisionPipeline` to connect a reusable analyzer to camera frames; it
 copies callback-owned data and drops stale pending frames under load.
 Use `ModelCache.fetch(httpsUrl, cacheKey, sha256)` for models too large
-to bundle. The initial model URL and every redirect must remain HTTPS;
-identical concurrent fetches coalesce instead of sharing a temporary
+to bundle. The initial model URL must remain HTTPS. Observable redirects
+are rejected if they downgrade to HTTP; iOS requires the digest because
+its network stack follows redirects below the portable callback.
+Identical concurrent fetches coalesce instead of sharing a temporary
 file unsafely. iOS and Mac native default to Apple Vision; iOS also
 supports explicit ML Kit selection. Android uses ML Kit.
 

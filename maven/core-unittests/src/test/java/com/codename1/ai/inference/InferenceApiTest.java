@@ -77,6 +77,17 @@ class InferenceApiTest extends UITestBase {
     }
 
     @Test
+    void modelCacheRequiresDigestWhenIosHidesRedirects() {
+        implementation.setPlatformName("ios");
+        assertTrue(ModelCache.requiresPinnedModelDigest());
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> ModelCache.fetch(
+                        "https://example.com/model.tflite", "ios-model"));
+        assertTrue(error.getMessage().contains("SHA-256"));
+    }
+
+    @Test
     void modelCacheRejectsInsecureRedirects() throws Exception {
         FileSystemStorage fs = FileSystemStorage.getInstance();
         String temporary = fs.getAppHomePath()
@@ -177,6 +188,47 @@ class InferenceApiTest extends UITestBase {
                 ModelCache.verifyDownloaded(fs, temporary,
                         "0000000000000000000000000000000000000000000000000000000000000000"));
         assertFalse(fs.exists(temporary), "a digest mismatch must delete executable data");
+    }
+
+    @Test
+    void modelCacheVerifiesPromotionBeforePublishingPath() throws Exception {
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        String directory = fs.getAppHomePath();
+        String fileName = "model-cache-promoted-test.tflite";
+        String target = directory + fileName;
+        String temporary = target + ".download";
+        if (fs.exists(target)) {
+            fs.delete(target);
+        }
+        if (fs.exists(temporary)) {
+            fs.delete(temporary);
+        }
+
+        assertThrows(java.io.IOException.class, () ->
+                ModelCache.promoteDownloaded(fs, temporary, target,
+                        fileName, null));
+        assertFalse(fs.exists(target),
+                "a failed rename must not publish a nonexistent cache path");
+
+        write(temporary, new byte[] {1, 2, 3});
+        assertThrows(java.io.IOException.class, () ->
+                ModelCache.promoteDownloaded(fs, temporary, target,
+                        fileName,
+                        "00000000000000000000000000000000"
+                        + "00000000000000000000000000000000"));
+        assertFalse(fs.exists(target),
+                "a final digest mismatch must remove the promoted path");
+        assertFalse(fs.exists(temporary),
+                "a final digest mismatch must remove the temporary file");
+
+        write(temporary, new byte[] {1, 2, 3});
+        ModelCache.promoteDownloaded(fs, temporary, target, fileName,
+                "039058c6f2c0cb492c533b0a4d14ef7"
+                + "7cc0f78abccced5287d84a1a2011cfb81");
+        assertTrue(fs.exists(target));
+        assertFalse(fs.exists(temporary));
+
+        fs.delete(target);
     }
 
     private static void write(String path, byte[] value) throws Exception {
