@@ -389,6 +389,33 @@ public final class ModelCache {
             this.temporary = temporary;
         }
 
+        /// Compares the inherited URL and request arguments together with the
+        /// temporary destination path. Callback and storage-service instances
+        /// do not change the logical identity of a download.
+        ///
+        /// @param other request to compare
+        /// @return {@code true} when both requests download the same URL and
+        ///         arguments to the same temporary path
+        @Override
+        public boolean equals(Object other) {
+            if (!super.equals(other)) {
+                return false;
+            }
+            ModelDownloadRequest request = (ModelDownloadRequest) other;
+            return temporary == null ? request.temporary == null
+                    : temporary.equals(request.temporary);
+        }
+
+        /// Produces a hash consistent with {@link #equals(Object)} from the
+        /// inherited request identity and temporary destination.
+        ///
+        /// @return hash of the logical download identity
+        @Override
+        public int hashCode() {
+            return 31 * super.hashCode()
+                    + (temporary == null ? 0 : temporary.hashCode());
+        }
+
         @Override
         public boolean onRedirect(String url) {
             if (isHttpsUrl(url)) {

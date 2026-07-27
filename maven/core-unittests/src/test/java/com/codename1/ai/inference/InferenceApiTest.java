@@ -123,6 +123,33 @@ class InferenceApiTest extends UITestBase {
     }
 
     @Test
+    void modelDownloadRequestIdentityIncludesTemporaryPath() {
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        ModelCache.ModelDownloadRequest first =
+                new ModelCache.ModelDownloadRequest(
+                        new ModelCache.Completion<ModelSource>(
+                                new AsyncResource<ModelSource>()),
+                        fs, "model-a.download");
+        ModelCache.ModelDownloadRequest same =
+                new ModelCache.ModelDownloadRequest(
+                        new ModelCache.Completion<ModelSource>(
+                                new AsyncResource<ModelSource>()),
+                        fs, "model-a.download");
+        ModelCache.ModelDownloadRequest differentTarget =
+                new ModelCache.ModelDownloadRequest(
+                        new ModelCache.Completion<ModelSource>(
+                                new AsyncResource<ModelSource>()),
+                        fs, "model-b.download");
+        first.setUrl("https://example.com/model.tflite");
+        same.setUrl("https://example.com/model.tflite");
+        differentTarget.setUrl("https://example.com/model.tflite");
+
+        assertEquals(first, same);
+        assertEquals(first.hashCode(), same.hashCode());
+        assertNotEquals(first, differentTarget);
+    }
+
+    @Test
     void modelCacheCoalescesIdenticalConcurrentFetches() {
         String fileName = "model-cache-coalescing-test.tflite";
         ModelCache.FetchRegistration first = ModelCache.registerFetch(
