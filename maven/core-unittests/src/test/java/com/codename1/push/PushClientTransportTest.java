@@ -268,9 +268,17 @@ class PushClientTransportTest extends UITestBase {
         assertThrows(IllegalArgumentException.class, () -> new PushSubscription(
                 "   ", "token", "test", "installation", 0, null));
         assertThrows(IllegalArgumentException.class, () -> new PushSubscription(
+                " fcm", "token", "test", "installation", 0, null));
+        assertThrows(IllegalArgumentException.class, () -> new PushSubscription(
+                "fcm ", "token", "test", "installation", 0, null));
+        assertThrows(IllegalArgumentException.class, () -> new PushSubscription(
                 "fcm", "", "test", "installation", 0, null));
         assertThrows(IllegalArgumentException.class, () -> new PushSubscription(
                 "fcm", "\t", "test", "installation", 0, null));
+        assertThrows(IllegalArgumentException.class, () -> new PushSubscription(
+                "fcm", " token", "test", "installation", 0, null));
+        assertThrows(IllegalArgumentException.class, () -> new PushSubscription(
+                "fcm", "token ", "test", "installation", 0, null));
     }
 
     private PushClient track(PushClient client) {
