@@ -1060,6 +1060,9 @@ void cn1BibopBeginGcCycle(void);
 void cn1GcRegisterImmortalObj(JAVA_OBJECT o);
 static int cn1GcImmortalObjContains(JAVA_OBJECT o);
 static JAVA_BOOLEAN cn1SweepRemoving;
+// Set ONLY around passes that iterate authoritative object registries
+// (allObjectsInHeap, the BiBOP page registry). See the guard in gcMarkObject.
+static int cn1GcTrustedRoots = 0;
 #endif
 
 void codenameOneGCMark() {
@@ -1435,6 +1438,7 @@ void codenameOneGCMark() {
                                       memory_order_relaxed);
 #endif
             int gn = atomic_load_explicit(&gp->bumpIndex, memory_order_acquire);
+            cn1GcTrustedRoots = 1;   // page-slot walk: authoritative references
             for(int gi = 0 ; gi < gn ; gi++) {
                 JAVA_OBJECT go = cn1BibopSlot(gp, gi);
                 if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
@@ -1443,6 +1447,7 @@ void codenameOneGCMark() {
                     gcMarkObject(d, go, JAVA_FALSE);
                 }
             }
+            cn1GcTrustedRoots = 0;
             gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
         }
         gcMarkDrain(d);
@@ -1469,6 +1474,7 @@ void codenameOneGCMark() {
     // already walks in full, and only fresh entries are traced.
 #ifndef CN1_DISABLE_LEGACY_GRACE
     {
+        cn1GcTrustedRoots = 1;   // walking allObjectsInHeap: authoritative references
 #ifdef CN1_GC_VERIFY
     { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "legacy-grace-pass"; }
 #endif
@@ -1482,6 +1488,7 @@ void codenameOneGCMark() {
             }
         }
         gcMarkDrain(d);
+        cn1GcTrustedRoots = 0;
     }
 #endif /* CN1_DISABLE_LEGACY_GRACE -- A/B escape hatch, mirrors CN1_DISABLE_SATB */
 
@@ -2258,7 +2265,9 @@ void cn1BibopBeginGcCycle(void) {
     // still sees the old latch and skips, so the fresh latch can never be
     // consumed by bytes just charged to the cycle that is starting.
     (void)atomic_exchange_explicit(&cn1LegacyGcScheduled, 0, memory_order_acq_rel);
-#ifdef CN1_GRACE_AUDIT
+    // Snapshot every page's bump cursor at mark start. No longer QA-only: the
+    // late-grace re-mark uses it to visit ONLY slots born during this mark
+    // (issue 5425), instead of every fresh slot on every page.
     // QA builds only: snapshot every page's cursor at mark start. Slots below the
     // snapshot existed before the grace pass ran, so a complete grace pass must
     // have traced every one of them that is still fresh at pre-sweep time.
@@ -2280,7 +2289,6 @@ void cn1BibopBeginGcCycle(void) {
             ap = atomic_load_explicit(&ap->nextAll, memory_order_acquire);
         }
     }
-#endif
 }
 
 // Raw 64KB page memory comes from large arenas -- one posix_memalign per
@@ -5251,7 +5259,17 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // Cost: one page/extent binary search per mark call, on the GC thread /
     // workers only (the mutator never calls gcMarkObject) -- GC-side passes
     // measured ~0% of wall time on this workload class.
-    if(cn1ConservativeResolve((void*)obj) != obj && !cn1GcImmortalObjContains(obj)) {
+    // TRUSTED CALLERS BYPASS THIS (issue 5425). The guard's job is to reject
+    // CONSERVATIVELY DERIVED pointers -- arbitrary machine words off a native stack
+    // that may not be objects at all. A caller that walked the object out of
+    // allObjectsInHeap or a BiBOP page slot has an authoritative reference and needs
+    // no proof; making it pass anyway means every object allocated after the cycle's
+    // extent snapshot is silently dropped, because the snapshot cannot contain it.
+    // That is exactly how a fresh object came to be grace-promoted by the sweep with
+    // its subtree never traced. Do NOT set this flag around anything that marks from
+    // a stack scan or a register file.
+    if(!cn1GcTrustedRoots
+       && cn1ConservativeResolve((void*)obj) != obj && !cn1GcImmortalObjContains(obj)) {
         return;
     }
 #endif

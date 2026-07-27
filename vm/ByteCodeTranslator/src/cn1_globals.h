@@ -1343,13 +1343,19 @@ typedef struct CN1BibopPage {
                                           //  idempotent across parallel markers)
     int gcGraceEpoch;                     // upper bound on survivor epochs as of the last
                                           //  full walk (GC-thread only)
-#ifdef CN1_GRACE_AUDIT
-    int gcAuditSnapshot;                  // QA builds only: bumpIndex at mark start.
+    int gcAuditSnapshot;                  // bumpIndex at mark start. Slots at or above
+                                          //  it were born DURING the mark, which is the
+                                          //  only population the late-grace re-mark has
+                                          //  to trace (issue 5425); scanning every fresh
+                                          //  slot instead is O(all slots) per cycle and
+                                          //  measured a 2.1x objectAllocation regression.
+                                          //  Was QA-only when it served -DCN1_GRACE_AUDIT
+                                          //  alone.
+                                          //  Relaxed __atomic access everywhere -- the
                                           //  Relaxed __atomic access everywhere -- the
                                           //  GC writes/reads it during marking while a
                                           //  mutator can reformat the page from the
                                           //  FREE pool
-#endif
 } CN1BibopPage;
 
 // Per-thread current page per size class; defined in cn1_globals.m. Touched only
