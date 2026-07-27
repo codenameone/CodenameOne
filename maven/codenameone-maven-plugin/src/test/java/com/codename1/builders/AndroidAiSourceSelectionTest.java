@@ -25,7 +25,9 @@ package com.codename1.builders;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AndroidAiSourceSelectionTest {
     @Test
@@ -69,5 +71,16 @@ class AndroidAiSourceSelectionTest {
                 "com/codename1/ai/vision/VisionPipeline"));
         assertNull(AndroidGradleBuilder.androidAiAdapterSource(
                 "com/codename1/ui/Form"));
+    }
+
+    @Test
+    void retainsLiteRtOutputShapeRefreshOnlyForInference() {
+        String rules =
+                AndroidGradleBuilder.androidInferenceProguardRules(true);
+        assertTrue(rules.contains("org.tensorflow.lite.TensorImpl"));
+        assertTrue(rules.contains("void refreshShape();"));
+        assertFalse(AndroidGradleBuilder
+                .androidInferenceProguardRules(false)
+                .contains("TensorImpl"));
     }
 }

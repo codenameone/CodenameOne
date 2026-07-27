@@ -363,10 +363,12 @@ five adapters.
 or a private file. Android uses LiteRT and can request NNAPI. iOS uses
 TensorFlow Lite Objective-C and may request the Core ML delegate. Both
 mobile implementations fall back to CPU unless
-`allowFallback(false)` is set. Android rejects strict
-`Accelerator.NPU` sessions because NNAPI can mix delegated and CPU
-operations without reporting that the entire graph reached the NPU.
-With fallback enabled, NNAPI is a best-effort accelerator preference.
+`allowFallback(false)` is set. Android and iOS reject strict
+`Accelerator.NPU` sessions: NNAPI can mix delegated and CPU operations,
+and the Core ML delegate can schedule work across the Neural Engine, GPU,
+and CPU. Neither reports that the entire graph ran on the requested NPU.
+With fallback enabled, NPU selection is a best-effort accelerator
+preference.
 The JavaSE simulator and targets without
 a native LiteRT runtime, including Mac native, return `false` from
 `InferenceSession.isSupported()`.

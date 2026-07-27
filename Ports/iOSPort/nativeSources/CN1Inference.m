@@ -91,6 +91,18 @@ static CN1InferenceHandle *cn1InferenceHandle(int handle) {
 
 static NSString *cn1InferenceOpenPath(NSString *path, BOOL deleteModelOnClose,
         int threads, int accelerator, BOOL allowFallback) {
+    // TFLCoreMLDelegate does not expose a way to require Neural Engine-only
+    // execution. It may schedule unsupported operations on CPU or GPU, so a
+    // strict NPU request cannot honor the portable no-fallback contract.
+    if (accelerator == 3 && !allowFallback) {
+        if (deleteModelOnClose) {
+            [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+        }
+        return cn1InferenceJSON(@{
+            @"error": @"Strict NPU execution cannot be verified on iOS; "
+                    @"the Core ML delegate may use CPU or GPU"
+        });
+    }
     TFLInterpreterOptions *options = [[TFLInterpreterOptions alloc] init];
     if (threads > 0) options.numberOfThreads = (NSUInteger)threads;
     NSMutableArray<TFLDelegate *> *delegates = [NSMutableArray array];

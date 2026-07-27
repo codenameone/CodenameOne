@@ -162,12 +162,15 @@ conflicting in-flight content identities fail instead of sharing a temporary
 path. File sources are opened by path without copying the model through the
 Java heap. Cache promotion verifies that the final file exists and, when
 supplied, still matches the requested digest before publishing its path.
-Android supplies a direct, native-order destination buffer for every current
-LiteRT output tensor before invoking `runForMultipleInputsOutputs`; null output
-destinations are reserved for externally bound delegate buffers and are not
-used by ordinary sessions. NNAPI is best effort when fallback is enabled.
-Strict Android NPU requests are rejected because LiteRT cannot verify that
-NNAPI delegated every operation instead of retaining CPU nodes.
+Android invokes LiteRT with null output destinations, then reads each result
+from its native tensor buffer. This allows value-dependent output dimensions
+to resolve before Codename One allocates or copies the result. LiteRT caches
+output shapes when no input reallocation occurred, so the Android port
+explicitly refreshes each output shape after invocation; both Android builders
+retain that package-private LiteRT method name through R8. NPU selection is
+best effort when fallback is enabled. Strict NPU requests are rejected on
+Android because LiteRT cannot verify that NNAPI delegated every operation,
+and on iOS because the Core ML delegate may schedule work on CPU or GPU.
 
 All native sessions and analyzers must be closed. Expensive open, analysis,
 and inference work runs off the EDT; completion and error delivery return to

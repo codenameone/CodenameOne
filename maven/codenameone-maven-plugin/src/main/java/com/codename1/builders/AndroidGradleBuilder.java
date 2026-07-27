@@ -4635,6 +4635,8 @@ public class AndroidGradleBuilder extends Executor {
         String keepAi = visionSupport || languageSupport || inferenceSupport
                 ? "-keep class com.codename1.impl.android.ai.** { *; }\n\n"
                 : "";
+        String keepInferenceRuntime =
+                androidInferenceProguardRules(inferenceSupport);
         // workaround broken optimizer in proguard
         String proguardConfigOverride = "-dontusemixedcaseclassnames\n"
                 + "-dontskipnonpubliclibraryclasses\n"
@@ -4646,6 +4648,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "-dontwarn com.google.android.gms.**\n"
                 + keepFirebase
                 + keepAi
+                + keepInferenceRuntime
                 + "-keep class com.codename1.impl.android.AndroidBrowserComponentCallback {\n"
                 + "*;\n"
                 + "}\n\n"
@@ -5357,6 +5360,14 @@ public class AndroidGradleBuilder extends Executor {
             return "AndroidSmartReplyAdapter.java";
         }
         return null;
+    }
+
+    static String androidInferenceProguardRules(boolean inferenceIncluded) {
+        return inferenceIncluded
+                ? "-keepclassmembers class org.tensorflow.lite.TensorImpl {\n"
+                + "    void refreshShape();\n"
+                + "}\n\n"
+                : "";
     }
 
     static String xmlize(String s) {

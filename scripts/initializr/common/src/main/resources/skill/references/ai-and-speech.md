@@ -347,9 +347,10 @@ On iOS, an ML Kit vision pod is selected only when both its analyzer
 and its matching feature-specific selector are referenced. For example,
 `VisionBackends.mlKitBarcodeScanning()` selects only the barcode pod.
 LiteRT is selected only by
-`InferenceSession`. Android NNAPI acceleration is best effort when
-fallback is enabled. Android rejects `Accelerator.NPU` together with
-`allowFallback(false)` because LiteRT cannot prove full-graph delegation.
+`InferenceSession`. NPU acceleration is best effort when fallback is
+enabled. Android and iOS reject `Accelerator.NPU` together with
+`allowFallback(false)`: NNAPI cannot prove full-graph delegation, while
+the Core ML delegate may also schedule work on CPU or GPU.
 
 Language identification defaults to Apple Natural Language on iOS and ML
 Kit on Android. Translation and Smart Reply use feature-scoped ML Kit

@@ -40,6 +40,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
@@ -48,6 +49,8 @@ import java.util.Map;
 
 /** Android LiteRT backend. */
 public final class AndroidInferenceImpl extends InferenceImpl {
+    private static volatile Method outputShapeRefreshMethod;
+
     private static final class Handle {
         final Interpreter interpreter;
 
@@ -182,25 +185,27 @@ public final class AndroidInferenceImpl extends InferenceImpl {
                         nativeInputs[index] =
                                 toBuffer(value, metadata.dataType());
                     }
-                    Map<Integer, Object> nativeOutputs = new HashMap<Integer, Object>();
+                    Map<Integer, Object> nativeOutputs =
+                            new HashMap<Integer, Object>();
                     int outputCount = interpreter.getOutputTensorCount();
-                    ByteBuffer[] outputBuffers =
-                            new ByteBuffer[outputCount];
                     for (int i = 0; i < outputCount; i++) {
-                        org.tensorflow.lite.Tensor metadata =
-                                interpreter.getOutputTensor(i);
-                        ByteBuffer destination = ByteBuffer.allocateDirect(
-                                metadata.numBytes()).order(
-                                ByteOrder.nativeOrder());
-                        outputBuffers[i] = destination;
-                        nativeOutputs.put(Integer.valueOf(i), destination);
+                        // LiteRT 1.0.1 treats a null output as invocation-only:
+                        // the native tensor remains available through
+                        // Tensor.asReadOnlyBuffer() after the run. This avoids
+                        // allocating from a pre-run size that may still contain
+                        // unresolved, value-dependent output dimensions.
+                        nativeOutputs.put(Integer.valueOf(i), null);
                     }
-                    interpreter.runForMultipleInputsOutputs(nativeInputs, nativeOutputs);
+                    interpreter.runForMultipleInputsOutputs(nativeInputs,
+                            nativeOutputs);
                     final Tensor[] result = new Tensor[outputCount];
                     for (int i = 0; i < result.length; i++) {
-                        org.tensorflow.lite.Tensor metadata = interpreter.getOutputTensor(i);
-                        result[i] = fromBuffer(metadata.name(), metadata.shape(),
-                                metadata.dataType(), outputBuffers[i]);
+                        org.tensorflow.lite.Tensor metadata =
+                                interpreter.getOutputTensor(i);
+                        refreshOutputShape(metadata);
+                        result[i] = fromBuffer(metadata.name(),
+                                metadata.shape(), metadata.dataType(),
+                                metadata.asReadOnlyBuffer());
                     }
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
@@ -245,6 +250,33 @@ public final class AndroidInferenceImpl extends InferenceImpl {
             }
         }
         return true;
+    }
+
+    private static void refreshOutputShape(
+            org.tensorflow.lite.Tensor metadata) {
+        try {
+            // TensorImpl caches shape(), and LiteRT refreshes that cache only
+            // when the invocation also reallocates tensors. Value-dependent
+            // output shapes can change without input reallocation, so refresh
+            // the package-private cache after every run. The builders retain
+            // this one method name for R8 release builds.
+            Method refresh = outputShapeRefreshMethod;
+            if (refresh == null) {
+                synchronized (AndroidInferenceImpl.class) {
+                    refresh = outputShapeRefreshMethod;
+                    if (refresh == null) {
+                        refresh = metadata.getClass()
+                                .getDeclaredMethod("refreshShape");
+                        refresh.setAccessible(true);
+                        outputShapeRefreshMethod = refresh;
+                    }
+                }
+            }
+            refresh.invoke(metadata);
+        } catch (Throwable error) {
+            throw new InferenceException(
+                    "Could not refresh the LiteRT output shape", error);
+        }
     }
 
     private static int inputIndex(Interpreter interpreter, String name) {
