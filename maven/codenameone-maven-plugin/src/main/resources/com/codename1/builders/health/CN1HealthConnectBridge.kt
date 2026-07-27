@@ -598,8 +598,11 @@ class CN1HealthConnectBridge(private val context: Context)
             // a placeholder here made every source-filtered read come back
             // empty, even though the native request had filtered correctly.
             .append(origin).append('\t')
-            // Field 7: the recording method, so a value the user typed can
-            // be told from one a device measured after a round trip.
+            // Fields 7 and 8 are the source display name and device name,
+            // which Health Connect does not give us. They stay empty so
+            // the recording method lands in field 9 rather than being read
+            // back as the name of the app that wrote the sample.
+            .append('\t').append('\t')
             .append(recordingMethodName(r)).append('\n')
     }
 

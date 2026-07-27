@@ -350,11 +350,15 @@ public class SensorSession {
             synchronized (session.pendingWrites) {
                 session.pendingWrites.addAll(0, batch);
             }
-            // Re-armed explicitly. The buffer is non-empty again, so a
-            // later measurement will not start a timer, and without this
-            // the requeued batch would sit there until the process exits.
-            session.scheduleFlush(session.getOptions()
-                    .getStoreBatchMillis());
+            // Re-armed explicitly, but only while the session is still
+            // running. Rescheduling from a STOPPED session -- which is
+            // exactly where a permanent failure like a revoked permission
+            // lands -- retried forever, keeping the dead session alive and
+            // firing store writes and errors after shutdown.
+            if (session.getState() != SensorSessionState.STOPPED) {
+                session.scheduleFlush(session.getOptions()
+                        .getStoreBatchMillis());
+            }
             session.fireError(error instanceof HealthException
                     ? (HealthException) error
                     : new HealthException(HealthError.UNKNOWN,

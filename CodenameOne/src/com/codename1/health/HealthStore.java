@@ -77,6 +77,8 @@ public class HealthStore {
     private final Map<String, HealthChangeListener> liveListeners =
             new HashMap<String, HealthChangeListener>();
     private int operationTimeout = DEFAULT_OPERATION_TIMEOUT;
+    /// Authorization waits on a person, not on a platform call.
+    private int authorizationTimeout = DEFAULT_AUTHORIZATION_TIMEOUT;
 
     /// Ports construct subclasses. Application code obtains the active
     /// store from [Health#getStore()].
@@ -202,7 +204,10 @@ public class HealthStore {
                     "requestAuthorization needs at least one access");
             return out;
         }
-        armTimeout(out);
+        // Authorization waits on a human reading a permission sheet, so
+        // it gets its own much longer budget -- the operation timeout
+        // would fail the request while the UI was still legitimately up.
+        armTimeout(out, authorizationTimeout);
         doRequestAuthorization(deduped, out);
         return out;
     }
@@ -442,13 +447,36 @@ public class HealthStore {
     /// the operation pending forever -- which is precisely the case the
     /// setting exists for.
     protected final void armTimeout(final AsyncResource resource) {
-        int millis = operationTimeout;
+        armTimeout(resource, operationTimeout);
+    }
+
+    protected final void armTimeout(final AsyncResource resource,
+            int millis) {
         if (millis <= 0 || resource == null) {
             return;
         }
-        // CLDC's Timer has no named/daemon constructor.
+        // CLDC's Timer has no named/daemon constructor, and a Timer keeps
+        // a live thread until it is cancelled -- so it is cancelled when
+        // the operation finishes, not merely when the deadline fires.
+        // Otherwise a burst of paged reads left one thread per call
+        // sitting around for the whole timeout.
         final java.util.Timer timer = new java.util.Timer();
         timer.schedule(new TimeoutTask(resource, timer), millis);
+        resource.onResult(new CancelTimer(timer));
+    }
+
+    /// Cancels a timeout timer once its operation has finished.
+    private static final class CancelTimer implements AsyncResult {
+        private final java.util.Timer timer;
+
+        CancelTimer(java.util.Timer timer) {
+            this.timer = timer;
+        }
+
+        @Override
+        public void onReady(Object value, Throwable error) {
+            timer.cancel();
+        }
     }
 
     /// Named rather than anonymous so the timer holds no synthetic

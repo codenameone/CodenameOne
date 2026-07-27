@@ -298,11 +298,11 @@ public final class HealthWire {
                         f.length > 8 ? emptyToNull(f[8]) : null, null,
                         null));
             }
-            if (f.length > 7) {
-                // Field 7 doubles as the recording method when it names
-                // one. An older port that put a source name there is
-                // unaffected: an unknown token leaves the default.
-                RecordingMethod m = recordingMethod(f[7]);
+            if (f.length > 9) {
+                // Field 9, its own column. Overloading field 7 -- the
+                // source display name -- made getSource().getName() report
+                // "AUTOMATIC" as the app that wrote the sample.
+                RecordingMethod m = recordingMethod(f[9]);
                 if (m != null) {
                     s.setRecordingMethod(m);
                 }

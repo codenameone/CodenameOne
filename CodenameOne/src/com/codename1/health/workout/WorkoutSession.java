@@ -332,7 +332,18 @@ public abstract class WorkoutSession {
                 case DISCRETE:
                     double sum = valueOf(type, AggregateMetric.TOTAL, unit) + v;
                     put(type, AggregateMetric.TOTAL, sum, unit);
-                    put(type, AggregateMetric.AVERAGE, sum / (n + 1), unit);
+                    // Weighted by how long each sample covers, matching the
+                    // aggregate semantics. An arithmetic mean reported ten
+                    // minutes at 60 bpm followed by one minute at 120 as
+                    // 90 bpm rather than about 65.
+                    double w = Math.max(1, sample.getDurationMillis());
+                    double weighted = weightedSum(type) + v * w;
+                    double totalWeight = weightOf(type) + w;
+                    setWeightedSum(type, weighted);
+                    setWeight(type, totalWeight);
+                    put(type, AggregateMetric.AVERAGE,
+                            totalWeight == 0 ? v : weighted / totalWeight,
+                            unit);
                     HealthQuantity min =
                             statistics.get(key(type, AggregateMetric.MINIMUM));
                     if (min == null || v < min.getValue(unit)) {
@@ -350,6 +361,29 @@ public abstract class WorkoutSession {
             }
         }
         fireStatisticsUpdated(type);
+    }
+
+    private final Map<String, Double> weightedSums =
+            new HashMap<String, Double>();
+    private final Map<String, Double> weights =
+            new HashMap<String, Double>();
+
+    private double weightedSum(HealthDataType type) {
+        Double v = weightedSums.get(type.getId());
+        return v == null ? 0 : v.doubleValue();
+    }
+
+    private void setWeightedSum(HealthDataType type, double v) {
+        weightedSums.put(type.getId(), Double.valueOf(v));
+    }
+
+    private double weightOf(HealthDataType type) {
+        Double v = weights.get(type.getId());
+        return v == null ? 0 : v.doubleValue();
+    }
+
+    private void setWeight(HealthDataType type, double v) {
+        weights.put(type.getId(), Double.valueOf(v));
     }
 
     private double valueOf(HealthDataType type, AggregateMetric metric,
