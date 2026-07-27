@@ -329,8 +329,14 @@ class MCPLoopbackSocketTransportTest {
         // Park the reader before closing, so this exercises "close wakes a waiting reader"
         // rather than "close had already been called". WAITING is precisely the state
         // lock.wait() puts it in.
-        await("the reader to park waiting for a client",
-                () -> reader.getState() == Thread.State.WAITING);
+        // Polling for a parked state is not the same as sleeping and hoping: once the
+        // reader reaches wait() it STAYS there until close() notifies it, so this cannot
+        // miss the window. TIMED_WAITING is accepted too, so a future timed wait in the
+        // transport would not silently turn this into a ten second stall.
+        await("the reader to park waiting for a client", () -> {
+            Thread.State state = reader.getState();
+            return state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING;
+        });
         t.close();
         reader.join(3000);
 

@@ -100,6 +100,28 @@ class MCPReleaseBuildGateTest extends UITestBase {
     }
 
     @Test
+    void theBuildGateIsQueryableSeparatelyFromPlatformCapability() {
+        // A caller preflighting with isSocketSupported() alone would be misled: that asks
+        // whether the platform CAN bind, and a build can be capable yet not permitted.
+        implementation.setServerSocketAvailable(true);
+
+        implementation.setDebuggableBuild(false);
+        assertFalse(MCP.isSocketServerAllowedOnThisBuild(),
+                "a release build must report that it is not allowed to serve");
+        assertTrue(MCP.isSocketSupported(),
+                "capability is unchanged by the gate; the platform can still bind");
+
+        implementation.setDebuggableBuild(true);
+        assertTrue(MCP.isSocketServerAllowedOnThisBuild(),
+                "a development build must report that it is allowed to serve");
+
+        implementation.setDebuggableBuild(false);
+        MCP.setAllowOnReleaseBuilds(true);
+        assertTrue(MCP.isSocketServerAllowedOnThisBuild(),
+                "the override must be reflected in the preflight, not only in the start");
+    }
+
+    @Test
     void aBlockedStartLeavesNoServerRunning() {
         // The gate runs before the transport is registered or opened, so a refusal must
         // not leave a half-started server behind.

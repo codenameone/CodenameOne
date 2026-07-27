@@ -98,6 +98,11 @@ public final class MCP {
     /// Whether a loopback socket transport is available on this platform - either one the
     /// port registered itself, or the portable one, which needs
     /// [com.codename1.io.Socket#isLoopbackServerSocketSupported()].
+    ///
+    /// This is a question about CAPABILITY and deliberately ignores the release build
+    /// gate, so it is not a complete preflight for [#startSocketServer(int)] on its own -
+    /// a platform that can bind may still refuse to serve. Ask
+    /// [#isSocketServerAllowedOnThisBuild()] for the other half.
     public static boolean isSocketSupported() {
         return socketTransportFactory != null
                 || com.codename1.io.Socket.isLoopbackServerSocketSupported();
@@ -189,9 +194,20 @@ public final class MCP {
         return allowOnReleaseBuilds;
     }
 
+    /// Whether the socket server is allowed to run on THIS build, which is the other half
+    /// of the question [#isSocketSupported()] answers: that one asks whether the platform
+    /// can bind a loopback server socket, this one whether it is permitted to serve.
+    /// [#startSocketServer(int)] needs both, and refuses on the first that says no.
+    ///
+    /// True on a development build, or on any build where
+    /// [#setAllowOnReleaseBuilds(boolean)] has been used.
+    public static synchronized boolean isSocketServerAllowedOnThisBuild() {
+        return allowOnReleaseBuilds || Display.getInstance().isDebuggableBuild();
+    }
+
     /// Throws unless this build may serve MCP over a socket.
     private static void checkAllowedOnThisBuild() {
-        if (allowOnReleaseBuilds || Display.getInstance().isDebuggableBuild()) {
+        if (isSocketServerAllowedOnThisBuild()) {
             return;
         }
         throw new IllegalStateException(
