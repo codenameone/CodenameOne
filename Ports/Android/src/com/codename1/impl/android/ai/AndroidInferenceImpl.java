@@ -326,6 +326,7 @@ public final class AndroidInferenceImpl extends InferenceImpl {
     private static Tensor fromBuffer(String name, int[] shape, DataType nativeType,
                                      ByteBuffer value) {
         value.rewind();
+        value.order(ByteOrder.nativeOrder());
         TensorType type = type(nativeType);
         int count = elementCount(shape);
         if (type == TensorType.FLOAT32) {
