@@ -228,7 +228,7 @@ The simulator's data is synthetic and seeded, not recorded from anyone. That's i
 
 *Sample metadata doesn't reach the phone's health store.* `HealthSample.getMetadata()` round-trips locally -- the simulator, desktop and JavaScript store -- but isn't persisted to HealthKit or Health Connect in this release, so a sample written and read back on a device returns without it. Health Connect has no arbitrary metadata at all, only a single client record id. Keep your correlation identifier in your own storage.
 
-*Recorded workouts are not kept alive on Android.* The manifest declares no foreground service, so a recorded workout lives exactly as long as your process does. If you need one to survive backgrounding, keep the app alive yourself.
+*Recorded workouts aren't kept alive on Android.* The manifest declares no foreground service, so a recorded workout lives exactly as long as your process does. If you need one to survive backgrounding, keep the app alive yourself.
 
 *`BODY_MASS_INDEX` is rejected on Android.* Health Connect has no BMI permission or record -- BMI is derived, not stored -- so the build fails rather than requesting an unrelated body-composition permission on your behalf. Read `BODY_MASS` and `HEIGHT` and compute it. HealthKit does store BMI, so iOS is unaffected.
 
