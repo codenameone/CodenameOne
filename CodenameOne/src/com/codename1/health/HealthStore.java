@@ -202,6 +202,7 @@ public class HealthStore {
                     "requestAuthorization needs at least one access");
             return out;
         }
+        armTimeout(out);
         doRequestAuthorization(deduped, out);
         return out;
     }
@@ -417,8 +418,59 @@ public class HealthStore {
                 }
             }
         });
+        armTimeout(raw);
         doReadSamples(query, raw);
         return out;
+    }
+
+    /// Records that one queued delivery has finished.
+    ///
+    /// `abandoned` is how many later chunks will never be queued, which
+    /// happens when a listener throws and the rest of the page is dropped.
+    void noteDeliveryDone(int abandoned) {
+        synchronized (subscriptions) {
+            pendingDeliveries--;
+        }
+        releaseDrainGates();
+    }
+
+    /// Fails `resource` with [HealthError#TIMEOUT] if the platform never
+    /// answers.
+    ///
+    /// [#getOperationTimeout()] was settable and documented and nothing
+    /// ever armed a timer, so a native call that lost its callback left
+    /// the operation pending forever -- which is precisely the case the
+    /// setting exists for.
+    protected final void armTimeout(final AsyncResource resource) {
+        int millis = operationTimeout;
+        if (millis <= 0 || resource == null) {
+            return;
+        }
+        // CLDC's Timer has no named/daemon constructor.
+        final java.util.Timer timer = new java.util.Timer();
+        timer.schedule(new TimeoutTask(resource, timer), millis);
+    }
+
+    /// Named rather than anonymous so the timer holds no synthetic
+    /// reference to the store.
+    private static final class TimeoutTask extends java.util.TimerTask {
+        private final AsyncResource resource;
+        private final java.util.Timer timer;
+
+        TimeoutTask(AsyncResource resource, java.util.Timer timer) {
+            this.resource = resource;
+            this.timer = timer;
+        }
+
+        @Override
+        public void run() {
+            timer.cancel();
+            if (!resource.isDone()) {
+                resource.error(new HealthException(HealthError.TIMEOUT,
+                        "the platform did not answer within the"
+                                + " configured operation timeout"));
+            }
+        }
     }
 
     /// Normalizes a raw platform page: flattens series when asked, and
@@ -841,6 +893,7 @@ public class HealthStore {
                         writeChunk(all, nextFrom, accumulated, out);
                     }
                 });
+        armTimeout(chunkResult);
         doWrite(chunk, chunkResult);
     }
 
@@ -924,6 +977,7 @@ public class HealthStore {
             out.error(ex);
             return out;
         }
+        armTimeout(out);
         doDelete(request, out);
         return out;
     }
@@ -1093,8 +1147,64 @@ public class HealthStore {
             out.complete(Integer.valueOf(0));
             return out;
         }
-        doDrainChanges(subs, out);
+        // The public resource resolves only once the deliveries this drain
+        // queued have actually run. The ports complete their own resource
+        // as soon as they have handed the batches over, but delivery hops
+        // through callSerially -- so an app polling again from the
+        // completion callback used to find the cursor unmoved and fetch
+        // the same page a second time.
+        AsyncResource<Integer> portResult = new AsyncResource<Integer>();
+        portResult.onResult(new DrainGate(this, out));
+        doDrainChanges(subs, portResult);
         return out;
+    }
+
+    /// Holds a drain's completion until its queued deliveries have run.
+    private static final class DrainGate
+            implements AsyncResult<Integer> {
+        private final HealthStore store;
+        private final AsyncResource<Integer> out;
+
+        DrainGate(HealthStore store, AsyncResource<Integer> out) {
+            this.store = store;
+            this.out = out;
+        }
+
+        @Override
+        public void onReady(Integer value, Throwable error) {
+            if (error != null) {
+                out.error(error);
+                return;
+            }
+            store.whenDeliveriesDrain(out, value);
+        }
+    }
+
+    /// Completes `out` once no delivery is outstanding.
+    void whenDeliveriesDrain(final AsyncResource<Integer> out,
+            final Integer value) {
+        synchronized (subscriptions) {
+            if (pendingDeliveries <= 0) {
+                out.complete(value);
+                return;
+            }
+            drainGates.add(new Object[] { out, value });
+        }
+    }
+
+    /// Releases any drain waiting on the delivery queue.
+    private void releaseDrainGates() {
+        List<Object[]> ready = null;
+        synchronized (subscriptions) {
+            if (pendingDeliveries > 0 || drainGates.isEmpty()) {
+                return;
+            }
+            ready = new ArrayList<Object[]>(drainGates);
+            drainGates.clear();
+        }
+        for (Object[] g : ready) {
+            ((AsyncResource) g[0]).complete(g[1]);
+        }
     }
 
     // ==================================================================
@@ -1138,9 +1248,13 @@ public class HealthStore {
         // sequence up front meant a listener that threw on an early chunk
         // still had the final chunk run and persist the page anchor,
         // skipping the failed chunk for good.
+        List<HealthChangeBatch> chunks = applyOptions(batch, sub);
+        synchronized (subscriptions) {
+            pendingDeliveries += chunks.size();
+        }
         Display.getInstance().callSerially(
-                makeDeliveryRunnable(this, target,
-                        applyOptions(batch, sub), 0, subscription));
+                makeDeliveryRunnable(this, target, chunks, 0,
+                        subscription));
     }
 
     /// Built in a static method so the `Runnable` carries no synthetic
@@ -1154,6 +1268,20 @@ public class HealthStore {
         return new Runnable() {
             @Override
             public void run() {
+                boolean queuedNext = false;
+                try {
+                    queuedNext = runDelivery();
+                } finally {
+                    // When a listener throws, the rest of the page is
+                    // abandoned and those chunks will never be queued --
+                    // so they are accounted for here or the drain waiting
+                    // on them would never resolve.
+                    store.noteDeliveryDone(queuedNext ? 0
+                            : chunks.size() - index - 1);
+                }
+            }
+
+            private boolean runDelivery() {
                 try {
                     listener.healthDataChanged(batch);
                 } catch (Throwable t) {
@@ -1164,7 +1292,7 @@ public class HealthStore {
                     // is abandoned too: delivering past a chunk the app
                     // could not handle would strand it permanently.
                     com.codename1.io.Log.e(t);
-                    return;
+                    return false;
                 }
                 if (index + 1 < chunks.size()) {
                     Display.getInstance().callSerially(
@@ -1185,6 +1313,7 @@ public class HealthStore {
                     subscription.noteDelivery(subscription.getAnchor(),
                             System.currentTimeMillis());
                 }
+                return true;
             }
         };
     }
@@ -1233,6 +1362,9 @@ public class HealthStore {
 
     /// Guards the one-shot restore in [#ensureSubscriptionsRestored].
     private boolean subscriptionsRestored;
+    /// Deliveries queued but not yet run; a drain waits for zero.
+    private int pendingDeliveries;
+    private final List<Object[]> drainGates = new ArrayList<Object[]>();
 
     /// Volatile because the build-generated factory is installed once
     /// during startup and then read from whatever thread the platform

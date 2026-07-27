@@ -90,6 +90,17 @@ final class RecordedWorkoutSession extends WorkoutSession {
         }
     }
 
+    /// Set on the returned workout when the platform could not store the
+    /// session record itself.
+    ///
+    /// Neither HealthKit nor the Health Connect bridge accepts a workout
+    /// through the sample write path in this release. The child
+    /// measurements are persisted; the workout is returned for the caller
+    /// to keep or upload. Check for this rather than assuming getId() is
+    /// populated.
+    public static final String WORKOUT_NOT_PERSISTED =
+            "cn1.workoutNotPersisted";
+
     @Override
     protected void doEnd(final AsyncResource<WorkoutSample> out) {
         final WorkoutSample workout = WorkoutSample.create(
@@ -138,6 +149,13 @@ final class RecordedWorkoutSession extends WorkoutSession {
                     // The first id belongs to the workout only when the
                     // workout was part of the batch.
                     workout.setId(value.getSampleIds().get(0));
+                } else if (!store.isWritable(HealthDataType.WORKOUT)) {
+                    // Neither mobile platform accepts a workout through
+                    // the sample write path in this release, so the child
+                    // measurements are stored and the session record is
+                    // not. Saying so through the returned sample beats
+                    // resolving as though the workout had been persisted.
+                    workout.putMetadata(WORKOUT_NOT_PERSISTED, "true");
                 }
                 setState(WorkoutSessionState.ENDED);
                 out.complete(workout);

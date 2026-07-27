@@ -185,6 +185,7 @@ public final class AggregateQuery {
     /// mass ever recorded -- and averaging a cumulative one -- the mean of
     /// arbitrarily-chunked step totals -- are both meaningless, so they
     /// are rejected rather than answered.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public static boolean isMeaningful(HealthDataType type,
             AggregateMetric metric) {
         if (type == null || metric == null) {
@@ -193,6 +194,13 @@ public final class AggregateQuery {
         if (metric == AggregateMetric.COUNT
                 || metric == AggregateMetric.DURATION) {
             return true;
+        }
+        // Composite types carry more than one number, so there is no single
+        // value to average or compare. Accepting the metric and returning
+        // null looked like "no data" for a bucket that genuinely had
+        // readings, which is the worse of the two answers.
+        if (type == HealthDataType.BLOOD_PRESSURE) {
+            return false;
         }
         HealthAggregationStyle style = type.getAggregationStyle();
         if (style == HealthAggregationStyle.CUMULATIVE) {
