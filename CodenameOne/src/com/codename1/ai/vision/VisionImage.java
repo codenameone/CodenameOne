@@ -49,14 +49,39 @@ public final class VisionImage {
         this.format = format == null ? FrameFormat.JPEG : format;
     }
 
-    /// Creates an encoded JPEG or PNG input.
+    /// Creates an encoded JPEG or PNG input whose stored pixels are already
+    /// upright. This method does not inspect EXIF orientation metadata. Use
+    /// {@link #encoded(byte[], int)} when the encoded image needs a clockwise
+    /// display rotation before analysis.
+    ///
     /// @param bytes complete encoded image, copied by this method
     /// @return immutable image input
+    /// @throws IllegalArgumentException if {@code bytes} is {@code null} or empty
     public static VisionImage encoded(byte[] bytes) {
+        return encoded(bytes, 0);
+    }
+
+    /// Creates an encoded JPEG or PNG input with display orientation metadata.
+    /// The rotation describes how the stored pixels must be rotated clockwise
+    /// to appear upright; for example, pass {@code 90} for a portrait JPEG
+    /// whose pixels are stored in landscape orientation. Decoders on Android
+    /// and Apple platforms receive this value directly, so detected bounds and
+    /// points use the displayed orientation. This method does not parse EXIF;
+    /// callers loading an image outside {@link #fromCameraFrame(CameraFrame)}
+    /// must supply the EXIF-derived rotation when it is relevant.
+    ///
+    /// @param bytes complete encoded image, copied by this method
+    /// @param rotationDegrees clockwise display rotation; only 0, 90, 180,
+    ///  or 270 degrees are supported
+    /// @return immutable image input
+    /// @throws IllegalArgumentException if {@code bytes} is {@code null} or
+    ///  empty, or if the rotation is not a quarter turn
+    public static VisionImage encoded(byte[] bytes, int rotationDegrees) {
         if (bytes == null || bytes.length == 0) {
             throw new IllegalArgumentException("Image bytes must not be empty");
         }
-        return new VisionImage(bytes, null, 0, 0, 0, 0, FrameFormat.JPEG);
+        return new VisionImage(bytes, null, 0, 0, rotationDegrees, 0,
+                FrameFormat.JPEG);
     }
 
     /// Creates raw NV21 or RGBA8888 input with display orientation metadata.

@@ -137,7 +137,10 @@ retain the current OS revision and its additional symbologies.
 PNG, NV21, and RGBA8888. Android feeds raw NV21 directly to ML Kit and
 converts RGBA to a bitmap. Apple creates a `CGImage` directly from NV21 or
 RGBA memory and passes it to Vision or ML Kit without an intermediate JPEG
-encode/decode.
+encode/decode. `VisionImage.encoded(bytes, rotationDegrees)` carries the
+clockwise display rotation for encoded gallery or file images; the
+one-argument overload deliberately assumes upright stored pixels rather than
+silently guessing or discarding EXIF orientation.
 
 `VisionImage.fromCameraFrame()` is safe beyond the
 `FrameListener.onFrame()` callback because it copies the callback-owned

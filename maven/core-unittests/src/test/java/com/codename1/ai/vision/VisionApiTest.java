@@ -49,6 +49,15 @@ class VisionApiTest extends UITestBase {
     }
 
     @Test
+    void encodedInputPreservesExplicitDisplayRotation() {
+        VisionImage image = VisionImage.encoded(
+                new byte[] {1, 2, 3}, -90);
+        assertEquals(270, image.getRotationDegrees());
+        assertThrows(IllegalArgumentException.class,
+                () -> VisionImage.encoded(new byte[] {1}, 45));
+    }
+
+    @Test
     void pixelInputNormalizesRotation() {
         VisionImage image = VisionImage.pixels(new byte[] {1, 2, 3, 4},
                 1, 1, FrameFormat.RGBA8888, -90);

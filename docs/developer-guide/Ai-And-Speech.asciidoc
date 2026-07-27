@@ -276,9 +276,13 @@ language.
 The vision API accepts JPEG, PNG, NV21, or RGBA8888 data through
 `VisionImage`. `VisionImage.fromCameraFrame(frame)` is normally the
 best way to connect a camera because it copies the frame's
-callback-owned buffers before analysis becomes asynchronous. Each
-analyzer returns stable Codename One result types. Bounds and points
-use normalized coordinates in the range 0 through 1.
+callback-owned buffers and preserves the frame rotation before analysis
+becomes asynchronous. For an encoded gallery or file image whose pixels
+need an EXIF display rotation, use
+`VisionImage.encoded(bytes, rotationDegrees)`; the one-argument overload
+assumes the stored pixels are already upright and does not inspect EXIF
+metadata. Each analyzer returns stable Codename One result types. Bounds
+and points use normalized coordinates in the range 0 through 1.
 
 Android uses ML Kit. iOS and Mac native builds default to Apple Vision
 and Core Image. iOS can select ML Kit explicitly:

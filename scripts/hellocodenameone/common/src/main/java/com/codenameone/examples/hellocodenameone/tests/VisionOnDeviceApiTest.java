@@ -123,6 +123,10 @@ public class VisionOnDeviceApiTest extends BaseTest {
         encodedOutput[1] = 9;
         checkEqual(2, encoded.getEncodedBytes()[1],
                 "VisionImage must copy encoded output");
+        VisionImage rotatedEncoded =
+                VisionImage.encoded(new byte[] {7}, -90);
+        checkEqual(270, rotatedEncoded.getRotationDegrees(),
+                "encoded image rotation normalization");
 
         byte[] jpeg = new byte[] {4, 5};
         byte[] pixels = new byte[] {10, 20, 30, 40};
