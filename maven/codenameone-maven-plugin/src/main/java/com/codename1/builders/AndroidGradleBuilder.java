@@ -2354,16 +2354,21 @@ public class AndroidGradleBuilder extends Executor {
                     || compareVersions(declaredKotlin, kotlinFloor) < 0) {
                 request.putArgument("requireKotlinStdlib", kotlinFloor);
                 // Kotlin 1.9.22's Gradle plugin needs Gradle 6.8.3 or
-                // newer, and the non-Gradle-8 path defaults to 6.5, so
-                // raising the Kotlin floor alone produced a project that
-                // failed before it ever compiled the bridge.
+                // newer and the non-Gradle-8 path defaults to 6.5, so the
+                // combination cannot build. Flipping useGradle8 here does
+                // not help: the Gradle version and executable were already
+                // resolved earlier in build(), so the project would keep
+                // the legacy toolchain and fail anyway. Refuse with an
+                // instruction instead of producing a build that dies
+                // during Kotlin compilation for no visible reason.
                 if (!useGradle8) {
-                    log("Health Connect needs Kotlin " + kotlinFloor
-                            + ", whose Gradle plugin requires Gradle"
-                            + " 6.8.3 or newer; enabling Gradle 8 for this"
-                            + " build. Set android.useGradle8=true"
-                            + " explicitly to silence this.");
-                    useGradle8 = true;
+                    throw new BuildException(
+                            "Health Connect requires Kotlin " + kotlinFloor
+                            + ", whose Gradle plugin needs Gradle 6.8.3 or"
+                            + " newer, but this build sets"
+                            + " android.useGradle8=false and would use"
+                            + " Gradle 6.5. Set android.useGradle8=true to"
+                            + " build a health-enabled app.");
                 }
                 log("Health Connect requires Kotlin " + kotlinFloor
                         + " or newer; raising requireKotlinStdlib from "

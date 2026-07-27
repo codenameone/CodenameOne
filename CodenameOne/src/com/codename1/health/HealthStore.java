@@ -606,7 +606,11 @@ public class HealthStore {
                 overlap = 0;
             }
             long span = s.getDurationMillis();
-            durationMillis += span <= 0 ? 1 : overlap;
+            // An instantaneous sample covers no time. The one-millisecond
+            // substitute below is an averaging weight, not a duration --
+            // adding it here made "total time covered" grow with the
+            // number of spot readings.
+            durationMillis += span <= 0 ? 0 : overlap;
             if (s instanceof QuantitySample) {
                 inBucket.add((QuantitySample) s);
                 // Cumulative quantities are divisible, so a sample that

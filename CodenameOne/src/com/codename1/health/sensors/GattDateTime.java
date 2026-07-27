@@ -38,6 +38,28 @@ final class GattDateTime {
     /// which happens after a battery change.
     private static final int YEAR_UNKNOWN = 0;
 
+    /// Days in a month, so an impossible date is rejected rather than
+    /// rolled forward.
+    ///
+    /// The CLDC Calendar this framework targets is always lenient and has
+    /// no setLenient, so 31 February would otherwise be normalised into
+    /// March and stored as a plausible but wrong measurement date.
+    private static int daysInMonth(int year, int month) {
+        switch (month) {
+            case 2:
+                boolean leap = (year % 4 == 0 && year % 100 != 0)
+                        || year % 400 == 0;
+                return leap ? 29 : 28;
+            case 4:
+            case 6:
+            case 9:
+            case 11:
+                return 30;
+            default:
+                return 31;
+        }
+    }
+
     private GattDateTime() {
     }
 
@@ -51,8 +73,8 @@ final class GattDateTime {
         int minute = r.uint8();
         int second = r.uint8();
         if (!r.isValid() || year == YEAR_UNKNOWN || month < 1 || month > 12
-                || day < 1 || day > 31 || hour > 23 || minute > 59
-                || second > 59) {
+                || day < 1 || day > daysInMonth(year, month)
+                || hour > 23 || minute > 59 || second > 59) {
             return -1;
         }
         // Field-at-a-time rather than clear() plus the six-argument set():

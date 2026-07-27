@@ -66,9 +66,14 @@ public final class HealthTimeRange {
         return new HealthTimeRange(startMillis, endMillis, false);
     }
 
-    /// A zero-width range at one instant, for querying a single moment.
+    /// A range covering exactly one instant.
+    ///
+    /// One millisecond wide rather than zero: ranges are half-open, so
+    /// `[t,t)` contains nothing at all and the factory documented for
+    /// querying a single moment returned an empty result for every input,
+    /// including a sample stamped exactly at `t`.
     public static HealthTimeRange at(long instantMillis) {
-        return new HealthTimeRange(instantMillis, instantMillis, false);
+        return new HealthTimeRange(instantMillis, instantMillis + 1, false);
     }
 
     /// The last `durationMillis` milliseconds, ending now.

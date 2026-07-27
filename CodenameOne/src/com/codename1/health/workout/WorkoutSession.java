@@ -238,6 +238,16 @@ public abstract class WorkoutSession {
             failState(out, "addSamples");
             return out;
         }
+        if (state == WorkoutSessionState.PAUSED) {
+            // Accepted but dropped. A strap stays connected across a pause
+            // and keeps notifying, and the elapsed clock already excludes
+            // the paused span -- so rolling these in produced a saved
+            // workout whose totals covered time its own duration says did
+            // not happen. Callers explicitly feeding history can add it
+            // after resuming.
+            out.complete(Boolean.TRUE);
+            return out;
+        }
         if (samples == null || samples.isEmpty()) {
             out.complete(Boolean.TRUE);
             return out;

@@ -395,16 +395,15 @@ class CN1HealthConnectBridge(private val context: Context)
             // Counted in emitted lines, not records. One heart-rate record
             // holds many samples and appendOne flattens them, so a
             // limit-1 request could otherwise return hundreds of lines.
+            // Every record in the fetched page is emitted. pageSize is
+            // counted in records while the budget is counted in samples,
+            // so breaking out mid-page abandoned records already fetched --
+            // and the page token resumes after the whole page, so they
+            // could never be read again. Overshooting the caller's limit
+            // is recoverable; skipping records is not.
             var lines = 0
             for (record in page.records) {
-                // The budget goes *into* the writer. Checking afterwards
-                // let one series record append hundreds of samples before
-                // the overrun was noticed, which is the whole failure the
-                // limit is supposed to prevent.
-                lines += appendOne(sb, record, token, remaining - lines)
-                if (lines >= remaining) {
-                    break
-                }
+                lines += appendOne(sb, record, token)
             }
             remaining -= lines
             emitted += lines
@@ -430,10 +429,7 @@ class CN1HealthConnectBridge(private val context: Context)
      * than silently dropping them.
      */
     private fun appendOne(sb: StringBuilder, record: Record,
-                          token: String, budget: Int = Int.MAX_VALUE): Int {
-        if (budget <= 0) {
-            return 0
-        }
+                          token: String): Int {
         when (record) {
             is StepsRecord -> interval(sb, record, token,
                 record.startTime, record.endTime,
@@ -672,28 +668,33 @@ class CN1HealthConnectBridge(private val context: Context)
                 weight = Mass.kilograms(value), metadata = meta)
 
             "lean_body_mass" -> LeanBodyMassRecord(time = start,
-                zoneOffset = zone, mass = Mass.kilograms(value))
+                zoneOffset = zone, mass = Mass.kilograms(value),
+                metadata = meta)
 
             "bone_mass" -> BoneMassRecord(time = start, zoneOffset = zone,
                 mass = Mass.kilograms(value), metadata = meta)
 
             "body_fat_percentage" -> BodyFatRecord(time = start,
-                zoneOffset = zone, percentage = Percentage(value))
+                zoneOffset = zone, percentage = Percentage(value),
+                metadata = meta)
 
             "height" -> HeightRecord(time = start, zoneOffset = zone,
                 height = Length.meters(value), metadata = meta)
 
             "resting_heart_rate" -> RestingHeartRateRecord(time = start,
-                zoneOffset = zone, beatsPerMinute = value.toLong())
+                zoneOffset = zone, beatsPerMinute = value.toLong(),
+                metadata = meta)
 
             "oxygen_saturation" -> OxygenSaturationRecord(time = start,
-                zoneOffset = zone, percentage = Percentage(value))
+                zoneOffset = zone, percentage = Percentage(value),
+                metadata = meta)
 
             "respiratory_rate" -> RespiratoryRateRecord(time = start,
-                zoneOffset = zone, rate = value)
+                zoneOffset = zone, rate = value, metadata = meta)
 
             "body_temperature" -> BodyTemperatureRecord(time = start,
-                zoneOffset = zone, temperature = Temperature.celsius(value))
+                zoneOffset = zone, temperature = Temperature.celsius(value),
+                metadata = meta)
 
             "basal_body_temperature" -> BasalBodyTemperatureRecord(
                 time = start, zoneOffset = zone,

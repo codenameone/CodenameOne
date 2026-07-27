@@ -170,8 +170,16 @@ public class LocalHealthStore extends HealthStore {
         }
         // A sample belongs to the range when it overlaps it, so an
         // interval straddling the boundary is not silently dropped.
-        if (s.getEndMillis() < range.getStartMillis()
-                || s.getStartMillis() >= range.getEndMillis()) {
+        //
+        // Half-open at both ends: an interval ending exactly at the start
+        // has zero overlap and belongs to the previous range, so steps
+        // ending at midnight are yesterday's. An instantaneous sample at
+        // the inclusive start is still inside.
+        if (s.getStartMillis() >= range.getEndMillis()) {
+            return false;
+        }
+        if (s.isInstantaneous() ? s.getEndMillis() < range.getStartMillis()
+                : s.getEndMillis() <= range.getStartMillis()) {
             return false;
         }
         List<String> sources = query.getSources();

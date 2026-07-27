@@ -224,11 +224,11 @@ The simulator's data is synthetic and seeded, not recorded from anyone. That's i
 
 *Background delivery never fires.* No platform pushes health data to a closed app in this release -- see the subscriptions section. Call `drainChanges()` from your background-fetch handler and branch on `isPushDelivery()` rather than assuming.
 
-*Replaying stored glucose records is not implemented.* `SensorSession.requestStoredRecords(...)` always fails with `NOT_SUPPORTED` in this release. Replay runs over the Record Access Control Point -- a stateful protocol on a second characteristic -- and it is not worth shipping untested against real meters. Live glucose notifications work normally.
+*Replaying stored glucose records isn't implemented.* `SensorSession.requestStoredRecords(...)` always fails with `NOT_SUPPORTED` in this release. Replay runs over the Record Access Control Point -- a stateful protocol on a second characteristic -- and shipping it untested against real meters would be worse than saying so. Live glucose notifications work normally.
 
-*Sample metadata does not reach the phone's health store.* `HealthSample.getMetadata()` round-trips locally -- the simulator, desktop and JavaScript store -- but is not persisted to HealthKit or Health Connect in this release, so a sample written and read back on a device returns without it. Health Connect has no arbitrary metadata at all, only a single client record id. Keep your correlation identifier in your own storage.
+*Sample metadata doesn't reach the phone's health store.* `HealthSample.getMetadata()` round-trips locally -- the simulator, desktop and JavaScript store -- but isn't persisted to HealthKit or Health Connect in this release, so a sample written and read back on a device returns without it. Health Connect has no arbitrary metadata at all, only a single client record id. Keep your correlation identifier in your own storage.
 
-*Recorded workouts have no keepalive on Android.* The manifest declares no foreground service, so a recorded workout lives exactly as long as your process does. If you need one to survive backgrounding, keep the app alive yourself.
+*Recorded workouts are not kept alive on Android.* The manifest declares no foreground service, so a recorded workout lives exactly as long as your process does. If you need one to survive backgrounding, keep the app alive yourself.
 
 *`BODY_MASS_INDEX` is rejected on Android.* Health Connect has no BMI permission or record -- BMI is derived, not stored -- so the build fails rather than requesting an unrelated body-composition permission on your behalf. Read `BODY_MASS` and `HEIGHT` and compute it. HealthKit does store BMI, so iOS is unaffected.
 
