@@ -112,6 +112,43 @@ class InferenceApiTest extends UITestBase {
     }
 
     @Test
+    void modelCacheCoalescesIdenticalConcurrentFetches() {
+        String fileName = "model-cache-coalescing-test.tflite";
+        ModelCache.FetchRegistration first = ModelCache.registerFetch(
+                fileName, "https://one.example/model.tflite", null);
+        ModelCache.FetchRegistration duplicate = ModelCache.registerFetch(
+                fileName, "https://one.example/model.tflite", null);
+        assertTrue(first.owner);
+        assertFalse(duplicate.owner);
+        assertSame(first.resource, duplicate.resource);
+
+        ModelCache.FetchRegistration conflict = ModelCache.registerFetch(
+                fileName, "https://two.example/model.tflite", null);
+        AtomicReference<Throwable> conflictError =
+                new AtomicReference<Throwable>();
+        conflict.resource.except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable value) {
+                conflictError.set(value);
+            }
+        });
+        flushSerialCalls();
+        assertNotNull(conflictError.get(),
+                "conflicting content for one cache key must fail");
+
+        first.completion.complete(ModelSource.file("test-model.tflite"));
+        flushSerialCalls();
+        ModelCache.FetchRegistration afterCompletion =
+                ModelCache.registerFetch(fileName,
+                        "https://two.example/model.tflite", null);
+        assertTrue(afterCompletion.owner,
+                "completion must release the cache-key download slot");
+        afterCompletion.completion.complete(
+                ModelSource.file("test-model-2.tflite"));
+        flushSerialCalls();
+    }
+
+    @Test
     void modelCacheNamesDoNotAliasSanitizedKeys() {
         assertNotEquals(ModelCache.safeName("model/v1"),
                 ModelCache.safeName("model?v1"));

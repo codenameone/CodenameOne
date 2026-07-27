@@ -150,10 +150,12 @@ actual backend id without exposing platform classes.
 `InferenceSession` supports named typed tensors, multiple inputs and outputs,
 input resizing, and reusable native sessions. Model sources are bytes,
 resources, private files, or the HTTPS-only `ModelCache`. The cache rejects
-redirects that downgrade a request to HTTP. File sources are opened by path
-without copying the model through the Java heap. The cache can verify a
-SHA-256 digest before publishing a downloaded model; callers should always
-supply the digest for mutable or third-party downloads.
+redirects that downgrade a request to HTTP. Identical concurrent fetches for
+one cache entry coalesce, while conflicting in-flight content identities fail
+instead of sharing a temporary path. File sources are opened by path without
+copying the model through the Java heap. The cache can verify a SHA-256 digest
+before publishing a downloaded model; callers should always supply the digest
+for mutable or third-party downloads.
 
 All native sessions and analyzers must be closed. Expensive open, analysis,
 and inference work runs off the EDT; completion and error delivery return to

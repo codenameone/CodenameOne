@@ -109,4 +109,25 @@ class ChatRequestBuilderTest {
         // ChatView can render a stripped-down preview safely.
         assertEquals("hello\nworld", m.getText());
     }
+
+    @Test
+    void binaryAiValuesAreDefensivelyCopied() {
+        byte[] imageBytes = new byte[] {1, 2, 3};
+        ImagePart image = new ImagePart(imageBytes, "image/png");
+        imageBytes[0] = 9;
+        assertArrayEquals(new byte[] {1, 2, 3}, image.getData());
+        byte[] returnedImage = image.getData();
+        returnedImage[1] = 9;
+        assertArrayEquals(new byte[] {1, 2, 3}, image.getData());
+
+        float[] coordinates = new float[] {0.25f, 0.75f};
+        Embedding embedding = new Embedding(coordinates, 0);
+        coordinates[0] = 9;
+        assertArrayEquals(new float[] {0.25f, 0.75f},
+                embedding.getVector());
+        float[] returnedVector = embedding.getVector();
+        returnedVector[1] = 9;
+        assertArrayEquals(new float[] {0.25f, 0.75f},
+                embedding.getVector());
+    }
 }

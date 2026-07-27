@@ -22,27 +22,26 @@
  */
 package com.codename1.ai;
 
-/// An image attachment for a multi-modal [ChatMessage]. Construct from
-/// raw bytes (the provider encodes them as base64 inline data) or from
-/// a publicly-reachable URL -- both modes are accepted by OpenAI,
-/// Anthropic, and Gemini.
 /// Image content within a multimodal {@link ChatMessage}. An image is either
-/// inline encoded bytes with a MIME type or a provider-accessible URL.
+/// inline encoded bytes with a MIME type or a provider-accessible URL. Inline
+/// bytes are copied on construction and access so later caller mutations
+/// cannot change a request that already contains this part.
 public final class ImagePart extends MessagePart {
     private final byte[] data;
     private final String mimeType;
     private final String url;
 
-    /// Inline image bytes. `mimeType` must be set (e.g. `"image/png"`,
-    /// `"image/jpeg"`); the providers reject inline images without it.
-    /// Creates an inline image part.
+    /// Creates an inline image part. The media type must describe the encoded
+    /// bytes, for example {@code image/png} or {@code image/jpeg}; providers
+    /// reject inline images without a type.
+    ///
     /// @param data encoded image bytes, defensively copied
     /// @param mimeType media type such as {@code image/png}
     public ImagePart(byte[] data, String mimeType) {
         if (data == null || mimeType == null) {
             throw new IllegalArgumentException("data and mimeType are required");
         }
-        this.data = data;
+        this.data = copy(data);
         this.mimeType = mimeType;
         this.url = null;
     }
@@ -61,7 +60,7 @@ public final class ImagePart extends MessagePart {
 
     /// @return a defensive copy of inline bytes, or {@code null} for a URL image
     public byte[] getData() {
-        return data;
+        return copy(data);
     }
 
     /// @return MIME type of inline bytes, or {@code null} for a URL image
@@ -77,5 +76,14 @@ public final class ImagePart extends MessagePart {
     /// @return {@code true} when this part references a URL instead of bytes
     public boolean isUrl() {
         return url != null;
+    }
+
+    private static byte[] copy(byte[] value) {
+        if (value == null) {
+            return null;
+        }
+        byte[] result = new byte[value.length];
+        System.arraycopy(value, 0, result, 0, value.length);
+        return result;
     }
 }

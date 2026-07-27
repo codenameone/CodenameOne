@@ -382,7 +382,10 @@ HTTP fails the resource and discards the temporary download. Supply the
 digest for every third-party or remotely mutable model: an omitted digest
 provides transport security but doesn't pin the executable model payload.
 Interrupted downloads restart through a temporary `.download` file and are
-never promoted to the cache until verification succeeds.
+never promoted to the cache until verification succeeds. Concurrent calls for
+the same cache key and content identity share one download. A conflicting URL
+or digest for a cache key that is already downloading fails rather than
+writing to the same temporary file.
 
 === On-device language services
 

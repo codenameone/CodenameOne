@@ -33,6 +33,7 @@ import com.codename1.util.AsyncResource;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Hashtable;
 
 /// Downloads a large model into app-private storage and exposes it as a
 /// file-backed {@link ModelSource}. The initial request and every redirect
@@ -45,6 +46,8 @@ import java.io.InputStream;
 /// {@link ModelSource#resource(String)}.
 public final class ModelCache {
     private static final int MAX_READABLE_CACHE_KEY_LENGTH = 160;
+    private static final Hashtable<String, ActiveFetch> ACTIVE_FETCHES =
+            new Hashtable<String, ActiveFetch>();
 
     private ModelCache() {
     }
@@ -53,6 +56,9 @@ public final class ModelCache {
     /// A stale {@code .download} file is deleted and restarted rather than
     /// resumed because the portable network layer cannot prove that a server's
     /// partial response still represents the pinned model.
+    /// Concurrent requests for the same cache entry and content identity share
+    /// one operation. A different URL or digest using that cache key while the
+    /// first operation is active fails instead of racing on the temporary file.
     ///
     /// @param url HTTPS URL of the model; every redirect must also use HTTPS
     /// @param cacheKey stable cache name, independent of the URL
@@ -70,16 +76,20 @@ public final class ModelCache {
             throw new IllegalArgumentException("SHA-256 must contain 64 hex characters");
         }
 
-        final AsyncResource<ModelSource> out = new AsyncResource<ModelSource>();
-        final Completion<ModelSource> completion =
-                new Completion<ModelSource>(out);
+        final String fileName = safeName(cacheKey) + ".tflite";
+        final FetchRegistration registration =
+                registerFetch(fileName, url, sha256);
+        if (!registration.owner) {
+            return registration.resource;
+        }
+        final AsyncResource<ModelSource> out = registration.resource;
+        final Completion<ModelSource> completion = registration.completion;
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             @Override
             public void run() {
                 final FileSystemStorage fs = FileSystemStorage.getInstance();
                 final String directory = fs.getAppHomePath() + "ai-models/";
                 fs.mkdir(directory);
-                final String fileName = safeName(cacheKey) + ".tflite";
                 final String target = directory + fileName;
                 try {
                     if (fs.exists(target) && verify(target, sha256)) {
@@ -106,6 +116,8 @@ public final class ModelCache {
 
     /// Fetches a model without content pinning. Prefer the three-argument
     /// overload for any model that is not versioned by the app itself.
+    /// Concurrent unpinned calls share an operation only when their URL and
+    /// cache key are identical.
     ///
     /// @param url HTTPS model URL
     /// @param cacheKey stable cache name
@@ -240,6 +252,80 @@ public final class ModelCache {
                 "https://", 0, "https://".length());
     }
 
+    static FetchRegistration registerFetch(
+            String fileName, String url, String sha256) {
+        synchronized (ACTIVE_FETCHES) {
+            ActiveFetch active = ACTIVE_FETCHES.get(fileName);
+            if (active != null) {
+                if (active.matches(url, sha256)) {
+                    return new FetchRegistration(
+                            active.resource, null, false);
+                }
+                AsyncResource<ModelSource> conflict =
+                        new AsyncResource<ModelSource>();
+                new Completion<ModelSource>(conflict).fail(
+                        new IOException("A different model download is "
+                                + "already using cache key " + fileName));
+                return new FetchRegistration(conflict, null, false);
+            }
+            AsyncResource<ModelSource> resource =
+                    new AsyncResource<ModelSource>();
+            Completion<ModelSource> completion =
+                    new Completion<ModelSource>(resource, fileName);
+            ACTIVE_FETCHES.put(fileName,
+                    new ActiveFetch(url, sha256, resource));
+            return new FetchRegistration(resource, completion, true);
+        }
+    }
+
+    private static void releaseFetch(
+            String fileName, AsyncResource<?> resource) {
+        if (fileName == null) {
+            return;
+        }
+        synchronized (ACTIVE_FETCHES) {
+            ActiveFetch active = ACTIVE_FETCHES.get(fileName);
+            if (active != null && active.resource == resource) {
+                ACTIVE_FETCHES.remove(fileName);
+            }
+        }
+    }
+
+    static final class ActiveFetch {
+        private final String url;
+        private final String sha256;
+        private final AsyncResource<ModelSource> resource;
+
+        ActiveFetch(String url, String sha256,
+                    AsyncResource<ModelSource> resource) {
+            this.url = url;
+            this.sha256 = sha256;
+            this.resource = resource;
+        }
+
+        boolean matches(String otherUrl, String otherSha256) {
+            if (sha256 != null || otherSha256 != null) {
+                return sha256 != null && otherSha256 != null
+                        && sha256.equalsIgnoreCase(otherSha256);
+            }
+            return url.equals(otherUrl);
+        }
+    }
+
+    static final class FetchRegistration {
+        final AsyncResource<ModelSource> resource;
+        final Completion<ModelSource> completion;
+        final boolean owner;
+
+        FetchRegistration(AsyncResource<ModelSource> resource,
+                          Completion<ModelSource> completion,
+                          boolean owner) {
+            this.resource = resource;
+            this.completion = completion;
+            this.owner = owner;
+        }
+    }
+
     static final class ModelDownloadRequest extends ConnectionRequest {
         private final Completion<ModelSource> completion;
         private final FileSystemStorage fs;
@@ -269,10 +355,16 @@ public final class ModelCache {
 
     static final class Completion<T> {
         private final AsyncResource<T> resource;
+        private final String activeFileName;
         private boolean done;
 
         Completion(AsyncResource<T> resource) {
+            this(resource, null);
+        }
+
+        Completion(AsyncResource<T> resource, String activeFileName) {
             this.resource = resource;
+            this.activeFileName = activeFileName;
         }
 
         synchronized void complete(final T value) {
@@ -280,6 +372,7 @@ public final class ModelCache {
                 return;
             }
             done = true;
+            releaseFetch(activeFileName, resource);
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
@@ -293,6 +386,7 @@ public final class ModelCache {
                 return;
             }
             done = true;
+            releaseFetch(activeFileName, resource);
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
