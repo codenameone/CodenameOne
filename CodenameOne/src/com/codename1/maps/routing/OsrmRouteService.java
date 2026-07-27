@@ -452,7 +452,19 @@ public class OsrmRouteService implements RouteService {
         void start() {
             NetworkManager nm = NetworkManager.getInstance();
             nm.addProgressListener(this);
-            nm.addToQueue(this);
+            try {
+                nm.addToQueue(this);
+            } catch (RuntimeException e) {
+                // Queueing validates synchronously -- a base URL that is not
+                // HTTP fails right here. Nothing will ever run or complete, so
+                // detach the listener (it would otherwise pin this request and
+                // its callback to the NetworkManager for good) and report the
+                // failure the same way as any other, rather than letting it
+                // escape a call documented to answer through the callback.
+                nm.removeProgressListener(this);
+                failLater("The routing request could not be sent: "
+                        + describe(e, "the endpoint was rejected"), e);
+            }
         }
 
         /// Counts the extra attempt before delegating. `retry()` runs inside

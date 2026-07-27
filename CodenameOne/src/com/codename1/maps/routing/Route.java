@@ -101,6 +101,16 @@ public final class Route {
     /// The smallest [MapBounds] containing the whole route, or `null` when the
     /// route has no geometry. Pass it to
     /// [com.codename1.maps.MapSurface#fitBounds] to frame the journey.
+    ///
+    /// **Antimeridian caveat**: [MapBounds] is an axis-aligned box whose
+    /// longitudes always run west to east, so it cannot describe a span that
+    /// wraps past 180 degrees. A route crossing the antimeridian -- Fiji to
+    /// Samoa, say -- therefore reports a box that runs the long way round the
+    /// globe, and framing it zooms out to most of the world instead of the
+    /// Pacific. This is a limitation of the bounds type rather than of
+    /// routing, and it affects anything built from
+    /// [MapBounds#fromCoordinates]; frame such a route from its own points
+    /// instead of from these bounds.
     public MapBounds getBounds() {
         if (bounds == null) {
             bounds = MapBounds.fromCoordinates(points);
