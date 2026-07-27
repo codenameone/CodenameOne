@@ -48,6 +48,12 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
     /// suffices because MCP runs one server per process.
     private static MCPLoopbackSocketTransport active;
 
+    /// Ceiling on one incoming frame. What arrives here are requests - tool calls and UI
+    /// actions - while the bulky payloads, screenshots among them, travel the other way,
+    /// so this sits far above any legitimate message. It exists to bound what an ill
+    /// behaved or hostile client can make the server allocate.
+    private static final int MAX_FRAME_BYTES = 8 * 1024 * 1024;
+
     private final int port;
     private final Object lock = new Object();
     private Socket.StopListening listening;
@@ -192,6 +198,13 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         // a payload that happened to contain one.
         boolean pendingCarriageReturn = false;
         while (true) {
+            if (buffer.size() >= MAX_FRAME_BYTES) {
+                // A client that sends no delimiter would otherwise grow this buffer until
+                // the process runs out of memory, and on a device any other app installed
+                // alongside can open this connection. Treat it as a disconnect, the same
+                // as a truncated frame, so the server stays bound for the next session.
+                return null;
+            }
             int b;
             try {
                 b = stream.read();

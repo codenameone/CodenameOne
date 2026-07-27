@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -149,6 +150,48 @@ class MCPLoopbackSocketTransportTest {
                 new ByteArrayOutputStream());
         reader.join(3000);
         assertEquals("{\"id\":9}", out[0], "the reconnecting agent's message should arrive");
+    }
+
+    @Test
+    void aClientThatNeverDelimitsItsFrameCannotExhaustMemory() throws Exception {
+        // A stream that never ends and never delimits: without a ceiling on the frame the
+        // reader would accumulate until the process died, and on a device any other
+        // installed app can open this connection. It must be dropped like any other bad
+        // client, leaving the server available for the next session.
+        final MCPLoopbackSocketTransport t = new MCPLoopbackSocketTransport(47811);
+        transport = t;
+        // Counting what the client is asked for is what distinguishes a ceiling from no
+        // ceiling here: the thread stays alive either way, but an uncapped reader never
+        // stops asking for more.
+        final AtomicLong served = new AtomicLong();
+        t.attach(new InputStream() {
+            @Override
+            public int read() {
+                served.incrementAndGet();
+                return 'x';
+            }
+        }, new ByteArrayOutputStream());
+
+        final String[] out = new String[1];
+        Thread reader = new Thread(() -> {
+            try {
+                out[0] = t.readMessage();
+            } catch (IOException ignored) {
+                // surfaces as a null message below
+            }
+        });
+        reader.start();
+        Thread.sleep(500);
+        long afterSettling = served.get();
+        Thread.sleep(250);
+        assertEquals(afterSettling, served.get(),
+                "reading must stop at the frame ceiling; it was still consuming bytes");
+
+        t.attach(new ByteArrayInputStream("{\"id\":11}\n".getBytes("UTF-8")),
+                new ByteArrayOutputStream());
+        reader.join(5000);
+        assertEquals("{\"id\":11}", out[0],
+                "the next client's message should arrive normally");
     }
 
     @Test
