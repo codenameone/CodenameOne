@@ -37,10 +37,16 @@ public class VisionOptions {
         return this;
     }
 
-    /// Sets the confidence threshold, clamped to 0..1.
+    /// Sets the confidence threshold, clamped to 0..1. NaN has no meaningful
+    /// ordering and is rejected instead of being passed to platform detectors.
     /// @param value requested threshold
     /// @return this options object
+    /// @throws IllegalArgumentException if {@code value} is NaN
     public VisionOptions minimumConfidence(float value) {
+        if (Float.isNaN(value)) {
+            throw new IllegalArgumentException(
+                    "minimum confidence must be a number");
+        }
         minimumConfidence = Math.max(0, Math.min(1, value));
         return this;
     }

@@ -84,6 +84,18 @@ class VisionApiTest extends UITestBase {
     }
 
     @Test
+    void optionsRejectNaNConfidence() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new VisionOptions().minimumConfidence(Float.NaN));
+        assertEquals(0f, new VisionOptions()
+                .minimumConfidence(Float.NEGATIVE_INFINITY)
+                .getMinimumConfidence());
+        assertEquals(1f, new VisionOptions()
+                .minimumConfidence(Float.POSITIVE_INFINITY)
+                .getMinimumConfidence());
+    }
+
+    @Test
     void cameraFrameCopiesOnlyTheRequestedFormat() {
         byte[] jpeg = new byte[] {1, 2};
         byte[] pixels = new byte[] {3, 4, 5, 6};

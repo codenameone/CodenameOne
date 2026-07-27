@@ -36,9 +36,16 @@ public final class LanguageOptions {
     }
 
     /// Sets the minimum language-identification confidence, clamped to 0..1.
+    /// NaN has no meaningful ordering and is rejected instead of being passed
+    /// to a platform language identifier.
     /// @param value requested threshold
     /// @return this options object
+    /// @throws IllegalArgumentException if {@code value} is NaN
     public LanguageOptions minimumConfidence(float value) {
+        if (Float.isNaN(value)) {
+            throw new IllegalArgumentException(
+                    "minimum confidence must be a number");
+        }
         minimumConfidence = Math.max(0, Math.min(1, value));
         return this;
     }

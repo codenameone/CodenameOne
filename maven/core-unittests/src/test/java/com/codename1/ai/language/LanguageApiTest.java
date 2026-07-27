@@ -39,6 +39,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LanguageApiTest extends UITestBase {
     @Test
+    void optionsRejectNaNConfidence() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new LanguageOptions().minimumConfidence(Float.NaN));
+        assertEquals(0f, new LanguageOptions()
+                .minimumConfidence(Float.NEGATIVE_INFINITY)
+                .getMinimumConfidence());
+        assertEquals(1f, new LanguageOptions()
+                .minimumConfidence(Float.POSITIVE_INFINITY)
+                .getMinimumConfidence());
+    }
+
+    @Test
     void languageOperationsForwardBackendAndOptions() {
         RecordingLanguageImpl backend = new RecordingLanguageImpl();
         implementation.setLanguageImpl(backend);

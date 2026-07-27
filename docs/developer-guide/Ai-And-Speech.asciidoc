@@ -283,6 +283,8 @@ need an EXIF display rotation, use
 assumes the stored pixels are already upright and doesn't inspect EXIF
 metadata. Each analyzer returns stable Codename One result types. Bounds
 and points use normalized coordinates in the range 0 through 1.
+`VisionOptions.minimumConfidence(...)` clamps finite and infinite values to
+that range and rejects NaN.
 
 Android uses ML Kit. iOS and Mac native builds default to Apple Vision
 and Core Image. iOS can select ML Kit explicitly:
@@ -408,8 +410,9 @@ conflicting URL or digest fails instead of sharing the temporary file.
 === On-device language services
 
 `LanguageIdentifier`, `Translator`, and `SmartReply` share
-`LanguageOptions`. Translation models are downloaded and cached by ML
-Kit when a language pair is first used. Android and iOS builders
+`LanguageOptions`. Its minimum-confidence threshold clamps to 0 through 1 and
+rejects NaN. Translation models are downloaded and cached by ML Kit when a
+language pair is first used. Android and iOS builders
 select `language-id`, `translate`, and `smart-reply` independently, so
 using language identification alone doesn't package the other two
 SDKs.
