@@ -330,11 +330,15 @@ static NSMutableDictionary* _cn1LoopbackListeners = nil;
         return NO;
     }
 
-    // accept() blocks; hand the VM back this thread while it does.
+    // accept() blocks; hand the VM back this thread while it does. EINTR is retried
+    // rather than reported: a signal arriving while parked here is a spurious wakeup, not
+    // a request to stop. Stopping arrives as a CLOSED descriptor, which is EBADF.
     int clientFd;
-    _yield();
-    clientFd = accept(listenFd, NULL, NULL);
-    _resume();
+    do {
+        _yield();
+        clientFd = accept(listenFd, NULL, NULL);
+        _resume();
+    } while(clientFd < 0 && errno == EINTR);
     if(clientFd < 0) {
         int acceptErrno = errno;
         errorCode = -1;
@@ -342,7 +346,7 @@ static NSMutableDictionary* _cn1LoopbackListeners = nil;
         // Stopping a listener is delivered by closing its descriptor, so these mean
         // "you were asked to stop", not "the accept failed". Reporting them as errors
         // would make every deliberate shutdown look like a fault to the Java side.
-        if(acceptErrno == EBADF || acceptErrno == EINVAL || acceptErrno == EINTR) {
+        if(acceptErrno == EBADF || acceptErrno == EINVAL) {
             errorMessage = nil;
         } else {
             errorMessage = @"Accept failed";

@@ -237,13 +237,6 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         // a payload that happened to contain one.
         boolean pendingCarriageReturn = false;
         while (true) {
-            if (buffer.size() > MAX_FRAME_BYTES) {
-                // A client that sends no delimiter would otherwise grow this buffer until
-                // the process runs out of memory, and on a device any other app installed
-                // alongside can open this connection. Treat it as a disconnect, the same
-                // as a truncated frame, so the server stays bound for the next session.
-                return null;
-            }
             int b;
             try {
                 b = stream.read();
@@ -263,7 +256,9 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
                 if (b == '\n') {
                     return toUtf8(buffer);          // the CR belonged to a CRLF delimiter
                 }
-                buffer.write('\r');                 // it belonged to the payload after all
+                if (!append(buffer, '\r')) {        // it belonged to the payload after all
+                    return null;
+                }
             }
             if (b == '\r') {
                 pendingCarriageReturn = true;
@@ -272,8 +267,26 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
             if (b == '\n') {
                 return toUtf8(buffer);
             }
-            buffer.write(b);
+            if (!append(buffer, b)) {
+                return null;
+            }
         }
+    }
+
+    /// Appends one payload byte, refusing once the frame would pass [#MAX_FRAME_BYTES].
+    /// Enforced here rather than at the top of the read loop so the ceiling is exact: a
+    /// frame of precisely the limit is accepted and its delimiter still read, and one byte
+    /// beyond is refused before it is ever buffered.
+    ///
+    /// A refusal is reported to the caller as end of stream. A client sending no delimiter
+    /// would otherwise grow this buffer until the process ran out of memory, and on a
+    /// device any other app installed alongside can open this connection.
+    private static boolean append(ByteArrayOutputStream buffer, int b) {
+        if (buffer.size() >= MAX_FRAME_BYTES) {
+            return false;
+        }
+        buffer.write(b);
+        return true;
     }
 
     private static String toUtf8(ByteArrayOutputStream buffer) throws IOException {

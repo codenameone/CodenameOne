@@ -260,6 +260,16 @@ public final class Socket {
                             }, "Connection " + port).start();
                         } else {
                             sc.connectionError(Util.getImplementation().getSocketErrorCode(connection), Util.getImplementation().getSocketErrorMessage(connection));
+                            // A listener whose accept fails immediately and keeps failing --
+                            // a port that cannot be bound, say -- would otherwise spin at
+                            // full speed, burning a core and filling the log. Pause so a
+                            // persistent failure is slow and visible instead of hot. Only
+                            // the failure path waits; a served connection never gets here.
+                            try {
+                                Thread.sleep(500);
+                            } catch (InterruptedException interrupted) {
+                                // fall through: the loop re-tests stopped straight away
+                            }
                         }
                     }
                 } catch (InstantiationException err) {
