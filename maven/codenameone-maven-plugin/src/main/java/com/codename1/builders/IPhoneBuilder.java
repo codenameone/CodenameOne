@@ -2556,6 +2556,10 @@ public class IPhoneBuilder extends Executor {
                 }
                 addLibs = appendFrameworks(addLibs, "Vision.framework",
                         "CoreImage.framework", "CoreVideo.framework");
+                for (String framework : aiAcc.iosFrameworks()) {
+                    addLibs = appendFrameworks(addLibs,
+                            framework + ".framework");
+                }
             }
 
             if (usesCn1Language) {

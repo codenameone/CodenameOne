@@ -86,6 +86,7 @@ public final class PlatformFeatureCatalog {
         e.add(new Entry("com/codename1/ai/vision/TextRecognizer")
                 .iosFrameworks("Vision", "CoreImage")
                 .androidGradle("com.google.mlkit:text-recognition:16.0.0")
+                .androidMinimumSdk(21)
                 .description("Text recognition"));
         e.add(new Entry("com/codename1/ai/vision/TextRecognizer")
                 .requiresMethod("com/codename1/ai/vision/VisionBackends",
@@ -99,6 +100,7 @@ public final class PlatformFeatureCatalog {
         e.add(new Entry("com/codename1/ai/vision/BarcodeScanner")
                 .iosFrameworks("Vision", "CoreImage")
                 .androidGradle("com.google.mlkit:barcode-scanning:17.2.0")
+                .androidMinimumSdk(21)
                 .description("Barcode scanning"));
         e.add(new Entry("com/codename1/ai/vision/BarcodeScanner")
                 .requiresMethod("com/codename1/ai/vision/VisionBackends",
@@ -112,6 +114,7 @@ public final class PlatformFeatureCatalog {
         e.add(new Entry("com/codename1/ai/vision/FaceDetector")
                 .iosFrameworks("Vision", "CoreImage")
                 .androidGradle("com.google.mlkit:face-detection:16.1.5")
+                .androidMinimumSdk(21)
                 .description("Face detection"));
         e.add(new Entry("com/codename1/ai/vision/FaceDetector")
                 .requiresMethod("com/codename1/ai/vision/VisionBackends",
@@ -125,6 +128,7 @@ public final class PlatformFeatureCatalog {
         e.add(new Entry("com/codename1/ai/vision/ImageLabeler")
                 .iosFrameworks("Vision", "CoreML")
                 .androidGradle("com.google.mlkit:image-labeling:17.0.7")
+                .androidMinimumSdk(21)
                 .description("Image labeling"));
         e.add(new Entry("com/codename1/ai/vision/ImageLabeler")
                 .requiresMethod("com/codename1/ai/vision/VisionBackends",
@@ -138,6 +142,7 @@ public final class PlatformFeatureCatalog {
         e.add(new Entry("com/codename1/ai/vision/PoseDetector")
                 .iosFrameworks("Vision", "CoreML")
                 .androidGradle("com.google.mlkit:pose-detection:18.0.0-beta3")
+                .androidMinimumSdk(21)
                 .description("Pose detection"));
         e.add(new Entry("com/codename1/ai/vision/PoseDetector")
                 .requiresMethod("com/codename1/ai/vision/VisionBackends",
@@ -152,6 +157,7 @@ public final class PlatformFeatureCatalog {
                 .iosFrameworks("Vision", "CoreML")
                 .androidGradle(
                         "com.google.mlkit:segmentation-selfie:16.0.0-beta5")
+                .androidMinimumSdk(21)
                 .description("Selfie segmentation"));
         e.add(new Entry("com/codename1/ai/vision/SelfieSegmenter")
                 .requiresMethod("com/codename1/ai/vision/VisionBackends",
@@ -174,11 +180,13 @@ public final class PlatformFeatureCatalog {
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosFrameworks("CoreML", "Metal", "Accelerate")
                 .androidGradle("com.google.ai.edge.litert:litert:1.0.1")
+                .androidMinimumSdk(21)
                 .description("LiteRT inference"));
 
         e.add(new Entry("com/codename1/ai/language/LanguageIdentifier")
                 .iosFrameworks("NaturalLanguage")
                 .androidGradle("com.google.mlkit:language-id:17.0.6")
+                .androidMinimumSdk(21)
                 .description("On-device language identification"));
         e.add(new Entry("com/codename1/ai/language/LanguageIdentifier")
                 .requiresMethod("com/codename1/ai/language/LanguageBackends",
@@ -198,6 +206,7 @@ public final class PlatformFeatureCatalog {
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
                 .androidGradle("com.google.mlkit:translate:17.0.3")
+                .androidMinimumSdk(21)
                 .description("On-device translation"));
         e.add(new Entry("com/codename1/ai/language/SmartReply")
                 .iosPod("GoogleMLKit/SmartReply")
@@ -206,6 +215,7 @@ public final class PlatformFeatureCatalog {
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
                 .androidGradle("com.google.mlkit:smart-reply:17.0.4")
+                .androidMinimumSdk(21)
                 .description("On-device smart reply"));
 
         e.add(new Entry("com/codename1/ai/whisper/")
@@ -350,6 +360,46 @@ public final class PlatformFeatureCatalog {
             }
             return false;
         }
+
+        /**
+         * Returns the highest Android API level required by the matched
+         * catalog entries.
+         *
+         * <p>Builders should combine this value with the application's
+         * {@code android.min_sdk_version} and retain the larger value before
+         * writing either the manifest or Gradle configuration. This prevents
+         * Android's manifest merger from rejecting a dependency whose own
+         * minimum SDK is newer than Codename One's default.</p>
+         *
+         * @return the required Android API level, or {@code 0} when none of
+         * the matched entries imposes an additional minimum
+         */
+        public int minimumAndroidSdk() {
+            int minimum = 0;
+            for (Entry entry : hits()) {
+                minimum = Math.max(minimum, entry.androidMinimumSdk());
+            }
+            return minimum;
+        }
+
+        /**
+         * Returns the de-duplicated Apple system frameworks required by the
+         * matched entries.
+         *
+         * <p>Names are returned without the {@code .framework} suffix, exactly
+         * as they appear in the catalog. Builders can append the suffix while
+         * merging these values into an application's existing library list.
+         * The returned set is immutable.</p>
+         *
+         * @return the framework names required by the observed API usage
+         */
+        public Set<String> iosFrameworks() {
+            Set<String> frameworks = new LinkedHashSet<String>();
+            for (Entry entry : hits()) {
+                frameworks.addAll(entry.iosFrameworks());
+            }
+            return Collections.unmodifiableSet(frameworks);
+        }
     }
 
     /**
@@ -369,6 +419,7 @@ public final class PlatformFeatureCatalog {
         private final List<String> androidPermissions = new ArrayList<String>();
         private final List<String> androidFeatures = new ArrayList<String>();
         private final List<String[]> androidMetaData = new ArrayList<String[]>();
+        private int androidMinimumSdk;
         private boolean iosDependenciesSupportMacCatalyst = true;
         private boolean iosDependenciesSupportArm64Simulator = true;
         private String iosMinimumDeploymentTarget;
@@ -461,6 +512,11 @@ public final class PlatformFeatureCatalog {
             return this;
         }
 
+        Entry androidMinimumSdk(int apiLevel) {
+            androidMinimumSdk = apiLevel;
+            return this;
+        }
+
         Entry androidPermissions(String... perms) {
             for (String p : perms) {
                 androidPermissions.add(p);
@@ -549,6 +605,22 @@ public final class PlatformFeatureCatalog {
 
         public List<String> androidGradleDeps() {
             return Collections.unmodifiableList(androidGradle);
+        }
+
+        /**
+         * Returns the minimum Android API level required by this entry's
+         * native dependencies.
+         *
+         * <p>The Android builder raises the application's requested minimum
+         * to at least this value before generating the manifest and Gradle
+         * configuration. A value of {@code 0} means that the entry does not
+         * impose an additional floor.</p>
+         *
+         * @return the required Android API level, or {@code 0} when no
+         * catalog-specific minimum is required
+         */
+        public int androidMinimumSdk() {
+            return androidMinimumSdk;
         }
 
         public List<String> androidPermissions() {

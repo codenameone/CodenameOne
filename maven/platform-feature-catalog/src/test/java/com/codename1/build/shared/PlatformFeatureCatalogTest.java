@@ -42,6 +42,7 @@ class PlatformFeatureCatalogTest {
         assertTrue(e.iosFrameworks().contains("Vision"));
         assertTrue(e.iosPods().isEmpty());
         assertTrue(e.androidGradleDeps().get(0).startsWith("com.google.mlkit:text-recognition"));
+        assertEquals(21, e.androidMinimumSdk());
         assertTrue(e.iosPlistEntries().isEmpty(),
                 "Still-image analysis must not imply camera permission");
     }
@@ -220,6 +221,39 @@ class PlatformFeatureCatalogTest {
                 "The official TensorFlow Lite Objective-C XCFramework has no Catalyst slice");
         assertTrue(e.iosDependenciesSupportArm64Simulator(),
                 "TensorFlow Lite's XCFramework includes an arm64 simulator slice");
+        assertEquals(21, e.androidMinimumSdk(),
+                "LiteRT requires Android API 21");
+    }
+
+    @Test
+    void accumulatorCombinesAndroidFloorAndAppleFrameworks() {
+        PlatformFeatureCatalog.Accumulator acc =
+                new PlatformFeatureCatalog.Accumulator();
+        acc.consume("com/codename1/ai/vision/DocumentScanner");
+        acc.consume("com/codename1/ai/vision/ImageLabeler");
+
+        assertEquals(21, acc.minimumAndroidSdk());
+        assertTrue(acc.iosFrameworks().contains("VisionKit"));
+        assertTrue(acc.iosFrameworks().contains("CoreML"));
+        assertTrue(acc.iosFrameworks().contains("Vision"));
+    }
+
+    @Test
+    void everyMlKitAndLiteRtDependencyDeclaresAndroidFloor() {
+        int checked = 0;
+        for (PlatformFeatureCatalog.Entry entry
+                : PlatformFeatureCatalog.entries()) {
+            for (String dependency : entry.androidGradleDeps()) {
+                if (dependency.startsWith("com.google.mlkit:")
+                        || dependency.startsWith(
+                                "com.google.ai.edge.litert:")) {
+                    checked++;
+                    assertEquals(21, entry.androidMinimumSdk(), dependency);
+                }
+            }
+        }
+        assertEquals(10, checked,
+                "Expected all built-in AI Android dependencies");
     }
 
     @Test

@@ -1728,6 +1728,9 @@ public class AndroidGradleBuilder extends Executor {
                 aiExtraGradleDependencies.append("    implementation '").append(gav).append("'\n");
             }
         }
+        if (aiAcc.minimumAndroidSdk() > 0) {
+            minSDK = maxInt(Integer.toString(aiAcc.minimumAndroidSdk()), minSDK);
+        }
         if (aiAcc.anyRequiresBigUpload()) {
             request.putArgument("cn1.ai.requiresBigUpload", "true");
         }
