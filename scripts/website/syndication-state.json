@@ -1257,6 +1257,18 @@
         "source_slug": "text-input-without-native-overlay",
         "scheduled_at": "2026-07-27T09:00:00+00:00"
       }
+    },
+    "accessibility-semantics": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cms3ctzbi00000ai3doecfy30",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a6772805201a5d3e7460dc2",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-27T15:01:12+00:00"
+      }
     }
   }
 }
