@@ -140,17 +140,19 @@ class HealthManifestFragmentsTest {
         String out = HealthManifestFragments.injectPermissions("",
                 list("workout"), list(), false, false, true, 34);
         assertTrue(out.contains("android.permission.ACTIVITY_RECOGNITION"));
-        assertTrue(out.contains("android.permission.FOREGROUND_SERVICE"));
-        assertTrue(out.contains(
+        // No foreground-service permissions: this release ships no
+        // foreground service, and requesting permissions the app cannot
+        // use invites a Play review question with no good answer.
+        assertFalse(out.contains("android.permission.FOREGROUND_SERVICE"));
+        assertFalse(out.contains(
                 "android.permission.FOREGROUND_SERVICE_HEALTH"));
     }
 
-    /** FOREGROUND_SERVICE_HEALTH only exists from API 34. */
     @Test
-    void foregroundServiceHealthIsOmittedBelowApi34() {
+    void foregroundServicePermissionsAreNeverRequested() {
         String out = HealthManifestFragments.injectPermissions("",
                 list("workout"), list(), false, false, true, 33);
-        assertTrue(out.contains("android.permission.FOREGROUND_SERVICE"));
+        assertFalse(out.contains("android.permission.FOREGROUND_SERVICE"));
         assertFalse(out.contains(
                 "android.permission.FOREGROUND_SERVICE_HEALTH"));
     }
@@ -189,15 +191,22 @@ class HealthManifestFragmentsTest {
         assertFalse(older.contains("ViewPermissionUsageActivity"));
     }
 
+    /**
+     * No workout service is declared, in either configuration.
+     *
+     * The manifest used to name a class that does not exist and was never
+     * started, so it advertised a keepalive the app never had. Declaring a
+     * missing service is worse than declaring none: it reads as protection
+     * in a review of the manifest.
+     */
     @Test
-    void workoutServiceIsOnlyDeclaredWhenWorkoutsAreUsed() {
+    void noWorkoutServiceIsDeclared() {
         assertFalse(HealthManifestFragments.injectApplicationEntries("",
                 false, 34).contains("HealthWorkoutService"));
         String withWorkouts = HealthManifestFragments
                 .injectApplicationEntries("", true, 34);
-        assertTrue(withWorkouts.contains("HealthWorkoutService"));
-        assertTrue(withWorkouts.contains(
-                "android:foregroundServiceType=\"health\""));
+        assertFalse(withWorkouts.contains("HealthWorkoutService"));
+        assertFalse(withWorkouts.contains("foregroundServiceType"));
     }
 
     /**
@@ -214,7 +223,8 @@ class HealthManifestFragmentsTest {
                 true, 34);
         assertEquals(once, twice, "a second pass must add nothing");
         assertEquals(1, count(twice, "<activity android:name="));
-        assertEquals(1, count(twice, "<service android:name="));
+        assertEquals(0, count(twice, "<service android:name="),
+                "no service is declared -- see noWorkoutServiceIsDeclared");
     }
 
     @Test

@@ -159,21 +159,42 @@ public final class HealthWire {
         if (payload == null || payload.length() == 0) {
             return new SamplePage(out, null, false);
         }
+        String nextToken = null;
+        boolean truncated = false;
         int start = 0;
         while (start < payload.length()) {
             int end = payload.indexOf(LINE, start);
             if (end < 0) {
                 end = payload.length();
             }
-            HealthSample s = decodeSampleLine(
-                    payload.substring(start, end));
+            String line = payload.substring(start, end);
+            start = end + 1;
+            if (line.length() > 0 && line.charAt(0) == PAGE_MARKER) {
+                // Trailer: the platform's continuation state. Without it
+                // every page claimed to be the last complete one, so the
+                // documented paging loop could never fetch the rest and a
+                // long history was silently cut off at the first limit.
+                String[] f = split(line.substring(1));
+                if (f.length > 0 && f[0].length() > 0) {
+                    nextToken = f[0];
+                }
+                truncated = f.length > 1 && "1".equals(f[1]);
+                continue;
+            }
+            HealthSample s = decodeSampleLine(line);
             if (s != null) {
                 out.add(s);
             }
-            start = end + 1;
         }
-        return new SamplePage(out, null, false);
+        return new SamplePage(out, nextToken, truncated);
     }
+
+    /// First character of the optional trailer line carrying paging state.
+    ///
+    /// A marker rather than a fixed position because ports stream sample
+    /// lines as they read them and only learn the continuation state at
+    /// the end.
+    public static final char PAGE_MARKER = '#';
 
     /// Decodes the change page produced by the Health Connect bridge.
     ///
@@ -293,6 +314,10 @@ public final class HealthWire {
           .append(",\"end\":").append(range.getEndMillis())
           .append(",\"limit\":").append(query.getLimit())
           .append(",\"descending\":").append(query.isSortDescending());
+        if (query.getPageToken() != null) {
+            sb.append(",\"pageToken\":\"")
+              .append(escape(query.getPageToken())).append('"');
+        }
         List<String> sources = query.getSources();
         if (!sources.isEmpty()) {
             sb.append(",\"sources\":[");

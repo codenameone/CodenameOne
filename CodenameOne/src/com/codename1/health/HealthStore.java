@@ -183,6 +183,16 @@ public class HealthStore {
                                 + " is not available on this platform");
                 return out;
             }
+            if (a.isWrite() && !isWritable(a.getType())) {
+                // Presenting a write permission this store can never use
+                // asks the user to grant something for nothing, and the
+                // flow resolves successfully while every later write is
+                // rejected locally.
+                fail(out, HealthError.TYPE_NOT_SUPPORTED,
+                        a.getType().getId()
+                                + " cannot be written on this platform");
+                return out;
+            }
             if (!deduped.contains(a)) {
                 deduped.add(a);
             }
@@ -552,7 +562,13 @@ public class HealthStore {
             if (s.getStartMillis() >= end || s.getEndMillis() < start) {
                 continue;
             }
-            if (s.getStartMillis() < range.getStartMillis()
+            // Overlap, matching sample queries. Filtering on start time
+            // dropped an interval that began before the range and ended
+            // inside it, so steps recorded 11:55-12:05 contributed nothing
+            // to an aggregate starting at noon instead of their
+            // proportional five minutes. The bucket arithmetic below
+            // already clips, so keeping it here is safe.
+            if (s.getEndMillis() < range.getStartMillis()
                     || s.getStartMillis() >= range.getEndMillis()) {
                 continue;
             }

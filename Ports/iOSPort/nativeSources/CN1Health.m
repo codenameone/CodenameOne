@@ -339,7 +339,13 @@ com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_do
         NSPredicate *pred = [HKQuery predicateForSamplesWithStartDate:from
                                                               endDate:to
                                                               options:
-            HKQueryOptionStrictStartDate];
+            // Overlap, not strict-start. The portable contract -- and
+            // LocalHealthStore.matches() -- includes an interval that
+            // straddles a boundary, so steps recorded 11:55-12:05 belong to
+            // a query starting at noon. HKQueryOptionStrictStartDate would
+            // drop them and make the same SampleQuery mean different things
+            // on iOS than everywhere else.
+            HKQueryOptionNone];
         NSSortDescriptor *sort = [NSSortDescriptor
             sortDescriptorWithKey:HKSampleSortIdentifierStartDate
                         ascending:asc];

@@ -244,15 +244,64 @@ class CN1HealthConnectBridge(private val context: Context)
             // limit-1 ascending query returns the oldest record, which is
             // the opposite of what the caller asked for.
             val ascending = !json.optBoolean("descending", false)
+            val inToken = json.optString("pageToken", "")
+            var outToken: String? = null
+            // Every type is read to the full budget and the merge happens
+            // afterwards. Spending the budget type by type made the answer
+            // depend on the order of `types` rather than on time: a
+            // descending limit-1 query over [steps, heart_rate] always
+            // returned the newest step, even when a heart-rate sample was
+            // newer.
+            val perType = ArrayList<String>()
             for (i in 0 until types.length()) {
-                if (budget <= 0) {
-                    break
+                val block = StringBuilder()
+                val r = appendRecords(block, types.getString(i), filter,
+                    budget, origins, ascending,
+                    if (i == 0 && inToken.isNotEmpty()) inToken else null)
+                perType.add(block.toString())
+                if (outToken == null) {
+                    outToken = r.second
                 }
-                budget -= appendRecords(sb, types.getString(i), filter,
-                    budget, origins, ascending)
             }
+            sb.append(mergeByTime(perType, budget, ascending))
+            // Trailer: what is left on the platform side. Reporting nothing
+            // made every page look complete, so the caller's paging loop
+            // stopped at the first limit and lost the rest.
+            sb.append('#').append(outToken ?: "").append('\t')
+                .append(if (outToken != null) "1" else "0").append('\n')
             sb.toString()
         }
+    }
+
+    /**
+     * Merges per-type blocks in time order and applies the shared limit.
+     *
+     * The line format leads with id, type, start -- start is field 2 -- so
+     * the merge sorts on that rather than re-parsing into records.
+     */
+    private fun mergeByTime(blocks: List<String>, limit: Int,
+                            ascending: Boolean): String {
+        val lines = ArrayList<String>()
+        for (block in blocks) {
+            for (line in block.split('\n')) {
+                if (line.isNotBlank()) {
+                    lines.add(line)
+                }
+            }
+        }
+        val keyed = lines.sortedBy {
+            val f = it.split('\t')
+            if (f.size > 2) f[2].toLongOrNull() ?: 0L else 0L
+        }
+        val ordered = if (ascending) keyed else keyed.asReversed()
+        val out = StringBuilder()
+        for ((i, line) in ordered.withIndex()) {
+            if (limit in 1..i) {
+                break
+            }
+            out.append(line).append('\n')
+        }
+        return out.toString()
     }
 
     /**
@@ -264,7 +313,8 @@ class CN1HealthConnectBridge(private val context: Context)
     private suspend fun appendRecords(sb: StringBuilder, token: String,
                                       filter: TimeRangeFilter, limit: Int,
                                       origins: Set<DataOrigin>,
-                                      ascending: Boolean): Int {
+                                      ascending: Boolean,
+                                      resumeToken: String?): Pair<Int, String?> {
         // A type this bridge cannot read is rejected rather than returned
         // as an empty page: the caller cannot tell an empty page apart from
         // "you have no data", which is the one answer a health API must
@@ -273,13 +323,16 @@ class CN1HealthConnectBridge(private val context: Context)
             ?: throw IllegalArgumentException(
                 "Health Connect reads are not implemented for '" + token
                     + "' in this build")
+        if (limit <= 0) {
+            return Pair(0, null)
+        }
         // Health Connect rejects a pageSize above MAX_PAGE_SIZE outright, so
         // a caller wanting more records than one page holds is served by
         // walking pages rather than by failing the read. Without this an
         // ordinary unbounded query throws before it reads anything.
         var remaining = if (limit > 0) limit else Int.MAX_VALUE
         var emitted = 0
-        var pageToken: String? = null
+        var pageToken: String? = resumeToken
         while (remaining > 0) {
             val page = requireClient().readRecords(
                 ReadRecordsRequest(type, timeRangeFilter = filter,
@@ -312,7 +365,7 @@ class CN1HealthConnectBridge(private val context: Context)
                 break
             }
         }
-        return emitted
+        return Pair(emitted, pageToken)
     }
 
     /**

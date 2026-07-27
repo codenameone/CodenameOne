@@ -43,8 +43,17 @@ import java.util.Map;
 ///
 /// [#getId()] is assigned by the platform on write. It is scoped to this
 /// platform and this installation and does **not** survive a reinstall, so
-/// it must not be used as a primary key on your server. Correlate on your
-/// own identifier stored in [#getMetadata()] instead.
+/// it must not be used as a primary key on your server.
+///
+/// [#getMetadata()] is **not persisted to HealthKit or Health Connect in
+/// this release.** It round-trips through the local store used by the
+/// simulator, desktop and JavaScript, and it travels with a sample you
+/// hold in memory, but a sample written to a mobile platform and read back
+/// comes back without it. Health Connect has no arbitrary metadata --
+/// only a single `clientRecordId` -- so a general map cannot be carried
+/// there at all. Correlate on your own identifier held in your own
+/// storage, keyed by whatever you can reconstruct from the sample's type,
+/// time range and value.
 ///
 /// #### Mutability
 ///

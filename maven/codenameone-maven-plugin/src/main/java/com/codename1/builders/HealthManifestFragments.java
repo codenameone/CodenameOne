@@ -270,17 +270,18 @@ final class HealthManifestFragments {
                     "android.permission.health.READ_HEALTH_DATA_HISTORY");
         }
         if (workoutSessions) {
-            // Recording an exercise session on a phone means staying alive
-            // in the foreground service; ACTIVITY_RECOGNITION additionally
-            // gates step and exercise detection from API 29.
+            // ACTIVITY_RECOGNITION gates step and exercise detection from
+            // API 29, which a recorded workout genuinely reads.
+            //
+            // The foreground-service permissions are deliberately NOT
+            // requested. They only matter alongside a foreground service,
+            // and this release ships none -- the manifest used to declare
+            // com.codename1.health.HealthWorkoutService, a class that does
+            // not exist, so the promised keepalive was never there. Asking
+            // for permissions the app cannot use invites a Play review
+            // question with no answer.
             addPermission(sb, emitted,
                     "android.permission.ACTIVITY_RECOGNITION");
-            addPermission(sb, emitted,
-                    "android.permission.FOREGROUND_SERVICE");
-            if (targetSdkVersion >= 34) {
-                addPermission(sb, emitted,
-                        "android.permission.FOREGROUND_SERVICE_HEALTH");
-            }
         }
         return sb.toString();
     }
@@ -371,14 +372,12 @@ final class HealthManifestFragments {
                         .append("        </activity-alias>\n");
             }
         }
-        if (workoutSessions
-                && sb.indexOf("com.codename1.health.HealthWorkoutService") < 0) {
-            sb.append("        <service android:name=")
-                    .append("\"com.codename1.health.HealthWorkoutService\"\n")
-                    .append("                 android:exported=\"false\"\n")
-                    .append("                 android:foregroundServiceType=")
-                    .append("\"health\" />\n");
-        }
+        // No <service> is emitted for workouts. The declaration used to
+        // name com.codename1.health.HealthWorkoutService, which does not
+        // exist and was never started, so it bought nothing while implying
+        // a recorded workout survives backgrounding. See the developer
+        // guide: on Android a recorded workout lives as long as the process
+        // does, and the app is responsible for keeping itself alive.
         return sb.toString();
     }
 

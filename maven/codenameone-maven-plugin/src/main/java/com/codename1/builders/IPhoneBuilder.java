@@ -887,7 +887,16 @@ public class IPhoneBuilder extends Executor {
                     // of that.
                     if (cls.indexOf("com/codename1/health/") == 0) {
                         usesHealth = true;
-                        if (cls.indexOf("com/codename1/health/sensors/") != 0) {
+                        // The facade itself is not evidence of the store:
+                        // the documented sensor-only flow is
+                        // Health.getInstance().getSensors(), which the
+                        // scanner reports with com/codename1/health/Health
+                        // as the owner. Treating that as store usage failed
+                        // the build for BLE-only apps over Health Connect
+                        // hints they have no use for. The usesClassMethod
+                        // hook below decides for the facade.
+                        if (cls.indexOf("com/codename1/health/sensors/") != 0
+                                && !"com/codename1/health/Health".equals(cls)) {
                             usesHealthStore = true;
                         }
                         if (cls.indexOf("com/codename1/health/workout/") == 0) {
@@ -961,6 +970,23 @@ public class IPhoneBuilder extends Executor {
 
                 @Override
                 public void usesClassMethod(String cls, String method) {
+                    // Health.getStore()/getWorkouts() mean a real platform
+                    // store; Health.getSensors() means BLE only. The class
+                    // reference alone cannot tell them apart, so the facade
+                    // is decided here.
+                    if ("com/codename1/health/Health".equals(cls)) {
+                        usesHealth = true;
+                        if (method.startsWith("getStore")
+                                || method.startsWith("getWorkouts")
+                                || method.startsWith("openHealthSettings")
+                                || method.startsWith("openProviderSetup")
+                                || method.startsWith("getAvailability")) {
+                            usesHealthStore = true;
+                        }
+                        if (method.startsWith("getWorkouts")) {
+                            usesHealthWorkout = true;
+                        }
+                    }
                     if (cls.indexOf("com/codename1/health/HealthStore") == 0) {
                         // Writing needs a separate privacy string from
                         // reading, and observers need a separate
