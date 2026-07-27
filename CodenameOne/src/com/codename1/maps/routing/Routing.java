@@ -24,16 +24,15 @@ package com.codename1.maps.routing;
 
 import com.codename1.maps.LatLng;
 import com.codename1.maps.MapSurface;
-import com.codename1.maps.Polyline;
 import com.codename1.ui.CN;
 
 import java.util.List;
 
 /// The entry point for road-following routes.
 ///
-/// A [Polyline] joins the points you give it with straight lines. To draw the
-/// road a driver would actually take you need a routing service to work out
-/// the road geometry first, which is what this class does:
+/// A [com.codename1.maps.Polyline] joins the points you give it with straight
+/// lines. To draw the road a driver would actually take you need a routing
+/// service to work out the road geometry first, which is what this class does:
 ///
 /// ```java
 /// MapView map = new MapView();
