@@ -404,6 +404,70 @@ class InferenceApiTest extends UITestBase {
     }
 
     @Test
+    void settledRunCanStartAnotherRunFromSuccessCallback() {
+        RecordingInferenceImpl backend = new RecordingInferenceImpl();
+        backend.pendingRun = new AsyncResource<Tensor[]>();
+        implementation.setInferenceImpl(backend);
+        final InferenceSession session = await(InferenceSession.open(
+                ModelSource.bytes(new byte[] {1}), new InferenceOptions()));
+        final AtomicReference<AsyncResource<Tensor[]>> second =
+                new AtomicReference<AsyncResource<Tensor[]>>();
+        session.run(new Tensor[] {
+                Tensor.floats("input", new int[] {1, 2},
+                        new float[] {1, 2})
+        }).ready(new SuccessCallback<Tensor[]>() {
+            public void onSucess(Tensor[] ignored) {
+                backend.pendingRun = null;
+                second.set(session.run(new Tensor[] {
+                        Tensor.floats("input", new int[] {1, 2},
+                                new float[] {3, 4})
+                }));
+            }
+        });
+
+        backend.pendingRun.complete(new Tensor[] {
+                Tensor.floats("output", new int[] {1}, new float[] {3})
+        });
+        flushSerialCalls();
+
+        assertNotNull(second.get());
+        assertArrayEquals(new float[] {3},
+                (float[]) await(second.get())[0].getData());
+        session.close();
+    }
+
+    @Test
+    void settledRunCanStartAnotherRunFromFailureCallback() {
+        RecordingInferenceImpl backend = new RecordingInferenceImpl();
+        backend.pendingRun = new AsyncResource<Tensor[]>();
+        implementation.setInferenceImpl(backend);
+        final InferenceSession session = await(InferenceSession.open(
+                ModelSource.bytes(new byte[] {1}), new InferenceOptions()));
+        final AtomicReference<AsyncResource<Tensor[]>> second =
+                new AtomicReference<AsyncResource<Tensor[]>>();
+        session.run(new Tensor[] {
+                Tensor.floats("input", new int[] {1, 2},
+                        new float[] {1, 2})
+        }).except(new SuccessCallback<Throwable>() {
+            public void onSucess(Throwable ignored) {
+                backend.pendingRun = null;
+                second.set(session.run(new Tensor[] {
+                        Tensor.floats("input", new int[] {1, 2},
+                                new float[] {3, 4})
+                }));
+            }
+        });
+
+        backend.pendingRun.error(new RuntimeException("expected"));
+        flushSerialCalls();
+
+        assertNotNull(second.get());
+        assertArrayEquals(new float[] {3},
+                (float[]) await(second.get())[0].getData());
+        session.close();
+    }
+
+    @Test
     void sessionSnapshotsInputArrayBeforeAsyncInference() {
         RecordingInferenceImpl backend = new RecordingInferenceImpl();
         backend.pendingRun = new AsyncResource<Tensor[]>();

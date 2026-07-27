@@ -121,11 +121,23 @@ static NSString *cn1IdentifyLanguage(NSString *text, float threshold,
 #endif
 }
 
+static NSString *cn1TranslateLanguageCode(NSString *languageTag) {
+    if (languageTag == nil) {
+        return nil;
+    }
+    NSString *normalized = [languageTag
+            stringByReplacingOccurrencesOfString:@"_" withString:@"-"];
+    NSDictionary *components =
+            [NSLocale componentsFromLocaleIdentifier:normalized];
+    NSString *language = components[NSLocaleLanguageCode];
+    return language.length == 0 ? nil : language.lowercaseString;
+}
+
 static NSString *cn1TranslateLanguage(NSString *text, NSString *source,
                                       NSString *target) {
 #if defined(CN1_HAS_MLKIT_TRANSLATE)
-    MLKTranslateLanguage sourceLanguage = source.lowercaseString;
-    MLKTranslateLanguage targetLanguage = target.lowercaseString;
+    MLKTranslateLanguage sourceLanguage = cn1TranslateLanguageCode(source);
+    MLKTranslateLanguage targetLanguage = cn1TranslateLanguageCode(target);
     NSSet<MLKTranslateLanguage> *supported = MLKTranslateAllLanguages();
     if (sourceLanguage == nil || targetLanguage == nil ||
             ![supported containsObject:sourceLanguage] ||

@@ -347,23 +347,17 @@ public final class InferenceSession implements AutoCloseable {
             backend.ready(new SuccessCallback<Tensor[]>() {
                 @Override
                 public void onSucess(Tensor[] value) {
-                    try {
-                        if (!isCancelled()) {
-                            complete(value);
-                        }
-                    } finally {
-                        SessionRunResource.this.pending.finish();
+                    SessionRunResource.this.pending.finish();
+                    if (!isCancelled()) {
+                        complete(value);
                     }
                 }
             }).except(new SuccessCallback<Throwable>() {
                 @Override
                 public void onSucess(Throwable error) {
-                    try {
-                        if (!isCancelled()) {
-                            error(error);
-                        }
-                    } finally {
-                        SessionRunResource.this.pending.finish();
+                    SessionRunResource.this.pending.finish();
+                    if (!isCancelled()) {
+                        error(error);
                     }
                 }
             });

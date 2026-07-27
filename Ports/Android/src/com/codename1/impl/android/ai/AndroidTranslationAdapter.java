@@ -28,6 +28,7 @@ import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.SuccessContinuation;
 import com.google.android.gms.tasks.Task;
 import com.google.mlkit.nl.translate.Translation;
+import com.google.mlkit.nl.translate.TranslateLanguage;
 import com.google.mlkit.nl.translate.Translator;
 import com.google.mlkit.nl.translate.TranslatorOptions;
 import java.util.Locale;
@@ -39,10 +40,17 @@ final class AndroidTranslationAdapter extends AndroidLanguageAdapter {
             final String text, String sourceLanguage, String targetLanguage,
             LanguageOptions options) {
         final AsyncResource<String> out = new AsyncResource<String>();
+        String sourceCode = languageCode(sourceLanguage);
+        String targetCode = languageCode(targetLanguage);
+        if (sourceCode == null || targetCode == null) {
+            out.error(new IllegalArgumentException(
+                    "Unsupported translation language"));
+            return out;
+        }
         TranslatorOptions translatorOptions =
                 new TranslatorOptions.Builder()
-                        .setSourceLanguage(normalizeLanguageTag(sourceLanguage))
-                        .setTargetLanguage(normalizeLanguageTag(targetLanguage))
+                        .setSourceLanguage(sourceCode)
+                        .setTargetLanguage(targetCode)
                         .build();
         final Translator client =
                 Translation.getClient(translatorOptions);
@@ -60,7 +68,14 @@ final class AndroidTranslationAdapter extends AndroidLanguageAdapter {
         return out;
     }
 
-    private static String normalizeLanguageTag(String languageTag) {
-        return languageTag.toLowerCase(Locale.ENGLISH);
+    private static String languageCode(String languageTag) {
+        if (languageTag == null) {
+            return null;
+        }
+        String language = Locale.forLanguageTag(languageTag).getLanguage();
+        if (language.length() == 0) {
+            return null;
+        }
+        return TranslateLanguage.fromLanguageTag(language);
     }
 }

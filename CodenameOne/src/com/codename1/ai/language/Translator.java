@@ -49,8 +49,13 @@ public final class Translator {
     /// Option values are copied before asynchronous backend work begins.
     ///
     /// @param text source text
-    /// @param sourceLanguage BCP-47/ML Kit source language tag
-    /// @param targetLanguage BCP-47/ML Kit target language tag
+    /// Current ML Kit backends accept a BCP-47 tag with an optional script or
+    /// region, such as {@code en-US}, and select the corresponding supported
+    /// base-language model ({@code en} in this example). The asynchronous
+    /// resource fails when either tag does not identify a supported model.
+    ///
+    /// @param sourceLanguage BCP-47 source language tag
+    /// @param targetLanguage BCP-47 target language tag
     /// @param options backend options, or {@code null}
     /// @return asynchronous translated text
     public static AsyncResource<String> translate(String text, String sourceLanguage,
