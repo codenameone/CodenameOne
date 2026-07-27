@@ -231,6 +231,25 @@ class InferenceApiTest extends UITestBase {
     }
 
     @Test
+    void cancelledOpenClosesLateNativeHandle() {
+        RecordingInferenceImpl backend = new RecordingInferenceImpl();
+        backend.pendingOpen = new AsyncResource<Object>();
+        implementation.setInferenceImpl(backend);
+
+        AsyncResource<InferenceSession> opening = InferenceSession.open(
+                ModelSource.bytes(new byte[] {1}), new InferenceOptions());
+        assertTrue(opening.cancel(false));
+        backend.pendingOpen.complete(backend.handle);
+        flushSerialCalls();
+
+        assertTrue(opening.isCancelled());
+        assertEquals(1, backend.closeCount,
+                "a late native handle must not be orphaned after cancellation");
+        assertThrows(AsyncResource.AsyncExecutionException.class,
+                opening::get);
+    }
+
+    @Test
     void sessionRejectsShapeMismatchBeforeBackendRun() {
         RecordingInferenceImpl backend = new RecordingInferenceImpl();
         implementation.setInferenceImpl(backend);
@@ -322,6 +341,7 @@ class InferenceApiTest extends UITestBase {
         AsyncResource<Tensor[]> pendingRun;
         Tensor[] receivedInputs;
         InferenceOptions openOptions;
+        AsyncResource<Object> pendingOpen;
 
         public boolean isSupported() {
             return true;
@@ -329,6 +349,9 @@ class InferenceApiTest extends UITestBase {
 
         public AsyncResource<Object> open(ModelSource source, InferenceOptions options) {
             openOptions = options;
+            if (pendingOpen != null) {
+                return pendingOpen;
+            }
             AsyncResource<Object> result = new AsyncResource<Object>();
             result.complete(handle);
             return result;

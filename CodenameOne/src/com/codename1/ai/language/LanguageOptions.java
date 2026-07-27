@@ -52,4 +52,10 @@ public final class LanguageOptions {
     public float getMinimumConfidence() {
         return minimumConfidence;
     }
+
+    LanguageOptions snapshot() {
+        return new LanguageOptions()
+                .backend(backend)
+                .minimumConfidence(minimumConfidence);
+    }
 }

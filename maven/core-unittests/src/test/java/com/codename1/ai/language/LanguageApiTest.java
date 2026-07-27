@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -77,10 +78,38 @@ class LanguageApiTest extends UITestBase {
         assertThrows(AsyncResource.AsyncExecutionException.class, result::get);
     }
 
+    @Test
+    void languageOperationsSnapshotMutableArguments() {
+        RecordingLanguageImpl backend = new RecordingLanguageImpl();
+        implementation.setLanguageImpl(backend);
+        LanguageOptions options = new LanguageOptions()
+                .backend(LanguageBackends.mlKitLanguageIdentification())
+                .minimumConfidence(.35f);
+
+        LanguageIdentifier.identify("bonjour", options);
+        options.backend(LanguageBackends.auto()).minimumConfidence(.9f);
+
+        assertNotSame(options, backend.options);
+        assertEquals("ml-kit", backend.backend);
+        assertEquals(.35f, backend.options.getMinimumConfidence());
+
+        SmartReplyMessage original = new SmartReplyMessage(
+                "First", "remote", false, 1);
+        SmartReplyMessage replacement = new SmartReplyMessage(
+                "Replacement", "remote", false, 2);
+        SmartReplyMessage[] conversation =
+                new SmartReplyMessage[] {original};
+        SmartReply.suggest(conversation, null);
+        conversation[0] = replacement;
+        assertNotSame(conversation, backend.conversation);
+        assertEquals(original, backend.conversation[0]);
+    }
+
     private static final class RecordingLanguageImpl extends LanguageImpl {
         String feature;
         String backend;
         LanguageOptions options;
+        SmartReplyMessage[] conversation;
 
         public boolean isSupported(String value, String backendId) {
             feature = value;
@@ -113,6 +142,7 @@ class LanguageApiTest extends UITestBase {
                 SmartReplyMessage[] conversation, String backendId,
                 LanguageOptions value) {
             feature = "smart-reply";
+            this.conversation = conversation;
             AsyncResource<String[]> result = new AsyncResource<String[]>();
             result.complete(new String[] {"Yes"});
             return result;

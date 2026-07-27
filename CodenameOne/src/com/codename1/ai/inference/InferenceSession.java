@@ -58,6 +58,9 @@ public final class InferenceSession implements AutoCloseable {
     /// The option values are copied before asynchronous backend work is
     /// scheduled. Reusing or changing the supplied {@link InferenceOptions}
     /// after this method returns therefore cannot alter the pending open.
+    /// Canceling the returned resource prevents session publication; if the
+    /// native backend finishes opening afterward, its handle is closed
+    /// automatically.
     ///
     /// @param source bytes, resource, or file containing a `.tflite` model
     /// @param options execution options; {@code null} uses defaults
@@ -68,7 +71,7 @@ public final class InferenceSession implements AutoCloseable {
         if (source == null) {
             throw new NullPointerException("source");
         }
-        final AsyncResource<InferenceSession> out = new AsyncResource<InferenceSession>();
+        final SessionOpenResource out = new SessionOpenResource();
         final InferenceImpl impl = Display.getInstance().getInferenceBackend();
         if (impl == null || !impl.isSupported()) {
             out.error(new InferenceException("LiteRT inference is not supported"));
@@ -80,15 +83,38 @@ public final class InferenceSession implements AutoCloseable {
                 .ready(new SuccessCallback<Object>() {
                     @Override
                     public void onSucess(Object value) {
-                        out.complete(new InferenceSession(impl, value));
+                        out.publish(impl, value);
                     }
                 }).except(new SuccessCallback<Throwable>() {
                     @Override
                     public void onSucess(Throwable error) {
-                        out.error(error);
+                        out.fail(error);
                     }
                 });
         return out;
+    }
+
+    private static final class SessionOpenResource
+            extends AsyncResource<InferenceSession> {
+        @Override
+        public synchronized boolean cancel(boolean mayInterruptIfRunning) {
+            return super.cancel(mayInterruptIfRunning);
+        }
+
+        synchronized void publish(InferenceImpl implementation,
+                                  Object nativeHandle) {
+            if (isCancelled()) {
+                implementation.close(nativeHandle);
+                return;
+            }
+            complete(new InferenceSession(implementation, nativeHandle));
+        }
+
+        synchronized void fail(Throwable error) {
+            if (!isCancelled()) {
+                error(error);
+            }
+        }
     }
 
     /// Returns the model's current input metadata. Shapes reflect the most

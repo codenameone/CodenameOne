@@ -62,18 +62,21 @@ public final class IOSLanguageImpl extends LanguageImpl {
     @Override
     public AsyncResource<LanguageCandidate[]> identify(
             final String text, String backendId, final LanguageOptions options) {
-        return identifyInBackground(text, "ml-kit".equals(backendId), options);
+        float minimumConfidence = options == null
+                ? 0 : options.getMinimumConfidence();
+        return identifyInBackground(text, "ml-kit".equals(backendId),
+                minimumConfidence);
     }
 
     private static AsyncResource<LanguageCandidate[]> identifyInBackground(
             final String text, final boolean mlKit,
-            final LanguageOptions options) {
+            final float minimumConfidence) {
         final AsyncResource<LanguageCandidate[]> out =
                 new AsyncResource<LanguageCandidate[]>();
         run(out, new NativeCall<LanguageCandidate[]>() {
             public LanguageCandidate[] call() throws Exception {
                 String json = IOSImplementation.nativeInstance.cn1LanguageIdentify(
-                        text, options.getMinimumConfidence(), mlKit);
+                        text, minimumConfidence, mlKit);
                 Map root = parse(json);
                 List values = list(root, "items");
                 LanguageCandidate[] result = new LanguageCandidate[values.size()];

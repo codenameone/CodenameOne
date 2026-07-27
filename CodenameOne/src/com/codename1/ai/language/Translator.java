@@ -46,6 +46,8 @@ public final class Translator {
                 actual.getBackend().getId());
     }
 
+    /// Option values are copied before asynchronous backend work begins.
+    ///
     /// @param text source text
     /// @param sourceLanguage BCP-47/ML Kit source language tag
     /// @param targetLanguage BCP-47/ML Kit target language tag
@@ -54,7 +56,8 @@ public final class Translator {
     public static AsyncResource<String> translate(String text, String sourceLanguage,
                                                    String targetLanguage,
                                                    LanguageOptions options) {
-        LanguageOptions actual = options == null ? new LanguageOptions() : options;
+        LanguageOptions actual = (options == null
+                ? new LanguageOptions() : options).snapshot();
         LanguageImpl impl = Display.getInstance().getLanguageBackend();
         if (impl == null || !impl.isSupported("translation", actual.getBackend().getId())) {
             AsyncResource<String> out = new AsyncResource<String>();

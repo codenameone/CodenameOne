@@ -47,13 +47,16 @@ public final class LanguageIdentifier {
                 actual.getBackend().getId());
     }
 
-    /// Identifies possible languages off the EDT without uploading text.
+    /// Identifies possible languages off the EDT without uploading text. The
+    /// option values are copied before the backend starts, so later mutations
+    /// of the supplied object cannot alter the pending identification.
     /// @param text non-null text to classify
     /// @param options backend and confidence options, or {@code null}
     /// @return asynchronous ranked candidates; may be empty for undetermined text
     public static AsyncResource<LanguageCandidate[]> identify(
             String text, LanguageOptions options) {
-        LanguageOptions actual = options == null ? new LanguageOptions() : options;
+        LanguageOptions actual = (options == null
+                ? new LanguageOptions() : options).snapshot();
         LanguageImpl impl = Display.getInstance().getLanguageBackend();
         if (impl == null || !impl.isSupported("language-id",
                 actual.getBackend().getId())) {

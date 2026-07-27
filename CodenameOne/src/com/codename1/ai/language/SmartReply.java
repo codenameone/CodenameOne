@@ -47,12 +47,16 @@ public final class SmartReply {
                 "smart-reply", actual.getBackend().getId());
     }
 
+    /// The conversation array and option values are copied before backend work
+    /// begins. {@link SmartReplyMessage} values are immutable.
+    ///
     /// @param conversation chronological messages, oldest first
     /// @param options backend options, or {@code null}
     /// @return asynchronous suggestions, possibly an empty array
     public static AsyncResource<String[]> suggest(SmartReplyMessage[] conversation,
                                                    LanguageOptions options) {
-        LanguageOptions actual = options == null ? new LanguageOptions() : options;
+        LanguageOptions actual = (options == null
+                ? new LanguageOptions() : options).snapshot();
         LanguageImpl impl = Display.getInstance().getLanguageBackend();
         if (impl == null || !impl.isSupported("smart-reply", actual.getBackend().getId())) {
             AsyncResource<String[]> out = new AsyncResource<String[]>();
@@ -60,7 +64,7 @@ public final class SmartReply {
             return out;
         }
         return impl.suggestReplies(conversation == null
-                        ? new SmartReplyMessage[0] : conversation,
+                        ? new SmartReplyMessage[0] : conversation.clone(),
                 actual.getBackend().getId(), actual);
     }
 }
