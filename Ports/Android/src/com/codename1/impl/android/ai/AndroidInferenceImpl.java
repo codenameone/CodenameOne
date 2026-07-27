@@ -65,21 +65,23 @@ public final class AndroidInferenceImpl extends InferenceImpl {
     public AsyncResource<Object> open(final ModelSource source,
                                       final InferenceOptions options) {
         final AsyncResource<Object> out = new AsyncResource<Object>();
+        final InferenceOptions.Accelerator accelerator =
+                options.getAccelerator();
+        final int threads = options.getThreads();
+        final boolean allowFallback = options.isFallbackAllowed();
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {
                 try {
-                    InferenceOptions.Accelerator accelerator =
-                            options.getAccelerator();
                     if ((accelerator == InferenceOptions.Accelerator.GPU
                             || accelerator == InferenceOptions.Accelerator.CORE_ML)
-                            && !options.isFallbackAllowed()) {
+                            && !allowFallback) {
                         throw new InferenceException(accelerator
                                 + " acceleration is unavailable on Android");
                     }
                     ByteBuffer model = loadModel(source);
                     Interpreter.Options nativeOptions = new Interpreter.Options();
-                    if (options.getThreads() > 0) {
-                        nativeOptions.setNumThreads(options.getThreads());
+                    if (threads > 0) {
+                        nativeOptions.setNumThreads(threads);
                     }
                     if (accelerator == InferenceOptions.Accelerator.NPU) {
                         nativeOptions.setUseNNAPI(true);
@@ -89,12 +91,12 @@ public final class AndroidInferenceImpl extends InferenceImpl {
                         interpreter = new Interpreter(model, nativeOptions);
                     } catch (Throwable acceleratedFailure) {
                         if (accelerator != InferenceOptions.Accelerator.NPU
-                                || !options.isFallbackAllowed()) {
+                                || !allowFallback) {
                             throw acceleratedFailure;
                         }
                         Interpreter.Options cpuOptions = new Interpreter.Options();
-                        if (options.getThreads() > 0) {
-                            cpuOptions.setNumThreads(options.getThreads());
+                        if (threads > 0) {
+                            cpuOptions.setNumThreads(threads);
                         }
                         model.rewind();
                         interpreter = new Interpreter(model, cpuOptions);

@@ -64,13 +64,17 @@ public final class IOSInferenceImpl extends InferenceImpl {
     public AsyncResource<Object> open(final ModelSource source,
                                       final InferenceOptions options) {
         final AsyncResource<Object> out = new AsyncResource<Object>();
-        openInBackground(out, source, options);
+        openInBackground(out, source, options.getThreads(),
+                options.getAccelerator().ordinal(),
+                options.isFallbackAllowed());
         return out;
     }
 
     private static void openInBackground(final AsyncResource<Object> out,
                                          final ModelSource source,
-                                         final InferenceOptions options) {
+                                         final int threads,
+                                         final int accelerator,
+                                         final boolean allowFallback) {
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {
                 try {
@@ -78,13 +82,10 @@ public final class IOSInferenceImpl extends InferenceImpl {
                             ? IOSImplementation.nativeInstance.cn1InferenceOpenFile(
                                     FileSystemStorage.getInstance().toNativePath(
                                             source.getPath()),
-                                    options.getThreads(),
-                                    options.getAccelerator().ordinal(),
-                                    options.isFallbackAllowed())
+                                    threads, accelerator, allowFallback)
                             : IOSImplementation.nativeInstance.cn1InferenceOpen(
-                                    loadModel(source), options.getThreads(),
-                                    options.getAccelerator().ordinal(),
-                                    options.isFallbackAllowed());
+                                    loadModel(source), threads, accelerator,
+                                    allowFallback);
                     Map root = parse(opened);
                     int id = integer(root, "handle");
                     final Handle handle;

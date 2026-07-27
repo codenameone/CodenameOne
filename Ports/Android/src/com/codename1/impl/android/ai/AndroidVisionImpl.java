@@ -60,6 +60,10 @@ public final class AndroidVisionImpl extends VisionImpl {
                                          final VisionImage image,
                                          final VisionOptions options) {
         final AsyncResource<T> out = new AsyncResource<T>();
+        final VisionOptions optionSnapshot = new VisionOptions()
+                .backend(options.getBackend())
+                .minimumConfidence(options.getMinimumConfidence())
+                .maximumResults(options.getMaximumResults());
         if (!isSupported(feature, backendId)) {
             out.error(new VisionException(VisionException.UNSUPPORTED,
                     feature + " is not included in this Android build"));
@@ -77,7 +81,8 @@ public final class AndroidVisionImpl extends VisionImpl {
                         return;
                     }
                     adapter(feature).analyze(decoded.input, decoded.width,
-                            decoded.height, options, (AsyncResource) out);
+                            decoded.height, optionSnapshot,
+                            (AsyncResource) out);
                 } catch (Throwable cause) {
                     error(out, new VisionException(
                             VisionException.BACKEND_ERROR,
