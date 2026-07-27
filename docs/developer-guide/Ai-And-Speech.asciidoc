@@ -280,7 +280,7 @@ callback-owned buffers and preserves the frame rotation before analysis
 becomes asynchronous. For an encoded gallery or file image whose pixels
 need an EXIF display rotation, use
 `VisionImage.encoded(bytes, rotationDegrees)`; the one-argument overload
-assumes the stored pixels are already upright and does not inspect EXIF
+assumes the stored pixels are already upright and doesn't inspect EXIF
 metadata. Each analyzer returns stable Codename One result types. Bounds
 and points use normalized coordinates in the range 0 through 1.
 
@@ -401,7 +401,7 @@ Interrupted downloads restart through a temporary `.download` file and are
 never promoted to the cache until verification succeeds. Concurrent calls for
 the same cache key and content identity share one download but receive
 independent asynchronous resources. Canceling one caller suppresses only that
-caller's notification; it does not cancel the shared download or the other
+caller's notification; it doesn't cancel the shared download or the other
 callers. When a cache key already has an active download, a request with a
 conflicting URL or digest fails instead of sharing the temporary file.
 
