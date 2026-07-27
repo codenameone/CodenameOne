@@ -78,6 +78,13 @@ public final class AndroidInferenceImpl extends InferenceImpl {
                         throw new InferenceException(accelerator
                                 + " acceleration is unavailable on Android");
                     }
+                    if (accelerator == InferenceOptions.Accelerator.NPU
+                            && !allowFallback) {
+                        throw new InferenceException(
+                                "Strict NPU execution cannot be verified on "
+                                + "Android; NNAPI may leave unsupported "
+                                + "operations on the CPU");
+                    }
                     ByteBuffer model = loadModel(source);
                     Interpreter.Options nativeOptions = new Interpreter.Options();
                     if (threads > 0) {
@@ -177,18 +184,23 @@ public final class AndroidInferenceImpl extends InferenceImpl {
                     }
                     Map<Integer, Object> nativeOutputs = new HashMap<Integer, Object>();
                     int outputCount = interpreter.getOutputTensorCount();
+                    ByteBuffer[] outputBuffers =
+                            new ByteBuffer[outputCount];
                     for (int i = 0; i < outputCount; i++) {
-                        // A null destination asks LiteRT to retain the result
-                        // in its tensor. This is required for outputs whose
-                        // shape is resolved or grows during invocation.
-                        nativeOutputs.put(Integer.valueOf(i), null);
+                        org.tensorflow.lite.Tensor metadata =
+                                interpreter.getOutputTensor(i);
+                        ByteBuffer destination = ByteBuffer.allocateDirect(
+                                metadata.numBytes()).order(
+                                ByteOrder.nativeOrder());
+                        outputBuffers[i] = destination;
+                        nativeOutputs.put(Integer.valueOf(i), destination);
                     }
                     interpreter.runForMultipleInputsOutputs(nativeInputs, nativeOutputs);
                     final Tensor[] result = new Tensor[outputCount];
                     for (int i = 0; i < result.length; i++) {
                         org.tensorflow.lite.Tensor metadata = interpreter.getOutputTensor(i);
                         result[i] = fromBuffer(metadata.name(), metadata.shape(),
-                                metadata.dataType(), metadata.asReadOnlyBuffer());
+                                metadata.dataType(), outputBuffers[i]);
                     }
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {

@@ -162,6 +162,12 @@ conflicting in-flight content identities fail instead of sharing a temporary
 path. File sources are opened by path without copying the model through the
 Java heap. Cache promotion verifies that the final file exists and, when
 supplied, still matches the requested digest before publishing its path.
+Android supplies a direct, native-order destination buffer for every current
+LiteRT output tensor before invoking `runForMultipleInputsOutputs`; null output
+destinations are reserved for externally bound delegate buffers and are not
+used by ordinary sessions. NNAPI is best effort when fallback is enabled.
+Strict Android NPU requests are rejected because LiteRT cannot verify that
+NNAPI delegated every operation instead of retaining CPU nodes.
 
 All native sessions and analyzers must be closed. Expensive open, analysis,
 and inference work runs off the EDT; completion and error delivery return to
