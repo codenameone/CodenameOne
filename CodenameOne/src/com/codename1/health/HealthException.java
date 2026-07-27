@@ -54,7 +54,11 @@ public class HealthException extends Exception {
     }
 
     /// The typed reason this operation failed.
-    private HealthWriteResult partialResult;
+    /// Transient: an exception is Serializable, the write result is not,
+    /// and a partial result has no meaning once it has crossed a process
+    /// boundary anyway -- the ids it names are scoped to the store that
+    /// issued them.
+    private transient HealthWriteResult partialResult;
 
     /// Samples already committed before the failure, when a chunked write
     /// fails partway.
