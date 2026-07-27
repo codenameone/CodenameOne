@@ -22,9 +22,15 @@
  */
 package com.codename1.builders;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -70,5 +76,35 @@ class ExecutorArchiveExtractionTest {
 
         assertThrows(IOException.class, () -> Executor.resolveArchiveEntry(
                 destination, "../archive-escape/payload.bin"));
+    }
+
+    @Test
+    void extractionFilterMayRouteSafeEntryToSibling() throws Exception {
+        File project = temporaryDirectory.resolve("project").toFile();
+        File source = new File(project, "src");
+        File settings = new File(project,
+                "codenameone_settings.properties");
+        source.mkdirs();
+
+        new IPhoneBuilder().extractZip(
+                new ByteArrayInputStream(zipEntry(
+                        "codenameone_settings.properties",
+                        "codename1.mainName=MyApp")),
+                source, (path, fileName) -> settings);
+
+        assertEquals("codename1.mainName=MyApp",
+                new String(Files.readAllBytes(settings.toPath()),
+                        StandardCharsets.UTF_8));
+    }
+
+    private static byte[] zipEntry(String name, String contents)
+            throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        ZipOutputStream zip = new ZipOutputStream(bytes);
+        zip.putNextEntry(new ZipEntry(name));
+        zip.write(contents.getBytes(StandardCharsets.UTF_8));
+        zip.closeEntry();
+        zip.close();
+        return bytes.toByteArray();
     }
 }

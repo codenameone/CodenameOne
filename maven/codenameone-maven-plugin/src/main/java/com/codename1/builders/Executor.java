@@ -1399,8 +1399,13 @@ public abstract class Executor {
                 byte[] data = new byte[8192];
 
                 // write the files to the disk
+                resolveArchiveEntry(destDir, entryName);
                 File destFile = filter.destFile(currentDir, entryName);
-                destFile = requireArchiveDestination(destDir, destFile, entryName);
+                if (destFile == null) {
+                    throw new IOException("Extraction filter returned no destination for "
+                            + entryName);
+                }
+                destFile = destFile.getCanonicalFile();
                 destFile.getParentFile().mkdirs();
                 FileOutputStream fos = new FileOutputStream(destFile);
                 dest = new BufferedOutputStream(fos, data.length);
