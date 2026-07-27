@@ -33,6 +33,7 @@ import com.codename1.health.HealthSample;
 import com.codename1.health.HealthStore;
 import com.codename1.health.HealthTimeRange;
 import com.codename1.health.HealthWriteResult;
+import com.codename1.health.QuantitySample;
 import com.codename1.health.SampleQuery;
 import com.codename1.health.SamplePage;
 import com.codename1.util.AsyncResource;
@@ -41,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 /// A health store held in the app's own process, for ports with no
 /// platform health provider -- the desktop ports, the JavaScript port, and
@@ -149,7 +151,11 @@ public class LocalHealthStore extends HealthStore {
         synchronized (samples) {
             for (HealthSample s : samples) {
                 if (matches(s, query, range)) {
-                    matched.add(s);
+                    // A copy, not the stored object. Query results are
+                    // snapshots: handing out the live record let caller
+                    // code mutate the store through setId/setSource/
+                    // putMetadata and see the change on later reads.
+                    matched.add(snapshot(s));
                 }
             }
         }
@@ -190,6 +196,30 @@ public class LocalHealthStore extends HealthStore {
             }
         }
         return true;
+    }
+
+    /// Copies a stored sample so callers cannot mutate the store.
+    ///
+    /// Quantity samples are the only shape this store holds; anything else
+    /// is returned as-is, which is still an improvement on handing back
+    /// the stored instance for the common case.
+    private static HealthSample snapshot(HealthSample s) {
+        if (!(s instanceof QuantitySample)) {
+            return s;
+        }
+        QuantitySample q = (QuantitySample) s;
+        QuantitySample copy = q.isInstantaneous()
+                ? QuantitySample.create(q.getType(), q.getQuantity(),
+                        q.getStartMillis())
+                : QuantitySample.create(q.getType(), q.getQuantity(),
+                        q.getStartMillis(), q.getEndMillis());
+        copy.setId(q.getId());
+        copy.setSource(q.getSource());
+        copy.setRecordingMethod(q.getRecordingMethod());
+        for (Map.Entry<String, String> e : q.getMetadata().entrySet()) {
+            copy.putMetadata(e.getKey(), e.getValue());
+        }
+        return copy;
     }
 
     private static void sort(List<HealthSample> list,

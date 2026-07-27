@@ -1134,19 +1134,23 @@ public class HealthStore {
         // been handed over -- withholding it outright, as an earlier fix
         // did, simply re-read the same page forever and the samples past
         // the cap were never reachable at all.
-        for (HealthChangeBatch chunk : applyOptions(batch, sub)) {
-            Display.getInstance().callSerially(
-                    makeDeliveryRunnable(this, target, chunk,
-                            subscription));
-        }
+        // Queued one at a time, not all at once. Enqueuing the whole
+        // sequence up front meant a listener that threw on an early chunk
+        // still had the final chunk run and persist the page anchor,
+        // skipping the failed chunk for good.
+        Display.getInstance().callSerially(
+                makeDeliveryRunnable(this, target,
+                        applyOptions(batch, sub), 0, subscription));
     }
 
     /// Built in a static method so the `Runnable` carries no synthetic
     /// reference to the enclosing store (SpotBugs
     /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
     private static Runnable makeDeliveryRunnable(final HealthStore store,
-            final HealthChangeListener listener, final HealthChangeBatch batch,
+            final HealthChangeListener listener,
+            final List<HealthChangeBatch> chunks, final int index,
             final HealthSubscription subscription) {
+        final HealthChangeBatch batch = chunks.get(index);
         return new Runnable() {
             @Override
             public void run() {
@@ -1156,9 +1160,16 @@ public class HealthStore {
                     // A listener that throws must not cost us the cursor
                     // advance for every *later* batch, but it also must
                     // not advance past data it failed on -- so log and
-                    // leave the anchor where it was.
+                    // leave the anchor where it was. The rest of the page
+                    // is abandoned too: delivering past a chunk the app
+                    // could not handle would strand it permanently.
                     com.codename1.io.Log.e(t);
                     return;
+                }
+                if (index + 1 < chunks.size()) {
+                    Display.getInstance().callSerially(
+                            makeDeliveryRunnable(store, listener, chunks,
+                                    index + 1, subscription));
                 }
                 if (batch.getAnchor() != null) {
                     store.storeAnchor(batch.getSubscriptionId(),
@@ -1366,7 +1377,12 @@ public class HealthStore {
             return null;
         }
         for (int i = 1; i < parts.size(); i++) {
-            HealthDataType t = HealthDataType.forId(parts.get(i));
+            String part = parts.get(i);
+            if (part.startsWith(OPTIONS_PREFIX)) {
+                applyStoredOptions(req, part);
+                continue;
+            }
+            HealthDataType t = HealthDataType.forId(part);
             // A type this build no longer knows is skipped rather than
             // failing the whole restore -- a downgraded app should keep
             // the subscriptions it still understands.
@@ -1377,6 +1393,28 @@ public class HealthStore {
         return req.getTypes().isEmpty() ? null : req;
     }
 
+    /// Marks the field carrying the delivery options.
+    ///
+    /// A prefix rather than a fixed position, so an entry written by a
+    /// build that did not persist them still parses -- its types simply
+    /// follow the id as before and the defaults apply.
+    private static final String OPTIONS_PREFIX = "o:";
+
+    private static void applyStoredOptions(SubscriptionRequest req,
+            String field) {
+        String v = field.substring(OPTIONS_PREFIX.length());
+        if (v.length() < 2) {
+            return;
+        }
+        req.setDeliverSamples(v.charAt(0) == '1');
+        req.setIncludeDeletions(v.charAt(1) == '1');
+        try {
+            req.setMaxSamplesPerBatch(Integer.parseInt(v.substring(2)));
+        } catch (NumberFormatException ex) {
+            // Leave the default rather than failing the whole restore.
+        }
+    }
+
     private void rememberSubscription(SubscriptionRequest request) {
         StringBuilder sb = new StringBuilder();
         List<String> kept = readStoredEntries(request.getId());
@@ -1384,6 +1422,14 @@ public class HealthStore {
             sb.append(keptItem).append('\n');
         }
         sb.append(request.getId());
+        // The delivery options ride along in a field the older format did
+        // not have. Without them a restored notify-only subscription began
+        // delivering full payloads after a restart, excluded deletions
+        // came back, and a configured cap was silently lost.
+        sb.append('\t').append(OPTIONS_PREFIX)
+          .append(request.isDeliverSamples() ? '1' : '0')
+          .append(request.isIncludeDeletions() ? '1' : '0')
+          .append(request.getMaxSamplesPerBatch());
         List<HealthDataType> types = request.getTypes();
         for (HealthDataType type : types) {
             sb.append('\t').append(type.getId());

@@ -23,6 +23,7 @@
 package com.codename1.health;
 
 import com.codename1.junit.UITestBase;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CountDownLatch;
@@ -46,6 +47,27 @@ class HealthSubscriptionCursorTest extends UITestBase {
 
     private static final long T0 = 1767268800000L;
 
+    /// Subscriptions persist into Preferences, which is process-global, so
+    /// a test that leaves one behind is seen by every later test -- the
+    /// fallback store restores it and stops reporting an empty registry.
+    private final List<HealthStore> touched = new ArrayList<HealthStore>();
+
+    @AfterEach
+    void forgetSubscriptions() {
+        for (HealthStore store : touched) {
+            for (HealthSubscription sub : store.getSubscriptions()) {
+                store.unsubscribe(sub.getId());
+            }
+        }
+        touched.clear();
+    }
+
+    private FakeHealthStore newStore() {
+        FakeHealthStore store = new FakeHealthStore();
+        touched.add(store);
+        return store;
+    }
+
     private static List<HealthSample> samples(int n) {
         List<HealthSample> out = new ArrayList<HealthSample>();
         for (int i = 0; i < n; i++) {
@@ -60,7 +82,7 @@ class HealthSubscriptionCursorTest extends UITestBase {
     /// The latch is what the test waits on: delivery hops through
     /// callSerially, so counting down here is the only honest signal that
     /// the batch actually arrived.
-    private static final class Collector implements HealthChangeListener {
+    private static class Collector implements HealthChangeListener {
         final List<HealthSample> seen = new ArrayList<HealthSample>();
         final List<HealthAnchor> anchors = new ArrayList<HealthAnchor>();
         final CountDownLatch latch;
@@ -90,7 +112,7 @@ class HealthSubscriptionCursorTest extends UITestBase {
      */
     @Test
     void aCappedBatchDeliversEverySampleAndAdvancesOnce() {
-        FakeHealthStore store = new FakeHealthStore();
+        FakeHealthStore store = newStore();
         Collector listener = new Collector(3);
         SubscriptionRequest req = new SubscriptionRequest("cap-test")
                 .addType(HealthDataType.STEPS)
@@ -124,7 +146,7 @@ class HealthSubscriptionCursorTest extends UITestBase {
     /** An uncapped batch is delivered as one, carrying its anchor. */
     @Test
     void anUncappedBatchIsDeliveredWhole() {
-        FakeHealthStore store = new FakeHealthStore();
+        FakeHealthStore store = newStore();
         Collector listener = new Collector(1);
         SubscriptionRequest req = new SubscriptionRequest("plain")
                 .addType(HealthDataType.STEPS);
@@ -147,7 +169,7 @@ class HealthSubscriptionCursorTest extends UITestBase {
      */
     @Test
     void notifyOnlySubscriptionsDropSamplesButKeepTheCursor() {
-        FakeHealthStore store = new FakeHealthStore();
+        FakeHealthStore store = newStore();
         Collector listener = new Collector(1);
         SubscriptionRequest req = new SubscriptionRequest("quiet")
                 .addType(HealthDataType.STEPS)
@@ -172,7 +194,7 @@ class HealthSubscriptionCursorTest extends UITestBase {
      */
     @Test
     void unsupportedStoreRefusesSubscriptions() {
-        FakeHealthStore store = new FakeHealthStore();
+        FakeHealthStore store = newStore();
         store.supported = false;
         assertThrows(IllegalStateException.class,
                 new org.junit.jupiter.api.function.Executable() {
@@ -182,5 +204,84 @@ class HealthSubscriptionCursorTest extends UITestBase {
                                 new Collector(1));
                     }
                 });
+    }
+
+    /**
+     * A listener that throws on an early chunk stops the whole page.
+     *
+     * <p>Queuing every chunk up front meant the final one still ran and
+     * persisted the page anchor, so the chunk the app failed on was
+     * skipped for good. The cursor must not move past data the listener
+     * could not handle.</p>
+     */
+    @Test
+    void aThrowingListenerStopsTheRestOfThePage() {
+        FakeHealthStore store = newStore();
+        final CountDownLatch first = new CountDownLatch(1);
+        final int[] calls = new int[1];
+        HealthChangeListener thrower = new HealthChangeListener() {
+            public void healthDataChanged(HealthChangeBatch batch) {
+                calls[0]++;
+                first.countDown();
+                throw new IllegalStateException("app cannot handle this");
+            }
+        };
+        SubscriptionRequest req = new SubscriptionRequest("throwing")
+                .addType(HealthDataType.STEPS)
+                .setMaxSamplesPerBatch(2);
+        store.subscribe(req, thrower);
+
+        store.batchesToFire.add(new HealthChangeBatch("throwing",
+                req.getTypes(), samples(5), null, false,
+                HealthAnchor.of("after-page"), 0L, false));
+        store.drainChanges();
+        waitFor(first, 5000);
+        // Then settle, so a wrongly-queued later chunk would have run.
+        com.codename1.testing.TestUtils.waitFor(300);
+
+        assertEquals(1, calls[0],
+                "delivery stops at the chunk the listener rejected");
+        assertNull(store.getSubscriptions().get(0).getAnchor(),
+                "and the cursor must not have advanced");
+    }
+
+    /**
+     * Delivery options survive a restart. A notify-only subscription that
+     * starts delivering full payloads after a relaunch is a privacy
+     * surprise, not just a performance one.
+     */
+    @Test
+    void deliveryOptionsSurviveRestore() {
+        FakeHealthStore first = newStore();
+        first.subscribe(new SubscriptionRequest("persisted")
+                .addType(HealthDataType.STEPS)
+                .setDeliverSamples(false)
+                .setIncludeDeletions(false)
+                .setMaxSamplesPerBatch(7), new Collector(1));
+
+        // A fresh store restores from the same preferences.
+        FakeHealthStore restored = newStore();
+        List<HealthSubscription> subs = restored.getSubscriptions();
+        HealthSubscription found = null;
+        for (HealthSubscription sub : subs) {
+            if ("persisted".equals(sub.getId())) {
+                found = sub;
+            }
+        }
+        assertNotNull(found, "the subscription must come back at all");
+
+        Collector listener = new Collector(1);
+        restored.subscribe(new SubscriptionRequest("persisted")
+                .addType(HealthDataType.STEPS)
+                .setDeliverSamples(false)
+                .setIncludeDeletions(false)
+                .setMaxSamplesPerBatch(7), listener);
+        restored.batchesToFire.add(new HealthChangeBatch("persisted",
+                new java.util.ArrayList<HealthDataType>(), samples(3), null,
+                false, HealthAnchor.of("c"), 0L, false));
+        restored.drainChanges();
+        waitFor(listener.latch, 5000);
+        assertEquals(0, listener.seen.size(),
+                "restored notify-only must stay notify-only");
     }
 }
