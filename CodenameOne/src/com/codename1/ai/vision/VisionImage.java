@@ -68,11 +68,18 @@ public final class VisionImage {
     ///  or 270 degrees are supported
     /// @return immutable image input
     /// @throws IllegalArgumentException if the data or dimensions are empty,
-    ///  or if the rotation is not a quarter turn
+    ///  if {@code format} is not {@link FrameFormat#NV21} or
+    ///  {@link FrameFormat#RGBA8888}, or if the rotation is not a quarter turn
     public static VisionImage pixels(byte[] bytes, int width, int height,
                                      FrameFormat format, int rotationDegrees) {
         if (bytes == null || bytes.length == 0 || width <= 0 || height <= 0) {
             throw new IllegalArgumentException("Pixels and positive dimensions are required");
+        }
+        if (format != FrameFormat.NV21
+                && format != FrameFormat.RGBA8888) {
+            throw new IllegalArgumentException(
+                    "Raw pixels require NV21 or RGBA8888 format; "
+                    + "use encoded() for JPEG or PNG data");
         }
         return new VisionImage(null, bytes, width, height, rotationDegrees, 0, format);
     }

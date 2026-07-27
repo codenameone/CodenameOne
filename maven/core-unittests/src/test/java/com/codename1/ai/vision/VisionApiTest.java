@@ -59,6 +59,16 @@ class VisionApiTest extends UITestBase {
     }
 
     @Test
+    void pixelInputRejectsEncodedAndMissingFormats() {
+        byte[] raw = new byte[] {1, 2, 3, 4};
+        assertThrows(IllegalArgumentException.class,
+                () -> VisionImage.pixels(raw, 1, 1,
+                        FrameFormat.JPEG, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> VisionImage.pixels(raw, 1, 1, null, 0));
+    }
+
+    @Test
     void cameraFrameCopiesOnlyTheRequestedFormat() {
         byte[] jpeg = new byte[] {1, 2};
         byte[] pixels = new byte[] {3, 4, 5, 6};
