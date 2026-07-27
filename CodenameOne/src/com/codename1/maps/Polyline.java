@@ -27,6 +27,12 @@ import java.util.List;
 
 /// A connected sequence of line segments drawn on a map. Add one through
 /// [MapSurface#addPolyline(Polyline)].
+///
+/// A polyline joins the vertices you give it with *straight* segments; it
+/// knows nothing about roads. To draw a route that follows the road network,
+/// ask a routing service for the road geometry and draw that -- see
+/// [com.codename1.maps.routing.Routing], or decode a geometry you fetched
+/// yourself with [#fromEncoded(String)].
 public final class Polyline extends MapObject {
 
     private final List points;
@@ -48,6 +54,21 @@ public final class Polyline extends MapObject {
                 points.add(pt);
             }
         }
+    }
+
+    /// Creates a polyline from an *encoded polyline* geometry at the default
+    /// precision of 5 -- the shape virtually every directions API returns for
+    /// a route. See [PolylineCodec].
+    public static Polyline fromEncoded(String encoded) {
+        return fromEncoded(encoded, 5);
+    }
+
+    /// Creates a polyline from an *encoded polyline* geometry at an explicit
+    /// decimal precision (5 for the classic format, 6 for `polyline6`).
+    public static Polyline fromEncoded(String encoded, int precision) {
+        Polyline pl = new Polyline();
+        pl.points.addAll(PolylineCodec.decode(encoded, precision));
+        return pl;
     }
 
     /// Appends a vertex.
