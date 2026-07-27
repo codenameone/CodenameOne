@@ -35,6 +35,9 @@ public final class SegmentationMask {
     /// @param width mask width in pixels
     /// @param height mask height in pixels
     /// @param confidence one foreground probability per pixel, defensively copied
+    /// @throws IllegalArgumentException if either dimension is negative, the
+    ///  pixel count exceeds the maximum Java array length, or
+    ///  {@code confidence} does not contain exactly one value per pixel
     public SegmentationMask(int width, int height, float[] confidence) {
         this(width, height, confidence, null);
     }
@@ -44,10 +47,14 @@ public final class SegmentationMask {
     /// @param height mask height in pixels
     /// @param confidence one foreground probability per pixel, defensively copied
     /// @param metadata backend details, or {@code null}
+    /// @throws IllegalArgumentException if either dimension is negative, the
+    ///  pixel count exceeds the maximum Java array length, or
+    ///  {@code confidence} does not contain exactly one value per pixel
     public SegmentationMask(int width, int height, float[] confidence,
                             VisionMetadata metadata) {
-        if (width < 0 || height < 0
-                || confidence == null || confidence.length != width * height) {
+        long pixelCount = (long) width * (long) height;
+        if (width < 0 || height < 0 || pixelCount > Integer.MAX_VALUE
+                || confidence == null || confidence.length != pixelCount) {
             throw new IllegalArgumentException("Mask dimensions do not match its data");
         }
         this.width = width;

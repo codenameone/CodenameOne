@@ -69,6 +69,12 @@ class VisionApiTest extends UITestBase {
     }
 
     @Test
+    void segmentationMaskRejectsOverflowingPixelCount() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new SegmentationMask(65536, 65536, new float[0]));
+    }
+
+    @Test
     void cameraFrameCopiesOnlyTheRequestedFormat() {
         byte[] jpeg = new byte[] {1, 2};
         byte[] pixels = new byte[] {3, 4, 5, 6};
