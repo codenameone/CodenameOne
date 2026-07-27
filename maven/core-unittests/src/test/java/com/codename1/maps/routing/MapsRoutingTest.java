@@ -232,6 +232,23 @@ class MapsRoutingTest {
                 () -> OsrmRouteService.parseResponse("{\"code\":\"Ok\",\"routes\":[]}"));
     }
 
+    @Test
+    void nonObjectRouteLegAndStepEntriesRaiseIoException() {
+        // parseResponse is public, so a caller feeding it a body from its own
+        // transport must be able to rely on the documented IOException. A
+        // non-object entry used to escape as an unchecked NullPointerException
+        // or ClassCastException straight through the catch.
+        assertThrows(IOException.class,
+                () -> OsrmRouteService.parseResponse("{\"code\":\"Ok\",\"routes\":[null]}"));
+        assertThrows(IOException.class,
+                () -> OsrmRouteService.parseResponse("{\"code\":\"Ok\",\"routes\":[7]}"));
+        assertThrows(IOException.class, () -> OsrmRouteService.parseResponse(
+                "{\"code\":\"Ok\",\"routes\":[{\"geometry\":\"" + GEOMETRY + "\",\"legs\":[null]}]}"));
+        assertThrows(IOException.class, () -> OsrmRouteService.parseResponse(
+                "{\"code\":\"Ok\",\"routes\":[{\"geometry\":\"" + GEOMETRY
+                        + "\",\"legs\":[{\"steps\":[\"turn left\"]}]}]}"));
+    }
+
     // ---- Routing facade ---------------------------------------------------
 
     @Test

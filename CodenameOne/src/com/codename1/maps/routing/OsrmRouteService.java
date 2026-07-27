@@ -159,8 +159,10 @@ public class OsrmRouteService implements RouteService {
     ///
     /// #### Throws
     ///
-    /// - `IOException`: when the body is malformed, or when OSRM reported that
-    ///   it could not route the request
+    /// - `IOException`: when the body is malformed -- unparseable, or holding
+    ///   a route, leg or step that is not a JSON object -- or when OSRM
+    ///   reported that it could not route the request. Malformed input never
+    ///   escapes as an unchecked exception, so catching this is enough.
     public static List parseResponse(String json) throws IOException {
         if (json == null || json.length() == 0) {
             throw new IOException("Empty routing response");
@@ -176,20 +178,29 @@ public class OsrmRouteService implements RouteService {
         }
         List routes = new ArrayList();
         for (Object routeObj : (List) routesObj) {
-            routes.add(parseRoute((Map) routeObj));
+            routes.add(parseRoute(requireObject(routeObj, "route")));
         }
         return routes;
     }
 
-    private static Route parseRoute(Map json) {
+    /// Casts a decoded JSON value that has to be an object, turning the
+    /// malformed case into the [IOException] [#parseResponse(String)]
+    /// documents rather than letting an unchecked cast escape a public API.
+    private static Map requireObject(Object value, String what) throws IOException {
+        if (!(value instanceof Map)) {
+            throw new IOException("Malformed routing response: " + what + " is not an object");
+        }
+        return (Map) value;
+    }
+
+    private static Route parseRoute(Map json) throws IOException {
         List points = PolylineCodec.decode(string(json.get("geometry")));
         List legs = new ArrayList();
         String summary = "";
         Object legsObj = json.get("legs");
         if (legsObj instanceof List) {
             for (Object legObj : (List) legsObj) {
-                Map legJson = (Map) legObj;
-                RouteLeg leg = parseLeg(legJson);
+                RouteLeg leg = parseLeg(requireObject(legObj, "route leg"));
                 legs.add(leg);
                 if (summary.length() == 0) {
                     summary = leg.getSummary();
@@ -200,12 +211,12 @@ public class OsrmRouteService implements RouteService {
                 number(json.get("duration")), summary);
     }
 
-    private static RouteLeg parseLeg(Map json) {
+    private static RouteLeg parseLeg(Map json) throws IOException {
         List steps = new ArrayList();
         Object stepsObj = json.get("steps");
         if (stepsObj instanceof List) {
             for (Object stepObj : (List) stepsObj) {
-                steps.add(parseStep((Map) stepObj));
+                steps.add(parseStep(requireObject(stepObj, "route step")));
             }
         }
         return new RouteLeg(string(json.get("summary")), number(json.get("distance")),
