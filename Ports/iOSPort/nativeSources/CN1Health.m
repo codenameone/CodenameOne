@@ -369,11 +369,11 @@ com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_do
             NSMutableString *tsv = [NSMutableString string];
             for (HKQuantitySample *sample in results) {
                 double value = [[sample quantity] doubleValueForUnit:unit];
-                if ([symbol isEqualToString:@"%"]) {
-                    // HealthKit stores these as 0..1 fractions; the
-                    // portable unit is a percentage.
-                    value *= 100.0;
-                }
+                // No percent rescaling. doubleValueForUnit:percentUnit
+                // already answers in percent -- 97% comes back as 97 -- so
+                // multiplying turned every oxygen saturation and body fat
+                // reading into 9700, and the matching division on the
+                // write path stored 97% as 0.97%.
                 [tsv appendFormat:@"%@\t%@\t%lld\t%lld\t%f\t%@\t%@\n",
                     [[sample UUID] UUIDString], portableId,
                     (long long)([[sample startDate] timeIntervalSince1970]
@@ -418,9 +418,7 @@ void com_codename1_impl_ios_IOSNative_hkSaveSamples___int_java_lang_String(
                 continue;
             }
             double value = [[f objectAtIndex:4] doubleValue];
-            if ([[f objectAtIndex:5] isEqualToString:@"%"]) {
-                value /= 100.0;
-            }
+            // Percent values pass through unchanged; see the read path.
             HKQuantity *quantity = [HKQuantity
                 quantityWithUnit:cn1hkUnit(portableId) doubleValue:value];
             NSDate *from = [NSDate dateWithTimeIntervalSince1970:

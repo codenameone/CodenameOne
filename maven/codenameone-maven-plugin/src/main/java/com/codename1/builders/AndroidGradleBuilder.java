@@ -417,6 +417,7 @@ public class AndroidGradleBuilder extends Executor {
     // treated as a health-data app.
     private boolean usesHealth;
     private boolean usesHealthStore;
+    private boolean usesHealthData;
     private boolean usesHealthWorkout;
     private final java.util.List<String> healthBackgroundListeners =
             new java.util.ArrayList<String>();
@@ -1561,6 +1562,7 @@ public class AndroidGradleBuilder extends Executor {
                             // Anything outside the sensors subpackage means
                             // a real platform health store is in play.
                             usesHealthStore = true;
+                            usesHealthData = true;
                         }
                         if (cls.indexOf("com/codename1/health/workout/") == 0) {
                             usesHealthWorkout = true;
@@ -1607,6 +1609,13 @@ public class AndroidGradleBuilder extends Executor {
                                 || method.startsWith("openProviderSetup")
                                 || method.startsWith("getAvailability")) {
                             usesHealthStore = true;
+                        }
+                        // getStore() is the only one of those that leads to
+                        // a data type; availability and the settings
+                        // shortcuts do not, so they must not force a
+                        // permission declaration the app never uses.
+                        if (method.startsWith("getStore")) {
+                            usesHealthData = true;
                         }
                         if (method.startsWith("getWorkouts")) {
                             usesHealthWorkout = true;
@@ -1947,7 +1956,17 @@ public class AndroidGradleBuilder extends Executor {
         if (usesHealthStore) {
             String readHint = request.getArg("android.health.read", "");
             String writeHint = request.getArg("android.health.write", "");
-            if (readHint.length() == 0 && writeHint.length() == 0) {
+            List<String> readTypes =
+                    HealthManifestFragments.parseTypeList(readHint);
+            List<String> writeTypes =
+                    HealthManifestFragments.parseTypeList(writeHint);
+            // Checked after parsing, so "  , " counts as empty rather than
+            // passing a raw length test and installing the bridge with no
+            // permissions at all. Availability-only apps are exempt: they
+            // touch no data type, and demanding one would put a permission
+            // in the manifest the app never uses.
+            if (usesHealthData && readTypes.isEmpty()
+                    && writeTypes.isEmpty()) {
                 // The scanner cannot infer these: a data type is referenced
                 // as a constant, and field reads are not recorded. Play
                 // also requires declaring exactly the types you use.
@@ -2463,28 +2482,24 @@ public class AndroidGradleBuilder extends Executor {
             // generator never consults it, so a non-Gradle-8 project would
             // still be pinned to 1.7.22 and fail compiling the bridge.
             String kotlinFloor = "1.9.22";
+            // Checked before, and independently of, whether this builder
+            // has to raise the version: a project that already sets
+            // requireKotlinStdlib=1.9.22 with useGradle8=false is just as
+            // broken, and the earlier nesting let it through.
+            if (!useGradle8) {
+                throw new BuildException(
+                        "Health Connect requires Kotlin " + kotlinFloor
+                        + ", whose Gradle plugin needs Gradle 6.8.3 or"
+                        + " newer, but this build sets"
+                        + " android.useGradle8=false and would use"
+                        + " Gradle 6.5. Set android.useGradle8=true to"
+                        + " build a health-enabled app.");
+            }
             String declaredKotlin =
                     request.getArg("requireKotlinStdlib", "").trim();
             if (declaredKotlin.length() == 0
                     || compareVersions(declaredKotlin, kotlinFloor) < 0) {
                 request.putArgument("requireKotlinStdlib", kotlinFloor);
-                // Kotlin 1.9.22's Gradle plugin needs Gradle 6.8.3 or
-                // newer and the non-Gradle-8 path defaults to 6.5, so the
-                // combination cannot build. Flipping useGradle8 here does
-                // not help: the Gradle version and executable were already
-                // resolved earlier in build(), so the project would keep
-                // the legacy toolchain and fail anyway. Refuse with an
-                // instruction instead of producing a build that dies
-                // during Kotlin compilation for no visible reason.
-                if (!useGradle8) {
-                    throw new BuildException(
-                            "Health Connect requires Kotlin " + kotlinFloor
-                            + ", whose Gradle plugin needs Gradle 6.8.3 or"
-                            + " newer, but this build sets"
-                            + " android.useGradle8=false and would use"
-                            + " Gradle 6.5. Set android.useGradle8=true to"
-                            + " build a health-enabled app.");
-                }
                 log("Health Connect requires Kotlin " + kotlinFloor
                         + " or newer; raising requireKotlinStdlib from "
                         + (declaredKotlin.length() == 0

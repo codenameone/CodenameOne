@@ -121,6 +121,15 @@ public class IPhoneBuilder extends Executor {
     // pull in HealthKit or its entitlement.
     private boolean usesHealth;
     private boolean usesHealthStore;
+    /// Treats a blank hint as missing.
+    private static String trimToNull(String v) {
+        if (v == null) {
+            return null;
+        }
+        String t = v.trim();
+        return t.length() == 0 ? null : t;
+    }
+
     private boolean usesHealthRead;
     private boolean usesHealthWrite;
     private boolean usesHealthObserver;
@@ -2557,10 +2566,22 @@ public class IPhoneBuilder extends Executor {
             // doing ordinary BLE and must not acquire HealthKit, its
             // entitlement, or an App Store health-data review.
             if (usesHealthStore) {
-                String share = request.getArg(
-                        "ios.NSHealthShareUsageDescription", null);
-                String update = request.getArg(
-                        "ios.NSHealthUpdateUsageDescription", null);
+                // Trimmed, and blank counts as absent. A hint present
+                // but empty produced an empty purpose string, which is
+                // exactly what App Review rejects and what iOS enforces at
+                // runtime -- the validation existed to prevent that.
+                String share = trimToNull(request.getArg(
+                        "ios.NSHealthShareUsageDescription", null));
+                String update = trimToNull(request.getArg(
+                        "ios.NSHealthUpdateUsageDescription", null));
+                if (share != null) {
+                    request.putArgument("ios.NSHealthShareUsageDescription",
+                            share);
+                }
+                if (update != null) {
+                    request.putArgument("ios.NSHealthUpdateUsageDescription",
+                            update);
+                }
 
                 // Deliberately a hard failure rather than a defaulted
                 // placeholder. Apple reviews health purpose strings against
@@ -2569,7 +2590,12 @@ public class IPhoneBuilder extends Executor {
                 // would also be a privacy claim made in the developer's
                 // name. Compare the camera/bluetooth entries in
                 // AiDependencyTable, which do default their strings.
-                if (share == null && update == null) {
+                // Availability alone needs no purpose string: checking
+                // whether HKHealthStore exists reads nothing, so there is
+                // no truthful text to demand. HealthKit still links.
+                if (!usesHealthRead && !usesHealthWrite) {
+                    // nothing to validate
+                } else if (share == null && update == null) {
                     throw new BuildException(
                         "This app uses com.codename1.health but declares no "
                       + "HealthKit privacy strings.\n"

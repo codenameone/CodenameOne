@@ -74,6 +74,7 @@ public class SensorSession {
             new CumulativeCounterTracker(0x10000L, 1024);
 
     private SensorSessionState state = SensorSessionState.CONNECTING;
+    private boolean streamed;
     private Integer batteryPercent;
     private int bodySensorLocation = -1;
 
@@ -526,7 +527,19 @@ public class SensorSession {
     }
 
     /// Moves the session to a new state and notifies listeners.
+    /// True once this session has actually streamed.
+    ///
+    /// A failed initial connect also publishes DISCONNECTED, and
+    /// reconnecting from that resurrects a session the caller was already
+    /// told had failed.
+    protected final boolean hasStreamed() {
+        return streamed;
+    }
+
     protected final void setState(SensorSessionState newState) {
+        if (newState == SensorSessionState.STREAMING) {
+            streamed = true;
+        }
         if (newState == null || newState == state) {
             return;
         }

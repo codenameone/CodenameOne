@@ -787,7 +787,11 @@ class CN1HealthConnectBridge(private val context: Context)
                 classes.forEach {
                     requireClient().deleteRecords(it, list, emptyList())
                 }
-                list.size.toString()
+                // Health Connect reports no affected-row count, and an id
+                // that is stale or owned by another app deletes nothing
+                // while still succeeding. Returning the id count claimed
+                // deletions that may not have happened.
+                "-1"
             } else {
                 val filter = TimeRangeFilter.between(
                     Instant.ofEpochMilli(json.getLong("start")),

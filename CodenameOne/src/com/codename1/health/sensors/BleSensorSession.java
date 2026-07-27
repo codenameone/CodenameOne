@@ -133,8 +133,16 @@ final class BleSensorSession extends SensorSession {
 
         @Override
         public void connectionStateChanged(ConnectionEvent event) {
+            // Only a session that actually got streaming reconnects. A
+            // failed initial connect publishes DISCONNECTED too, and
+            // retrying from there resurrected a session the caller had
+            // already been told had failed -- streaming and routing
+            // samples while absent from getActiveSessions().
             if (event.getState() == ConnectionState.DISCONNECTED
-                    && session.getState() != SensorSessionState.STOPPED) {
+                    && (session.getState() == SensorSessionState.STREAMING
+                        || session.getState()
+                            == SensorSessionState.CONNECTING)
+                    && session.hasStreamed()) {
                 session.reconnect();
             }
         }

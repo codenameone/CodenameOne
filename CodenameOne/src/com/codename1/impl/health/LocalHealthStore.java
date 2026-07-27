@@ -135,7 +135,7 @@ public class LocalHealthStore extends HealthStore {
     protected void doRequestAuthorization(
             List<com.codename1.health.HealthAccess> access,
             AsyncResource<Boolean> out) {
-        out.complete(Boolean.TRUE);
+        completeOnEdt(out, Boolean.TRUE);
     }
 
     // ------------------------------------------------------------------
@@ -166,7 +166,7 @@ public class LocalHealthStore extends HealthStore {
         }
         // Everything is in memory, so a single page always satisfies the
         // query; there is no continuation token to hand back.
-        out.complete(new SamplePage(matched, null, truncated));
+        completeOnEdt(out, new SamplePage(matched, null, truncated));
     }
 
     private boolean matches(HealthSample s, SampleQuery query,
@@ -198,6 +198,55 @@ public class LocalHealthStore extends HealthStore {
         return true;
     }
 
+    /// Completes on the EDT.
+    ///
+    /// AsyncResource runs callbacks on whichever thread completes it, and
+    /// this store answers synchronously on the caller's thread. A read
+    /// started from a worker therefore delivered its result there,
+    /// breaking the guarantee HealthStore makes that every callback
+    /// arrives on the EDT -- the same guarantee the mobile ports honour.
+    private static void completeOnEdt(AsyncResource out, Object value) {
+        com.codename1.ui.Display.getInstance()
+                .callSerially(new Complete(out, value));
+    }
+
+    private static void failOnEdt(AsyncResource out, Throwable error) {
+        com.codename1.ui.Display.getInstance()
+                .callSerially(new Fail(out, error));
+    }
+
+    /// Named rather than anonymous so the hop carries no synthetic
+    /// reference to the store.
+    private static final class Complete implements Runnable {
+        private final AsyncResource resource;
+        private final Object value;
+
+        Complete(AsyncResource resource, Object value) {
+            this.resource = resource;
+            this.value = value;
+        }
+
+        @Override
+        public void run() {
+            resource.complete(value);
+        }
+    }
+
+    private static final class Fail implements Runnable {
+        private final AsyncResource resource;
+        private final Throwable error;
+
+        Fail(AsyncResource resource, Throwable error) {
+            this.resource = resource;
+            this.error = error;
+        }
+
+        @Override
+        public void run() {
+            resource.error(error);
+        }
+    }
+
     /// Copies a stored sample so callers cannot mutate the store.
     ///
     /// Quantity samples are the only shape this store holds; anything else
@@ -205,6 +254,10 @@ public class LocalHealthStore extends HealthStore {
     /// the stored instance for the common case.
     private static HealthSample snapshot(HealthSample s) {
         if (!(s instanceof QuantitySample)) {
+            // Blood pressure, series, category, sleep, workout and
+            // nutrition records are mutable through the common setters
+            // too. There is no portable deep copy for them, so the store
+            // keeps its own copy on write instead -- see storeCopy.
             return s;
         }
         QuantitySample q = (QuantitySample) s;
@@ -245,7 +298,7 @@ public class LocalHealthStore extends HealthStore {
         synchronized (samples) {
             snapshot = new ArrayList<HealthSample>(samples);
         }
-        out.complete(aggregateSamples(query, boundaries, snapshot));
+        completeOnEdt(out, aggregateSamples(query, boundaries, snapshot));
     }
 
 
@@ -261,12 +314,18 @@ public class LocalHealthStore extends HealthStore {
             for (HealthSample s : toWrite) {
                 String id = "local-" + (nextId++);
                 s.setId(id);
-                samples.add(s);
+                // Stored as a copy where one can be made. Keeping the
+                // caller's object meant later setId/setSource/putMetadata
+                // on it silently rewrote the stored record -- and could
+                // make deleting by the returned id fail.
+                HealthSample stored = snapshot(s);
+                stored.setId(id);
+                samples.add(stored);
                 result.addSampleId(id);
             }
         }
         persist();
-        out.complete(result);
+        completeOnEdt(out, result);
     }
 
     @Override
@@ -299,7 +358,7 @@ public class LocalHealthStore extends HealthStore {
         if (removed > 0) {
             persist();
         }
-        out.complete(Integer.valueOf(removed));
+        completeOnEdt(out, Integer.valueOf(removed));
     }
 
     // ------------------------------------------------------------------
