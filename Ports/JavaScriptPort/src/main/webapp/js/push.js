@@ -169,11 +169,19 @@
             // Get public key and user auth from the subscription object
             var key = subscription.getKey ? subscription.getKey('p256dh') : '';
             var auth = subscription.getKey ? subscription.getKey('auth') : '';
-            var material = typedEnvelope && typeof subscription.toJSON === 'function'
-                    ? JSON.stringify(subscription.toJSON())
-                    : subscription.endpoint + '?key=' +
-                      encodeURIComponent(key ? btoa(String.fromCharCode.apply(null, new Uint8Array(key))) : '') +
-                      '&auth=' + encodeURIComponent(auth ? btoa(String.fromCharCode.apply(null, new Uint8Array(auth))) : '');
+            var material = subscription.endpoint + '?key=' +
+                    encodeURIComponent(key ? btoa(String.fromCharCode.apply(null, new Uint8Array(key))) : '') +
+                    '&auth=' + encodeURIComponent(auth ? btoa(String.fromCharCode.apply(null, new Uint8Array(auth))) : '');
+            if (typedEnvelope && typeof subscription.toJSON === 'function') {
+                try {
+                    var serializedSubscription = JSON.stringify(subscription.toJSON());
+                    if (serializedSubscription && serializedSubscription !== 'null') {
+                        material = serializedSubscription;
+                    }
+                } catch (e) {
+                    console.warn('Unable to serialize push subscription; using endpoint and keys instead.', e);
+                }
+            }
             var id = 'cn1-web-'+Base64.encodeURI(material);
             onSuccess(id);
         }
