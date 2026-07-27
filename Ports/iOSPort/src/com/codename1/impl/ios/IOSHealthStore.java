@@ -215,10 +215,17 @@ class IOSHealthStore extends HealthStore {
         }
         HealthTimeRange range =
                 query.getTimeRange().resolve(System.currentTimeMillis());
-        int id = IOSHealth.takeId(out);
+        // The limit is asked for one higher than the caller wanted, so a
+        // full page can be told apart from a page that merely ended. There
+        // is no HealthKit continuation token here, so the honest signal is
+        // SamplePage.isTruncated() -- claiming a partial history was
+        // complete is what silently lost everything past the first page.
+        int id = IOSHealth.takeId(out, query.getLimit());
         nativeInstance.hkQuerySamples(id, types.get(0).getId(),
                 range.getStartMillis(), range.getEndMillis(),
-                query.getLimit(), !query.isSortDescending());
+                query.getLimit() == Integer.MAX_VALUE ? query.getLimit()
+                        : query.getLimit() + 1,
+                !query.isSortDescending());
     }
 
     protected void doWrite(List<HealthSample> samples,

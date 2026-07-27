@@ -24,6 +24,8 @@ package com.codename1.impl.ios;
 
 import com.codename1.health.Health;
 import com.codename1.health.HealthAvailability;
+import com.codename1.health.HealthSample;
+import com.codename1.health.SamplePage;
 import com.codename1.health.HealthStore;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
@@ -40,6 +42,8 @@ import java.util.Map;
 /// [IOSBluetooth] uses.
 public final class IOSHealth extends Health {
 
+    private static final Map<Integer, Integer> LIMITS =
+            new HashMap<Integer, Integer>();
     private static final Map<Integer, AsyncResource> REQUESTS =
             new HashMap<Integer, AsyncResource>();
     private static int nextRequestId = 1;
@@ -109,8 +113,24 @@ public final class IOSHealth extends Health {
         return id;
     }
 
+    /// Registers a read whose page must report truncation.
+    ///
+    /// HealthKit has no continuation token, so the only honest thing a
+    /// capped read can say is "there was more". The requested limit is
+    /// remembered here and compared against what came back.
+    static synchronized int takeId(AsyncResource resource, int limit) {
+        int id = takeId(resource);
+        LIMITS.put(Integer.valueOf(id), Integer.valueOf(limit));
+        return id;
+    }
+
     static synchronized AsyncResource take(int requestId) {
         return REQUESTS.remove(Integer.valueOf(requestId));
+    }
+
+    static synchronized int takeLimit(int requestId) {
+        Integer v = LIMITS.remove(Integer.valueOf(requestId));
+        return v == null ? Integer.MAX_VALUE : v.intValue();
     }
 
     // ---- Callbacks invoked from native code (do not rename) ----
@@ -135,11 +155,20 @@ public final class IOSHealth extends Health {
 
     static void nativeHkSamples(int requestId, String tsv) {
         AsyncResource r = take(requestId);
+        int limit = takeLimit(requestId);
         if (r == null) {
             return;
         }
-        completeOnEdt(r, com.codename1.impl.health.HealthWire
-                .decodeSamplePage(tsv));
+        SamplePage page = com.codename1.impl.health.HealthWire
+                .decodeSamplePage(tsv);
+        if (limit != Integer.MAX_VALUE && page.size() > limit) {
+            // One more came back than was asked for, which is how a capped
+            // read learns there is more. Trim to the limit and say so.
+            List<HealthSample> kept = new ArrayList<HealthSample>(
+                    page.getSamples().subList(0, limit));
+            page = new SamplePage(kept, null, true);
+        }
+        completeOnEdt(r, page);
     }
 
     static void nativeHkSaveResult(int requestId, String uuids) {

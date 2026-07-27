@@ -35,6 +35,7 @@ import com.codename1.health.HealthUnit;
 import com.codename1.health.HealthWriteResult;
 import com.codename1.health.QuantitySample;
 import com.codename1.health.SampleQuery;
+import com.codename1.health.RecordingMethod;
 import com.codename1.health.SamplePage;
 
 import java.util.ArrayList;
@@ -249,6 +250,19 @@ public final class HealthWire {
         return page;
     }
 
+    private static RecordingMethod recordingMethod(String token) {
+        if ("MANUAL_ENTRY".equals(token)) {
+            return RecordingMethod.MANUAL_ENTRY;
+        }
+        if ("AUTOMATIC".equals(token)) {
+            return RecordingMethod.AUTOMATIC;
+        }
+        if ("ACTIVE".equals(token)) {
+            return RecordingMethod.ACTIVELY_RECORDED;
+        }
+        return null;
+    }
+
     private static HealthSample decodeSampleLine(String line) {
         if (line == null || line.trim().length() == 0) {
             return null;
@@ -283,6 +297,15 @@ public final class HealthWire {
                         f.length > 7 ? emptyToNull(f[7]) : null,
                         f.length > 8 ? emptyToNull(f[8]) : null, null,
                         null));
+            }
+            if (f.length > 7) {
+                // Field 7 doubles as the recording method when it names
+                // one. An older port that put a source name there is
+                // unaffected: an unknown token leaves the default.
+                RecordingMethod m = recordingMethod(f[7]);
+                if (m != null) {
+                    s.setRecordingMethod(m);
+                }
             }
             return s;
         } catch (NumberFormatException ex) {

@@ -274,15 +274,28 @@ class CN1HealthConnectBridge(private val context: Context)
             if (outTokens.values.all { it.isEmpty() }) {
                 outTokens.clear()
             }
-            // Merged in time order but not trimmed: trimming here would
-            // drop samples the trailer's tokens can no longer reach. The
-            // shared layer applies the caller's limit.
-            sb.append(mergeByTime(perType, Int.MAX_VALUE, ascending))
+            // Merged in time order and trimmed to the caller's limit.
+            //
+            // Trimming and paging cannot both be honoured for a multi-type
+            // query: a Health Connect token advances its own type, so a
+            // sample dropped by the merge has no token that would return
+            // it. The limit wins, because it is what bounds memory, and
+            // the reply says it was truncated rather than pretending to be
+            // complete. Multi-type queries are therefore single-page.
+            val merged = mergeByTime(perType, budget, ascending)
+            val truncated = perType.sumOf { block ->
+                block.count { it == '\n' }
+            } > merged.count { it == '\n' }
+            if (truncated) {
+                outTokens.clear()
+            }
+            sb.append(merged)
             // Trailer: what is left on the platform side. Reporting nothing
             // made every page look complete, so the caller's paging loop
             // stopped at the first limit and lost the rest.
             sb.append('#').append(encodeTokens(outTokens)).append('\t')
-                .append(if (outTokens.isEmpty()) "0" else "1").append('\n')
+                .append(if (outTokens.isEmpty() && !truncated) "0" else "1")
+                .append('\n')
             sb.toString()
         }
     }
@@ -555,18 +568,18 @@ class CN1HealthConnectBridge(private val context: Context)
                          start: Instant, end: Instant, value: Double,
                          unit: String) {
         line(sb, r.metadata.id, token, start.toEpochMilli(),
-            end.toEpochMilli(), value, unit, originOf(r))
+            end.toEpochMilli(), value, unit, originOf(r), r)
     }
 
     private fun instant(sb: StringBuilder, r: Record, token: String,
                         at: Instant, value: Double, unit: String) {
         line(sb, r.metadata.id, token, at.toEpochMilli(),
-            at.toEpochMilli(), value, unit, originOf(r))
+            at.toEpochMilli(), value, unit, originOf(r), r)
     }
 
     private fun sample(sb: StringBuilder, r: Record, token: String,
                        at: Long, value: Double, unit: String) {
-        line(sb, r.metadata.id, token, at, at, value, unit, originOf(r))
+        line(sb, r.metadata.id, token, at, at, value, unit, originOf(r), r)
     }
 
     private fun originOf(r: Record): String {
@@ -576,7 +589,7 @@ class CN1HealthConnectBridge(private val context: Context)
 
     private fun line(sb: StringBuilder, id: String, type: String,
                      start: Long, end: Long, value: Double, unit: String,
-                     origin: String) {
+                     origin: String, r: Record) {
         sb.append(id).append('\t').append(type).append('\t')
             .append(start).append('\t').append(end).append('\t')
             .append(value).append('\t').append(unit).append('\t')
@@ -584,7 +597,19 @@ class CN1HealthConnectBridge(private val context: Context)
             // this field as the source bundle id and filters on it. Writing
             // a placeholder here made every source-filtered read come back
             // empty, even though the native request had filtered correctly.
-            .append(origin).append('\n')
+            .append(origin).append('\t')
+            // Field 7: the recording method, so a value the user typed can
+            // be told from one a device measured after a round trip.
+            .append(recordingMethodName(r)).append('\n')
+    }
+
+    private fun recordingMethodName(r: Record): String {
+        return when (r.metadata.recordingMethod) {
+            Metadata.RECORDING_METHOD_MANUAL_ENTRY -> "MANUAL_ENTRY"
+            Metadata.RECORDING_METHOD_AUTOMATICALLY_RECORDED -> "AUTOMATIC"
+            Metadata.RECORDING_METHOD_ACTIVELY_RECORDED -> "ACTIVE"
+            else -> "UNKNOWN"
+        }
     }
 
     override fun aggregate(requestJson: String,

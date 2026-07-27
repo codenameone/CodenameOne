@@ -343,9 +343,18 @@ class AndroidHealthStore extends HealthStore {
                                                 + "screen was dismissed"));
                                 return;
                             }
-                            String grants = d.parsePermissionResult(
-                                    resultCode, data);
-                            rememberGrants(grants);
+                            // The result only lists what this intent
+                            // asked for. Replacing the cached snapshot
+                            // with it made a previously granted type read
+                            // as DENIED after a second, unrelated
+                            // authorization -- so re-read the full set
+                            // from Health Connect instead.
+                            d.parsePermissionResult(resultCode, data);
+                            clearGrantsRequest();
+                            synchronized (granted) {
+                                grantsLoaded = false;
+                            }
+                            refreshGrants();
                             // True because the flow completed, matching the
                             // documented contract -- not because everything
                             // was granted.

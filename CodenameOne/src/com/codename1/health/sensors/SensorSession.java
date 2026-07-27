@@ -349,6 +349,11 @@ public class SensorSession {
             synchronized (session.pendingWrites) {
                 session.pendingWrites.addAll(0, batch);
             }
+            // Re-armed explicitly. The buffer is non-empty again, so a
+            // later measurement will not start a timer, and without this
+            // the requeued batch would sit there until the process exits.
+            session.scheduleFlush(session.getOptions()
+                    .getStoreBatchMillis());
             session.fireError(error instanceof HealthException
                     ? (HealthException) error
                     : new HealthException(HealthError.UNKNOWN,
