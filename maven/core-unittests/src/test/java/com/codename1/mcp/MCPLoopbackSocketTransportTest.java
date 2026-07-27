@@ -34,6 +34,7 @@ import java.io.PipedOutputStream;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -57,6 +58,21 @@ class MCPLoopbackSocketTransportTest {
             transport.close();
             transport = null;
         }
+    }
+
+    /// Waits for a condition instead of sleeping for a guessed interval. A fixed sleep
+    /// either wastes time or, on a loaded machine, fires before the thread it is waiting
+    /// on has got anywhere - which is how timing-based tests turn flaky.
+    private static void await(String what, java.util.concurrent.Callable<Boolean> condition)
+            throws Exception {
+        long deadline = System.currentTimeMillis() + 10000;
+        while (System.currentTimeMillis() < deadline) {
+            if (condition.call()) {
+                return;
+            }
+            Thread.sleep(5);
+        }
+        fail("timed out waiting for " + what);
     }
 
     private MCPLoopbackSocketTransport attached(String clientBytes) throws IOException {
@@ -132,7 +148,16 @@ class MCPLoopbackSocketTransportTest {
         // instead of reporting end-of-transport, so reconnects keep working.
         final MCPLoopbackSocketTransport t = new MCPLoopbackSocketTransport(47811);
         transport = t;
-        t.attach(new ByteArrayInputStream(new byte[0]), new ByteArrayOutputStream());
+        // Counts the end-of-stream read, so the test can wait for the reader to have SEEN
+        // the disconnect rather than sleeping and hoping.
+        final AtomicLong endOfStreamReads = new AtomicLong();
+        t.attach(new InputStream() {
+            @Override
+            public int read() {
+                endOfStreamReads.incrementAndGet();
+                return -1;
+            }
+        }, new ByteArrayOutputStream());
 
         final String[] out = new String[1];
         Thread reader = new Thread(() -> {
@@ -143,7 +168,7 @@ class MCPLoopbackSocketTransportTest {
             }
         });
         reader.start();
-        Thread.sleep(150);
+        await("the reader to consume the disconnect", () -> endOfStreamReads.get() > 0);
         assertTrue(reader.isAlive(), "the reader should be waiting for the next client");
 
         t.attach(new ByteArrayInputStream("{\"id\":9}\n".getBytes("UTF-8")),
@@ -181,17 +206,63 @@ class MCPLoopbackSocketTransportTest {
             }
         });
         reader.start();
-        Thread.sleep(500);
-        long afterSettling = served.get();
-        Thread.sleep(250);
-        assertEquals(afterSettling, served.get(),
-                "reading must stop at the frame ceiling; it was still consuming bytes");
+        // Wait for consumption to stop rather than for a fixed interval: the ceiling is
+        // what makes it stop, and how long 8MB takes depends on the machine.
+        await("the reader to stop consuming at the frame ceiling", () -> {
+            long before = served.get();
+            Thread.sleep(50);
+            return before == served.get();
+        });
 
         t.attach(new ByteArrayInputStream("{\"id\":11}\n".getBytes("UTF-8")),
                 new ByteArrayOutputStream());
         reader.join(5000);
         assertEquals("{\"id\":11}", out[0],
                 "the next client's message should arrive normally");
+    }
+
+    @Test
+    void aFrameOfExactlyTheCeilingIsStillDelivered() throws Exception {
+        // The ceiling is on the payload, so a frame of exactly that size is legal and its
+        // delimiter still has to be read. Rejecting at >= would have made the largest
+        // permitted message unsendable, which is the classic off-by-one on a limit.
+        final int size = MCPLoopbackSocketTransport.MAX_FRAME_BYTES;
+        final MCPLoopbackSocketTransport t = new MCPLoopbackSocketTransport(47811);
+        transport = t;
+        t.attach(new InputStream() {
+            private int pos;
+
+            @Override
+            public int read() {
+                if (pos < size) {
+                    pos++;
+                    return 'x';
+                }
+                if (pos == size) {
+                    pos++;
+                    return '\n';
+                }
+                return -1;
+            }
+        }, new ByteArrayOutputStream());
+
+        // Read on another thread with a deadline. Should the ceiling ever go back to
+        // rejecting at exactly the limit, this frame is discarded as a disconnect and the
+        // reader parks waiting for the next client -- so a direct call here would hang CI
+        // instead of failing it.
+        final String[] out = new String[1];
+        Thread reader = new Thread(() -> {
+            try {
+                out[0] = t.readMessage();
+            } catch (IOException ignored) {
+                // surfaces as a null message below
+            }
+        });
+        reader.start();
+        reader.join(30000);
+        assertNotNull(out[0], "a frame of exactly the ceiling must be delivered");
+        assertEquals(size, out[0].length(),
+                "the whole payload should arrive, without the delimiter");
     }
 
     @Test
@@ -202,8 +273,22 @@ class MCPLoopbackSocketTransportTest {
         // stay available, exactly as it does for a clean end of stream.
         final MCPLoopbackSocketTransport t = new MCPLoopbackSocketTransport(47811);
         transport = t;
-        t.attach(new ByteArrayInputStream("{\"id\":1,\"method\":\"init".getBytes("UTF-8")),
-                new ByteArrayOutputStream());
+        // Yields a partial frame then end of stream, counting the EOF so the test can wait
+        // for the reader to have reached it.
+        final AtomicLong truncatedReads = new AtomicLong();
+        final byte[] partial = "{\"id\":1,\"method\":\"init".getBytes("UTF-8");
+        t.attach(new InputStream() {
+            private int pos;
+
+            @Override
+            public int read() {
+                if (pos < partial.length) {
+                    return partial[pos++] & 0xff;
+                }
+                truncatedReads.incrementAndGet();
+                return -1;
+            }
+        }, new ByteArrayOutputStream());
 
         final String[] out = new String[1];
         Thread reader = new Thread(() -> {
@@ -214,7 +299,7 @@ class MCPLoopbackSocketTransportTest {
             }
         });
         reader.start();
-        Thread.sleep(150);
+        await("the reader to consume the truncated frame", () -> truncatedReads.get() > 0);
         assertTrue(reader.isAlive(),
                 "a truncated frame must leave the reader waiting for the next client, "
                         + "not hand up a partial message");
@@ -232,7 +317,7 @@ class MCPLoopbackSocketTransportTest {
         transport = t;
         final String[] out = new String[1];
         final boolean[] done = new boolean[1];
-        Thread reader = new Thread(() -> {
+        final Thread reader = new Thread(() -> {
             try {
                 out[0] = t.readMessage();
             } catch (IOException ignored) {
@@ -241,7 +326,11 @@ class MCPLoopbackSocketTransportTest {
             done[0] = true;
         });
         reader.start();
-        Thread.sleep(150);
+        // Park the reader before closing, so this exercises "close wakes a waiting reader"
+        // rather than "close had already been called". WAITING is precisely the state
+        // lock.wait() puts it in.
+        await("the reader to park waiting for a client",
+                () -> reader.getState() == Thread.State.WAITING);
         t.close();
         reader.join(3000);
 

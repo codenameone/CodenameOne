@@ -52,7 +52,7 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
     /// actions - while the bulky payloads, screenshots among them, travel the other way,
     /// so this sits far above any legitimate message. It exists to bound what an ill
     /// behaved or hostile client can make the server allocate.
-    private static final int MAX_FRAME_BYTES = 8 * 1024 * 1024;
+    static final int MAX_FRAME_BYTES = 8 * 1024 * 1024;
 
     private final int port;
     private final Object lock = new Object();
@@ -133,10 +133,49 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
     /// Called from the connection callback thread when a client attaches. The previous
     /// client, if any, is dropped: one agent drives at a time.
     void attach(InputStream is, OutputStream os) {
+        InputStream previousIn; // NOPMD closed below, deliberately outside the lock
+        OutputStream previousOut; // NOPMD closed below, outside the lock
         synchronized (lock) {
+            previousIn = in;
+            previousOut = out;
             in = is;
             out = os;
             lock.notifyAll();
+        }
+        // Dropping the previous client means closing its streams, not just forgetting
+        // them. A reader parked in read() on the old stream is not watching this field,
+        // so a client that holds its connection open and sends nothing would keep the
+        // server serving a session that has already been replaced.
+        //
+        // Outside the lock, because closing is what wakes that reader and it takes the
+        // lock on its way out.
+        if (previousIn != is) { // NOPMD identity: the same stream re-attached is not a swap
+            closeQuietly(previousIn);
+        }
+        if (previousOut != os) { // NOPMD identity: as above
+            closeQuietly(previousOut);
+        }
+    }
+
+    /// Closes a dropped client's stream. Failure is uninteresting: the stream is being
+    /// discarded either way, and closing is best effort by nature.
+    private static void closeQuietly(InputStream stream) {
+        if (stream != null) {
+            try {
+                stream.close();
+            } catch (IOException ignored) {
+                // discarding this stream regardless
+            }
+        }
+    }
+
+    private static void closeQuietly(OutputStream stream) {
+        if (stream != null) {
+            try {
+                stream.close();
+            } catch (IOException ignored) {
+                // discarding this stream regardless
+            }
         }
     }
 
@@ -198,7 +237,7 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         // a payload that happened to contain one.
         boolean pendingCarriageReturn = false;
         while (true) {
-            if (buffer.size() >= MAX_FRAME_BYTES) {
+            if (buffer.size() > MAX_FRAME_BYTES) {
                 // A client that sends no delimiter would otherwise grow this buffer until
                 // the process runs out of memory, and on a device any other app installed
                 // alongside can open this connection. Treat it as a disconnect, the same

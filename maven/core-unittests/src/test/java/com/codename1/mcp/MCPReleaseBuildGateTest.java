@@ -57,8 +57,13 @@ class MCPReleaseBuildGateTest extends UITestBase {
     private String refusal(boolean debuggable) {
         implementation.setDebuggableBuild(debuggable);
         implementation.setServerSocketAvailable(true);
-        return assertThrows(IllegalStateException.class,
+        String message = assertThrows(IllegalStateException.class,
                 () -> MCP.startSocketServer(47899)).getMessage();
+        // getMessage() is allowed to be null; assert it here so a future change that drops
+        // the message fails as a readable assertion rather than a NullPointerException in
+        // the caller's contains() check.
+        assertNotNull(message, "the refusal must explain itself");
+        return message;
     }
 
     /// Asserts the gate let the start through, leaving a running server behind.

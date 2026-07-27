@@ -26,6 +26,7 @@
 #include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <errno.h>
 #include <arpa/inet.h>
 #include "xmlvm.h"
 #import "CodenameOne_GLViewController.h"
@@ -169,9 +170,16 @@ static void _resume() {
     if(rawFd >= 0) {
         // Blocking recv: the caller is a reader thread and expects to wait for data,
         // and returning nil in a spin would burn the CPU.
-        _yield();
-        ssize_t r = recv(rawFd, buffer, sizeof(buffer), 0);
-        _resume();
+        //
+        // EINTR is retried rather than treated as a disconnect. This process installs
+        // signal handlers, so a signal arriving mid-read is an ordinary event here, and
+        // dropping a healthy connection because of one would be wrong.
+        ssize_t r;
+        do {
+            _yield();
+            r = recv(rawFd, buffer, sizeof(buffer), 0);
+            _resume();
+        } while(r < 0 && errno == EINTR);
         if(r > 0) {
             return [NSData dataWithBytes:buffer length:r];
         }
@@ -200,9 +208,12 @@ static void _resume() {
             // send() blocks once the send buffer fills, so hand the thread back to the VM
             // across it exactly as the accept and recv paths do; holding it would stall
             // cooperative scheduling for as long as the peer is slow to drain.
-            _yield();
-            ssize_t w = send(rawFd, bytes, remaining, 0);
-            _resume();
+            ssize_t w;
+            do {
+                _yield();
+                w = send(rawFd, bytes, remaining, 0);
+                _resume();
+            } while(w < 0 && errno == EINTR);
             if(w <= 0) {
                 [self closeRawDescriptor];
                 return;
@@ -325,9 +336,17 @@ static NSMutableDictionary* _cn1LoopbackListeners = nil;
     clientFd = accept(listenFd, NULL, NULL);
     _resume();
     if(clientFd < 0) {
-        errorMessage = @"Accept failed";
+        int acceptErrno = errno;
         errorCode = -1;
         connected = NO;
+        // Stopping a listener is delivered by closing its descriptor, so these mean
+        // "you were asked to stop", not "the accept failed". Reporting them as errors
+        // would make every deliberate shutdown look like a fault to the Java side.
+        if(acceptErrno == EBADF || acceptErrno == EINVAL || acceptErrno == EINTR) {
+            errorMessage = nil;
+        } else {
+            errorMessage = @"Accept failed";
+        }
         return NO;
     }
 

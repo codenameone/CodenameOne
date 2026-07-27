@@ -11769,6 +11769,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
          * address must never be handed back to a caller that asked for loopback.
          * Distinguishing them by sign within one map would collide on port 0, the
          * ephemeral-port request, where -0 == 0.
+         *
+         * The IPv4 loopback is named explicitly rather than taken from
+         * InetAddress.getLoopbackAddress(), which answers ::1 when the runtime
+         * prefers IPv6. A client that then connects to 127.0.0.1 - which is what
+         * adb forward and attaching agents do, and what the iOS port binds - would
+         * find nothing listening, with the server reporting that it had started.
          */
         public synchronized ServerSocket get(int port, boolean loopbackOnly) throws IOException {
             Map<Integer,ServerSocket> cache = loopbackOnly ? loopbackSocks : socks;
@@ -11776,7 +11782,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ServerSocket sock = cache.get(key);
             if (sock == null || sock.isClosed()) {
                 sock = loopbackOnly
-                        ? new ServerSocket(port, 50, InetAddress.getLoopbackAddress())
+                        ? new ServerSocket(port, 50, InetAddress.getByName("127.0.0.1"))
                         : new ServerSocket(port);
                 cache.put(key, sock);
             }
