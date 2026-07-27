@@ -98,6 +98,32 @@ class VisionPipelineTest extends UITestBase {
         assertFalse(pipeline.isBusy());
     }
 
+    @Test
+    void listenerCloseDiscardsAlreadySelectedPendingFrame() {
+        final RecordingAnalyzer analyzer = new RecordingAnalyzer();
+        pipeline = new VisionPipeline<String>(session, analyzer,
+                new VisionPipelineListener<String>() {
+                    public void result(String value, VisionImage image) {
+                        pipeline.close();
+                    }
+
+                    public void error(Throwable error) {
+                    }
+                });
+
+        implementationBackend.lastFrameListener.onFrame(frame(1));
+        implementationBackend.lastFrameListener.onFrame(frame(2));
+        assertEquals(1, analyzer.operations.size());
+
+        analyzer.operations.get(0).complete("first");
+        flushSerialCalls();
+
+        assertEquals(1, analyzer.operations.size(),
+                "close from the listener must discard the pending frame");
+        assertEquals(1, analyzer.closeCount);
+        assertFalse(pipeline.isBusy());
+    }
+
     private static CameraFrame frame(int value) {
         return new CameraFrame(new byte[] {(byte) value}, null,
                 1, 1, 0, value, FrameFormat.JPEG);
@@ -107,6 +133,7 @@ class VisionPipelineTest extends UITestBase {
             implements VisionAnalyzer<String> {
         final List<AsyncResource<String>> operations =
                 new ArrayList<AsyncResource<String>>();
+        int closeCount;
 
         public boolean isSupported() {
             return true;
@@ -119,6 +146,7 @@ class VisionPipelineTest extends UITestBase {
         }
 
         public void close() {
+            closeCount++;
         }
     }
 }

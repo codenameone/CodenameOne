@@ -80,9 +80,17 @@ public final class VisionPipeline<T> implements AutoCloseable {
     private void process(final VisionImage image) {
         final com.codename1.util.AsyncResource<T> operation;
         try {
-            operation = analyzer.process(image);
-            if (operation == null) {
-                throw new IllegalStateException("Vision analyzer returned no operation");
+            synchronized (this) {
+                if (closed) {
+                    busy = false;
+                    pending = null;
+                    return;
+                }
+                operation = analyzer.process(image);
+                if (operation == null) {
+                    throw new IllegalStateException(
+                            "Vision analyzer returned no operation");
+                }
             }
         } catch (final Throwable error) {
             onFinished(new Runnable() {
@@ -144,7 +152,7 @@ public final class VisionPipeline<T> implements AutoCloseable {
 
     /// Returns whether a frame is currently being analyzed.
     ///
-    /// @return {@code true} while an analysis is in flight
+    /// @return {@code true} while the open pipeline has an analysis in flight
     public boolean isBusy() {
         synchronized (this) {
             return busy;
@@ -152,8 +160,10 @@ public final class VisionPipeline<T> implements AutoCloseable {
     }
 
     /// Stops accepting frames, detaches from the camera session, discards the
-    /// pending frame, and closes the analyzer. Calling this method more than
-    /// once has no effect.
+    /// pending frame, clears the busy state, and closes the analyzer. A pending
+    /// frame already selected for dispatch is rechecked and discarded before
+    /// it can reach the closed analyzer. Calling this method more than once
+    /// has no effect.
     @Override
     public void close() {
         synchronized (this) {
@@ -161,6 +171,7 @@ public final class VisionPipeline<T> implements AutoCloseable {
                 return;
             }
             closed = true;
+            busy = false;
             pending = null;
         }
         session.removeFrameListener(frameListener);
