@@ -81,4 +81,11 @@ public final class InferenceOptions {
     public boolean isFallbackAllowed() {
         return allowFallback;
     }
+
+    InferenceOptions snapshot() {
+        return new InferenceOptions()
+                .accelerator(accelerator)
+                .threads(threads)
+                .allowFallback(allowFallback);
+    }
 }

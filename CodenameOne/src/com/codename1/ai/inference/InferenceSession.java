@@ -55,6 +55,10 @@ public final class InferenceSession implements AutoCloseable {
 
     /// Opens and allocates a model session off the EDT.
     ///
+    /// The option values are copied before asynchronous backend work is
+    /// scheduled. Reusing or changing the supplied {@link InferenceOptions}
+    /// after this method returns therefore cannot alter the pending open.
+    ///
     /// @param source bytes, resource, or file containing a `.tflite` model
     /// @param options execution options; {@code null} uses defaults
     /// @return an asynchronous session, failed with {@link InferenceException}
@@ -70,7 +74,9 @@ public final class InferenceSession implements AutoCloseable {
             out.error(new InferenceException("LiteRT inference is not supported"));
             return out;
         }
-        impl.open(source, options == null ? new InferenceOptions() : options)
+        InferenceOptions requested = options == null
+                ? new InferenceOptions() : options;
+        impl.open(source, requested.snapshot())
                 .ready(new SuccessCallback<Object>() {
                     @Override
                     public void onSucess(Object value) {
@@ -122,6 +128,8 @@ public final class InferenceSession implements AutoCloseable {
     /// as an empty input array
     /// @return asynchronous output tensors in model output order
     /// @throws IllegalStateException if the session is closed or already running
+    /// @throws IllegalArgumentException if an input name, count, or shape does
+    ///         not match the model's current input metadata
     public AsyncResource<Tensor[]> run(Tensor[] inputs) {
         final AsyncResource<Tensor[]> result;
         synchronized (this) {
@@ -134,6 +142,8 @@ public final class InferenceSession implements AutoCloseable {
             try {
                 Tensor[] inputSnapshot = inputs == null
                         ? new Tensor[0] : inputs.clone();
+                validateInputShapes(inputSnapshot,
+                        implementation.getInputs(handle));
                 result = implementation.run(handle,
                         inputSnapshot);
                 if (result == null) {
@@ -161,6 +171,62 @@ public final class InferenceSession implements AutoCloseable {
             }
         });
         return result;
+    }
+
+    private static void validateInputShapes(Tensor[] inputs,
+                                            TensorInfo[] metadata) {
+        if (metadata == null || inputs.length != metadata.length) {
+            throw new IllegalArgumentException("Expected "
+                    + (metadata == null ? 0 : metadata.length)
+                    + " input tensors but received " + inputs.length);
+        }
+        boolean[] resolved = new boolean[metadata.length];
+        for (int i = 0; i < inputs.length; i++) {
+            Tensor tensor = inputs[i];
+            if (tensor == null) {
+                throw new IllegalArgumentException(
+                        "Input tensor " + i + " is null");
+            }
+            int metadataPosition = i;
+            if (tensor.getName() != null) {
+                metadataPosition = -1;
+                for (int candidate = 0; candidate < metadata.length;
+                        candidate++) {
+                    if (tensor.getName().equals(
+                            metadata[candidate].getName())) {
+                        metadataPosition = candidate;
+                        break;
+                    }
+                }
+                if (metadataPosition < 0) {
+                    throw new IllegalArgumentException(
+                            "Unknown model input " + tensor.getName());
+                }
+            }
+            TensorInfo expected = metadata[metadataPosition];
+            if (resolved[metadataPosition]) {
+                throw new IllegalArgumentException("Model input "
+                        + expected.getName() + " was supplied more than once");
+            }
+            resolved[metadataPosition] = true;
+            if (!sameShape(tensor.getShape(), expected.getShape())) {
+                throw new IllegalArgumentException("Input "
+                        + expected.getName() + " shape does not match the "
+                        + "model metadata; call resizeInput() before run()");
+            }
+        }
+    }
+
+    private static boolean sameShape(int[] supplied, int[] expected) {
+        if (supplied.length != expected.length) {
+            return false;
+        }
+        for (int i = 0; i < supplied.length; i++) {
+            if (supplied[i] != expected[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Resizes an input and reallocates native tensors before the next run.

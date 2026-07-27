@@ -162,6 +162,14 @@ public final class AndroidInferenceImpl extends InferenceImpl {
                                             + " was supplied more than once");
                         }
                         resolved[index] = true;
+                        if (!sameShape(value.getShape(),
+                                metadata.shape())) {
+                            throw new IllegalArgumentException(
+                                    "Input " + metadata.name()
+                                            + " shape does not match the "
+                                            + "model metadata; call "
+                                            + "resizeInput() before run()");
+                        }
                         nativeInputs[index] =
                                 toBuffer(value, metadata.dataType());
                     }
@@ -211,6 +219,18 @@ public final class AndroidInferenceImpl extends InferenceImpl {
             throw new IllegalArgumentException("Invalid LiteRT session handle");
         }
         return (Handle) value;
+    }
+
+    private static boolean sameShape(int[] supplied, int[] expected) {
+        if (supplied.length != expected.length) {
+            return false;
+        }
+        for (int i = 0; i < supplied.length; i++) {
+            if (supplied[i] != expected[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int inputIndex(Interpreter interpreter, String name) {

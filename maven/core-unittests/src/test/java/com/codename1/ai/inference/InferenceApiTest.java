@@ -208,6 +208,47 @@ class InferenceApiTest extends UITestBase {
     }
 
     @Test
+    void sessionSnapshotsOptionsBeforeAsyncOpen() {
+        RecordingInferenceImpl backend = new RecordingInferenceImpl();
+        implementation.setInferenceImpl(backend);
+        InferenceOptions options = new InferenceOptions()
+                .accelerator(InferenceOptions.Accelerator.GPU)
+                .threads(3)
+                .allowFallback(false);
+
+        AsyncResource<InferenceSession> opening = InferenceSession.open(
+                ModelSource.bytes(new byte[] {1}), options);
+        options.accelerator(InferenceOptions.Accelerator.CPU)
+                .threads(8)
+                .allowFallback(true);
+
+        assertNotSame(options, backend.openOptions);
+        assertEquals(InferenceOptions.Accelerator.GPU,
+                backend.openOptions.getAccelerator());
+        assertEquals(3, backend.openOptions.getThreads());
+        assertFalse(backend.openOptions.isFallbackAllowed());
+        await(opening).close();
+    }
+
+    @Test
+    void sessionRejectsShapeMismatchBeforeBackendRun() {
+        RecordingInferenceImpl backend = new RecordingInferenceImpl();
+        implementation.setInferenceImpl(backend);
+        InferenceSession session = await(InferenceSession.open(
+                ModelSource.bytes(new byte[] {1}), new InferenceOptions()));
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class, () -> session.run(
+                        new Tensor[] {Tensor.floats("input",
+                                new int[] {2, 1},
+                                new float[] {1, 2})}));
+        assertTrue(error.getMessage().contains("resizeInput"));
+        assertNull(backend.receivedInputs,
+                "shape mismatch must not reach the asynchronous backend");
+        session.close();
+    }
+
+    @Test
     void sessionDefersCloseUntilPendingRunSettles() {
         RecordingInferenceImpl backend = new RecordingInferenceImpl();
         backend.pendingRun = new AsyncResource<Tensor[]>();
@@ -280,12 +321,14 @@ class InferenceApiTest extends UITestBase {
         int closeCount;
         AsyncResource<Tensor[]> pendingRun;
         Tensor[] receivedInputs;
+        InferenceOptions openOptions;
 
         public boolean isSupported() {
             return true;
         }
 
         public AsyncResource<Object> open(ModelSource source, InferenceOptions options) {
+            openOptions = options;
             AsyncResource<Object> result = new AsyncResource<Object>();
             result.complete(handle);
             return result;

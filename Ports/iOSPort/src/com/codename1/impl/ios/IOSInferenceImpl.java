@@ -157,6 +157,14 @@ public final class IOSInferenceImpl extends InferenceImpl {
                                     + expected.getType() + " but received "
                                     + tensor.getType());
                         }
+                        if (!sameShape(tensor.getShape(),
+                                expected.getShape())) {
+                            throw new IllegalArgumentException(
+                                    "Input " + expected.getName()
+                                            + " shape does not match the "
+                                            + "model metadata; call "
+                                            + "resizeInput() before run()");
+                        }
                     }
                     for (int i = 0; i < inputs.length; i++) {
                         Tensor tensor = inputs[i];
@@ -375,6 +383,18 @@ public final class IOSInferenceImpl extends InferenceImpl {
             out *= shape[i];
         }
         return out;
+    }
+
+    private static boolean sameShape(int[] supplied, int[] expected) {
+        if (supplied.length != expected.length) {
+            return false;
+        }
+        for (int i = 0; i < supplied.length; i++) {
+            if (supplied[i] != expected[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int[] intArray(List values) {
