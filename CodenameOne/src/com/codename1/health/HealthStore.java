@@ -600,8 +600,15 @@ public class HealthStore {
             // buckets contributes one hour to each, not two hours to both;
             // adding the whole span to every bucket it touches inflates
             // every summary around a boundary.
-            long overlap = Math.min(end, s.getEndMillis())
-                    - Math.max(start, s.getStartMillis());
+            // Clipped to the bucket *and* the query range. A calendar
+            // bucket can extend past the requested range -- a daily bucket
+            // on a noon-to-midnight query starts at midnight -- so
+            // clipping only to the bucket counted time the caller never
+            // asked about.
+            long from = Math.max(start, range.getStartMillis());
+            long to = Math.min(end, range.getEndMillis());
+            long overlap = Math.min(to, s.getEndMillis())
+                    - Math.max(from, s.getStartMillis());
             if (overlap < 0) {
                 overlap = 0;
             }
@@ -809,7 +816,18 @@ public class HealthStore {
                     public void onReady(HealthWriteResult value,
                             Throwable err) {
                         if (err != null) {
-                            out.error(err);
+                            // Earlier chunks are already in the store.
+                            // Reporting only the failure makes a caller
+                            // retry the whole batch and duplicate them.
+                            HealthException wrapped =
+                                    err instanceof HealthException
+                                    ? (HealthException) err
+                                    : new HealthException(
+                                            HealthError.UNKNOWN,
+                                            "the write failed partway",
+                                            err);
+                            wrapped.setPartialResult(accumulated);
+                            out.error(wrapped);
                             return;
                         }
                         List<String> ids = value.getSampleIds();
@@ -1110,10 +1128,17 @@ public class HealthStore {
             return;
         }
         final HealthSubscription subscription = sub;
-        final HealthChangeBatch delivered = applyOptions(batch, sub);
-        Display.getInstance().callSerially(
-                makeDeliveryRunnable(this, target, delivered,
-                        subscription));
+        // A cap splits the batch into successive deliveries rather than
+        // discarding the tail. Every chunk but the last carries no anchor,
+        // so the cursor only advances once the whole platform page has
+        // been handed over -- withholding it outright, as an earlier fix
+        // did, simply re-read the same page forever and the samples past
+        // the cap were never reachable at all.
+        for (HealthChangeBatch chunk : applyOptions(batch, sub)) {
+            Display.getInstance().callSerially(
+                    makeDeliveryRunnable(this, target, chunk,
+                            subscription));
+        }
     }
 
     /// Built in a static method so the `Runnable` carries no synthetic
@@ -1244,8 +1269,9 @@ public class HealthStore {
     /// excluded deletion was still delivered, and a per-batch cap was
     /// ignored. Applied here so every port obeys them without knowing they
     /// exist.
-    private static HealthChangeBatch applyOptions(HealthChangeBatch batch,
-            HealthSubscription sub) {
+    private static List<HealthChangeBatch> applyOptions(
+            HealthChangeBatch batch, HealthSubscription sub) {
+        List<HealthChangeBatch> out = new ArrayList<HealthChangeBatch>();
         List<HealthSample> added = batch.getAdded();
         List<String> deleted = batch.getDeletedSampleIds();
         boolean changed = false;
@@ -1253,31 +1279,35 @@ public class HealthStore {
             added = new ArrayList<HealthSample>();
             changed = true;
         }
-        int cap = sub.getMaxSamplesPerBatch();
-        boolean truncated = false;
-        if (cap > 0 && added.size() > cap) {
-            added = new ArrayList<HealthSample>(added.subList(0, cap));
-            changed = true;
-            truncated = true;
-        }
         if (!sub.isIncludeDeletions() && !deleted.isEmpty()) {
             deleted = new ArrayList<String>();
             changed = true;
         }
-        if (!changed) {
-            return batch;
+        int cap = sub.getMaxSamplesPerBatch();
+        if (cap > 0 && added.size() > cap) {
+            for (int i = 0; i < added.size(); i += cap) {
+                int to = Math.min(added.size(), i + cap);
+                boolean last = to == added.size();
+                out.add(new HealthChangeBatch(batch.getSubscriptionId(),
+                        batch.getTypes(),
+                        new ArrayList<HealthSample>(added.subList(i, to)),
+                        last ? deleted : new ArrayList<String>(),
+                        batch.isResyncRequired(),
+                        last ? batch.getAnchor() : null,
+                        batch.getDeadlineMillis(),
+                        !last || batch.hasMore()));
+            }
+            return out;
         }
-        // A truncated batch must not carry the platform's cursor. That
-        // cursor sits after the *whole* page, and the delivery runnable
-        // persists it once the listener returns -- so every sample past the
-        // cap would be skipped for good. Withholding the anchor makes the
-        // next drain re-read the same window, and hasMore tells the app
-        // more is waiting.
-        return new HealthChangeBatch(batch.getSubscriptionId(),
+        if (!changed) {
+            out.add(batch);
+            return out;
+        }
+        out.add(new HealthChangeBatch(batch.getSubscriptionId(),
                 batch.getTypes(), added, deleted, batch.isResyncRequired(),
-                truncated ? null : batch.getAnchor(),
-                batch.getDeadlineMillis(),
-                truncated || batch.hasMore());
+                batch.getAnchor(), batch.getDeadlineMillis(),
+                batch.hasMore()));
+        return out;
     }
 
     /// Re-registers every subscription persisted by a previous launch.

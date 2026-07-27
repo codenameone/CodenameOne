@@ -54,6 +54,25 @@ public class HealthException extends Exception {
     }
 
     /// The typed reason this operation failed.
+    private HealthWriteResult partialResult;
+
+    /// Samples already committed before the failure, when a chunked write
+    /// fails partway.
+    ///
+    /// A write larger than [HealthStore#getMaxWriteBatchSize()] is sent in
+    /// chunks, and an earlier chunk can be stored before a later one
+    /// fails. Without this the caller sees only the failure, retries the
+    /// whole batch, and writes the committed samples a second time --
+    /// duplicate records in the user's health store. Null when the failure
+    /// was not a partial write.
+    public HealthWriteResult getPartialResult() {
+        return partialResult;
+    }
+
+    void setPartialResult(HealthWriteResult partialResult) {
+        this.partialResult = partialResult;
+    }
+
     public HealthError getError() {
         return error;
     }

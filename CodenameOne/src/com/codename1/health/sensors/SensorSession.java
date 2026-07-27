@@ -30,6 +30,7 @@ import com.codename1.health.workout.WorkoutSession;
 import com.codename1.health.HealthException;
 import com.codename1.health.HealthQuantity;
 import com.codename1.health.HealthSample;
+import com.codename1.health.HealthWriteResult;
 import com.codename1.health.HealthUnit;
 import com.codename1.health.QuantitySample;
 import com.codename1.health.RecordingMethod;
@@ -321,7 +322,37 @@ public class SensorSession {
             batch = new ArrayList<HealthSample>(pendingWrites);
             pendingWrites.clear();
         }
-        Health.getInstance().getStore().write(batch);
+        // The samples stay accounted for until the store confirms them.
+        // Removing them from the buffer and ignoring the result meant a
+        // revoked permission or an unavailable provider silently discarded
+        // a scale or cuff reading the caller explicitly asked to persist.
+        Health.getInstance().getStore().write(batch)
+                .onResult(new WriteBack(this, batch));
+    }
+
+    /// Puts a failed batch back and tells the app it failed.
+    private static final class WriteBack
+            implements com.codename1.util.AsyncResult<HealthWriteResult> {
+        private final SensorSession session;
+        private final List<HealthSample> batch;
+
+        WriteBack(SensorSession session, List<HealthSample> batch) {
+            this.session = session;
+            this.batch = batch;
+        }
+
+        public void onReady(HealthWriteResult value, Throwable error) {
+            if (error == null) {
+                return;
+            }
+            synchronized (session.pendingWrites) {
+                session.pendingWrites.addAll(0, batch);
+            }
+            session.fireError(error instanceof HealthException
+                    ? (HealthException) error
+                    : new HealthException(HealthError.UNKNOWN,
+                            "could not persist sensor samples", error));
+        }
     }
 
     /// Decodes a payload into zero or more samples, or `null` when the

@@ -75,10 +75,17 @@ public final class HealthSensorProfile {
     /// Cycling Speed and Cadence, service `0x1816`. Streams derived speed
     /// and cadence -- the raw characteristic carries cumulative counters,
     /// which [SensorSession] differences for you.
+    /// Cycling Speed and Cadence, service `0x1816`.
+    ///
+    /// Only cadence is produced. Speed would need a wheel circumference
+    /// the profile does not carry, and guessing a tyre size scales every
+    /// distance the app derives -- so the wheel block is decoded and
+    /// discarded rather than published. Advertising SPEED here left apps
+    /// waiting forever for a sample that never came.
     public static final HealthSensorProfile CYCLING_SPEED_CADENCE =
             new HealthSensorProfile("Cycling Speed and Cadence", 0x1816,
                     0x2A5B, true,
-                    new HealthDataType[] { HealthDataType.SPEED,
+                    new HealthDataType[] {
                             HealthDataType.CYCLING_CADENCE });
 
     /// Running Speed and Cadence, service `0x1814`. Streams speed and step
