@@ -21,12 +21,28 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-///
-/// Typed push notification registration, delivery, and custom transport APIs.
-///
-/// Applications use {@link com.codename1.push.PushClient} and
-/// {@link com.codename1.push.PushListener}. The older
-/// {@link com.codename1.push.PushCallback} contract remains for compatibility
-/// and generated native plumbing; new applications should not implement it on
-/// their main class.
 package com.codename1.push;
+
+///
+/// Mirrors native subscription changes to an application-owned server.
+///
+/// This interface is optional with managed BuildCloud push. It is mandatory
+/// when a {@link PushTransport} is supplied, because custom transport mode never
+/// sends registration data to BuildCloud. Implementations should upsert by
+/// installation ID and replace rotated tokens.
+///
+/// Callbacks run on the Codename One EDT. Network work should be queued
+/// asynchronously rather than blocking the callback.
+public interface PushRegistrationSink {
+    ///
+    /// Stores or replaces a subscription on the application-owned server.
+    ///
+    /// @param subscription the current native subscription
+    void registered(PushSubscription subscription);
+
+    ///
+    /// Removes a subscription after the transport unregisters.
+    ///
+    /// @param subscription the subscription that was active before removal
+    void unregistered(PushSubscription subscription);
+}

@@ -229,6 +229,13 @@ public abstract class CodenameOneImplementation {
         callback = push;
     }
 
+    /// Returns the callback explicitly installed by `PushClient`, or the legacy main-class
+    /// callback installed by a port. Native bootstrap code uses this instead of assuming the
+    /// application main class implements `PushCallback`.
+    public static PushCallback getPushCallback() {
+        return callback;
+    }
+
     /// Returns the purchase callback instance
     public static PurchaseCallback getPurchaseCallback() {
         return purchaseCallback;

@@ -221,6 +221,7 @@ import java.net.ServerSocket;
 import java.security.MessageDigest;
 import java.text.ParseException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.net.ssl.HttpsURLConnection;
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -232,6 +233,8 @@ import org.xml.sax.SAXException;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
     private AndroidCalendarSource calendarSource;
+    private static final AtomicLong V3_NOTIFICATION_SEQUENCE = new AtomicLong();
+
     public static final Thread.UncaughtExceptionHandler exceptionHandler = new Thread.UncaughtExceptionHandler() {
         @Override
         public void uncaughtException(Thread t, Throwable e) {
@@ -820,6 +823,91 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public static void appendNotification(String type, String body, Context a) {
         appendNotification(type, body, null, null, a);
+    }
+
+    /** Receives the managed typed envelope from FCM without applying legacy push decoding. */
+    public static void handleV3Push(final String envelope, Context context,
+            boolean appRunning, Class appStubClass) {
+        if (appRunning && Display.isInitialized()
+                && com.codename1.push.PushClient.hasActiveClient()) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    com.codename1.push.PushClient.dispatch(envelope);
+                }
+            });
+            return;
+        }
+        try {
+            org.json.JSONObject message = new org.json.JSONObject(envelope);
+            // The pending-push file explicitly encodes whether a legacy type is present.
+            // A missing type is the sentinel for a typed V3 envelope and is replayed intact.
+            appendNotification(null, envelope, context);
+            if (message.optBoolean("silent", false)) {
+                return;
+            }
+            String title = message.optString("title", "");
+            String body = message.optString("body", "");
+            String image = message.optString("image", "");
+            if (title.length() == 0 && body.length() == 0 && image.length() == 0) {
+                return;
+            }
+            if (title.length() == 0) {
+                title = context.getApplicationInfo().loadLabel(context.getPackageManager()).toString();
+            }
+            Intent intent = new Intent(context, appStubClass);
+            PendingIntent contentIntent = createPendingIntent(context, 0, intent);
+            int smallIcon = context.getResources().getIdentifier("ic_stat_notify", "drawable",
+                    context.getPackageName());
+            if (smallIcon == 0) {
+                smallIcon = context.getApplicationInfo().icon;
+            }
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(context)
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setSmallIcon(smallIcon)
+                    .setContentIntent(contentIntent)
+                    .setAutoCancel(true)
+                    .setWhen(System.currentTimeMillis());
+            NotificationManager manager = (NotificationManager)
+                    context.getSystemService(Context.NOTIFICATION_SERVICE);
+            setNotificationChannel(manager, builder, context);
+            String collapseKey = message.optString("collapseKey", null);
+            String messageId = message.optString("id", null);
+            String notificationTag;
+            if (collapseKey != null && collapseKey.length() > 0) {
+                notificationTag = v3NotificationTag("CN1_PUSH_V3_COLLAPSE:", collapseKey);
+            } else if (messageId != null && messageId.length() > 0) {
+                notificationTag = v3NotificationTag("CN1_PUSH_V3_MESSAGE:", messageId);
+            } else {
+                notificationTag = "CN1_PUSH_V3_EPHEMERAL:" + System.currentTimeMillis()
+                        + ":" + V3_NOTIFICATION_SEQUENCE.incrementAndGet();
+            }
+            manager.notify(notificationTag, 0, builder.build());
+        } catch (Exception error) {
+            Log.e("Codename One", "Failed to handle a Push V3 envelope", error);
+        }
+    }
+
+    private static String v3NotificationTag(String prefix, String value) {
+        if (prefix.length() + value.length() <= 128) {
+            return prefix + value;
+        }
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder out = new StringBuilder(prefix.length() + digest.length * 2);
+            out.append(prefix);
+            for (byte item : digest) {
+                int unsigned = item & 0xff;
+                if (unsigned < 0x10) {
+                    out.append('0');
+                }
+                out.append(Integer.toHexString(unsigned));
+            }
+            return out.toString();
+        } catch (Exception error) {
+            return prefix + Integer.toHexString(value.hashCode());
+        }
     }
     
     public static void appendNotification(String type, String body, String image, String category, Context a) {
@@ -10530,13 +10618,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
 
-        if (!hasAndroidMarket()) {
+        boolean huawei = "huawei".equals(Display.getInstance().getProperty("cn1.push.transport", ""));
+        if (!hasAndroidMarket() && !huawei) {
             Log.d("Codename One", "Device doesn't have Android market/google play can't register for push!");
             return;
         }
-        String id = (String)metaData.get(com.codename1.push.Push.GOOGLE_PUSH_KEY);
-        if (id == null) {
-            id = Display.getInstance().getProperty("gcm.sender_id", null);
+        String id = "";
+        if (!huawei) {
+            id = (String)metaData.get(com.codename1.push.Push.GOOGLE_PUSH_KEY);
+            if (id == null) {
+                id = Display.getInstance().getProperty("gcm.sender_id", null);
+            }
         }
         Log.d("Codename One", "Sending async push request for id: " + id);
         ((CodenameOneActivity) getActivity()).registerForPush(id);
@@ -10552,7 +10644,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void deregisterPush() {
-        boolean has = hasAndroidMarket();
+        boolean has = hasAndroidMarket()
+                || "huawei".equals(Display.getInstance().getProperty("cn1.push.transport", ""));
         if (has) {
             ((CodenameOneActivity) getActivity()).stopReceivingPush();
             deregisterPushFromServer();

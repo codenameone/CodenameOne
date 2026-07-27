@@ -1268,7 +1268,7 @@ body.dark .cn1-footer-logo {
   margin-left: 12px;
 }
 
-.post-single:not(.cn1-pricing-page):not(.post-single--demo) {
+.post-single:not(.cn1-pricing-page):not(.post-single--demo):not(.post-single--api-javadoc) {
   max-width: 940px;
 }
 

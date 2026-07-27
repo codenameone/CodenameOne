@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
  * published by the Free Software Foundation.  Codename One designates this
@@ -21,12 +20,41 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-///
-/// Typed push notification registration, delivery, and custom transport APIs.
-///
-/// Applications use {@link com.codename1.push.PushClient} and
-/// {@link com.codename1.push.PushListener}. The older
-/// {@link com.codename1.push.PushCallback} contract remains for compatibility
-/// and generated native plumbing; new applications should not implement it on
-/// their main class.
-package com.codename1.push;
+package com.codename1.builders;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+class AndroidGradleBuilderSdkVersionTest {
+
+    @Test
+    void raisesCompileSdkToTargetSdk() {
+        assertEquals("36",
+                AndroidGradleBuilder.ensureCompileSdkAtLeastTarget("33", "36"));
+    }
+
+    @Test
+    void doesNotLowerCompileSdk() {
+        assertEquals("36",
+                AndroidGradleBuilder.ensureCompileSdkAtLeastTarget("36", "35"));
+    }
+
+    @Test
+    void handlesLegacyCompileSdkNotation() {
+        assertEquals("36",
+                AndroidGradleBuilder.ensureCompileSdkAtLeastTarget("'android-21'", "36"));
+    }
+
+    @Test
+    void preservesNonNumericCompileSdk() {
+        assertEquals("'android-Baklava'",
+                AndroidGradleBuilder.ensureCompileSdkAtLeastTarget("'android-Baklava'", "36"));
+    }
+
+    @Test
+    void suppliesMissingCompileSdk() {
+        assertEquals("36",
+                AndroidGradleBuilder.ensureCompileSdkAtLeastTarget(null, "36"));
+    }
+}
