@@ -52,8 +52,9 @@ public final class CameraFrame {
     }
 
     /// JPEG-encoded bytes for this frame. Always non-null regardless of the
-    /// requested `FrameFormat`; the framework encodes raw frames into JPEG
-    /// on demand for AI module consumption.
+    /// requested `FrameFormat`; use this when encoded image data is needed.
+    /// `VisionImage#fromCameraFrame(CameraFrame)` instead selects the raw
+    /// buffer for NV21 and RGBA8888 frames.
     public byte[] getJpegBytes() {
         return jpegBytes;
     }

@@ -347,6 +347,34 @@ class InferenceApiTest extends UITestBase {
     }
 
     @Test
+    void cancelledRunReleasesSessionAndDeferredClose() {
+        RecordingInferenceImpl backend = new RecordingInferenceImpl();
+        backend.pendingRun = new AsyncResource<Tensor[]>();
+        implementation.setInferenceImpl(backend);
+        InferenceSession session = await(InferenceSession.open(
+                ModelSource.bytes(new byte[] {1}), new InferenceOptions()));
+        AsyncResource<Tensor[]> run = session.run(new Tensor[] {
+                Tensor.floats("input", new int[] {1, 2},
+                        new float[] {1, 2})
+        });
+
+        assertTrue(run.cancel(false));
+        assertTrue(backend.pendingRun.isCancelled(),
+                "session cancellation must reach the backend operation");
+        backend.pendingRun = new AsyncResource<Tensor[]>();
+        AsyncResource<Tensor[]> next = session.run(new Tensor[] {
+                Tensor.floats("input", new int[] {1, 2},
+                        new float[] {3, 4})
+        });
+        session.close();
+        assertEquals(0, backend.closeCount,
+                "the second pending run must still defer native close");
+        assertTrue(next.cancel(false));
+        assertEquals(1, backend.closeCount,
+                "cancelling the final run must complete deferred close");
+    }
+
+    @Test
     void sessionSnapshotsInputArrayBeforeAsyncInference() {
         RecordingInferenceImpl backend = new RecordingInferenceImpl();
         backend.pendingRun = new AsyncResource<Tensor[]>();

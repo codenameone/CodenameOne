@@ -141,9 +141,11 @@ encode/decode.
 
 `VisionImage.fromCameraFrame()` is safe beyond the
 `FrameListener.onFrame()` callback because it copies the callback-owned
-arrays. `VisionPipeline` allows one request to run and retains only the newest
-pending frame. This bounds memory and latency for live OCR, barcode, face,
-pose, labeling, or segmentation.
+buffer selected by the requested `FrameFormat`. Raw frames do not retain the
+always-available JPEG fallback, so mobile backends consume NV21 or RGBA8888
+without accidentally selecting the encoded path. `VisionPipeline` allows one
+request to run and retains only the newest pending frame. This bounds memory
+and latency for live OCR, barcode, face, pose, labeling, or segmentation.
 
 Native results are converted to stable Codename One value types. Geometry is
 normalized to the top-left coordinate system. `VisionMetadata` carries the

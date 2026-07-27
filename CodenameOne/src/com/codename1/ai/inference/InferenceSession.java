@@ -149,6 +149,9 @@ public final class InferenceSession implements AutoCloseable {
     /// container is defensively copied before it is handed to the asynchronous
     /// backend, so replacing an element after this method returns cannot change
     /// the pending invocation. Each {@link Tensor} is itself immutable.
+    /// Canceling the returned resource forwards cancellation to the native
+    /// backend and releases the session's run slot, allowing a later
+    /// invocation or a pending {@link #close()} to proceed.
     ///
     /// @param inputs one tensor for each model input; {@code null} is treated
     /// as an empty input array
@@ -157,7 +160,7 @@ public final class InferenceSession implements AutoCloseable {
     /// @throws IllegalArgumentException if an input name, count, or shape does
     ///         not match the model's current input metadata
     public AsyncResource<Tensor[]> run(Tensor[] inputs) {
-        final AsyncResource<Tensor[]> result;
+        final AsyncResource<Tensor[]> backendResult;
         synchronized (this) {
             ensureOpen();
             if (activeRuns > 0) {
@@ -170,9 +173,9 @@ public final class InferenceSession implements AutoCloseable {
                         ? new Tensor[0] : copyInputs(inputs);
                 validateInputShapes(inputSnapshot,
                         implementation.getInputs(handle));
-                result = implementation.run(handle,
+                backendResult = implementation.run(handle,
                         inputSnapshot);
-                if (result == null) {
+                if (backendResult == null) {
                     throw new InferenceException(
                             "Inference backend returned no asynchronous result");
                 }
@@ -185,18 +188,7 @@ public final class InferenceSession implements AutoCloseable {
             }
         }
         final PendingRun pending = new PendingRun(this);
-        result.ready(new SuccessCallback<Tensor[]>() {
-            @Override
-            public void onSucess(Tensor[] value) {
-                pending.finish();
-            }
-        }).except(new SuccessCallback<Throwable>() {
-            @Override
-            public void onSucess(Throwable error) {
-                pending.finish();
-            }
-        });
-        return result;
+        return new SessionRunResource(backendResult, pending);
     }
 
     private static void validateInputShapes(Tensor[] inputs,
@@ -341,6 +333,51 @@ public final class InferenceSession implements AutoCloseable {
                 finished = true;
                 session.runFinished();
             }
+        }
+    }
+
+    private static final class SessionRunResource
+            extends AsyncResource<Tensor[]> {
+        private final AsyncResource<Tensor[]> backend;
+        private final PendingRun pending;
+
+        SessionRunResource(AsyncResource<Tensor[]> backend,
+                           PendingRun pending) {
+            this.backend = backend;
+            this.pending = pending;
+            backend.ready(new SuccessCallback<Tensor[]>() {
+                @Override
+                public void onSucess(Tensor[] value) {
+                    try {
+                        if (!isCancelled()) {
+                            complete(value);
+                        }
+                    } finally {
+                        SessionRunResource.this.pending.finish();
+                    }
+                }
+            }).except(new SuccessCallback<Throwable>() {
+                @Override
+                public void onSucess(Throwable error) {
+                    try {
+                        if (!isCancelled()) {
+                            error(error);
+                        }
+                    } finally {
+                        SessionRunResource.this.pending.finish();
+                    }
+                }
+            });
+        }
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            boolean cancelled = super.cancel(mayInterruptIfRunning);
+            if (cancelled) {
+                backend.cancel(mayInterruptIfRunning);
+                pending.finish();
+            }
+            return cancelled;
         }
     }
 }

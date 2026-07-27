@@ -77,7 +77,12 @@ public final class VisionImage {
         return new VisionImage(null, bytes, width, height, rotationDegrees, 0, format);
     }
 
-    /// Copies a camera frame, including timestamp, format, and orientation.
+    /// Copies the buffer selected by the camera frame's format, together with
+    /// its timestamp and orientation. JPEG frames copy only
+    /// {@link CameraFrame#getJpegBytes()}; NV21 and RGBA8888 frames copy only
+    /// {@link CameraFrame#getRawBytes()}. This preserves the requested raw
+    /// pipeline without retaining or preferring an encoded fallback.
+    ///
     /// @param frame callback-owned frame
     /// @return detached immutable input safe for asynchronous analysis
     /// @throws IllegalArgumentException if the frame reports a rotation other
@@ -86,9 +91,15 @@ public final class VisionImage {
         if (frame == null) {
             throw new NullPointerException("frame");
         }
-        return new VisionImage(frame.getJpegBytes(), frame.getRawBytes(),
+        FrameFormat format = frame.getFormat() == null
+                ? FrameFormat.JPEG : frame.getFormat();
+        byte[] encoded = format == FrameFormat.JPEG
+                ? frame.getJpegBytes() : null;
+        byte[] pixels = format == FrameFormat.JPEG
+                ? null : frame.getRawBytes();
+        return new VisionImage(encoded, pixels,
                 frame.getWidth(), frame.getHeight(), frame.getRotationDegrees(),
-                frame.getTimestampNanos(), frame.getFormat());
+                frame.getTimestampNanos(), format);
     }
 
     /// @return a defensive copy of encoded bytes, or {@code null} for raw input

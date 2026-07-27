@@ -131,8 +131,8 @@ public class VisionOnDeviceApiTest extends BaseTest {
         VisionImage cameraImage = VisionImage.fromCameraFrame(frame);
         jpeg[0] = 99;
         pixels[0] = 99;
-        checkEqual(4, cameraImage.getEncodedBytes()[0],
-                "VisionImage must own camera JPEG bytes");
+        check(cameraImage.getEncodedBytes() == null,
+                "raw VisionImage must not retain camera JPEG bytes");
         checkEqual(10, cameraImage.getPixels()[0],
                 "VisionImage must own camera pixel bytes");
         checkEqual(1, cameraImage.getWidth(), "camera image width");

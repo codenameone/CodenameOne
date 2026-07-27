@@ -22,6 +22,7 @@
  */
 package com.codename1.ai.vision;
 
+import com.codename1.camera.CameraFrame;
 import com.codename1.camera.FrameFormat;
 import com.codename1.impl.VisionImpl;
 import com.codename1.junit.UITestBase;
@@ -55,6 +56,24 @@ class VisionApiTest extends UITestBase {
         assertThrows(IllegalArgumentException.class,
                 () -> VisionImage.pixels(new byte[] {1, 2, 3, 4},
                         1, 1, FrameFormat.RGBA8888, 45));
+    }
+
+    @Test
+    void cameraFrameCopiesOnlyTheRequestedFormat() {
+        byte[] jpeg = new byte[] {1, 2};
+        byte[] pixels = new byte[] {3, 4, 5, 6};
+        VisionImage raw = VisionImage.fromCameraFrame(new CameraFrame(
+                jpeg, pixels, 1, 1, 0, 7L, FrameFormat.RGBA8888));
+        jpeg[0] = 9;
+        pixels[0] = 9;
+        assertNull(raw.getEncodedBytes());
+        assertArrayEquals(new byte[] {3, 4, 5, 6}, raw.getPixels());
+        assertEquals(7L, raw.getTimestampNanos());
+
+        VisionImage encoded = VisionImage.fromCameraFrame(new CameraFrame(
+                jpeg, pixels, 1, 1, 0, 8L, FrameFormat.JPEG));
+        assertNotNull(encoded.getEncodedBytes());
+        assertNull(encoded.getPixels());
     }
 
     @Test
