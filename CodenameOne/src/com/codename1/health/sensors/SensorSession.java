@@ -341,6 +341,7 @@ public class SensorSession {
             this.batch = batch;
         }
 
+        @Override
         public void onReady(HealthWriteResult value, Throwable error) {
             if (error == null) {
                 return;
