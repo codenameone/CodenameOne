@@ -484,7 +484,13 @@ public class HealthStore {
         // Metadata travels with the sample. Losing it merely because the
         // caller asked for pounds instead of kilograms would drop the
         // correlation identifier this API tells them to keep there.
-        converted.getMetadata().putAll(q.getMetadata());
+        //
+        // Copied entry by entry: getMetadata() hands back an unmodifiable
+        // view, so putAll on it throws and would have failed the whole
+        // write rather than merely losing the metadata.
+        for (Map.Entry<String, String> e : q.getMetadata().entrySet()) {
+            converted.putMetadata(e.getKey(), e.getValue());
+        }
         return converted;
     }
 
@@ -563,7 +569,17 @@ public class HealthStore {
             if (s.getType() != type) {
                 continue;
             }
-            if (s.getStartMillis() >= end || s.getEndMillis() < start) {
+            // Half-open, matching the range contract. An interval whose
+            // end lands exactly on this bucket's start has zero overlap
+            // with it and belongs entirely to the previous bucket;
+            // counting it in both double-counted every record sitting on a
+            // boundary. An instant at the inclusive start still belongs
+            // here, hence the isInstantaneous allowance.
+            if (s.getStartMillis() >= end) {
+                continue;
+            }
+            if (s.isInstantaneous() ? s.getEndMillis() < start
+                    : s.getEndMillis() <= start) {
                 continue;
             }
             // Overlap, matching sample queries. Filtering on start time
@@ -854,7 +870,13 @@ public class HealthStore {
         // Metadata travels with the sample. Losing it merely because the
         // caller asked for pounds instead of kilograms would drop the
         // correlation identifier this API tells them to keep there.
-        converted.getMetadata().putAll(q.getMetadata());
+        //
+        // Copied entry by entry: getMetadata() hands back an unmodifiable
+        // view, so putAll on it throws and would have failed the whole
+        // write rather than merely losing the metadata.
+        for (Map.Entry<String, String> e : q.getMetadata().entrySet()) {
+            converted.putMetadata(e.getKey(), e.getValue());
+        }
         Map<String, String> meta = q.getMetadata();
         for (Map.Entry<String, String> e : meta.entrySet()) {
             converted.putMetadata(e.getKey(), e.getValue());
@@ -936,6 +958,21 @@ public class HealthStore {
         if (request == null) {
             throw new IllegalArgumentException(
                     "subscribe needs a request");
+        }
+        // Reads validate this; subscriptions did not, so an unsupported
+        // store handed back an active handle that delivered nothing
+        // forever, and a supported one accepted a type whose every later
+        // drain failed.
+        if (!isSupported()) {
+            throw new IllegalStateException(
+                    "health data is not available on this platform");
+        }
+        for (HealthDataType t : request.getTypes()) {
+            if (!isTypeSupported(t)) {
+                throw new IllegalArgumentException(t.getId()
+                        + " is not available on this platform, so a"
+                        + " subscription for it could never deliver");
+            }
         }
         try {
             request.validate();

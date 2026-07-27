@@ -986,6 +986,14 @@ public class IPhoneBuilder extends Executor {
                         if (method.startsWith("getWorkouts")) {
                             usesHealthWorkout = true;
                         }
+                        if (method.startsWith("getSensors")) {
+                            // Same reason as Android: the sensor layer is
+                            // built on the public bluetooth API, so an app
+                            // that only calls getSensors() would otherwise
+                            // ship without CoreBluetooth linked or
+                            // CN1_INCLUDE_BLUETOOTH set.
+                            usesBluetooth = true;
+                        }
                     }
                     if (cls.indexOf("com/codename1/health/HealthStore") == 0) {
                         // Writing needs a separate privacy string from

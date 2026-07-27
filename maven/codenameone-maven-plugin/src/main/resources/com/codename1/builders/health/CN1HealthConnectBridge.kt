@@ -264,9 +264,15 @@ class CN1HealthConnectBridge(private val context: Context)
                 val r = appendRecords(block, token, filter,
                     budget, origins, ascending, inTokens[token])
                 perType.add(block.toString())
-                if (r.second != null) {
-                    outTokens[token] = r.second!!
-                }
+                // Exhausted types are recorded with an empty token, not
+                // omitted. Omitting them made the next page see no token
+                // for that type and read it from the beginning again,
+                // duplicating records while the other types advanced.
+                outTokens[token] = r.second ?: ""
+            }
+            // Nothing left anywhere means no trailer token at all.
+            if (outTokens.values.all { it.isEmpty() }) {
+                outTokens.clear()
             }
             // Merged in time order but not trimmed: trimming here would
             // drop samples the trailer's tokens can no longer reach. The
@@ -289,7 +295,9 @@ class CN1HealthConnectBridge(private val context: Context)
         }
         for (part in encoded.split(TOKEN_SEPARATOR)) {
             val eq = part.indexOf('=')
-            if (eq > 0 && eq < part.length - 1) {
+            if (eq > 0) {
+                // An empty value means that type is exhausted, which is
+                // deliberately different from the type being absent.
                 out[part.substring(0, eq)] = part.substring(eq + 1)
             }
         }
@@ -361,6 +369,9 @@ class CN1HealthConnectBridge(private val context: Context)
                 "Health Connect reads are not implemented for '" + token
                     + "' in this build")
         if (limit <= 0) {
+            return Pair(0, null)
+        }
+        if (resumeToken != null && resumeToken.isEmpty()) {
             return Pair(0, null)
         }
         // Health Connect rejects a pageSize above MAX_PAGE_SIZE outright, so

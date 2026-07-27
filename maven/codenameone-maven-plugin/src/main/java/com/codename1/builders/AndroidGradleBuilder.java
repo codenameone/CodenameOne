@@ -1564,6 +1564,17 @@ public class AndroidGradleBuilder extends Executor {
                         if (method.startsWith("getWorkouts")) {
                             usesHealthWorkout = true;
                         }
+                        if (method.startsWith("getSensors")) {
+                            // The BLE sensor layer runs entirely on the
+                            // public bluetooth API, and an app that only
+                            // calls getSensors() never names that package
+                            // itself -- so without this the manifest got no
+                            // BLUETOOTH_SCAN/CONNECT and discovery failed on
+                            // Android 12+.
+                            usesBluetooth = true;
+                            usesBluetoothScan = true;
+                            usesBluetoothConnect = true;
+                        }
                     }
                     if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0
                             || (cls.indexOf("com/codename1/calendar/CalendarManager") == 0
@@ -2342,6 +2353,18 @@ public class AndroidGradleBuilder extends Executor {
             if (declaredKotlin.length() == 0
                     || compareVersions(declaredKotlin, kotlinFloor) < 0) {
                 request.putArgument("requireKotlinStdlib", kotlinFloor);
+                // Kotlin 1.9.22's Gradle plugin needs Gradle 6.8.3 or
+                // newer, and the non-Gradle-8 path defaults to 6.5, so
+                // raising the Kotlin floor alone produced a project that
+                // failed before it ever compiled the bridge.
+                if (!useGradle8) {
+                    log("Health Connect needs Kotlin " + kotlinFloor
+                            + ", whose Gradle plugin requires Gradle"
+                            + " 6.8.3 or newer; enabling Gradle 8 for this"
+                            + " build. Set android.useGradle8=true"
+                            + " explicitly to silence this.");
+                    useGradle8 = true;
+                }
                 log("Health Connect requires Kotlin " + kotlinFloor
                         + " or newer; raising requireKotlinStdlib from "
                         + (declaredKotlin.length() == 0

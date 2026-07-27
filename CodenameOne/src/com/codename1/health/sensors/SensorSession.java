@@ -175,12 +175,24 @@ public class SensorSession {
     /// through the normal sample listeners, and resolving with how many
     /// were retrieved.
     ///
-    /// Fails with [HealthError#NOT_SUPPORTED] on other profiles.
+    /// **Not implemented in this release: this always fails with
+    /// [HealthError#NOT_SUPPORTED], on the glucose profile as well as any
+    /// other.** Replay runs over the Record Access Control Point, a
+    /// stateful request/response protocol on a second characteristic with
+    /// its own operators, filters and abort semantics, and shipping it
+    /// untested against real meters would be worse than saying plainly
+    /// that it is absent. [GlucoseRecordFilter] and the rest of the
+    /// vocabulary are here so the call site does not have to change when
+    /// it lands.
+    ///
+    /// Live glucose notifications are unaffected and work today.
     public AsyncResource<Integer> requestStoredRecords(
             GlucoseRecordFilter filter) {
         AsyncResource<Integer> out = new AsyncResource<Integer>();
         out.error(new HealthException(HealthError.NOT_SUPPORTED,
-                "stored records are only available on the glucose profile"));
+                "replaying stored glucose records is not implemented in"
+                        + " this release; live measurements still arrive"
+                        + " through the sample listeners"));
         return out;
     }
 
