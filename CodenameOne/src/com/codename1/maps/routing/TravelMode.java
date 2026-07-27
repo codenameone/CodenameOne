@@ -25,9 +25,11 @@ package com.codename1.maps.routing;
 /// How the traveller moves, which decides the road network and speeds a
 /// [RouteService] routes over.
 ///
-/// Not every backend implements every mode -- a service that cannot honor the
-/// requested mode falls back to its closest supported profile rather than
-/// failing the request.
+/// Not every backend implements every mode. A service that cannot honor the
+/// requested mode answers with the closest profile it does have rather than
+/// failing the request, so check the [RouteService] you installed before
+/// promising a user a walking route -- see [OsrmRouteService] for how the
+/// built-in default behaves.
 public enum TravelMode {
 
     /// Route over roads open to cars, respecting one-way streets and turn

@@ -45,6 +45,11 @@ import java.util.List;
 public final class PolylineCodec {
 
     private static final int DEFAULT_PRECISION = 5;
+    /// The smallest decimal precision that still scales coordinates at all.
+    private static final int MIN_PRECISION = 1;
+    /// Comfortably past the precision 5/6/7 that real services emit, and the
+    /// largest power of ten a `double` still represents exactly.
+    private static final int MAX_PRECISION = 10;
     private static final int CHUNK_BITS = 5;
     private static final int CHUNK_MASK = 0x1f;
     private static final int CONTINUATION_BIT = 0x20;
@@ -79,17 +84,23 @@ public final class PolylineCodec {
     ///
     /// - `encoded`: the encoded geometry, may be `null`
     ///
-    /// - `precision`: the number of decimal digits the encoder scaled by
+    /// - `precision`: the number of decimal digits the encoder scaled by,
+    ///   between 1 and 10
     ///
     /// #### Returns
     ///
     /// the decoded [LatLng] vertices, never `null`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `precision` is outside 1 to 10, which
+    ///   would scale every coordinate into nonsense rather than fail
     public static List decode(String encoded, int precision) {
+        double factor = factor(precision);
         List points = new ArrayList();
         if (encoded == null || encoded.length() == 0) {
             return points;
         }
-        double factor = factor(precision);
         int[] cursor = new int[1];
         long[] value = new long[1];
         long lat = 0;
@@ -131,17 +142,21 @@ public final class PolylineCodec {
     ///
     /// - `points`: the vertices to encode, may be `null`
     ///
-    /// - `precision`: the number of decimal digits to scale by
+    /// - `precision`: the number of decimal digits to scale by, between 1 and 10
     ///
     /// #### Returns
     ///
     /// the encoded geometry, never `null`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `precision` is outside 1 to 10
     public static String encode(List points, int precision) {
+        double factor = factor(precision);
         StringBuilder sb = new StringBuilder();
         if (points == null) {
             return sb.toString();
         }
-        double factor = factor(precision);
         long prevLat = 0;
         long prevLng = 0;
         for (Object pointObj : points) {
@@ -156,7 +171,18 @@ public final class PolylineCodec {
         return sb.toString();
     }
 
+    /// The scale a `precision` of decimal digits multiplies by.
+    ///
+    /// Out-of-range values are rejected rather than quietly producing garbage:
+    /// a precision of 0 or less leaves the scale at 1 and inflates every
+    /// coordinate by five orders of magnitude, and a very large one overflows
+    /// the scale to infinity and collapses every coordinate to zero. Both
+    /// decode without complaint into a map full of wrong places.
     private static double factor(int precision) {
+        if (precision < MIN_PRECISION || precision > MAX_PRECISION) {
+            throw new IllegalArgumentException("precision must be between " + MIN_PRECISION
+                    + " and " + MAX_PRECISION + ", was " + precision);
+        }
         double f = 1;
         for (int i = 0; i < precision; i++) {
             f *= 10;

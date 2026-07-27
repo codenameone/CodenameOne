@@ -23,6 +23,7 @@
 package com.codename1.maps;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -108,6 +109,29 @@ class PolylineCodecTest {
         assertEquals(2, points.size());
         assertLatLng(38.5, -120.2, points.get(0));
         assertLatLng(40.7, -120.95, points.get(1));
+    }
+
+    @Test
+    void rejectsAPrecisionThatCannotScaleCoordinates() {
+        // Precision 0 or less leaves the scale at 1 and inflates every
+        // coordinate; a huge one overflows the scale and collapses them to
+        // zero. Both used to decode silently into a map of wrong places.
+        assertThrows(IllegalArgumentException.class, () -> PolylineCodec.decode(GOOGLE_SAMPLE, 0));
+        assertThrows(IllegalArgumentException.class, () -> PolylineCodec.decode(GOOGLE_SAMPLE, -5));
+        assertThrows(IllegalArgumentException.class, () -> PolylineCodec.decode(GOOGLE_SAMPLE, 400));
+        assertThrows(IllegalArgumentException.class,
+                () -> PolylineCodec.encode(new ArrayList(), 0));
+        assertThrows(IllegalArgumentException.class, () -> Polyline.fromEncoded(GOOGLE_SAMPLE, 0));
+
+        // The check runs before the empty-input short-circuit, so a bad
+        // argument fails the same way whatever the payload.
+        assertThrows(IllegalArgumentException.class, () -> PolylineCodec.decode(null, 0));
+        assertThrows(IllegalArgumentException.class, () -> PolylineCodec.encode(null, 0));
+
+        // The precisions services actually emit stay accepted.
+        assertEquals(3, PolylineCodec.decode(GOOGLE_SAMPLE, 5).size());
+        assertEquals(3, PolylineCodec.decode(GOOGLE_SAMPLE, 6).size());
+        assertEquals(3, PolylineCodec.decode(GOOGLE_SAMPLE, 7).size());
     }
 
     @Test

@@ -54,9 +54,21 @@ import java.util.Map;
 /// Routing.setService(new OsrmRouteService("https://osrm.example.com"));
 /// ```
 ///
-/// Because the demo server hosts the car profile, [TravelMode#WALKING] and
-/// [TravelMode#CYCLING] are accepted but routed over driving data there. A
-/// self-hosted instance with the matching profiles honors them properly.
+/// **On travel modes**: the request URL carries the mode as OSRM's profile
+/// path component, which OSRM-compatible hosted services (Mapbox Directions
+/// and friends) use to pick a profile. A stock `osrm-routed` process does
+/// not: it serves the single dataset it was prepared and started with and
+/// ignores that part of the path. So one `OsrmRouteService` speaks to one
+/// endpoint, and that endpoint answers with whatever profile it holds --
+/// the public demo server holds the car profile, which is why
+/// [TravelMode#WALKING] and [TravelMode#CYCLING] are accepted there but
+/// answered with driving data. To offer several modes off self-hosted OSRM,
+/// give each mode its own endpoint and pick the matching service:
+///
+/// ```java
+/// OsrmRouteService walking = new OsrmRouteService("https://osrm-foot.example.com");
+/// walking.findRoutes(request.setTravelMode(TravelMode.WALKING), callback);
+/// ```
 public class OsrmRouteService implements RouteService {
 
     /// The OSRM public demo server, used when no other base URL is configured.
@@ -330,6 +342,15 @@ public class OsrmRouteService implements RouteService {
         return "The routing service reported: " + code;
     }
 
+    /// The readable half of an exception, for the `message` a [RouteCallback]
+    /// may put in front of a user. Falls back to `fallback` when the exception
+    /// carries no message of its own, so a bare `UnknownHostException` does
+    /// not surface as an empty string or as a raw class name.
+    private static String describe(Throwable error, String fallback) {
+        String message = error == null ? null : error.getMessage();
+        return message == null || message.length() == 0 ? fallback : message;
+    }
+
     private static String string(Object value) {
         return value == null ? "" : String.valueOf(value);
     }
@@ -414,15 +435,13 @@ public class OsrmRouteService implements RouteService {
             byte[] data = Util.readInputStream(input);
             try {
                 routes = parseResponse(new String(data, "UTF-8"));
-            } catch (Throwable t) {
+            } catch (Exception e) {
+                // Deliberately not Throwable: an OutOfMemoryError or
+                // StackOverflowError is a VM problem, not a routing failure,
+                // and disguising it as one only makes it harder to find.
                 routes = null;
-                // An IOException from parseResponse is our own "the service
-                // answered but declined to route" signal, whose message is the
-                // whole story; anything else is a genuine failure worth
-                // handing to the caller.
-                error = t instanceof IOException ? null : t;
-                errorMessage = t.getMessage() == null
-                        ? "The routing response could not be read" : t.getMessage();
+                error = e;
+                errorMessage = describe(e, "The routing response could not be read");
             }
         }
 
@@ -437,7 +456,8 @@ public class OsrmRouteService implements RouteService {
 
         @Override
         protected void handleException(Exception err) {
-            failLater("The routing request failed: " + err, err);
+            failLater("The routing request failed: "
+                    + describe(err, "the network could not be reached"), err);
         }
 
         @Override

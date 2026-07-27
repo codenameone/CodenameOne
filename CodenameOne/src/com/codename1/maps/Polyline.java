@@ -65,6 +65,10 @@ public final class Polyline extends MapObject {
 
     /// Creates a polyline from an *encoded polyline* geometry at an explicit
     /// decimal precision (5 for the classic format, 6 for `polyline6`).
+    ///
+    /// Throws `IllegalArgumentException` when `precision` falls outside 1 to
+    /// 10; a precision that cannot scale coordinates sensibly would otherwise
+    /// decode into a line drawn in the wrong place. See [PolylineCodec].
     public static Polyline fromEncoded(String encoded, int precision) {
         Polyline pl = new Polyline();
         pl.points.addAll(PolylineCodec.decode(encoded, precision));

@@ -42,7 +42,9 @@ public interface RouteCallback {
     ///
     /// - `message`: a human readable explanation, never `null`
     ///
-    /// - `error`: the underlying exception, or `null` when the service
-    ///   answered but declined to route
+    /// - `error`: the underlying exception when one was thrown, or `null` when
+    ///   the failure carried none -- a request rejected before it was sent, or
+    ///   an error status the service answered with. `message` stands on its own
+    ///   either way; `error` is there for logging and diagnostics.
     void routeFailed(String message, Throwable error);
 }
