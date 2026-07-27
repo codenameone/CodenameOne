@@ -34,9 +34,9 @@ import java.util.Map;
 ///
 /// Immutable typed push message used by clients and sending code.
 ///
-/// <p>Common fields are provider-independent. Provider-specific options belong
+/// Common fields are provider-independent. Provider-specific options belong
 /// under {@link Builder#platform(String, Map)}. Received JSON must contain a
-/// supported schema number and is exposed as immutable maps and lists.</p>
+/// supported schema number and is exposed as immutable maps and lists.
 public final class PushMessage {
     /// Current JSON envelope schema.
     public static final int SCHEMA_VERSION = 3;

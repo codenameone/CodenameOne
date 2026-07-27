@@ -30,10 +30,10 @@ import java.util.List;
 ///
 /// Immutable native registration produced by a push transport.
 ///
-/// <p>The token is opaque provider data. Applications should send the complete
+/// The token is opaque provider data. Applications should send the complete
 /// subscription to their server and must not parse, truncate, or use the token
 /// as a user identity. Providers can rotate tokens, so a later registration for
-/// the same installation replaces the earlier value.</p>
+/// the same installation replaces the earlier value.
 public final class PushSubscription {
     private final String transportId;
     private final String token;

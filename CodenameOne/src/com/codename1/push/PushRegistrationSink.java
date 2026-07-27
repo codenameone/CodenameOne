@@ -26,13 +26,13 @@ package com.codename1.push;
 ///
 /// Mirrors native subscription changes to an application-owned server.
 ///
-/// <p>This interface is optional with managed BuildCloud push. It is mandatory
+/// This interface is optional with managed BuildCloud push. It is mandatory
 /// when a {@link PushTransport} is supplied, because custom transport mode never
 /// sends registration data to BuildCloud. Implementations should upsert by
-/// installation ID and replace rotated tokens.</p>
+/// installation ID and replace rotated tokens.
 ///
-/// <p>Callbacks run on the Codename One EDT. Network work should be queued
-/// asynchronously rather than blocking the callback.</p>
+/// Callbacks run on the Codename One EDT. Network work should be queued
+/// asynchronously rather than blocking the callback.
 public interface PushRegistrationSink {
     ///
     /// Stores or replaces a subscription on the application-owned server.

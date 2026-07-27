@@ -44,24 +44,24 @@ import java.util.concurrent.atomic.AtomicReference;
 ///
 /// Owns push registration and delivers typed push events to an application.
 ///
-/// <p>Create exactly one client from the application's {@code init()} method,
+/// Create exactly one client from the application's {@code init()} method,
 /// keep it in a field on the main application class, and call {@link #register()}
 /// from {@code start()}. Registration is idempotent, so it is safe for
 /// {@code start()} to call it again when Codename One resumes the application.
 /// Do not call {@link #unregister()} from {@code stop()}; unregistering removes
-/// the device subscription and is intended for an explicit user opt-out.</p>
+/// the device subscription and is intended for an explicit user opt-out.
 ///
-/// <p>The listener is mandatory and is installed before native registration
+/// The listener is mandatory and is installed before native registration
 /// starts. Messages that reach the runtime before {@code register()} are kept in
 /// a bounded process-local queue and replayed when the client becomes active.
 /// Native cold-start implementations also persist messages until the Codename
 /// One runtime starts. All listener and registration-sink callbacks run on the
-/// Codename One EDT.</p>
+/// Codename One EDT.
 ///
-/// <p>Codename One does not discover a listener with reflection or
+/// Codename One does not discover a listener with reflection or
 /// {@code Class.forName()}. Calling {@code build()} without a listener fails
 /// immediately, but the application is responsible for retaining the client and
-/// calling {@code register()}. Only one client can be active in a process.</p>
+/// calling {@code register()}. Only one client can be active in a process.
 ///
 /// @see PushListener
 /// @see PushTransport
@@ -90,10 +90,10 @@ public final class PushClient {
     ///
     /// Starts a client builder for a managed BuildCloud push application.
     ///
-    /// <p>The application key is displayed in the Push section of the Codename
+    /// The application key is displayed in the Push section of the Codename
     /// One Console. It identifies the application during client registration; it
     /// is not a server API key. Install a {@link PushTransport} on the returned
-    /// builder to bypass BuildCloud and use an application-owned push server.</p>
+    /// builder to bypass BuildCloud and use an application-owned push server.
     ///
     /// @param appId the non-empty Push application key, or an application-owned
     ///              identifier when using a custom transport
@@ -106,17 +106,17 @@ public final class PushClient {
     ///
     /// Activates this client and requests native push registration.
     ///
-    /// <p>This method is idempotent. Calling it from each invocation of the
+    /// This method is idempotent. Calling it from each invocation of the
     /// application's {@code start()} method requests registration only once.
     /// A native token persisted before this client becomes active is replayed
     /// immediately, then the platform is asked to refresh it. Registration
     /// otherwise completes asynchronously through
     /// {@link PushListener#onRegistration(PushSubscription)} or
     /// {@link PushListener#onError(PushError)}. Messages queued before activation
-    /// are replayed before this method requests a new native token.</p>
+    /// are replayed before this method requests a new native token.
     ///
-    /// <p>If another {@code PushClient} is already active, this client reports an
-    /// {@code active_client} error and remains inactive.</p>
+    /// If another {@code PushClient} is already active, this client reports an
+    /// {@code active_client} error and remains inactive.
     public void register() {
         synchronized (this) {
             if (registrationRequested) {
@@ -166,11 +166,11 @@ public final class PushClient {
     ///
     /// Removes this device's subscription.
     ///
-    /// <p>Use this for an explicit notification opt-out or account-removal
+    /// Use this for an explicit notification opt-out or account-removal
     /// workflow, not as part of the normal {@code stop()} lifecycle. A later call
     /// to {@link #register()} may subscribe again after unregistration completes.
     /// Custom transports report completion through
-    /// {@link PushTransport.Callback#unregistered()}.</p>
+    /// {@link PushTransport.Callback#unregistered()}.
     public void unregister() {
         if (transport == null) {
             Display.getInstance().deregisterPush();
@@ -200,8 +200,8 @@ public final class PushClient {
     ///
     /// Returns the compatibility callback used by generated native bootstraps.
     ///
-    /// <p>Application code should use {@link PushListener}; this method exists
-    /// for generated platform code and native transport integrations.</p>
+    /// Application code should use {@link PushListener}; this method exists
+    /// for generated platform code and native transport integrations.
     ///
     /// @return the active native callback, or {@code null} before a client is
     ///         registered
@@ -222,10 +222,10 @@ public final class PushClient {
     ///
     /// Delivers an encoded schema-3 envelope from generated native code.
     ///
-    /// <p>If no client is active yet, the message is queued and replayed on the
+    /// If no client is active yet, the message is queued and replayed on the
     /// next successful {@link #register()}. Application code normally does not
     /// call this method; a custom {@link PushTransport} should use its callback's
-    /// {@link PushTransport.Callback#message(String)} method.</p>
+    /// {@link PushTransport.Callback#message(String)} method.
     ///
     /// @param envelopeJson the complete schema-3 JSON envelope
     public static void dispatch(String envelopeJson) {
@@ -540,11 +540,11 @@ public final class PushClient {
     ///
     /// Configures a {@link PushClient}.
     ///
-    /// <p>A {@link PushListener} is required. Without a custom
+    /// A {@link PushListener} is required. Without a custom
     /// {@link PushTransport}, the client uses the platform transport and
     /// BuildCloud registration. Supplying a custom transport bypasses BuildCloud
     /// and also requires a {@link PushRegistrationSink} so the application can
-    /// maintain its own server-side subscription.</p>
+    /// maintain its own server-side subscription.
     public static final class Builder {
         private final String appId;
         private PushListener listener;
@@ -570,8 +570,8 @@ public final class PushClient {
         ///
         /// Mirrors subscription changes to application-owned code.
         ///
-        /// <p>For managed push this is optional and runs in addition to
-        /// BuildCloud registration. For a custom transport it is required.</p>
+        /// For managed push this is optional and runs in addition to
+        /// BuildCloud registration. For a custom transport it is required.
         ///
         /// @param value the registration sink, or {@code null} for managed push
         /// @return this builder
@@ -583,9 +583,9 @@ public final class PushClient {
         ///
         /// Replaces the managed native transport.
         ///
-        /// <p>Setting this option prevents {@code PushClient} from contacting
+        /// Setting this option prevents {@code PushClient} from contacting
         /// BuildCloud. The transport must emit schema-3 envelopes and the builder
-        /// must also receive a {@link #registrationSink(PushRegistrationSink)}.</p>
+        /// must also receive a {@link #registrationSink(PushRegistrationSink)}.
         ///
         /// @param value a custom native transport, or {@code null} to use managed
         ///              platform push

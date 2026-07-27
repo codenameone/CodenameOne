@@ -26,9 +26,9 @@ package com.codename1.push;
 ///
 /// Describes a push registration or envelope-processing error.
 ///
-/// <p>The code is intended for application decisions and logging. The message
+/// The code is intended for application decisions and logging. The message
 /// is diagnostic text and may vary. A retryable error may be attempted again
-/// later with backoff; it is not a promise that an immediate retry will work.</p>
+/// later with backoff; it is not a promise that an immediate retry will work.
 public final class PushError {
     private final String code;
     private final String message;

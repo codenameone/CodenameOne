@@ -26,18 +26,18 @@ package com.codename1.push;
 ///
 /// Low-level native push integration for a CN1Lib or private provider.
 ///
-/// <p>A custom transport owns the provider SDK and native registration flow.
+/// A custom transport owns the provider SDK and native registration flow.
 /// When installed with {@link PushClient.Builder#transport(PushTransport)},
 /// BuildCloud registration is disabled. The matching
 /// {@link PushRegistrationSink} is responsible for synchronizing tokens with
-/// the application's server.</p>
+/// the application's server.
 ///
-/// <p>The transport must invoke exactly one registration result callback for
+/// The transport must invoke exactly one registration result callback for
 /// each {@link #register(Callback)} attempt, report token rotations through
 /// {@link Callback#registered(PushSubscription)}, and pass complete schema-3
 /// JSON envelopes to {@link Callback#message(String)}. The callback accepts
 /// calls from native threads; {@link PushClient} moves application callbacks to
-/// the EDT.</p>
+/// the EDT.
 public interface PushTransport {
     ///
     /// Returns the stable provider identifier stored with subscriptions.
