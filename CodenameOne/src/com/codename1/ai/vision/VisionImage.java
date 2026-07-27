@@ -80,8 +80,10 @@ public final class VisionImage {
     /// Copies the buffer selected by the camera frame's format, together with
     /// its timestamp and orientation. JPEG frames copy only
     /// {@link CameraFrame#getJpegBytes()}; NV21 and RGBA8888 frames copy only
-    /// {@link CameraFrame#getRawBytes()}. This preserves the requested raw
-    /// pipeline without retaining or preferring an encoded fallback.
+    /// {@link CameraFrame#getRawBytes()} when the port supplies that buffer.
+    /// If a port cannot supply the requested raw format, this method copies
+    /// the always-available JPEG fallback instead. This preserves the raw
+    /// pipeline without creating an empty image on JPEG-only camera ports.
     ///
     /// @param frame callback-owned frame
     /// @return detached immutable input safe for asynchronous analysis
@@ -93,10 +95,14 @@ public final class VisionImage {
         }
         FrameFormat format = frame.getFormat() == null
                 ? FrameFormat.JPEG : frame.getFormat();
-        byte[] encoded = format == FrameFormat.JPEG
-                ? frame.getJpegBytes() : null;
-        byte[] pixels = format == FrameFormat.JPEG
-                ? null : frame.getRawBytes();
+        byte[] raw = frame.getRawBytes();
+        boolean useRaw = format != FrameFormat.JPEG
+                && raw != null && raw.length > 0;
+        byte[] encoded = useRaw ? null : frame.getJpegBytes();
+        byte[] pixels = useRaw ? raw : null;
+        if (!useRaw) {
+            format = FrameFormat.JPEG;
+        }
         return new VisionImage(encoded, pixels,
                 frame.getWidth(), frame.getHeight(), frame.getRotationDegrees(),
                 frame.getTimestampNanos(), format);

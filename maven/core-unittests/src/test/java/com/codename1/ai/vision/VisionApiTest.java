@@ -74,6 +74,12 @@ class VisionApiTest extends UITestBase {
                 jpeg, pixels, 1, 1, 0, 8L, FrameFormat.JPEG));
         assertNotNull(encoded.getEncodedBytes());
         assertNull(encoded.getPixels());
+
+        VisionImage fallback = VisionImage.fromCameraFrame(new CameraFrame(
+                jpeg, null, 1, 1, 0, 9L, FrameFormat.NV21));
+        assertNotNull(fallback.getEncodedBytes());
+        assertNull(fallback.getPixels());
+        assertEquals(FrameFormat.JPEG, fallback.getFormat());
     }
 
     @Test

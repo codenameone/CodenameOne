@@ -143,6 +143,18 @@ public class VisionOnDeviceApiTest extends BaseTest {
                 "camera image timestamp");
         check(cameraImage.getFormat() == FrameFormat.RGBA8888,
                 "camera image format");
+
+        byte[] fallbackJpeg = new byte[] {50, 60};
+        VisionImage fallbackImage = VisionImage.fromCameraFrame(
+                new CameraFrame(fallbackJpeg, null, 1, 1, 0, 1L,
+                        FrameFormat.NV21));
+        fallbackJpeg[0] = 99;
+        checkEqual(50, fallbackImage.getEncodedBytes()[0],
+                "JPEG-only port fallback must be copied");
+        check(fallbackImage.getPixels() == null,
+                "JPEG-only port fallback must not expose raw pixels");
+        check(fallbackImage.getFormat() == FrameFormat.JPEG,
+                "JPEG-only port fallback must report JPEG");
     }
 
     private void checkOptions() {

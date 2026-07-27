@@ -149,9 +149,10 @@ public final class InferenceSession implements AutoCloseable {
     /// container is defensively copied before it is handed to the asynchronous
     /// backend, so replacing an element after this method returns cannot change
     /// the pending invocation. Each {@link Tensor} is itself immutable.
-    /// Canceling the returned resource forwards cancellation to the native
-    /// backend and releases the session's run slot, allowing a later
-    /// invocation or a pending {@link #close()} to proceed.
+    /// Canceling the returned resource suppresses result publication but does
+    /// not interrupt an invocation that has already entered LiteRT. The
+    /// session remains busy, and a pending {@link #close()} remains deferred,
+    /// until the native operation actually succeeds or fails.
     ///
     /// @param inputs one tensor for each model input; {@code null} is treated
     /// as an empty input array
@@ -338,12 +339,10 @@ public final class InferenceSession implements AutoCloseable {
 
     private static final class SessionRunResource
             extends AsyncResource<Tensor[]> {
-        private final AsyncResource<Tensor[]> backend;
         private final PendingRun pending;
 
         SessionRunResource(AsyncResource<Tensor[]> backend,
                            PendingRun pending) {
-            this.backend = backend;
             this.pending = pending;
             backend.ready(new SuccessCallback<Tensor[]>() {
                 @Override
@@ -368,16 +367,6 @@ public final class InferenceSession implements AutoCloseable {
                     }
                 }
             });
-        }
-
-        @Override
-        public boolean cancel(boolean mayInterruptIfRunning) {
-            boolean cancelled = super.cancel(mayInterruptIfRunning);
-            if (cancelled) {
-                backend.cancel(mayInterruptIfRunning);
-                pending.finish();
-            }
-            return cancelled;
         }
     }
 }

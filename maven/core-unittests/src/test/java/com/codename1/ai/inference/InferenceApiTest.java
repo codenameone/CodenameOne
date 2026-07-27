@@ -347,7 +347,7 @@ class InferenceApiTest extends UITestBase {
     }
 
     @Test
-    void cancelledRunReleasesSessionAndDeferredClose() {
+    void cancelledRunStaysSerializedUntilNativeWorkSettles() {
         RecordingInferenceImpl backend = new RecordingInferenceImpl();
         backend.pendingRun = new AsyncResource<Tensor[]>();
         implementation.setInferenceImpl(backend);
@@ -359,19 +359,21 @@ class InferenceApiTest extends UITestBase {
         });
 
         assertTrue(run.cancel(false));
-        assertTrue(backend.pendingRun.isCancelled(),
-                "session cancellation must reach the backend operation");
-        backend.pendingRun = new AsyncResource<Tensor[]>();
-        AsyncResource<Tensor[]> next = session.run(new Tensor[] {
-                Tensor.floats("input", new int[] {1, 2},
-                        new float[] {3, 4})
-        });
+        assertFalse(backend.pendingRun.isCancelled(),
+                "outward cancellation must not interrupt a native invocation");
+        assertThrows(IllegalStateException.class, () -> session.run(
+                new Tensor[] {Tensor.floats("input", new int[] {1, 2},
+                        new float[] {3, 4})}));
         session.close();
         assertEquals(0, backend.closeCount,
-                "the second pending run must still defer native close");
-        assertTrue(next.cancel(false));
+                "cancellation must not close an interpreter still in use");
+        backend.pendingRun.complete(new Tensor[] {
+                Tensor.floats("output", new int[] {1}, new float[] {3})
+        });
+        flushSerialCalls();
+        assertTrue(run.isCancelled());
         assertEquals(1, backend.closeCount,
-                "cancelling the final run must complete deferred close");
+                "native settlement must complete deferred close");
     }
 
     @Test
