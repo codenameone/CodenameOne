@@ -369,13 +369,13 @@ public class HealthStore {
                         String next = page.getNextPageToken();
                         int limit = query.getLimit();
                         if (next == null || collected.size() >= limit) {
-                            // Trim rather than hand back more than
-                            // was asked for: a caller that sized a
-                            // buffer from the limit would otherwise
-                            // overflow it. Flattening a series can push
-                            // the count past the limit even when the
-                            // platform honoured it.
-                            while (collected.size() > limit) {
+                            // Trim only when this is genuinely the end.
+                            // Trimming a page that has a continuation
+                            // token would discard samples the token
+                            // resumes past, losing them for good; the
+                            // caller asked for a limit, not for a hole.
+                            while (next == null
+                                    && collected.size() > limit) {
                                 collected.remove(collected.size() - 1);
                             }
                             out.complete(collected);
@@ -481,6 +481,10 @@ public class HealthStore {
         converted.setId(q.getId());
         converted.setSource(q.getSource());
         converted.setRecordingMethod(q.getRecordingMethod());
+        // Metadata travels with the sample. Losing it merely because the
+        // caller asked for pounds instead of kilograms would drop the
+        // correlation identifier this API tells them to keep there.
+        converted.getMetadata().putAll(q.getMetadata());
         return converted;
     }
 
@@ -847,6 +851,10 @@ public class HealthStore {
                 : QuantitySample.create(type, q.getQuantity().in(preferred),
                         q.getStartMillis(), q.getEndMillis());
         converted.setRecordingMethod(q.getRecordingMethod());
+        // Metadata travels with the sample. Losing it merely because the
+        // caller asked for pounds instead of kilograms would drop the
+        // correlation identifier this API tells them to keep there.
+        converted.getMetadata().putAll(q.getMetadata());
         Map<String, String> meta = q.getMetadata();
         for (Map.Entry<String, String> e : meta.entrySet()) {
             converted.putMetadata(e.getKey(), e.getValue());

@@ -56,6 +56,7 @@ import androidx.health.connect.client.records.Vo2MaxRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.WheelchairPushesRecord
 import androidx.health.connect.client.records.metadata.DataOrigin
+import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.ChangesTokenRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -244,34 +245,70 @@ class CN1HealthConnectBridge(private val context: Context)
             // limit-1 ascending query returns the oldest record, which is
             // the opposite of what the caller asked for.
             val ascending = !json.optBoolean("descending", false)
-            val inToken = json.optString("pageToken", "")
-            var outToken: String? = null
-            // Every type is read to the full budget and the merge happens
-            // afterwards. Spending the budget type by type made the answer
-            // depend on the order of `types` rather than on time: a
-            // descending limit-1 query over [steps, heart_rate] always
-            // returned the newest step, even when a heart-rate sample was
-            // newer.
+            // One continuation token per type, not one for the query. A
+            // single token is opaque to a record class other than the one
+            // that issued it, so carrying just the first type's token
+            // restarted every other type from the beginning on page two --
+            // or handed a steps token to HeartRateRecord.
+            val inTokens = parseTokens(json.optString("pageToken", ""))
+            val outTokens = LinkedHashMap<String, String>()
+            // Every type is read to the full budget and merged afterwards.
+            // Spending the budget type by type made the answer depend on
+            // the order of `types` rather than on time: a descending limit-1
+            // query over [steps, heart_rate] always returned the newest
+            // step even when a heart-rate sample was newer.
             val perType = ArrayList<String>()
             for (i in 0 until types.length()) {
+                val token = types.getString(i)
                 val block = StringBuilder()
-                val r = appendRecords(block, types.getString(i), filter,
-                    budget, origins, ascending,
-                    if (i == 0 && inToken.isNotEmpty()) inToken else null)
+                val r = appendRecords(block, token, filter,
+                    budget, origins, ascending, inTokens[token])
                 perType.add(block.toString())
-                if (outToken == null) {
-                    outToken = r.second
+                if (r.second != null) {
+                    outTokens[token] = r.second!!
                 }
             }
-            sb.append(mergeByTime(perType, budget, ascending))
+            // Merged in time order but not trimmed: trimming here would
+            // drop samples the trailer's tokens can no longer reach. The
+            // shared layer applies the caller's limit.
+            sb.append(mergeByTime(perType, Int.MAX_VALUE, ascending))
             // Trailer: what is left on the platform side. Reporting nothing
             // made every page look complete, so the caller's paging loop
             // stopped at the first limit and lost the rest.
-            sb.append('#').append(outToken ?: "").append('\t')
-                .append(if (outToken != null) "1" else "0").append('\n')
+            sb.append('#').append(encodeTokens(outTokens)).append('\t')
+                .append(if (outTokens.isEmpty()) "0" else "1").append('\n')
             sb.toString()
         }
     }
+
+    /** Decodes the per-type continuation tokens from a page token. */
+    private fun parseTokens(encoded: String): Map<String, String> {
+        val out = LinkedHashMap<String, String>()
+        if (encoded.isEmpty()) {
+            return out
+        }
+        for (part in encoded.split(TOKEN_SEPARATOR)) {
+            val eq = part.indexOf('=')
+            if (eq > 0 && eq < part.length - 1) {
+                out[part.substring(0, eq)] = part.substring(eq + 1)
+            }
+        }
+        return out
+    }
+
+    private fun encodeTokens(tokens: Map<String, String>): String {
+        val sb = StringBuilder()
+        for ((type, token) in tokens) {
+            if (sb.isNotEmpty()) {
+                sb.append(TOKEN_SEPARATOR)
+            }
+            sb.append(type).append('=').append(token)
+        }
+        return sb.toString()
+    }
+
+    /// Neither a portable type id nor a Health Connect token contains it.
+    private val TOKEN_SEPARATOR = '\u0001'
 
     /**
      * Merges per-type blocks in time order and applies the shared limit.
@@ -457,42 +494,47 @@ class CN1HealthConnectBridge(private val context: Context)
             // Series records hold many samples in one record and the
             // portable layer flattens by default, so emit one line per
             // sample rather than per record.
-            is HeartRateRecord -> record.samples.take(budget).forEach {
+            is HeartRateRecord -> record.samples.forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.beatsPerMinute.toDouble(), "count/min")
             }
 
-            is PowerRecord -> record.samples.take(budget).forEach {
+            is PowerRecord -> record.samples.forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.power.inWatts, "W")
             }
 
-            is SpeedRecord -> record.samples.take(budget).forEach {
+            is SpeedRecord -> record.samples.forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.speed.inMetersPerSecond, "m/s")
             }
 
-            is CyclingPedalingCadenceRecord -> record.samples.take(budget).forEach {
+            is CyclingPedalingCadenceRecord -> record.samples.forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.revolutionsPerMinute, "count/min")
             }
 
-            is StepsCadenceRecord -> record.samples.take(budget).forEach {
+            is StepsCadenceRecord -> record.samples.forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.rate, "count/min")
             }
 
             else -> return 0
         }
-        // One line per scalar record; a series contributes one per sample
-        // actually written, which is capped by the budget above.
+        // One line per scalar record; a series contributes one per sample.
+        //
+        // A series record is never split. Health Connect's page token
+        // resumes after a whole record, so emitting a prefix would strand
+        // the rest with no token that could ever reach it. The page may
+        // therefore overshoot the limit by less than one record, which the
+        // shared layer trims for the caller while the token still resumes
+        // at the right place.
         return when (record) {
-            is HeartRateRecord -> minOf(record.samples.size, budget)
-            is PowerRecord -> minOf(record.samples.size, budget)
-            is SpeedRecord -> minOf(record.samples.size, budget)
-            is CyclingPedalingCadenceRecord ->
-                minOf(record.samples.size, budget)
-            is StepsCadenceRecord -> minOf(record.samples.size, budget)
+            is HeartRateRecord -> record.samples.size
+            is PowerRecord -> record.samples.size
+            is SpeedRecord -> record.samples.size
+            is CyclingPedalingCadenceRecord -> record.samples.size
+            is StepsCadenceRecord -> record.samples.size
             else -> 1
         }
     }
@@ -578,52 +620,57 @@ class CN1HealthConnectBridge(private val context: Context)
         val end = Instant.ofEpochMilli(f[3].toLong())
         val value = f[4].toDouble()
         val zone = java.time.ZoneId.systemDefault().rules.getOffset(start)
+        // Field 6 is the portable RecordingMethod. Dropping it stored every
+        // sample with the platform default, so other health apps could not
+        // tell a value the user typed from one a device measured -- which
+        // is the whole point of the field.
+        val meta = metadataFor(if (f.size > 6) f[6] else "")
         return when (token) {
             "steps" -> StepsRecord(startTime = start, endTime = end,
                 startZoneOffset = zone, endZoneOffset = zone,
-                count = value.toLong())
+                count = value.toLong(), metadata = meta)
 
             // Only the generic distance type is written. Writing a
             // cycling distance as a bare DistanceRecord would erase the
             // modality, and it would read back as walking distance.
             "distance_walking_running" -> DistanceRecord(startTime = start,
                 endTime = end, startZoneOffset = zone, endZoneOffset = zone,
-                distance = Length.meters(value))
+                distance = Length.meters(value), metadata = meta)
 
             "flights_climbed" -> FloorsClimbedRecord(startTime = start,
                 endTime = end, startZoneOffset = zone, endZoneOffset = zone,
-                floors = value)
+                floors = value, metadata = meta)
 
             "elevation_gained" -> ElevationGainedRecord(startTime = start,
                 endTime = end, startZoneOffset = zone, endZoneOffset = zone,
-                elevation = Length.meters(value))
+                elevation = Length.meters(value), metadata = meta)
 
             "active_energy" -> ActiveCaloriesBurnedRecord(startTime = start,
                 endTime = end, startZoneOffset = zone, endZoneOffset = zone,
-                energy = Energy.kilocalories(value))
+                energy = Energy.kilocalories(value), metadata = meta)
 
             "wheelchair_pushes" -> WheelchairPushesRecord(startTime = start,
                 endTime = end, startZoneOffset = zone, endZoneOffset = zone,
-                count = value.toLong())
+                count = value.toLong(), metadata = meta)
 
             "hydration" -> HydrationRecord(startTime = start, endTime = end,
                 startZoneOffset = zone, endZoneOffset = zone,
-                volume = Volume.liters(value))
+                volume = Volume.liters(value), metadata = meta)
 
             "body_mass" -> WeightRecord(time = start, zoneOffset = zone,
-                weight = Mass.kilograms(value))
+                weight = Mass.kilograms(value), metadata = meta)
 
             "lean_body_mass" -> LeanBodyMassRecord(time = start,
                 zoneOffset = zone, mass = Mass.kilograms(value))
 
             "bone_mass" -> BoneMassRecord(time = start, zoneOffset = zone,
-                mass = Mass.kilograms(value))
+                mass = Mass.kilograms(value), metadata = meta)
 
             "body_fat_percentage" -> BodyFatRecord(time = start,
                 zoneOffset = zone, percentage = Percentage(value))
 
             "height" -> HeightRecord(time = start, zoneOffset = zone,
-                height = Length.meters(value))
+                height = Length.meters(value), metadata = meta)
 
             "resting_heart_rate" -> RestingHeartRateRecord(time = start,
                 zoneOffset = zone, beatsPerMinute = value.toLong())
@@ -639,24 +686,47 @@ class CN1HealthConnectBridge(private val context: Context)
 
             "basal_body_temperature" -> BasalBodyTemperatureRecord(
                 time = start, zoneOffset = zone,
-                temperature = Temperature.celsius(value))
+                temperature = Temperature.celsius(value), metadata = meta)
 
             "vo2_max" -> Vo2MaxRecord(time = start, zoneOffset = zone,
-                vo2MillilitersPerMinuteKilogram = value)
+                vo2MillilitersPerMinuteKilogram = value, metadata = meta)
 
             "blood_glucose" -> BloodGlucoseRecord(time = start,
                 zoneOffset = zone,
-                level = BloodGlucose.millimolesPerLiter(value))
+                level = BloodGlucose.millimolesPerLiter(value), metadata = meta)
 
             "heart_rate" -> HeartRateRecord(startTime = start, endTime = end,
                 startZoneOffset = zone, endZoneOffset = zone,
                 samples = listOf(HeartRateRecord.Sample(time = start,
-                    beatsPerMinute = value.toLong())))
+                    beatsPerMinute = value.toLong())), metadata = meta)
 
             else -> throw IllegalArgumentException(
                 "Health Connect writes are not implemented for '" + token
                     + "' in this build")
         }
+    }
+
+    /**
+     * Builds Health Connect metadata carrying the portable recording
+     * method.
+     *
+     * Falls back to unspecified metadata when this connect-client release
+     * does not expose the matching factory, which is better than refusing
+     * the write.
+     */
+    private fun metadataFor(recordingMethod: String): Metadata {
+        // connect-client models this as an int on Metadata rather than as
+        // named factories, and the constructor's other parameters have
+        // defaults, so only the recording method is supplied here.
+        val method = when (recordingMethod) {
+            "MANUAL_ENTRY" -> Metadata.RECORDING_METHOD_MANUAL_ENTRY
+            "AUTOMATIC", "AUTOMATICALLY_RECORDED" ->
+                Metadata.RECORDING_METHOD_AUTOMATICALLY_RECORDED
+            "ACTIVE", "ACTIVELY_RECORDED" ->
+                Metadata.RECORDING_METHOD_ACTIVELY_RECORDED
+            else -> Metadata.RECORDING_METHOD_UNKNOWN
+        }
+        return Metadata(recordingMethod = method)
     }
 
     override fun deleteRecords(requestJson: String,

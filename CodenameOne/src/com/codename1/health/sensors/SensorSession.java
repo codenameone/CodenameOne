@@ -61,7 +61,7 @@ public class SensorSession {
     private final SensorSessionOptions options;
     private final List<HealthSample> pendingWrites =
             new ArrayList<HealthSample>();
-    private long pendingSince;
+    private java.util.Timer flushTimer;
     private final List<SensorSampleListener> listeners =
             new ArrayList<SensorSampleListener>();
     private final Map<String, HealthSample> latest =
@@ -245,26 +245,62 @@ public class SensorSession {
         // Batched rather than written per notification: a strap notifies
         // about once a second, and a store round trip per reading would
         // spend more time in the platform than in the app.
-        List<HealthSample> batch = null;
-        long now = System.currentTimeMillis();
+        boolean startTimer = false;
         synchronized (pendingWrites) {
-            if (pendingWrites.isEmpty()) {
-                pendingSince = now;
-            }
+            startTimer = pendingWrites.isEmpty();
             pendingWrites.addAll(samples);
-            if (now - pendingSince >= options.getStoreBatchMillis()) {
-                batch = new ArrayList<HealthSample>(pendingWrites);
-                pendingWrites.clear();
-            }
         }
-        if (batch != null) {
-            Health.getInstance().getStore().write(batch);
+        if (startTimer) {
+            // Armed when the batch opens rather than checked when the next
+            // measurement arrives. A scale or a blood-pressure cuff sends
+            // one reading and then stays quiet, so a deadline that only
+            // advances on the next notification never fires and the reading
+            // is written only if the app happens to call stop() -- losing it
+            // outright if the process exits first.
+            scheduleFlush(options.getStoreBatchMillis());
+        }
+    }
+
+    private void scheduleFlush(int delayMillis) {
+        cancelFlush();
+        // CLDC's Timer has no named/daemon constructor.
+        java.util.Timer t = new java.util.Timer();
+        synchronized (pendingWrites) {
+            flushTimer = t;
+        }
+        t.schedule(new FlushTask(this), Math.max(1, delayMillis));
+    }
+
+    private void cancelFlush() {
+        java.util.Timer t;
+        synchronized (pendingWrites) {
+            t = flushTimer;
+            flushTimer = null;
+        }
+        if (t != null) {
+            t.cancel();
+        }
+    }
+
+    /// Named rather than anonymous so the timer holds no synthetic
+    /// reference beyond the session it flushes.
+    private static final class FlushTask extends java.util.TimerTask {
+        private final SensorSession session;
+
+        FlushTask(SensorSession session) {
+            this.session = session;
+        }
+
+        @Override
+        public void run() {
+            session.flushPendingWrites();
         }
     }
 
     /// Writes anything still buffered. Called when the session stops so a
     /// short ride does not lose its last partial batch.
     protected final void flushPendingWrites() {
+        cancelFlush();
         List<HealthSample> batch;
         synchronized (pendingWrites) {
             if (pendingWrites.isEmpty()) {

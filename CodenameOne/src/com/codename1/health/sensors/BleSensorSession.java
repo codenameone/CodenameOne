@@ -100,6 +100,13 @@ final class BleSensorSession extends SensorSession {
             return;
         }
         setState(SensorSessionState.CONNECTING);
+        // The cumulative trackers hold the previous connection's baseline.
+        // A sensor that power-cycled while away restarts its counters at
+        // zero, and even one that did not will have wrapped its 16-bit
+        // event timer several times across the gap, so the first delta
+        // after reconnecting would publish a large fabricated cadence into
+        // the live workout and into anything persisted from it.
+        resetCounters();
         peripheral.connect().onResult(new AsyncResult<BlePeripheral>() {
             @Override
             public void onReady(BlePeripheral value, Throwable err) {
