@@ -27,6 +27,7 @@ import com.codename1.surfaces.spi.SurfaceBridge;
 import com.codename1.ui.Display;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -141,6 +142,18 @@ public final class Surfaces {
         Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
         String json = SurfaceSerializer.serializeTimeline(kindId, timeline, images);
         b.publishWidgetTimeline(kindId, json, images);
+    }
+
+    /// Push-framework entry point for a server-rendered timeline descriptor. The descriptor uses
+    /// the same wire format as `publish()`. The descriptor is persisted directly once the
+    /// Codename One runtime receives it. A platform that doesn't run application code for a
+    /// background push applies it when the application next starts or resumes.
+    public static void publishRemote(String kindId, String timelineJson) {
+        SurfaceBridge b = bridgeInternal();
+        if (b == null || !b.areWidgetsSupported() || kindId == null || timelineJson == null) {
+            return;
+        }
+        b.publishWidgetTimeline(kindId, timelineJson, Collections.<String, byte[]>emptyMap());
     }
 
     /// Asks the platform to re-render widgets from their already-published timelines.

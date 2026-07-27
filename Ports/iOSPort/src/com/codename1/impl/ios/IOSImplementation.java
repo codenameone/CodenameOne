@@ -10402,6 +10402,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void registerPush(Hashtable metaData, boolean noFallback) {
+        PushCallback explicit = CodenameOneImplementation.getPushCallback();
+        if (explicit != null) {
+            pushCallback = explicit;
+        }
         nativeInstance.registerPush();
     }
 
@@ -10469,7 +10473,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(pushCallback != null) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
-                    if(CodenameOneImplementation.registerServerPush(deviceKey, getApplicationKey(), (byte)2, "", clsName)) {
+                    // PushClient owns managed registration. Calling the historical relay here
+                    // would register the same APNs token with the retired service before the
+                    // typed client has a chance to send it to BuildCloud.
+                    if (com.codename1.push.PushClient.getActiveCallback() == pushCallback) {
+                        pushCallback.registeredForPush(deviceKey);
+                    } else if(CodenameOneImplementation.registerServerPush(deviceKey, getApplicationKey(), (byte)2, "", clsName)) {
                         pushCallback.registeredForPush(deviceKey);
                     } else {
                         pushCallback.pushRegistrationError("Server registration error", 1);

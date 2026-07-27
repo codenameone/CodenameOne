@@ -2,7 +2,7 @@
 (function () {
     window.cn1_registerPush = registerPush;
     
-    function registerPush(onSuccess, onFail, onPush, pushActionCategories) {
+    function registerPush(onSuccess, onFail, onPush, pushActionCategories, typedEnvelope) {
         /**
          * Step one: run a function on load (or whenever is appropriate for you)
          * Function run on load sets up the service worker if it is supported in the
@@ -50,10 +50,6 @@
             }
             if (serviceWorker) {
                 //console.log("Current state: "+serviceWorker.state);
-                if (serviceWorker.state === 'activated') {
-                    //console.log("Controller is "+serviceWorker.controller);
-                    serviceWorker.postMessage("a message");
-                }
                 serviceWorker.addEventListener('controllerchange', function (e) {
                     //console.log("Controller changed");
                 });
@@ -102,6 +98,9 @@
                 navigator.serviceWorker.addEventListener('controllerchange', function() {
                     //console.log('Okay, now things are under control. navigator.serviceWorker.controller is', navigator.serviceWorker.controller);
                     //navigator.serviceWorker.controller.postMessage("The client says hello");
+                });
+                serviceWorkerRegistration.active.postMessage({
+                    command: 'pushClientReady'
                 });
                 serviceWorkerRegistration.active.postMessage({
                     command: 'registerPushActionCategories',
@@ -170,9 +169,20 @@
             // Get public key and user auth from the subscription object
             var key = subscription.getKey ? subscription.getKey('p256dh') : '';
             var auth = subscription.getKey ? subscription.getKey('auth') : '';
-            var id = 'cn1-web-'+Base64.encodeURI(subscription.endpoint + '?key=' + 
+            var material = subscription.endpoint + '?key=' +
                     encodeURIComponent(key ? btoa(String.fromCharCode.apply(null, new Uint8Array(key))) : '') +
-                    '&auth=' + encodeURIComponent(auth ? btoa(String.fromCharCode.apply(null, new Uint8Array(auth))) : ''));
+                    '&auth=' + encodeURIComponent(auth ? btoa(String.fromCharCode.apply(null, new Uint8Array(auth))) : '');
+            if (typedEnvelope && typeof subscription.toJSON === 'function') {
+                try {
+                    var serializedSubscription = JSON.stringify(subscription.toJSON());
+                    if (serializedSubscription && serializedSubscription !== 'null') {
+                        material = serializedSubscription;
+                    }
+                } catch (e) {
+                    console.warn('Unable to serialize push subscription; using endpoint and keys instead.', e);
+                }
+            }
+            var id = 'cn1-web-'+Base64.encodeURI(material);
             onSuccess(id);
         }
     }
