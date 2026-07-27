@@ -94,7 +94,8 @@ class LanguageApiTest extends UITestBase {
         assertEquals(.35f, backend.options.getMinimumConfidence());
 
         SmartReplyMessage original = new SmartReplyMessage(
-                "First", "remote", false, 1);
+                "First", null, false, 1);
+        assertEquals("remote", original.getParticipantId());
         SmartReplyMessage replacement = new SmartReplyMessage(
                 "Replacement", "remote", false, 2);
         SmartReplyMessage[] conversation =

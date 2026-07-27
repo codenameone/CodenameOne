@@ -31,13 +31,14 @@ public final class SmartReplyMessage {
 
     /// Creates one conversation turn used to generate reply suggestions.
     /// @param text message body; {@code null} becomes an empty string
-    /// @param participantId stable speaker id used to group conversation turns
+    /// @param participantId stable speaker id used to group conversation turns;
+    ///        {@code null} becomes {@code "remote"}
     /// @param localUser whether this message was written by the current user
     /// @param timestampMillis message time in Unix epoch milliseconds
     public SmartReplyMessage(String text, String participantId,
                              boolean localUser, long timestampMillis) {
         this.text = text == null ? "" : text;
-        this.participantId = participantId;
+        this.participantId = participantId == null ? "remote" : participantId;
         this.localUser = localUser;
         this.timestampMillis = timestampMillis;
     }
@@ -47,7 +48,8 @@ public final class SmartReplyMessage {
         return text;
     }
 
-    /// @return stable participant identifier used to group remote speakers
+    /// @return stable participant identifier used to group remote speakers,
+    ///         never {@code null}
     public String getParticipantId() {
         return participantId;
     }

@@ -50,7 +50,9 @@ final class AndroidSmartReplyAdapter extends AndroidLanguageAdapter {
                             message.getText(), message.getTimestampMillis())
                     : TextMessage.createForRemoteUser(
                             message.getText(), message.getTimestampMillis(),
-                            message.getParticipantId()));
+                            message.getParticipantId() == null
+                                    ? "remote"
+                                    : message.getParticipantId()));
         }
         client.suggestReplies(messages).addOnSuccessListener(
                 new OnSuccessListener<SmartReplySuggestionResult>() {
