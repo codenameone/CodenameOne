@@ -390,6 +390,27 @@ class SurfaceTest {
     }
 
     @Test
+    void remoteLiveActivityCommandsHonorBridgeSupport() {
+        FakeBridge bridge = new FakeBridge();
+        bridge.activitiesSupported = false;
+        Surfaces.setBridge(bridge);
+
+        LiveActivity.updateRemote("act1", "{\"status\":\"moving\"}");
+        LiveActivity.endRemote("act1", null, true);
+        assertTrue(bridge.updates.isEmpty());
+        assertNull(bridge.endedId);
+
+        bridge.activitiesSupported = true;
+        LiveActivity.updateRemote("act1", "{\"status\":\"moving\"}");
+        LiveActivity.endRemote("act1", "{\"status\":\"done\"}", true);
+        assertEquals(1, bridge.updates.size());
+        assertEquals("act1:{\"status\":\"moving\"}", bridge.updates.get(0));
+        assertEquals("act1", bridge.endedId);
+        assertEquals("{\"status\":\"done\"}", bridge.endedFinalState);
+        assertTrue(bridge.endedImmediately);
+    }
+
+    @Test
     void publishForwardsToBridgeAndNoBridgeIsNoOp() {
         // no bridge: must not throw
         Surfaces.publish("k", new WidgetTimeline().setContent(new SurfaceText("x")));
