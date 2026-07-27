@@ -6,6 +6,19 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.maps;
 
@@ -82,6 +95,19 @@ class PolylineCodecTest {
         List truncated = PolylineCodec.decode("_p~iF~ps|U_ulL");
         assertEquals(1, truncated.size());
         assertLatLng(38.5, -120.2, truncated.get(0));
+    }
+
+    @Test
+    void dropsAValueCutInHalfRatherThanEmittingABogusPoint() {
+        // Losing the last byte truncates the final longitude mid-value. The
+        // accumulated bits are a fraction of the real delta, so emitting them
+        // would draw a spurious segment and widen the route bounds; the point
+        // has to be dropped instead.
+        String cut = GOOGLE_SAMPLE.substring(0, GOOGLE_SAMPLE.length() - 1);
+        List points = PolylineCodec.decode(cut);
+        assertEquals(2, points.size());
+        assertLatLng(38.5, -120.2, points.get(0));
+        assertLatLng(40.7, -120.95, points.get(1));
     }
 
     @Test

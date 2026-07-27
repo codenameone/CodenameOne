@@ -121,8 +121,12 @@ public final class Routing {
     /// the outcome to `callback`.
     ///
     /// The polyline is added and the camera moved *before* `callback` runs, so
-    /// the callback can restyle the returned route or read its distance and
-    /// duration to update the UI.
+    /// the callback can read the route's distance and duration to update the
+    /// UI. It cannot restyle the line that was drawn -- that polyline is not
+    /// exposed, and [Route#toPolyline()] hands back a fresh one every call. To
+    /// control how the route looks, skip this method: call
+    /// [#findRoute(RouteRequest, RouteCallback)] and add the styled polyline
+    /// yourself.
     ///
     /// #### Parameters
     ///

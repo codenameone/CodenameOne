@@ -33,14 +33,14 @@ image::img/maps-markers.png[Markers drawn with the default Material map pin,scal
 
 === Routes that follow the road
 
-A polyline joins the coordinates you hand it with *straight* lines -- it knows nothing about roads. Passing two endpoints to `addPolyline` therefore draws a line across the map as the crow flies, which is almost never what a navigation screen wants. Working out the road geometry between two points is a separate job, done by a routing service, and that is what the `com.codename1.maps.routing` package is for:
+A polyline joins the coordinates you hand it with *straight* lines -- it knows nothing about roads. Passing two endpoints to `addPolyline` therefore draws a single straight segment across the map, which is seldom what a navigation screen wants. Working out the road geometry between two points is a separate job, done by a routing service, and that's what the `com.codename1.maps.routing` package is for:
 
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MapsJava005Snippet.java[tag=maps-java-005,indent=0]
 ----
 
-`Routing.showRoute(...)` fetches the route, draws it and frames the camera around it. Like the keyless OpenFreeMap basemap, it works with no API key and no signup: routing runs over OpenStreetMap data through the built-in `OsrmRouteService`.
+`Routing.showRoute(...)` fetches the route, draws it and moves the camera to frame it. Like the keyless OpenFreeMap basemap, it works with no API key and no signup: routing runs over OpenStreetMap data through the built-in `OsrmRouteService`.
 
 Routing is asynchronous -- the call returns immediately and the line appears when the service answers. Use `Routing.findRoute(...)` when you want the result itself, for example to style the line or show the distance and the estimated time:
 

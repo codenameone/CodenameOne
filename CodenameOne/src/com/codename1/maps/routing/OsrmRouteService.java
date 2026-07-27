@@ -24,11 +24,13 @@ package com.codename1.maps.routing;
 
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.JSONParser;
+import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Util;
 import com.codename1.maps.LatLng;
 import com.codename1.maps.PolylineCodec;
 import com.codename1.ui.CN;
+import com.codename1.ui.events.ActionListener;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -118,11 +120,10 @@ public class OsrmRouteService implements RouteService {
             fail(callback, "A route request needs both an origin and a destination", null);
             return;
         }
-        ConnectionRequest req = new RouteConnection(callback);
+        RouteConnection req = new RouteConnection(callback);
         req.setUrl(buildUrl(request));
         req.setPost(false);
-        req.setFailSilently(true);
-        NetworkManager.getInstance().addToQueue(req);
+        req.start();
     }
 
     /// Builds the OSRM request URL for `request`. Package visible so the shape
@@ -373,7 +374,15 @@ public class OsrmRouteService implements RouteService {
 
     /// The network request, kept as a named class so the single-delivery
     /// guarantee of [RouteService#findRoutes] is enforced in one place.
-    private static final class RouteConnection extends ConnectionRequest {
+    ///
+    /// Note that the request is deliberately *not* marked `failSilently`:
+    /// [com.codename1.io.NetworkManager] swallows transport exceptions
+    /// outright for silent requests, so [#handleException] would never run and
+    /// the caller would wait forever for a callback that never came. Since
+    /// every failure hook here is overridden, nothing reaches the default
+    /// retry dialog either way.
+    private static final class RouteConnection extends ConnectionRequest
+            implements ActionListener<NetworkEvent> {
 
         private final RouteCallback callback;
         private boolean delivered;
@@ -383,6 +392,29 @@ public class OsrmRouteService implements RouteService {
 
         RouteConnection(RouteCallback callback) {
             this.callback = callback;
+        }
+
+        /// Queues the request, listening for its completion so the callback is
+        /// delivered even along paths that reach neither [#postResponse] nor a
+        /// failure hook -- a killed request, or an app-wide error listener that
+        /// consumes the event before it reaches this request.
+        void start() {
+            NetworkManager nm = NetworkManager.getInstance();
+            nm.addProgressListener(this);
+            nm.addToQueue(this);
+        }
+
+        /// The completion backstop. Progress events are dispatched to the EDT
+        /// through the same serial queue as [#postResponse], and this hops once
+        /// more, so any real result already queued is delivered first and wins.
+        @Override
+        public void actionPerformed(NetworkEvent n) {
+            if (n.getConnectionRequest() != this
+                    || n.getProgressType() != NetworkEvent.PROGRESS_TYPE_COMPLETED) {
+                return;
+            }
+            NetworkManager.getInstance().removeProgressListener(this);
+            failLater("The routing request did not complete", null);
         }
 
         @Override

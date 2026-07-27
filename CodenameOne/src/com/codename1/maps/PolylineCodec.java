@@ -70,8 +70,10 @@ public final class PolylineCodec {
     /// classic format, 6 for `polyline6`).
     ///
     /// Trailing bytes that do not form a complete coordinate pair -- the usual
-    /// symptom of a truncated response -- are ignored rather than throwing, so
-    /// a partial geometry still draws what it can.
+    /// symptom of a truncated response -- are dropped rather than throwing, so
+    /// a partial geometry still draws the coordinates it did carry. A value cut
+    /// in half is discarded too: half a delta is not a coordinate, and emitting
+    /// it would put a spurious vertex on the map and skew the route bounds.
     ///
     /// #### Parameters
     ///
@@ -89,18 +91,22 @@ public final class PolylineCodec {
         }
         double factor = factor(precision);
         int[] cursor = new int[1];
+        long[] value = new long[1];
         long lat = 0;
         long lng = 0;
         int len = encoded.length();
         while (cursor[0] < len) {
-            long dLat = readValue(encoded, cursor);
-            if (cursor[0] >= len) {
-                // Odd number of values: the latitude has no matching longitude.
+            if (!readValue(encoded, cursor, value)) {
                 break;
             }
-            long dLng = readValue(encoded, cursor);
+            long dLat = value[0];
+            if (!readValue(encoded, cursor, value)) {
+                // The longitude is missing or was cut in half: emitting the
+                // partial value would place a bogus vertex on the map.
+                break;
+            }
             lat += dLat;
-            lng += dLng;
+            lng += value[0];
             points.add(new LatLng(lat / factor, lng / factor));
         }
         return points;
@@ -158,21 +164,32 @@ public final class PolylineCodec {
         return f;
     }
 
-    /// Reads one zig-zag encoded delta, advancing `cursor[0]` past it. A value
-    /// cut short by the end of the string simply stops early.
-    private static long readValue(String encoded, int[] cursor) {
+    /// Reads one zig-zag encoded delta into `out[0]`, advancing `cursor[0]`
+    /// past it.
+    ///
+    /// Returns false when the string ran out before the value's terminating
+    /// chunk. The accumulated bits are a fraction of the real delta in that
+    /// case, so the caller must discard them rather than treat them as a
+    /// coordinate.
+    private static boolean readValue(String encoded, int[] cursor, long[] out) {
         int len = encoded.length();
         long result = 0;
         int shift = 0;
+        boolean terminated = false;
         while (cursor[0] < len) {
             int b = encoded.charAt(cursor[0]++) - ASCII_OFFSET;
             result |= ((long) (b & CHUNK_MASK)) << shift;
             shift += CHUNK_BITS;
-            if (b < CONTINUATION_BIT || shift >= 64) {
+            if (b < CONTINUATION_BIT) {
+                terminated = true;
+                break;
+            }
+            if (shift >= 64) {
                 break;
             }
         }
-        return (result & 1) != 0 ? ~(result >>> 1) : result >>> 1;
+        out[0] = (result & 1) != 0 ? ~(result >>> 1) : result >>> 1;
+        return terminated;
     }
 
     private static void writeValue(StringBuilder sb, long value) {

@@ -25,6 +25,7 @@ package com.codename1.maps.routing;
 import com.codename1.maps.LatLng;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /// Describes the journey to route: where it starts, where it ends, anything it
@@ -74,10 +75,12 @@ public final class RouteRequest {
         return this;
     }
 
-    /// The intermediate points ([LatLng]) in visiting order; empty for a
-    /// direct journey.
+    /// The unmodifiable intermediate points ([LatLng]) in visiting order;
+    /// empty for a direct journey. Add to it through [#addWaypoint(LatLng)],
+    /// which keeps out the `null` and non-[LatLng] entries a
+    /// [RouteService] would later choke on.
     public List getWaypoints() {
-        return waypoints;
+        return Collections.unmodifiableList(waypoints);
     }
 
     /// How the traveller moves; [TravelMode#DRIVING] unless changed.
