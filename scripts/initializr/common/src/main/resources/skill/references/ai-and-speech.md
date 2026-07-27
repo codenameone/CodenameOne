@@ -330,6 +330,11 @@ Use `ModelCache.fetch(httpsUrl, cacheKey, sha256)` for models too large
 to bundle. iOS and Mac native default to Apple Vision; iOS also supports
 explicit ML Kit selection. Android uses ML Kit.
 
+The Apple barcode backend uses Vision request revision 1 in the iOS
+simulator because newer simulator runtimes can return no observations
+for valid QR images. Devices use the latest OS revision. Validate newer
+Apple symbologies on a device, or select the ML Kit barcode backend.
+
 Dependency selection is per entry point. Referencing `TextRecognizer`
 retains only the Android text adapter/artifact; it does not pull
 barcode, face, labeling, pose, or segmentation. `LanguageIdentifier`,

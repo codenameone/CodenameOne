@@ -122,6 +122,11 @@ The iOS NEON implementation reports SIMD as unsupported in that x86_64
 configuration and aliases its native entry points to the generic scalar
 implementation; device and arm64-simulator builds retain the NEON path.
 
+Apple Vision barcode requests use revision 1 only when compiling for an iOS
+simulator. Recent simulator runtimes can otherwise complete the default
+request without returning observations for valid QR images. Physical devices
+retain the current OS revision and its additional symbologies.
+
 ## Image and camera contract
 
 `VisionImage` owns defensive copies of its input. It accepts encoded JPEG or
@@ -158,8 +163,10 @@ the EDT.
 `scripts/hellocodenameone` registers three non-screenshot conformance tests:
 
 - `VisionOnDeviceApiTest` covers `VisionImage.fromCameraFrame()` ownership,
-  option normalization, capability queries for every analyzer, and close
-  semantics.
+  option normalization, capability queries for every analyzer, close
+  semantics, and—when a native barcode backend is available—a deterministic
+  QR decode through image marshalling, native detection, JSON parsing, format
+  normalization, and corner geometry.
 - `LanguageOnDeviceApiTest` covers language value/options contracts,
   capability queries for identification, translation, and smart reply, and
   immediate unsupported resources.

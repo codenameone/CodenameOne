@@ -539,6 +539,15 @@ static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
         }
     } else if (feature == 1) {
         VNDetectBarcodesRequest *request = [[VNDetectBarcodesRequest alloc] init];
+#if TARGET_OS_SIMULATOR
+        /*
+         * Recent iOS simulator runtimes can successfully perform the default
+         * barcode request while returning no observations for valid QR
+         * images. Revision 1 avoids that simulator-only Vision regression.
+         * Devices retain the latest revision and its additional symbologies.
+         */
+        request.revision = VNDetectBarcodesRequestRevision1;
+#endif
         if (![handler performRequests:@[request] error:&error]) {
             return cn1VisionError(error);
         }
