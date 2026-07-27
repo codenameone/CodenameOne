@@ -1481,14 +1481,23 @@ void codenameOneGCMark() {
         int gt = currentSizeOfAllObjectsInHeap;
         for(int gi = 0 ; gi < gt ; gi++) {
             JAVA_OBJECT go = allObjectsInHeap[gi];
-            if(go != JAVA_NULL && go->__codenameOneGcMark == -1
+            // ACQUIRE: the mark word is the publication point (see gcMarkObject);
+            // reading it plainly can let a weak-memory target observe the object
+            // without the preceding parentClsReference store.
+            if(go != JAVA_NULL
+               && __atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
                && go->__codenameOneParentClsReference != 0
                && go->__codenameOneParentClsReference->markFunction != 0) {
                 gcMarkObject(d, go, JAVA_FALSE);
             }
         }
-        gcMarkDrain(d);
+        // Trust covers ONLY the registry walk above. Every fresh entry is already
+        // stamped and queued, so the drain needs no trust -- and must not have it:
+        // it follows child words out of arbitrary mark functions, including those
+        // of dead objects kept alive by a conservative native-stack false positive,
+        // whose fields can dangle. That is precisely what the guard exists to stop.
         cn1GcTrustedRoots = 0;
+        gcMarkDrain(d);
     }
 #endif /* CN1_DISABLE_LEGACY_GRACE -- A/B escape hatch, mirrors CN1_DISABLE_SATB */
 
@@ -2265,9 +2274,7 @@ void cn1BibopBeginGcCycle(void) {
     // still sees the old latch and skips, so the fresh latch can never be
     // consumed by bytes just charged to the cycle that is starting.
     (void)atomic_exchange_explicit(&cn1LegacyGcScheduled, 0, memory_order_acq_rel);
-    // Snapshot every page's bump cursor at mark start. No longer QA-only: the
-    // late-grace re-mark uses it to visit ONLY slots born during this mark
-    // (issue 5425), instead of every fresh slot on every page.
+#ifdef CN1_GRACE_AUDIT
     // QA builds only: snapshot every page's cursor at mark start. Slots below the
     // snapshot existed before the grace pass ran, so a complete grace pass must
     // have traced every one of them that is still fresh at pre-sweep time.
@@ -2289,6 +2296,7 @@ void cn1BibopBeginGcCycle(void) {
             ap = atomic_load_explicit(&ap->nextAll, memory_order_acquire);
         }
     }
+#endif
 }
 
 // Raw 64KB page memory comes from large arenas -- one posix_memalign per
