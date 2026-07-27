@@ -384,8 +384,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 Open is asynchronous because model initialization can allocate native
 resources. A session is reusable and supports multiple named inputs,
-multiple outputs, and `resizeInput(...)`. Tensor data is copied across
-the port boundary. Always close the session.
+multiple outputs, and `resizeInput(...)`. A session serializes its mutable
+native interpreter: while `run(...)` is pending, another run, input resize,
+or input/output metadata query throws `IllegalStateException`. Tensor data is
+copied across the port boundary. Always close the session.
 
 Bundle small models as resources. For larger models use
 `ModelCache.fetch(url, cacheKey, sha256)`, which downloads over HTTPS,
@@ -397,9 +399,11 @@ argument and rejects the unpinned two-argument overload. Supply the digest
 on every platform for every third-party or remotely mutable model.
 Interrupted downloads restart through a temporary `.download` file and are
 never promoted to the cache until verification succeeds. Concurrent calls for
-the same cache key and content identity share one download. When a cache key
-already has an active download, a request with a conflicting URL or digest
-fails instead of sharing the temporary file.
+the same cache key and content identity share one download but receive
+independent asynchronous resources. Canceling one caller suppresses only that
+caller's notification; it does not cancel the shared download or the other
+callers. When a cache key already has an active download, a request with a
+conflicting URL or digest fails instead of sharing the temporary file.
 
 === On-device language services
 

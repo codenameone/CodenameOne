@@ -158,7 +158,9 @@ class InferenceApiTest extends UITestBase {
                 fileName, "https://one.example/model.tflite", null);
         assertTrue(first.owner);
         assertFalse(duplicate.owner);
-        assertSame(first.resource, duplicate.resource);
+        assertNotSame(first.resource, duplicate.resource,
+                "coalesced callers need independent cancellation handles");
+        assertTrue(duplicate.resource.cancel(false));
 
         ModelCache.FetchRegistration conflict = ModelCache.registerFetch(
                 fileName, "https://two.example/model.tflite", null);
@@ -176,6 +178,9 @@ class InferenceApiTest extends UITestBase {
 
         first.completion.complete(ModelSource.file("test-model.tflite"));
         flushSerialCalls();
+        assertEquals("test-model.tflite", first.resource.get().getPath());
+        assertTrue(duplicate.resource.isCancelled(),
+                "one subscriber's cancellation must remain local");
         ModelCache.FetchRegistration afterCompletion =
                 ModelCache.registerFetch(fileName,
                         "https://two.example/model.tflite", null);
@@ -362,6 +367,8 @@ class InferenceApiTest extends UITestBase {
                         new float[] {3, 4})}));
         assertThrows(IllegalStateException.class,
                 () -> session.resizeInput("input", new int[] {1, 4}));
+        assertThrows(IllegalStateException.class, session::getInputs);
+        assertThrows(IllegalStateException.class, session::getOutputs);
         session.close();
         assertEquals(0, backend.closeCount);
         backend.pendingRun.complete(new Tensor[] {

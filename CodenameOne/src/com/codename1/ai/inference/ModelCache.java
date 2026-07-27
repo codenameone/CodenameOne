@@ -30,6 +30,7 @@ import com.codename1.security.Hash;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -60,8 +61,11 @@ public final class ModelCache {
     /// resumed because the portable network layer cannot prove that a server's
     /// partial response still represents the pinned model.
     /// Concurrent requests for the same cache entry and content identity share
-    /// one operation. A different URL or digest using that cache key while the
-    /// first operation is active fails instead of racing on the temporary file.
+    /// one underlying operation, but each caller receives an independent
+    /// resource. Canceling one caller's resource suppresses only that caller's
+    /// notification and does not cancel the shared download or other callers.
+    /// A different URL or digest using that cache key while the first operation
+    /// is active fails instead of racing on the temporary file.
     ///
     /// @param url initial HTTPS URL of the model; observable redirects must
     /// also use HTTPS
@@ -310,7 +314,7 @@ public final class ModelCache {
             if (active != null) {
                 if (active.matches(url, sha256)) {
                     return new FetchRegistration(
-                            active.resource, null, false);
+                            subscribe(active.resource), null, false);
                 }
                 AsyncResource<ModelSource> conflict =
                         new AsyncResource<ModelSource>();
@@ -325,8 +329,27 @@ public final class ModelCache {
                     new Completion<ModelSource>(resource, fileName);
             ACTIVE_FETCHES.put(fileName,
                     new ActiveFetch(url, sha256, resource));
-            return new FetchRegistration(resource, completion, true);
+            return new FetchRegistration(
+                    subscribe(resource), completion, true);
         }
+    }
+
+    private static <T> AsyncResource<T> subscribe(
+            AsyncResource<T> operation) {
+        final SubscriberResource<T> subscriber =
+                new SubscriberResource<T>();
+        operation.ready(new SuccessCallback<T>() {
+            @Override
+            public void onSucess(T value) {
+                subscriber.publish(value);
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable error) {
+                subscriber.fail(error);
+            }
+        });
+        return subscriber;
     }
 
     private static void releaseFetch(
@@ -360,6 +383,26 @@ public final class ModelCache {
                         && sha256.equalsIgnoreCase(otherSha256);
             }
             return url.equals(otherUrl);
+        }
+    }
+
+    private static final class SubscriberResource<T>
+            extends AsyncResource<T> {
+        @Override
+        public synchronized boolean cancel(boolean mayInterruptIfRunning) {
+            return super.cancel(mayInterruptIfRunning);
+        }
+
+        synchronized void publish(T value) {
+            if (!isCancelled()) {
+                complete(value);
+            }
+        }
+
+        synchronized void fail(Throwable error) {
+            if (!isCancelled()) {
+                error(error);
+            }
         }
     }
 

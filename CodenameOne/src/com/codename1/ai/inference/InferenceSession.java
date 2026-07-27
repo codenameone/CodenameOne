@@ -118,12 +118,16 @@ public final class InferenceSession implements AutoCloseable {
     }
 
     /// Returns the model's current input metadata. Shapes reflect the most
-    /// recent successful {@link #resizeInput(String, int[])} call.
+    /// recent successful {@link #resizeInput(String, int[])} call. Metadata
+    /// cannot be queried while {@link #run(Tensor[])} is pending because the
+    /// native interpreter is mutable and may be updating tensor state.
     ///
     /// @return a defensive copy of the input metadata array
+    /// @throws IllegalStateException if the session is closed or a run is pending
     public TensorInfo[] getInputs() {
         synchronized (this) {
             ensureOpen();
+            ensureNotRunning("read input metadata");
             return implementation.getInputs(handle);
         }
     }
@@ -131,11 +135,16 @@ public final class InferenceSession implements AutoCloseable {
     /// Returns the model's current output metadata. Backends refresh this
     /// information after an invocation so models with dynamically resolved
     /// output dimensions report the shape used to decode the returned tensor.
+    /// Metadata cannot be queried while {@link #run(Tensor[])} is pending
+    /// because the native interpreter is mutable and may be updating tensor
+    /// state.
     ///
     /// @return a defensive copy of the output metadata array
+    /// @throws IllegalStateException if the session is closed or a run is pending
     public TensorInfo[] getOutputs() {
         synchronized (this) {
             ensureOpen();
+            ensureNotRunning("read output metadata");
             return implementation.getOutputs(handle);
         }
     }
@@ -318,6 +327,13 @@ public final class InferenceSession implements AutoCloseable {
     private void ensureOpen() {
         if (closed) {
             throw new IllegalStateException("Inference session is closed");
+        }
+    }
+
+    private void ensureNotRunning(String operation) {
+        if (activeRuns > 0) {
+            throw new IllegalStateException(
+                    "Cannot " + operation + " while inference is running");
         }
     }
 

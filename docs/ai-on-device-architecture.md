@@ -167,9 +167,12 @@ observable. iOS follows redirects below the portable network layer, so the
 cache requires a SHA-256 digest for every iOS download and rejects its unpinned
 overload. Identical concurrent fetches for one cache entry coalesce, while
 conflicting in-flight content identities fail instead of sharing a temporary
-path. File sources are opened by path without copying the model through the
-Java heap. Cache promotion verifies that the final file exists and, when
-supplied, still matches the requested digest before publishing its path.
+path. Each coalesced caller has an independent resource, so cancellation
+suppresses only that caller's notification and never cancels the shared
+download or another subscriber. File sources are opened by path without
+copying the model through the Java heap. Cache promotion verifies that the
+final file exists and, when supplied, still matches the requested digest
+before publishing its path.
 Android invokes LiteRT with null output destinations, then reads each result
 from its native tensor buffer. This allows value-dependent output dimensions
 to resolve before Codename One allocates or copies the result. LiteRT caches
@@ -182,7 +185,9 @@ and on iOS because the Core ML delegate may schedule work on CPU or GPU.
 
 All native sessions and analyzers must be closed. Expensive open, analysis,
 and inference work runs off the EDT; completion and error delivery return to
-the EDT.
+the EDT. A session rejects metadata queries, resizing, and another invocation
+while a run is pending so no two API calls can touch the mutable native
+interpreter concurrently.
 
 ## Permanent cross-platform coverage
 
