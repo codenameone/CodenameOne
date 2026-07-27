@@ -988,6 +988,15 @@ public class IPhoneBuilder extends Executor {
                                 || method.startsWith("drainChanges")) {
                             usesHealthObserver = true;
                         }
+                        // requestAuthorization takes a HealthAccess list whose
+                        // contents the scanner cannot see, and asking for any
+                        // write access needs the update string. Requiring both
+                        // descriptions is the conservative reading; the
+                        // alternative is a build that passes and an app that
+                        // iOS kills the moment it requests share access.
+                        if (method.startsWith("requestAuthorization")) {
+                            usesHealthWrite = true;
+                        }
                     }
                     if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0
                             || (cls.indexOf("com/codename1/calendar/CalendarManager") == 0

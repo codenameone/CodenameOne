@@ -248,7 +248,7 @@ class IOSHealthStore extends HealthStore {
                 out);
     }
 
-    private void drainFrom(final List<HealthSubscription> subs,
+    void drainFrom(final List<HealthSubscription> subs,
             final int index, final int delivered,
             final AsyncResource<Integer> out) {
         if (index >= subs.size()) {
@@ -348,9 +348,18 @@ class IOSHealthStore extends HealthStore {
         }
 
         public void onReady(List<HealthSample> page, Throwable error) {
-            // An unreadable type must not strand the rest of the batch.
-            // The window stays open, so the next drain retries it.
-            if (page != null && error == null) {
+            if (error != null) {
+                // Abandon this subscription's drain without firing a
+                // batch. Continuing would deliver a partial result
+                // anchored at `now`, and persisting that anchor would skip
+                // everything the failed type produced in this window --
+                // permanently. HealthKit reporting
+                // HKErrorDatabaseInaccessible because the device is locked
+                // is exactly when this happens, and it is retryable.
+                store.drainFrom(subs, index + 1, delivered, out);
+                return;
+            }
+            if (page != null) {
                 collected.addAll(page);
             }
             store.readTypes(subs, index, delivered, out, types,

@@ -1073,9 +1073,17 @@ public class HealthStore {
                 if (batch.getAnchor() != null) {
                     store.storeAnchor(batch.getSubscriptionId(),
                             batch.getAnchor());
+                    subscription.noteDelivery(batch.getAnchor(),
+                            System.currentTimeMillis());
+                } else {
+                    // A batch with no anchor is one we deliberately did not
+                    // advance past -- a truncated page. Overwriting the
+                    // in-memory cursor with null would send the next drain
+                    // back to a fresh baseline, which on Android means
+                    // discarding the change token entirely.
+                    subscription.noteDelivery(subscription.getAnchor(),
+                            System.currentTimeMillis());
                 }
-                subscription.noteDelivery(batch.getAnchor(),
-                        System.currentTimeMillis());
             }
         };
     }
@@ -1181,9 +1189,11 @@ public class HealthStore {
             changed = true;
         }
         int cap = sub.getMaxSamplesPerBatch();
+        boolean truncated = false;
         if (cap > 0 && added.size() > cap) {
             added = new ArrayList<HealthSample>(added.subList(0, cap));
             changed = true;
+            truncated = true;
         }
         if (!sub.isIncludeDeletions() && !deleted.isEmpty()) {
             deleted = new ArrayList<String>();
@@ -1192,10 +1202,17 @@ public class HealthStore {
         if (!changed) {
             return batch;
         }
+        // A truncated batch must not carry the platform's cursor. That
+        // cursor sits after the *whole* page, and the delivery runnable
+        // persists it once the listener returns -- so every sample past the
+        // cap would be skipped for good. Withholding the anchor makes the
+        // next drain re-read the same window, and hasMore tells the app
+        // more is waiting.
         return new HealthChangeBatch(batch.getSubscriptionId(),
                 batch.getTypes(), added, deleted, batch.isResyncRequired(),
-                batch.getAnchor(), batch.getDeadlineMillis(),
-                batch.hasMore());
+                truncated ? null : batch.getAnchor(),
+                batch.getDeadlineMillis(),
+                truncated || batch.hasMore());
     }
 
     /// Re-registers every subscription persisted by a previous launch.

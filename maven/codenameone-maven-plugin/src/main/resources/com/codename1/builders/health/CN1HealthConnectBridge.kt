@@ -212,12 +212,16 @@ class CN1HealthConnectBridge(private val context: Context)
             if (budget <= 0) {
                 budget = Int.MAX_VALUE
             }
+            // Descending matters for the common "latest reading" shape: a
+            // limit-1 ascending query returns the oldest record, which is
+            // the opposite of what the caller asked for.
+            val ascending = !json.optBoolean("descending", false)
             for (i in 0 until types.length()) {
                 if (budget <= 0) {
                     break
                 }
                 budget -= appendRecords(sb, types.getString(i), filter,
-                    budget, origins)
+                    budget, origins, ascending)
             }
             sb.toString()
         }
@@ -231,7 +235,8 @@ class CN1HealthConnectBridge(private val context: Context)
      */
     private suspend fun appendRecords(sb: StringBuilder, token: String,
                                       filter: TimeRangeFilter, limit: Int,
-                                      origins: Set<DataOrigin>): Int {
+                                      origins: Set<DataOrigin>,
+                                      ascending: Boolean): Int {
         // A type this bridge cannot read is rejected rather than returned
         // as an empty page: the caller cannot tell an empty page apart from
         // "you have no data", which is the one answer a health API must
@@ -255,6 +260,7 @@ class CN1HealthConnectBridge(private val context: Context)
                     // counting the same steps from both phone and watch,
                     // and ignoring it silently inflates every total.
                     dataOriginFilter = origins,
+                    ascendingOrder = ascending,
                     pageSize = minOf(remaining, MAX_PAGE_SIZE),
                     pageToken = pageToken))
             // Counted in emitted lines, not records. One heart-rate record
@@ -410,26 +416,36 @@ class CN1HealthConnectBridge(private val context: Context)
                          start: Instant, end: Instant, value: Double,
                          unit: String) {
         line(sb, r.metadata.id, token, start.toEpochMilli(),
-            end.toEpochMilli(), value, unit)
+            end.toEpochMilli(), value, unit, originOf(r))
     }
 
     private fun instant(sb: StringBuilder, r: Record, token: String,
                         at: Instant, value: Double, unit: String) {
         line(sb, r.metadata.id, token, at.toEpochMilli(),
-            at.toEpochMilli(), value, unit)
+            at.toEpochMilli(), value, unit, originOf(r))
     }
 
     private fun sample(sb: StringBuilder, r: Record, token: String,
                        at: Long, value: Double, unit: String) {
-        line(sb, r.metadata.id, token, at, at, value, unit)
+        line(sb, r.metadata.id, token, at, at, value, unit, originOf(r))
+    }
+
+    private fun originOf(r: Record): String {
+        val pkg = r.metadata.dataOrigin.packageName
+        return if (pkg.isNullOrEmpty()) "UNKNOWN" else pkg
     }
 
     private fun line(sb: StringBuilder, id: String, type: String,
-                     start: Long, end: Long, value: Double, unit: String) {
+                     start: Long, end: Long, value: Double, unit: String,
+                     origin: String) {
         sb.append(id).append('\t').append(type).append('\t')
             .append(start).append('\t').append(end).append('\t')
             .append(value).append('\t').append(unit).append('\t')
-            .append("UNKNOWN").append('\n')
+            // The real originating package, because the shared layer reads
+            // this field as the source bundle id and filters on it. Writing
+            // a placeholder here made every source-filtered read come back
+            // empty, even though the native request had filtered correctly.
+            .append(origin).append('\n')
     }
 
     override fun aggregate(requestJson: String,

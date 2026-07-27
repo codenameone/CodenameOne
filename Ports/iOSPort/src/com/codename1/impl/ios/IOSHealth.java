@@ -121,6 +121,13 @@ public final class IOSHealth extends Health {
         if (r == null) {
             return;
         }
+        if (errorCode >= 0) {
+            // HealthKit failed the request outright rather than the user
+            // declining. Completing with `false` and no error would let the
+            // caller carry on as though the sheet had simply been answered.
+            failOnEdt(r, IOSHealthStore.toException(errorCode, message));
+            return;
+        }
         // granted reflects only that the sheet completed. HealthKit will
         // not say what the user chose for reads, so neither do we.
         completeOnEdt(r, Boolean.valueOf(granted));
