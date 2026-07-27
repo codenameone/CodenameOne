@@ -63,8 +63,20 @@ public final class SmartReply {
             out.error(new UnsupportedOperationException("smart reply is not supported"));
             return out;
         }
-        return impl.suggestReplies(conversation == null
-                        ? new SmartReplyMessage[0] : conversation.clone(),
+        return impl.suggestReplies(copyConversation(conversation),
                 actual.getBackend().getId(), actual);
+    }
+
+    private static SmartReplyMessage[] copyConversation(
+            SmartReplyMessage[] conversation) {
+        if (conversation == null) {
+            return new SmartReplyMessage[0];
+        }
+        SmartReplyMessage[] copy =
+                new SmartReplyMessage[conversation.length];
+        for (int i = 0; i < conversation.length; i++) {
+            copy[i] = conversation[i];
+        }
+        return copy;
     }
 }

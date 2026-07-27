@@ -167,7 +167,7 @@ public final class InferenceSession implements AutoCloseable {
             activeRuns++;
             try {
                 Tensor[] inputSnapshot = inputs == null
-                        ? new Tensor[0] : inputs.clone();
+                        ? new Tensor[0] : copyInputs(inputs);
                 validateInputShapes(inputSnapshot,
                         implementation.getInputs(handle));
                 result = implementation.run(handle,
@@ -241,6 +241,14 @@ public final class InferenceSession implements AutoCloseable {
                         + "model metadata; call resizeInput() before run()");
             }
         }
+    }
+
+    private static Tensor[] copyInputs(Tensor[] inputs) {
+        Tensor[] copy = new Tensor[inputs.length];
+        for (int i = 0; i < inputs.length; i++) {
+            copy[i] = inputs[i];
+        }
+        return copy;
     }
 
     private static boolean sameShape(int[] supplied, int[] expected) {
