@@ -809,32 +809,52 @@ static CGImageRef cn1VisionCreateRawImage(NSData *data, int width, int height,
     if (width <= 0 || height <= 0) {
         return NULL;
     }
-    NSUInteger pixelCount = (NSUInteger)width * (NSUInteger)height;
+    if (format != 1 && format != 2) {
+        return NULL;
+    }
+    if (format == 1 && ((width & 1) != 0 || (height & 1) != 0)) {
+        return NULL;
+    }
+    NSUInteger imageWidth = (NSUInteger)width;
+    NSUInteger imageHeight = (NSUInteger)height;
+    if (imageWidth > NSUIntegerMax / imageHeight) {
+        return NULL;
+    }
+    NSUInteger pixelCount = imageWidth * imageHeight;
+    NSUInteger requiredLength;
+    if (format == 2) {
+        if (pixelCount > NSUIntegerMax / 4) {
+            return NULL;
+        }
+        requiredLength = pixelCount * 4;
+    } else {
+        if (pixelCount > NSUIntegerMax - pixelCount / 2) {
+            return NULL;
+        }
+        requiredLength = pixelCount + pixelCount / 2;
+    }
+    if (data.length < requiredLength) {
+        return NULL;
+    }
     const uint8_t *source = data.bytes;
     NSMutableData *rgba = [NSMutableData dataWithLength:pixelCount * 4];
     uint8_t *dest = rgba.mutableBytes;
     if (format == 2) {
-        if (data.length < pixelCount * 4) {
-            return NULL;
-        }
         memcpy(dest, source, pixelCount * 4);
-    } else if (format == 1) {
-        if ((width & 1) != 0 || (height & 1) != 0) {
-            return NULL;
-        }
-        if (data.length < pixelCount + pixelCount / 2) {
-            return NULL;
-        }
+    } else {
         for (int y = 0; y < height; y++) {
-            int uvRow = width * height + (y >> 1) * width;
+            NSUInteger uvRow = pixelCount
+                    + (NSUInteger)(y >> 1) * imageWidth;
             for (int x = 0; x < width; x++) {
-                int yy = source[y * width + x] & 255;
-                int uv = uvRow + (x & ~1);
+                int yy = source[(NSUInteger)y * imageWidth
+                        + (NSUInteger)x] & 255;
+                NSUInteger uv = uvRow + (NSUInteger)(x & ~1);
                 int v = (source[uv] & 255) - 128;
                 int u = (source[uv + 1] & 255) - 128;
                 int c = yy - 16;
                 if (c < 0) c = 0;
-                NSUInteger p = ((NSUInteger)y * width + x) * 4;
+                NSUInteger p = ((NSUInteger)y * imageWidth
+                        + (NSUInteger)x) * 4;
                 dest[p] = cn1VisionClamp((298 * c + 409 * v + 128) >> 8);
                 dest[p + 1] = cn1VisionClamp(
                         (298 * c - 100 * u - 208 * v + 128) >> 8);
@@ -843,13 +863,12 @@ static CGImageRef cn1VisionCreateRawImage(NSData *data, int width, int height,
                 dest[p + 3] = 255;
             }
         }
-    } else {
-        return NULL;
     }
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
     CGDataProviderRef provider = CGDataProviderCreateWithCFData(
             (CFDataRef)rgba);
-    CGImageRef cgImage = CGImageCreate(width, height, 8, 32, width * 4,
+    CGImageRef cgImage = CGImageCreate(imageWidth, imageHeight, 8, 32,
+            imageWidth * 4,
             colorSpace, kCGBitmapByteOrderDefault | kCGImageAlphaLast,
             provider, NULL, false, kCGRenderingIntentDefault);
     CGDataProviderRelease(provider);
