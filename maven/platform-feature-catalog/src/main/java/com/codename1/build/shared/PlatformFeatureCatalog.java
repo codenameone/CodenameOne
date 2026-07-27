@@ -79,6 +79,111 @@ public final class PlatformFeatureCatalog {
                 .iosFrameworks("AVFAudio")
                 .description("Text-to-speech"));
 
+        // Compatibility mappings for the retired AI cn1libs. The artifacts
+        // already published with these package names remain usable even
+        // though new applications should use the built-in vision, language,
+        // and inference APIs below.
+        e.add(new Entry("com/codename1/ai/mlkit/text/")
+                .iosPod("GoogleMLKit/TextRecognition")
+                .iosMinimumDeploymentTarget("15.5")
+                .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
+                .androidGradle("com.google.mlkit:text-recognition:16.0.0")
+                .androidMinimumSdk(21)
+                .iosPlist("NSCameraUsageDescription",
+                         "Used to recognise text from your camera.")
+                .description("Legacy ML Kit Text Recognition cn1lib"));
+        e.add(new Entry("com/codename1/ai/mlkit/barcode/")
+                .iosPod("GoogleMLKit/BarcodeScanning")
+                .iosMinimumDeploymentTarget("15.5")
+                .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
+                .androidGradle("com.google.mlkit:barcode-scanning:17.2.0")
+                .androidMinimumSdk(21)
+                .iosPlist("NSCameraUsageDescription",
+                         "Used to scan barcodes with your camera.")
+                .androidFeatures("android.hardware.camera")
+                .description("Legacy ML Kit Barcode Scanning cn1lib"));
+        e.add(new Entry("com/codename1/ai/mlkit/face/")
+                .iosPod("GoogleMLKit/FaceDetection")
+                .iosMinimumDeploymentTarget("15.5")
+                .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
+                .androidGradle("com.google.mlkit:face-detection:16.1.5")
+                .androidMinimumSdk(21)
+                .iosPlist("NSCameraUsageDescription",
+                         "Used to detect faces in images.")
+                .description("Legacy ML Kit Face Detection cn1lib"));
+        e.add(new Entry("com/codename1/ai/mlkit/labeling/")
+                .iosPod("GoogleMLKit/ImageLabeling")
+                .iosMinimumDeploymentTarget("15.5")
+                .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
+                .androidGradle("com.google.mlkit:image-labeling:17.0.7")
+                .androidMinimumSdk(21)
+                .description("Legacy ML Kit Image Labeling cn1lib"));
+        e.add(new Entry("com/codename1/ai/mlkit/translate/")
+                .iosPod("GoogleMLKit/Translate")
+                .iosMinimumDeploymentTarget("15.5")
+                .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
+                .androidGradle("com.google.mlkit:translate:17.0.1")
+                .androidMinimumSdk(21)
+                .description("Legacy ML Kit Translation cn1lib"));
+        e.add(new Entry("com/codename1/ai/mlkit/smartreply/")
+                .iosPod("GoogleMLKit/SmartReply")
+                .iosMinimumDeploymentTarget("15.5")
+                .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
+                .androidGradle("com.google.mlkit:smart-reply:17.0.2")
+                .androidMinimumSdk(21)
+                .description("Legacy ML Kit Smart Reply cn1lib"));
+        e.add(new Entry("com/codename1/ai/mlkit/langid/")
+                .iosPod("GoogleMLKit/LanguageID")
+                .iosMinimumDeploymentTarget("15.5")
+                .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
+                .androidGradle("com.google.mlkit:language-id:17.0.4")
+                .androidMinimumSdk(21)
+                .description("Legacy ML Kit Language ID cn1lib"));
+        e.add(new Entry("com/codename1/ai/mlkit/pose/")
+                .iosPod("GoogleMLKit/PoseDetection")
+                .iosMinimumDeploymentTarget("15.5")
+                .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
+                .androidGradle("com.google.mlkit:pose-detection:18.0.0-beta3")
+                .androidMinimumSdk(21)
+                .description("Legacy ML Kit Pose Detection cn1lib"));
+        e.add(new Entry("com/codename1/ai/mlkit/segmentation/")
+                .iosPod("GoogleMLKit/SegmentationSelfie")
+                .iosMinimumDeploymentTarget("15.5")
+                .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
+                .androidGradle(
+                        "com.google.mlkit:segmentation-selfie:16.0.0-beta4")
+                .androidMinimumSdk(21)
+                .description("Legacy ML Kit Selfie Segmentation cn1lib"));
+        e.add(new Entry("com/codename1/ai/mlkit/docscan/")
+                .iosPod("GoogleMLKit/DocumentScanner")
+                .iosMinimumDeploymentTarget("15.5")
+                .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
+                .iosFrameworks("VisionKit")
+                .androidGradle(
+                        "com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")
+                .androidMinimumSdk(21)
+                .description("Legacy ML Kit Document Scanner cn1lib"));
+        e.add(new Entry("com/codename1/ai/tflite/")
+                .iosPod("TensorFlowLiteSwift")
+                .iosSpm("TensorFlowLiteSwift",
+                        "https://github.com/tensorflow/tensorflow.git",
+                        "from:2.13.0", "TensorFlowLite")
+                .androidGradle("org.tensorflow:tensorflow-lite:2.13.0")
+                .androidGradle(
+                        "org.tensorflow:tensorflow-lite-support:0.4.4")
+                .androidMinimumSdk(21)
+                .description("Legacy TensorFlow Lite interpreter cn1lib"));
+
         // Built-in vision APIs. Android uses ML Kit by default. iOS uses
         // Apple Vision/VisionKit unless VisionBackends.mlKit() is selected.
         // The compound entries require both the feature and selector method,

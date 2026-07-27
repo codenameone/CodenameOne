@@ -48,6 +48,26 @@ class PlatformFeatureCatalogTest {
     }
 
     @Test
+    void retiredCn1libsRetainPublishedDependencyMappings() {
+        List<PlatformFeatureCatalog.Entry> mlKit =
+                PlatformFeatureCatalog.matchesFor(
+                        "com/codename1/ai/mlkit/text/TextRecognizer");
+        assertEquals(1, mlKit.size());
+        assertTrue(mlKit.get(0).iosPods().contains(
+                "GoogleMLKit/TextRecognition"));
+        assertTrue(mlKit.get(0).androidGradleDeps().get(0).startsWith(
+                "com.google.mlkit:text-recognition:"));
+
+        List<PlatformFeatureCatalog.Entry> tflite =
+                PlatformFeatureCatalog.matchesFor(
+                        "com/codename1/ai/tflite/Interpreter");
+        assertEquals(1, tflite.size());
+        assertFalse(tflite.get(0).iosPods().isEmpty());
+        assertFalse(tflite.get(0).iosSpmSpecs().isEmpty());
+        assertEquals(2, tflite.get(0).androidGradleDeps().size());
+    }
+
+    @Test
     void explicitMlKitBackendAddsOnlyUsedFeaturePod() {
         PlatformFeatureCatalog.Accumulator acc = new PlatformFeatureCatalog.Accumulator();
         acc.consume("com/codename1/ai/vision/TextRecognizer");
@@ -246,14 +266,18 @@ class PlatformFeatureCatalogTest {
             for (String dependency : entry.androidGradleDeps()) {
                 if (dependency.startsWith("com.google.mlkit:")
                         || dependency.startsWith(
-                                "com.google.ai.edge.litert:")) {
+                                "com.google.ai.edge.litert:")
+                        || dependency.startsWith(
+                                "com.google.android.gms:play-services-mlkit-")
+                        || dependency.startsWith(
+                                "org.tensorflow:tensorflow-lite")) {
                     checked++;
                     assertEquals(21, entry.androidMinimumSdk(), dependency);
                 }
             }
         }
-        assertEquals(10, checked,
-                "Expected all built-in AI Android dependencies");
+        assertEquals(22, checked,
+                "Expected built-in and compatibility AI dependencies");
     }
 
     @Test

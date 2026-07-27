@@ -24,8 +24,10 @@ package com.codename1.builders;
 
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -211,6 +213,36 @@ class IPhoneBuilderDependencyConfigTest {
                 requestWithArgs("ios.deployment_target", "14.0"));
 
         assertEquals("15.5", target);
+    }
+
+    @Test
+    void catalogPrivacyDefaultsReachGeneratedPlistMap() throws Exception {
+        Method apply = IPhoneBuilder.class.getDeclaredMethod(
+                "applyCatalogPlistEntry", BuildRequest.class,
+                String[].class);
+        apply.setAccessible(true);
+        Field privacy = IPhoneBuilder.class.getDeclaredField(
+                "privacyUsageDescriptions");
+        privacy.setAccessible(true);
+
+        IPhoneBuilder defaultBuilder = new IPhoneBuilder();
+        BuildRequest defaultRequest = new BuildRequest();
+        apply.invoke(defaultBuilder, defaultRequest,
+                new String[] {"NSCameraUsageDescription", "Camera default"});
+        assertEquals("Camera default", defaultRequest.getArg(
+                "ios.NSCameraUsageDescription", null));
+        Map<?, ?> defaultMap = (Map<?, ?>) privacy.get(defaultBuilder);
+        assertEquals("Camera default",
+                defaultMap.get("NSCameraUsageDescription"));
+
+        IPhoneBuilder explicitBuilder = new IPhoneBuilder();
+        BuildRequest explicitRequest = requestWithArgs(
+                "ios.NSCameraUsageDescription", "Developer value");
+        apply.invoke(explicitBuilder, explicitRequest,
+                new String[] {"NSCameraUsageDescription", "Camera default"});
+        Map<?, ?> explicitMap = (Map<?, ?>) privacy.get(explicitBuilder);
+        assertEquals("Developer value",
+                explicitMap.get("NSCameraUsageDescription"));
     }
 
     private BuildRequest requestWithArgs(String... kvPairs) {

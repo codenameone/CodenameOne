@@ -356,7 +356,22 @@ public class IPhoneBuilder extends Executor {
         }
         return out;
     }
-    
+
+    private void applyCatalogPlistEntry(BuildRequest request,
+                                        String[] plistEntry) {
+        String privacyKey = plistEntry[0];
+        String requestKey = "ios." + privacyKey;
+        String value = request.getArg(requestKey, null);
+        if (value == null) {
+            value = plistEntry[1];
+            request.putArgument(requestKey, value);
+        }
+        if (value != null
+                && !privacyUsageDescriptions.containsKey(privacyKey)) {
+            privacyUsageDescriptions.put(privacyKey, value);
+        }
+    }
+
     private int getDeploymentTargetInt(BuildRequest request) {
         String target = getDeploymentTarget(request);
         if (target.indexOf(".") > 0) {
@@ -1101,10 +1116,7 @@ public class IPhoneBuilder extends Executor {
                     }
                 }
                 for (String[] plistEntry : entry.iosPlistEntries()) {
-                    String key = "ios." + plistEntry[0];
-                    if (request.getArg(key, null) == null) {
-                        request.putArgument(key, plistEntry[1]);
-                    }
+                    applyCatalogPlistEntry(request, plistEntry);
                 }
             }
             if (spmPackages.length() > 0) {
@@ -2544,6 +2556,11 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            for (String framework : aiAcc.iosFrameworks()) {
+                addLibs = appendFrameworks(addLibs,
+                        framework + ".framework");
+            }
+
             if (usesCn1Vision) {
                 try {
                     replaceInFile(new File(buildinRes,
@@ -2556,10 +2573,6 @@ public class IPhoneBuilder extends Executor {
                 }
                 addLibs = appendFrameworks(addLibs, "Vision.framework",
                         "CoreImage.framework", "CoreVideo.framework");
-                for (String framework : aiAcc.iosFrameworks()) {
-                    addLibs = appendFrameworks(addLibs,
-                            framework + ".framework");
-                }
             }
 
             if (usesCn1Language) {
