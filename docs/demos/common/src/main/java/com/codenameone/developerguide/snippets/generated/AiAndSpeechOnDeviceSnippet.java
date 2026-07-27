@@ -41,7 +41,7 @@ class AiAndSpeechOnDeviceSnippet {
     void vision() {
         // tag::ai-and-speech-on-device-vision[]
         VisionOptions options = new VisionOptions()
-                .backend(VisionBackends.appleVision())
+                .backend(VisionBackends.mlKitTextRecognition())
                 .minimumConfidence(0.5f);
 
         new TextRecognizer(options)
@@ -61,9 +61,22 @@ class AiAndSpeechOnDeviceSnippet {
                 Tensor input = Tensor.floats("serving_default_input",
                         new int[] {1, 224, 224, 3}, pixels);
                 session.run(new Tensor[] {input})
-                        .ready(outputs -> consume(outputs[0]))
-                        .except(error -> Log.e(error));
-            });
+                        .ready(outputs -> {
+                            try {
+                                consume(outputs[0]);
+                            } finally {
+                                session.close();
+                            }
+                        })
+                        .except(error -> {
+                            try {
+                                Log.e(error);
+                            } finally {
+                                session.close();
+                            }
+                        });
+            })
+            .except(error -> Log.e(error));
         // end::ai-and-speech-on-device-inference[]
     }
 
