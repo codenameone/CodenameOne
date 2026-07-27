@@ -173,9 +173,37 @@ class CN1HealthConnectBridge(private val context: Context)
         val perms = permissionsCsv.split(",")
             .filter { it.isNotBlank() }
             .mapNotNull { toHealthPermission(it.trim()) }
-            .toSet()
+            .toMutableSet()
+        perms.addAll(declaredSpecialPermissions())
         return PermissionController.createRequestPermissionResultContract()
             .createIntent(context, perms)
+    }
+
+    /**
+     * The background and history permissions the manifest declares.
+     *
+     * These are not per-type, so they never appear in a HealthAccess list
+     * and cannot come through the token table. Declaring them without ever
+     * requesting them -- which is what the builder used to produce -- gives
+     * an app that is configured for background or historical reads and is
+     * never authorized for either.
+     *
+     * Read back from the manifest rather than passed in, so the bridge
+     * asks for exactly what the build declared.
+     */
+    private fun declaredSpecialPermissions(): Set<String> {
+        val special = setOf(
+            "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND",
+            "android.permission.health.READ_HEALTH_DATA_HISTORY")
+        return try {
+            val info = context.packageManager.getPackageInfo(
+                context.packageName,
+                android.content.pm.PackageManager.GET_PERMISSIONS)
+            val declared = info.requestedPermissions ?: emptyArray()
+            declared.filter { special.contains(it) }.toSet()
+        } catch (t: Throwable) {
+            emptySet()
+        }
     }
 
     override fun parsePermissionResult(resultCode: Int,
@@ -268,7 +296,11 @@ class CN1HealthConnectBridge(private val context: Context)
             // limit-1 request could otherwise return hundreds of lines.
             var lines = 0
             for (record in page.records) {
-                lines += appendOne(sb, record, token)
+                // The budget goes *into* the writer. Checking afterwards
+                // let one series record append hundreds of samples before
+                // the overrun was noticed, which is the whole failure the
+                // limit is supposed to prevent.
+                lines += appendOne(sb, record, token, remaining - lines)
                 if (lines >= remaining) {
                     break
                 }
@@ -297,7 +329,10 @@ class CN1HealthConnectBridge(private val context: Context)
      * than silently dropping them.
      */
     private fun appendOne(sb: StringBuilder, record: Record,
-                          token: String): Int {
+                          token: String, budget: Int = Int.MAX_VALUE): Int {
+        if (budget <= 0) {
+            return 0
+        }
         when (record) {
             is StepsRecord -> interval(sb, record, token,
                 record.startTime, record.endTime,
@@ -369,40 +404,42 @@ class CN1HealthConnectBridge(private val context: Context)
             // Series records hold many samples in one record and the
             // portable layer flattens by default, so emit one line per
             // sample rather than per record.
-            is HeartRateRecord -> record.samples.forEach {
+            is HeartRateRecord -> record.samples.take(budget).forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.beatsPerMinute.toDouble(), "count/min")
             }
 
-            is PowerRecord -> record.samples.forEach {
+            is PowerRecord -> record.samples.take(budget).forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.power.inWatts, "W")
             }
 
-            is SpeedRecord -> record.samples.forEach {
+            is SpeedRecord -> record.samples.take(budget).forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.speed.inMetersPerSecond, "m/s")
             }
 
-            is CyclingPedalingCadenceRecord -> record.samples.forEach {
+            is CyclingPedalingCadenceRecord -> record.samples.take(budget).forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.revolutionsPerMinute, "count/min")
             }
 
-            is StepsCadenceRecord -> record.samples.forEach {
+            is StepsCadenceRecord -> record.samples.take(budget).forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.rate, "count/min")
             }
 
             else -> return 0
         }
-        // One line per scalar record; a series contributes one per sample.
+        // One line per scalar record; a series contributes one per sample
+        // actually written, which is capped by the budget above.
         return when (record) {
-            is HeartRateRecord -> record.samples.size
-            is PowerRecord -> record.samples.size
-            is SpeedRecord -> record.samples.size
-            is CyclingPedalingCadenceRecord -> record.samples.size
-            is StepsCadenceRecord -> record.samples.size
+            is HeartRateRecord -> minOf(record.samples.size, budget)
+            is PowerRecord -> minOf(record.samples.size, budget)
+            is SpeedRecord -> minOf(record.samples.size, budget)
+            is CyclingPedalingCadenceRecord ->
+                minOf(record.samples.size, budget)
+            is StepsCadenceRecord -> minOf(record.samples.size, budget)
             else -> 1
         }
     }
