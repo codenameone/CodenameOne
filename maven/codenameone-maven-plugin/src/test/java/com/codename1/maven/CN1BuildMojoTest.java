@@ -8,6 +8,7 @@ import java.lang.reflect.Method;
 import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -49,5 +50,32 @@ public class CN1BuildMojoTest {
         } catch (InvocationTargetException ex) {
             assertTrue(ex.getCause().getMessage().contains("Property codename1.arg.test has a conflict"));
         }
+    }
+
+    @Test
+    public void stripsTheFrameworkTheServerReSupplies() {
+        assertTrue(CN1BuildMojo.isStrippedFromStagedJar("com.codenameone", "codenameone-core", "provided", "ios-device"));
+        assertTrue(CN1BuildMojo.isStrippedFromStagedJar("com.codenameone", "codenameone-core", "provided", "ios-source"));
+        assertTrue(CN1BuildMojo.isStrippedFromStagedJar("com.codenameone", "java-runtime", "provided", "android-device"));
+    }
+
+    @Test
+    public void keepsTheFrameworkForLocalJavascriptBuilds() {
+        // ParparVM translates locally for these, so it needs every class in the jar.
+        assertFalse(CN1BuildMojo.isStrippedFromStagedJar("com.codenameone", "codenameone-core", "provided", "local-javascript"));
+        assertFalse(CN1BuildMojo.isStrippedFromStagedJar("com.codenameone", "java-runtime", "provided", "local-javascript"));
+    }
+
+    @Test
+    public void stripsKotlinStdlibOnlyForServerBuilds() {
+        assertTrue(CN1BuildMojo.isStrippedFromStagedJar("org.jetbrains.kotlin", "kotlin-stdlib", "compile", "ios-device"));
+        assertFalse(CN1BuildMojo.isStrippedFromStagedJar("org.jetbrains.kotlin", "kotlin-stdlib", "compile", "ios-source"));
+    }
+
+    @Test
+    public void keepsTheApplicationsOwnCompileDependencies() {
+        assertFalse(CN1BuildMojo.isStrippedFromStagedJar("com.mycompany", "myproject-common", "compile", "ios-source"));
+        assertFalse(CN1BuildMojo.isStrippedFromStagedJar("com.codenameone", "cn1-admob-lib", "compile", "ios-device"));
+        assertTrue(CN1BuildMojo.isStrippedFromStagedJar("org.junit.jupiter", "junit-jupiter", "test", "ios-device"));
     }
 }
