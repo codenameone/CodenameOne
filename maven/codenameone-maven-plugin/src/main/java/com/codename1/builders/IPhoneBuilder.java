@@ -1061,6 +1061,11 @@ public class IPhoneBuilder extends Executor {
                         !macNativeBuilder.isEnabled()
                         || entry.iosDependenciesSupportMacCatalyst();
                 if (includeApplePackageDependencies
+                        && entry.iosMinimumDeploymentTarget() != null) {
+                    addMinDeploymentTarget(
+                            entry.iosMinimumDeploymentTarget());
+                }
+                if (includeApplePackageDependencies
                         && !entry.iosDependenciesSupportArm64Simulator()
                         && (!entry.iosPods().isEmpty()
                         || !entry.iosSpmSpecs().isEmpty())) {

@@ -351,6 +351,9 @@ each class the application actually uses:
 The optional iOS ML Kit pod is added only when both the analyzer and its
 feature-specific selector are referenced. For example,
 `VisionBackends.mlKitBarcodeScanning()` adds only the barcode pod.
+Current Google ML Kit iOS pods require iOS 15.5. Selecting one of these
+optional backends automatically raises the effective application and
+CocoaPods deployment target to 15.5 when the configured target is lower.
 Referencing one Android analyzer doesn't compile or package the other
 five adapters.
 
@@ -408,6 +411,9 @@ keeps arm64 simulator builds native and adds no third-party dependency.
 identification into the ML Kit iOS pod. Translation and Smart Reply use
 their feature-scoped ML Kit components on both mobile platforms; those
 two iOS components currently require the x86_64 simulator slice.
+The current Google ML Kit iOS pods also require iOS 15.5, so referencing
+translation or Smart Reply, or opting identification into ML Kit, raises
+the effective iOS deployment target to 15.5 automatically.
 Mac native and the other unsupported targets return `false` from the
 language service `isSupported()` checks. Completion and failure callbacks
 arrive on the EDT.

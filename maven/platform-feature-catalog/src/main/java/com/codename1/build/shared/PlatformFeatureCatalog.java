@@ -91,6 +91,7 @@ public final class PlatformFeatureCatalog {
                 .requiresMethod("com/codename1/ai/vision/VisionBackends",
                         "mlKitTextRecognition")
                 .iosPod("GoogleMLKit/TextRecognition")
+                .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS text-recognition backend"));
@@ -103,6 +104,7 @@ public final class PlatformFeatureCatalog {
                 .requiresMethod("com/codename1/ai/vision/VisionBackends",
                         "mlKitBarcodeScanning")
                 .iosPod("GoogleMLKit/BarcodeScanning")
+                .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS barcode backend"));
@@ -115,6 +117,7 @@ public final class PlatformFeatureCatalog {
                 .requiresMethod("com/codename1/ai/vision/VisionBackends",
                         "mlKitFaceDetection")
                 .iosPod("GoogleMLKit/FaceDetection")
+                .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS face-detection backend"));
@@ -127,6 +130,7 @@ public final class PlatformFeatureCatalog {
                 .requiresMethod("com/codename1/ai/vision/VisionBackends",
                         "mlKitImageLabeling")
                 .iosPod("GoogleMLKit/ImageLabeling")
+                .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS image-labeling backend"));
@@ -139,6 +143,7 @@ public final class PlatformFeatureCatalog {
                 .requiresMethod("com/codename1/ai/vision/VisionBackends",
                         "mlKitPoseDetection")
                 .iosPod("GoogleMLKit/PoseDetection")
+                .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS pose-detection backend"));
@@ -152,6 +157,7 @@ public final class PlatformFeatureCatalog {
                 .requiresMethod("com/codename1/ai/vision/VisionBackends",
                         "mlKitSelfieSegmentation")
                 .iosPod("GoogleMLKit/SegmentationSelfie")
+                .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS selfie-segmentation backend"));
@@ -178,6 +184,7 @@ public final class PlatformFeatureCatalog {
                 .requiresMethod("com/codename1/ai/language/LanguageBackends",
                         "mlKitLanguageIdentification")
                 .iosPod("GoogleMLKit/LanguageID")
+                .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS language-identification backend"));
@@ -186,6 +193,7 @@ public final class PlatformFeatureCatalog {
         // link the small system NaturalLanguage framework.
         e.add(new Entry("com/codename1/ai/language/Translator")
                 .iosPod("GoogleMLKit/Translate")
+                .iosMinimumDeploymentTarget("15.5")
                 .iosFrameworks("NaturalLanguage")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
@@ -193,6 +201,7 @@ public final class PlatformFeatureCatalog {
                 .description("On-device translation"));
         e.add(new Entry("com/codename1/ai/language/SmartReply")
                 .iosPod("GoogleMLKit/SmartReply")
+                .iosMinimumDeploymentTarget("15.5")
                 .iosFrameworks("NaturalLanguage")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
@@ -362,6 +371,7 @@ public final class PlatformFeatureCatalog {
         private final List<String[]> androidMetaData = new ArrayList<String[]>();
         private boolean iosDependenciesSupportMacCatalyst = true;
         private boolean iosDependenciesSupportArm64Simulator = true;
+        private String iosMinimumDeploymentTarget;
         private boolean requiresBigUpload;
         private String description = "";
 
@@ -410,6 +420,11 @@ public final class PlatformFeatureCatalog {
 
         Entry iosPod(String pod) {
             iosPods.add(pod);
+            return this;
+        }
+
+        Entry iosMinimumDeploymentTarget(String target) {
+            iosMinimumDeploymentTarget = target;
             return this;
         }
 
@@ -502,6 +517,23 @@ public final class PlatformFeatureCatalog {
          */
         public boolean iosDependenciesSupportArm64Simulator() {
             return iosDependenciesSupportArm64Simulator;
+        }
+
+        /**
+         * Returns the minimum iOS deployment target required by this entry's
+         * CocoaPod or Swift package payload.
+         *
+         * <p>The iOS builder combines this value with the application's
+         * requested deployment target and all other dependency floors, then
+         * uses the highest version for the generated app target and Podfile.
+         * A {@code null} value means that the entry does not impose an
+         * additional deployment floor.</p>
+         *
+         * @return the required iOS version, such as {@code "15.5"}, or
+         * {@code null} when the dependency has no catalog-specific minimum
+         */
+        public String iosMinimumDeploymentTarget() {
+            return iosMinimumDeploymentTarget;
         }
 
         public List<String> iosFrameworks() {

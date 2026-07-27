@@ -196,6 +196,23 @@ class IPhoneBuilderDependencyConfigTest {
         assertEquals("ThirdPartyVision.framework;Vision.framework", value);
     }
 
+    @Test
+    void dependencyFloorRaisesExplicitDeploymentTarget() throws Exception {
+        IPhoneBuilder builder = new IPhoneBuilder();
+        Method addTarget = IPhoneBuilder.class.getDeclaredMethod(
+                "addMinDeploymentTarget", String.class);
+        addTarget.setAccessible(true);
+        addTarget.invoke(builder, "15.5");
+
+        Method getTarget = IPhoneBuilder.class.getDeclaredMethod(
+                "getDeploymentTarget", BuildRequest.class);
+        getTarget.setAccessible(true);
+        String target = (String) getTarget.invoke(builder,
+                requestWithArgs("ios.deployment_target", "14.0"));
+
+        assertEquals("15.5", target);
+    }
+
     private BuildRequest requestWithArgs(String... kvPairs) {
         BuildRequest out = new BuildRequest();
         for (int i = 0; i < kvPairs.length; i += 2) {

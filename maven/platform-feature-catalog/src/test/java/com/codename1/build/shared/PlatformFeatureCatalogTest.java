@@ -66,6 +66,28 @@ class PlatformFeatureCatalogTest {
     }
 
     @Test
+    void currentIosMlKitPodsRequireIos155() {
+        PlatformFeatureCatalog.Accumulator acc =
+                new PlatformFeatureCatalog.Accumulator();
+        acc.consume("com/codename1/ai/vision/TextRecognizer");
+        acc.consumeMethod("com/codename1/ai/vision/VisionBackends",
+                "mlKitTextRecognition");
+        acc.consume("com/codename1/ai/language/Translator");
+        acc.consume("com/codename1/ai/language/SmartReply");
+
+        int podEntries = 0;
+        for (PlatformFeatureCatalog.Entry entry : acc.hits()) {
+            if (!entry.iosPods().isEmpty()) {
+                podEntries++;
+                assertEquals("15.5",
+                        entry.iosMinimumDeploymentTarget(),
+                        entry.description());
+            }
+        }
+        assertEquals(3, podEntries);
+    }
+
+    @Test
     void speechRecognizerInjectsMicAndSpeechPlist() {
         List<PlatformFeatureCatalog.Entry> hits = PlatformFeatureCatalog.matchesFor(
                 "com/codename1/media/SpeechRecognizer");
