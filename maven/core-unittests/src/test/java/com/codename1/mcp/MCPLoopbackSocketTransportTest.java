@@ -345,6 +345,37 @@ class MCPLoopbackSocketTransportTest {
     }
 
     @Test
+    void closingTheTransportClosesBothClientStreams() throws Exception {
+        // Forgetting the fields is not enough. A writer that already captured the output
+        // stream would go on writing into a session that has ended, and the socket would
+        // stay open until the connection callback happened to unwind.
+        final boolean[] inClosed = new boolean[1];
+        final boolean[] outClosed = new boolean[1];
+        transport = new MCPLoopbackSocketTransport(47811);
+        transport.attach(new InputStream() {
+            @Override
+            public int read() {
+                return -1;
+            }
+
+            @Override
+            public void close() {
+                inClosed[0] = true;
+            }
+        }, new ByteArrayOutputStream() {
+            @Override
+            public void close() {
+                outClosed[0] = true;
+            }
+        });
+
+        transport.close();
+        transport = null;
+        assertTrue(inClosed[0], "close must close the client's input stream");
+        assertTrue(outClosed[0], "close must close the client's output stream too");
+    }
+
+    @Test
     void aPipedClientRoundTrips() throws Exception {
         // Closest thing to a real socket without one: the client end is a live pipe, so
         // the read blocks until bytes actually arrive rather than hitting a buffer's end.

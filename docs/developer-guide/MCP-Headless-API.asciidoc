@@ -4,7 +4,7 @@ The Model Context Protocol (MCP) headless API lets an application expose itself 
 
 The API reuses the accessibility semantics tree. The same immutable tree that describes the screen to VoiceOver and TalkBack also describes it to the agent, so any application is drivable without extra code. Application specific data and actions are exposed through the existing `com.codename1.ai.Tool` contract.
 
-The socket transport runs anywhere the port can bind the loopback interface, which includes an application running on a device, so an agent can attach to a build on a phone as well as to the simulator. It's blocked on a release build; see <<Development builds only>>. The stdio transport needs process standard input and so is supported by the JavaSE port, which powers the simulator and the desktop tooling.
+The socket transport runs anywhere the port can bind the loopback interface, which includes an application running on a device, so an agent can attach to a build on a phone as well as to the simulator. It's blocked on a release build; see <<development-builds-only,Development builds only>>. The stdio transport needs process standard input and so is supported by the JavaSE port, which powers the simulator and the desktop tooling.
 
 == The MCP menu
 
@@ -34,7 +34,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/M
 
 The stdio transport is the standard MCP local transport, exchanging newline delimited JSON-RPC messages. While it runs, application logging is redirected away from standard output so it can't corrupt the protocol stream. The stdio transport lives in the JavaSE port because it needs process standard input, which isn't available on every target.
 
-[[Development builds only]]
+[[development-builds-only]]
 == Development builds only
 
 The socket server refuses to bind on a release build and throws an `IllegalStateException` instead.

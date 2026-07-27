@@ -318,14 +318,17 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
     @Override
     public void close() {
         Socket.StopListening l;
-        // Taken out of the field under the lock precisely so it can be closed below,
-        // outside the lock: closing is what unblocks a reader parked in read().
+        // Both streams come out of their fields under the lock so they can be closed
+        // below, outside it: closing is what unblocks a reader parked in read(), and it
+        // takes the lock on its way out.
         InputStream is; // NOPMD closed below, deliberately outside the lock
+        OutputStream os; // NOPMD closed below, outside the lock
         synchronized (lock) {
             closed = true;
             l = listening;
             listening = null;
             is = in;
+            os = out;
             in = null;
             out = null;
             lock.notifyAll();
@@ -335,13 +338,11 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         if (l != null) {
             l.stop();
         }
-        if (is != null) {
-            try {
-                is.close();
-            } catch (IOException ignored) {
-                // best effort: closing is what unblocks a pending read
-            }
-        }
+        // Closing the output as well as the input: forgetting the field is not enough,
+        // because a writer that already captured it would go on writing to a session that
+        // has ended, and the socket would stay open until the connection callback unwound.
+        closeQuietly(is);
+        closeQuietly(os);
     }
 
     /// The per-connection callback the socket API instantiates. Public with a no-argument
