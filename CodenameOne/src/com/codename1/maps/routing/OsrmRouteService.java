@@ -24,11 +24,13 @@ package com.codename1.maps.routing;
 
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.JSONParser;
+import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Util;
 import com.codename1.maps.LatLng;
 import com.codename1.maps.PolylineCodec;
 import com.codename1.ui.CN;
+import com.codename1.ui.events.ActionListener;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -131,10 +133,10 @@ public class OsrmRouteService implements RouteService {
             fail(callback, "A route request needs both an origin and a destination", null);
             return;
         }
-        ConnectionRequest req = new RouteConnection(callback);
+        RouteConnection req = new RouteConnection(callback);
         req.setUrl(buildUrl(request));
         req.setPost(false);
-        NetworkManager.getInstance().addToQueue(req);
+        req.start();
     }
 
     /// Builds the OSRM request URL for `request`. Package visible so the shape
@@ -423,21 +425,82 @@ public class OsrmRouteService implements RouteService {
     /// `super`, nothing reaches the framework's default retry dialog either
     /// way.
     ///
-    /// One framework-level caveat remains, and it is the same for every
-    /// `ConnectionRequest`: an app-wide error listener registered through
+    /// That still leaves one path where nothing would be delivered: an
+    /// app-wide error listener registered through
     /// [com.codename1.io.NetworkManager#addErrorListener] that *consumes* the
-    /// event has taken over failure reporting, and this request never hears
-    /// about it.
-    private static final class RouteConnection extends ConnectionRequest {
+    /// event makes `NetworkManager` skip this request's hooks entirely. A
+    /// completion listener closes that hole -- see [#actionPerformed].
+    private static final class RouteConnection extends ConnectionRequest
+            implements ActionListener<NetworkEvent> {
 
         private final RouteCallback callback;
         private boolean delivered;
         private List routes;
         private String errorMessage;
         private Throwable error;
+        /// Attempts queued and not yet completed. Starts at one for the
+        /// initial queueing and rises with every [#retry()], so a redirect
+        /// hop is not mistaken for the end of the request.
+        private int outstandingAttempts = 1;
 
         RouteConnection(RouteCallback callback) {
             this.callback = callback;
+        }
+
+        /// Queues the request, watching for its completion so the callback is
+        /// delivered even when nothing else reports the outcome.
+        void start() {
+            NetworkManager nm = NetworkManager.getInstance();
+            nm.addProgressListener(this);
+            nm.addToQueue(this);
+        }
+
+        /// Counts the extra attempt before delegating. `retry()` runs inside
+        /// `performOperationComplete`, ahead of the completion event for the
+        /// attempt that scheduled it, so the count is always raised before the
+        /// event it has to outlive.
+        @Override
+        public void retry() {
+            synchronized (this) {
+                outstandingAttempts++;
+            }
+            super.retry();
+        }
+
+        /// The completion backstop.
+        ///
+        /// `NetworkManager` fires this from its `finally` block for every
+        /// attempt -- including a redirect hop that is about to be retried --
+        /// so it cannot be read as "the request is over" on its own. Counting
+        /// attempts against [#retry()] can: only when the last one has
+        /// completed is there nothing left to wait for. Testing `isRedirecting()`
+        /// instead would be a race, because this runs on the EDT after the
+        /// network thread may already have started the next attempt and reset
+        /// the flag.
+        ///
+        /// A real result always wins: `postResponse` is queued onto the EDT
+        /// before this event, and this hops once more before delivering.
+        @Override
+        public void actionPerformed(NetworkEvent n) {
+            // Identity, not equality: the listener is registered globally, so
+            // it sees every request's progress and must pick out this exact
+            // instance.
+            if (n.getConnectionRequest() != this) { //NOPMD CompareObjectsWithEquals
+                return;
+            }
+            if (n.getProgressType() != NetworkEvent.PROGRESS_TYPE_COMPLETED) {
+                return;
+            }
+            boolean finished;
+            synchronized (this) {
+                outstandingAttempts--;
+                finished = outstandingAttempts <= 0;
+            }
+            if (!finished) {
+                return;
+            }
+            NetworkManager.getInstance().removeProgressListener(this);
+            failLater("The routing request ended without a result", null);
         }
 
         @Override

@@ -26,6 +26,8 @@ import com.codename1.maps.spi.MapProvider;
 import com.codename1.maps.spi.MapProviderRegistry;
 import com.codename1.maps.vector.MapStyle;
 import com.codename1.maps.vector.TileSource;
+import com.codename1.maps.vector.WebMercator;
+import com.codename1.util.MathUtil;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -335,9 +337,61 @@ public class NativeMap extends Container implements MapSurface {
             fallback.fitBounds(bounds, paddingPixels);
             return;
         }
-        // Native providers center on the bounds; precise fit is provider work.
+        if (bounds == null) {
+            return;
+        }
+        double zoom = zoomToFit(bounds, getWidth(), getHeight(), paddingPixels,
+                MapView.devicePixelRatio());
+        if (Double.isNaN(zoom)) {
+            // Nothing to fit to yet (no layout, or a single point): keep the
+            // zoom and just recenter.
+            zoom = provider.getZoom(mapId);
+        } else {
+            zoom = Math.max(provider.getMinZoom(mapId),
+                    Math.min(provider.getMaxZoom(mapId), zoom));
+        }
         provider.setCamera(mapId, bounds.getCenter().getLatitude(),
-                bounds.getCenter().getLongitude(), provider.getZoom(mapId), 0, 0);
+                bounds.getCenter().getLongitude(), (float) zoom, 0, 0);
+    }
+
+    /// The zoom at which `bounds` fills a `viewWidth` x `viewHeight` viewport
+    /// of device pixels, inset by `paddingPixels` on every edge, or
+    /// `Double.NaN` when there is nothing to fit to -- no layout yet, or bounds
+    /// with no extent.
+    ///
+    /// `fitBounds` used to keep the current zoom and merely recenter, so a
+    /// region larger than the viewport stayed clipped and
+    /// [MapSurface#fitBounds] did not mean the same thing on a native map as
+    /// on a vector one. This solves for the zoom the way the vector engine
+    /// does, in the same Web Mercator units, so both surfaces frame a region
+    /// identically. Package visible so the arithmetic can be tested without a
+    /// native provider.
+    static double zoomToFit(MapBounds bounds, int viewWidth, int viewHeight,
+                            int paddingPixels, double pixelRatio) {
+        if (bounds == null || viewWidth <= 0 || viewHeight <= 0 || pixelRatio <= 0) {
+            return Double.NaN;
+        }
+        // Native map SDKs use the slippy convention, where a zoom level spans
+        // 256 logical points; the component's size is in device pixels, so it
+        // converts through the same density ratio the vector engine uses.
+        double usableWidth = Math.max(1, viewWidth - 2 * paddingPixels) / pixelRatio;
+        double usableHeight = Math.max(1, viewHeight - 2 * paddingPixels) / pixelRatio;
+        double worldWidth = Math.abs(
+                WebMercator.lonToWorldX(bounds.getNorthEast().getLongitude(), 0)
+                        - WebMercator.lonToWorldX(bounds.getSouthWest().getLongitude(), 0));
+        double worldHeight = Math.abs(
+                WebMercator.latToWorldY(bounds.getNorthEast().getLatitude(), 0)
+                        - WebMercator.latToWorldY(bounds.getSouthWest().getLatitude(), 0));
+        if (worldWidth <= 0 && worldHeight <= 0) {
+            return Double.NaN;
+        }
+        double horizontal = worldWidth <= 0 ? Double.MAX_VALUE : log2(usableWidth / worldWidth);
+        double vertical = worldHeight <= 0 ? Double.MAX_VALUE : log2(usableHeight / worldHeight);
+        return Math.min(horizontal, vertical);
+    }
+
+    private static double log2(double v) {
+        return MathUtil.log(v) / MathUtil.log(2);
     }
 
     // ---- MapSurface: map objects -----------------------------------------

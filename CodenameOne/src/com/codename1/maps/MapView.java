@@ -113,7 +113,7 @@ public class MapView extends Container implements MapSurface {
     /// screen it must cover proportionally more physical pixels (the standard
     /// slippy-map convention: mdpi = 1, hdpi = 1.5, xhdpi = 2, xxhdpi = 3, ...)
     /// otherwise the viewport spans many tiles and the map shows too much area.
-    private static double devicePixelRatio() {
+    static double devicePixelRatio() {
         switch (Display.getInstance().getDeviceDensity()) {
             case Display.DENSITY_HIGH:
                 return 1.5;

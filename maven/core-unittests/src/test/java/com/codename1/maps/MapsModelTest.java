@@ -234,6 +234,57 @@ class MapsModelTest {
     }
 
     /** A no-op MapProvider used to exercise the registry without any native peer. */
+    // ---- NativeMap bounds fitting ----------------------------------------
+
+    @Test
+    void nativeMapSolvesTheZoomThatFitsBounds() {
+        // The whole world spans exactly one 256pt tile at zoom 0, so a 256px
+        // viewport fits it at zoom 0 and every doubling adds one level.
+        MapBounds world = new MapBounds(new LatLng(-85.05112878, -180),
+                new LatLng(85.05112878, 180));
+        assertEquals(0.0, NativeMap.zoomToFit(world, 256, 256, 0, 1.0), 1e-6);
+        assertEquals(1.0, NativeMap.zoomToFit(world, 512, 512, 0, 1.0), 1e-6);
+        assertEquals(2.0, NativeMap.zoomToFit(world, 1024, 1024, 0, 1.0), 1e-6);
+
+        // Padding shrinks the usable viewport, and so the zoom.
+        assertEquals(0.0, NativeMap.zoomToFit(world, 512, 512, 128, 1.0), 1e-6);
+
+        // Native zoom counts logical points, so a 2x density screen fits the
+        // same region at one level less than its device-pixel size suggests.
+        assertEquals(0.0, NativeMap.zoomToFit(world, 512, 512, 0, 2.0), 1e-6);
+
+        // The tighter of the two axes wins: a wide, short viewport is limited
+        // by its height here.
+        double fit = NativeMap.zoomToFit(world, 2048, 256, 0, 1.0);
+        assertEquals(0.0, fit, 1e-6);
+    }
+
+    @Test
+    void nativeMapReportsNoFitWhenThereIsNothingToFitTo() {
+        MapBounds world = new MapBounds(new LatLng(-85, -180), new LatLng(85, 180));
+        // Before layout there is no viewport to solve against.
+        assertTrue(Double.isNaN(NativeMap.zoomToFit(world, 0, 0, 0, 1.0)));
+        assertTrue(Double.isNaN(NativeMap.zoomToFit(world, 256, 0, 0, 1.0)));
+        assertTrue(Double.isNaN(NativeMap.zoomToFit(null, 256, 256, 0, 1.0)));
+        assertTrue(Double.isNaN(NativeMap.zoomToFit(world, 256, 256, 0, 0)));
+
+        // A single point has no extent, so no zoom "fits" it.
+        MapBounds point = new MapBounds(new LatLng(37.7749, -122.4194),
+                new LatLng(37.7749, -122.4194));
+        assertTrue(Double.isNaN(NativeMap.zoomToFit(point, 256, 256, 0, 1.0)));
+    }
+
+    @Test
+    void nativeMapZoomsFurtherForASmallerRegion() {
+        // A tighter region must fit at a higher zoom than a wider one; this is
+        // the property that was missing when fitBounds only recentered.
+        MapBounds city = new MapBounds(new LatLng(37.70, -122.52), new LatLng(37.83, -122.35));
+        MapBounds block = new MapBounds(new LatLng(37.7740, -122.4200), new LatLng(37.7760, -122.4180));
+        double cityZoom = NativeMap.zoomToFit(city, 800, 800, 0, 1.0);
+        double blockZoom = NativeMap.zoomToFit(block, 800, 800, 0, 1.0);
+        assertTrue(blockZoom > cityZoom, "block " + blockZoom + " should out-zoom city " + cityZoom);
+    }
+
     private static class StubProvider implements MapProvider {
         private final String id;
         private final boolean available;
