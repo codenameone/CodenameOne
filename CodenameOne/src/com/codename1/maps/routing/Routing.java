@@ -92,9 +92,31 @@ public final class Routing {
     /// Routes `request` and reports the outcome to `callback`.
     ///
     /// Returns immediately; `callback` is invoked later on the event dispatch
-    /// thread, exactly once.
-    public static void findRoute(RouteRequest request, RouteCallback callback) {
-        getService().findRoutes(request, callback);
+    /// thread, exactly once. A service that reports itself unavailable -- one
+    /// still waiting for an API key, say -- fails the request here with a
+    /// readable message instead of letting it turn into a network error, so
+    /// callers never have to check [RouteService#isAvailable()] themselves.
+    ///
+    /// Throws `IllegalArgumentException` when `callback` is `null`; an
+    /// asynchronous call has no other way to reach you.
+    public static void findRoute(RouteRequest request, final RouteCallback callback) {
+        if (callback == null) {
+            throw new IllegalArgumentException("callback is required: routing is asynchronous, "
+                    + "so there is no other way to report the result");
+        }
+        RouteService routeService = getService();
+        if (!routeService.isAvailable()) {
+            final String id = routeService.getId();
+            CN.callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    callback.routeFailed("The routing service '" + id
+                            + "' is not ready to route; it may still need to be configured", null);
+                }
+            });
+            return;
+        }
+        routeService.findRoutes(request, callback);
     }
 
     /// Draws the best route between `origin` and `destination` on `map` and

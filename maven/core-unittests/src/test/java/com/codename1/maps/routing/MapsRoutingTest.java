@@ -273,6 +273,29 @@ class MapsRoutingTest {
     }
 
     @Test
+    void aNullCallbackIsRejectedRatherThanSilentlyIgnored() {
+        // An asynchronous call with nowhere to report its result is a mistake;
+        // returning quietly just leaves the caller waiting on nothing.
+        Routing.setService(new RecordingService());
+        assertThrows(IllegalArgumentException.class,
+                () -> Routing.findRoute(new LatLng(1, 2), new LatLng(3, 4), null));
+        assertThrows(IllegalArgumentException.class, () -> new OsrmRouteService()
+                .findRoutes(new RouteRequest(new LatLng(1, 2), new LatLng(3, 4)), null));
+    }
+
+    @Test
+    void anUnavailableServiceFailsTheRequestInsteadOfBeingCalled() {
+        // isAvailable() is the SPI's fail-fast hook; the facade has to honor it
+        // or every caller ends up repeating the check.
+        RecordingService service = new RecordingService();
+        service.available = false;
+        Routing.setService(service);
+
+        Routing.findRoute(new LatLng(1, 2), new LatLng(3, 4), service.callback);
+        assertNull(service.lastRequest, "an unavailable service must not be asked to route");
+    }
+
+    @Test
     void settingANullServiceRestoresTheDefault() {
         Routing.setService(new RecordingService());
         Routing.setService(null);
@@ -301,6 +324,7 @@ class MapsRoutingTest {
     private static final class RecordingService implements RouteService {
 
         private RouteRequest lastRequest;
+        private boolean available = true;
         private final RouteCallback callback = new RouteCallback() {
             @Override
             public void routesFound(List routes) {
@@ -318,7 +342,7 @@ class MapsRoutingTest {
 
         @Override
         public boolean isAvailable() {
-            return true;
+            return available;
         }
 
         @Override

@@ -77,8 +77,8 @@ public final class RouteRequest {
 
     /// The unmodifiable intermediate points ([LatLng]) in visiting order;
     /// empty for a direct journey. Add to it through [#addWaypoint(LatLng)],
-    /// which keeps out the `null` and non-[LatLng] entries a
-    /// [RouteService] would later choke on.
+    /// which drops a `null`; the view being unmodifiable is what stops anything
+    /// else being slipped in behind it for a [RouteService] to choke on.
     public List getWaypoints() {
         return Collections.unmodifiableList(waypoints);
     }

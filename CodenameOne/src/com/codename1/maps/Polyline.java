@@ -56,11 +56,11 @@ public final class Polyline extends MapObject {
         }
     }
 
-    /// Creates a polyline from an *encoded polyline* geometry at the default
-    /// precision of 5 -- the shape virtually every directions API returns for
-    /// a route. See [PolylineCodec].
+    /// Creates a polyline from an *encoded polyline* geometry at
+    /// [PolylineCodec]'s default precision -- the shape virtually every
+    /// directions API returns for a route.
     public static Polyline fromEncoded(String encoded) {
-        return fromEncoded(encoded, 5);
+        return through(PolylineCodec.decode(encoded));
     }
 
     /// Creates a polyline from an *encoded polyline* geometry at an explicit
@@ -70,8 +70,14 @@ public final class Polyline extends MapObject {
     /// 10; a precision that cannot scale coordinates sensibly would otherwise
     /// decode into a line drawn in the wrong place. See [PolylineCodec].
     public static Polyline fromEncoded(String encoded, int precision) {
+        return through(PolylineCodec.decode(encoded, precision));
+    }
+
+    /// Wraps already-decoded vertices, so neither factory has to restate the
+    /// codec's default precision.
+    private static Polyline through(List decoded) {
         Polyline pl = new Polyline();
-        pl.points.addAll(PolylineCodec.decode(encoded, precision));
+        pl.points.addAll(decoded);
         return pl;
     }
 

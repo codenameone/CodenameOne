@@ -53,6 +53,8 @@ public final class PolylineCodec {
     private static final int CHUNK_BITS = 5;
     private static final int CHUNK_MASK = 0x1f;
     private static final int CONTINUATION_BIT = 0x20;
+    /// Largest legal chunk: five data bits plus the continuation bit.
+    private static final int MAX_CHUNK = 0x3f;
     private static final int ASCII_OFFSET = 63;
 
     private PolylineCodec() {
@@ -79,6 +81,8 @@ public final class PolylineCodec {
     /// a partial geometry still draws the coordinates it did carry. A value cut
     /// in half is discarded too: half a delta is not a coordinate, and emitting
     /// it would put a spurious vertex on the map and skew the route bounds.
+    /// Decoding likewise stops at the first character outside the encoding's
+    /// alphabet instead of folding it into a coordinate.
     ///
     /// #### Parameters
     ///
@@ -193,8 +197,9 @@ public final class PolylineCodec {
     /// Reads one zig-zag encoded delta into `out[0]`, advancing `cursor[0]`
     /// past it.
     ///
-    /// Returns false when the string ran out before the value's terminating
-    /// chunk. The accumulated bits are a fraction of the real delta in that
+    /// Returns false when the value did not end cleanly -- the string ran out
+    /// before its terminating chunk, or a character fell outside the encoding's
+    /// alphabet. The accumulated bits are a fraction of the real delta in that
     /// case, so the caller must discard them rather than treat them as a
     /// coordinate.
     private static boolean readValue(String encoded, int[] cursor, long[] out) {
@@ -204,6 +209,14 @@ public final class PolylineCodec {
         boolean terminated = false;
         while (cursor[0] < len) {
             int b = encoded.charAt(cursor[0]++) - ASCII_OFFSET;
+            if (b < 0 || b > MAX_CHUNK) {
+                // Outside the '?'..'~' alphabet the encoding uses. A character
+                // below the offset goes negative, and negative reads as a
+                // terminating chunk, so without this check junk in the middle
+                // of a geometry would end the value early and emit garbage.
+                out[0] = 0;
+                return false;
+            }
             result |= ((long) (b & CHUNK_MASK)) << shift;
             shift += CHUNK_BITS;
             if (b < CONTINUATION_BIT) {

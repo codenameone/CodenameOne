@@ -112,6 +112,23 @@ class PolylineCodecTest {
     }
 
     @Test
+    void stopsAtCharactersOutsideTheEncodingAlphabet() {
+        // A byte below the ASCII offset decodes to a negative chunk, and a
+        // negative chunk reads as "terminating", so junk in the middle of a
+        // geometry used to close the value early and emit a bogus coordinate.
+        List withSpace = PolylineCodec.decode("_p~iF~ps|U _ulLnnqC");
+        assertEquals(1, withSpace.size());
+        assertLatLng(38.5, -120.2, withSpace.get(0));
+
+        // Above the alphabet too -- a stray high byte is not a chunk.
+        List withHighByte = PolylineCodec.decode("_p~iF~ps|Uÿ_ulLnnqC");
+        assertEquals(1, withHighByte.size());
+        assertLatLng(38.5, -120.2, withHighByte.get(0));
+
+        assertTrue(PolylineCodec.decode("!!!!").isEmpty());
+    }
+
+    @Test
     void rejectsAPrecisionThatCannotScaleCoordinates() {
         // Precision 0 or less leaves the scale at 1 and inflates every
         // coordinate; a huge one overflows the scale and collapses them to

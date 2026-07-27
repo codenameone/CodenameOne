@@ -124,7 +124,8 @@ public class OsrmRouteService implements RouteService {
     @Override
     public void findRoutes(RouteRequest request, final RouteCallback callback) {
         if (callback == null) {
-            return;
+            throw new IllegalArgumentException("callback is required: routing is asynchronous, "
+                    + "so there is no other way to report the result");
         }
         if (request == null || request.getOrigin() == null || request.getDestination() == null) {
             fail(callback, "A route request needs both an origin and a destination", null);
@@ -179,7 +180,16 @@ public class OsrmRouteService implements RouteService {
         if (json == null || json.length() == 0) {
             throw new IOException("Empty routing response");
         }
-        Map root = JSONParser.parseJSON(json);
+        Map root;
+        try {
+            root = JSONParser.parseJSON(json);
+        } catch (RuntimeException e) {
+            // The parser is lenient with most junk, but not contractually so.
+            // Converting keeps the promise that IOException is all a caller
+            // has to catch.
+            throw new IOException("Malformed routing response: "
+                    + describe(e, "it could not be parsed as JSON"), e);
+        }
         String code = string(root.get("code"));
         if (code.length() > 0 && !"Ok".equals(code)) {
             throw new IOException(describeErrorCode(code, string(root.get("message"))));

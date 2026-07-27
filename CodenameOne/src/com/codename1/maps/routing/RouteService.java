@@ -47,5 +47,10 @@ public interface RouteService {
     /// thread and the callback is invoked back on it. Implementations must
     /// invoke exactly one callback method for every request, including when
     /// the request is rejected outright.
+    ///
+    /// `callback` is required -- an asynchronous call with nowhere to report
+    /// its result is a mistake, not a fire-and-forget mode, so implementations
+    /// reject a `null` one with `IllegalArgumentException` rather than
+    /// returning quietly and leaving the caller to wonder.
     void findRoutes(RouteRequest request, RouteCallback callback);
 }
