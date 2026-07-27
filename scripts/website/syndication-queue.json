@@ -2,22 +2,6 @@
   "_comment": "Queue of browser-only syndication tasks (Medium, DZone, Hashnode) drained by a local syndication tool that runs on the maintainer's machine inside an already-signed-in browser session. Tasks are appended by scripts/website/queue_browser_syndication.py which is invoked by the daily blog-syndication workflow, and the local tool writes the resulting URLs back into syndication-state.json.",
   "tasks": [
     {
-      "id": "linkedin:2026-07-27-1200-shai-text-input-without-native-overlay",
-      "site": "linkedin",
-      "kind": "social",
-      "slug": "2026-07-27-1200-shai-text-input-without-native-overlay",
-      "source_slug": "text-input-without-native-overlay",
-      "account": "shai",
-      "title": "Pure Codename One text editing without a native overlay",
-      "canonical": "https://www.codenameone.com/blog/text-input-without-native-overlay/",
-      "cover_image_url": "https://www.codenameone.com/blog/text-input-without-native-overlay.jpg",
-      "body_text": "Codename One now supports pure lightweight text editing without placing a native field over the component.\n\nThe existing overlay remains the default for `TextField` and `TextArea`. It is mature and appropriate for ordinary forms. The new route is for text surfaces that need syntax colors, inline images, custom masks, or portable selection and painting.\n\nWe now have a second route. The OS sends semantic operations such as `commitText`, `setComposingText`, and `deleteSurroundingText`. A pure Codename One document owns the caret, selection, bidirectional layout, undo, and painting.\n\n`EditField`, `RichTextArea`, and `CodeEditor` use the new contract. Each port handles the keyboard session, while Codename One owns the document and the pixels on screen.\n\nhttps://www.codenameone.com/blog/text-input-without-native-overlay/",
-      "scheduled_at": "2026-07-27T09:00:00+00:00",
-      "scheduled_local": "2026-07-27T12:00+03:00",
-      "timezone": "Asia/Jerusalem",
-      "queued_at": "2026-07-26T06:52:36+00:00"
-    },
-    {
       "id": "linkedin:2026-07-28-1200-codenameone-rich-text-without-webview",
       "site": "linkedin",
       "kind": "social",

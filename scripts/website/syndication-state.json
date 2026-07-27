@@ -1248,6 +1248,15 @@
         "url": "https://dev.to/codenameone/widgets-live-activities-and-dynamic-island-from-one-java-api-5166",
         "syndicated_at": "2026-07-26T15:40:22+00:00"
       }
+    },
+    "2026-07-27-1200-shai-text-input-without-native-overlay": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-07-27T09:01:02+00:00",
+        "account": "shai",
+        "source_slug": "text-input-without-native-overlay",
+        "scheduled_at": "2026-07-27T09:00:00+00:00"
+      }
     }
   }
 }
