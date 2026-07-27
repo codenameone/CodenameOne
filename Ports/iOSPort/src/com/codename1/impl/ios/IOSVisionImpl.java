@@ -176,7 +176,8 @@ public final class IOSVisionImpl extends VisionImpl {
                                 number(point, "y"));
                     }
                     values[i] = new Barcode(stringOrNull(value, "value"),
-                            string(value, "format"), null, rect(value),
+                            string(value, "format"),
+                            decodeBase64OrNull(value, "rawData"), rect(value),
                             corners, metadata);
                 }
                 return (T) values;
@@ -332,6 +333,13 @@ public final class IOSVisionImpl extends VisionImpl {
         }
         String base64 = string(value, "data");
         return Base64.decode(base64.getBytes("UTF-8"));
+    }
+
+    private static byte[] decodeBase64OrNull(Map value, String key)
+            throws Exception {
+        String base64 = stringOrNull(value, key);
+        return base64 == null ? null
+                : Base64.decode(base64.getBytes("UTF-8"));
     }
 
     @Override

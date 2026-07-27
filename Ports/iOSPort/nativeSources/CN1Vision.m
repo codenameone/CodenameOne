@@ -300,6 +300,9 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
             NSMutableDictionary *item = [NSMutableDictionary
                     dictionaryWithDictionary:cn1MLKitRect(barcode.frame, resultSize)];
             item[@"value"] = barcode.rawValue ?: [NSNull null];
+            item[@"rawData"] = barcode.rawData == nil
+                    ? [NSNull null]
+                    : [barcode.rawData base64EncodedStringWithOptions:0];
             item[@"format"] = cn1MLKitBarcodeFormat(barcode.format);
             NSMutableArray *corners = [NSMutableArray array];
             for (NSValue *pointValue in barcode.cornerPoints ?: @[]) {
