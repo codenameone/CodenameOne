@@ -307,6 +307,44 @@ class MapsRoutingTest {
     }
 
     @Test
+    void nonFiniteCoordinatesAreRejectedRatherThanRoutedFromNullIsland() {
+        // LatLng lets NaN through -- its range clamps compare against NaN, and
+        // those comparisons are always false -- and Math.round(NaN) is 0, so
+        // the URL would have said 0.000000 and routed from off Africa.
+        CountingCallback counts = new CountingCallback();
+        OsrmRouteService service = new OsrmRouteService();
+
+        service.findRoutes(new RouteRequest(new LatLng(Double.NaN, Double.NaN),
+                new LatLng(38.8894, -77.0352)), counts);
+        service.findRoutes(new RouteRequest(new LatLng(38.8977, -77.0365),
+                new LatLng(0, Double.NaN)), counts);
+        service.findRoutes(new RouteRequest(new LatLng(38.8977, -77.0365),
+                new LatLng(38.8894, -77.0352)).addWaypoint(new LatLng(Double.NaN, 0)), counts);
+
+        assertEquals(0, counts.successes);
+        assertEquals(3, counts.failures, "each unusable coordinate must fail its request");
+
+        // Infinities never survive LatLng to reach the check: an infinite
+        // latitude trips the range clamp (Infinity > 90 is true) and lands on
+        // 90, while an infinite longitude degenerates to NaN in the wrap
+        // arithmetic. NaN is the only non-finite value that gets through.
+        assertEquals(90.0, new LatLng(Double.POSITIVE_INFINITY, 0).getLatitude(), 1e-9);
+        assertTrue(Double.isNaN(new LatLng(0, Double.POSITIVE_INFINITY).getLongitude()));
+    }
+
+    @Test
+    void aServiceWhoseReadinessProbeThrowsStillProducesOneCallback() {
+        // isAvailable() and getId() are third-party code too; a service that
+        // throws while checking its own configuration must not escape the
+        // facade's exactly-once promise.
+        Routing.setService(new ThrowingProbeService());
+        CountingCallback counts = new CountingCallback();
+        Routing.findRoute(new LatLng(1, 2), new LatLng(3, 4), counts);
+        assertEquals(1, counts.failures);
+        assertEquals(0, counts.successes);
+    }
+
+    @Test
     void aServiceThatThrowsStillProducesExactlyOneCallback() {
         // findRoute promises the app one answer. A third-party service that
         // throws instead of calling back must not turn that into silence.
@@ -366,6 +404,25 @@ class MapsRoutingTest {
         @Override
         public void routeFailed(String message, Throwable error) {
             failures++;
+        }
+    }
+
+    /** A service that blows up while being asked whether it is ready. */
+    private static final class ThrowingProbeService implements RouteService {
+
+        @Override
+        public String getId() {
+            return "throwing-probe";
+        }
+
+        @Override
+        public boolean isAvailable() {
+            throw new IllegalStateException("configuration check exploded");
+        }
+
+        @Override
+        public void findRoutes(RouteRequest request, RouteCallback cb) {
+            throw new IllegalStateException("should never be reached");
         }
     }
 

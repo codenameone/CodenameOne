@@ -133,10 +133,46 @@ public class OsrmRouteService implements RouteService {
             fail(callback, "A route request needs both an origin and a destination", null);
             return;
         }
+        String unusable = firstUnroutable(request);
+        if (unusable != null) {
+            fail(callback, unusable, null);
+            return;
+        }
         RouteConnection req = new RouteConnection(callback);
         req.setUrl(buildUrl(request));
         req.setPost(false);
         req.start();
+    }
+
+    /// Names the first coordinate in `request` that cannot be routed from, or
+    /// `null` when they are all usable.
+    ///
+    /// A `NaN` or infinite coordinate has to be caught before the URL is
+    /// built. [#appendFixed] rounds, and `Math.round(NaN)` is 0, so a `NaN`
+    /// would be written as `0.000000` and quietly route from null island
+    /// instead of failing. [LatLng] does not stop them either: its range
+    /// clamps compare against `NaN`, and every such comparison is false.
+    private static String firstUnroutable(RouteRequest request) {
+        if (!isUsable(request.getOrigin())) {
+            return "The route origin is not a usable coordinate";
+        }
+        for (Object waypoint : request.getWaypoints()) {
+            if (!isUsable((LatLng) waypoint)) {
+                return "A route waypoint is not a usable coordinate";
+            }
+        }
+        if (!isUsable(request.getDestination())) {
+            return "The route destination is not a usable coordinate";
+        }
+        return null;
+    }
+
+    private static boolean isUsable(LatLng coord) {
+        return isReal(coord.getLatitude()) && isReal(coord.getLongitude());
+    }
+
+    private static boolean isReal(double value) {
+        return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
     /// Builds the OSRM request URL for `request`. Package visible so the shape
@@ -163,6 +199,12 @@ public class OsrmRouteService implements RouteService {
     /// Exposed so an app that fetches from an OSRM-compatible endpoint through
     /// its own transport (a proxy, a cached response, a bundled fixture) can
     /// reuse the same parsing.
+    ///
+    /// **Geometry precision**: this reads geometries as `geometries=polyline`,
+    /// the precision-5 encoding this service always requests. A response
+    /// fetched with `geometries=polyline6` decodes ten times off through here;
+    /// decode those yourself with
+    /// [com.codename1.maps.PolylineCodec#decode(String, int)] at precision 6.
     ///
     /// #### Parameters
     ///
@@ -437,6 +479,20 @@ public class OsrmRouteService implements RouteService {
     /// [com.codename1.io.NetworkManager#addErrorListener] that *consumes* the
     /// event makes `NetworkManager` skip this request's hooks entirely. A
     /// completion listener closes that hole -- see [#actionPerformed].
+    ///
+    /// The success and HTTP-error paths cannot be suppressed at all:
+    /// `postResponse` and `handleErrorResponseCode` are invoked on the request
+    /// directly, with no listener in between. One residual case survives, and
+    /// needs an app to consume *two* different global event streams: a
+    /// consuming error listener hides the transport exception, and a progress
+    /// listener registered before this one that also consumes
+    /// `PROGRESS_TYPE_COMPLETED` starves the backstop, because
+    /// [com.codename1.ui.util.EventDispatcher] stops dispatching at a consumed
+    /// event. Consuming a progress event has no defined meaning in the
+    /// framework, so this is documented rather than worked around -- the only
+    /// unsuppressable hook left is a getter the network manager happens to
+    /// call, and depending on that side effect would be far more fragile than
+    /// the case it guards against.
     private static final class RouteConnection extends ConnectionRequest
             implements ActionListener<NetworkEvent> {
 

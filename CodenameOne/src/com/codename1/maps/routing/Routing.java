@@ -104,20 +104,26 @@ public final class Routing {
             throw new IllegalArgumentException("callback is required: routing is asynchronous, "
                     + "so there is no other way to report the result");
         }
-        RouteService routeService = getService();
         final OnceOnly guarded = new OnceOnly(callback);
-        if (!routeService.isAvailable()) {
-            final String id = routeService.getId();
-            CN.callSerially(new Runnable() {
-                @Override
-                public void run() {
-                    guarded.routeFailed("The routing service '" + id
-                            + "' is not ready to route; it may still need to be configured", null);
-                }
-            });
-            return;
-        }
         try {
+            // Everything that touches the service belongs inside the guard,
+            // not just the routing call: resolving it, asking whether it is
+            // ready and reading its id are all third-party code, and any of
+            // them throwing would otherwise escape a method that promises the
+            // caller exactly one asynchronous answer.
+            RouteService routeService = getService();
+            if (!routeService.isAvailable()) {
+                final String id = routeService.getId();
+                CN.callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        guarded.routeFailed("The routing service '" + id
+                                + "' is not ready to route; it may still need to be configured",
+                                null);
+                    }
+                });
+                return;
+            }
             routeService.findRoutes(request, guarded);
         } catch (final RuntimeException e) {
             // A service is required to answer through the callback, but this
