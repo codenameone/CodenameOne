@@ -7012,6 +7012,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
+     * Queues a hook on the shared queue and makes sure something will drain it.
+     *
+     * <p>Unlike {@link #addGestureOnlyHook(JSRunnable, Runnable)}, plain
+     * {@link #addBacksideHook(JSRunnable)} schedules nothing: the hook waits for
+     * a drain that may already have run. Safari schedules a single 75/300ms
+     * drain per interaction, so an EDT slower than that arrives with none left
+     * and the hook sits forever. Callers that have no other attempt to fall
+     * back on need this.</p>
+     */
+    private void addBacksideHookEnsuringDrain(JSRunnable r) {
+        addBacksideHook(r);
+        if (pendingGestureDrains <= 0 && backsideHooksIntervalHandle == 0) {
+            runBacksideHooksInTimeout(0);
+        }
+    }
+
+    /**
      * Downloads a {@code data:} URL by clicking a generated anchor on the page.
      *
      * <p>The same technique {@code browser_bridge.js} uses, run from here so it
@@ -7062,14 +7079,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         };
         if (isBacksideHookAvailable()) {
-            addBacksideHook(click);
+            addBacksideHookEnsuringDrain(click);
             return;
         }
         createConfirmationSheet("Download file", "Download " + fileName + " now?",
                 null, new Runnable() {
             @Override
             public void run() {
-                addBacksideHook(click);
+                // Ensuring a drain matters most here: the user confirmed, and
+                // removing the bridge's eager click left no earlier attempt to
+                // rescue a hook that never runs.
+                addBacksideHookEnsuringDrain(click);
             }
         }).show();
     }
