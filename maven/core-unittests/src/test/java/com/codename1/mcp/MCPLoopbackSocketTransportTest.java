@@ -65,8 +65,11 @@ class MCPLoopbackSocketTransportTest {
     /// on has got anywhere - which is how timing-based tests turn flaky.
     private static void await(String what, java.util.concurrent.Callable<Boolean> condition)
             throws Exception {
-        long deadline = System.currentTimeMillis() + 10000;
-        while (System.currentTimeMillis() < deadline) {
+        // nanoTime, not currentTimeMillis: a wall clock can be stepped by NTP mid-wait,
+        // which would either cut the wait short or extend it, and a test that fails when
+        // the clock is adjusted is worse than one that sleeps.
+        long deadline = System.nanoTime() + 10000L * 1000000L;
+        while (System.nanoTime() < deadline) {
             if (condition.call()) {
                 return;
             }

@@ -230,6 +230,10 @@ public final class Socket {
             /// listener would quietly resurrect itself instead of stopping.
             private final AtomicBoolean stopped = new AtomicBoolean();
 
+            /// The backoff after a failed accept, split so a stop is noticed promptly.
+            private static final int BACKOFF_SLICES = 10;
+            private static final int BACKOFF_SLICE_MS = 50;
+
             @Override
             public void run() {
                 try {
@@ -244,6 +248,12 @@ public final class Socket {
                             if (connection != null) {
                                 Util.getImplementation().disconnectSocket(connection);
                             }
+                            break;
+                        }
+                        if (connection == null && stopped.get()) {
+                            // Closing the listening socket is how a stop is delivered, and
+                            // it surfaces here as a failed accept. Reporting that through
+                            // connectionError would announce a fault that never happened.
                             break;
                         }
                         final SocketConnection sc = (SocketConnection) scClass.newInstance();
@@ -265,10 +275,16 @@ public final class Socket {
                             // full speed, burning a core and filling the log. Pause so a
                             // persistent failure is slow and visible instead of hot. Only
                             // the failure path waits; a served connection never gets here.
-                            try {
-                                Thread.sleep(500);
-                            } catch (InterruptedException interrupted) {
-                                // fall through: the loop re-tests stopped straight away
+                            //
+                            // Slept in slices, re-testing the flag between them, so a stop
+                            // arriving during the pause is acted on within a slice rather
+                            // than after the whole backoff.
+                            for (int slice = 0; slice < BACKOFF_SLICES && !stopped.get(); slice++) {
+                                try {
+                                    Thread.sleep(BACKOFF_SLICE_MS);
+                                } catch (InterruptedException interrupted) {
+                                    break;   // the loop re-tests stopped straight away
+                                }
                             }
                         }
                     }

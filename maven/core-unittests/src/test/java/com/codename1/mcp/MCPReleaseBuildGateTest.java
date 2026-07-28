@@ -138,6 +138,7 @@ class MCPReleaseBuildGateTest extends UITestBase {
         implementation.setServerSocketAvailable(false);
         String message = assertThrows(IllegalStateException.class,
                 () -> MCP.startSocketServer(47898)).getMessage();
+        assertNotNull(message, "the refusal must explain itself");
         assertTrue(message.contains(GATE),
                 "the build gate must be evaluated first, got: " + message);
         assertFalse(MCP.isRunning());
@@ -152,6 +153,7 @@ class MCPReleaseBuildGateTest extends UITestBase {
         implementation.setServerSocketAvailable(false);
         String message = assertThrows(IllegalStateException.class,
                 () -> MCP.startSocketServer(47897)).getMessage();
+        assertNotNull(message, "the refusal must explain itself");
         assertTrue(message.contains("No socket MCP transport"),
                 "an unbindable platform must say so synchronously, got: " + message);
         assertFalse(MCP.isRunning(), "nothing must be left running after that refusal");
