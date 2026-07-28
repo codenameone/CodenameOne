@@ -98,7 +98,7 @@ Writes are validated before the platform is touched: a type this app can't write
 
 Set `RecordingMethod` on what you write. Other apps use it to decide how much to trust a value, and a manually typed weight is a different kind of evidence from one a scale reported.
 
-`HealthSample.getId()` is assigned by the platform, is scoped to this install, and won't survive a reinstall. Don't use it as a primary key on your server -- put your own identifier in `getMetadata()` and correlate on that.
+`HealthSample.getId()` is assigned by the platform, is scoped to this install, and won't survive a reinstall, so don't use it as a primary key on your server. Keep your own identifier in your own storage and correlate on that. `getMetadata()` looks like the natural home for it and isn't: metadata round-trips through the local and simulator stores but isn't written to HealthKit or Health Connect in this release, so on a phone the identifier is gone the moment you read the sample back.
 
 === Background delivery
 

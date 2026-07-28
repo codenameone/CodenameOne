@@ -386,6 +386,42 @@ class SensorParserTest {
         assertTrue(WeightMeasurement.parse(both).hasBmiAndHeight());
     }
 
+    /**
+     * The Date Time characteristic defines years 1582-9999 and reserves
+     * everything else. A malformed 10000 used to decode as an ordinary
+     * future timestamp, so a reading was published under a date the
+     * device never claimed -- and one whose age is negative, which makes
+     * it look permanently fresh.
+     */
+    @Test
+    void datesOutsideTheProfileRangeAreUnknown() {
+        // A weight reading whose timestamp field carries year 10000.
+        byte[] future = new byte[] {
+            0x02,                         // timestamp present, SI units
+            0x10, 0x27,                   // 50 kg
+            0x10, 0x27, 1, 1, 12, 0, 0    // year 10000
+        };
+        WeightMeasurement m = WeightMeasurement.parse(future);
+        assertNotNull(m);
+        assertEquals(-1, m.getTimestampMillis(),
+                "a reserved year is not a date");
+
+        byte[] tooEarly = new byte[] {
+            0x02,
+            0x10, 0x27,
+            0x2D, 0x06, 1, 1, 12, 0, 0    // year 1581
+        };
+        assertEquals(-1,
+                WeightMeasurement.parse(tooEarly).getTimestampMillis());
+
+        byte[] valid = new byte[] {
+            0x02,
+            0x10, 0x27,
+            (byte) 0xEA, 0x07, 1, 1, 12, 0, 0  // year 2026
+        };
+        assertTrue(WeightMeasurement.parse(valid).getTimestampMillis() > 0);
+    }
+
     @Test
     void weightRejectsTruncatedPayloads() {
         assertNull(WeightMeasurement.parse(null));

@@ -26,6 +26,7 @@ import com.codename1.bluetooth.Bluetooth;
 import com.codename1.bluetooth.BluetoothUuid;
 import com.codename1.bluetooth.le.BlePeripheral;
 import com.codename1.bluetooth.le.BleScan;
+import com.codename1.util.AsyncResult;
 import com.codename1.bluetooth.le.ScanFilter;
 import com.codename1.bluetooth.le.ScanListener;
 import com.codename1.bluetooth.le.ScanResult;
@@ -118,9 +119,44 @@ public class HealthSensors {
         }
         BleScan scan = Bluetooth.getInstance().getLE().startScan(bleSettings,
                 makeScanListener(wanted, listener));
+        // A scan can fail without anything being thrown -- a missing
+        // BLUETOOTH_SCAN grant, a platform abort -- and that failure
+        // reaches the caller only through the BleScan. Callers here are
+        // handed a SensorScan, which deliberately does not expose the
+        // delegate, so without this the documented scanFailed() callback
+        // never fired and the scan just quietly was not running.
+        scan.onResult(new ScanFailure(listener));
         SensorScan out = new SensorScan(scan);
         out.scheduleTimeout(s.getTimeoutMillis());
         return out;
+    }
+
+    /// Translates a failed BLE scan into the health listener's own
+    /// callback.
+    ///
+    /// Named rather than anonymous so it carries no synthetic reference
+    /// to the enclosing object (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class ScanFailure
+            implements AsyncResult<Boolean> {
+
+        private final SensorDiscoveryListener listener;
+
+        ScanFailure(SensorDiscoveryListener listener) {
+            this.listener = listener;
+        }
+
+        @Override
+        public void onReady(Boolean value, Throwable error) {
+            if (error == null || listener == null) {
+                return;
+            }
+            listener.scanFailed(error instanceof HealthException
+                    ? (HealthException) error
+                    : new HealthException(HealthError.SENSOR_DISCONNECTED,
+                            "the Bluetooth scan could not be started",
+                            error));
+        }
     }
 
     /// Built in a static method so the listener carries no synthetic

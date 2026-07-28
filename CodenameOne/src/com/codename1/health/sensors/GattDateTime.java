@@ -34,10 +34,6 @@ import java.util.TimeZone;
 /// user saw when they took the measurement.
 final class GattDateTime {
 
-    /// The year field is 0 when the device has no idea what the date is,
-    /// which happens after a battery change.
-    private static final int YEAR_UNKNOWN = 0;
-
     /// Days in a month, so an impossible date is rejected rather than
     /// rolled forward.
     ///
@@ -60,6 +56,13 @@ final class GattDateTime {
         }
     }
 
+    /// The first and last years the Date Time characteristic defines.
+    /// Everything else is reserved, including the 0 a device reports
+    /// when it has no idea what the date is -- after a battery change,
+    /// say -- so that case falls out of the same range test.
+    private static final int YEAR_MIN = 1582;
+    private static final int YEAR_MAX = 9999;
+
     private GattDateTime() {
     }
 
@@ -72,7 +75,14 @@ final class GattDateTime {
         int hour = r.uint8();
         int minute = r.uint8();
         int second = r.uint8();
-        if (!r.isValid() || year == YEAR_UNKNOWN || month < 1 || month > 12
+        // The profile defines the year as 1582-9999 and reserves
+        // everything else, 0 included. A malformed 10000 used to become a
+        // perfectly ordinary future timestamp: the session published the
+        // reading under a date the device never claimed, and getLatest()
+        // treated it as permanently fresh because its age came out
+        // negative.
+        if (!r.isValid() || year < YEAR_MIN || year > YEAR_MAX
+                || month < 1 || month > 12
                 || day < 1 || day > daysInMonth(year, month)
                 || hour > 23 || minute > 59 || second > 59) {
             return -1;
