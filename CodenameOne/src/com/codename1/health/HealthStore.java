@@ -890,7 +890,13 @@ public class HealthStore {
             // substitute below is an averaging weight, not a duration --
             // adding it here made "total time covered" grow with the
             // number of spot readings.
-            durationMillis += span <= 0 ? 0 : overlap;
+            //
+            // A series is accounted for measurement by measurement in the
+            // branch below, so its enclosing span must not be added here
+            // as well.
+            if (!(s instanceof SeriesSample)) {
+                durationMillis += span <= 0 ? 0 : overlap;
+            }
             if (s instanceof SeriesSample) {
                 // A series reaches here whole -- the local and simulator
                 // stores hold it that way and aggregate their records
@@ -899,17 +905,41 @@ public class HealthStore {
                 // a null AVERAGE, MINIMUM, MAXIMUM and LATEST for a record
                 // full of values.
                 SeriesSample series = (SeriesSample) s;
+                boolean cumulativeSeries = type.getAggregationStyle()
+                        == HealthAggregationStyle.CUMULATIVE;
                 for (int i = 0; i < series.size(); i++) {
                     long at = series.getSampleStartMillis(i);
-                    if (at < from || at >= to) {
+                    long until = series.getSampleEndMillis(i);
+                    // Overlap, not start-only. A measurement may be an
+                    // interval -- an interval-only type requires it -- and
+                    // testing its start alone dropped one running
+                    // 11:55-12:05 from a noon bucket entirely, while the
+                    // same span as a scalar sample contributed its five
+                    // minutes.
+                    if (at == until
+                            ? (at < from || at >= to)
+                            : (until <= from || at >= to)) {
                         continue;
                     }
+                    long pointOverlap = Math.min(to, until)
+                            - Math.max(from, at);
+                    if (pointOverlap < 0) {
+                        pointOverlap = 0;
+                    }
+                    long pointSpan = until - at;
                     count++;
                     inBucket.add(series.toQuantitySample(i));
-                    // Each measurement is a point reading: whole, and an
-                    // equal weight in the average.
-                    weights.add(Double.valueOf(1.0));
-                    durations.add(Double.valueOf(1));
+                    // Same rule as a scalar sample: a cumulative value
+                    // straddling the boundary contributes in proportion, a
+                    // discrete one counts whole.
+                    weights.add(Double.valueOf(
+                            cumulativeSeries && pointSpan > 0
+                                    ? (double) pointOverlap
+                                            / (double) pointSpan
+                                    : 1.0));
+                    durations.add(Double.valueOf(
+                            pointSpan <= 0 ? 1 : pointOverlap));
+                    durationMillis += pointSpan <= 0 ? 0 : pointOverlap;
                 }
             } else {
                 count++;

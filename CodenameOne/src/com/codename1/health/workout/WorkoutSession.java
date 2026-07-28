@@ -30,6 +30,7 @@ import com.codename1.health.HealthQuantity;
 import com.codename1.health.HealthSample;
 import com.codename1.health.HealthUnit;
 import com.codename1.health.QuantitySample;
+import com.codename1.health.SeriesSample;
 import com.codename1.health.WorkoutSample;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
@@ -317,6 +318,17 @@ public abstract class WorkoutSession {
     /// and latest values. Shared by every port, so a recorded session on
     /// Android and a live one on watchOS report statistics the same way.
     private void rollUp(HealthSample sample) {
+        if (sample instanceof SeriesSample) {
+            // A heart-rate trace fed in whole is workout data like any
+            // other. Returning here left AVERAGE, MINIMUM, MAXIMUM and
+            // LATEST null or stale for measurements the session was
+            // collecting and would go on to persist.
+            SeriesSample series = (SeriesSample) sample;
+            for (int i = 0; i < series.size(); i++) {
+                rollUp(series.toQuantitySample(i));
+            }
+            return;
+        }
         if (!(sample instanceof QuantitySample)) {
             return;
         }
@@ -363,7 +375,17 @@ public abstract class WorkoutSession {
                     if (max == null || v > max.getValue(unit)) {
                         put(type, AggregateMetric.MAXIMUM, v, unit);
                     }
-                    put(type, AggregateMetric.LATEST, v, unit);
+                    // Latest by timestamp, not by arrival. A delayed
+                    // device reading or an unsorted history batch made an
+                    // older value overwrite a newer one, so the workout
+                    // reported a stale number as the current one.
+                    Long seen = latestAt.get(type.getId());
+                    if (seen == null
+                            || q.getStartMillis() >= seen.longValue()) {
+                        latestAt.put(type.getId(),
+                                Long.valueOf(q.getStartMillis()));
+                        put(type, AggregateMetric.LATEST, v, unit);
+                    }
                     break;
                 default:
                     break;
@@ -371,6 +393,10 @@ public abstract class WorkoutSession {
         }
         fireStatisticsUpdated(type);
     }
+
+    /// When each type's LATEST value was measured, so a sample arriving
+    /// late cannot pass itself off as the newest.
+    private final Map<String, Long> latestAt = new HashMap<String, Long>();
 
     private final Map<String, Double> weightedSums =
             new HashMap<String, Double>();

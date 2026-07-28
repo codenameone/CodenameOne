@@ -300,4 +300,38 @@ class HealthAggregateMathTest {
                 AggregateMetric.COUNT).getValue(HealthUnit.COUNT), 1e-9,
                 "and it is not counted either");
     }
+
+    /**
+     * A series measurement that straddles the bucket start counts for the
+     * part inside it.
+     *
+     * <p>Series points were tested on their start alone, so an interval
+     * measurement running 11:55-12:05 contributed nothing to a noon
+     * bucket -- while the identical span as a scalar sample contributed
+     * its five minutes. An interval-only type requires interval
+     * measurements, so this is the ordinary shape, not an exotic one.</p>
+     */
+    @Test
+    void seriesMeasurementsAreProRatedLikeScalarSamples() throws Exception {
+        long[] starts = {NOON - 5 * MINUTE};
+        long[] ends = {NOON + 5 * MINUTE};
+        double[] values = {10};
+        SeriesSample series = SeriesSample.create(HealthDataType.STEPS,
+                starts[0], ends[0], starts, ends, values, HealthUnit.COUNT);
+
+        LocalHealthStore s = new LocalHealthStore();
+        List<HealthSample> in = new ArrayList<HealthSample>();
+        in.add(series);
+        s.write(in).get();
+
+        List<AggregateResult> b = s.aggregate(new AggregateQuery()
+                .addType(HealthDataType.STEPS)
+                .addMetric(AggregateMetric.TOTAL)
+                .setTimeRange(HealthTimeRange.between(NOON,
+                        NOON + 10 * MINUTE))).get();
+        assertEquals(5.0, value(b.get(0), HealthDataType.STEPS,
+                AggregateMetric.TOTAL), 0.5,
+                "only the five minutes inside the query count, as they"
+                        + " would for a scalar sample");
+    }
 }

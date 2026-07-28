@@ -371,4 +371,52 @@ class WorkoutAndNutritionTest extends UITestBase {
             implementation.setHealth(null);
         }
     }
+
+    /**
+     * A series fed to a workout counts toward its statistics, and LATEST
+     * follows the timestamp rather than the arrival order.
+     *
+     * <p>The rollup skipped anything that was not a {@code QuantitySample},
+     * so a heart-rate trace left AVERAGE, MINIMUM and MAXIMUM null for
+     * data the session was collecting and would go on to persist. And
+     * LATEST was replaced by whatever arrived last, so a delayed device
+     * reading or an unsorted history batch reported a stale value as the
+     * newest.</p>
+     */
+    @Test
+    void seriesSamplesCountAndLatestFollowsTheClock() throws Exception {
+        WorkoutSession s = startedSession();
+
+        long[] at = {5000L, 6000L, 7000L};
+        double[] bpm = {60, 80, 70};
+        List<HealthSample> fed = new ArrayList<HealthSample>();
+        fed.add(SeriesSample.create(HealthDataType.HEART_RATE, at[0], at[2],
+                at, at, bpm, HealthUnit.COUNT_PER_MINUTE));
+        s.addSamples(fed).get();
+
+        assertEquals(60.0, s.getStatistic(HealthDataType.HEART_RATE,
+                AggregateMetric.MINIMUM).getValue(
+                        HealthUnit.COUNT_PER_MINUTE), 1e-9);
+        assertEquals(80.0, s.getStatistic(HealthDataType.HEART_RATE,
+                AggregateMetric.MAXIMUM).getValue(
+                        HealthUnit.COUNT_PER_MINUTE), 1e-9);
+        assertEquals(70.0, s.getStatistic(HealthDataType.HEART_RATE,
+                AggregateMetric.LATEST).getValue(
+                        HealthUnit.COUNT_PER_MINUTE), 1e-9,
+                "the last measurement in the series is the latest");
+
+        // An older reading arriving afterwards must not become "latest".
+        List<HealthSample> late = new ArrayList<HealthSample>();
+        late.add(FakeHealthStore.sample(HealthDataType.HEART_RATE,
+                3000L, 3000L, 55));
+        s.addSamples(late).get();
+        assertEquals(70.0, s.getStatistic(HealthDataType.HEART_RATE,
+                AggregateMetric.LATEST).getValue(
+                        HealthUnit.COUNT_PER_MINUTE), 1e-9,
+                "a delayed older reading is not the newest one");
+        assertEquals(55.0, s.getStatistic(HealthDataType.HEART_RATE,
+                AggregateMetric.MINIMUM).getValue(
+                        HealthUnit.COUNT_PER_MINUTE), 1e-9,
+                "but it still counts everywhere else");
+    }
 }
