@@ -1619,6 +1619,12 @@ public class AndroidGradleBuilder extends Executor {
                         }
                         if (method.startsWith("getWorkouts")) {
                             usesHealthWorkout = true;
+                            // A workout reads and writes exercise data, so
+                            // it needs a declared token like any other
+                            // store use -- otherwise the manifest carried
+                            // only ACTIVITY_RECOGNITION and every workout
+                            // call was unauthorized at runtime.
+                            usesHealthData = true;
                         }
                         if (method.startsWith("getSensors")) {
                             // The BLE sensor layer runs entirely on the
@@ -1994,7 +2000,14 @@ public class AndroidGradleBuilder extends Executor {
                         + HealthManifestFragments.knownTokens(),
                         new RuntimeException("unknown health token"));
             }
-            if (request.getArg("android.health.privacyPolicyUrl", "")
+            // Only when the app actually requests a Health Connect
+            // permission. An availability-only app never presents the
+            // rationale screen, so demanding a policy URL rejected a
+            // harmless flow for a hint it would never use.
+            boolean requestsPermissions =
+                    !readTypes.isEmpty() || !writeTypes.isEmpty();
+            if (requestsPermissions
+                    && request.getArg("android.health.privacyPolicyUrl", "")
                     .length() == 0) {
                 // Play requires a privacy policy for health permissions and
                 // the rationale screen has to link to it, so a missing URL
