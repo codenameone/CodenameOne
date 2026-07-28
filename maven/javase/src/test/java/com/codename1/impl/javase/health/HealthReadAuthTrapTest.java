@@ -198,6 +198,38 @@ class HealthReadAuthTrapTest {
                 ((HealthException) err).getError());
     }
 
+    /**
+     * Every rejection is observable on the calling thread, whichever layer
+     * produced it.
+     *
+     * <p>A store call can be turned down in three places -- the shared
+     * unsupported check, query validation, and the backend itself -- and
+     * all three must behave the same way, because a caller cannot tell
+     * which one answered. Routing one of them through {@code callSerially}
+     * made the store's threading depend on <i>why</i> it failed, so the
+     * same rejection resolved inline or a cycle later depending on whether
+     * an event thread happened to be pumping. This asserts the three
+     * together rather than one at a time, which is how the split went
+     * unnoticed.</p>
+     */
+    @Test
+    void everyRejectionResolvesOnTheCallingThread() {
+        store.setAvailable(false);
+        assertTrue(store.readSamples(heartRateQuery()).isDone(),
+                "an unsupported store must answer before returning");
+
+        store.setAvailable(true);
+        store.setReadPermission(HealthDataType.HEART_RATE,
+                SimulatedHealthStore.ReadAuthScript.GRANTED);
+        assertTrue(store.readSamples(new SampleQuery()).isDone(),
+                "a rejected query must answer before returning");
+
+        store.failNext("query", HealthError.DATABASE_INACCESSIBLE,
+                "device locked");
+        assertTrue(store.readSamples(heartRateQuery()).isDone(),
+                "a backend failure must answer before returning");
+    }
+
     /** Fault injection is one-shot, so a test can assert recovery. */
     @Test
     void primedFailureFiresOnceThenRecovers() {

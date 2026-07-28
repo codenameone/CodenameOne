@@ -1868,33 +1868,19 @@ public class HealthStore {
                 "health data is not available on this platform");
     }
 
-    /// Fails on the EDT, like every other completion.
+    /// Fails inline, on the calling thread.
     ///
-    /// These are the shared fast paths -- rejected validation, an
-    /// unsupported store -- and they answer without ever reaching a port.
-    /// Completing inline handed a caller on a worker thread its callback
-    /// on that thread, so the guarantee held for every real platform
-    /// answer and broke for every rejected one.
+    /// Deliberately *not* marshalled through `callSerially`. Nothing else
+    /// in this class marshals an [AsyncResource] completion: rejected
+    /// validation errors inline, and a port completes on whichever thread
+    /// its SDK called back on. Routing only these fast paths through the
+    /// EDT would make the store's threading depend on *why* a call failed,
+    /// and would deadlock [AsyncResource#get()] wherever no event thread is
+    /// pumping. The EDT hop belongs where a callback reaches app code that
+    /// did not ask for it -- change delivery and the timeout thread -- and
+    /// both of those do hop.
     private static void fail(AsyncResource out, HealthError error,
             String message) {
-        Display.getInstance().callSerially(new FailOnEdt(out,
-                new HealthException(error, message)));
-    }
-
-    private static final class FailOnEdt implements Runnable {
-        private final AsyncResource resource;
-        private final HealthException error;
-
-        FailOnEdt(AsyncResource resource, HealthException error) {
-            this.resource = resource;
-            this.error = error;
-        }
-
-        @Override
-        public void run() {
-            if (!resource.isDone()) {
-                resource.error(error);
-            }
-        }
+        out.error(new HealthException(error, message));
     }
 }
