@@ -417,4 +417,114 @@ class BleSensorReconnectTest extends UITestBase {
                     "scripted permanent refusal"));
         }
     }
+
+    /**
+     * Samples of a type the store will never accept are dropped, not
+     * retried.
+     *
+     * <p>An Android cycling-power or cadence session produces types
+     * Health Connect can read but not write. Shared validation rejects
+     * the batch before it reaches the store, so the retry resent the
+     * identical batch for as long as the session streamed -- an error
+     * every {@code storeBatchMillis}, for ever, and a buffer that only
+     * grew. Counted through the error callback rather than through store
+     * writes, because a refused batch never reaches the store at all.</p>
+     */
+    @Test
+    void permanentlyUnwritableSamplesAreDroppedRatherThanRetried()
+            throws Exception {
+        RefusingStore store = new RefusingStore();
+        com.codename1.health.Health health =
+                new com.codename1.health.Health() {
+                    @Override
+                    public boolean isSupported() {
+                        return true;
+                    }
+
+                    @Override
+                    public com.codename1.health.HealthStore getStore() {
+                        return store;
+                    }
+                };
+        implementation.setHealth(health);
+        try {
+            FakePeripheral p = new FakePeripheral();
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE,
+                    new SensorSessionOptions().setWriteToStore(true)
+                            .setStoreBatchMillis(10), p);
+            final int[] errors = new int[1];
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+            session.addListener(new SensorSampleListener() {
+                public void sensorSample(SensorSession s,
+                        com.codename1.health.HealthSample sample) {
+                }
+
+                public void sensorStateChanged(SensorSession s,
+                        SensorSessionState state) {
+                }
+
+                public void sensorError(SensorSession s,
+                        com.codename1.health.HealthException error) {
+                    errors[0]++;
+                }
+            });
+            p.notifyHeartRate(72);
+            flushSerialCalls();
+
+            pump(300);
+            int afterFirstRound = errors[0];
+            assertTrue(afterFirstRound > 0,
+                    "the refused batch should have reported an error");
+            pump(300);
+            assertEquals(afterFirstRound, errors[0],
+                    "a type the store refuses outright must not be"
+                            + " retried; it kept failing");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
+    /** Pumps the EDT for a while so timers can fire. */
+    private void pump(long millis) throws Exception {
+        long until = System.currentTimeMillis() + millis;
+        while (System.currentTimeMillis() < until) {
+            flushSerialCalls();
+            Thread.sleep(10);
+        }
+    }
+
+    /** A store that supports the type for reading but never for writing. */
+    private static final class RefusingStore
+            extends com.codename1.health.HealthStore {
+
+        @Override
+        public boolean isSupported() {
+            return true;
+        }
+
+        @Override
+        public boolean isTypeSupported(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        @Override
+        public boolean isWritable(
+                com.codename1.health.HealthDataType type) {
+            return false;
+        }
+
+        @Override
+        protected void doWrite(
+                java.util.List<com.codename1.health.HealthSample> samples,
+                AsyncResource<com.codename1.health.HealthWriteResult> out) {
+            out.error(new com.codename1.health.HealthException(
+                    com.codename1.health.HealthError.TYPE_NOT_SUPPORTED,
+                    "not writable here"));
+        }
+    }
 }

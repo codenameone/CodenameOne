@@ -30,6 +30,7 @@ import com.codename1.health.HealthAnchor;
 import com.codename1.health.HealthChangeBatch;
 import com.codename1.health.HealthAuthorizationStatus;
 import com.codename1.health.HealthDataType;
+import com.codename1.health.SubscriptionRequest;
 import com.codename1.health.HealthDeleteRequest;
 import com.codename1.health.HealthError;
 import com.codename1.health.HealthException;
@@ -548,9 +549,69 @@ class AndroidHealthStore extends HealthStore {
                 new DrainStep(subs, index, delivered, out, false));
     }
 
+    /// Takes the baseline token when the subscription is registered, not
+    /// when it is first drained.
+    ///
+    /// A Health Connect token describes changes from the moment it is
+    /// issued. Waiting for the first drain meant everything written
+    /// between `subscribe()` and that drain fell before the token, and
+    /// the empty baseline delivery then advanced the cursor past changes
+    /// that would never be reported -- an app that subscribed at launch
+    /// and drained on the next foreground silently missed the interval in
+    /// between.
+    ///
+    /// Failure is not fatal: the token stays absent and the first drain
+    /// establishes it exactly as before, which is worse than this but
+    /// better than a subscription that never works.
+    @Override
+    protected void doSubscribe(SubscriptionRequest request,
+            HealthAnchor anchor) {
+        if (anchor != null || delegate() == null) {
+            return;
+        }
+        delegate().getChangesToken(typesCsv(request.getTypes()),
+                new BaselineToken(this, request.getId()));
+    }
+
+    /// Persists the token a subscription starts from.
+    ///
+    /// Named rather than anonymous so it carries no synthetic reference
+    /// to the enclosing store (SpotBugs `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class BaselineToken
+            implements HealthConnectDelegate.Callback {
+
+        private final AndroidHealthStore store;
+        private final String subscriptionId;
+
+        BaselineToken(AndroidHealthStore store, String subscriptionId) {
+            this.store = store;
+            this.subscriptionId = subscriptionId;
+        }
+
+        @Override
+        public void onSuccess(String payload) {
+            if (payload == null || payload.trim().length() == 0) {
+                return;
+            }
+            store.storeAnchor(subscriptionId,
+                    HealthAnchor.of(payload.trim()));
+        }
+
+        @Override
+        public void onError(int code, String message) {
+            com.codename1.io.Log.p("CN1 Health: could not take a baseline"
+                    + " change token for " + subscriptionId + " ("
+                    + message + "); the first drain will establish one,"
+                    + " and changes before it are not reported");
+        }
+    }
+
     private static String typesCsv(HealthSubscription sub) {
+        return typesCsv(sub.getTypes());
+    }
+
+    private static String typesCsv(List<HealthDataType> types) {
         StringBuilder sb = new StringBuilder();
-        List<HealthDataType> types = sub.getTypes();
         for (int i = 0; i < types.size(); i++) {
             if (i > 0) {
                 sb.append(',');

@@ -70,7 +70,7 @@ Health Connect stores a heart-rate series as one record containing many samples,
 
 Writing a `SeriesSample` to a phone stores its measurements individually -- neither platform accepts a series through this API -- so the write result carries one identifier per measurement rather than one for the record. A series is unit-checked and converted exactly like a scalar write, and one longer than the platform's batch limit is split across several calls. Sleep and workout samples can't be written to HealthKit or Health Connect at all; writing one is refused with `TYPE_NOT_SUPPORTED` rather than reported as a success that stored nothing.
 
-Sleep isn't readable on iOS either in this release. The iOS type map carries quantity types only, so `HealthDataType.SLEEP` is refused before a query runs, and `SampleQuery.setSleepSessionGapMillis(long)` -- which configures the session reassembly the port will eventually need -- changes nothing today. Sleep works on Android, where sessions are stored natively, and against the local and simulator stores.
+Sleep isn't readable on either phone in this release. The iOS type map carries quantity types only, so `HealthDataType.SLEEP` is refused before a query runs, and `SampleQuery.setSleepSessionGapMillis(long)` -- which configures the session reassembly that port will eventually need -- changes nothing today. Android refuses it too: sleep is absent from the readable type set and the bridge has no record class for it, so a query fails with `TYPE_NOT_SUPPORTED` rather than returning nothing. Sleep works fully against the local and simulator stores, which is where to develop against it for now.
 
 === Aggregates and time buckets
 

@@ -37,8 +37,11 @@ package com.codename1.health;
 /// grouping that is not there. So the choice is yours:
 /// [SampleQuery#setFlattenSeries(boolean)] defaults to `true`, which gives
 /// both platforms plain [QuantitySample] objects and lets cross-platform
-/// code be identical. Turn it off when you need record identity, and
-/// expect iOS to return series of size 1.
+/// code be identical. Turn it off when you need record identity -- and
+/// note that **iOS returns [QuantitySample] objects either way**, not
+/// one-point series, because HealthKit stores each measurement
+/// separately and has no record to preserve. Test the type rather than
+/// casting.
 ///
 /// #### Storage
 ///

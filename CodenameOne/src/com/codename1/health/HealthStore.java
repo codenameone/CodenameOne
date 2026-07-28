@@ -243,6 +243,16 @@ public class HealthStore {
     /// Whether presenting the authorization sheet would show the user
     /// anything -- see [HealthRequestStatus]. Useful for deciding whether
     /// to show your own explainer screen first.
+    ///
+    /// **Answers [HealthRequestStatus#UNKNOWN] on both phones in this
+    /// release.** Neither port implements the query yet -- HealthKit's
+    /// `getRequestStatusForAuthorization` and a Health Connect grant
+    /// comparison are what would answer it -- so the documented
+    /// `SHOULD_REQUEST` and `UNNECESSARY` answers never arrive there and
+    /// an explainer gated on them would never show. Show the explainer on
+    /// your own terms until this reports something else, and treat
+    /// `UNKNOWN` as "ask anyway": requesting authorization that is
+    /// already granted is harmless on both platforms.
     public final AsyncResource<HealthRequestStatus>
             getAuthorizationRequestStatus(HealthAccess... access) {
         AsyncResource<HealthRequestStatus> out =
@@ -2367,6 +2377,12 @@ public class HealthStore {
     }
 
     /// Reports whether the authorization sheet would show anything.
+    ///
+    /// No mobile port overrides this yet, so both phones answer
+    /// `UNKNOWN`; the public method says so. HealthKit answers it through
+    /// `getRequestStatusForAuthorization`, and Health Connect through
+    /// comparing the granted permission set against the requested one --
+    /// each of which is a real piece of work rather than a mapping.
     protected void doGetAuthorizationRequestStatus(List<HealthAccess> access,
             AsyncResource<HealthRequestStatus> out) {
         out.complete(HealthRequestStatus.UNKNOWN);

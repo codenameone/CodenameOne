@@ -30,6 +30,7 @@ import com.codename1.health.workout.WorkoutSession;
 import com.codename1.health.HealthException;
 import com.codename1.health.HealthQuantity;
 import com.codename1.health.HealthSample;
+import com.codename1.health.HealthStore;
 import com.codename1.health.HealthWriteResult;
 import com.codename1.health.HealthUnit;
 import com.codename1.health.QuantitySample;
@@ -347,8 +348,39 @@ public class SensorSession {
             if (error == null) {
                 return;
             }
+            // Samples of a type the store will never accept are dropped
+            // rather than requeued. An Android cycling-power or cadence
+            // session produces types Health Connect can read but not
+            // write, so every batch failed validation and the retry below
+            // resent the identical batch for as long as the session
+            // streamed -- an error every storeBatchMillis, for ever, and
+            // a buffer that only grew. Retrying is right for a store that
+            // is busy or locked; it is pointless for one that has said
+            // no, and the answer does not change with time.
+            List<HealthSample> retryable = new ArrayList<HealthSample>(
+                    batch.size());
+            List<HealthDataType> refused = new ArrayList<HealthDataType>();
+            HealthStore store = Health.getInstance().getStore();
+            for (HealthSample s : batch) {
+                if (store.isWritable(s.getType())) {
+                    retryable.add(s);
+                } else if (!refused.contains(s.getType())) {
+                    refused.add(s.getType());
+                }
+            }
+            if (!refused.isEmpty()) {
+                com.codename1.io.Log.p("CN1 Health: this platform cannot"
+                        + " write " + refused + ", so those sensor samples"
+                        + " are dropped rather than retried. Turn"
+                        + " setWriteToStore off for this session, or route"
+                        + " the readings to a workout instead.");
+            }
+            if (retryable.isEmpty()) {
+                session.fireError(asHealthException(error));
+                return;
+            }
             synchronized (session.pendingWrites) {
-                session.pendingWrites.addAll(0, batch);
+                session.pendingWrites.addAll(0, retryable);
             }
             // Re-armed explicitly, but only while the session is still
             // running. Rescheduling from a session that has ended --
@@ -365,10 +397,14 @@ public class SensorSession {
                 session.scheduleFlush(session.getOptions()
                         .getStoreBatchMillis());
             }
-            session.fireError(error instanceof HealthException
+            session.fireError(asHealthException(error));
+        }
+
+        private static HealthException asHealthException(Throwable error) {
+            return error instanceof HealthException
                     ? (HealthException) error
                     : new HealthException(HealthError.UNKNOWN,
-                            "could not persist sensor samples", error));
+                            "could not persist sensor samples", error);
         }
     }
 
