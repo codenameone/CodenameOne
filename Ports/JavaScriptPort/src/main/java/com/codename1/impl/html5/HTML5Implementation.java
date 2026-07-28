@@ -7196,6 +7196,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * regressed {@code report:2026.pdf}, then still regressed
      * {@code https:report.pdf}. Ambiguity is a property of the shape, not of
      * the scheme name.</p>
+     *
+     * <p>Takes the RAW string, the same one the lookup uses. Judging the
+     * normalized form would let {@code " https://example.com/report "} -- a
+     * perfectly legal key, since keys may carry surrounding whitespace -- look
+     * unambiguous and skip the lookup that would have found it.</p>
      */
     private static boolean isUnambiguousBrowserUrl(String url) {
         if (url.startsWith("//")) {
@@ -7342,13 +7347,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     @Override
                     public void run() {
                         if (!openUrlOnMainThread(url, false, false)) {
-                            // The user confirmed and it still did not open.
-                            // openUrlOnMainThread has already logged why; note
-                            // only that this was the confirmed attempt, which
-                            // is the end of the line -- re-showing the Sheet
-                            // from here would just loop.
+                            // The user confirmed and it still did not open --
+                            // a browser setting, an extension, or an activation
+                            // that expired before this drain. Do not stop at a
+                            // log: they acted and deserve a way through. Offer
+                            // the current tab, which needs no activation and so
+                            // cannot be blocked in turn. Not a loop -- that
+                            // path is a navigation, not another popup.
                             _log("execute(): confirmed open did not succeed for "
                                     + url);
+                            callSerially(new Runnable() {
+                                @Override
+                                public void run() {
+                                    createConfirmationSheet("Open Link",
+                                            "Your browser blocked the new window."
+                                                    + " Open this link in the current tab instead?",
+                                            shortenUrlForDisplay(url), new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            openUrlOnMainThread(url, true, false);
+                                        }
+                                    }).show();
+                                }
+                            });
                         }
                     }
                 });
@@ -7387,10 +7408,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // be called report:2026.pdf or https:report.pdf, both of which a
         // browser would read as URLs. Only shapes that cannot be a key skip the
         // lookup, since exists() costs up to two IndexedDB reads and ordinary
-        // https://... links should not pay for them. Looked up under the path
-        // exactly as given: a key may legitimately open or close with a space,
-        // and nothing here is parsed by the browser.
-        if (!isUnambiguousBrowserUrl(url) && exists(rawUrl)) {
+        // https://... links should not pay for them. Both the decision and the
+        // lookup read rawUrl: a key may legitimately open or close with a
+        // space, so judging the normalized form would skip the lookup for keys
+        // the lookup would have found.
+        // ...and only when normalization left the string untouched. If it
+        // changed anything, the raw form is not what the browser would parse,
+        // so it can still be a key in its own right -- "https://x/y\n" among
+        // them, which the shape test alone would wave through.
+        boolean cannotBeStorageKey = isUnambiguousBrowserUrl(rawUrl) && rawUrl.equals(url);
+        if (!cannotBeStorageKey && exists(rawUrl)) {
             try {
                 Blob blob = openFileAsBlob(rawUrl);
                 char sep = getFileSystemSeparator();
