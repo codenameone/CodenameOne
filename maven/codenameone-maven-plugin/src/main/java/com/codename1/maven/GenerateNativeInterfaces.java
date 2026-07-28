@@ -214,7 +214,7 @@ public class GenerateNativeInterfaces extends AbstractCN1Mojo {
                         @Override
                         public FieldVisitor visitField(int i, String string, String type, String string2, Object o) {
                             if (type.startsWith("L")) {
-                                scanner.usesClass(type.substring(1, type.length() - 2));
+                                scanner.usesClass(com.codename1.builders.Executor.descriptorToInternalName(type));
                             }
                             return null;
                         }
@@ -316,7 +316,7 @@ public class GenerateNativeInterfaces extends AbstractCN1Mojo {
                                 @Override
                                 public void visitLocalVariable(String string, String classType, String string2, Label label, Label label1, int i) {
                                     if (classType.startsWith("L")) {
-                                        scanner.usesClass(classType.substring(1, classType.length() - 2));
+                                        scanner.usesClass(com.codename1.builders.Executor.descriptorToInternalName(classType));
                                     }
                                 }
 

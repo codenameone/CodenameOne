@@ -99,6 +99,26 @@ public abstract class Executor {
     private Class<?>[] nativeInterfaces;
     private boolean unitTestMode;
     static boolean IS_MAC;
+    /**
+     * The internal class name inside a JVM field descriptor.
+     *
+     * <p>{@code Lcom/foo/Bar;} carries one character of punctuation at
+     * each end. Cutting two off the tail dropped the last letter of every
+     * class name reported from a field or a local variable, so any check
+     * comparing a whole name silently missed -- which is how a BLE-only
+     * app declaring a {@code HealthSample} field was still classified as
+     * using the health store.</p>
+     */
+    public static String descriptorToInternalName(String descriptor) {
+        if (descriptor == null || descriptor.length() < 3
+                || descriptor.charAt(0) != 'L') {
+            return descriptor;
+        }
+        int end = descriptor.charAt(descriptor.length() - 1) == ';'
+                ? descriptor.length() - 1 : descriptor.length();
+        return descriptor.substring(1, end);
+    }
+
     protected final Map<String,String> defaultEnvironment = new HashMap<String,String>();
 
     private Properties localBuilderProperties;
@@ -514,7 +534,7 @@ public abstract class Executor {
                         @Override
                         public FieldVisitor visitField(int i, String string, String type, String string2, Object o) {
                             if (type.startsWith("L")) {
-                                scanner.usesClass(type.substring(1, type.length() - 2));
+                                scanner.usesClass(descriptorToInternalName(type));
                             }
                             return null;
                         }
@@ -624,7 +644,7 @@ public abstract class Executor {
                                 @Override
                                 public void visitLocalVariable(String string, String classType, String string2, Label label, Label label1, int i) {
                                     if (classType.startsWith("L")) {
-                                        scanner.usesClass(classType.substring(1, classType.length() - 2));
+                                        scanner.usesClass(descriptorToInternalName(classType));
                                     }
                                 }
 
