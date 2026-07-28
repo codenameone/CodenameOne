@@ -6836,22 +6836,55 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (url == null) {
             return "";
         }
-        String shortened = url;
-        int schemeEnd = shortened.indexOf("://");
-        if (schemeEnd >= 0) {
-            shortened = shortened.substring(schemeEnd + 3);
+        int schemeEnd = url.indexOf("://");
+        if (schemeEnd < 0) {
+            // No authority to protect (mailto:, tel:, a bare storage path).
+            return ellipsizeTail(url);
         }
-        if (shortened.length() > MAX_DISPLAY_URL_LENGTH) {
-            int slash = shortened.indexOf('/');
-            if (slash > 0 && slash <= MAX_DISPLAY_URL_LENGTH) {
-                // Host fits: keep it whole and stand in for the path.
-                shortened = shortened.substring(0, slash) + "/" + DISPLAY_URL_ELLIPSIS;
-            } else {
-                shortened = shortened.substring(0, MAX_DISPLAY_URL_LENGTH - DISPLAY_URL_ELLIPSIS.length())
-                        + DISPLAY_URL_ELLIPSIS;
+        String rest = url.substring(schemeEnd + 3);
+        int authorityEnd = rest.length();
+        for (int i = 0; i < rest.length(); i++) {
+            char c = rest.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                authorityEnd = i;
+                break;
             }
         }
-        return shortened;
+        String authority = rest.substring(0, authorityEnd);
+        // Everything before the last '@' is user info. An attacker picks it
+        // freely and can spell it to read like a trusted host, so showing it --
+        // or truncating the display in the middle of it -- would let
+        // https://www.paypal.com@evil.example/ be confirmed as "www.paypal.com".
+        // What confirming actually opens is the host, so show only that.
+        int at = authority.lastIndexOf('@');
+        if (at >= 0) {
+            authority = authority.substring(at + 1);
+        }
+        if (authority.length() == 0) {
+            // Scheme-relative or path-only, e.g. imdb:///find?q=godfather.
+            return ellipsizeTail(rest);
+        }
+        if (authority.length() > MAX_DISPLAY_URL_LENGTH) {
+            // Keep the END of an over-long host: the registrable domain is the
+            // rightmost labels, so dropping the front is what preserves the
+            // part that decides where the link goes.
+            authority = DISPLAY_URL_ELLIPSIS + authority.substring(
+                    authority.length() - (MAX_DISPLAY_URL_LENGTH - DISPLAY_URL_ELLIPSIS.length()));
+        }
+        // A lone trailing "/" is not worth an ellipsis.
+        boolean hasPath = rest.length() - authorityEnd > 1;
+        return hasPath ? authority + "/" + DISPLAY_URL_ELLIPSIS : authority;
+    }
+
+    /**
+     * Trims a string with no authority to protect down to the display cap.
+     */
+    private static String ellipsizeTail(String value) {
+        if (value.length() <= MAX_DISPLAY_URL_LENGTH) {
+            return value;
+        }
+        return value.substring(0, MAX_DISPLAY_URL_LENGTH - DISPLAY_URL_ELLIPSIS.length())
+                + DISPLAY_URL_ELLIPSIS;
     }
 
     /**
@@ -6924,6 +6957,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * URLs. {@code file:} is the exception: like the bare paths that carry no
      * scheme at all, it names local content.</p>
      */
+    /**
+     * True when {@code url} carries exactly {@code scheme}, compared without
+     * regard to case since URI schemes are case-insensitive. Guards the
+     * {@code javascript:} and {@code data:} branches of {@link #execute(String)},
+     * which would otherwise let {@code JavaScript:} slip through to the
+     * external-link path.
+     */
+    private static boolean hasScheme(String url, String scheme) {
+        return url.length() > scheme.length()
+                && url.charAt(scheme.length()) == ':'
+                && url.regionMatches(true, 0, scheme, 0, scheme.length());
+    }
+
     private static boolean isExternalUrl(String url) {
         if (url.startsWith("//")) {
             // Protocol relative -- the page's own scheme applies.
@@ -6986,7 +7032,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             });
             return;
         }
-        createConfirmationSheet("Open Link", "Open this link in a new window?",
+        // Only _blank actually asked for a new window. Under auto or _self the
+        // Sheet is a compatibility fallback the caller never requested, so
+        // promising a new window there would describe behavior they did not
+        // choose.
+        String prompt = EXECUTE_TARGET_BLANK.equals(target)
+                ? "Open this link in a new window?"
+                : "Open this link?";
+        createConfirmationSheet("Open Link", prompt,
                 shortenUrlForDisplay(url), new Runnable() {
             @Override
             public void run() {
@@ -7019,7 +7072,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void execute(String url) {
-        if (url.startsWith("javascript:")) {
+        if (hasScheme(url, "javascript")) {
             String cmd = url.substring(url.indexOf(":")+1);
             eval_(cmd);
             return;
@@ -7028,9 +7081,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         String fileName = null;
         boolean useBlobHandler = false;
         Button nativeButton = new Button();
-        // Only a local path can name storage content to wrap in a Blob. A
-        // data: URL carries its own payload and is handled further down;
-        // isExternalUrl already excludes it, since it has a scheme.
+        // Only a local path can name storage content to wrap in a Blob.
+        // isExternalUrl() is false for exactly those, and true for everything
+        // with a scheme -- data: included, which carries its own payload and is
+        // claimed by its own branch further down.
         if (!isExternalUrl(url)) {
             if (exists(url)) {
                 try {
@@ -7059,7 +7113,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             buttonText = "Click to Download "+(fileName!=null?fileName:"File");
             nativeButton.setText(buttonText);
             nativeButton.setMaterialIcon(FontImage.MATERIAL_SAVE);
-        } else if (url.startsWith("data:")) {
+        } else if (hasScheme(url, "data")) {
             registerSaveBlobHandlerDataUrl(fileName == null ? "download":fileName, url);
             //popover.setContents("<button style='white-space:nowrap' onclick='window.cn1SaveBlobHandler();'><span style='font-size:3em;vertical-align:text-bottom;' class='glyphicon glyphicon-download; font-size: '/><span style='font-size:2em;vertical-align:top;'> Download "+(fileName!=null?fileName:"File")+"</span></button>");
             buttonText = "Click to Download "+(fileName!=null?fileName:"File");
@@ -7096,7 +7150,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
             }
         };
-        if (isBacksideHookAvailable()) {
+        // Firing the registered blob handler is a download, which browsers gate
+        // on engagement rather than transient activation, so an interval-only
+        // hook is good enough for it. The no-blob-handler leg opens a popup
+        // instead, and that does need a real gesture -- draining it from a timer
+        // would let the browser block it with no Sheet shown. Pick the gate that
+        // matches the leg this run will actually take.
+        boolean hookAvailable = fuseBlobHandler
+                ? isBacksideHookAvailable()
+                : isGestureBackedHookAvailable();
+        if (hookAvailable) {
             addBacksideHook(new JSRunnable() {
                 @Override
                 public void run() {
