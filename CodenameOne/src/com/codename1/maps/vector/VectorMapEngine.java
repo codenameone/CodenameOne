@@ -228,13 +228,7 @@ public final class VectorMapEngine {
         double cwx = WebMercator.lonToWorldX(centerLon, zoom) - dx / pixelRatio;
         double cwy = WebMercator.latToWorldY(centerLat, zoom) - dy / pixelRatio;
         centerLon = WebMercator.worldXToLon(cwx, zoom);
-        double lat = WebMercator.worldYToLat(cwy, zoom);
-        if (lat > 85.05112878) {
-            lat = 85.05112878;
-        } else if (lat < -85.05112878) {
-            lat = -85.05112878;
-        }
-        centerLat = lat;
+        centerLat = WebMercator.clampLatitude(WebMercator.worldYToLat(cwy, zoom));
     }
 
     /// Zooms to `newZoom` while keeping the geographic point currently under
@@ -273,14 +267,27 @@ public final class VectorMapEngine {
         }
         // Convert the usable device-pixel viewport to logical map pixels (the
         // unit worldSpanX/Y are in) before solving for the zoom that fits.
-        double usableW = Math.max(1, viewWidth - 2 * padding) / pixelRatio;
-        double usableH = Math.max(1, viewHeight - 2 * padding) / pixelRatio;
+        // These "nothing to fit" cases keep the current zoom and merely
+        // recenter, matching NativeMap.zoomToFit so that MapSurface#fitBounds
+        // means the same thing on both surfaces.
         double worldW = worldSpanX(bounds);
         double worldH = worldSpanY(bounds);
-        double zx = worldW <= 0 ? getMaxZoom() : log2(usableW / worldW);
-        double zy = worldH <= 0 ? getMaxZoom() : log2(usableH / worldH);
-        setZoom(Math.min(zx, zy));
-        setCenter(bounds.getCenter());
+        boolean roomToFit = viewWidth - 2 * padding > 0 && viewHeight - 2 * padding > 0;
+        if (roomToFit && (worldW > 0 || worldH > 0)) {
+            double usableW = (viewWidth - 2 * padding) / pixelRatio;
+            double usableH = (viewHeight - 2 * padding) / pixelRatio;
+            double zx = worldW <= 0 ? Double.MAX_VALUE : log2(usableW / worldW);
+            double zy = worldH <= 0 ? Double.MAX_VALUE : log2(usableH / worldH);
+            setZoom(Math.min(zx, zy));
+        }
+        // The vertical center has to be the projected midpoint, not the mean
+        // of the two latitudes: Mercator stretches away from the equator, so
+        // centering a tall band on its arithmetic middle leaves the poleward
+        // edge outside the viewport the zoom above just sized for it.
+        setCenter(new LatLng(
+                WebMercator.centerLatitude(bounds.getSouthWest().getLatitude(),
+                        bounds.getNorthEast().getLatitude()),
+                bounds.getCenter().getLongitude()));
     }
 
     private double worldSpanX(MapBounds b) {
@@ -290,8 +297,12 @@ public final class VectorMapEngine {
     }
 
     private double worldSpanY(MapBounds b) {
-        double y0 = WebMercator.latToWorldY(b.getSouthWest().getLatitude(), 0);
-        double y1 = WebMercator.latToWorldY(b.getNorthEast().getLatitude(), 0);
+        // Clamped, or a bound touching a pole projects to infinity and the
+        // solved zoom collapses.
+        double y0 = WebMercator.latToWorldY(
+                WebMercator.clampLatitude(b.getSouthWest().getLatitude()), 0);
+        double y1 = WebMercator.latToWorldY(
+                WebMercator.clampLatitude(b.getNorthEast().getLatitude()), 0);
         return Math.abs(y1 - y0);
     }
 

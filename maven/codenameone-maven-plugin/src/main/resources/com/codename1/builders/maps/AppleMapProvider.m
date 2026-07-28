@@ -1,4 +1,27 @@
 /*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+/*
  * Codename One maps provider -- Apple MapKit (iOS).
  *
  * BUILD TEMPLATE. Copied into the generated Xcode project's native sources as
@@ -143,35 +166,59 @@ static CN1AppleMap *cn1MapFor(int mapId) {
     return [cn1AppleMaps() objectForKey:[NSNumber numberWithInt:mapId]];
 }
 
-static float spanToZoom(double lonDelta) {
+// MapSurface documents zoom as the standard slippy-map scale, where a level
+// spans 256 points and the visible degrees therefore depend on how wide the
+// view is. MapKit works in a degree span instead, so the two conversions below
+// have to bring the viewport width into it. The earlier 360/2^zoom form
+// ignored the view entirely, which made a zoom mean one thing here and another
+// on every other provider -- and made a fitted region come out too small, so
+// bounds the caller asked to frame ended up clipped.
+static double cn1MapWidthPoints(CN1AppleMap *m) {
+    // Before the view is laid out there is no width to reason about; 256 makes
+    // the formulas degenerate to the historical behavior rather than divide by
+    // zero.
+    if (m == nil || m.mapView == nil) {
+        return 256.0;
+    }
+    double w = m.mapView.bounds.size.width;
+    return w > 0 ? w : 256.0;
+}
+
+static float spanToZoom(double lonDelta, double widthPoints) {
     if (lonDelta <= 0) {
         return 0;
     }
-    return (float)(log(360.0 / lonDelta) / log(2.0));
+    return (float)(log(360.0 * widthPoints / (256.0 * lonDelta)) / log(2.0));
 }
 
-static double zoomToSpan(float zoom) {
-    return 360.0 / pow(2.0, zoom);
+static double zoomToSpan(float zoom, double widthPoints) {
+    return 360.0 * widthPoints / (256.0 * pow(2.0, zoom));
+}
+
+// MKMapView state (bounds, region, centerCoordinate) may only be read on the
+// main thread. The Codename One iOS EDT runs on the main thread, so most calls
+// arrive there already and a dispatch_sync would deadlock; only marshal when
+// the caller really is on a background thread.
+static void cn1RunOnMain(void (^block)(void)) {
+    if ([NSThread isMainThread]) {
+        block();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), block);
+    }
 }
 
 JAVA_LONG com_codename1_maps_MapProviderImpl_nativeCreate___int_double_double_float_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon, JAVA_FLOAT zoom) {
     __block CN1AppleMap *m = nil;
-    double span = zoomToSpan((float)zoom);
-    void (^createBlock)(void) = ^{
+    cn1RunOnMain(^{
         m = [[CN1AppleMap alloc] initWithMapId:(int)mapId];
+        // Resolved after the view exists so its width can be used when it
+        // already has one.
+        double span = zoomToSpan((float)zoom, cn1MapWidthPoints(m));
         MKCoordinateRegion region = MKCoordinateRegionMake(
             CLLocationCoordinate2DMake(lat, lon), MKCoordinateSpanMake(span, span));
         [m.mapView setRegion:region animated:NO];
         [cn1AppleMaps() setObject:m forKey:[NSNumber numberWithInt:(int)mapId]];
-    };
-    // The Codename One iOS EDT runs on the main thread, so a dispatch_sync to
-    // the main queue from here would deadlock. Create inline when already on
-    // the main thread; only marshal when invoked from a background thread.
-    if ([NSThread isMainThread]) {
-        createBlock();
-    } else {
-        dispatch_sync(dispatch_get_main_queue(), createBlock);
-    }
+    });
     return (JAVA_LONG)((BRIDGE_CAST void*)m.mapView);
 }
 
@@ -182,8 +229,10 @@ void com_codename1_maps_MapProviderImpl_nativeDeinit___int(CN1_THREAD_STATE_MULT
 void com_codename1_maps_MapProviderImpl_nativeSetCamera___int_double_double_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon, JAVA_FLOAT zoom) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
     if (!m) { return; }
-    double span = zoomToSpan((float)zoom);
     dispatch_async(dispatch_get_main_queue(), ^{
+        // The view's width is only safe to read on the main thread, and it is
+        // needed to turn a slippy zoom into a MapKit span.
+        double span = zoomToSpan((float)zoom, cn1MapWidthPoints(m));
         MKCoordinateRegion region = MKCoordinateRegionMake(
             CLLocationCoordinate2DMake(lat, lon), MKCoordinateSpanMake(span, span));
         [m.mapView setRegion:region animated:YES];
@@ -192,17 +241,30 @@ void com_codename1_maps_MapProviderImpl_nativeSetCamera___int_double_double_floa
 
 JAVA_DOUBLE com_codename1_maps_MapProviderImpl_nativeGetLat___int_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
-    return m ? m.mapView.centerCoordinate.latitude : 0;
+    if (!m) { return 0; }
+    __block double lat = 0;
+    cn1RunOnMain(^{ lat = m.mapView.centerCoordinate.latitude; });
+    return lat;
 }
 
 JAVA_DOUBLE com_codename1_maps_MapProviderImpl_nativeGetLon___int_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
-    return m ? m.mapView.centerCoordinate.longitude : 0;
+    if (!m) { return 0; }
+    __block double lon = 0;
+    cn1RunOnMain(^{ lon = m.mapView.centerCoordinate.longitude; });
+    return lon;
 }
 
 JAVA_FLOAT com_codename1_maps_MapProviderImpl_nativeGetZoom___int_R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
-    return m ? spanToZoom(m.mapView.region.span.longitudeDelta) : 0;
+    if (!m) { return 0; }
+    // The span and the width have to come from the same main-thread read, or
+    // a resize between them would convert one region against another's width.
+    __block float zoom = 0;
+    cn1RunOnMain(^{
+        zoom = spanToZoom(m.mapView.region.span.longitudeDelta, cn1MapWidthPoints(m));
+    });
+    return zoom;
 }
 
 JAVA_LONG com_codename1_maps_MapProviderImpl_nativeAddMarker___int_double_double_java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon, JAVA_OBJECT title) {
@@ -294,28 +356,40 @@ void com_codename1_maps_MapProviderImpl_nativeRemoveAll___int(CN1_THREAD_STATE_M
 JAVA_INT com_codename1_maps_MapProviderImpl_nativeScreenX___int_double_double_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
     if (!m) { return 0; }
-    CGPoint p = [m.mapView convertCoordinate:CLLocationCoordinate2DMake(lat, lon) toPointToView:m.mapView];
+    __block CGPoint p = CGPointZero;
+    cn1RunOnMain(^{
+        p = [m.mapView convertCoordinate:CLLocationCoordinate2DMake(lat, lon) toPointToView:m.mapView];
+    });
     return (JAVA_INT)p.x;
 }
 
 JAVA_INT com_codename1_maps_MapProviderImpl_nativeScreenY___int_double_double_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
     if (!m) { return 0; }
-    CGPoint p = [m.mapView convertCoordinate:CLLocationCoordinate2DMake(lat, lon) toPointToView:m.mapView];
+    __block CGPoint p = CGPointZero;
+    cn1RunOnMain(^{
+        p = [m.mapView convertCoordinate:CLLocationCoordinate2DMake(lat, lon) toPointToView:m.mapView];
+    });
     return (JAVA_INT)p.y;
 }
 
 JAVA_DOUBLE com_codename1_maps_MapProviderImpl_nativeLat___int_int_int_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_INT x, JAVA_INT y) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
     if (!m) { return 0; }
-    CLLocationCoordinate2D c = [m.mapView convertPoint:CGPointMake(x, y) toCoordinateFromView:m.mapView];
+    __block CLLocationCoordinate2D c = CLLocationCoordinate2DMake(0, 0);
+    cn1RunOnMain(^{
+        c = [m.mapView convertPoint:CGPointMake(x, y) toCoordinateFromView:m.mapView];
+    });
     return c.latitude;
 }
 
 JAVA_DOUBLE com_codename1_maps_MapProviderImpl_nativeLon___int_int_int_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_INT x, JAVA_INT y) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
     if (!m) { return 0; }
-    CLLocationCoordinate2D c = [m.mapView convertPoint:CGPointMake(x, y) toCoordinateFromView:m.mapView];
+    __block CLLocationCoordinate2D c = CLLocationCoordinate2DMake(0, 0);
+    cn1RunOnMain(^{
+        c = [m.mapView convertPoint:CGPointMake(x, y) toCoordinateFromView:m.mapView];
+    });
     return c.longitude;
 }
 

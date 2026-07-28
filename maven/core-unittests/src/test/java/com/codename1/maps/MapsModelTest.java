@@ -6,6 +6,19 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.maps;
 
@@ -19,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.codename1.maps.spi.MapProvider;
 import com.codename1.maps.spi.MapProviderRegistry;
+import com.codename1.maps.vector.WebMercator;
 import com.codename1.ui.PeerComponent;
 import java.util.ArrayList;
 import java.util.List;
@@ -231,6 +245,96 @@ class MapsModelTest {
             }
         });
         assertNotNull(MapProviderRegistry.getProvider());
+    }
+
+    // ---- NativeMap bounds fitting ----------------------------------------
+
+    @Test
+    void nativeMapSolvesTheZoomThatFitsBounds() {
+        // The whole world spans exactly one 256pt tile at zoom 0, so a 256px
+        // viewport fits it at zoom 0 and every doubling adds one level.
+        MapBounds world = new MapBounds(new LatLng(-WebMercator.MAX_LATITUDE, -180),
+                new LatLng(WebMercator.MAX_LATITUDE, 180));
+        assertEquals(0.0, NativeMap.zoomToFit(world, 256, 256, 0, 1.0), 1e-6);
+        assertEquals(1.0, NativeMap.zoomToFit(world, 512, 512, 0, 1.0), 1e-6);
+        assertEquals(2.0, NativeMap.zoomToFit(world, 1024, 1024, 0, 1.0), 1e-6);
+
+        // Padding shrinks the usable viewport, and so the zoom.
+        assertEquals(0.0, NativeMap.zoomToFit(world, 512, 512, 128, 1.0), 1e-6);
+
+        // Native zoom counts logical points, so a 2x density screen fits the
+        // same region at one level less than its device-pixel size suggests.
+        assertEquals(0.0, NativeMap.zoomToFit(world, 512, 512, 0, 2.0), 1e-6);
+
+        // The tighter of the two axes wins: a wide, short viewport is limited
+        // by its height here.
+        double fit = NativeMap.zoomToFit(world, 2048, 256, 0, 1.0);
+        assertEquals(0.0, fit, 1e-6);
+    }
+
+    @Test
+    void mercatorCenterIsTheProjectedMidpointNotTheMean() {
+        // Mercator stretches away from the equator, so a band from 0 to 80
+        // is visually centred near 57, not 40. Centring on the mean leaves the
+        // northern edge outside a viewport the fitted zoom just sized for it.
+        assertEquals(57.045, WebMercator.centerLatitude(0, 80), 1e-3);
+        assertEquals(-57.045, WebMercator.centerLatitude(-80, 0), 1e-3);
+
+        // Symmetric bands still centre on the equator, and a degenerate band
+        // on itself.
+        assertEquals(0.0, WebMercator.centerLatitude(-45, 45), 1e-9);
+        assertEquals(37.7749, WebMercator.centerLatitude(37.7749, 37.7749), 1e-6);
+
+        // Near the equator the distortion is negligible, so it stays close to
+        // the arithmetic mean.
+        assertEquals(1.0, WebMercator.centerLatitude(0, 2), 1e-3);
+    }
+
+    @Test
+    void mercatorCenterSurvivesThePoles() {
+        // Mercator runs to infinity at the poles, so projecting +-90 and
+        // averaging produced nonsense: a pole-to-pole span used to centre on
+        // the south pole rather than the equator.
+        assertEquals(0.0, WebMercator.centerLatitude(-90, 90), 1e-9);
+        assertEquals(WebMercator.MAX_LATITUDE, WebMercator.centerLatitude(90, 90), 1e-6);
+        assertEquals(-WebMercator.MAX_LATITUDE, WebMercator.centerLatitude(-90, -90), 1e-6);
+        assertTrue(WebMercator.centerLatitude(0, 90) < WebMercator.MAX_LATITUDE);
+
+        assertEquals(WebMercator.MAX_LATITUDE, WebMercator.clampLatitude(90), 1e-9);
+        assertEquals(-WebMercator.MAX_LATITUDE, WebMercator.clampLatitude(-90), 1e-9);
+        assertEquals(12.5, WebMercator.clampLatitude(12.5), 1e-9);
+    }
+
+    @Test
+    void nativeMapReportsNoFitWhenThereIsNothingToFitTo() {
+        MapBounds world = new MapBounds(new LatLng(-85, -180), new LatLng(85, 180));
+        // Before layout there is no viewport to solve against.
+        assertTrue(Double.isNaN(NativeMap.zoomToFit(world, 0, 0, 0, 1.0)));
+        assertTrue(Double.isNaN(NativeMap.zoomToFit(world, 256, 0, 0, 1.0)));
+        assertTrue(Double.isNaN(NativeMap.zoomToFit(null, 256, 256, 0, 1.0)));
+        assertTrue(Double.isNaN(NativeMap.zoomToFit(world, 256, 256, 0, 0)));
+
+        // A single point has no extent, so no zoom "fits" it.
+        MapBounds point = new MapBounds(new LatLng(37.7749, -122.4194),
+                new LatLng(37.7749, -122.4194));
+        assertTrue(Double.isNaN(NativeMap.zoomToFit(point, 256, 256, 0, 1.0)));
+
+        // Padding that swallows the viewport leaves nothing to fit into;
+        // solving against a forced one-pixel window would give an absurd zoom.
+        assertTrue(Double.isNaN(NativeMap.zoomToFit(world, 256, 256, 128, 1.0)));
+        assertTrue(Double.isNaN(NativeMap.zoomToFit(world, 256, 256, 200, 1.0)));
+        assertFalse(Double.isNaN(NativeMap.zoomToFit(world, 256, 256, 127, 1.0)));
+    }
+
+    @Test
+    void nativeMapZoomsFurtherForASmallerRegion() {
+        // A tighter region must fit at a higher zoom than a wider one; this is
+        // the property that was missing when fitBounds only recentered.
+        MapBounds city = new MapBounds(new LatLng(37.70, -122.52), new LatLng(37.83, -122.35));
+        MapBounds block = new MapBounds(new LatLng(37.7740, -122.4200), new LatLng(37.7760, -122.4180));
+        double cityZoom = NativeMap.zoomToFit(city, 800, 800, 0, 1.0);
+        double blockZoom = NativeMap.zoomToFit(block, 800, 800, 0, 1.0);
+        assertTrue(blockZoom > cityZoom, "block " + blockZoom + " should out-zoom city " + cityZoom);
     }
 
     /** A no-op MapProvider used to exercise the registry without any native peer. */
