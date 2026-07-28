@@ -363,20 +363,28 @@ class CN1HealthConnectBridge(private val context: Context)
         // samples with no token that could ever reach them. Overshooting
         // the limit by the tail of one record is recoverable; losing it is
         // not.
-        // Membership, not adjacency. Two overlapping series records
-        // interleave once their samples are sorted by time -- A1, B1, A2 --
-        // so comparing against only the previous line's id cut inside
-        // record A while believing it had finished it. Health Connect's
-        // token has already advanced past both fetched records and the
-        // truncation path clears it, so A2 would have been unreachable for
-        // good. A record already started is always finished.
-        val started = HashSet<String>()
-        for ((i, line) in ordered.withIndex()) {
+        //
+        // Records are admitted, and admission is what the budget buys; the
+        // loop never breaks. Two earlier attempts stopped at the first
+        // line of an unseen record: comparing against only the previous
+        // line's id cut inside a record whose samples interleaved with
+        // another's (A1, B1, A2), and remembering which records had
+        // started still stopped at C1 in A1, B1, C1, A2 -- leaving A
+        // half-emitted while the token had advanced past all of it, so A2
+        // was unreachable for good. Skipping a line whose record was never
+        // admitted, rather than stopping on it, lets every admitted record
+        // run to its end and keeps the output in time order.
+        val admitted = HashSet<String>()
+        var emitted = 0
+        for (line in ordered) {
             val id = line.substringBefore('\t')
-            if (limit in 1..i && !started.contains(id)) {
-                break
+            if (!admitted.contains(id)) {
+                if (limit in 1..emitted) {
+                    continue
+                }
+                admitted.add(id)
             }
-            started.add(id)
+            emitted++
             out.append(line).append('\n')
         }
         return out.toString()
@@ -835,7 +843,13 @@ class CN1HealthConnectBridge(private val context: Context)
                 zoneOffset = zone,
                 level = BloodGlucose.millimolesPerLiter(value), metadata = meta)
 
-            "heart_rate" -> HeartRateRecord(startTime = start, endTime = end,
+            // HeartRateRecord is an interval record and rejects
+            // start == end in its constructor. A heart rate is an instant
+            // reading, and every flattened series point is one too, so
+            // without a span of its own every ordinary Android heart-rate
+            // write threw before it reached the insert.
+            "heart_rate" -> HeartRateRecord(startTime = start,
+                endTime = if (end.isAfter(start)) end else start.plusMillis(1),
                 startZoneOffset = zone, endZoneOffset = zone,
                 samples = listOf(HeartRateRecord.Sample(time = start,
                     beatsPerMinute = value.toLong())), metadata = meta)

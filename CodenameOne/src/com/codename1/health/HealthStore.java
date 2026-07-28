@@ -655,6 +655,51 @@ public class HealthStore {
         return converted;
     }
 
+    /// Checks and converts a series exactly as a scalar write is checked.
+    ///
+    /// A series used to be returned untouched, skipping both the
+    /// dimension check and the conversion to the port's preferred write
+    /// unit. The bridges read the value and ignore the unit that travels
+    /// beside it, so a heart-rate series in `COUNT_PER_SECOND` was stored
+    /// as the same numbers in `COUNT_PER_MINUTE` -- 2 Hz became 2 bpm
+    /// rather than 120 -- and a series in an entirely wrong dimension was
+    /// accepted without complaint.
+    private SeriesSample validateSeriesForWrite(SeriesSample series,
+            HealthDataType type) throws HealthException {
+        HealthUnit preferred = getPreferredWriteUnit(type);
+        if (preferred == null) {
+            return series;
+        }
+        if (!series.getUnit().isCompatibleWith(preferred)) {
+            throw new HealthException(HealthError.UNIT_MISMATCH,
+                    type.getId() + " is measured in "
+                            + preferred.getDimension() + " but the series is"
+                            + " in " + series.getUnit().getSymbol());
+        }
+        if (series.getUnit() == preferred) {
+            return series;
+        }
+        int n = series.size();
+        long[] starts = new long[n];
+        long[] ends = new long[n];
+        double[] values = new double[n];
+        for (int i = 0; i < n; i++) {
+            starts[i] = series.getSampleStartMillis(i);
+            ends[i] = series.getSampleEndMillis(i);
+            values[i] = series.getSampleValue(i, preferred);
+        }
+        SeriesSample converted = SeriesSample.create(type,
+                series.getStartMillis(), series.getEndMillis(), starts, ends,
+                values, preferred);
+        converted.setId(series.getId());
+        converted.setSource(series.getSource());
+        converted.setRecordingMethod(series.getRecordingMethod());
+        for (Map.Entry<String, String> e : series.getMetadata().entrySet()) {
+            converted.putMetadata(e.getKey(), e.getValue());
+        }
+        return converted;
+    }
+
     // ==================================================================
     // aggregates
     // ==================================================================
@@ -953,8 +998,69 @@ public class HealthStore {
             out.error(ex);
             return out;
         }
-        writeChunk(prepared, 0, new HealthWriteResult(), out);
+        writeChunk(splitOversizedSeries(prepared,
+                Math.max(1, getMaxWriteBatchSize())), 0,
+                new HealthWriteResult(), out);
         return out;
+    }
+
+    /// One record per measurement, so the chunker's budget is honest.
+    ///
+    /// A series reaches the platform as one record per point -- see
+    /// `HealthWire.encodeSamples` -- while the chunker counted it as a
+    /// single sample. A 5,000-point series therefore went to Health
+    /// Connect as 5,000 records in one call, past its 1,000-record cap,
+    /// and the whole write was rejected even though `write` documents
+    /// automatic chunking. Anything longer than a batch is split into
+    /// several series first, so no single one can overflow a chunk on its
+    /// own.
+    ///
+    /// The pieces share the original's identifier: they came from one
+    /// record and there is nothing else to call them.
+    private static List<HealthSample> splitOversizedSeries(
+            List<HealthSample> samples, int max) {
+        List<HealthSample> out = new ArrayList<HealthSample>();
+        for (HealthSample sample : samples) {
+            if (!(sample instanceof SeriesSample)
+                    || ((SeriesSample) sample).size() <= max) {
+                out.add(sample);
+                continue;
+            }
+            SeriesSample series = (SeriesSample) sample;
+            for (int from = 0; from < series.size(); from += max) {
+                out.add(slice(series, from,
+                        Math.min(series.size(), from + max)));
+            }
+        }
+        return out;
+    }
+
+    /// Measurements `[from,to)` of `series` as a series of their own.
+    private static SeriesSample slice(SeriesSample series, int from, int to) {
+        int n = to - from;
+        long[] starts = new long[n];
+        long[] ends = new long[n];
+        double[] values = new double[n];
+        for (int i = 0; i < n; i++) {
+            starts[i] = series.getSampleStartMillis(from + i);
+            ends[i] = series.getSampleEndMillis(from + i);
+            values[i] = series.getSampleValue(from + i, series.getUnit());
+        }
+        SeriesSample part = SeriesSample.create(series.getType(), starts[0],
+                ends[n - 1], starts, ends, values, series.getUnit());
+        part.setId(series.getId());
+        part.setSource(series.getSource());
+        part.setRecordingMethod(series.getRecordingMethod());
+        for (Map.Entry<String, String> e : series.getMetadata().entrySet()) {
+            part.putMetadata(e.getKey(), e.getValue());
+        }
+        return part;
+    }
+
+    /// How many platform records a sample becomes.
+    private static int recordCost(HealthSample sample) {
+        return sample instanceof SeriesSample
+                ? Math.max(1, ((SeriesSample) sample).size()) : 1;
     }
 
     private void writeChunk(final List<HealthSample> all, final int from,
@@ -964,8 +1070,19 @@ public class HealthStore {
             out.complete(accumulated);
             return;
         }
-        int to = Math.min(all.size(), from + Math.max(1,
-                getMaxWriteBatchSize()));
+        // Counted in records rather than in samples, because that is what
+        // the platform's batch cap counts.
+        int max = Math.max(1, getMaxWriteBatchSize());
+        int to = from;
+        int cost = 0;
+        while (to < all.size()) {
+            int next = recordCost(all.get(to));
+            if (to > from && cost + next > max) {
+                break;
+            }
+            cost += next;
+            to++;
+        }
         List<HealthSample> chunk = new ArrayList<HealthSample>(
                 all.subList(from, to));
         final int nextFrom = to;
@@ -1027,6 +1144,9 @@ public class HealthStore {
                     type.getId() + " accumulates over time and needs a"
                             + " start and an end, but this sample marks a"
                             + " single instant");
+        }
+        if (sample instanceof SeriesSample) {
+            return validateSeriesForWrite((SeriesSample) sample, type);
         }
         if (!(sample instanceof QuantitySample)) {
             return sample;

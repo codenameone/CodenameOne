@@ -167,6 +167,21 @@ final class HealthManifestFragments {
      * dropping blanks. Tolerates whitespace and trailing commas, since the
      * value is hand-written in a properties file.
      */
+    /// Whether `android.topDependency` declares a `kotlin-gradle-plugin`
+    /// at all, however it spells the version.
+    ///
+    /// This is the condition the Gradle generator actually branches on --
+    /// a bare substring match -- so it is what decides whether the
+    /// generated 1.9.22 plugin line is suppressed. A declaration whose
+    /// version is a Gradle variable (`kotlin-gradle-plugin:$kotlin_version`)
+    /// suppresses it just the same while
+    /// [#declaredKotlinPluginVersion(String)] can read nothing, so the two
+    /// questions have to be asked separately.
+    static boolean declaresKotlinPlugin(String topDependency) {
+        return topDependency != null
+                && topDependency.indexOf(KOTLIN_PLUGIN) >= 0;
+    }
+
     /// The `kotlin-gradle-plugin` version an app declares for itself in
     /// `android.topDependency`, or null when it declares none.
     ///

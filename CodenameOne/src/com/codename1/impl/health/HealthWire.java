@@ -125,6 +125,16 @@ public final class HealthWire {
                 && ANDROID_WRITABLE.indexOf("," + type.getId() + ",") >= 0;
     }
 
+    /// Whether the Health Connect bridge can delete records of `type`.
+    ///
+    /// The same set it can read. Deletion goes by record class plus
+    /// identifier or range, so it needs a mapped record class and nothing
+    /// more -- unlike a write, which also needs a single-value form the
+    /// series-shaped types do not have.
+    public static boolean isAndroidDeletable(HealthDataType type) {
+        return isAndroidSupported(type);
+    }
+
     // ------------------------------------------------------------------
     // samples
     // ------------------------------------------------------------------

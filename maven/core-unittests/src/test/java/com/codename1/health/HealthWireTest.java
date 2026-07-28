@@ -414,4 +414,122 @@ class HealthWireTest {
                 .indexOf("\"flatten\":false") >= 0,
                 "a bridge cannot honour an option it is never told about");
     }
+
+    /**
+     * A series is checked and converted like a scalar write.
+     *
+     * <p>The wire carries the raw value and the bridges read it in the
+     * type's canonical unit, so a series that skipped the conversion was
+     * stored as the wrong numbers entirely -- 2 Hz persisted as 2 bpm
+     * rather than 120 -- and an incompatible dimension was accepted
+     * without complaint.</p>
+     */
+    @Test
+    void aSeriesWriteIsConvertedToTheCanonicalUnit() throws Exception {
+        long[] at = {1000L, 2000L};
+        long[] ends = {1000L, 2000L};
+        double[] hertz = {2.0, 3.0};
+        SeriesSample series = SeriesSample.create(HealthDataType.HEART_RATE,
+                1000L, 2000L, at, ends, hertz, HealthUnit.COUNT_PER_SECOND);
+
+        FakeHealthStore store = new FakeHealthStore();
+        store.write(series).get();
+
+        assertEquals(1, store.writeChunks.size());
+        SeriesSample written =
+                (SeriesSample) store.writeChunks.get(0).get(0);
+        assertSame(HealthUnit.COUNT_PER_MINUTE, written.getUnit(),
+                "the port receives the unit it writes in");
+        assertEquals(120.0,
+                written.getSampleValue(0, HealthUnit.COUNT_PER_MINUTE), 1e-9);
+        assertEquals(180.0,
+                written.getSampleValue(1, HealthUnit.COUNT_PER_MINUTE), 1e-9);
+    }
+
+    /** A series in the wrong dimension is refused, not silently stored. */
+    @Test
+    void aSeriesInTheWrongDimensionIsRejected() {
+        long[] at = {1000L};
+        double[] kg = {70.0};
+        SeriesSample series = SeriesSample.create(HealthDataType.HEART_RATE,
+                1000L, 1000L, at, at, kg, HealthUnit.KILOGRAM);
+        FakeHealthStore store = new FakeHealthStore();
+        Throwable err = errorOf(store.write(series));
+        assertNotNull(err, "an incompatible unit must not reach the port");
+        assertSame(HealthError.UNIT_MISMATCH,
+                ((HealthException) err).getError());
+    }
+
+    /**
+     * A series longer than one batch is split so no single platform call
+     * exceeds the record cap.
+     *
+     * <p>The chunker counted a series as one sample while the wire expands
+     * it to one record per point, so a 5,000-point series went to Health
+     * Connect as 5,000 records in one call -- past its 1,000-record cap,
+     * rejecting the whole write that `write` documents as chunked.</p>
+     */
+    @Test
+    void anOversizedSeriesIsSplitAcrossWrites() throws Exception {
+        int n = 250;
+        long[] at = new long[n];
+        long[] ends = new long[n];
+        double[] values = new double[n];
+        for (int i = 0; i < n; i++) {
+            at[i] = 1000L + i;
+            ends[i] = at[i];
+            values[i] = 60 + i % 10;
+        }
+        SeriesSample series = SeriesSample.create(HealthDataType.HEART_RATE,
+                at[0], at[n - 1], at, ends, values,
+                HealthUnit.COUNT_PER_MINUTE);
+
+        FakeHealthStore store = new FakeHealthStore();
+        store.maxWriteBatch = 100;
+        store.write(series).get();
+
+        int records = 0;
+        for (List<HealthSample> chunk : store.writeChunks) {
+            int cost = 0;
+            for (HealthSample s : chunk) {
+                cost += s instanceof SeriesSample
+                        ? ((SeriesSample) s).size() : 1;
+            }
+            assertTrue(cost <= 100,
+                    "no call may exceed the platform record cap, got " + cost);
+            records += cost;
+        }
+        assertEquals(n, records, "every measurement is still written");
+    }
+
+    /**
+     * Deleting is not writing. The series-shaped types have no
+     * single-value write form on Health Connect but delete by record id
+     * perfectly well -- which is the whole point of asking for record
+     * identity in the first place.
+     */
+    @Test
+    void seriesTypesAreDeletableOnAndroidEvenThoughTheyAreNotWritable() {
+        assertFalse(HealthWire.isAndroidWritable(HealthDataType.POWER));
+        assertTrue(HealthWire.isAndroidDeletable(HealthDataType.POWER));
+        assertTrue(HealthWire.isAndroidDeletable(HealthDataType.SPEED));
+        assertTrue(HealthWire.isAndroidDeletable(
+                HealthDataType.CYCLING_CADENCE));
+        assertTrue(HealthWire.isAndroidDeletable(
+                HealthDataType.RUNNING_CADENCE));
+        // Still bounded by what the bridge maps at all.
+        assertFalse(HealthWire.isAndroidDeletable(
+                HealthDataType.SLEEP));
+    }
+
+    private static Throwable errorOf(
+            com.codename1.util.AsyncResource<?> r) {
+        final Throwable[] err = new Throwable[1];
+        r.except(new com.codename1.util.SuccessCallback<Throwable>() {
+            public void onSucess(Throwable t) {
+                err[0] = t;
+            }
+        });
+        return err[0];
+    }
 }

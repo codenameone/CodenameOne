@@ -65,6 +65,16 @@ class WatchNativeBuilder {
     // shake from its own root. Empty when neither watchMain nor an explicit
     // watchNative.mainClass hint is set (then we fall back to the phone main).
     private String watchMain;
+    // Whether the watch shakes from its own root rather than the phone's.
+    // A distinct root means the phone's health usage says nothing about
+    // the watch's, so the HealthKit entitlement cannot be inferred from
+    // the phone's privacy strings.
+    private boolean distinctWatchMain;
+    // Explicit opt-in/out for HealthKit on the watch bundle.
+    private String healthHint;
+    // watchNative.health.workoutProcessing, kept so the entitlement
+    // decision can read it too -- a workout session is HealthKit.
+    private String workoutProcessingHint;
 
     // GL/Metal-only source files with no watchOS substitute. Excluded from the
     // watch target; the CG backend (CN1CGGraphics/CN1WatchRenderingView) and the
@@ -141,11 +151,16 @@ class WatchNativeBuilder {
         if (!enabled) {
             return;
         }
+        distinctWatchMain = watchMain.length() > 0
+                && !watchMain.equals(request.getMainClass());
         if (watchMain.length() == 0) {
             // No distinct watch entry: reuse the phone main class as the watch
             // lifecycle root.
             watchMain = request.getMainClass();
         }
+        healthHint = request.getArg("watchNative.health", "").trim();
+        workoutProcessingHint = request.getArg(
+                "watchNative.health.workoutProcessing", "false").trim();
         distribution = request.getArg("watchNative.distribution", "companion");
         bundleId = request.getArg("watchNative.bundleId",
                 request.getPackageName() + ".watchkitapp");
@@ -433,20 +448,130 @@ class WatchNativeBuilder {
         }
         // HKWorkoutSession keeps the app running while a workout records;
         // without this background mode watchOS suspends it mid-run.
-        if ("true".equalsIgnoreCase(request.getArg(
-                "watchNative.health.workoutProcessing", "false"))) {
+        if ("true".equalsIgnoreCase(workoutProcessingHint)) {
             sb.append("    <key>WKBackgroundModes</key>\n    <array>\n")
               .append("        <string>workout-processing</string>\n")
               .append("    </array>\n");
         }
         sb.append("</dict>\n</plist>\n");
+        writeWatchEntitlements(request, appSrcDir,
+                watchUsesHealth(healthShare != null || healthUpdate != null));
         File plist = new File(appSrcDir, request.getMainClass() + "-Watch-Info.plist");
         owner.createFile(plist, sb.toString().getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * Whether the watch bundle itself uses HealthKit.
+     *
+     * <p>The phone's privacy strings are evidence about the phone. When
+     * the watch shares the phone's main class it runs the same code, so
+     * they are evidence about the watch too. When the watch has its own
+     * {@code watchMain} it shakes from its own root and the phone's usage
+     * says nothing -- entitling that bundle anyway made codesigning fail
+     * for an ordinary non-health watch app whose App ID has no HealthKit
+     * capability, with nothing in the output to explain it.</p>
+     *
+     * <p>{@code watchNative.health} settles it either way, and
+     * {@code watchNative.health.workoutProcessing} implies it: a workout
+     * session is HealthKit.</p>
+     */
+    boolean watchUsesHealth(boolean phoneUsesHealth) {
+        if ("true".equalsIgnoreCase(healthHint)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(healthHint)) {
+            return false;
+        }
+        if ("true".equalsIgnoreCase(workoutProcessingHint)) {
+            return true;
+        }
+        return phoneUsesHealth && !distinctWatchMain;
+    }
+
+    /**
+     * Writes the watch target's own entitlements file when the watch uses
+     * HealthKit.
+     *
+     * <p>The watch app is signed independently of the phone app, so the
+     * phone's entitlement does not reach it. Emitting the privacy strings
+     * alone produces a watch build that asks for HealthKit authorization
+     * and is refused, with nothing in the build output to explain why.</p>
+     */
+    private void writeWatchEntitlements(BuildRequest request, File appSrcDir,
+            boolean usesHealth) throws IOException {
+        if (!usesHealth) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+          .append("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" ")
+          .append("\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n")
+          .append("<plist version=\"1.0\">\n<dict>\n")
+          .append("    <key>com.apple.developer.healthkit</key>\n")
+          .append("    <true/>\n");
+        if ("true".equalsIgnoreCase(request.getArg(
+                "ios.health.backgroundDelivery", "false"))
+                || "true".equalsIgnoreCase(workoutProcessingHint)) {
+            sb.append("    <key>com.apple.developer.healthkit")
+              .append(".background-delivery</key>\n    <true/>\n");
+        }
+        sb.append("</dict>\n</plist>\n");
+        owner.createFile(new File(appSrcDir,
+                request.getMainClass() + "-Watch.entitlements"),
+                sb.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * The CODE_SIGN_ENTITLEMENTS setting for the watch target, or an empty
+     * string when the watch does not use HealthKit.
+     */
+    private String watchEntitlementsSetting(BuildRequest request,
+            String mainClass) {
+        // The same gate the entitlements file itself uses. Pointing the
+        // target at a file that is not written, or writing one the target
+        // never signs with, are two different ways to be wrong.
+        boolean phoneUsesHealth =
+                request.getArg("ios.NSHealthShareUsageDescription", null) != null
+                || request.getArg("ios.NSHealthUpdateUsageDescription",
+                        null) != null;
+        if (!watchUsesHealth(phoneUsesHealth)) {
+            return "";
+        }
+        return "  bs['CODE_SIGN_ENTITLEMENTS'] = '"
+                + IPhoneBuilder.escapeRubyStr(mainClass + "-src/" + mainClass
+                        + "-Watch.entitlements") + "'\n";
+    }
+
     private static void plistString(StringBuilder sb, String key, String value) {
         sb.append("    <key>").append(key).append("</key>\n    <string>")
-                .append(value == null ? "" : value).append("</string>\n");
+                .append(escapeXml(value)).append("</string>\n");
+    }
+
+    /**
+     * Escapes a value for XML content.
+     *
+     * <p>These strings come from build hints, so they are whatever the
+     * developer wrote. A perfectly reasonable purpose string such as
+     * "Reads &amp; analyzes workouts" produced a malformed plist and an
+     * Xcode failure with no obvious cause.</p>
+     */
+    private static String escapeXml(String value) {
+        if (value == null || value.length() == 0) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder(value.length() + 16);
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '&': out.append("&amp;"); break;
+                case '<': out.append("&lt;"); break;
+                case '>': out.append("&gt;"); break;
+                case '"': out.append("&quot;"); break;
+                case '\'': out.append("&apos;"); break;
+                default: out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     /**
@@ -536,6 +661,7 @@ class WatchNativeBuilder {
                 .append("  bs['PRODUCT_NAME'] = '$(TARGET_NAME)'\n")
                 .append("  bs['INFOPLIST_FILE'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(infoPlistPath)).append("'\n")
+                .append(watchEntitlementsSetting(request, mainClass))
                 .append("  bs['MARKETING_VERSION'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(request.getVersion() == null ? "1.0" : request.getVersion())).append("'\n")
                 .append("  bs['CURRENT_PROJECT_VERSION'] = '")

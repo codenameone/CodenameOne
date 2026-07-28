@@ -2573,9 +2573,32 @@ public class AndroidGradleBuilder extends Executor {
             // and the bridge was compiled by whatever compiler was pinned.
             // Overriding a version the app asked for would break whatever
             // it wanted that compiler for, so say so instead.
+            String topDependency =
+                    request.getArg("android.topDependency", "");
             String declaredPlugin =
                     HealthManifestFragments.declaredKotlinPluginVersion(
-                            request.getArg("android.topDependency", ""));
+                            topDependency);
+            if (HealthManifestFragments.declaresKotlinPlugin(topDependency)
+                    && declaredPlugin == null) {
+                // A version this build cannot read -- a Gradle variable,
+                // typically. The generator suppresses its own plugin line
+                // on the bare substring, so the declaration takes effect
+                // while the floor check below sees nothing to check, and a
+                // variable resolving to 1.7.x compiled the bridge with an
+                // incompatible compiler. Nothing here can resolve it, so
+                // ask for a literal rather than guess.
+                error("This app declares kotlin-gradle-plugin in "
+                        + "android.topDependency with a version this build "
+                        + "cannot read, and that declaration replaces the "
+                        + "plugin the build would otherwise add. Health "
+                        + "Connect needs Kotlin " + kotlinFloor + " or "
+                        + "newer to compile the bridge, so state the "
+                        + "version literally -- "
+                        + "org.jetbrains.kotlin:kotlin-gradle-plugin:"
+                        + kotlinFloor + " -- or drop the declaration.",
+                        new RuntimeException("kotlin plugin version "
+                                + "unreadable"));
+            }
             if (declaredPlugin != null
                     && compareVersions(declaredPlugin, kotlinFloor) < 0) {
                 error("This app declares kotlin-gradle-plugin "

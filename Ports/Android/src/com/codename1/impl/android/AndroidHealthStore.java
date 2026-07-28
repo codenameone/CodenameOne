@@ -98,8 +98,16 @@ class AndroidHealthStore extends HealthStore {
         return isTypeSupported(type) && HealthWire.isAndroidWritable(type);
     }
 
+    /// Deletion is not writing.
+    ///
+    /// `deleteRecords` removes by record class and identifier or range,
+    /// and the bridge maps a record class for every readable type -- so
+    /// the four series-shaped types have no single-value write form yet
+    /// are perfectly deletable. Answering from the write table made
+    /// capability-gated code refuse to delete exactly the record
+    /// identities `setFlattenSeries(false)` exists to hand out.
     public boolean isDeletable(HealthDataType type) {
-        return isTypeSupported(type) && HealthWire.isAndroidWritable(type);
+        return isTypeSupported(type) && HealthWire.isAndroidDeletable(type);
     }
 
     /// Health Connect computes these natively; anything else is derived
