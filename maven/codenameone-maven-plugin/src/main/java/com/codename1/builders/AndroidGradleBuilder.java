@@ -2031,6 +2031,19 @@ public class AndroidGradleBuilder extends Executor {
                         + HealthManifestFragments.knownTokens(),
                         new RuntimeException("android.health.write unset"));
             }
+            // A workout is its own data type, so a declaration of some
+            // other type satisfies the emptiness checks above while the
+            // manifest still gets neither READ_EXERCISE nor WRITE_EXERCISE
+            // and every workout call is unauthorized at runtime.
+            if (usesHealthWorkout && !(readTypes.contains("workout")
+                    && writeTypes.contains("workout"))) {
+                error("This app uses the workout API, which reads and "
+                        + "writes exercise data, but does not declare the "
+                        + "workout type. Add it to both lists:\n"
+                        + "  android.health.read=workout\n"
+                        + "  android.health.write=workout",
+                        new RuntimeException("workout token undeclared"));
+            }
             java.util.List<String> readTokens =
                     HealthManifestFragments.parseTypeList(readHint);
             java.util.List<String> writeTokens =

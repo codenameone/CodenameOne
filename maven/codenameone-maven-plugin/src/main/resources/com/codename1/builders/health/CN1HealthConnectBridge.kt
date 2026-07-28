@@ -468,7 +468,7 @@ class CN1HealthConnectBridge(private val context: Context)
             // is recoverable; skipping records is not.
             var lines = 0
             for (record in page.records) {
-                lines += appendOne(sb, record, token, flatten)
+                lines += appendOne(sb, record, token, flatten, ascending)
             }
             if (page.records.isNotEmpty()) {
                 samplesPerRecord = maxOf(1, lines / page.records.size)
@@ -497,7 +497,8 @@ class CN1HealthConnectBridge(private val context: Context)
      * than silently dropping them.
      */
     private fun appendOne(sb: StringBuilder, record: Record,
-                          token: String, flatten: Boolean): Int {
+                          token: String, flatten: Boolean,
+                          ascending: Boolean = true): Int {
         if (!flatten && appendWholeSeries(sb, record, token)) {
             return 1
         }
@@ -572,27 +573,27 @@ class CN1HealthConnectBridge(private val context: Context)
             // Series records hold many samples in one record and the
             // portable layer flattens by default, so emit one line per
             // sample rather than per record.
-            is HeartRateRecord -> record.samples.forEach {
+            is HeartRateRecord -> ordered(record.samples, ascending).forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.beatsPerMinute.toDouble(), "count/min")
             }
 
-            is PowerRecord -> record.samples.forEach {
+            is PowerRecord -> ordered(record.samples, ascending).forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.power.inWatts, "W")
             }
 
-            is SpeedRecord -> record.samples.forEach {
+            is SpeedRecord -> ordered(record.samples, ascending).forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.speed.inMetersPerSecond, "m/s")
             }
 
-            is CyclingPedalingCadenceRecord -> record.samples.forEach {
+            is CyclingPedalingCadenceRecord -> ordered(record.samples, ascending).forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.revolutionsPerMinute, "count/min")
             }
 
-            is StepsCadenceRecord -> record.samples.forEach {
+            is StepsCadenceRecord -> ordered(record.samples, ascending).forEach {
                 sample(sb, record, token, it.time.toEpochMilli(),
                     it.rate, "count/min")
             }
@@ -674,6 +675,19 @@ class CN1HealthConnectBridge(private val context: Context)
      * honoured. Ignoring it meant the option did nothing anywhere and the
      * caller got scalar samples whatever it asked for.
      */
+    /**
+     * The samples of a series in the direction the query asked for.
+     *
+     * `ascendingOrder` on the request orders the *records*; the samples
+     * inside one were always emitted oldest-first. A single-type response
+     * is not passed through `mergeByTime`, so a descending read came back
+     * with each record's points in ascending order -- and a small portable
+     * limit then kept the oldest readings when the caller had asked for
+     * the newest.
+     */
+    private fun <T> ordered(samples: List<T>, ascending: Boolean): List<T> =
+        if (ascending) samples else samples.asReversed()
+
     private fun appendWholeSeries(sb: StringBuilder, record: Record,
                                   token: String): Boolean {
         when (record) {
