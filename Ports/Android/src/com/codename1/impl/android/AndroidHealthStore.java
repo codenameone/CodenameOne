@@ -145,8 +145,17 @@ class AndroidHealthStore extends HealthStore {
         return false;
     }
 
+    /// False, like [#isPushDelivery()].
+    ///
+    /// The base method's contract is that changes arrive without the app
+    /// asking. Nothing here does that: Health Connect has no push at all,
+    /// and no lifecycle hook drains on the app's behalf, so a subscription
+    /// delivers exactly when `drainChanges()` is called and never
+    /// otherwise. Answering true let an app branch away from scheduling
+    /// its own drain and then receive nothing -- the same silence as
+    /// having no data, which is the confusion this API exists to avoid.
     public boolean isBackgroundDeliverySupported() {
-        return isSupported();
+        return false;
     }
 
     /// Unlike iOS, Android can answer this honestly: read access is an

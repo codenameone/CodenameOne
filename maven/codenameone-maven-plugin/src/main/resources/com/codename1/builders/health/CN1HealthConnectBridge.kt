@@ -272,11 +272,25 @@ class CN1HealthConnectBridge(private val context: Context)
             // of an incremental k-way merge, which would mean per-type
             // page cursors held across the whole read.
             //
-            // So the cost is K per type rather than K overall. That is
-            // bounded and predictable, and it is the side to err on: a
-            // reply that is larger than asked for is trimmed by the shared
-            // layer, while one built from the wrong candidates is simply
-            // wrong.
+            // So the cost is K per type rather than K overall, and the
+            // reply can exceed the caller's limit by a factor of the type
+            // count: the shared layer trims only when no continuation
+            // token remains, and these types still have theirs.
+            //
+            // Neither static split is right. Dividing the budget cannot
+            // see a top-K that lives in one type; giving each the whole
+            // budget cannot honour the cap. The answer is an incremental
+            // k-way merge -- fetch a page per type, emit the newest across
+            // them until K, and report for any partially-emitted type the
+            // token *before* its last page so the remainder is re-read
+            // rather than skipped. That is a real rewrite of this path and
+            // is not something to land unverified; see the note in
+            // SampleQuery#setLimit.
+            //
+            // Until it lands, the limit is per type here. That is the side
+            // to err on: an oversized reply is bounded, predictable and
+            // trimmable, while one built from the wrong candidates is
+            // simply wrong.
             val perTypeBudget = budget
             val perType = ArrayList<String>()
             for (i in 0 until types.length()) {

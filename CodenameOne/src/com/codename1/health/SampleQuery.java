@@ -101,6 +101,17 @@ public final class SampleQuery {
     }
 
     /// Caps how many samples come back. Must be positive.
+    ///
+    /// **On Android the cap is per data type when a query names several.**
+    /// Health Connect pages per record type, so a limit of ten over two
+    /// types can return twenty. Neither alternative works: dividing the
+    /// budget cannot find a newest-ten that all lives in one type, and
+    /// trimming the merged page discards records the per-type
+    /// continuation tokens have already moved past. Honouring it exactly
+    /// needs an incremental k-way merge across the types, which is not
+    /// implemented yet. Query one type at a time where the cap has to be
+    /// exact -- which is also what iOS does, since `HKSampleQuery` reads
+    /// one type per query.
     public SampleQuery setLimit(int limit) {
         this.limit = limit;
         return this;
