@@ -559,4 +559,128 @@ class BleSensorReconnectTest extends UITestBase {
                 "the ladder should be bounded, saw " + p.connects
                         + " connect attempts");
     }
+
+    /**
+     * A store that commits its first chunk and then fails, so a caller
+     * that requeues the whole batch writes the committed part twice.
+     */
+    private static final class HalfCommittingStore
+            extends com.codename1.health.HealthStore {
+
+        /** Every value handed to doWrite, across every attempt. */
+        final java.util.List<Double> written = new ArrayList<Double>();
+
+        @Override
+        public boolean isSupported() {
+            return true;
+        }
+
+        @Override
+        public boolean isTypeSupported(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        @Override
+        public boolean isWritable(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        /** One record per chunk, so the batch splits sample by sample. */
+        @Override
+        public int getMaxWriteBatchSize() {
+            return 1;
+        }
+
+        @Override
+        protected void doWrite(
+                java.util.List<com.codename1.health.HealthSample> samples,
+                AsyncResource<com.codename1.health.HealthWriteResult> out) {
+            com.codename1.health.QuantitySample q =
+                    (com.codename1.health.QuantitySample) samples.get(0);
+            double bpm = q.getQuantity().getValue(
+                    com.codename1.health.HealthUnit.COUNT_PER_MINUTE);
+            written.add(Double.valueOf(bpm));
+            if (bpm >= 71) {
+                // The later sample always fails, so the earlier one is
+                // always a committed prefix of a failed write.
+                out.error(new com.codename1.health.HealthException(
+                        com.codename1.health.HealthError.DATABASE_INACCESSIBLE,
+                        "scripted failure on the second chunk"));
+                return;
+            }
+            com.codename1.health.HealthWriteResult r =
+                    new com.codename1.health.HealthWriteResult();
+            r.addSampleId("committed-" + written.size());
+            out.complete(r);
+        }
+
+        int timesWritten(double bpm) {
+            int n = 0;
+            for (Double d : written) {
+                if (d.doubleValue() == bpm) {
+                    n++;
+                }
+            }
+            return n;
+        }
+    }
+
+    /**
+     * A retry after a partly-successful write does not resend what was
+     * already committed.
+     *
+     * <p>A buffered batch larger than the platform's chunk can fail on a
+     * later chunk with the earlier ones already in the store.
+     * {@code getPartialResult()} names those, but the retry rebuilt its
+     * list from the whole batch -- so every retry wrote the committed
+     * prefix again, and a session that kept streaming kept duplicating
+     * it. Asserted as an invariant rather than a count: the committed
+     * sample is written exactly once no matter how often the tail is
+     * retried.</p>
+     */
+    @Test
+    void aRetryDoesNotResendTheCommittedPrefix() throws Exception {
+        final HalfCommittingStore store = new HalfCommittingStore();
+        implementation.setHealth(new com.codename1.health.Health() {
+            @Override
+            public boolean isSupported() {
+                return true;
+            }
+
+            @Override
+            public com.codename1.health.HealthStore getStore() {
+                return store;
+            }
+        });
+        try {
+            FakePeripheral p = new FakePeripheral();
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE,
+                    // Long enough that two notifications issued back to
+                    // back are unambiguously one batch, rather than
+                    // relying on them landing inside a few milliseconds.
+                    new SensorSessionOptions().setWriteToStore(true)
+                            .setStoreBatchMillis(400), p);
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+
+            p.notifyHeartRate(70);
+            p.notifyHeartRate(71);
+            flushSerialCalls();
+
+            pump(2000);
+
+            assertTrue(store.timesWritten(71) > 1,
+                    "the uncommitted sample must keep being retried, or"
+                            + " this proves nothing");
+            assertEquals(1, store.timesWritten(70),
+                    "the committed sample must never be written again");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
 }

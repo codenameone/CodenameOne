@@ -295,6 +295,18 @@ class IOSHealthStore extends HealthStore {
                 out);
     }
 
+    /// Whether the subscription being drained hit a window it could not
+    /// page through, so the batch has to ask the app to resynchronise.
+    ///
+    /// Reset per subscription in [#drainFrom], and safe as a field for
+    /// the same reason [#drainFailure] is: the shared layer runs one
+    /// drain at a time and this drain reads its subscriptions in turn.
+    private boolean resyncRequired;
+
+    void noteResyncRequired() {
+        resyncRequired = true;
+    }
+
     /// The first failure this drain hit, or null.
     ///
     /// One field rather than state threaded through the recursion because
@@ -358,6 +370,7 @@ class IOSHealthStore extends HealthStore {
             drainFrom(subs, index + 1, delivered + sent, out);
             return;
         }
+        resyncRequired = false;
         readTypes(subs, index, delivered, out, types, 0,
                 new ArrayList<HealthSample>(), since, now, now);
     }
@@ -400,6 +413,20 @@ class IOSHealthStore extends HealthStore {
                     // ordinary drain as already out of time.
                     HealthAnchor.of(String.valueOf(safeUntil)), Long.MAX_VALUE,
                     safeUntil < now));;
+            if (resyncRequired) {
+                // A second, empty batch rather than a flag on the first.
+                // getAdded() is documented as empty when a resynchronisation
+                // is required, and the samples above were genuinely read
+                // and are genuinely the app's -- so they are delivered as
+                // themselves, and the instruction to go and re-read the
+                // range follows them. Delivered in that order because the
+                // shared layer drops the cursor on a resync batch, and
+                // dropping it first would discard the anchor the samples
+                // just earned.
+                sent += fireChanges(new HealthChangeBatch(sub.getId(),
+                        sub.getTypes(), null, null, true, null,
+                        Long.MAX_VALUE, false));
+            }
             // Counted per delivery a listener actually received: a
             // subscription restored with no live listener and no
             // persisted class queues nothing, and a page split by the
@@ -659,14 +686,22 @@ class IOSHealthStore extends HealthStore {
                     // Beyond TIED_INSTANT_LIMIT records at one millisecond
                     // the cursor has to step over the remainder anyway --
                     // the alternative is a drain that never terminates.
-                    // Said out loud, because it is data loss, and because
-                    // no device produces this without something writing
-                    // every record under a single stamped timestamp.
+                    //
+                    // Told to the app, not only to the log. Stepping over
+                    // it puts those records permanently outside every
+                    // later window, and a log line is not something an
+                    // app can act on: the batch is marked as needing a
+                    // resynchronisation, which is the signal this API
+                    // already defines for "your cursor cannot be trusted,
+                    // read the range yourself". The log stays for whoever
+                    // is looking at why.
+                    store.noteResyncRequired();
                     com.codename1.io.Log.p("CN1 Health: more than "
                             + TIED_INSTANT_LIMIT + " records share the"
                             + " timestamp " + since + " for "
                             + types.get(typeIndex).getId() + "; the"
-                            + " remainder cannot be paged and is skipped");
+                            + " remainder cannot be paged, so the batch"
+                            + " asks the app to resynchronise");
                 }
             }
             store.readTypes(subs, index, delivered, out, types,

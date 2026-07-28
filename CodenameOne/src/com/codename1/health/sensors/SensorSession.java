@@ -35,6 +35,7 @@ import com.codename1.health.HealthWriteResult;
 import com.codename1.health.HealthUnit;
 import com.codename1.health.QuantitySample;
 import com.codename1.health.RecordingMethod;
+import com.codename1.health.SeriesSample;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
@@ -343,6 +344,46 @@ public class SensorSession {
             this.batch = batch;
         }
 
+        /// The tail of `batch` that the failed write did not commit.
+        ///
+        /// [HealthException#getPartialResult()] names the records that
+        /// went in, and the store writes chunks in order, so the
+        /// committed ones are a prefix. Counted in records rather than
+        /// samples because a series is one sample and many records.
+        ///
+        /// A series straddling the boundary is retried whole and may
+        /// duplicate the part of it that landed. That is the same trade
+        /// the write path already makes for one sample, rather than the
+        /// alternative of dropping measurements that were never stored.
+        private static List<HealthSample> uncommitted(
+                List<HealthSample> batch, Throwable error) {
+            if (!(error instanceof HealthException)) {
+                return batch;
+            }
+            HealthWriteResult partial =
+                    ((HealthException) error).getPartialResult();
+            if (partial == null) {
+                return batch;
+            }
+            int committed = partial.getSampleIds().size();
+            if (committed <= 0) {
+                return batch;
+            }
+            int records = 0;
+            int from = 0;
+            for (int i = 0; i < batch.size(); i++) {
+                HealthSample s = batch.get(i);
+                records += s instanceof SeriesSample
+                        ? ((SeriesSample) s).size() : 1;
+                if (records > committed) {
+                    break;
+                }
+                from = i + 1;
+            }
+            return new ArrayList<HealthSample>(
+                    batch.subList(from, batch.size()));
+        }
+
         @Override
         public void onReady(HealthWriteResult value, Throwable error) {
             if (error == null) {
@@ -357,11 +398,19 @@ public class SensorSession {
             // a buffer that only grew. Retrying is right for a store that
             // is busy or locked; it is pointless for one that has said
             // no, and the answer does not change with time.
+            // Whatever a partly-successful write already committed is
+            // not sent again. A buffered batch larger than the platform's
+            // chunk can fail on a later chunk with the earlier ones
+            // already in the store, and requeuing the whole batch wrote
+            // those a second time -- duplicate records in the user's
+            // health data and every aggregate over them inflated, for as
+            // long as the session kept streaming.
+            List<HealthSample> outstanding = uncommitted(batch, error);
             List<HealthSample> retryable = new ArrayList<HealthSample>(
-                    batch.size());
+                    outstanding.size());
             List<HealthDataType> refused = new ArrayList<HealthDataType>();
             HealthStore store = Health.getInstance().getStore();
-            for (HealthSample s : batch) {
+            for (HealthSample s : outstanding) {
                 if (store.isWritable(s.getType())) {
                     retryable.add(s);
                 } else if (!refused.contains(s.getType())) {
