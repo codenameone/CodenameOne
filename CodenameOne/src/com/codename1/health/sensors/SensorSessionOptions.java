@@ -64,7 +64,18 @@ public final class SensorSessionOptions {
     ///
     /// Turning this on is right when you are logging a standalone
     /// measurement the OS knows nothing about -- a weight from a scale, a
-    /// blood-pressure reading from a cuff.
+    /// body temperature from a thermometer, a glucose reading from a
+    /// meter.
+    ///
+    /// **Blood pressure is not among them on mobile in this release.** It
+    /// is two values in one reading, which HealthKit models as a
+    /// correlation and Health Connect as its own record type, and neither
+    /// is implemented here -- the sample line this API writes over carries
+    /// a single value. A cuff reading routed to the store therefore fails
+    /// with [HealthError#TYPE_NOT_SUPPORTED] on both platforms rather than
+    /// being quietly dropped, and the local and simulator stores keep it
+    /// fine. Read it off the session and persist it yourself until the
+    /// correlation paths land.
     public SensorSessionOptions setWriteToStore(boolean writeToStore) {
         this.writeToStore = writeToStore;
         return this;

@@ -605,9 +605,11 @@ class AndroidHealthStore extends HealthStore {
             // No anchor: the batch carries the resync flag and nothing
             // else, and the cursor is dropped so the next drain asks for a
             // fresh token rather than resending the expired one.
+            // The cursor is dropped by the shared delivery path once the
+            // listener has actually been told to resynchronise; doing it
+            // here would lose the expired token to a listener that threw.
             fireChanges(new HealthChangeBatch(sub.getId(), sub.getTypes(),
                     null, null, true, null, Long.MAX_VALUE, false));
-            clearAnchor(sub.getId());
             drainFrom(subs, index + 1, delivered + 1, out);
         }
 

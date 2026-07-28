@@ -1749,7 +1749,16 @@ public class HealthStore {
                             makeDeliveryRunnable(store, listener, chunks,
                                     index + 1, subscription));
                 }
-                if (batch.getAnchor() != null) {
+                if (batch.isResyncRequired()) {
+                    // The cursor the platform rejected is dropped here,
+                    // after the listener has been told to resynchronise --
+                    // not when the port noticed. Dropping it earlier means
+                    // a listener that threw, or a process that died before
+                    // the queued delivery ran, loses the notification *and*
+                    // the expired token, so the next drain quietly starts a
+                    // fresh baseline and the missed history is never read.
+                    store.clearAnchor(batch.getSubscriptionId());
+                } else if (batch.getAnchor() != null) {
                     store.storeAnchor(batch.getSubscriptionId(),
                             batch.getAnchor());
                     subscription.noteDelivery(batch.getAnchor(),

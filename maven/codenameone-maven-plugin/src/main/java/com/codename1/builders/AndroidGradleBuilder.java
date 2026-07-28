@@ -1625,6 +1625,20 @@ public class AndroidGradleBuilder extends Executor {
                 // cannot see it -- and without this the build skipped the
                 // type validation and shipped a manifest with no per-type
                 // permissions, leaving those calls unauthorized.
+                // Sensor write-through is store use. An app can enable it
+                // with SensorSessionOptions.setWriteToStore(true) and never
+                // name HealthStore, so the sensors-package exemption -- which
+                // exists so a BLE-only app is not dragged into Health Connect
+                // -- hid the one call that genuinely needs it, and the build
+                // shipped no bridge and no permissions for a documented flow.
+                if ("com/codename1/health/sensors/SensorSessionOptions"
+                        .equals(cls)
+                        && method.startsWith("setWriteToStore")) {
+                    usesHealth = true;
+                    usesHealthStore = true;
+                    usesHealthData = true;
+                    usesHealthWrite = true;
+                }
                 if (cls.indexOf("com/codename1/health/HealthStore") == 0) {
                     usesHealth = true;
                     usesHealthStore = true;
