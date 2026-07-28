@@ -109,7 +109,7 @@ The subscription id keys the persisted cursor that records how far you have read
 
 On Android this is permanent. Health Connect has no push mechanism at all and Google's own guidance is to poll. On iOS, HealthKit does offer `HKObserverQuery` with background relaunch, but this release doesn't register one, so iOS behaves the same way as Android for now. `isPushDelivery()` is the query to branch on; it will start answering `true` on iOS when observers land, and code that already polls will simply poll less often.
 
-**Draining is what delivers changes.** The framework drains at app start, on foreground, and whenever you call `drainChanges()`. Wire that into your background-fetch handler if foreground-only isn't good enough.
+**Draining is what delivers changes, and your app has to ask for it.** Nothing here hooks the application lifecycle: call `drainChanges()` when you come to the foreground, and from your background-fetch handler. Omit it and a subscription delivers nothing at all, however much data arrives. This is the one place where forgetting a call looks exactly like having no new data.
 
 The two backends drain differently, and the difference is visible to you. Android uses Health Connect change tokens, so a drain reports deletions as well as additions and never re-reports a sample you have already seen. iOS re-reads each subscribed type over the window since the last drain: additions arrive, deletions don't, and a sample edited in place looks like a new one. Both advance their cursor only after your listener returns, so a crash re-reads rather than skips.
 

@@ -1861,6 +1861,24 @@ public class HealthStore {
         }
     }
 
+    /// Drops a subscription's cursor, in memory and on disk.
+    ///
+    /// For a cursor the platform has rejected outright -- a Health Connect
+    /// change token that has aged out, say. Clearing only the persisted
+    /// copy is not enough: the drains read the live handle, so the next
+    /// one would resend the very token that just failed and keep failing
+    /// identically forever.
+    protected final void clearAnchor(String subscriptionId) {
+        storeAnchor(subscriptionId, null);
+        HealthSubscription sub;
+        synchronized (subscriptions) {
+            sub = subscriptions.get(subscriptionId);
+        }
+        if (sub != null) {
+            sub.noteDelivery(null, System.currentTimeMillis());
+        }
+    }
+
     /// Applies the subscription's delivery options to a batch.
     ///
     /// These were settable on SubscriptionRequest and read by nothing, so

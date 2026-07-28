@@ -583,10 +583,32 @@ class AndroidHealthStore extends HealthStore {
         }
 
         public void onError(final int code, final String message) {
+            if (code == HealthConnectDelegate.ERR_TOKEN_EXPIRED) {
+                // Not transient. A Health Connect token ages out after
+                // about 30 days, and retrying it fails identically
+                // forever -- so treating it like any other error left the
+                // subscription retrying an unusable token and silently
+                // never advancing again. Tell the app to resynchronise and
+                // start a fresh baseline, which is what
+                // isResyncRequired() exists to say.
+                AndroidHealth.onEdt(new ResyncOne(this));
+                return;
+            }
             // One failing subscription must not strand the others, and it
             // must not advance its own cursor. Skipping it leaves the
             // token where it was so the next drain retries the same range.
             AndroidHealth.onEdt(new SkipOne(this));
+        }
+
+        void resync() {
+            HealthSubscription sub = subs.get(index);
+            // No anchor: the batch carries the resync flag and nothing
+            // else, and the cursor is dropped so the next drain asks for a
+            // fresh token rather than resending the expired one.
+            fireChanges(new HealthChangeBatch(sub.getId(), sub.getTypes(),
+                    null, null, true, null, Long.MAX_VALUE, false));
+            clearAnchor(sub.getId());
+            drainFrom(subs, index + 1, delivered + 1, out);
         }
 
         void deliver(String payload) {
@@ -599,6 +621,11 @@ class AndroidHealthStore extends HealthStore {
                         // that budgets against getDeadlineMillis() treat every
                         // ordinary drain as already out of time.
                         HealthAnchor.of(payload.trim()), Long.MAX_VALUE, false));
+                // Counted, like every other delivery. drainChanges()
+                // documents its result as the number of batches delivered,
+                // and the listener did receive this one -- the iOS
+                // baseline path has always counted it.
+                count++;
             } else {
                 HealthChangePage page =
                         HealthWire.decodeChangePage(payload);
@@ -639,6 +666,23 @@ class AndroidHealthStore extends HealthStore {
 
         public void run() {
             step.deliver(payload);
+        }
+    }
+
+    /// Reports an expired token and clears the cursor.
+    ///
+    /// Named rather than anonymous so it carries no synthetic reference
+    /// (SpotBugs `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class ResyncOne implements Runnable {
+        private final ChangeRead read;
+
+        ResyncOne(ChangeRead read) {
+            this.read = read;
+        }
+
+        @Override
+        public void run() {
+            read.resync();
         }
     }
 
