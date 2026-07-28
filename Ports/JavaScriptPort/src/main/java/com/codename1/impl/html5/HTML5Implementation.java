@@ -2525,7 +2525,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 JavaScriptKeyboardInteractionAdapter.handleKeyUp(new JavaScriptKeyboardInteractionAdapter.BacksideHooks() {
                     @Override
                     public void installBacksideHooksInUserInteraction() {
-                        HTML5Implementation.this.installBacksideHooksInUserInteraction();
+                        HTML5Implementation.this.installBacksideHooksInUserInteraction(false);
                     }
                 }, new JavaScriptKeyboardInteractionAdapter.KeyDispatch() {
                     @Override
@@ -2606,7 +2606,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }, new JavaScriptKeyboardInteractionAdapter.BacksideHooks() {
                     @Override
                     public void installBacksideHooksInUserInteraction() {
-                        HTML5Implementation.this.installBacksideHooksInUserInteraction();
+                        HTML5Implementation.this.installBacksideHooksInUserInteraction(false);
                     }
                 }, new JavaScriptKeyboardInteractionAdapter.KeyDispatch() {
                     @Override
@@ -6976,7 +6976,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     + SEVER_OPENER;
         }
         try {
-            eval_(script);
+            // Wrapped in a function: __cn1_eval_on_main__ runs this through
+            // indirect eval, so a bare "var cn1w" would land on the page's
+            // global object -- clobbering an identically named global of the
+            // embedding page, and throwing outright against a top-level let or
+            // const of that name, which would break the default popup path.
+            eval_("(function(){" + script + "})();");
             return true;
         } catch (Throwable t) {
             _log("Failed to open URL on the main thread: " + t);
@@ -7081,7 +7086,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 + "cn1a.click();"
                 + "document.body.removeChild(cn1a);";
         try {
-            eval_(script);
+            // Function-scoped for the same reason as the open scripts: indirect
+            // eval would otherwise leak cn1a onto the page's globals.
+            eval_("(function(){" + script + "})();");
             return true;
         } catch (Throwable t) {
             _log("Failed to download a data: URL on the main thread: " + t);
