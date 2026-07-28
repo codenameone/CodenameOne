@@ -168,77 +168,51 @@ final class HealthManifestFragments {
      * dropping blanks. Tolerates whitespace and trailing commas, since the
      * value is hand-written in a properties file.
      */
-    /// Tokens with a Health Connect permission the bridge cannot read.
+    /// Tokens with a Health Connect permission but no record class at all,
+    /// so nothing the bridge does can service them.
     ///
-    /// Declaring one produced an app carrying a health permission it could
-    /// never use: the permission is granted and the read fails as an
-    /// invalid argument. Play asks what every health permission is for,
-    /// and "we cannot actually use it" is not an answer worth shipping.
+    /// Deliberately one list, not one per direction. A permission covers
+    /// more than a single operation: the write permission authorises both
+    /// inserts and deletes, and the read permission covers both reads and
+    /// change subscriptions. Deletes and subscriptions go through
+    /// `recordClassFor`, which is wider than the insert and read gates, so
+    /// each direction's union of capabilities *is* `recordClassFor` -- and
+    /// a build cannot know which of those operations an app will use.
     ///
-    /// Read and write are separate lists because the bridge's capabilities
-    /// are: `readableRecordClassFor` refuses sleep and workout on top of
-    /// whatever `recordClassFor` lacks, and `toRecord` has its own, larger
-    /// set of gaps. One symmetric list accepted `read=sleep` and
-    /// `write=power`, both of which fail at runtime.
+    /// A narrower per-direction split refused `write=power` from an app
+    /// that only deletes power records, and `read=sleep` from one that only
+    /// subscribes to sleep changes. Both are supported flows. Rejecting
+    /// only what nothing can service is the line the build can actually
+    /// draw; a token that is declared and then used for the one operation
+    /// its record class does not support fails at runtime with a message
+    /// naming it.
     ///
     /// Kept in step with the Kotlin by `HealthBridgeTokenTableTest`, which
     /// parses it and fails the build when the two drift.
-    private static final Set<String> NO_READ = new HashSet<String>();
-
-    private static final Set<String> NO_WRITE = new HashSet<String>();
+    private static final Set<String> NO_RECORD_CLASS =
+            new HashSet<String>();
 
     static {
-        NO_READ.add("basal_energy");
-        NO_READ.add("blood_pressure");
-        NO_READ.add("dietary_energy");
-        NO_READ.add("distance_cycling");
-        NO_READ.add("distance_swimming");
-        NO_READ.add("exercise_time");
-        NO_READ.add("heart_rate_variability_sdnn");
-        NO_READ.add("intermenstrual_bleeding");
-        NO_READ.add("menstruation_flow");
-        NO_READ.add("mindful_session");
-        NO_READ.add("nutrition");
-        NO_READ.add("sleep");
-        NO_READ.add("waist_circumference");
-        NO_READ.add("walking_heart_rate_average");
-        NO_READ.add("workout");
-        NO_WRITE.add("basal_energy");
-        NO_WRITE.add("blood_pressure");
-        NO_WRITE.add("cycling_cadence");
-        NO_WRITE.add("dietary_energy");
-        NO_WRITE.add("distance_cycling");
-        NO_WRITE.add("distance_swimming");
-        NO_WRITE.add("exercise_time");
-        NO_WRITE.add("heart_rate_variability_sdnn");
-        NO_WRITE.add("intermenstrual_bleeding");
-        NO_WRITE.add("menstruation_flow");
-        NO_WRITE.add("mindful_session");
-        NO_WRITE.add("nutrition");
-        NO_WRITE.add("power");
-        NO_WRITE.add("running_cadence");
-        NO_WRITE.add("sleep");
-        NO_WRITE.add("speed");
-        NO_WRITE.add("waist_circumference");
-        NO_WRITE.add("walking_heart_rate_average");
-        NO_WRITE.add("workout");
+        NO_RECORD_CLASS.add("basal_energy");
+        NO_RECORD_CLASS.add("blood_pressure");
+        NO_RECORD_CLASS.add("dietary_energy");
+        NO_RECORD_CLASS.add("distance_cycling");
+        NO_RECORD_CLASS.add("distance_swimming");
+        NO_RECORD_CLASS.add("exercise_time");
+        NO_RECORD_CLASS.add("heart_rate_variability_sdnn");
+        NO_RECORD_CLASS.add("intermenstrual_bleeding");
+        NO_RECORD_CLASS.add("menstruation_flow");
+        NO_RECORD_CLASS.add("mindful_session");
+        NO_RECORD_CLASS.add("nutrition");
+        NO_RECORD_CLASS.add("waist_circumference");
+        NO_RECORD_CLASS.add("walking_heart_rate_average");
     }
 
-    /// The declared read tokens this build cannot service on Android.
-    static List<String> unreadableTokens(List<String> tokens) {
-        return matching(tokens, NO_READ);
-    }
-
-    /// The declared write tokens this build cannot service on Android.
-    static List<String> unwritableTokens(List<String> tokens) {
-        return matching(tokens, NO_WRITE);
-    }
-
-    private static List<String> matching(List<String> tokens,
-            Set<String> unsupported) {
+    /// The declared tokens no Health Connect operation can service.
+    static List<String> unsupportedTokens(List<String> tokens) {
         List<String> out = new ArrayList<String>();
         for (String t : tokens) {
-            if (unsupported.contains(t) && !out.contains(t)) {
+            if (NO_RECORD_CLASS.contains(t) && !out.contains(t)) {
                 out.add(t);
             }
         }
