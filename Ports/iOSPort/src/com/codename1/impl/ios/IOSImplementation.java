@@ -11852,7 +11852,35 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public Object listenSocket(int port) {
+        // Wildcard-bound server sockets stay unsupported on iOS; see
+        // listenSocketLoopback, which binds the loopback interface only.
         return null;
+    }
+
+    @Override
+    public boolean isLoopbackServerSocketAvailable() {
+        return true;
+    }
+
+    @Override
+    public boolean isDebuggableBuild() {
+        return nativeInstance.isDebuggableBuild();
+    }
+
+    @Override
+    public void stopListeningSocket(int port, boolean loopbackOnly) {
+        if(loopbackOnly) {
+            nativeInstance.stopListeningSocket(port);
+        }
+    }
+
+    @Override
+    public Object listenSocketLoopback(int port) {
+        long peer = nativeInstance.listenSocketLoopback(port);
+        if(peer == 0) {
+            return null;
+        }
+        return Long.valueOf(peer);
     }
     
     @Override

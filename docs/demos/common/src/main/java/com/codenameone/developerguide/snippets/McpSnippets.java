@@ -26,6 +26,7 @@ import com.codename1.ai.Tool;
 import com.codename1.ai.ToolHandler;
 import com.codename1.mcp.MCP;
 import com.codename1.mcp.MCPVerbosity;
+import com.codename1.ui.Display;
 
 /** Compiled source snippets for the MCP headless API guide chapter. */
 public class McpSnippets {
@@ -47,6 +48,22 @@ public class McpSnippets {
         // tag::mcp-start-stdio[]
         MCP.startStdioServer();
         // end::mcp-start-stdio[]
+    }
+
+    public void allowOnReleaseBuilds() {
+        // tag::mcp-allow-release[]
+        // Only for a build that ships to devices you control, such as a kiosk fleet:
+        MCP.setAllowOnReleaseBuilds(true);
+        MCP.startSocketServer(8765);
+        // end::mcp-allow-release[]
+    }
+
+    public void startWhenDevelopmentBuild() {
+        // tag::mcp-guard-start[]
+        if (Display.getInstance().isDebuggableBuild()) {
+            MCP.startSocketServer(8765);
+        }
+        // end::mcp-guard-start[]
     }
 
     public void publishTool(final String signedInUser) {

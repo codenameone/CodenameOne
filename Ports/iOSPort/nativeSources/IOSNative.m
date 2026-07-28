@@ -10845,6 +10845,95 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_
     return (JAVA_LONG)JAVA_NULL;
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_listenSocketLoopback___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT port) {
+    POOL_BEGIN();
+    SocketImpl* impl = [[SocketImpl alloc] init];
+    BOOL b = [impl listenLoopback:port];
+    POOL_END();
+    if(b) {
+        return (JAVA_LONG)impl;
+    }
+    // ownership is transferred to Java only on success, so a failed bind or accept must
+    // release here or every retry leaks the peer
+    [impl release];
+    return (JAVA_LONG)JAVA_NULL;
+}
+
+void com_codename1_impl_ios_IOSNative_stopListeningSocket___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT port) {
+    POOL_BEGIN();
+    [SocketImpl closeLoopbackListenerForPort:port];
+    POOL_END();
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDebuggableBuild___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_SIMULATOR
+    // Nothing ships from the simulator, so it is always a development build. It also has
+    // no provisioning profile to inspect, which is what the device path relies on.
+    return JAVA_TRUE;
+#else
+    // The provisioning profile is fixed for the life of the process, so read and parse it
+    // once. This is consulted by the MCP gate and is public through
+    // Display.isDebuggableBuild(), so a caller is free to ask repeatedly, and file IO plus
+    // a plist parse per call would be a poor answer to that.
+    static JAVA_BOOLEAN cachedDebuggable = JAVA_FALSE;
+    static dispatch_once_t debuggableOnce;
+    dispatch_once(&debuggableOnce, ^{
+    POOL_BEGIN();
+    JAVA_BOOLEAN result = JAVA_FALSE;
+    // get-task-allow is the entitlement that lets a debugger attach. Development and
+    // ad-hoc profiles carry it; App Store and enterprise distribution profiles do not, so
+    // it is the honest "is this a build I am working on" signal, and unlike the Xcode
+    // DEBUG macro it does not depend on which configuration the build server compiled.
+    NSString* path = [[NSBundle mainBundle] pathForResource:@"embedded" ofType:@"mobileprovision"];
+    if(path != nil) {
+        NSData* data = [NSData dataWithContentsOfFile:path];
+        if(data != nil) {
+            // The profile is CMS signed, so the file as a whole is not a plist, but the
+            // payload it wraps is one. Cut it out and parse it properly.
+            //
+            // Do NOT do this by looking for "get-task-allow" and then hunting nearby for
+            // <true/>: the value that follows it is <false/> in a distribution profile, and
+            // the very next entitlement is often beta-reports-active, whose <true/> sits
+            // about 53 characters later. Any proximity window wide enough to be useful
+            // matches it, and the mistake lands on the unsafe side - a shipped build
+            // classified as debuggable.
+            NSData* startMarker = [@"<?xml" dataUsingEncoding:NSUTF8StringEncoding];
+            NSData* endMarker = [@"</plist>" dataUsingEncoding:NSUTF8StringEncoding];
+            NSRange whole = NSMakeRange(0, [data length]);
+            NSRange start = [data rangeOfData:startMarker options:0 range:whole];
+            if(start.location != NSNotFound) {
+                NSRange rest = NSMakeRange(start.location, [data length] - start.location);
+                NSRange end = [data rangeOfData:endMarker options:0 range:rest];
+                if(end.location != NSNotFound) {
+                    NSUInteger length = end.location + end.length - start.location;
+                    NSData* plistData = [data subdataWithRange:NSMakeRange(start.location, length)];
+                    id plist = [NSPropertyListSerialization propertyListWithData:plistData
+                                                                        options:NSPropertyListImmutable
+                                                                         format:NULL
+                                                                          error:NULL];
+                    if([plist isKindOfClass:[NSDictionary class]]) {
+                        id entitlements = [(NSDictionary*)plist objectForKey:@"Entitlements"];
+                        if([entitlements isKindOfClass:[NSDictionary class]]) {
+                            id allowed = [(NSDictionary*)entitlements objectForKey:@"get-task-allow"];
+                            if([allowed isKindOfClass:[NSNumber class]]) {
+                                result = [(NSNumber*)allowed boolValue] ? JAVA_TRUE : JAVA_FALSE;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    POOL_END();
+    // Every path that could not read an answer leaves result JAVA_FALSE: an unreadable or
+    // unexpected profile means "treat this as a release build", which withholds the
+    // facility rather than exposing it.
+    cachedDebuggable = result;
+    });
+    return cachedDebuggable;
+#endif
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getHostOrIP__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     POOL_BEGIN();
     JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [SocketImpl getIP]);
@@ -12431,6 +12520,10 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUserAgentString___java_lang_Stri
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port, JAVA_INT connectTimeout) {
     return com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int_int(CN1_THREAD_STATE_PASS_ARG instanceObject, host, port, connectTimeout);
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_listenSocketLoopback___int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT port) {
+    return com_codename1_impl_ios_IOSNative_listenSocketLoopback___int(CN1_THREAD_STATE_PASS_ARG instanceObject, port);
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getHostOrIP___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {

@@ -797,6 +797,9 @@ public final class IOSNative {
     public native int getVKBWidth();
 
     public native long connectSocket(String host, int port, int connectTimeout);
+    public native long listenSocketLoopback(int port);
+    public native boolean isDebuggableBuild();
+    public native void stopListeningSocket(int port);
     public native String getHostOrIP();
     public native void disconnectSocket(long socket);
     public native boolean isSocketConnected(long socket);
