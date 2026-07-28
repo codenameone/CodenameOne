@@ -1298,6 +1298,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-07-28T15:01:09+00:00"
+      },
+      "devto": {
+        "id": 4255423,
+        "url": "https://dev.to/codenameone/your-codename-one-app-can-be-an-mcp-server-21ja",
+        "syndicated_at": "2026-07-28T15:16:20+00:00"
       }
     }
   }
