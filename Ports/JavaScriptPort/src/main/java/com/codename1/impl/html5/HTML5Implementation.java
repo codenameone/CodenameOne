@@ -7048,89 +7048,26 @@ public class HTML5Implementation extends CodenameOneImplementation {
         sheet.show();
     }
 
-    /**
-     * Queues a hook on the shared queue and makes sure something will drain it.
-     *
-     * <p>Unlike {@link #addGestureOnlyHook(JSRunnable, Runnable)}, plain
-     * {@link #addBacksideHook(JSRunnable)} schedules nothing: the hook waits for
-     * a drain that may already have run. Safari schedules a single 75/300ms
-     * drain per interaction, so an EDT slower than that arrives with none left
-     * and the hook sits forever. Callers that have no other attempt to fall
-     * back on need this.</p>
-     */
-    private void addBacksideHookEnsuringDrain(JSRunnable r) {
-        addBacksideHook(r);
-        if (pendingGestureDrains <= 0 && backsideHooksIntervalHandle == 0) {
-            runBacksideHooksInTimeout(0, false);
-        }
-    }
 
     /**
-     * Downloads a {@code data:} URL by clicking a generated anchor on the page.
+     * Hands a {@code data:} download to the bridge's structured handler.
      *
-     * <p>The same technique {@code browser_bridge.js} uses, run from here so it
-     * happens exactly ONCE and at a moment we choose. Its
-     * {@code __cn1_register_save_blob_dataurl__} fires the click eagerly and
-     * stashes a copy for a later retry, which is only resolvable by knowing
-     * whether the eager click was allowed -- and {@code a.click()} reports that
-     * to nobody. Doing it ourselves sidesteps the question: there is no eager
-     * click to duplicate, and no stash left unfired.</p>
+     * <p>Three constraints apply and the current bridge can satisfy only two.
+     * The download must happen once; a blocked attempt should be retryable; and
+     * the payload must not be copied more than necessary. Registering fires the
+     * click eagerly, so re-firing the stash duplicates it. Clicking the anchor
+     * ourselves through eval-on-main avoids that and restores the retry, but
+     * escapes a multi-megabyte base64 string into JavaScript source, builds
+     * several payload-sized copies of it and makes the page parse it as code.</p>
+     *
+     * <p>So: register and return. One download, and the payload travels once as
+     * structured host-call data rather than as source text. The retry is what is
+     * given up, and recovering it needs a bridge-side change --
+     * {@code __cn1_register_save_blob_dataurl__} would have to accept a
+     * no-eager-fire flag -- which lives in the translator, not here.</p>
      */
-    private boolean downloadDataUrlOnMainThread(String dataUrl, String fileName) {
-        String script = "if (typeof document === 'undefined') {"
-                + " throw new Error('cn1: not running on the page'); }"
-                + "var cn1a = document.createElement('a');"
-                + "cn1a.href = " + toJavaScriptStringLiteral(dataUrl) + ";"
-                + "cn1a.download = " + toJavaScriptStringLiteral(fileName) + ";"
-                + "document.body.appendChild(cn1a);"
-                + "cn1a.click();"
-                + "document.body.removeChild(cn1a);";
-        try {
-            // Function-scoped for the same reason as the open scripts: indirect
-            // eval would otherwise leak cn1a onto the page's globals.
-            eval_("(function(){" + script + "})();");
-            return true;
-        } catch (Throwable t) {
-            _log("Failed to download a data: URL on the main thread: " + t);
-            return false;
-        }
-    }
-
-    /**
-     * Runs a {@code data:} download once, riding a pending hook when there is
-     * one and otherwise asking, so a blocked attempt still has a user-driven
-     * retry. Uses the shared hook queue: a download is gated on engagement
-     * rather than transient activation, exactly as the Blob leg is.
-     */
-    private void downloadDataUrl(final String dataUrl, final String fileName) {
-        if (!isMainThreadBridgeAvailable()) {
-            // No page-side channel of our own, so the bridge's register handler
-            // -- whose eager click is its own trigger -- is all that is left.
-            // One attempt and no retry, which is what this bundle can manage.
-            _log("execute(): no page-side channel, leaving the data: download to the bridge");
-            registerSaveBlobHandlerDataUrl(fileName, dataUrl);
-            return;
-        }
-        final JSRunnable click = new JSRunnable() {
-            @Override
-            public void run() {
-                downloadDataUrlOnMainThread(dataUrl, fileName);
-            }
-        };
-        if (isBacksideHookAvailable()) {
-            addBacksideHookEnsuringDrain(click);
-            return;
-        }
-        createConfirmationSheet("Download file", "Download " + fileName + " now?",
-                null, new Runnable() {
-            @Override
-            public void run() {
-                // Ensuring a drain matters most here: the user confirmed, and
-                // removing the bridge's eager click left no earlier attempt to
-                // rescue a hook that never runs.
-                addBacksideHookEnsuringDrain(click);
-            }
-        }).show();
+    private void downloadDataUrl(String dataUrl, String fileName) {
+        registerSaveBlobHandlerDataUrl(fileName, dataUrl);
     }
 
     /**
