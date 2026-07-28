@@ -1085,8 +1085,24 @@ class CN1HealthConnectBridge(private val context: Context)
                     + " this sample is " + value
                     + ". Round it before writing.")
         }
+        // Range too, not only integrality. Double.toLong() saturates at the
+        // bounds rather than overflowing, so a value past them stored a
+        // different number and reported success -- the same silent rewrite
+        // the fractional check exists to prevent.
+        if (value >= LONG_MAX_AS_DOUBLE || value < LONG_MIN_AS_DOUBLE) {
+            throw IllegalArgumentException(
+                "Health Connect cannot store " + token + " = " + value
+                    + ": it is outside the range of a 64-bit integer.")
+        }
         return value.toLong()
     }
+
+    /// 2^63 exactly, which is one past Long.MAX_VALUE: a double cannot
+    /// represent Long.MAX_VALUE itself, so the comparison has to exclude
+    /// this bound rather than include it.
+    private val LONG_MAX_AS_DOUBLE = Long.MAX_VALUE.toDouble()
+
+    private val LONG_MIN_AS_DOUBLE = Long.MIN_VALUE.toDouble()
 
     private fun isSeriesToken(token: String) = when (token) {
         "heart_rate", "power", "speed", "cycling_cadence",
