@@ -669,11 +669,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     private void addGestureOnlyHook(JSRunnable r, Runnable superseded) {
         // Backstop against unbounded growth: a hook whose interaction is long
-        // past can no longer be drained, which only happens if the EDT took
-        // longer than the whole 5s drain burst to reach us.
+        // past can no longer be drained. Eight generations is only about four
+        // rapid clicks, since press and release each advance one, so this is
+        // reachable in ordinary use -- drop the hook, but hand it to its
+        // fallback rather than losing the request. Silently discarding it left
+        // an execute() with no popup, no Sheet and no trace.
         for (int i = gestureOnlyHooks.size() - 1; i >= 0; i--) {
-            if (gestureGeneration - gestureOnlyHooks.get(i).generation > 8) {
+            GestureHook stale = gestureOnlyHooks.get(i);
+            if (gestureGeneration - stale.generation > 8) {
                 gestureOnlyHooks.remove(i);
+                _log("execute(): a queued open aged out before its drain ran");
+                if (stale.superseded != null) {
+                    callSerially(stale.superseded);
+                }
             }
         }
         gestureOnlyHooks.add(new GestureHook(gestureGeneration, r, superseded));
