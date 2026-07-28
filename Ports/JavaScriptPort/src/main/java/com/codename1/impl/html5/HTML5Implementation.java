@@ -7176,7 +7176,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // as the destination would be simply false.
                     String scheme = url.substring(0, colon);
                     String page = pageScheme();
-                    if (page != null && page.equalsIgnoreCase(scheme)) {
+                    // ...and only when fewer than two separators follow the
+                    // colon. Two of them, in any mix of "/" and "\\", are an
+                    // authority marker that outranks the same-scheme rule:
+                    // https:\\\\evil.example/p navigates to evil.example even
+                    // from an https page, so claiming the app's own host there
+                    // would name a destination the browser is not going to.
+                    boolean authorityFollows =
+                            startsWithAuthorityMarker(url.substring(colon + 1));
+                    if (!authorityFollows && page != null && page.equalsIgnoreCase(scheme)) {
                         String host = mainLocationPart("host");
                         if (host != null && host.length() > 0) {
                             return host + "/" + DISPLAY_URL_ELLIPSIS;
