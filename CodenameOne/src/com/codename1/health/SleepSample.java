@@ -76,11 +76,17 @@ public final class SleepSample extends SessionSample {
         List<SleepStageInterval> copy = new ArrayList<SleepStageInterval>();
         if (stages != null) {
             for (SleepStageInterval interval : stages) {
+                // Skipping the null during validation and then copying the
+                // whole list anyway meant it was stored unvalidated, and
+                // every accessor that walks the stages -- hasStageDetail,
+                // the two duration roll-ups -- dereferenced it. Dropping it
+                // here instead matches addStage(null), which has always
+                // ignored one.
                 if (interval != null) {
                     requireInsideSession(interval, startMillis, endMillis);
+                    copy.add(interval);
                 }
             }
-            copy.addAll(stages);
         }
         return new SleepSample(startMillis, endMillis, copy);
     }
@@ -137,15 +143,18 @@ public final class SleepSample extends SessionSample {
         return false;
     }
 
-    /// The total time in `stage`, summed across every span.
+    /// The total time in `stage` -- the time actually covered by its
+    /// spans, so two overlapping spans of the same stage count the overlap
+    /// once.
     public long getDurationMillis(SleepStage stage) {
-        long total = 0;
+        List<SleepStageInterval> matching =
+                new ArrayList<SleepStageInterval>();
         for (SleepStageInterval iv : stages) {
             if (iv.getStage() == stage) {
-                total += iv.getDurationMillis();
+                matching.add(iv);
             }
         }
-        return total;
+        return coveredMillis(matching);
     }
 
     /// The total time spent asleep -- every span except [SleepStage#AWAKE],
@@ -158,15 +167,66 @@ public final class SleepSample extends SessionSample {
         if (stages.isEmpty()) {
             return getDurationMillis();
         }
-        long total = 0;
+        List<SleepStageInterval> asleep =
+                new ArrayList<SleepStageInterval>();
         for (SleepStageInterval iv : stages) {
             SleepStage s = iv.getStage();
             if (s != SleepStage.AWAKE && s != SleepStage.AWAKE_IN_BED
                     && s != SleepStage.OUT_OF_BED) {
-                total += iv.getDurationMillis();
+                asleep.add(iv);
             }
         }
-        return total;
+        return coveredMillis(asleep);
+    }
+
+    /// Time actually covered by a set of spans, counting an overlap once.
+    ///
+    /// Summing the spans instead was wrong for the data both platforms
+    /// really produce: this class documents platform sleep categories as
+    /// overlapping, and a LIGHT span of `[0,10]` beside a DEEP span of
+    /// `[5,15]` summed to 20 in a session that lasted 15. A total time
+    /// asleep longer than the night it happened in is the kind of number
+    /// that gets drawn straight into a chart.
+    ///
+    /// Note this cannot be replaced by clamping to the session length --
+    /// that would hide the overlap while still reporting the wrong figure
+    /// for every night short enough not to hit the clamp.
+    private static long coveredMillis(List<SleepStageInterval> spans) {
+        if (spans.isEmpty()) {
+            return 0;
+        }
+        Collections.sort(spans, ByStart.INSTANCE);
+        long covered = 0;
+        long openFrom = spans.get(0).getStartMillis();
+        long openTo = spans.get(0).getEndMillis();
+        for (int iter = 1; iter < spans.size(); iter++) {
+            SleepStageInterval iv = spans.get(iter);
+            if (iv.getStartMillis() > openTo) {
+                covered += openTo - openFrom;
+                openFrom = iv.getStartMillis();
+                openTo = iv.getEndMillis();
+            } else if (iv.getEndMillis() > openTo) {
+                openTo = iv.getEndMillis();
+            }
+        }
+        return covered + openTo - openFrom;
+    }
+
+    /// Sorts spans by start so the merge above only has to look at the one
+    /// span it currently has open.
+    private static final class ByStart
+            implements java.util.Comparator<SleepStageInterval> {
+
+        static final ByStart INSTANCE = new ByStart();
+
+        public int compare(SleepStageInterval a, SleepStageInterval b) {
+            long left = a.getStartMillis();
+            long right = b.getStartMillis();
+            if (left == right) {
+                return 0;
+            }
+            return left < right ? -1 : 1;
+        }
     }
 
     @Override

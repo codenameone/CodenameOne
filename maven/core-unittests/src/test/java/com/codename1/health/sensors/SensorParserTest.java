@@ -386,6 +386,65 @@ class SensorParserTest {
         assertTrue(Double.isNaN(m.getMillimolesPerLiter()));
     }
 
+    /**
+     * 0x8000 is the profile's "offset unknown" value. Read as a number it
+     * is -32768 minutes, which moved the reading back about 22.8 days --
+     * a real glucose value published, and on some paths stored, under a
+     * date the meter never reported.
+     */
+    @Test
+    void glucoseIgnoresTheUnknownTimeOffsetSentinel() {
+        byte[] withSentinel = new byte[] {
+            0x03,                         // time offset + concentration
+            0x0A, 0x00,
+            (byte) 0xEA, 0x07, 1, 1, 12, 0, 0,  // 2026-01-01 12:00:00
+            0x00, (byte) 0x80,            // offset 0x8000 = unknown
+            0x5A, (byte) 0xB0,
+            0x11
+        };
+        byte[] noOffset = new byte[] {
+            0x02,
+            0x0A, 0x00,
+            (byte) 0xEA, 0x07, 1, 1, 12, 0, 0,
+            0x5A, (byte) 0xB0,
+            0x11
+        };
+        GlucoseMeasurement sentinel = GlucoseMeasurement.parse(withSentinel);
+        GlucoseMeasurement plain = GlucoseMeasurement.parse(noOffset);
+        assertNotNull(sentinel);
+        assertNotNull(plain);
+        assertEquals(plain.getTimestampMillis(),
+                sentinel.getTimestampMillis());
+    }
+
+    /** Every other sint16 is a real offset, including large ones: a meter
+     *  that stamps one base time and offsets months of records from it is
+     *  doing what the profile describes. */
+    @Test
+    void glucoseAppliesAnOrdinaryTimeOffset() {
+        byte[] payload = new byte[] {
+            0x03,
+            0x0B, 0x00,
+            (byte) 0xEA, 0x07, 1, 1, 12, 0, 0,
+            0x1E, 0x00,                   // +30 minutes
+            0x5A, (byte) 0xB0,
+            0x11
+        };
+        byte[] noOffset = new byte[] {
+            0x02,
+            0x0B, 0x00,
+            (byte) 0xEA, 0x07, 1, 1, 12, 0, 0,
+            0x5A, (byte) 0xB0,
+            0x11
+        };
+        GlucoseMeasurement offset = GlucoseMeasurement.parse(payload);
+        GlucoseMeasurement plain = GlucoseMeasurement.parse(noOffset);
+        assertNotNull(offset);
+        assertNotNull(plain);
+        assertEquals(plain.getTimestampMillis() + 30L * 60000L,
+                offset.getTimestampMillis());
+    }
+
     @Test
     void glucoseRejectsTruncatedPayloads() {
         assertNull(GlucoseMeasurement.parse(null));

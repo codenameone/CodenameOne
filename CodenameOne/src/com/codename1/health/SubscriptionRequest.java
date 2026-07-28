@@ -52,13 +52,40 @@ public final class SubscriptionRequest {
     ///
     /// #### Throws
     ///
-    /// - `IllegalArgumentException`: if `id` is null or blank.
+    /// - `IllegalArgumentException`: if `id` is null, blank, or contains a
+    ///   control character.
     public SubscriptionRequest(String id) {
         if (id == null || id.trim().length() == 0) {
             throw new IllegalArgumentException(
                     "a subscription needs a stable, non-blank id");
         }
         this.id = id.trim();
+        requireNoControlCharacters(this.id);
+    }
+
+    /// The registry that survives process death is newline-delimited by
+    /// record and tab-delimited by field, and it is written without
+    /// escaping.
+    ///
+    /// An id carrying either delimiter therefore came back as a *different*
+    /// id after a restart -- or as two entries, or as none -- and the
+    /// symptom was a subscription that simply stopped delivering with no
+    /// error anywhere. Rejecting the character at the point it is supplied
+    /// turns a silent, restart-delayed data loss into an immediate
+    /// programming error. Every control character is refused rather than
+    /// just the two delimiters, because none of them belong in an
+    /// identifier and the persisted format is free to grow another one.
+    private static void requireNoControlCharacters(String id) {
+        for (int iter = 0; iter < id.length(); iter++) {
+            char c = id.charAt(iter);
+            if (c < ' ' || c == 0x7f) {
+                throw new IllegalArgumentException("a subscription id is"
+                        + " persisted in a line-and-tab delimited registry"
+                        + " and cannot contain control characters; found"
+                        + " 0x" + Integer.toHexString(c) + " at offset "
+                        + iter);
+            }
+        }
     }
 
     /// The stable identifier for this subscription.

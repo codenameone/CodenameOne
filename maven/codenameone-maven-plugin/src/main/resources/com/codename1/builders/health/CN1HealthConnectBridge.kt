@@ -726,27 +726,31 @@ class CN1HealthConnectBridge(private val context: Context)
                                   ascending: Boolean): Boolean {
         when (record) {
             is HeartRateRecord -> series(sb, record, token, "count/min",
+                record.startTime, record.endTime,
                 ordered(record.samples, ascending).map {
                     Pair(it.time.toEpochMilli(), it.beatsPerMinute.toDouble())
                 })
 
             is PowerRecord -> series(sb, record, token, "W",
+                record.startTime, record.endTime,
                 ordered(record.samples, ascending).map {
                     Pair(it.time.toEpochMilli(), it.power.inWatts)
                 })
 
             is SpeedRecord -> series(sb, record, token, "m/s",
+                record.startTime, record.endTime,
                 ordered(record.samples, ascending).map {
                     Pair(it.time.toEpochMilli(), it.speed.inMetersPerSecond)
                 })
 
             is CyclingPedalingCadenceRecord -> series(sb, record, token,
-                "count/min",
+                "count/min", record.startTime, record.endTime,
                 ordered(record.samples, ascending).map {
                     Pair(it.time.toEpochMilli(), it.revolutionsPerMinute)
                 })
 
             is StepsCadenceRecord -> series(sb, record, token, "count/min",
+                record.startTime, record.endTime,
                 ordered(record.samples, ascending).map {
                     Pair(it.time.toEpochMilli(), it.rate)
                 })
@@ -757,15 +761,24 @@ class CN1HealthConnectBridge(private val context: Context)
     }
 
     private fun series(sb: StringBuilder, r: Record, token: String,
-                       unit: String, points: List<Pair<Long, Double>>) {
+                       unit: String, recordStart: Instant, recordEnd: Instant,
+                       points: List<Pair<Long, Double>>) {
         // An empty series would decode to a record with no measurements,
         // which is indistinguishable from a decode failure. There is
         // nothing to report, so nothing is written.
         if (points.isEmpty()) {
             return
         }
-        val start = points.minOf { it.first }
-        val end = points.maxOf { it.first }
+        // The record's own interval, not the extent of its measurements.
+        // Disabling flattening is a request for record identity, and a
+        // record whose first sample lands a minute after it opened does
+        // not start at that sample: reported that way, a read could return
+        // a series whose stated span did not overlap the query that
+        // selected it. The point extent is still folded in so a record
+        // whose samples somehow sit outside its own bounds stays
+        // decodable rather than being rejected as malformed.
+        val start = minOf(recordStart.toEpochMilli(), points.minOf { it.first })
+        val end = maxOf(recordEnd.toEpochMilli(), points.maxOf { it.first })
         sb.append('~').append(r.metadata.id).append('\t')
             .append(token).append('\t')
             .append(start).append('\t').append(end).append('\t')

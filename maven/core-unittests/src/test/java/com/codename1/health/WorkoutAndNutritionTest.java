@@ -42,6 +42,40 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Workout recording and nutrition logging. */
 class WorkoutAndNutritionTest extends UITestBase {
 
+    /**
+     * The stores write whatever they are handed, so a total in the wrong
+     * dimension round-tripped intact and only blew up in the caller that
+     * did the documented thing and asked for kilocalories.
+     */
+    @Test
+    void workoutTotalsRejectTheWrongDimension() {
+        WorkoutSample w = WorkoutSample.create(WorkoutActivityType.RUNNING,
+                1767225600000L, 1767225600000L + 60000L);
+        assertThrows(IllegalArgumentException.class,
+                () -> w.setTotalEnergy(
+                        new HealthQuantity(70, HealthUnit.KILOGRAM)));
+        assertThrows(IllegalArgumentException.class,
+                () -> w.setTotalDistance(
+                        new HealthQuantity(500, HealthUnit.KILOCALORIE)));
+        assertNull(w.getTotalEnergy());
+        assertNull(w.getTotalDistance());
+    }
+
+    /** Any unit of the right dimension is accepted, and null still means
+     *  the total was never measured. */
+    @Test
+    void workoutTotalsAcceptAnyUnitOfTheRightDimension() {
+        WorkoutSample w = WorkoutSample.create(WorkoutActivityType.RUNNING,
+                1767225600000L, 1767225600000L + 60000L);
+        w.setTotalEnergy(new HealthQuantity(2000, HealthUnit.KILOJOULE));
+        w.setTotalDistance(new HealthQuantity(5, HealthUnit.KILOMETER));
+        assertEquals(5000,
+                w.getTotalDistance().in(HealthUnit.METER).getValue(
+                        HealthUnit.METER), 0.001);
+        w.setTotalEnergy(null);
+        assertNull(w.getTotalEnergy());
+    }
+
     private static Throwable errorOf(AsyncResource<?> r) {
         final Throwable[] err = new Throwable[1];
         r.except(new SuccessCallback<Throwable>() {

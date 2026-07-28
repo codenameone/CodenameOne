@@ -110,7 +110,13 @@ public final class WorkoutSample extends SessionSample {
     }
 
     /// Sets the energy total.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the quantity does not measure
+    ///   energy.
     public void setTotalEnergy(HealthQuantity totalEnergy) {
+        requireDimension(totalEnergy, HealthUnit.KILOCALORIE, "energy");
         this.totalEnergy = totalEnergy;
     }
 
@@ -120,8 +126,34 @@ public final class WorkoutSample extends SessionSample {
     }
 
     /// Sets the distance total.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the quantity does not measure
+    ///   length.
     public void setTotalDistance(HealthQuantity totalDistance) {
+        requireDimension(totalDistance, HealthUnit.METER, "distance");
         this.totalDistance = totalDistance;
+    }
+
+    /// A workout total in the wrong dimension is not caught anywhere else.
+    ///
+    /// The store writes whatever it is handed, so a total energy given in
+    /// kilograms round-tripped through the local and simulator stores
+    /// intact and only failed much later, in the caller that did the
+    /// documented thing and asked for the value in kilocalories. Rejecting
+    /// it at the setter puts the exception on the line that made the
+    /// mistake -- the same reason [BloodPressureSample] checks its
+    /// readings. Null stays legal: it is how a workout says the total was
+    /// never measured.
+    private static void requireDimension(HealthQuantity q, HealthUnit expected,
+            String which) {
+        if (q != null && !q.getUnit().isCompatibleWith(expected)) {
+            throw new IllegalArgumentException("a workout " + which
+                    + " total must measure " + expected.getDimension()
+                    + ", but " + q.getUnit().getSymbol() + " measures "
+                    + q.getUnit().getDimension());
+        }
     }
 
     /// Time actually exercising, excluding pauses. Falls back to the wall

@@ -52,6 +52,13 @@ import java.util.List;
 /// the ParparVM heap.
 class IOSHealthStore extends HealthStore {
 
+    /// How many records sharing a single millisecond the drain is willing
+    /// to pull in one read -- see [#readTiedInstant]. Bounded rather than
+    /// unlimited because a background delivery has a few seconds of wall
+    /// clock and a ParparVM heap to stay inside; generous because the
+    /// records beyond it cannot be paged to and are lost.
+    private static final int TIED_INSTANT_LIMIT = 50000;
+
     private final IOSNative nativeInstance;
 
     IOSHealthStore(IOSNative nativeInstance) {
@@ -360,6 +367,50 @@ class IOSHealthStore extends HealthStore {
                 safeUntil));
     }
 
+    /// Re-reads the single instant a page turned out to be entirely made
+    /// of, so the cursor can step over it without losing what did not fit.
+    ///
+    /// The window is read oldest-first, so a truncated page whose *last*
+    /// record starts at the cursor is a page in which every record starts
+    /// there. That is the one shape a timestamp cursor cannot page
+    /// through: the resume point is the last record read, which is where
+    /// the cursor already was, so the next drain gets the identical prefix
+    /// and the one after that too.
+    ///
+    /// The floor of `since + 1` used to break that loop by stepping over
+    /// the whole instant -- discarding every record in it that had not
+    /// been read, silently and for good. Draining the instant first makes
+    /// the same step safe, because nothing is left behind to skip.
+    ///
+    /// A large instant is still deliverable: the base class splits a batch
+    /// over the subscription's cap into cap-sized deliveries and anchors
+    /// only the last, so this arrives as several handled deliveries rather
+    /// than one unbounded payload.
+    void readTiedInstant(final List<HealthSubscription> subs,
+            final int index, final int delivered,
+            final AsyncResource<Integer> out,
+            final List<HealthDataType> types, final int typeIndex,
+            final List<HealthSample> collected, final long since,
+            final long now, final long safeUntil) {
+        SampleQuery q = new SampleQuery()
+                .addType(types.get(typeIndex))
+                .setTimeRange(HealthTimeRange.between(since, since + 1))
+                .setLimit(TIED_INSTANT_LIMIT);
+        readSamplePage(q).onResult(new TiedInstantRead(this, subs, index,
+                delivered, out, types, typeIndex, collected, since, now,
+                safeUntil));
+    }
+
+    /// `true` when a truncated page holds nothing but records starting at
+    /// the cursor, which is what makes the page unpageable.
+    private static boolean isWhollyTied(SamplePage page, long since) {
+        if (page == null || !page.isTruncated() || page.isEmpty()) {
+            return false;
+        }
+        List<HealthSample> samples = page.getSamples();
+        return samples.get(samples.size() - 1).getStartMillis() <= since;
+    }
+
     /// How far the cursor may move given one type's page.
     ///
     /// A complete page leaves it where it was. A truncated one pulls it
@@ -378,8 +429,9 @@ class IOSHealthStore extends HealthStore {
     ///
     /// Never earlier than `since + 1`: a window whose very first sample
     /// overflows the limit would otherwise re-read the same page forever.
-    /// That floor can only bite when a whole page shares one timestamp,
-    /// and standing still is the worse failure.
+    /// That floor is a backstop only -- the case it guards against is
+    /// handled before this is reached, by [#readTiedInstant], which drains
+    /// the instant so that stepping over it loses nothing.
     private static long advanceTo(long safeUntil, long since,
             SamplePage page) {
         if (page == null || !page.isTruncated() || page.isEmpty()) {
@@ -454,12 +506,87 @@ class IOSHealthStore extends HealthStore {
                 store.drainFrom(subs, index + 1, delivered, out);
                 return;
             }
+            if (isWhollyTied(page, since)) {
+                // Every record in a truncated page shares the cursor
+                // instant, so paging cannot get past it -- see
+                // readTiedInstant. The page is discarded rather than
+                // collected because the re-read returns a superset of it.
+                store.readTiedInstant(subs, index, delivered, out, types,
+                        typeIndex, collected, since, now, safeUntil);
+                return;
+            }
             if (page != null) {
                 collected.addAll(page.getSamples());
             }
             store.readTypes(subs, index, delivered, out, types,
                     typeIndex + 1, collected, since, now,
                     advanceTo(safeUntil, since, page));
+        }
+    }
+
+    /// Collects one instant's records after a page turned out to hold
+    /// nothing else, then lets the cursor step over that instant.
+    private static final class TiedInstantRead
+            implements com.codename1.util.AsyncResult<SamplePage> {
+
+        private final IOSHealthStore store;
+        private final List<HealthSubscription> subs;
+        private final int index;
+        private final int delivered;
+        private final AsyncResource<Integer> out;
+        private final List<HealthDataType> types;
+        private final int typeIndex;
+        private final List<HealthSample> collected;
+        private final long since;
+        private final long now;
+        private final long safeUntil;
+
+        TiedInstantRead(IOSHealthStore store, List<HealthSubscription> subs,
+                int index, int delivered, AsyncResource<Integer> out,
+                List<HealthDataType> types, int typeIndex,
+                List<HealthSample> collected, long since, long now,
+                long safeUntil) {
+            this.store = store;
+            this.subs = subs;
+            this.index = index;
+            this.delivered = delivered;
+            this.out = out;
+            this.types = types;
+            this.typeIndex = typeIndex;
+            this.collected = collected;
+            this.since = since;
+            this.now = now;
+            this.safeUntil = safeUntil;
+        }
+
+        public void onReady(SamplePage page, Throwable error) {
+            if (error != null) {
+                // Same reasoning as the ordinary page read: firing a
+                // partial batch would persist an anchor past records this
+                // read never returned.
+                store.drainFrom(subs, index + 1, delivered, out);
+                return;
+            }
+            long cursor = since + 1;
+            if (page != null) {
+                collected.addAll(page.getSamples());
+                if (page.isTruncated()) {
+                    // Beyond TIED_INSTANT_LIMIT records at one millisecond
+                    // the cursor has to step over the remainder anyway --
+                    // the alternative is a drain that never terminates.
+                    // Said out loud, because it is data loss, and because
+                    // no device produces this without something writing
+                    // every record under a single stamped timestamp.
+                    com.codename1.io.Log.p("CN1 Health: more than "
+                            + TIED_INSTANT_LIMIT + " records share the"
+                            + " timestamp " + since + " for "
+                            + types.get(typeIndex).getId() + "; the"
+                            + " remainder cannot be paged and is skipped");
+                }
+            }
+            store.readTypes(subs, index, delivered, out, types,
+                    typeIndex + 1, collected, since, now,
+                    Math.min(safeUntil, cursor));
         }
     }
 }

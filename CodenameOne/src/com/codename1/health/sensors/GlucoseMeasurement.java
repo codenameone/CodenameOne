@@ -57,6 +57,13 @@ package com.codename1.health.sensors;
 public final class GlucoseMeasurement {
 
     private static final int FLAG_TIME_OFFSET = 0x01;
+
+    /// The value the profile reserves for "the offset is not known". Every
+    /// other `sint16` is a real number of minutes, which is why nothing
+    /// narrower is rejected: a meter that stores a base time once and
+    /// offsets every record from it legitimately reports offsets months
+    /// wide.
+    private static final int TIME_OFFSET_UNKNOWN = -32768;
     private static final int FLAG_CONCENTRATION = 0x02;
     private static final int FLAG_UNITS_MOL_PER_L = 0x04;
     private static final int FLAG_STATUS = 0x08;
@@ -112,7 +119,13 @@ public final class GlucoseMeasurement {
         long timestamp = baseTime;
         if ((flags & FLAG_TIME_OFFSET) != 0) {
             int offsetMinutes = r.sint16();
-            if (baseTime >= 0) {
+            // 0x8000 is the profile's "time offset unknown" value, not an
+            // offset of -32768 minutes. Applied as a number it moved the
+            // reading back about 22.8 days, and the session then published
+            // -- and on some paths stored -- a real glucose value under a
+            // date the meter never claimed. Unknown means the base time is
+            // the best answer available, so that is what is used.
+            if (baseTime >= 0 && offsetMinutes != TIME_OFFSET_UNKNOWN) {
                 timestamp = baseTime + offsetMinutes * 60000L;
             }
         }

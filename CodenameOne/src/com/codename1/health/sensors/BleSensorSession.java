@@ -59,9 +59,17 @@ final class BleSensorSession extends SensorSession {
     private static final BluetoothUuid HEART_RATE_CONTROL_POINT =
             BluetoothUuid.fromShort(0x2A39);
 
+    /// How many times the reconnect ladder may stumble on discovery or
+    /// subscription before the session is retired. Bounded so a device
+    /// that has genuinely changed does not get reconnected at forever;
+    /// more than one so a single transient failure does not end a session
+    /// the caller still wants.
+    private static final int MAX_RECONNECT_FAILURES = 3;
+
     private final BlePeripheral peripheral;
     private GattCharacteristic measurement;
     private Reconnector reconnectListener;
+    private int reconnectFailures;
 
     BleSensorSession(String sensorId, HealthSensorProfile profile,
             SensorSessionOptions options, BlePeripheral peripheral) {
@@ -265,6 +273,10 @@ final class BleSensorSession extends SensorSession {
                     return;
                 }
                 setState(SensorSessionState.STREAMING);
+                // A run of failures only retires the session when it is
+                // uninterrupted: a strap that reconnects cleanly has
+                // spent whatever budget it used getting there.
+                reconnectFailures = 0;
                 if (out != null) {
                     out.complete(BleSensorSession.this);
                 }
@@ -299,18 +311,58 @@ final class BleSensorSession extends SensorSession {
     /// and completing it a second time -- or dereferencing it -- would
     /// throw on the BLE callback thread.
     private void failStart(AsyncResource<SensorSession> out, Throwable err) {
+        HealthException wrapped = wrapStartFailure(err);
+        if (out == null && !isStopped()) {
+            // No caller waiting means this came from the reconnect ladder,
+            // and a session that has streamed before is one the caller
+            // still wants. Failing it here retired the whole session over
+            // one transient discovery or subscribe error: FAILED is not a
+            // state the reconnect listener retries from, and the session
+            // had already been dropped from the active registry, so the
+            // documented auto-reconnect stopped for good after a single
+            // stumble.
+            failReconnect(wrapped);
+            return;
+        }
         setState(SensorSessionState.FAILED);
         forgetFromManager();
-        HealthException wrapped = err instanceof HealthException
-                ? (HealthException) err
-                : new HealthException(HealthError.SENSOR_DISCONNECTED,
-                        "could not start the " + getProfile().getName()
-                                + " session", err);
         if (out != null) {
             out.error(wrapped);
         } else {
             fireError(wrapped);
         }
+    }
+
+    private HealthException wrapStartFailure(Throwable err) {
+        return err instanceof HealthException
+                ? (HealthException) err
+                : new HealthException(HealthError.SENSOR_DISCONNECTED,
+                        "could not start the " + getProfile().getName()
+                                + " session", err);
+    }
+
+    /// Reports a reconnect-path failure and lets the ladder try again.
+    ///
+    /// The link is dropped deliberately. Leaving a connected-but-unusable
+    /// peripheral in place would be a quieter failure than the one this
+    /// replaces: the reconnect listener only fires on a disconnection, so
+    /// a session left sitting on a live link with no subscription would
+    /// never retry and never report itself broken either.
+    ///
+    /// Attempts are counted so this cannot cycle forever against a device
+    /// that has genuinely changed -- a peripheral reflashed with different
+    /// services will never expose the measurement characteristic again,
+    /// and the session should end rather than reconnect at it all day.
+    private void failReconnect(HealthException wrapped) {
+        reconnectFailures++;
+        if (reconnectFailures >= MAX_RECONNECT_FAILURES) {
+            setState(SensorSessionState.FAILED);
+            forgetFromManager();
+            fireError(wrapped);
+            return;
+        }
+        fireError(wrapped);
+        peripheral.disconnect();
     }
 
     @Override
