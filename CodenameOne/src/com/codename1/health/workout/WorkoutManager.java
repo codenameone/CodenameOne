@@ -86,6 +86,11 @@ public class WorkoutManager {
 
     /// Whether the operating system collects sensor data into the session
     /// on its own, without the app feeding samples in.
+    ///
+    /// `false` on every platform in this release. It is the OS-owned
+    /// session that would do the collecting, and no port runs one yet --
+    /// so a workout contains what you fed it through
+    /// [WorkoutSession#addSamples(java.util.List)], and nothing else.
     public boolean isSensorCollectionSupported() {
         return false;
     }

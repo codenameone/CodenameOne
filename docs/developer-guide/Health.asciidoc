@@ -12,12 +12,20 @@ On iOS and Android every callback -- `AsyncResource` results, sensor samples, wo
 | Read samples and aggregates | yes | yes | yes | yes | yes (scripted) | local only
 | Write samples | yes | yes | yes | yes | yes | local only
 | Read-authorization introspection | no | no | no | yes | yes | n/a
-| Background push delivery | *no* | *no* | *no* | *no* | yes | no
-| Change delivery while running | yes | yes | yes | yes | yes | yes
+| Background push delivery | *no* | *no* | *no* | *no* | *no* | no
+| Change delivery while running | yes | yes | yes | yes | *no* | *no*
 | Live workout session | *recorded* | recorded | *recorded* | recorded | recorded | recorded
-| Automatic sensor collection in a workout | yes | no | yes | no | no | no
+| Automatic sensor collection in a workout | *no* | no | *no* | no | no | no
 | Bluetooth health sensors | yes | yes | limited | yes | yes | yes
 |===
+
+Subscriptions are the one place the local-backed ports aren't a
+substitute for a device. `subscribe()` registers, persists its cursor and
+restores across launches everywhere, but nothing on the local store records
+a mutation as a change, so `drainChanges()` there resolves with zero and no
+listener ever fires. Subscription code can be written and its registration
+exercised on the desktop; whether it actually delivers has to be tested on
+a phone.
 
 Branch through the capability queries -- `Health.getAvailability()`, `HealthStore.isTypeSupported(...)`, `WorkoutManager.isLiveSessionSupported()`, `HealthSubscription.isPushDelivery()` -- rather than through platform detection.
 
@@ -135,9 +143,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 Two capabilities that are easy to conflate and that this API keeps separate:
 
 * `isLiveSessionSupported()` -- the OS runs a real session and keeps the app alive. **False everywhere in this release.** `HKWorkoutSession` exists on watchOS and on iOS 26 and later, and `androidx.health.services` exists on Wear OS, but neither is wired up yet, so every platform currently uses the recorded session described below. Branch on this query rather than on the OS version and your code will pick up native sessions when they land.
-* `isSensorCollectionSupported()` -- the OS also gathers heart rate and energy into that session by itself.
+* `isSensorCollectionSupported()` -- the OS also gathers heart rate and energy into that session by itself. **False everywhere in this release**, for the same reason: the live session is what collects, and there isn't one yet.
 
-Where the second is false, **a workout records only what you feed it**. On an Android phone that isn't a degraded fallback: Health Connect has no live-session concept, and inserting a session, batching your own data and updating it at the end is precisely the flow Google documents. Feed it with `addSamples(...)`, or by attaching a Bluetooth sensor.
+The second being false everywhere today, **a workout records only what you feed it**. On an Android phone that isn't a degraded fallback: Health Connect has no live-session concept, and inserting a session, batching your own data and updating it at the end is precisely the flow Google documents. Feed it with `addSamples(...)`, or by attaching a Bluetooth sensor.
 
 `getStatistic(...)` returns `null` rather than a fabricated zero when nothing has been collected. Sessions aren't restored after the process dies -- a killed workout is over, `end()` was never called, and nothing is written.
 

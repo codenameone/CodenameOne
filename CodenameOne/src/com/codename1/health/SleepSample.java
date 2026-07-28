@@ -46,14 +46,21 @@ import java.util.List;
 /// }
 /// ```
 ///
-/// #### Sessions on iOS are reassembled
+/// #### Neither phone reads sleep in this release
 ///
-/// HealthKit has no sleep-session object at all -- only a run of
-/// overlapping category samples. The iOS port groups them into sessions
-/// using Apple's own convention of splitting on a gap, configurable via
-/// [SampleQuery#setSleepSessionGapMillis(long)]. That grouping is a
-/// heuristic, which is why it lives in the port and is tunable rather than
-/// being silently baked into the shared code.
+/// Sleep is available on the simulator, the desktop and the JavaScript
+/// port, and on none of the mobile ones: a sleep query is refused on iOS
+/// and Android alike, so no session of this shape ever comes back from a
+/// device. Build against it by all means -- but do not build a mobile
+/// screen around it yet.
+///
+/// The reason it is unfinished on iOS is worth knowing, because it shapes
+/// what finishing it will look like. HealthKit has no sleep-session
+/// object at all, only a run of overlapping category samples, so the port
+/// has to group them into sessions itself -- Apple's own convention is to
+/// split on a gap, which is what [SampleQuery#setSleepSessionGapMillis(long)]
+/// is there to tune. That grouping is a heuristic, which is why it
+/// belongs in the port rather than baked into the shared code.
 public final class SleepSample extends SessionSample {
 
     private final List<SleepStageInterval> stages;
