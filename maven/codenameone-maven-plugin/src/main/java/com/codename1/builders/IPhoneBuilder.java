@@ -2690,8 +2690,21 @@ public class IPhoneBuilder extends Executor {
                 // capability its App ID may never have enabled, and an
                 // otherwise harmless getAvailability() call failed
                 // codesigning.
+                // The explicit sub-capability hints count as usage too.
+                // Each block below emits its sub-entitlement from the hint
+                // alone, and a HealthKit sub-capability without
+                // com.apple.developer.healthkit beneath it is not a
+                // capability Apple can enable -- so an availability-only
+                // app asking for background delivery produced an
+                // entitlement set that could not be signed against a
+                // profile and would not have worked if it had been.
                 boolean entitleHealthKit = usesHealthRead || usesHealthWrite
-                        || usesHealthWorkout;
+                        || usesHealthWorkout
+                        || "true".equalsIgnoreCase(request.getArg(
+                                "ios.health.backgroundDelivery", "false"))
+                        || "true".equalsIgnoreCase(request.getArg(
+                                "ios.health.recalibrateEstimates", "false"))
+                        || usesHealthObserver;
                 if (entitleHealthKit && request.getArg(
                         "ios.entitlements.com.apple.developer.healthkit",
                         null) == null) {
