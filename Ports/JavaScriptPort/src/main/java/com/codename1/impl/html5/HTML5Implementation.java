@@ -6876,16 +6876,41 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
-     * True when the URL names something the browser itself can navigate to, as
+     * True when the URL names something the browser itself can hand off, as
      * opposed to a path into local storage that {@link #execute(String)} is
      * expected to turn into a download. Only these get the
      * {@code javascript.execute.target} treatment -- pointing the current page
      * at a storage path would unload the app and land on nothing.
+     *
+     * <p>Anything carrying a URI scheme qualifies, whatever its case. That
+     * deliberately includes custom deep links such as the {@code imdb:///find}
+     * example in {@code Display.execute}'s javadoc, which the browser passes to
+     * a registered handler, and it includes protocol-relative {@code //host/path}
+     * URLs. {@code file:} is the exception: like the bare paths that carry no
+     * scheme at all, it names local content.</p>
      */
     private static boolean isExternalUrl(String url) {
-        return url.startsWith("http:") || url.startsWith("https:")
-                || url.startsWith("mailto:") || url.startsWith("tel:")
-                || url.startsWith("sms:");
+        if (url.startsWith("//")) {
+            // Protocol relative -- the page's own scheme applies.
+            return true;
+        }
+        int colon = url.indexOf(':');
+        // A single character before the colon is a Windows drive letter rather
+        // than a URI scheme; every scheme worth handing off is longer.
+        if (colon < 2) {
+            return false;
+        }
+        // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ), per RFC 3986. A
+        // path that merely happens to contain a colon fails this.
+        for (int i = 0; i < colon; i++) {
+            char c = url.charAt(i);
+            boolean alpha = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+            boolean extra = i > 0 && ((c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.');
+            if (!alpha && !extra) {
+                return false;
+            }
+        }
+        return !"file".equals(url.substring(0, colon).toLowerCase());
     }
 
     /**
@@ -6950,7 +6975,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         String fileName = null;
         boolean useBlobHandler = false;
         Button nativeButton = new Button();
-        if (!isExternalUrl(url) && !url.startsWith("data:")) {
+        // Only a local path can name storage content to wrap in a Blob. A
+        // data: URL carries its own payload and is handled further down;
+        // isExternalUrl already excludes it, since it has a scheme.
+        if (!isExternalUrl(url)) {
             if (exists(url)) {
                 try {
                     Blob blob = openFileAsBlob(url);

@@ -4105,9 +4105,11 @@ public final class Display extends CN1Constants {
     /// Display.getInstance().setProperty("javascript.execute.target", "_self");
     /// ```
     ///
-    /// The property is ignored on every other platform, and on all targets a
-    /// `javascript:` URL, a `data:` URL or a path to a local file keeps its
-    /// existing meaning.
+    /// The property applies to any URL carrying a URI scheme the browser can
+    /// hand off, custom deep links like the `imdb:///find` example above
+    /// included. It is ignored on every other platform, and on all targets a
+    /// `javascript:` URL, a `data:` URL, a `file:` URL or a path into local
+    /// storage keeps its existing meaning.
     ///
     /// #### Parameters
     ///
