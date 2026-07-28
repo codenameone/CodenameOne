@@ -48,6 +48,10 @@ import com.codename1.ui.Display;
 /// ```
 public final class MCP {
     private static MCPServer server;
+    /// Every access to these goes through the class monitor, because the port that
+    /// registers a transport and the code asking whether one exists are not necessarily
+    /// the same thread. The accessors below are synchronized for that reason rather than
+    /// the fields being volatile, which this codebase does not use.
     private static StdioTransportFactory stdioTransportFactory;
     private static SocketTransportFactory socketTransportFactory;
     /// Lifts the release build block; see [#setAllowOnReleaseBuilds(boolean)].
@@ -74,24 +78,24 @@ public final class MCP {
     }
 
     /// Registers the platform stdio transport factory. Called by the JavaSE port.
-    public static void setStdioTransportFactory(StdioTransportFactory factory) {
+    public static synchronized void setStdioTransportFactory(StdioTransportFactory factory) {
         stdioTransportFactory = factory;
     }
 
     /// Registers the platform socket transport factory. Called by the JavaSE port.
-    public static void setSocketTransportFactory(SocketTransportFactory factory) {
+    public static synchronized void setSocketTransportFactory(SocketTransportFactory factory) {
         socketTransportFactory = factory;
     }
 
     /// Whether the PORT supplied a transport of its own. Distinct from
     /// [#isSocketSupported()], which also counts the portable fallback - the fallback
     /// must not see itself as already installed.
-    static boolean hasPlatformSocketTransport() {
+    static synchronized boolean hasPlatformSocketTransport() {
         return socketTransportFactory != null;
     }
 
     /// Whether an stdio transport is available on this platform.
-    public static boolean isStdioSupported() {
+    public static synchronized boolean isStdioSupported() {
         return stdioTransportFactory != null;
     }
 
@@ -103,7 +107,7 @@ public final class MCP {
     /// gate, so it is not a complete preflight for [#startSocketServer(int)] on its own -
     /// a platform that can bind may still refuse to serve. Ask
     /// [#isSocketServerAllowedOnThisBuild()] for the other half.
-    public static boolean isSocketSupported() {
+    public static synchronized boolean isSocketSupported() {
         return socketTransportFactory != null
                 || com.codename1.io.Socket.isLoopbackServerSocketSupported();
     }

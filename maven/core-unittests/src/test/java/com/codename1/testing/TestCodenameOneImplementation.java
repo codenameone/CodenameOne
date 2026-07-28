@@ -2803,8 +2803,14 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         stoppedListeners.add(port + ":" + loopbackOnly);
     }
 
+    /// A snapshot, not the live list. Handing back the real one lets a test mutate what a
+    /// later assertion reads, and iterating a synchronized list safely needs external
+    /// locking that a test would have to remember.
     public java.util.List<String> getStoppedListeners() {
-        return stoppedListeners;
+        synchronized (stoppedListeners) {
+            return java.util.Collections.unmodifiableList(
+                    new java.util.ArrayList<String>(stoppedListeners));
+        }
     }
 
     private boolean loopbackSupportedOnlyOnFirstQuery;

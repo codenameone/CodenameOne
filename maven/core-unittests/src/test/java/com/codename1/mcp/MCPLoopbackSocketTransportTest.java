@@ -103,6 +103,22 @@ class MCPLoopbackSocketTransportTest {
     }
 
     @Test
+    void bufferedReadsDoNotSwallowTheNextClientsBytes() throws Exception {
+        // Reading in blocks means a read can pull in bytes past the delimiter. Those
+        // belong to the NEXT message on the same connection and must be kept, but they
+        // must not survive into a different client's session.
+        MCPLoopbackSocketTransport t = attached("{\"id\":1}\n{\"id\":2}\n{\"id\":3}\n");
+        assertEquals("{\"id\":1}", t.readMessage());
+        assertEquals("{\"id\":2}", t.readMessage(), "carried-over bytes must be readable");
+
+        // A new client arrives while the previous stream still had "{id:3}" buffered.
+        t.attach(new ByteArrayInputStream("{\"id\":9}\n".getBytes("UTF-8")),
+                new ByteArrayOutputStream());
+        assertEquals("{\"id\":9}", t.readMessage(),
+                "the new client's first message must not be the old client's leftovers");
+    }
+
+    @Test
     void toleratesCarriageReturnsBeforeTheDelimiter() throws Exception {
         MCPLoopbackSocketTransport t = attached("{\"id\":1}\r\n");
         assertEquals("{\"id\":1}", t.readMessage(),

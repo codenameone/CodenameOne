@@ -54,6 +54,18 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
     /// behaved or hostile client can make the server allocate.
     static final int MAX_FRAME_BYTES = 8 * 1024 * 1024;
 
+    /// Bulk reads land here and are consumed a byte at a time. Whatever follows a
+    /// delimiter stays put for the next message, which is what makes buffering safe: the
+    /// bytes are held rather than swallowed.
+    ///
+    /// Touched only by the reader thread, and reset in readMessage whenever the attached
+    /// stream is not the one that filled it, so a new client never inherits a dead
+    /// client's tail.
+    private final byte[] chunk = new byte[8192];
+    private int chunkPos;
+    private int chunkLen;
+    private InputStream chunkSource; // NOPMD borrowed identity, never read from or closed
+
     private final int port;
     private final Object lock = new Object();
     private Socket.StopListening listening;
@@ -212,6 +224,14 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
                 }
                 stream = in;
             }
+            if (stream != chunkSource) { // NOPMD identity: is this the stream we buffered?
+                // A different client. Anything left from the previous one belongs to a
+                // session that has ended and must not be read as this client's first
+                // message.
+                chunkSource = stream;
+                chunkPos = 0;
+                chunkLen = 0;
+            }
             String line = readLine(stream);
             if (line != null) {
                 return line;
@@ -227,9 +247,10 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
     /// Reads one newline-delimited UTF-8 message. Returns null at end of stream, which
     /// includes a frame cut short by the client going away.
     ///
-    /// Read byte at a time rather than through a buffered reader: a buffer would swallow
-    /// bytes belonging to the next message, and this transport hands the same stream back
-    /// after a reconnect.
+    /// Reads in blocks rather than a byte at a time - a frame near the ceiling would
+    /// otherwise cost millions of single-byte reads. Buffering is safe here because
+    /// whatever follows the delimiter is KEPT in the chunk for the next call, so no bytes
+    /// belonging to the next message are swallowed.
     private String readLine(InputStream stream) throws IOException {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         // A carriage return is only part of the delimiter when a newline follows it, so it
@@ -237,20 +258,29 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         // a payload that happened to contain one.
         boolean pendingCarriageReturn = false;
         while (true) {
-            int b;
-            try {
-                b = stream.read();
-            } catch (IOException ex) {
-                return null;   // a read error on the client is a disconnect
+            if (chunkPos >= chunkLen) {
+                int read;
+                try {
+                    read = stream.read(chunk, 0, chunk.length);
+                } catch (IOException ex) {
+                    return null;   // a read error on the client is a disconnect
+                }
+                if (read < 0) {
+                    // End of stream with no delimiter: the frame is truncated, so this is
+                    // a disconnect and not a message, however many bytes arrived first.
+                    // Handing the partial frame up would have the server fail to parse it,
+                    // then fail to answer it (the peer is already gone), and end the loop -
+                    // when the whole point of this transport is to stay bound and await a
+                    // reconnect.
+                    return null;
+                }
+                chunkPos = 0;
+                chunkLen = read;
+                if (read == 0) {
+                    continue;      // nothing this time; ask again rather than call it EOF
+                }
             }
-            if (b < 0) {
-                // End of stream with no delimiter: the frame is truncated, so this is a
-                // disconnect and not a message, however many bytes arrived first. Handing
-                // the partial frame up would have the server fail to parse it, then fail
-                // to answer it (the peer is already gone), and end the loop - when the
-                // whole point of this transport is to stay bound and await a reconnect.
-                return null;
-            }
+            int b = chunk[chunkPos++] & 0xff;
             if (pendingCarriageReturn) {
                 pendingCarriageReturn = false;
                 if (b == '\n') {
