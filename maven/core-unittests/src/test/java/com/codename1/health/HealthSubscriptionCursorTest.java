@@ -462,4 +462,41 @@ class HealthSubscriptionCursorTest extends UITestBase {
         assertEquals(2, listener.seen.size(),
                 "and the batch is delivered once, not twice");
     }
+
+    /**
+     * A cursor seeded at registration reaches the live handle, not only
+     * Preferences.
+     *
+     * <p>The drains read the handle. Persisting alone looked correct and
+     * did nothing: the next drain still found a null anchor, took a fresh
+     * cursor, and skipped exactly the window the seed existed to
+     * cover.</p>
+     */
+    @Test
+    void aSeededCursorReachesTheLiveSubscription() {
+        FakeHealthStore store = newStore();
+        Collector listener = new Collector(1);
+        // A fresh id every run: the persisted cursor outlives the JVM's
+        // Preferences, and subscribe() seeds a new handle from it -- so a
+        // reused id made this pass on a cursor left by an earlier run
+        // rather than on the one seeded here.
+        String id = "seeded-" + System.nanoTime();
+        SubscriptionRequest req = new SubscriptionRequest(id)
+                .addType(HealthDataType.STEPS);
+        store.subscribe(req, listener);
+        store.drainChanges();
+        assertEquals(1, store.anchorsSeen.size());
+        assertNull(store.anchorsSeen.get(0),
+                "a new subscription starts with no cursor");
+
+        store.seedForTest(id, HealthAnchor.of("baseline-token"));
+        store.drainChanges();
+
+        assertEquals(1, store.anchorsSeen.size());
+        assertNotNull(store.anchorsSeen.get(0),
+                "the drain must see the seeded cursor on the handle");
+        assertEquals("baseline-token",
+                store.anchorsSeen.get(0).toStorableString());
+        store.unsubscribe(id);
+    }
 }

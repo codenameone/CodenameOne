@@ -164,6 +164,7 @@ class BleSensorReconnectTest extends UITestBase {
     private static final class FakePeripheral extends BlePeripheral {
 
         private int failDiscoveries;
+        private int failConnects;
         private int discoveries;
         private int connects;
 
@@ -202,6 +203,12 @@ class BleSensorReconnectTest extends UITestBase {
         protected void doConnect(ConnectionOptions options,
                 AsyncResource<BlePeripheral> out) {
             connects++;
+            if (failConnects > 0) {
+                failConnects--;
+                out.error(new BluetoothException(
+                        BluetoothError.CONNECTION_FAILED, "no such device"));
+                return;
+            }
             out.complete(this);
         }
 
@@ -526,5 +533,30 @@ class BleSensorReconnectTest extends UITestBase {
                     com.codename1.health.HealthError.TYPE_NOT_SUPPORTED,
                     "not writable here"));
         }
+    }
+
+    /**
+     * Repeated connect failures are bounded, like discovery ones.
+     *
+     * <p>A failed {@code connect()} publishes DISCONNECTED, the reconnect
+     * listener fires on that transition and reconnects at once, so a
+     * sensor that has gone for good span the ladder at full speed --
+     * forever, because only discovery and subscribe failures were
+     * counting toward the limit.</p>
+     */
+    @Test
+    void repeatedConnectFailuresRetireTheSession() {
+        FakePeripheral p = new FakePeripheral();
+        BleSensorSession session = start(p);
+        assertEquals(SensorSessionState.STREAMING, session.getState());
+
+        p.failConnects = 99;
+        p.dropLink();
+
+        pumpUntil(session, SensorSessionState.FAILED);
+        assertTrue(session.isTerminal());
+        assertTrue(p.connects <= 6,
+                "the ladder should be bounded, saw " + p.connects
+                        + " connect attempts");
     }
 }

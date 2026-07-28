@@ -2009,6 +2009,26 @@ public class HealthStore {
                 Preferences.get(PREF_ANCHOR + subscriptionId, null));
     }
 
+    /// Seeds a subscription's cursor in memory *and* on disk.
+    ///
+    /// A port that establishes a starting cursor at registration -- the
+    /// Health Connect baseline token, say -- has to reach the live
+    /// handle, because that is what the drains read. Persisting alone
+    /// looked correct and did nothing: the next drain still found a null
+    /// anchor on the handle, took a fresh cursor, and skipped exactly the
+    /// window the seed existed to cover.
+    protected final void seedAnchor(String subscriptionId,
+            HealthAnchor anchor) {
+        HealthSubscription sub;
+        synchronized (subscriptions) {
+            sub = subscriptions.get(subscriptionId);
+        }
+        if (sub != null) {
+            sub.seedAnchor(anchor);
+        }
+        storeAnchor(subscriptionId, anchor);
+    }
+
     /// Persists a cursor. Called by [#fireChanges(HealthChangeBatch)]
     /// after successful delivery; ports rarely need it directly.
     protected final void storeAnchor(String subscriptionId,

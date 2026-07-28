@@ -2665,8 +2665,14 @@ public class AndroidGradleBuilder extends Executor {
             }
             String declaredKotlin =
                     request.getArg("requireKotlinStdlib", "").trim();
-            if (declaredKotlin.length() == 0
-                    || compareVersions(declaredKotlin, kotlinFloor) < 0) {
+            // Compared on the numeric prefix. A qualified version like
+            // 1.9.22-RC2 is perfectly acceptable, and feeding it to
+            // compareVersions -- which parses each segment as an int --
+            // threw and failed the build instead of accepting it.
+            String comparableKotlin = HealthManifestFragments
+                    .numericVersionPrefix(declaredKotlin);
+            if (comparableKotlin == null
+                    || compareVersions(comparableKotlin, kotlinFloor) < 0) {
                 request.putArgument("requireKotlinStdlib", kotlinFloor);
                 log("Health Connect requires Kotlin " + kotlinFloor
                         + " or newer; raising requireKotlinStdlib from "

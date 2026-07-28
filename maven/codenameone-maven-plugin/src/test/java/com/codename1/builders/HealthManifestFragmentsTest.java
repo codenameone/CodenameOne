@@ -406,4 +406,26 @@ class HealthManifestFragmentsTest {
         assertTrue(HealthManifestFragments.isWriteCall(
                 "requestAuthorization"));
     }
+
+    /**
+     * A qualified version compares on its numeric prefix.
+     *
+     * <p>{@code 1.9.22-RC2} is a perfectly acceptable Kotlin version, and
+     * feeding it to a segment-by-segment {@code Integer.parseInt}
+     * comparison threw and failed the build instead of accepting it.</p>
+     */
+    @Test
+    void qualifiedVersionsCompareOnTheirNumericPrefix() {
+        assertEquals("1.9.22",
+                HealthManifestFragments.numericVersionPrefix("1.9.22-RC2"));
+        assertEquals("2.0.0",
+                HealthManifestFragments.numericVersionPrefix("2.0.0-Beta1"));
+        assertEquals("1.9.22",
+                HealthManifestFragments.numericVersionPrefix("1.9.22"));
+        assertEquals("1.9",
+                HealthManifestFragments.numericVersionPrefix("1.9."));
+        assertNull(HealthManifestFragments.numericVersionPrefix("RC2"));
+        assertNull(HealthManifestFragments.numericVersionPrefix(""));
+        assertNull(HealthManifestFragments.numericVersionPrefix(null));
+    }
 }

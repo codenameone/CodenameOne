@@ -120,10 +120,15 @@ final class BleSensorSession extends SensorSession {
             public void onReady(BlePeripheral value, Throwable err) {
                 if (err == null) {
                     discover(null);
+                    return;
                 }
-                // A failed retry is not fatal: the listener fires again on
-                // the next transition, so the session keeps trying for as
-                // long as the caller leaves it running.
+                // Counted, not ignored. A failed connect publishes
+                // DISCONNECTED, the listener fires on that transition and
+                // reconnects immediately, so a sensor that has gone for
+                // good span the whole ladder at full speed and never
+                // reached the three-failure limit -- which only discovery
+                // and subscribe failures were incrementing.
+                failReconnect(wrapStartFailure(err));
             }
         });
     }

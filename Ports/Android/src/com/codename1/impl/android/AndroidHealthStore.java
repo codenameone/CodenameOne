@@ -593,7 +593,11 @@ class AndroidHealthStore extends HealthStore {
             if (payload == null || payload.trim().length() == 0) {
                 return;
             }
-            store.storeAnchor(subscriptionId,
+            // The live handle as well as the persisted copy: the drains
+            // read the handle, so persisting alone left the next drain
+            // taking a fresh baseline and skipping the very window this
+            // token exists to cover.
+            store.seedAnchor(subscriptionId,
                     HealthAnchor.of(payload.trim()));
         }
 

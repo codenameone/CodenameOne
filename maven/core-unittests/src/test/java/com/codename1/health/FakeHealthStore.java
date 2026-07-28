@@ -115,10 +115,23 @@ public class FakeHealthStore extends HealthStore {
     /// Run on entry to the port drain, so a test can overlap two calls.
     public Runnable beforeDrain;
 
+    /** Anchors the live handles carried into the last drain. */
+    public final List<HealthAnchor> anchorsSeen =
+            new ArrayList<HealthAnchor>();
+
+    /** Seeds a cursor the way a port does at registration. */
+    public void seedForTest(String subscriptionId, HealthAnchor anchor) {
+        seedAnchor(subscriptionId, anchor);
+    }
+
     @Override
     protected void doDrainChanges(List<HealthSubscription> subscriptions,
             AsyncResource<Integer> out) {
         drainCount++;
+        anchorsSeen.clear();
+        for (HealthSubscription sub : subscriptions) {
+            anchorsSeen.add(sub.getAnchor());
+        }
         if (beforeDrain != null) {
             Runnable r = beforeDrain;
             beforeDrain = null;

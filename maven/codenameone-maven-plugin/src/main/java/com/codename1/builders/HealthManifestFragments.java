@@ -250,6 +250,28 @@ final class HealthManifestFragments {
     /// fail the build on a version that is perfectly acceptable. Dropping
     /// it can only round a prerelease up to its release, which is the
     /// forgiving direction for a floor check.
+    /// The leading numeric part of a version, or null when there is none.
+    ///
+    /// `1.9.22-RC2` comes back as `1.9.22`. Callers compare segment by
+    /// segment with `Integer.parseInt`, which throws on a qualifier and
+    /// fails the build over a version that is perfectly acceptable --
+    /// dropping it can only round a prerelease up to its release, which
+    /// is the forgiving direction for a floor check.
+    static String numericVersionPrefix(String version) {
+        if (version == null) {
+            return null;
+        }
+        int to = 0;
+        while (to < version.length()
+                && "0123456789.".indexOf(version.charAt(to)) >= 0) {
+            to++;
+        }
+        while (to > 0 && version.charAt(to - 1) == '.') {
+            to--;
+        }
+        return to > 0 ? version.substring(0, to) : null;
+    }
+
     static String declaredKotlinPluginVersion(String topDependency) {
         if (topDependency == null) {
             return null;
