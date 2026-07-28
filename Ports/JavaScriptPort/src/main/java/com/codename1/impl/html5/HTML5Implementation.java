@@ -6896,7 +6896,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 shortenUrlForDisplay(url), new Runnable() {
             @Override
             public void run() {
-                openUrlOnMainThread(url, false, false);
+                // This callback runs on the EDT, by which point the browser no
+                // longer counts the OK tap as an ongoing gesture -- opening
+                // from here would be discarded by a popup blocker, which is the
+                // very thing the Sheet exists to recover from. That tap did
+                // install a backside hook though (pointer handling calls
+                // installBacksideHooksInUserInteraction), so queue the open on
+                // it and let the drain perform it inside the gesture. Same
+                // shape as the download confirmation below.
+                addBacksideHook(new JSRunnable() {
+                    @Override
+                    public void run() {
+                        openUrlOnMainThread(url, false, false);
+                    }
+                });
             }
         }).show();
     }
