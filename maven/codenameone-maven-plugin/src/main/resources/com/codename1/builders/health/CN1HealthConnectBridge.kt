@@ -261,12 +261,20 @@ class CN1HealthConnectBridge(private val context: Context)
             // the order of `types` rather than on time: a descending limit-1
             // query over [steps, heart_rate] always returned the newest
             // step even when a heart-rate sample was newer.
+            // The budget is the caller's, not each type's. Handing every
+            // type the whole limit multiplied the reply -- and the memory
+            // -- by the number of types, and nothing trims it afterwards.
+            // Divided rather than spent in order, so the answer does not
+            // depend on which type happens to be listed first; at least
+            // one record per type, so no type is silently dropped.
+            val perTypeBudget = maxOf(1, budget / maxOf(1, types.length()))
             val perType = ArrayList<String>()
             for (i in 0 until types.length()) {
                 val token = types.getString(i)
                 val block = StringBuilder()
                 val r = appendRecords(block, token, filter,
-                    budget, origins, ascending, inTokens[token], flatten)
+                    perTypeBudget, origins, ascending, inTokens[token],
+                    flatten)
                 perType.add(block.toString())
                 // Exhausted types are recorded with an empty token, not
                 // omitted. Omitting them made the next page see no token
@@ -485,7 +493,7 @@ class CN1HealthConnectBridge(private val context: Context)
     private fun appendOne(sb: StringBuilder, record: Record,
                           token: String, flatten: Boolean,
                           ascending: Boolean = true): Int {
-        if (!flatten && appendWholeSeries(sb, record, token)) {
+        if (!flatten && appendWholeSeries(sb, record, token, ascending)) {
             return 1
         }
         when (record) {
@@ -675,31 +683,32 @@ class CN1HealthConnectBridge(private val context: Context)
         if (ascending) samples else samples.asReversed()
 
     private fun appendWholeSeries(sb: StringBuilder, record: Record,
-                                  token: String): Boolean {
+                                  token: String,
+                                  ascending: Boolean): Boolean {
         when (record) {
             is HeartRateRecord -> series(sb, record, token, "count/min",
-                record.samples.map {
+                ordered(record.samples, ascending).map {
                     Pair(it.time.toEpochMilli(), it.beatsPerMinute.toDouble())
                 })
 
             is PowerRecord -> series(sb, record, token, "W",
-                record.samples.map {
+                ordered(record.samples, ascending).map {
                     Pair(it.time.toEpochMilli(), it.power.inWatts)
                 })
 
             is SpeedRecord -> series(sb, record, token, "m/s",
-                record.samples.map {
+                ordered(record.samples, ascending).map {
                     Pair(it.time.toEpochMilli(), it.speed.inMetersPerSecond)
                 })
 
             is CyclingPedalingCadenceRecord -> series(sb, record, token,
                 "count/min",
-                record.samples.map {
+                ordered(record.samples, ascending).map {
                     Pair(it.time.toEpochMilli(), it.revolutionsPerMinute)
                 })
 
             is StepsCadenceRecord -> series(sb, record, token, "count/min",
-                record.samples.map {
+                ordered(record.samples, ascending).map {
                     Pair(it.time.toEpochMilli(), it.rate)
                 })
 

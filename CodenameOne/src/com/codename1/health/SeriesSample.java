@@ -91,6 +91,16 @@ public final class SeriesSample extends HealthSample {
         // batch is reported by both bridges as a successful write of
         // nothing -- the caller was told it worked while the store never
         // heard of it.
+        // A series is a run of measurements, and flattening one -- the
+        // default read shape -- turns each into a QuantitySample. A
+        // category or session type has no numeric value, so such a series
+        // could be written to the local store and then threw on the next
+        // ordinary read.
+        if (type == null || type.getCanonicalUnit() == null) {
+            throw new IllegalArgumentException((type == null ? "null"
+                    : type.getId()) + " has no numeric value, so it cannot"
+                            + " be recorded as a series");
+        }
         if (values.length == 0) {
             throw new IllegalArgumentException(
                     "a series needs at least one measurement");

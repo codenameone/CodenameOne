@@ -168,24 +168,23 @@ final class HealthManifestFragments {
      * dropping blanks. Tolerates whitespace and trailing commas, since the
      * value is hand-written in a properties file.
      */
-    /// Tokens with a Health Connect permission but no record class at all,
-    /// so nothing the bridge does can service them.
+    /// Tokens with a Health Connect permission that no Android operation
+    /// can service.
     ///
-    /// Deliberately one list, not one per direction. A permission covers
-    /// more than a single operation: the write permission authorises both
-    /// inserts and deletes, and the read permission covers both reads and
-    /// change subscriptions. Deletes and subscriptions go through
-    /// `recordClassFor`, which is wider than the insert and read gates, so
-    /// each direction's union of capabilities *is* `recordClassFor` -- and
-    /// a build cannot know which of those operations an app will use.
+    /// The authority is `readableRecordClassFor`, not `recordClassFor`,
+    /// because the portable layer gates *everything* on
+    /// `HealthStore.isTypeSupported`, which on Android answers from the
+    /// same narrower set. A read, a delete and a change subscription all
+    /// pass through it, so a type outside that set cannot be used for any
+    /// of them -- `subscribe()` throws in `register()` before the bridge
+    /// is ever asked for a token.
     ///
-    /// A narrower per-direction split refused `write=power` from an app
-    /// that only deletes power records, and `read=sleep` from one that only
-    /// subscribes to sleep changes. Both are supported flows. Rejecting
-    /// only what nothing can service is the line the build can actually
-    /// draw; a token that is declared and then used for the one operation
-    /// its record class does not support fails at runtime with a message
-    /// naming it.
+    /// Still one list rather than one per direction: within that set, a
+    /// permission covers more than one operation -- write authorises
+    /// inserts and deletes, read covers reads and subscriptions -- and a
+    /// build cannot know which an app will use. Splitting it refused
+    /// `write=power` from an app that only deletes power records, which
+    /// works.
     ///
     /// Kept in step with the Kotlin by `HealthBridgeTokenTableTest`, which
     /// parses it and fails the build when the two drift.
@@ -204,11 +203,13 @@ final class HealthManifestFragments {
         NO_RECORD_CLASS.add("menstruation_flow");
         NO_RECORD_CLASS.add("mindful_session");
         NO_RECORD_CLASS.add("nutrition");
+        NO_RECORD_CLASS.add("sleep");
         NO_RECORD_CLASS.add("waist_circumference");
         NO_RECORD_CLASS.add("walking_heart_rate_average");
+        NO_RECORD_CLASS.add("workout");
     }
 
-    /// The declared tokens no Health Connect operation can service.
+    /// The declared tokens no Android health operation can service.
     static List<String> unsupportedTokens(List<String> tokens) {
         List<String> out = new ArrayList<String>();
         for (String t : tokens) {

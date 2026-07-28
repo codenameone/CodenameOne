@@ -303,8 +303,15 @@ public class HealthBridgeTokenTableTest {
         int start = src.indexOf("private fun recordClassFor(");
         assertTrue("the bridge must declare recordClassFor", start > 0);
         String records = src.substring(start, src.indexOf("\n    }", start));
+        // readableRecordClassFor is the gate, not recordClassFor: the
+        // portable layer routes reads, deletes and subscriptions alike
+        // through isTypeSupported, which answers from the same narrower
+        // set, so a type it excludes cannot be used for anything.
+        java.util.List<String> excluded = java.util.Arrays.asList(
+                "sleep", "workout");
         for (String token : bridgeTable().keySet()) {
-            boolean serviceable = records.contains("\"" + token + "\"");
+            boolean serviceable = records.contains("\"" + token + "\"")
+                    && !excluded.contains(token);
             assertEquals(token + ": a token no operation can service must be"
                     + " rejected by the build, and one that any operation"
                     + " can service must not be", !serviceable,
