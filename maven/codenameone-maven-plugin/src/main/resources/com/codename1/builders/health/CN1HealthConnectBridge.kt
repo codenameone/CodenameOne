@@ -261,13 +261,23 @@ class CN1HealthConnectBridge(private val context: Context)
             // the order of `types` rather than on time: a descending limit-1
             // query over [steps, heart_rate] always returned the newest
             // step even when a heart-rate sample was newer.
-            // The budget is the caller's, not each type's. Handing every
-            // type the whole limit multiplied the reply -- and the memory
-            // -- by the number of types, and nothing trims it afterwards.
-            // Divided rather than spent in order, so the answer does not
-            // depend on which type happens to be listed first; at least
-            // one record per type, so no type is silently dropped.
-            val perTypeBudget = maxOf(1, budget / maxOf(1, types.length()))
+            // Every type reads to the full budget, and the merge picks the
+            // newest across all of them.
+            //
+            // Dividing it bounded memory but changed the answer: all ten
+            // newest samples of a descending limit-10 query can belong to
+            // one type, and a fifth of the budget cannot see them. Any of
+            // the K results may come from any one type, so guaranteeing
+            // the global top-K needs up to K candidates from each -- short
+            // of an incremental k-way merge, which would mean per-type
+            // page cursors held across the whole read.
+            //
+            // So the cost is K per type rather than K overall. That is
+            // bounded and predictable, and it is the side to err on: a
+            // reply that is larger than asked for is trimmed by the shared
+            // layer, while one built from the wrong candidates is simply
+            // wrong.
+            val perTypeBudget = budget
             val perType = ArrayList<String>()
             for (i in 0 until types.length()) {
                 val token = types.getString(i)

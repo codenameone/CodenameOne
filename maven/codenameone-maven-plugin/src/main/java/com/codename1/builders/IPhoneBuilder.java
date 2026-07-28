@@ -1008,6 +1008,14 @@ public class IPhoneBuilder extends Executor {
                         }
                         if (method.startsWith("getWorkouts")) {
                             usesHealthWorkout = true;
+                            // Both purpose strings, as the Android hook does. The
+                            // class-reference branch sets these when a workout type
+                            // is named, but an app that calls getWorkouts() and
+                            // passes the facade around as Object never names one --
+                            // and was entitled for HealthKit with neither string,
+                            // so its first authorization request was refused.
+                            usesHealthRead = true;
+                            usesHealthWrite = true;
                         }
                         if (method.startsWith("getSensors")) {
                             // Same reason as Android: the sensor layer is
