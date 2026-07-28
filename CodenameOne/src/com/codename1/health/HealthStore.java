@@ -1709,9 +1709,9 @@ public class HealthStore {
     /// ordering means a crash inside a listener costs one redelivered
     /// batch rather than losing the data permanently -- the opposite
     /// ordering would advance past data the app never actually processed.
-    protected final void fireChanges(final HealthChangeBatch batch) {
+    protected final boolean fireChanges(final HealthChangeBatch batch) {
         if (batch == null) {
-            return;
+            return false;
         }
         final String id = batch.getSubscriptionId();
         HealthChangeListener live;
@@ -1721,12 +1721,16 @@ public class HealthStore {
             sub = subscriptions.get(id);
         }
         if (sub == null) {
-            return;
+            return false;
         }
         final HealthChangeListener target = live != null ? live
                 : resolveBackgroundListener(id);
         if (target == null) {
-            return;
+            // Nothing to hand it to -- a subscription restored after a
+            // relaunch with no live listener and no persisted class. The
+            // caller counts what it delivers, and a drain reporting
+            // batches nobody received reads as handled when it was not.
+            return false;
         }
         final HealthSubscription subscription = sub;
         // A cap splits the batch into successive deliveries rather than
@@ -1746,6 +1750,7 @@ public class HealthStore {
         Display.getInstance().callSerially(
                 makeDeliveryRunnable(this, target, chunks, 0,
                         subscription));
+        return true;
     }
 
     /// Built in a static method so the `Runnable` carries no synthetic

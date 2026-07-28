@@ -296,13 +296,18 @@ class IOSHealthStore extends HealthStore {
             // anchor gets persisted and the next drain has a window to read
             // over -- without this the branch repeats forever and the
             // subscription never delivers anything at all.
-            fireChanges(new HealthChangeBatch(sub.getId(), sub.getTypes(),
+            boolean sent = fireChanges(new HealthChangeBatch(sub.getId(), sub.getTypes(),
                     null, null, false,
                     // Foreground: no OS deadline. Reporting 0 made a listener
                     // that budgets against getDeadlineMillis() treat every
                     // ordinary drain as already out of time.
-                    HealthAnchor.of(String.valueOf(now)), Long.MAX_VALUE, false));
-            drainFrom(subs, index + 1, delivered + 1, out);
+                    HealthAnchor.of(String.valueOf(now)), Long.MAX_VALUE, false));;
+            // Counted only when a listener actually received it: a
+            // subscription restored with no live listener and no
+            // persisted class queues nothing, and a drain reporting
+            // batches nobody got reads as handled.
+            drainFrom(subs, index + 1, sent ? delivered + 1 : delivered,
+                    out);
             return;
         }
         readTypes(subs, index, delivered, out, types, 0,
@@ -330,14 +335,19 @@ class IOSHealthStore extends HealthStore {
             // query returns is only ever read once -- anchoring at `now`
             // regardless meant everything past the limit was skipped for
             // good, silently, on exactly the busiest subscriptions.
-            fireChanges(new HealthChangeBatch(sub.getId(), sub.getTypes(),
+            boolean sent = fireChanges(new HealthChangeBatch(sub.getId(), sub.getTypes(),
                     collected, null, false,
                     // Foreground: no OS deadline. Reporting 0 made a listener
                     // that budgets against getDeadlineMillis() treat every
                     // ordinary drain as already out of time.
                     HealthAnchor.of(String.valueOf(safeUntil)), Long.MAX_VALUE,
-                    safeUntil < now));
-            drainFrom(subs, index + 1, delivered + 1, out);
+                    safeUntil < now));;
+            // Counted only when a listener actually received it: a
+            // subscription restored with no live listener and no
+            // persisted class queues nothing, and a drain reporting
+            // batches nobody got reads as handled.
+            drainFrom(subs, index + 1, sent ? delivered + 1 : delivered,
+                    out);
             return;
         }
         SampleQuery q = new SampleQuery()

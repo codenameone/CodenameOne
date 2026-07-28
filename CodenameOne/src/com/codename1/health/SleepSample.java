@@ -75,6 +75,11 @@ public final class SleepSample extends SessionSample {
             List<SleepStageInterval> stages) {
         List<SleepStageInterval> copy = new ArrayList<SleepStageInterval>();
         if (stages != null) {
+            for (SleepStageInterval interval : stages) {
+                if (interval != null) {
+                    requireInsideSession(interval, startMillis, endMillis);
+                }
+            }
             copy.addAll(stages);
         }
         return new SleepSample(startMillis, endMillis, copy);
@@ -89,7 +94,26 @@ public final class SleepSample extends SessionSample {
     /// Appends a stage span. Used when building a session to write.
     public void addStage(SleepStageInterval interval) {
         if (interval != null) {
+            requireInsideSession(interval, getStartMillis(), getEndMillis());
             stages.add(interval);
+        }
+    }
+
+    /// A stage outside the session it belongs to is not a stage of it.
+    ///
+    /// Unchecked, a session could report more time asleep than it lasted,
+    /// and carry stage data outside the very span the record is queried
+    /// by -- so a query that found the session would return detail from
+    /// outside its own range.
+    private static void requireInsideSession(SleepStageInterval interval,
+            long startMillis, long endMillis) {
+        if (interval.getStartMillis() < startMillis
+                || interval.getEndMillis() > endMillis) {
+            throw new IllegalArgumentException("sleep stage "
+                    + interval.getStartMillis() + ".."
+                    + interval.getEndMillis()
+                    + " falls outside the session's span " + startMillis
+                    + ".." + endMillis);
         }
     }
 
