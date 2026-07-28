@@ -7267,6 +7267,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // It is therefore only applied to those: a javascript: payload and a
         // storage path are consumed verbatim below, since stripping their tabs
         // and newlines would change a program's meaning and a key's identity.
+        if (rawUrl == null) {
+            // Pre-existing behavior was an NPE off the first startsWith. There
+            // is nothing to open, so say so and return rather than crash the
+            // caller's EDT.
+            _log("execute(): ignoring null URL");
+            return;
+        }
         final String url = normalizeUrlForParsing(rawUrl);
         if (hasScheme(url, "javascript")) {
             // Payload taken from the raw string. Normalizing it would splice
