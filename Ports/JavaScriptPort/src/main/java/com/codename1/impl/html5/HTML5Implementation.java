@@ -7059,6 +7059,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
             nativeButton.setMaterialIcon(FontImage.MATERIAL_SAVE);
             //icon = "save-file";
         } else if (isExternalUrl(url)) {
+            // Reached only by URLs the data: branch above did not claim.
+            // isExternalUrl() is true for data: as well -- it does carry a
+            // scheme -- so that branch MUST stay ahead of this one or data:
+            // URLs would navigate instead of downloading.
             openExternalUrl(furl);
             return;
         } else {
