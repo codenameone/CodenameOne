@@ -228,13 +228,7 @@ public final class VectorMapEngine {
         double cwx = WebMercator.lonToWorldX(centerLon, zoom) - dx / pixelRatio;
         double cwy = WebMercator.latToWorldY(centerLat, zoom) - dy / pixelRatio;
         centerLon = WebMercator.worldXToLon(cwx, zoom);
-        double lat = WebMercator.worldYToLat(cwy, zoom);
-        if (lat > 85.05112878) {
-            lat = 85.05112878;
-        } else if (lat < -85.05112878) {
-            lat = -85.05112878;
-        }
-        centerLat = lat;
+        centerLat = WebMercator.clampLatitude(WebMercator.worldYToLat(cwy, zoom));
     }
 
     /// Zooms to `newZoom` while keeping the geographic point currently under
@@ -297,8 +291,12 @@ public final class VectorMapEngine {
     }
 
     private double worldSpanY(MapBounds b) {
-        double y0 = WebMercator.latToWorldY(b.getSouthWest().getLatitude(), 0);
-        double y1 = WebMercator.latToWorldY(b.getNorthEast().getLatitude(), 0);
+        // Clamped, or a bound touching a pole projects to infinity and the
+        // solved zoom collapses.
+        double y0 = WebMercator.latToWorldY(
+                WebMercator.clampLatitude(b.getSouthWest().getLatitude()), 0);
+        double y1 = WebMercator.latToWorldY(
+                WebMercator.clampLatitude(b.getNorthEast().getLatitude()), 0);
         return Math.abs(y1 - y0);
     }
 

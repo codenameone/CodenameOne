@@ -385,9 +385,13 @@ public class NativeMap extends Container implements MapSurface {
         double worldWidth = Math.abs(
                 WebMercator.lonToWorldX(bounds.getNorthEast().getLongitude(), 0)
                         - WebMercator.lonToWorldX(bounds.getSouthWest().getLongitude(), 0));
+        // Clamped, or a bound touching a pole projects to infinity and the
+        // solved zoom collapses.
         double worldHeight = Math.abs(
-                WebMercator.latToWorldY(bounds.getNorthEast().getLatitude(), 0)
-                        - WebMercator.latToWorldY(bounds.getSouthWest().getLatitude(), 0));
+                WebMercator.latToWorldY(
+                        WebMercator.clampLatitude(bounds.getNorthEast().getLatitude()), 0)
+                        - WebMercator.latToWorldY(
+                        WebMercator.clampLatitude(bounds.getSouthWest().getLatitude()), 0));
         if (worldWidth <= 0 && worldHeight <= 0) {
             return Double.NaN;
         }

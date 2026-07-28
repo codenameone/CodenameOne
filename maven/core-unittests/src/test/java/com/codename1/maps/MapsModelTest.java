@@ -292,6 +292,21 @@ class MapsModelTest {
     }
 
     @Test
+    void mercatorCenterSurvivesThePoles() {
+        // Mercator runs to infinity at the poles, so projecting +-90 and
+        // averaging produced nonsense: a pole-to-pole span used to centre on
+        // the south pole rather than the equator.
+        assertEquals(0.0, WebMercator.centerLatitude(-90, 90), 1e-9);
+        assertEquals(WebMercator.MAX_LATITUDE, WebMercator.centerLatitude(90, 90), 1e-6);
+        assertEquals(-WebMercator.MAX_LATITUDE, WebMercator.centerLatitude(-90, -90), 1e-6);
+        assertTrue(WebMercator.centerLatitude(0, 90) < WebMercator.MAX_LATITUDE);
+
+        assertEquals(WebMercator.MAX_LATITUDE, WebMercator.clampLatitude(90), 1e-9);
+        assertEquals(-WebMercator.MAX_LATITUDE, WebMercator.clampLatitude(-90), 1e-9);
+        assertEquals(12.5, WebMercator.clampLatitude(12.5), 1e-9);
+    }
+
+    @Test
     void nativeMapReportsNoFitWhenThereIsNothingToFitTo() {
         MapBounds world = new MapBounds(new LatLng(-85, -180), new LatLng(85, 180));
         // Before layout there is no viewport to solve against.

@@ -468,7 +468,7 @@ public class OsrmRouteService implements RouteService {
                 // its callback to the NetworkManager for good) and report the
                 // failure the same way as any other, rather than letting it
                 // escape a call documented to answer through the callback.
-                nm.removeProgressListener(this);
+                detach();
                 failLater("The routing request could not be sent: "
                         + describe(e, "the endpoint was rejected"), e);
             }
@@ -518,7 +518,7 @@ public class OsrmRouteService implements RouteService {
             if (!finished) {
                 return;
             }
-            NetworkManager.getInstance().removeProgressListener(this);
+            detach();
             if (delivered) {
                 // The common case: `postResponse` is queued onto the EDT ahead
                 // of this event, so a real result has already landed and there
@@ -565,11 +565,23 @@ public class OsrmRouteService implements RouteService {
                     + (message == null || message.length() == 0 ? "" : " (" + message + ")"), null);
         }
 
+        /// Stops listening for progress. Called from every delivery path, not
+        /// just the backstop: an app-level progress listener registered before
+        /// this one can *consume* the completion event, and
+        /// [com.codename1.ui.util.EventDispatcher] then never reaches this
+        /// listener at all. Detaching only from [#actionPerformed] would leave
+        /// one listener -- holding this request and the application's callback
+        /// -- attached to the [NetworkManager] for every route ever requested.
+        private void detach() {
+            NetworkManager.getInstance().removeProgressListener(this);
+        }
+
         private void deliverRoutes() {
             if (delivered) {
                 return;
             }
             delivered = true;
+            detach();
             callback.routesFound(routes);
         }
 
@@ -578,6 +590,7 @@ public class OsrmRouteService implements RouteService {
                 return;
             }
             delivered = true;
+            detach();
             callback.routeFailed(message, err);
         }
 
