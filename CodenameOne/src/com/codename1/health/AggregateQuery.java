@@ -36,18 +36,25 @@ import java.util.List;
 ///         .setBucket(HealthInterval.calendarDays(1, TimeZone.getDefault()));
 /// ```
 ///
-/// #### Totals are not comparable across platforms
+/// #### Overlapping sources are counted twice, on every platform
 ///
 /// When a phone and a watch both record steps for the same walk, the store
-/// holds two overlapping sets of samples. **HealthKit de-duplicates them
-/// in its statistics engine; Health Connect does not.** The same query
-/// against the same person can therefore return roughly double on Android.
+/// holds two overlapping sets of samples, and a total over them counts the
+/// walk twice.
 ///
-/// This API does not paper over that with a heuristic de-duplicator --
-/// guessing which of two overlapping sources is authoritative is exactly
-/// the kind of silent wrongness health data cannot afford. Use
-/// [#addSource(String)] to pin the query to the source you trust, and tell
-/// the user which device a figure came from.
+/// **This includes iOS.** HealthKit's statistics engine does de-duplicate
+/// overlapping sources -- but no port uses it in this release. Every
+/// metric here is computed by shared code from raw samples read back
+/// through an ordinary query, so that the bucket arithmetic has one
+/// implementation rather than one per platform that can drift. iOS
+/// therefore double-counts exactly as Android does. A port that grows a
+/// native aggregate path would change that, and this note with it.
+///
+/// This API does not paper over the overlap with a heuristic
+/// de-duplicator -- guessing which of two overlapping sources is
+/// authoritative is exactly the kind of silent wrongness health data
+/// cannot afford. Use [#addSource(String)] to pin the query to the source
+/// you trust, and tell the user which device a figure came from.
 public final class AggregateQuery {
 
     private final List<HealthDataType> types = new ArrayList<HealthDataType>();

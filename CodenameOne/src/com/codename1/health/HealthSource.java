@@ -27,10 +27,11 @@ package com.codename1.health;
 ///
 /// This matters more than it looks. When a phone and a watch both record
 /// steps for the same walk, the store holds two overlapping sets of
-/// samples. HealthKit's statistics engine de-duplicates them; Health
-/// Connect does not. Filtering a query by source via
-/// [AggregateQuery#addSource(String)] is the portable way to avoid
-/// double-counting -- see the warning on [AggregateQuery].
+/// samples, and every platform counts the walk twice: aggregation is done
+/// in shared code from raw samples, so HealthKit's own de-duplicating
+/// statistics engine is not in play. Filtering a query by source via
+/// [AggregateQuery#addSource(String)] is the way to avoid double-counting
+/// -- see the warning on [AggregateQuery].
 public final class HealthSource {
 
     private final String bundleId;

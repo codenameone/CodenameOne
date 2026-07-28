@@ -93,7 +93,7 @@ Two rules here are easy to get wrong and hard to notice.
 
 **Use calendar buckets when your UI labels them with dates.** `HealthInterval.calendarDays(1, tz)` follows the calendar; a fixed `86_400_000` doesn't, and drifts against the dates the user sees twice a year at each daylight-saving transition. Calendar intervals require an explicit `TimeZone` -- nothing in this API reads the JVM default, because a server-side default of UTC would file a user's evening walk under the wrong day.
 
-WARNING: Aggregate totals aren't comparable across platforms when several apps write the same type. When a phone and a watch both record steps for one walk, HealthKit's statistics engine de-duplicates the overlap and Health Connect doesn't, so the same query for the same person can return close to double on Android. This API leaves that visible rather than papering over it with a heuristic, because guessing which of two overlapping sources is authoritative is exactly the kind of quiet wrongness health data can't afford. Use `addSource(...)` to pin a query to the source you trust, and tell the user which device a figure came from.
+WARNING: Overlapping sources are counted twice, on every platform including iOS. When a phone and a watch both record steps for one walk, a total over them counts the walk twice. HealthKit's statistics engine does de-duplicate overlapping sources, but no port uses it in this release -- every metric is computed by shared code from raw samples, so the bucket arithmetic has one implementation rather than one per platform that can drift, and iOS double-counts exactly as Android does. This API leaves that visible rather than papering over it with a heuristic, because guessing which of two overlapping sources is authoritative is exactly the kind of quiet wrongness health data can't afford. Use `addSource(...)` to pin a query to the source you trust, and tell the user which device a figure came from.
 
 === Writing samples
 
@@ -211,7 +211,7 @@ NOTE: HealthKit is entitlement-gated, unlike CoreBluetooth. The `com.apple.devel
 
 An app that only uses `Health.getSensors()` needs none of this. The sensor
 layer is built on `com.codename1.bluetooth.le` and touches no HealthKit, so
-the build injects neither the framework, nor the entitlement, nor the usage
+the build injects neither the framework nor the entitlement nor the usage
 strings, and none of the hints above apply -- it needs
 `ios.NSBluetoothAlwaysUsageDescription` instead. Reaching for the store is
 what pulls HealthKit in, and it's `getStore()` rather than
@@ -257,7 +257,7 @@ The simulator's data is synthetic and seeded, not recorded from anyone. That's i
 
 *The chart shows zero for days the user was active.* You are substituting zero for a `null` aggregate. An empty bucket means no data, not no steps.
 
-*Totals are double on Android.* A phone and a watch are both writing the same type. HealthKit de-duplicates overlapping sources and Health Connect doesn't; pin the query with `addSource(...)`.
+*Totals are double.* A phone and a watch are both writing the same type, on iOS as much as on Android -- aggregation runs on raw samples in shared code, so HealthKit's de-duplicating statistics engine never sees the query. Pin it with `addSource(...)`.
 
 *Background delivery never fires.* No platform pushes health data to a closed app in this release -- see the subscriptions section. Call `drainChanges()` from your background-fetch handler and branch on `isPushDelivery()` rather than assuming.
 

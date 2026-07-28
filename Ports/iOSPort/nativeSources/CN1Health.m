@@ -355,11 +355,20 @@ static void cn1hkRunSampleQuery(JAVA_INT rid, NSString *portableId,
         NSMutableString *tsv = [NSMutableString string];
         for (HKQuantitySample *sample in results) {
             double value = [[sample quantity] doubleValueForUnit:unit];
-            // No percent rescaling. doubleValueForUnit:percentUnit
-            // already answers in percent -- 97% comes back as 97 -- so
-            // multiplying turned every oxygen saturation and body fat
-            // reading into 9700, and the matching division on the
-            // write path stored 97% as 0.97%.
+            if ([unit isEqual:[HKUnit percentUnit]]) {
+                // HKUnit percent is a 0..1 fraction -- Apple defines it
+                // as "valid values from 0.0-1.0 inclusive" -- while
+                // HealthUnit.PERCENT is 0..100. Without this a 97%
+                // oxygen saturation reads as 0.97.
+                //
+                // This scaling was here, was removed in 8e2d009832 on
+                // the belief that percentUnit already answers in
+                // percent, and is back because that belief was wrong.
+                // Nothing in this repository compiles or runs this file,
+                // so the "observation" that argued it away was not one.
+                // Check Apple's definition before touching it again.
+                value *= 100.0;
+            }
             HKSource *src = [[sample sourceRevision] source];
             // Only the user-entered flag is reported. HealthKit does
             // not distinguish an automatic reading from an actively
@@ -502,9 +511,15 @@ void com_codename1_impl_ios_IOSNative_hkSaveSamples___int_java_lang_String(
                 continue;
             }
             double value = [[f objectAtIndex:4] doubleValue];
-            // Percent values pass through unchanged; see the read path.
+            HKUnit *writeUnit = cn1hkUnit(portableId);
+            if ([writeUnit isEqual:[HKUnit percentUnit]]) {
+                // The read path's inverse: HealthUnit.PERCENT is 0..100
+                // and HKUnit percent is a 0..1 fraction, so 97% has to
+                // be stored as 0.97. See the note there.
+                value /= 100.0;
+            }
             HKQuantity *quantity = [HKQuantity
-                quantityWithUnit:cn1hkUnit(portableId) doubleValue:value];
+                quantityWithUnit:writeUnit doubleValue:value];
             NSDate *from = [NSDate dateWithTimeIntervalSince1970:
                 [[f objectAtIndex:2] doubleValue] / 1000.0];
             NSDate *to = [NSDate dateWithTimeIntervalSince1970:
