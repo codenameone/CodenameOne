@@ -7232,11 +7232,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void execute(String rawUrl) {
-        // Everything below -- classification, the Sheet's display, and the
-        // string handed to the page -- works from this one normalized form.
+        // Normalization exists to make classification, the Sheet's display and
+        // the string handed to the page agree on what the BROWSER will parse.
+        // It is therefore only applied to those: a javascript: payload and a
+        // storage path are consumed verbatim below, since stripping their tabs
+        // and newlines would change a program's meaning and a key's identity.
         final String url = normalizeUrlForParsing(rawUrl);
         if (hasScheme(url, "javascript")) {
-            String cmd = url.substring(url.indexOf(":")+1);
+            // Payload taken from the raw string. Normalizing it would splice
+            // out newlines that terminate a // comment and tabs that separate
+            // tokens, silently changing what the caller asked to run.
+            String cmd = rawUrl.substring(rawUrl.indexOf(":")+1);
             eval_(cmd);
             return;
         }
@@ -7250,11 +7256,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // true, data: included -- that carries its own payload and is claimed
         // by its own branch further down.
         if (!isExternalUrl(url)) {
-            if (exists(url)) {
+            // Looked up under the path exactly as given: a storage key may
+            // legitimately open or close with a space, and nothing here is
+            // parsed by the browser.
+            if (exists(rawUrl)) {
                 try {
-                    Blob blob = openFileAsBlob(url);
+                    Blob blob = openFileAsBlob(rawUrl);
                     char sep = getFileSystemSeparator();
-                    fileName = url;
+                    fileName = rawUrl;
                     if (fileName.indexOf(sep) >=0) {
                         fileName = fileName.substring(fileName.lastIndexOf(sep)+1);
                     }
