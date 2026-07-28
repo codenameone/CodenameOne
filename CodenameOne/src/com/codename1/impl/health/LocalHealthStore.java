@@ -135,7 +135,7 @@ public class LocalHealthStore extends HealthStore {
     protected void doRequestAuthorization(
             List<com.codename1.health.HealthAccess> access,
             AsyncResource<Boolean> out) {
-        completeOnEdt(out, Boolean.TRUE);
+        completeInline(out, Boolean.TRUE);
     }
 
     // ------------------------------------------------------------------
@@ -166,7 +166,7 @@ public class LocalHealthStore extends HealthStore {
         }
         // Everything is in memory, so a single page always satisfies the
         // query; there is no continuation token to hand back.
-        completeOnEdt(out, new SamplePage(matched, null, truncated));
+        completeInline(out, new SamplePage(matched, null, truncated));
     }
 
     private boolean matches(HealthSample s, SampleQuery query,
@@ -198,53 +198,20 @@ public class LocalHealthStore extends HealthStore {
         return true;
     }
 
-    /// Completes on the EDT.
+    /// Completes inline, on the calling thread.
     ///
-    /// AsyncResource runs callbacks on whichever thread completes it, and
-    /// this store answers synchronously on the caller's thread. A read
-    /// started from a worker therefore delivered its result there,
-    /// breaking the guarantee HealthStore makes that every callback
-    /// arrives on the EDT -- the same guarantee the mobile ports honour.
-    private static void completeOnEdt(AsyncResource out, Object value) {
-        com.codename1.ui.Display.getInstance()
-                .callSerially(new Complete(out, value));
-    }
-
-    private static void failOnEdt(AsyncResource out, Throwable error) {
-        com.codename1.ui.Display.getInstance()
-                .callSerially(new Fail(out, error));
-    }
-
-    /// Named rather than anonymous so the hop carries no synthetic
-    /// reference to the store.
-    private static final class Complete implements Runnable {
-        private final AsyncResource resource;
-        private final Object value;
-
-        Complete(AsyncResource resource, Object value) {
-            this.resource = resource;
-            this.value = value;
-        }
-
-        @Override
-        public void run() {
-            resource.complete(value);
-        }
-    }
-
-    private static final class Fail implements Runnable {
-        private final AsyncResource resource;
-        private final Throwable error;
-
-        Fail(AsyncResource resource, Throwable error) {
-            this.resource = resource;
-            this.error = error;
-        }
-
-        @Override
-        public void run() {
-            resource.error(error);
-        }
+    /// This used to hop through `callSerially` on the premise that
+    /// HealthStore guarantees every callback on the EDT and that the
+    /// mobile ports honour it. Neither is so: HealthStore completes an
+    /// AsyncResource on whichever thread produced the answer, and a port
+    /// completes on whichever thread its SDK called back on. Hopping only
+    /// here made this store the odd one out, and would deadlock
+    /// AsyncResource.get() wherever nothing is pumping an event thread.
+    ///
+    /// The EDT hop belongs where a callback reaches app code that did not
+    /// ask for it -- change delivery -- and that is done in HealthStore.
+    private static void completeInline(AsyncResource out, Object value) {
+        out.complete(value);
     }
 
     /// Copies a stored sample so callers cannot mutate the store.
@@ -298,7 +265,7 @@ public class LocalHealthStore extends HealthStore {
         synchronized (samples) {
             snapshot = new ArrayList<HealthSample>(samples);
         }
-        completeOnEdt(out, aggregateSamples(query, boundaries, snapshot));
+        completeInline(out, aggregateSamples(query, boundaries, snapshot));
     }
 
 
@@ -325,7 +292,7 @@ public class LocalHealthStore extends HealthStore {
             }
         }
         persist();
-        completeOnEdt(out, result);
+        completeInline(out, result);
     }
 
     @Override
@@ -358,7 +325,7 @@ public class LocalHealthStore extends HealthStore {
         if (removed > 0) {
             persist();
         }
-        completeOnEdt(out, Integer.valueOf(removed));
+        completeInline(out, Integer.valueOf(removed));
     }
 
     // ------------------------------------------------------------------

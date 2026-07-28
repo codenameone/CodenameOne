@@ -188,4 +188,47 @@ class HealthUnitConversionTest {
         assertThrows(IllegalArgumentException.class,
                 () -> new HealthQuantity(1, null));
     }
+
+    /**
+     * A series the caller asked to keep whole still answers in the unit
+     * the query asked for.
+     *
+     * <p>Only {@link QuantitySample} was normalized, so turning flattening
+     * off -- an option about record shape, not about units -- silently
+     * changed which unit the values came back in. The same query then
+     * meant two different things depending on a flag that has nothing to
+     * do with measurement.</p>
+     */
+    @Test
+    void anUnflattenedSeriesIsConvertedToTheRequestedUnit()
+            throws Exception {
+        long[] at = {1000L, 2000L};
+        long[] ends = {1000L, 2000L};
+        double[] metresPerSecond = {10.0, 20.0};
+        SeriesSample series = SeriesSample.create(HealthDataType.SPEED,
+                1000L, 2000L, at, ends, metresPerSecond,
+                HealthUnit.METER_PER_SECOND);
+
+        FakeHealthStore store = new FakeHealthStore();
+        java.util.List<HealthSample> page =
+                new java.util.ArrayList<HealthSample>();
+        page.add(series);
+        store.pages.add(new SamplePage(page, null, false));
+
+        java.util.List<HealthSample> read = store.readSamples(
+                new SampleQuery().addType(HealthDataType.SPEED)
+                        .setFlattenSeries(false)
+                        .setUnit(HealthUnit.KILOMETER_PER_HOUR)
+                        .setTimeRange(HealthTimeRange.between(0L, 5000L)))
+                .get();
+
+        assertEquals(1, read.size(), "the record stays whole");
+        SeriesSample out = (SeriesSample) read.get(0);
+        assertSame(HealthUnit.KILOMETER_PER_HOUR, out.getUnit(),
+                "the series reports the unit that was asked for");
+        assertEquals(36.0, out.getSampleValue(0,
+                HealthUnit.KILOMETER_PER_HOUR), 1e-9);
+        assertEquals(72.0, out.getSampleValue(1,
+                HealthUnit.KILOMETER_PER_HOUR), 1e-9);
+    }
 }

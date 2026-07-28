@@ -37,6 +37,7 @@ import com.codename1.health.QuantitySample;
 import com.codename1.health.SampleQuery;
 import com.codename1.health.RecordingMethod;
 import com.codename1.health.SamplePage;
+import com.codename1.health.SeriesSample;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -129,25 +130,68 @@ public final class HealthWire {
     // ------------------------------------------------------------------
 
     /// Encodes samples as tab-separated lines for a write.
+    ///
+    /// A [SeriesSample] is written out point by point. Neither platform
+    /// accepts a series through this payload -- HealthKit has no series
+    /// save at all here, and the Health Connect bridge inserts discrete
+    /// records -- so the choice was between persisting the measurements
+    /// and persisting nothing. Skipping the sample outright is what it did
+    /// before, and because both ports hand this payload straight to their
+    /// bridge, an all-series write produced an empty batch that completed
+    /// successfully with no identifiers: the caller was told the write
+    /// worked while none of the data reached the store. The points survive;
+    /// the record identity does not, which is why the returned result
+    /// carries one identifier per point rather than one per series.
+    ///
+    /// Shapes this cannot carry at all are reported by
+    /// [#unsupportedForWrite(List)] so a port can refuse the write rather
+    /// than report a success it did not perform.
     public static String encodeSamples(List<HealthSample> samples) {
         StringBuilder sb = new StringBuilder();
         for (HealthSample s : samples) {
-            if (!(s instanceof QuantitySample)) {
-                // Sessions and categories are encoded by the port-specific
-                // bridges, which know their platform's record shapes.
+            if (s instanceof SeriesSample) {
+                SeriesSample series = (SeriesSample) s;
+                for (int i = 0; i < series.size(); i++) {
+                    appendSample(sb, series.toQuantitySample(i));
+                }
                 continue;
             }
-            QuantitySample q = (QuantitySample) s;
-            HealthUnit unit = q.getQuantity().getUnit();
-            sb.append(nullToEmpty(q.getId())).append(FIELD)
-              .append(q.getType().getId()).append(FIELD)
-              .append(q.getStartMillis()).append(FIELD)
-              .append(q.getEndMillis()).append(FIELD)
-              .append(q.getQuantity().getRawValue()).append(FIELD)
-              .append(unit.getSymbol()).append(FIELD)
-              .append(q.getRecordingMethod().name()).append(LINE);
+            if (!(s instanceof QuantitySample)) {
+                continue;
+            }
+            appendSample(sb, (QuantitySample) s);
         }
         return sb.toString();
+    }
+
+    private static void appendSample(StringBuilder sb, QuantitySample q) {
+        HealthUnit unit = q.getQuantity().getUnit();
+        sb.append(nullToEmpty(q.getId())).append(FIELD)
+          .append(q.getType().getId()).append(FIELD)
+          .append(q.getStartMillis()).append(FIELD)
+          .append(q.getEndMillis()).append(FIELD)
+          .append(q.getQuantity().getRawValue()).append(FIELD)
+          .append(unit.getSymbol()).append(FIELD)
+          .append(q.getRecordingMethod().name()).append(LINE);
+    }
+
+    /// The first sample [#encodeSamples(List)] would drop, or null.
+    ///
+    /// Sessions and categories have no line in this format. They were
+    /// documented as being encoded by the port-specific bridges, which is
+    /// not what either port does -- both pass this payload through
+    /// unchanged -- so a sleep or workout sample handed to a mobile write
+    /// vanished and the write still resolved successfully. A port calls
+    /// this first and fails the write instead.
+    public static HealthSample unsupportedForWrite(
+            List<HealthSample> samples) {
+        for (HealthSample s : samples) {
+            if (!(s instanceof QuantitySample)
+                    && !(s instanceof SeriesSample)) {
+                return s;
+            }
+        }
+        return null;
     }
 
     /// Decodes a page of tab-separated sample lines.
@@ -182,12 +226,129 @@ public final class HealthWire {
                 truncated = f.length > 1 && "1".equals(f[1]);
                 continue;
             }
-            HealthSample s = decodeSampleLine(line);
+            HealthSample s = line.length() > 0
+                    && line.charAt(0) == SERIES_MARKER
+                    ? decodeSeriesLine(line.substring(1))
+                    : decodeSampleLine(line);
             if (s != null) {
                 out.add(s);
             }
         }
         return new SamplePage(out, nextToken, truncated);
+    }
+
+    /// First character of a line carrying a whole series record.
+    ///
+    /// A bridge emits one only when the query turned flattening off. The
+    /// default stays one line per measurement, which is both the common
+    /// case and the cheaper one to parse.
+    public static final char SERIES_MARKER = '~';
+
+    /// Separates the measurements of a series.
+    private static final char POINT = ',';
+
+    /// Separates a measurement's start, end and value.
+    private static final char POINT_FIELD = ':';
+
+    /// Appends a series as a single line: the shared fields, then the
+    /// measurements packed into the last one.
+    ///
+    /// The values ride in one field rather than in extra columns because a
+    /// series can hold tens of thousands of points and the decoder walks
+    /// them without splitting the line into that many strings.
+    public static void appendSeries(StringBuilder sb, SeriesSample series,
+            String sourceBundleId, String sourceName, String deviceName) {
+        sb.append(SERIES_MARKER)
+          .append(nullToEmpty(series.getId())).append(FIELD)
+          .append(series.getType().getId()).append(FIELD)
+          .append(series.getStartMillis()).append(FIELD)
+          .append(series.getEndMillis()).append(FIELD)
+          .append(series.size()).append(FIELD)
+          .append(series.getUnit().getSymbol()).append(FIELD)
+          .append(nullToEmpty(sourceBundleId)).append(FIELD)
+          .append(nullToEmpty(sourceName)).append(FIELD)
+          .append(nullToEmpty(deviceName)).append(FIELD)
+          .append(series.getRecordingMethod().name()).append(FIELD);
+        for (int i = 0; i < series.size(); i++) {
+            if (i > 0) {
+                sb.append(POINT);
+            }
+            sb.append(series.getSampleStartMillis(i)).append(POINT_FIELD)
+              .append(series.getSampleEndMillis(i)).append(POINT_FIELD)
+              .append(series.getSampleValue(i, series.getUnit()));
+        }
+        sb.append(LINE);
+    }
+
+    private static HealthSample decodeSeriesLine(String line) {
+        String[] f = split(line);
+        if (f.length < 11) {
+            return null;
+        }
+        HealthDataType type = HealthDataType.forId(f[1]);
+        HealthUnit unit = HealthUnit.forSymbol(f[5]);
+        if (type == null || unit == null) {
+            return null;
+        }
+        try {
+            int count = Integer.parseInt(f[4]);
+            long[] starts = new long[count];
+            long[] ends = new long[count];
+            double[] values = new double[count];
+            if (!parsePoints(f[10], starts, ends, values)) {
+                return null;
+            }
+            SeriesSample series = SeriesSample.create(type,
+                    Long.parseLong(f[2]), Long.parseLong(f[3]), starts, ends,
+                    values, unit);
+            if (f[0].length() > 0) {
+                series.setId(f[0]);
+            }
+            if (f[6].length() > 0) {
+                series.setSource(new HealthSource(f[6], emptyToNull(f[7]),
+                        emptyToNull(f[8]), null, null));
+            }
+            RecordingMethod m = recordingMethod(f[9]);
+            if (m != null) {
+                series.setRecordingMethod(m);
+            }
+            return series;
+        } catch (NumberFormatException ex) {
+            return null;
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    /// Fills the arrays from the packed measurement field.
+    ///
+    /// Returns false when the field holds a different number of points
+    /// than the count column claimed, which is the one inconsistency that
+    /// would otherwise produce a series whose tail is silently zeroes.
+    private static boolean parsePoints(String packed, long[] starts,
+            long[] ends, double[] values) {
+        int index = 0;
+        int at = 0;
+        while (at < packed.length() && index < starts.length) {
+            int next = packed.indexOf(POINT, at);
+            if (next < 0) {
+                next = packed.length();
+            }
+            int a = packed.indexOf(POINT_FIELD, at);
+            if (a < 0 || a > next) {
+                return false;
+            }
+            int b = packed.indexOf(POINT_FIELD, a + 1);
+            if (b < 0 || b > next) {
+                return false;
+            }
+            starts[index] = Long.parseLong(packed.substring(at, a));
+            ends[index] = Long.parseLong(packed.substring(a + 1, b));
+            values[index] = Double.parseDouble(packed.substring(b + 1, next));
+            index++;
+            at = next + 1;
+        }
+        return index == starts.length && at >= packed.length();
     }
 
     /// First character of the optional trailer line carrying paging state.
@@ -336,7 +497,12 @@ public final class HealthWire {
         sb.append("],\"start\":").append(range.getStartMillis())
           .append(",\"end\":").append(range.getEndMillis())
           .append(",\"limit\":").append(query.getLimit())
-          .append(",\"descending\":").append(query.isSortDescending());
+          .append(",\"descending\":").append(query.isSortDescending())
+          // The bridge decides record shape, so it needs this. Leaving it
+          // out meant a query that asked to keep its series whole got one
+          // scalar line per measurement anyway, and the option the API
+          // documents was honoured nowhere.
+          .append(",\"flatten\":").append(query.isFlattenSeries());
         if (query.getPageToken() != null) {
             sb.append(",\"pageToken\":\"")
               .append(escape(query.getPageToken())).append('"');

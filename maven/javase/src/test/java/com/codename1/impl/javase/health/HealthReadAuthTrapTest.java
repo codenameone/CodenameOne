@@ -274,4 +274,41 @@ class HealthReadAuthTrapTest {
         assertEquals(1, store.readSamples(heartRateQuery()).get().size(),
                 "resetScripts must not discard seeded data");
     }
+
+    /**
+     * A denied write is unauthorized, not unsupported.
+     *
+     * <p>Both mobile stores answer {@code isWritable} from what the
+     * platform can store, independently of what the user has allowed. The
+     * simulator folded the scripted grant into that answer, so a test
+     * scripting DENIED was refused by the shared layer as
+     * TYPE_NOT_SUPPORTED before the authorization path ran at all -- the
+     * developer chased "this platform cannot store that" instead of the
+     * permission problem they were simulating. NOT_DETERMINED went the
+     * other way and wrote successfully, letting an app ship having never
+     * exercised its own authorization flow.</p>
+     */
+    @Test
+    void writeAuthorizationIsSeparateFromWritability() {
+        QuantitySample w = QuantitySample.create(HealthDataType.BODY_MASS,
+                new HealthQuantity(70, HealthUnit.KILOGRAM),
+                1_767_225_600_000L);
+
+        store.setWritePermission(HealthDataType.BODY_MASS,
+                HealthAuthorizationStatus.DENIED);
+        assertTrue(store.isWritable(HealthDataType.BODY_MASS),
+                "the platform can still store a body mass");
+        assertEquals(HealthError.UNAUTHORIZED,
+                ((HealthException) errorOf(store.write(w))).getError());
+
+        store.setWritePermission(HealthDataType.BODY_MASS,
+                HealthAuthorizationStatus.NOT_DETERMINED);
+        assertEquals(HealthError.UNAUTHORIZED,
+                ((HealthException) errorOf(store.write(w))).getError(),
+                "a write before the user was asked is refused too");
+
+        store.setWritePermission(HealthDataType.BODY_MASS,
+                HealthAuthorizationStatus.AUTHORIZED);
+        assertNull(errorOf(store.write(w)), "a granted write succeeds");
+    }
 }

@@ -1334,9 +1334,14 @@ public final class IOSNative {
     native int hkShareAuthorizationStatus(String typeIdentifier);
     native void hkRequestAuthorization(int requestId, String[] readTypes,
             String[] shareTypes);
+    /// `sourceBundleIds` is tab-separated and may be empty for "any
+    /// source". It has to reach HealthKit rather than being filtered after
+    /// the fact: the limit is applied by the query, so filtering the
+    /// results afterwards can return nothing at all while matching data
+    /// sits just past the cut.
     native void hkQuerySamples(int requestId, String typeIdentifier,
             double startEpochMs, double endEpochMs, int limit,
-            boolean ascending);
+            boolean ascending, String sourceBundleIds);
     native void hkSaveSamples(int requestId, String samplesTsv);
 
     /** Blocking write to an open L2CAP channel. Returns the byte count

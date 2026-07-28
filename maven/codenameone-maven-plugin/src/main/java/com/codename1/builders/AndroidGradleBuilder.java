@@ -418,6 +418,14 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesHealth;
     private boolean usesHealthStore;
     private boolean usesHealthData;
+    /// Whether a read-direction store call was seen. Tracked apart from
+    /// [#usesHealthWrite] because Health Connect permissions are
+    /// directional: an app that only reads but declares only
+    /// android.health.write passed validation and shipped a manifest with
+    /// no read permission, so every read failed at runtime with nothing in
+    /// the build log to explain it.
+    private boolean usesHealthRead;
+    private boolean usesHealthWrite;
     private boolean usesHealthWorkout;
     private final java.util.List<String> healthBackgroundListeners =
             new java.util.ArrayList<String>();
@@ -1566,6 +1574,8 @@ public class AndroidGradleBuilder extends Executor {
                         }
                         if (cls.indexOf("com/codename1/health/workout/") == 0) {
                             usesHealthWorkout = true;
+                            usesHealthRead = true;
+                            usesHealthWrite = true;
                         }
                     }
                     if (cls.indexOf("com/codename1/bluetooth/") == 0) {
@@ -1610,6 +1620,10 @@ public class AndroidGradleBuilder extends Executor {
                     usesHealth = true;
                     usesHealthStore = true;
                     usesHealthData = true;
+                    usesHealthWrite |=
+                            HealthManifestFragments.isWriteCall(method);
+                    usesHealthRead |=
+                            HealthManifestFragments.isReadCall(method);
                 }
                 if ("com/codename1/health/Health".equals(cls)) {
                         usesHealth = true;
@@ -1635,6 +1649,8 @@ public class AndroidGradleBuilder extends Executor {
                             // only ACTIVITY_RECOGNITION and every workout
                             // call was unauthorized at runtime.
                             usesHealthData = true;
+                            usesHealthRead = true;
+                            usesHealthWrite = true;
                         }
                         if (method.startsWith("getSensors")) {
                             // The BLE sensor layer runs entirely on the
@@ -1995,6 +2011,25 @@ public class AndroidGradleBuilder extends Executor {
                         + "Known tokens: "
                         + HealthManifestFragments.knownTokens(),
                         new RuntimeException("android.health.read unset"));
+            }
+            if (usesHealthRead && readTypes.isEmpty()) {
+                error("This app reads health data but android.health.read is "
+                        + "empty. Health Connect permissions are directional, "
+                        + "so a write declaration does not authorize a read:\n"
+                        + "  android.health.read=steps,heart_rate\n"
+                        + "Known tokens: "
+                        + HealthManifestFragments.knownTokens(),
+                        new RuntimeException("android.health.read unset"));
+            }
+            if (usesHealthWrite && writeTypes.isEmpty()) {
+                error("This app writes or deletes health data but "
+                        + "android.health.write is empty. Health Connect "
+                        + "permissions are directional, so a read declaration "
+                        + "does not authorize a write:\n"
+                        + "  android.health.write=steps\n"
+                        + "Known tokens: "
+                        + HealthManifestFragments.knownTokens(),
+                        new RuntimeException("android.health.write unset"));
             }
             java.util.List<String> readTokens =
                     HealthManifestFragments.parseTypeList(readHint);

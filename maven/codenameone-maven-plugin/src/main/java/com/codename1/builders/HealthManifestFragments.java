@@ -167,6 +167,32 @@ final class HealthManifestFragments {
      * dropping blanks. Tolerates whitespace and trailing commas, since the
      * value is hand-written in a properties file.
      */
+    /// Whether a `HealthStore` method reads data.
+    ///
+    /// Health Connect permissions are directional, so the build has to know
+    /// which way an app actually uses the store. Collapsing both directions
+    /// into one flag let an app that only reads satisfy the check with an
+    /// `android.health.write` declaration alone, and ship a manifest whose
+    /// every read then failed at runtime.
+    ///
+    /// Lives here rather than in the builder so the two builder twins share
+    /// one classification instead of two that can drift apart.
+    static boolean isReadCall(String method) {
+        return method != null
+                && (method.startsWith("read")
+                        || method.startsWith("aggregate")
+                        || method.startsWith("subscribe")
+                        || method.startsWith("hasAnyData")
+                        || method.startsWith("drainChanges"));
+    }
+
+    /// Whether a `HealthStore` method changes stored data. A delete counts:
+    /// Health Connect authorizes it with the write permission.
+    static boolean isWriteCall(String method) {
+        return method != null
+                && (method.startsWith("write") || method.startsWith("delete"));
+    }
+
     static List<String> parseTypeList(String hintValue) {
         List<String> out = new ArrayList<String>();
         if (hintValue == null) {

@@ -250,6 +250,10 @@ class CN1HealthConnectBridge(private val context: Context)
             // that issued it, so carrying just the first type's token
             // restarted every other type from the beginning on page two --
             // or handed a steps token to HeartRateRecord.
+            // Whether a series record may stay whole. Defaults to true so
+            // an older descriptor, or one from a caller that never touched
+            // the option, keeps the flattened shape it has always had.
+            val flatten = json.optBoolean("flatten", true)
             val inTokens = parseTokens(json.optString("pageToken", ""))
             val outTokens = LinkedHashMap<String, String>()
             // Every type is read to the full budget and merged afterwards.
@@ -262,7 +266,7 @@ class CN1HealthConnectBridge(private val context: Context)
                 val token = types.getString(i)
                 val block = StringBuilder()
                 val r = appendRecords(block, token, filter,
-                    budget, origins, ascending, inTokens[token])
+                    budget, origins, ascending, inTokens[token], flatten)
                 perType.add(block.toString())
                 // Exhausted types are recorded with an empty token, not
                 // omitted. Omitting them made the next page see no token
@@ -381,7 +385,8 @@ class CN1HealthConnectBridge(private val context: Context)
                                       filter: TimeRangeFilter, limit: Int,
                                       origins: Set<DataOrigin>,
                                       ascending: Boolean,
-                                      resumeToken: String?): Pair<Int, String?> {
+                                      resumeToken: String?,
+                                      flatten: Boolean): Pair<Int, String?> {
         // A type this bridge cannot read is rejected rather than returned
         // as an empty page: the caller cannot tell an empty page apart from
         // "you have no data", which is the one answer a health API must
@@ -425,7 +430,7 @@ class CN1HealthConnectBridge(private val context: Context)
             // is recoverable; skipping records is not.
             var lines = 0
             for (record in page.records) {
-                lines += appendOne(sb, record, token)
+                lines += appendOne(sb, record, token, flatten)
             }
             remaining -= lines
             emitted += lines
@@ -451,7 +456,10 @@ class CN1HealthConnectBridge(private val context: Context)
      * than silently dropping them.
      */
     private fun appendOne(sb: StringBuilder, record: Record,
-                          token: String): Int {
+                          token: String, flatten: Boolean): Int {
+        if (!flatten && appendWholeSeries(sb, record, token)) {
+            return 1
+        }
         when (record) {
             is StepsRecord -> interval(sb, record, token,
                 record.startTime, record.endTime,
@@ -613,6 +621,82 @@ class CN1HealthConnectBridge(private val context: Context)
             // back as the name of the app that wrote the sample.
             .append('\t').append('\t')
             .append(recordingMethodName(r)).append('\n')
+    }
+
+    /**
+     * Emits a series record whole, as one line, when the caller asked to
+     * keep it intact. Returns false for anything that is not a series, so
+     * the ordinary per-measurement path handles it.
+     *
+     * Health Connect is the only platform here that has series records at
+     * all, so this is the only place `setFlattenSeries(false)` can be
+     * honoured. Ignoring it meant the option did nothing anywhere and the
+     * caller got scalar samples whatever it asked for.
+     */
+    private fun appendWholeSeries(sb: StringBuilder, record: Record,
+                                  token: String): Boolean {
+        when (record) {
+            is HeartRateRecord -> series(sb, record, token, "count/min",
+                record.samples.map {
+                    Pair(it.time.toEpochMilli(), it.beatsPerMinute.toDouble())
+                })
+
+            is PowerRecord -> series(sb, record, token, "W",
+                record.samples.map {
+                    Pair(it.time.toEpochMilli(), it.power.inWatts)
+                })
+
+            is SpeedRecord -> series(sb, record, token, "m/s",
+                record.samples.map {
+                    Pair(it.time.toEpochMilli(), it.speed.inMetersPerSecond)
+                })
+
+            is CyclingPedalingCadenceRecord -> series(sb, record, token,
+                "count/min",
+                record.samples.map {
+                    Pair(it.time.toEpochMilli(), it.revolutionsPerMinute)
+                })
+
+            is StepsCadenceRecord -> series(sb, record, token, "count/min",
+                record.samples.map {
+                    Pair(it.time.toEpochMilli(), it.rate)
+                })
+
+            else -> return false
+        }
+        return true
+    }
+
+    private fun series(sb: StringBuilder, r: Record, token: String,
+                       unit: String, points: List<Pair<Long, Double>>) {
+        // An empty series would decode to a record with no measurements,
+        // which is indistinguishable from a decode failure. There is
+        // nothing to report, so nothing is written.
+        if (points.isEmpty()) {
+            return
+        }
+        val start = points.minOf { it.first }
+        val end = points.maxOf { it.first }
+        sb.append('~').append(r.metadata.id).append('\t')
+            .append(token).append('\t')
+            .append(start).append('\t').append(end).append('\t')
+            .append(points.size).append('\t').append(unit).append('\t')
+            .append(originOf(r)).append('\t')
+            // Source display name and device name, which Health Connect
+            // does not give us, then the recording method -- the same
+            // column order the scalar line uses.
+            .append('\t').append('\t')
+            .append(recordingMethodName(r)).append('\t')
+        for ((i, p) in points.withIndex()) {
+            if (i > 0) {
+                sb.append(',')
+            }
+            // Start and end are the same instant: every Health Connect
+            // series measurement is a point reading, not an interval.
+            sb.append(p.first).append(':').append(p.first).append(':')
+                .append(p.second)
+        }
+        sb.append('\n')
     }
 
     private fun recordingMethodName(r: Record): String {
@@ -872,7 +956,10 @@ class CN1HealthConnectBridge(private val context: Context)
                                     record: Record) {
         val token = TOKEN_FOR_RECORD[record.javaClass.simpleName]
         val body = StringBuilder()
-        if (token == null || appendOne(body, record, token) == 0) {
+        // Always flattened. A subscription has no query on it to carry the
+        // option, and the change page is a notification of what moved
+        // rather than a shaped read.
+        if (token == null || appendOne(body, record, token, true) == 0) {
             sb.append(op).append("\t").append(record.metadata.id)
                 .append('\t').append(token ?: "").append('\n')
             return

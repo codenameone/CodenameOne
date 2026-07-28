@@ -284,4 +284,58 @@ class HealthSubscriptionCursorTest extends UITestBase {
         assertEquals(0, listener.seen.size(),
                 "restored notify-only must stay notify-only");
     }
+
+    /**
+     * Cancelling a subscription mid-page does not gate every later drain.
+     *
+     * <p>Delivery is queued one chunk at a time and each chunk reports
+     * whether it queued the next, so a drain can wait for the page to
+     * finish before it resolves. A chunk that finds its subscription
+     * cancelled queues nothing -- but it used to report otherwise, so the
+     * chunks behind it stayed counted as outstanding for the life of the
+     * process, and every later drain waited on deliveries that would never
+     * happen.</p>
+     *
+     * <p>The listener cancels itself, which places the cancellation
+     * exactly between two chunks rather than leaving it to a race. A
+     * second subscription stays registered, because a drain with nothing
+     * registered resolves without consulting the counter at all and would
+     * hide the leak.</p>
+     */
+    @Test
+    void cancellingMidPageDoesNotStallLaterDrains() throws Exception {
+        final FakeHealthStore store = newStore();
+        store.subscribe(new SubscriptionRequest("keeper")
+                .addType(HealthDataType.STEPS), new Collector(1));
+
+        SubscriptionRequest req = new SubscriptionRequest("cancelled")
+                .addType(HealthDataType.STEPS)
+                .setMaxSamplesPerBatch(1);
+        final CountDownLatch first = new CountDownLatch(1);
+        store.subscribe(req, new HealthChangeListener() {
+            public void healthDataChanged(HealthChangeBatch batch) {
+                store.unsubscribe("cancelled");
+                first.countDown();
+            }
+        });
+
+        // Five chunks; the second finds the subscription gone and the
+        // three behind it are never queued at all.
+        store.batchesToFire.add(new HealthChangeBatch("cancelled",
+                req.getTypes(), samples(5), null, false,
+                HealthAnchor.of("c1"), 0L, false));
+        store.drainChanges();
+        assertTrue(first.await(5, java.util.concurrent.TimeUnit.SECONDS),
+                "the first chunk must be delivered");
+
+        final CountDownLatch drained = new CountDownLatch(1);
+        store.drainChanges().onResult(
+                new com.codename1.util.AsyncResult<Integer>() {
+                    public void onReady(Integer value, Throwable err) {
+                        drained.countDown();
+                    }
+                });
+        assertTrue(drained.await(5, java.util.concurrent.TimeUnit.SECONDS),
+                "a drain must not wait on chunks that were never queued");
+    }
 }

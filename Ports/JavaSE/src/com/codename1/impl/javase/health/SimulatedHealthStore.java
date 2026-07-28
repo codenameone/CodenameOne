@@ -246,9 +246,19 @@ public class SimulatedHealthStore extends LocalHealthStore {
         return s == null ? HealthAuthorizationStatus.AUTHORIZED : s;
     }
 
+    /// A capability, not a grant.
+    ///
+    /// Both mobile stores answer this from what the platform can store,
+    /// independently of what the user has allowed -- and the shared layer
+    /// rejects an unwritable type as TYPE_NOT_SUPPORTED before any
+    /// authorization flow runs. Folding the scripted grant in here meant a
+    /// test scripting DENIED never reached the authorization path at all:
+    /// it got "this platform cannot store that" instead of "you are not
+    /// allowed to", which is a different bug for a developer to chase. The
+    /// scripted status is enforced in [#doWrite(List, AsyncResource)],
+    /// where a real store enforces it.
     public boolean isWritable(HealthDataType type) {
-        return type != null && getWriteAuthorizationStatus(type)
-                != HealthAuthorizationStatus.DENIED;
+        return type != null && available;
     }
 
     protected void doRequestAuthorization(List<HealthAccess> access,
@@ -312,6 +322,21 @@ public class SimulatedHealthStore extends LocalHealthStore {
             AsyncResource<HealthWriteResult> out) {
         if (consumeFailure("save", out)) {
             return;
+        }
+        for (HealthSample sample : samples) {
+            HealthAuthorizationStatus status =
+                    getWriteAuthorizationStatus(sample.getType());
+            // NOT_DETERMINED fails too. A write before the user has been
+            // asked is refused by both platforms, and letting it succeed
+            // here would let an app ship having never exercised its own
+            // authorization flow.
+            if (status == HealthAuthorizationStatus.DENIED
+                    || status == HealthAuthorizationStatus.NOT_DETERMINED) {
+                out.error(new HealthException(HealthError.UNAUTHORIZED,
+                        "write access to " + sample.getType().getId()
+                                + " is " + status));
+                return;
+            }
         }
         super.doWrite(samples, out);
     }

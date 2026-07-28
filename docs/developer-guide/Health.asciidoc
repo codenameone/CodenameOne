@@ -62,7 +62,9 @@ Values always come back in the type's canonical unit unless the query asks for a
 
 Always set a limit for high-frequency types. A year of continuous heart rate is on the order of half a million samples; the default cap of 10,000 exists so a naive query can't exhaust the heap, and `readSamplePage(...)` is there for walking more than that.
 
-Health Connect stores a heart-rate series as one record containing many samples, while HealthKit returns many independent samples. `SampleQuery.setFlattenSeries(boolean)` defaults to `true` so both platforms hand back plain `QuantitySample` objects; turn it off when you need the record identity to delete it, and expect iOS to return series of size 1.
+Health Connect stores a heart-rate series as one record containing many samples, while HealthKit returns many independent samples. `SampleQuery.setFlattenSeries(boolean)` defaults to `true` so both platforms hand back plain `QuantitySample` objects. Turn it off to keep a Health Connect record whole, which is what you want when you intend to delete it: you get one `SeriesSample` carrying the record identifier and every measurement in it. HealthKit has no series records at all, so iOS answers with plain samples whichever way the flag is set. Every flattened measurement still carries its record identifier, so record-level deletion works either way.
+
+Writing a `SeriesSample` to a phone stores its measurements individually -- neither platform accepts a series through this API -- so the write result carries one identifier per measurement rather than one for the record. Sleep and workout samples can't be written to HealthKit or Health Connect at all; the write is refused with `TYPE_NOT_SUPPORTED` rather than reported as a success that stored nothing.
 
 === Aggregates and time buckets
 
@@ -108,6 +110,8 @@ On Android this is permanent. Health Connect has no push mechanism at all and Go
 **Draining is what delivers changes.** The framework drains at app start, on foreground, and whenever you call `drainChanges()`. Wire that into your background-fetch handler if foreground-only isn't good enough.
 
 The two backends drain differently, and the difference is visible to you. Android uses Health Connect change tokens, so a drain reports deletions as well as additions and never re-reports a sample you have already seen. iOS re-reads each subscribed type over the window since the last drain: additions arrive, deletions don't, and a sample edited in place looks like a new one. Both advance their cursor only after your listener returns, so a crash re-reads rather than skips.
+
+A busy window on iOS can hold more samples than one HealthKit query returns, and HealthKit offers no continuation token. When that happens the cursor advances only as far as the samples actually delivered and the batch reports `hasMore()`, so the next drain picks up the remainder rather than skipping it. Draining more often keeps each window small; a subscription left undrained for weeks will take several drains to catch up.
 
 Handle `isResyncRequired()`. A Health Connect change token expires after 30 days and an iOS anchor can be rejected after a restore from backup; when that happens the batch carries no data and you must do a full time-range read to catch up.
 

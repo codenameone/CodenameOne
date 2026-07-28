@@ -321,4 +321,38 @@ class HealthManifestFragmentsTest {
         assertEquals("cn1_health_privacy_policy",
                 HealthManifestFragments.POLICY_URL_RESOURCE);
     }
+
+    /**
+     * The read and write directions are classified apart.
+     *
+     * <p>Health Connect permissions are directional. Collapsing both into a
+     * single "uses health data" flag let an app that only reads satisfy the
+     * build check with an {@code android.health.write} declaration alone;
+     * the manifest then carried no read permission and every read failed at
+     * runtime with nothing in the build log to explain it.</p>
+     */
+    @Test
+    void storeCallsAreClassifiedByDirection() {
+        for (String read : new String[] {"readSamples", "readWorkouts",
+                "aggregate", "subscribe", "hasAnyData", "drainChanges"}) {
+            assertTrue(HealthManifestFragments.isReadCall(read),
+                    read + " reads");
+            assertFalse(HealthManifestFragments.isWriteCall(read),
+                    read + " does not write");
+        }
+        for (String write : new String[] {"write", "writeAll", "delete",
+                "deleteByRange"}) {
+            assertTrue(HealthManifestFragments.isWriteCall(write),
+                    write + " writes");
+            assertFalse(HealthManifestFragments.isReadCall(write),
+                    write + " does not read");
+        }
+        // A delete needs the write permission, not a third kind.
+        assertTrue(HealthManifestFragments.isWriteCall("delete"));
+        // Neither direction, so neither hint is demanded.
+        assertFalse(HealthManifestFragments.isReadCall("isSupported"));
+        assertFalse(HealthManifestFragments.isWriteCall("isSupported"));
+        assertFalse(HealthManifestFragments.isReadCall(null));
+        assertFalse(HealthManifestFragments.isWriteCall(null));
+    }
 }

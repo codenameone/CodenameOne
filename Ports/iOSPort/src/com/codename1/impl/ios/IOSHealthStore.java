@@ -220,16 +220,37 @@ class IOSHealthStore extends HealthStore {
         // is no HealthKit continuation token here, so the honest signal is
         // SamplePage.isTruncated() -- claiming a partial history was
         // complete is what silently lost everything past the first page.
+        // Sources go to HealthKit, not to the shared post-filter. The
+        // limit is applied by the query, so a page whose first records all
+        // belong to another app was filtered down to nothing afterwards --
+        // and with no continuation token there was no way to reach the
+        // matching records behind them.
+        StringBuilder sources = new StringBuilder();
+        for (String bundleId : query.getSources()) {
+            if (sources.length() > 0) {
+                sources.append('\t');
+            }
+            sources.append(bundleId);
+        }
         int id = IOSHealth.takeId(out, query.getLimit());
         nativeInstance.hkQuerySamples(id, types.get(0).getId(),
                 range.getStartMillis(), range.getEndMillis(),
                 query.getLimit() == Integer.MAX_VALUE ? query.getLimit()
                         : query.getLimit() + 1,
-                !query.isSortDescending());
+                !query.isSortDescending(), sources.toString());
     }
 
     protected void doWrite(List<HealthSample> samples,
             AsyncResource<HealthWriteResult> out) {
+        HealthSample rejected = HealthWire.unsupportedForWrite(samples);
+        if (rejected != null) {
+            // The payload cannot carry this shape, and the native side
+            // reports an empty batch as a successful write of nothing.
+            out.error(new HealthException(HealthError.TYPE_NOT_SUPPORTED,
+                    rejected.getType().getId() + " cannot be written to"
+                            + " HealthKit through this API"));
+            return;
+        }
         int id = IOSHealth.takeId(out);
         nativeInstance.hkSaveSamples(id, HealthWire.encodeSamples(samples));
     }
@@ -282,30 +303,67 @@ class IOSHealthStore extends HealthStore {
             return;
         }
         readTypes(subs, index, delivered, out, types, 0,
-                new ArrayList<HealthSample>(), since, now);
+                new ArrayList<HealthSample>(), since, now, now);
     }
 
     /// HealthKit queries one type at a time, so a subscription over three
     /// types is three reads accumulated into one batch.
+    ///
+    /// `safeUntil` is how far the cursor may move. It is `now` until a
+    /// type comes back truncated, at which point it drops to the last
+    /// sample that type actually produced -- see [#advanceTo(long, long,
+    /// SamplePage)].
     private void readTypes(final List<HealthSubscription> subs,
             final int index, final int delivered,
             final AsyncResource<Integer> out,
             final List<HealthDataType> types, final int typeIndex,
             final List<HealthSample> collected, final long since,
-            final long now) {
+            final long now, final long safeUntil) {
         if (typeIndex >= types.size()) {
             HealthSubscription sub = subs.get(index);
+            // The cursor moves to the end of what was read, not to the end
+            // of the window that was asked for. HealthKit hands back no
+            // continuation token, so a window holding more samples than one
+            // query returns is only ever read once -- anchoring at `now`
+            // regardless meant everything past the limit was skipped for
+            // good, silently, on exactly the busiest subscriptions.
             fireChanges(new HealthChangeBatch(sub.getId(), sub.getTypes(),
                     collected, null, false,
-                    HealthAnchor.of(String.valueOf(now)), 0L, false));
+                    HealthAnchor.of(String.valueOf(safeUntil)), 0L,
+                    safeUntil < now));
             drainFrom(subs, index + 1, delivered + 1, out);
             return;
         }
         SampleQuery q = new SampleQuery()
                 .addType(types.get(typeIndex))
                 .setTimeRange(HealthTimeRange.between(since, now));
-        readSamples(q).onResult(new ChangeRead(this, subs, index, delivered,
-                out, types, typeIndex, collected, since, now));
+        // The page, not the accumulating read: only the page carries the
+        // truncation flag, and that flag is the whole point here.
+        readSamplePage(q).onResult(new ChangeRead(this, subs, index,
+                delivered, out, types, typeIndex, collected, since, now,
+                safeUntil));
+    }
+
+    /// How far the cursor may move given one type's page.
+    ///
+    /// A complete page leaves it where it was. A truncated one pulls it
+    /// back to the last sample read, so the next drain resumes there
+    /// rather than past the samples that did not fit. The window is read
+    /// oldest-first, so the last sample is the newest one delivered.
+    ///
+    /// Never earlier than `since + 1`: a window whose very first sample
+    /// overflows the limit would otherwise re-read the same page forever.
+    private static long advanceTo(long safeUntil, long since,
+            SamplePage page) {
+        if (page == null || !page.isTruncated() || page.isEmpty()) {
+            return safeUntil;
+        }
+        List<HealthSample> samples = page.getSamples();
+        long last = samples.get(samples.size() - 1).getEndMillis();
+        if (last <= since) {
+            last = since + 1;
+        }
+        return Math.min(safeUntil, last);
     }
 
     private static long anchorMillis(HealthSubscription sub, long now) {
@@ -325,7 +383,7 @@ class IOSHealthStore extends HealthStore {
     /// Named rather than anonymous so the callback carries no implicit
     /// reference to the enclosing store.
     private static final class ChangeRead
-            implements com.codename1.util.AsyncResult<List<HealthSample>> {
+            implements com.codename1.util.AsyncResult<SamplePage> {
 
         private final IOSHealthStore store;
         private final List<HealthSubscription> subs;
@@ -337,11 +395,13 @@ class IOSHealthStore extends HealthStore {
         private final List<HealthSample> collected;
         private final long since;
         private final long now;
+        private final long safeUntil;
 
         ChangeRead(IOSHealthStore store, List<HealthSubscription> subs,
                 int index, int delivered, AsyncResource<Integer> out,
                 List<HealthDataType> types, int typeIndex,
-                List<HealthSample> collected, long since, long now) {
+                List<HealthSample> collected, long since, long now,
+                long safeUntil) {
             this.store = store;
             this.subs = subs;
             this.index = index;
@@ -352,9 +412,10 @@ class IOSHealthStore extends HealthStore {
             this.collected = collected;
             this.since = since;
             this.now = now;
+            this.safeUntil = safeUntil;
         }
 
-        public void onReady(List<HealthSample> page, Throwable error) {
+        public void onReady(SamplePage page, Throwable error) {
             if (error != null) {
                 // Abandon this subscription's drain without firing a
                 // batch. Continuing would deliver a partial result
@@ -367,10 +428,11 @@ class IOSHealthStore extends HealthStore {
                 return;
             }
             if (page != null) {
-                collected.addAll(page);
+                collected.addAll(page.getSamples());
             }
             store.readTypes(subs, index, delivered, out, types,
-                    typeIndex + 1, collected, since, now);
+                    typeIndex + 1, collected, since, now,
+                    advanceTo(safeUntil, since, page));
         }
     }
 }

@@ -396,6 +396,15 @@ class AndroidHealthStore extends HealthStore {
         if (failIfNoBridge(out)) {
             return;
         }
+        HealthSample rejected = HealthWire.unsupportedForWrite(samples);
+        if (rejected != null) {
+            // The payload cannot carry this shape, and the bridge reports
+            // an empty batch as a successful insert of nothing.
+            out.error(new HealthException(HealthError.TYPE_NOT_SUPPORTED,
+                    rejected.getType().getId() + " cannot be written to"
+                            + " Health Connect through this API"));
+            return;
+        }
         delegate().insertRecords(HealthWire.encodeSamples(samples),
                 new Bridged<HealthWriteResult>(out) {
                     HealthWriteResult convert(String payload) {

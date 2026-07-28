@@ -290,4 +290,128 @@ class HealthWireTest {
                 });
         assertSame(HealthError.INVALID_ARGUMENT, ex.getError());
     }
+
+    private static SeriesSample heartRate(long base, int n) {
+        long[] starts = new long[n];
+        long[] ends = new long[n];
+        double[] values = new double[n];
+        for (int i = 0; i < n; i++) {
+            starts[i] = base + i * 1000L;
+            ends[i] = starts[i];
+            values[i] = 60 + i;
+        }
+        return SeriesSample.create(HealthDataType.HEART_RATE, base,
+                base + (n - 1) * 1000L, starts, ends, values,
+                HealthUnit.COUNT_PER_MINUTE);
+    }
+
+    /**
+     * A series write reaches the platform as its measurements rather than
+     * as nothing at all.
+     *
+     * <p>The encoder used to skip any sample that was not a
+     * {@link QuantitySample}, and both mobile ports hand this payload
+     * straight to their bridge -- so a write of nothing but series data
+     * produced an empty batch, which completes successfully with no
+     * identifiers. The caller was told the write worked while none of it
+     * was stored.</p>
+     */
+    @Test
+    void aSeriesWriteCarriesItsMeasurements() {
+        List<HealthSample> out = new ArrayList<HealthSample>();
+        out.add(heartRate(10_000L, 3));
+
+        SamplePage page = HealthWire.decodeSamplePage(
+                HealthWire.encodeSamples(out));
+
+        assertEquals(3, page.size(),
+                "every measurement must reach the platform");
+        for (int i = 0; i < 3; i++) {
+            QuantitySample s = (QuantitySample) page.getSamples().get(i);
+            assertSame(HealthDataType.HEART_RATE, s.getType());
+            assertEquals(60 + i,
+                    s.getValue(HealthUnit.COUNT_PER_MINUTE), 1e-9);
+        }
+    }
+
+    /**
+     * A shape the payload cannot carry is reported rather than dropped.
+     *
+     * <p>This is what stops the ports reporting a successful write of
+     * nothing: they refuse the write instead.</p>
+     */
+    @Test
+    void shapesTheWireCannotCarryAreReported() {
+        List<HealthSample> series = new ArrayList<HealthSample>();
+        series.add(heartRate(10_000L, 2));
+        series.add(steps(1000L, 2000L, 10));
+        assertNull(HealthWire.unsupportedForWrite(series),
+                "quantities and series both encode");
+
+        List<HealthSample> withSleep = new ArrayList<HealthSample>();
+        withSleep.add(steps(1000L, 2000L, 10));
+        SleepSample sleep = SleepSample.create(1000L, 2000L);
+        withSleep.add(sleep);
+        HealthSample rejected = HealthWire.unsupportedForWrite(withSleep);
+        assertNotNull(rejected, "a shape with no line must be reported");
+        assertSame(sleep, rejected);
+    }
+
+    /**
+     * A series survives the wire whole when the caller asked to keep it.
+     *
+     * <p>`setFlattenSeries(false)` promises record identity, and the
+     * descriptor never carried the option so the bridge flattened
+     * regardless -- the option was honoured nowhere.</p>
+     */
+    @Test
+    void anUnflattenedSeriesRoundTripsAsOneRecord() {
+        SeriesSample original = heartRate(50_000L, 4);
+        original.setId("hc-record-1");
+        original.setRecordingMethod(RecordingMethod.AUTOMATIC);
+        StringBuilder sb = new StringBuilder();
+        HealthWire.appendSeries(sb, original, "com.example.app", "Example",
+                "Strap");
+
+        SamplePage page = HealthWire.decodeSamplePage(sb.toString());
+        assertEquals(1, page.size(), "one record, not four samples");
+        SeriesSample s = (SeriesSample) page.getSamples().get(0);
+        assertEquals("hc-record-1", s.getId(),
+                "record identity is the reason for asking");
+        assertEquals(4, s.size());
+        assertSame(RecordingMethod.AUTOMATIC, s.getRecordingMethod());
+        assertEquals("com.example.app", s.getSource().getBundleId());
+        for (int i = 0; i < 4; i++) {
+            assertEquals(50_000L + i * 1000L, s.getSampleStartMillis(i));
+            assertEquals(60 + i,
+                    s.getSampleValue(i, HealthUnit.COUNT_PER_MINUTE), 1e-9);
+        }
+    }
+
+    /**
+     * A series line whose measurements disagree with its count is dropped.
+     *
+     * <p>Trusting the count would produce a record padded with zeroes,
+     * which reads as real data at a plausible-looking timestamp.</p>
+     */
+    @Test
+    void aSeriesLineWithATruncatedTailIsSkipped() {
+        String line = "~id\theart_rate\t1000\t3000\t3\tcount/min\t\t\t\t"
+                + "UNKNOWN\t1000:1000:60.0,2000:2000:61.0\n";
+        assertEquals(0, HealthWire.decodeSamplePage(line).size(),
+                "two measurements cannot answer a claim of three");
+    }
+
+    /** The query descriptor carries the flattening option. */
+    @Test
+    void theQueryDescriptorCarriesTheFlatteningOption() {
+        SampleQuery q = new SampleQuery()
+                .addType(HealthDataType.HEART_RATE)
+                .setTimeRange(HealthTimeRange.between(0L, 1000L));
+        assertTrue(HealthWire.encodeSampleQuery(q).indexOf(
+                "\"flatten\":true") >= 0);
+        assertTrue(HealthWire.encodeSampleQuery(q.setFlattenSeries(false))
+                .indexOf("\"flatten\":false") >= 0,
+                "a bridge cannot honour an option it is never told about");
+    }
 }

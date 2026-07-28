@@ -314,13 +314,77 @@ com_codename1_impl_ios_IOSNative_hkRequestAuthorization___int_java_lang_String_1
     });
 }
 
+/// Runs the sample query and reports the page. Takes ownership of
+/// `portableId`, releasing it once the results handler has run.
+static void cn1hkRunSampleQuery(JAVA_INT rid, NSString *portableId,
+        HKQuantityType *type, NSPredicate *pred, int lim, BOOL asc) {
+    NSSortDescriptor *sort = [NSSortDescriptor
+        sortDescriptorWithKey:HKSampleSortIdentifierStartDate
+                    ascending:asc];
+    HKSampleQuery *q = [[HKSampleQuery alloc]
+        initWithSampleType:type predicate:pred limit:lim
+           sortDescriptors:@[sort]
+            resultsHandler:^(HKSampleQuery *query, NSArray *results,
+                             NSError *error) {
+        if (error != nil) {
+            // A locked device makes the store unreadable, which is
+            // exactly when a background observer fires. It must stay
+            // distinguishable from "no data" so callers can retry.
+            int code = ([error code] == HKErrorDatabaseInaccessible)
+                ? CN1_HK_ERR_DATABASE_INACCESSIBLE : CN1_HK_ERR_UNKNOWN;
+            cn1hkReportError(rid, code, [error localizedDescription]);
+            [portableId release];
+            return;
+        }
+        HKUnit *unit = cn1hkUnit(portableId);
+        NSString *symbol = cn1hkUnitSymbol(portableId);
+        NSMutableString *tsv = [NSMutableString string];
+        for (HKQuantitySample *sample in results) {
+            double value = [[sample quantity] doubleValueForUnit:unit];
+            // No percent rescaling. doubleValueForUnit:percentUnit
+            // already answers in percent -- 97% comes back as 97 -- so
+            // multiplying turned every oxygen saturation and body fat
+            // reading into 9700, and the matching division on the
+            // write path stored 97% as 0.97%.
+            HKSource *src = [[sample sourceRevision] source];
+            // Only the user-entered flag is reported. HealthKit does
+            // not distinguish an automatic reading from an actively
+            // recorded one, and answering AUTOMATIC for everything
+            // else would be a guess dressed as a fact -- an empty
+            // field decodes to UNKNOWN, which is what we know.
+            NSNumber *entered =
+                [[sample metadata] objectForKey:HKMetadataKeyWasUserEntered];
+            [tsv appendFormat:@"%@\t%@\t%lld\t%lld\t%f\t%@\t%@\t%@\t%@\t%@\n",
+                [[sample UUID] UUIDString], portableId,
+                (long long)([[sample startDate] timeIntervalSince1970]
+                            * 1000.0),
+                (long long)([[sample endDate] timeIntervalSince1970]
+                            * 1000.0),
+                value, symbol,
+                src ? [src bundleIdentifier] : @"",
+                src && [src name] ? [src name] : @"",
+                [sample device] && [[sample device] name]
+                    ? [[sample device] name] : @"",
+                (entered && [entered boolValue]) ? @"MANUAL_ENTRY" : @""];
+        }
+        com_codename1_impl_ios_IOSHealth_nativeHkSamples___int_java_lang_String(
+            getThreadLocalData(), rid,
+            fromNSString(getThreadLocalData(), tsv));
+        [portableId release];
+    }];
+    [cn1hkStore executeQuery:q];
+    [q release];
+}
+
 void
-com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_double_int_boolean(
+com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_double_int_boolean_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId,
         JAVA_OBJECT typeId, JAVA_DOUBLE startMs, JAVA_DOUBLE endMs,
-        JAVA_INT limit, JAVA_BOOLEAN ascending) {
+        JAVA_INT limit, JAVA_BOOLEAN ascending, JAVA_OBJECT sourceIds) {
     cn1hkInit();
     NSString *portableId = [toNSString(threadStateData, typeId) retain];
+    NSString *wantedSources = sourceIds == JAVA_NULL ? nil
+        : [toNSString(threadStateData, sourceIds) retain];
     JAVA_INT rid = requestId;
     double s = startMs, e = endMs;
     int lim = limit;
@@ -332,6 +396,7 @@ com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_do
             cn1hkReportError(rid, CN1_HK_ERR_NOT_SUPPORTED,
                              @"type unavailable on this iOS version");
             [portableId release];
+            [wantedSources release];
             return;
         }
         NSDate *from = [NSDate dateWithTimeIntervalSince1970:s / 1000.0];
@@ -346,52 +411,58 @@ com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_do
             // drop them and make the same SampleQuery mean different things
             // on iOS than everywhere else.
             HKQueryOptionNone];
-        NSSortDescriptor *sort = [NSSortDescriptor
-            sortDescriptorWithKey:HKSampleSortIdentifierStartDate
-                        ascending:asc];
-        HKSampleQuery *q = [[HKSampleQuery alloc]
-            initWithSampleType:type predicate:pred limit:lim
-               sortDescriptors:@[sort]
-                resultsHandler:^(HKSampleQuery *query, NSArray *results,
+        if (wantedSources == nil || [wantedSources length] == 0) {
+            [wantedSources release];
+            cn1hkRunSampleQuery(rid, portableId, type, pred, lim, asc);
+            return;
+        }
+        // Source filtering has to be part of the query. HealthKit applies
+        // the limit itself, so filtering the returned page afterwards --
+        // which is what the shared post-filter does -- discards records
+        // that were already counted against the limit, and with no
+        // continuation token the ones behind them are unreachable. A read
+        // whose first page happened to be another app's data came back
+        // empty even though matching samples existed.
+        //
+        // Sources are named by bundle identifier, and only HKSourceQuery
+        // can turn one into the HKSource that a predicate needs.
+        NSSet *wanted = [NSSet setWithArray:
+            [wantedSources componentsSeparatedByString:@"\t"]];
+        HKSourceQuery *sq = [[HKSourceQuery alloc]
+            initWithSampleType:type samplePredicate:pred
+             completionHandler:^(HKSourceQuery *q, NSSet *sources,
                                  NSError *error) {
             if (error != nil) {
-                // A locked device makes the store unreadable, which is
-                // exactly when a background observer fires. It must stay
-                // distinguishable from "no data" so callers can retry.
                 int code = ([error code] == HKErrorDatabaseInaccessible)
                     ? CN1_HK_ERR_DATABASE_INACCESSIBLE : CN1_HK_ERR_UNKNOWN;
                 cn1hkReportError(rid, code, [error localizedDescription]);
                 [portableId release];
+                [wantedSources release];
                 return;
             }
-            HKUnit *unit = cn1hkUnit(portableId);
-            NSString *symbol = cn1hkUnitSymbol(portableId);
-            NSMutableString *tsv = [NSMutableString string];
-            for (HKQuantitySample *sample in results) {
-                double value = [[sample quantity] doubleValueForUnit:unit];
-                // No percent rescaling. doubleValueForUnit:percentUnit
-                // already answers in percent -- 97% comes back as 97 -- so
-                // multiplying turned every oxygen saturation and body fat
-                // reading into 9700, and the matching division on the
-                // write path stored 97% as 0.97%.
-                [tsv appendFormat:@"%@\t%@\t%lld\t%lld\t%f\t%@\t%@\n",
-                    [[sample UUID] UUIDString], portableId,
-                    (long long)([[sample startDate] timeIntervalSince1970]
-                                * 1000.0),
-                    (long long)([[sample endDate] timeIntervalSince1970]
-                                * 1000.0),
-                    value, symbol,
-                    [[sample sourceRevision] source]
-                        ? [[[sample sourceRevision] source] bundleIdentifier]
-                        : @""];
+            NSMutableSet *matched = [NSMutableSet set];
+            for (HKSource *src in sources) {
+                if ([wanted containsObject:[src bundleIdentifier]]) {
+                    [matched addObject:src];
+                }
             }
-            com_codename1_impl_ios_IOSHealth_nativeHkSamples___int_java_lang_String(
-                getThreadLocalData(), rid,
-                fromNSString(getThreadLocalData(), tsv));
-            [portableId release];
+            [wantedSources release];
+            if ([matched count] == 0) {
+                // No source in this store matches, so the answer is an
+                // empty page rather than an unfiltered one.
+                com_codename1_impl_ios_IOSHealth_nativeHkSamples___int_java_lang_String(
+                    getThreadLocalData(), rid,
+                    fromNSString(getThreadLocalData(), @""));
+                [portableId release];
+                return;
+            }
+            NSPredicate *both = [NSCompoundPredicate
+                andPredicateWithSubpredicates:@[pred,
+                    [HKQuery predicateForObjectsFromSources:matched]]];
+            cn1hkRunSampleQuery(rid, portableId, type, both, lim, asc);
         }];
-        [cn1hkStore executeQuery:q];
-        [q release];
+        [cn1hkStore executeQuery:sq];
+        [sq release];
     });
 }
 
@@ -425,9 +496,21 @@ void com_codename1_impl_ios_IOSNative_hkSaveSamples___int_java_lang_String(
                 [[f objectAtIndex:2] doubleValue] / 1000.0];
             NSDate *to = [NSDate dateWithTimeIntervalSince1970:
                 [[f objectAtIndex:3] doubleValue] / 1000.0];
+            // Field 6 is the recording method. HealthKit has no general
+            // notion of one, but it does have the single distinction that
+            // matters to every other app reading the sample: whether a
+            // person typed it in. Dropping it made a hand-entered weight
+            // indistinguishable from a scale reading, and a later read of
+            // our own sample reported UNKNOWN.
+            NSDictionary *metadata = nil;
+            if ([f count] > 6
+                    && [[f objectAtIndex:6] isEqualToString:@"MANUAL_ENTRY"]) {
+                metadata = @{HKMetadataKeyWasUserEntered: @YES};
+            }
             HKQuantitySample *sample = [HKQuantitySample
                 quantitySampleWithType:type quantity:quantity
-                             startDate:from endDate:to];
+                             startDate:from endDate:to
+                              metadata:metadata];
             [samples addObject:sample];
             [ids appendFormat:@"%@\n", [[sample UUID] UUIDString]];
         }
@@ -489,10 +572,10 @@ com_codename1_impl_ios_IOSNative_hkRequestAuthorization___int_java_lang_String_1
 }
 
 void
-com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_double_int_boolean(
+com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_double_int_boolean_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId,
         JAVA_OBJECT typeId, JAVA_DOUBLE startMs, JAVA_DOUBLE endMs,
-        JAVA_INT limit, JAVA_BOOLEAN ascending) {
+        JAVA_INT limit, JAVA_BOOLEAN ascending, JAVA_OBJECT sourceIds) {
 }
 
 void com_codename1_impl_ios_IOSNative_hkSaveSamples___int_java_lang_String(

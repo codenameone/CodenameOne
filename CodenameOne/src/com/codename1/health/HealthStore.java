@@ -579,6 +579,9 @@ public class HealthStore {
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
     private HealthSample normalize(HealthSample s, SampleQuery query)
             throws HealthException {
+        if (s instanceof SeriesSample) {
+            return normalizeSeries((SeriesSample) s, query);
+        }
         if (!(s instanceof QuantitySample)) {
             return s;
         }
@@ -607,6 +610,46 @@ public class HealthStore {
         // view, so putAll on it throws and would have failed the whole
         // write rather than merely losing the metadata.
         for (Map.Entry<String, String> e : q.getMetadata().entrySet()) {
+            converted.putMetadata(e.getKey(), e.getValue());
+        }
+        return converted;
+    }
+
+    /// Converts a whole series into the query's unit.
+    ///
+    /// A series reaches here only when the caller turned flattening off,
+    /// which is the one path where the values are not repackaged as
+    /// [QuantitySample]s on the way out. Returning it untouched left
+    /// `getUnit()` reporting whatever the platform stored while
+    /// [#readSamplePage(SampleQuery)] promises the requested unit, so the
+    /// same query answered in two different units depending on a flag that
+    /// has nothing to do with units.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
+    private static SeriesSample normalizeSeries(SeriesSample series,
+            SampleQuery query) {
+        HealthUnit target = query.getUnit();
+        if (target == null) {
+            target = series.getType().getCanonicalUnit();
+        }
+        if (target == null || series.getUnit() == target) {
+            return series;
+        }
+        int n = series.size();
+        long[] starts = new long[n];
+        long[] ends = new long[n];
+        double[] values = new double[n];
+        for (int i = 0; i < n; i++) {
+            starts[i] = series.getSampleStartMillis(i);
+            ends[i] = series.getSampleEndMillis(i);
+            values[i] = series.getSampleValue(i, target);
+        }
+        SeriesSample converted = SeriesSample.create(series.getType(),
+                series.getStartMillis(), series.getEndMillis(), starts, ends,
+                values, target);
+        converted.setId(series.getId());
+        converted.setSource(series.getSource());
+        converted.setRecordingMethod(series.getRecordingMethod());
+        for (Map.Entry<String, String> e : series.getMetadata().entrySet()) {
             converted.putMetadata(e.getKey(), e.getValue());
         }
         return converted;
@@ -1018,10 +1061,6 @@ public class HealthStore {
         for (Map.Entry<String, String> e : q.getMetadata().entrySet()) {
             converted.putMetadata(e.getKey(), e.getValue());
         }
-        Map<String, String> meta = q.getMetadata();
-        for (Map.Entry<String, String> e : meta.entrySet()) {
-            converted.putMetadata(e.getKey(), e.getValue());
-        }
         return converted;
     }
 
@@ -1338,10 +1377,12 @@ public class HealthStore {
                 try {
                     queuedNext = runDelivery();
                 } finally {
-                    // When a listener throws, the rest of the page is
-                    // abandoned and those chunks will never be queued --
-                    // so they are accounted for here or the drain waiting
-                    // on them would never resolve.
+                    // Whatever stops this chunk -- a listener that threw,
+                    // or a subscription cancelled before the chunk ran --
+                    // also stops every chunk behind it, and those will
+                    // never be queued. They are accounted for here or the
+                    // drain waiting on them never resolves, and every
+                    // later drain stays gated behind it too.
                     store.noteDeliveryDone(queuedNext ? 0
                             : chunks.size() - index - 1);
                 }
@@ -1353,8 +1394,13 @@ public class HealthStore {
                 // app has cancelled, and persisting the cursor would undo
                 // what unsubscribe() promised to discard -- or overwrite
                 // the cursor of a new subscription reusing the same id.
+                //
+                // Reported as "nothing queued", because nothing was: an
+                // earlier version answered as though the tail were still
+                // coming, and the chunks it never queued stayed counted
+                // for the life of the process.
                 if (!store.isStillRegistered(subscription)) {
-                    return true;
+                    return false;
                 }
                 try {
                     listener.healthDataChanged(batch);
