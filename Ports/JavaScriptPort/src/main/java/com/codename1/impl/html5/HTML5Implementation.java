@@ -6836,12 +6836,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (url == null) {
             return "";
         }
-        int schemeEnd = url.indexOf("://");
-        if (schemeEnd < 0) {
-            // No authority to protect (mailto:, tel:, a bare storage path).
-            return ellipsizeTail(url);
+        String rest;
+        if (url.startsWith("//")) {
+            // Protocol relative. isExternalUrl() accepts these, so they reach
+            // the Sheet and carry an authority that needs the same parsing --
+            // indexOf("://") does not find one.
+            rest = url.substring(2);
+        } else {
+            int schemeEnd = url.indexOf("://");
+            if (schemeEnd < 0) {
+                // No authority to protect (mailto:, tel:, a bare storage path).
+                return ellipsizeTail(url);
+            }
+            rest = url.substring(schemeEnd + 3);
         }
-        String rest = url.substring(schemeEnd + 3);
         int authorityEnd = rest.length();
         for (int i = 0; i < rest.length(); i++) {
             char c = rest.charAt(i);
@@ -7016,13 +7024,28 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         // _blank, or _self / auto whose page-side script never ran because the
         // host bundle predates the eval-on-main handler -- degrade rather than
-        // leave execute() with no effect at all:
-        // a popup only survives inside a live user gesture, so ride the backside
-        // hook when a gesture-backed one is pending and otherwise ask the user,
-        // whose tap on the Sheet becomes the gesture. Note this deliberately
-        // ignores an interval-only hook: draining from a timer would let the
-        // browser block the popup with nothing shown, which is worse than the
-        // Sheet that _blank promises.
+        // leave execute() with no effect at all.
+        //
+        // Only _blank actually asked for a new window. Under auto or _self the
+        // Sheet is a compatibility fallback the caller never requested, so
+        // promising a new window there would describe behavior they did not
+        // choose.
+        openInNewWindowWithConfirmation(url, EXECUTE_TARGET_BLANK.equals(target)
+                ? "Open this link in a new window?"
+                : "Open this link?");
+    }
+
+    /**
+     * Opens {@code url} in a new window/tab the gesture-aware way: a popup only
+     * survives inside a live user gesture, so ride a backside hook when a
+     * gesture-backed one is pending and otherwise ask the user, whose tap on the
+     * Sheet becomes the gesture.
+     *
+     * <p>An interval-only hook is deliberately not enough here. Draining from a
+     * timer would let the browser block the popup with nothing shown, which is
+     * worse than the Sheet.</p>
+     */
+    private void openInNewWindowWithConfirmation(final String url, String prompt) {
         if (isGestureBackedHookAvailable()) {
             addBacksideHook(new JSRunnable() {
                 @Override
@@ -7032,13 +7055,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
             });
             return;
         }
-        // Only _blank actually asked for a new window. Under auto or _self the
-        // Sheet is a compatibility fallback the caller never requested, so
-        // promising a new window there would describe behavior they did not
-        // choose.
-        String prompt = EXECUTE_TARGET_BLANK.equals(target)
-                ? "Open this link in a new window?"
-                : "Open this link?";
         createConfirmationSheet("Open Link", prompt,
                 shortenUrlForDisplay(url), new Runnable() {
             @Override
@@ -7050,7 +7066,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // install a backside hook though (pointer handling calls
                 // installBacksideHooksInUserInteraction), so queue the open on
                 // it and let the drain perform it inside the gesture. Same
-                // shape as the download confirmation below.
+                // shape as the download confirmation in execute().
                 addBacksideHook(new JSRunnable() {
                     @Override
                     public void run() {
@@ -7134,9 +7150,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // off the external-link target policy -- under auto or _self that
             // would point the page at a path the server does not serve and
             // unload the app instead of downloading anything. Best effort in a
-            // new window, which is what this port did before.
+            // new window, which is what this port did before -- and through the
+            // gesture-aware path, since opening straight from the EDT would let
+            // the browser block the popup with no confirmation shown.
             _log("execute(): no downloadable content for " + url);
-            openUrlOnMainThread(url, false, false);
+            openInNewWindowWithConfirmation(url, "Open this link?");
             return;
         }
         final Runnable startDownload = new Runnable() {
