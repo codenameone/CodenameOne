@@ -663,6 +663,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             public void onTimer() {
                 backsideHooksSemaphore--;
                 //_log("Decrementing backsideHooksSemaphore: "+backsideHooksSemaphore);
+                if (backsideHooksSemaphore <= 0) {
+                    // Every delayed drain scheduled off that interaction has
+                    // run, so whatever activation it granted is spent. The next
+                    // popup has to earn a gesture of its own.
+                    popupReservedForGesture = false;
+                }
                 runBacksideHooks();
             }
         }, timeout);
@@ -6981,16 +6987,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
-     * Popup opens queued on a backside hook but not yet drained.
+     * Whether the gesture currently represented by {@link #backsideHooksSemaphore}
+     * has already had a popup queued against it.
      *
      * <p>The semaphore counts pending drains, not unconsumed popup
-     * authorization. One gesture authorizes ONE {@code window.open()}: the
-     * first consumes the transient activation, so a second queued behind the
-     * same gesture drains in the same batch and is blocked. Only ever reserve a
-     * pending gesture for a single popup and send the rest to the Sheet, which
-     * earns them a gesture of their own.</p>
+     * authorization. One gesture authorizes ONE {@code window.open()} -- the
+     * first consumes the transient activation -- yet
+     * {@code installBacksideHooksInUserInteraction()} schedules three drains
+     * (300ms, 1500ms, 5000ms) off a single interaction. Releasing the
+     * reservation when the first of those runs would let a later execute() read
+     * one of the remaining drains as a fresh gesture and queue a popup whose
+     * activation is already spent. So hold the reservation until the whole burst
+     * has expired, i.e. the semaphore falls back to zero, and send everything
+     * else to the Sheet, which earns a gesture of its own.</p>
      */
-    private int pendingPopupOpens;
+    private boolean popupReservedForGesture;
 
     /**
      * True when the URL names something the browser itself can hand off, as
@@ -7087,17 +7098,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * worse than the Sheet.</p>
      */
     private void openInNewWindowWithConfirmation(final String url, String prompt) {
-        if (isGestureBackedHookAvailable() && pendingPopupOpens == 0) {
-            pendingPopupOpens++;
+        if (isGestureBackedHookAvailable() && !popupReservedForGesture) {
+            // Held until the gesture's whole drain burst expires -- see the
+            // field. Not released here, where the first drain would free it
+            // while later drains from the same interaction are still pending.
+            popupReservedForGesture = true;
             addBacksideHook(new JSRunnable() {
                 @Override
                 public void run() {
-                    try {
-                        if (!openUrlOnMainThread(url, false, false)) {
-                            _log("execute(): popup blocked for " + url);
-                        }
-                    } finally {
-                        pendingPopupOpens--;
+                    if (!openUrlOnMainThread(url, false, false)) {
+                        _log("execute(): popup blocked for " + url);
                     }
                 }
             });
