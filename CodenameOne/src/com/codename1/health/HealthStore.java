@@ -666,6 +666,22 @@ public class HealthStore {
     /// accepted without complaint.
     private SeriesSample validateSeriesForWrite(SeriesSample series,
             HealthDataType type) throws HealthException {
+        // Every measurement, not only the enclosing span. The wire expands
+        // a series point by point, so an interval-only type whose points
+        // are instants produced zero-duration StepsRecords that Health
+        // Connect rejects at runtime -- after the outer span had passed
+        // the check just above.
+        if (type.isIntervalOnly()) {
+            for (int i = 0; i < series.size(); i++) {
+                if (series.getSampleStartMillis(i)
+                        >= series.getSampleEndMillis(i)) {
+                    throw new HealthException(HealthError.INVALID_ARGUMENT,
+                            type.getId() + " accumulates over time, but"
+                                    + " measurement " + i + " of this series"
+                                    + " marks a single instant");
+                }
+            }
+        }
         HealthUnit preferred = getPreferredWriteUnit(type);
         if (preferred == null) {
             return series;
@@ -1409,24 +1425,40 @@ public class HealthStore {
         }
     }
 
-    /// Immediately drains pending changes for every active subscription,
-    /// resolving with the number of batches delivered.
+    /// Drains pending changes for every active subscription, resolving
+    /// with the number of batches delivered.
     ///
-    /// Called automatically at app start and when the app returns to the
-    /// foreground. **On Android you should also call it from your
-    /// background-fetch handler** -- Health Connect never wakes the app on
-    /// its own, so nothing else will notice new data while your app is
-    /// closed.
+    /// **Your app decides when this happens.** Nothing here hooks the
+    /// application lifecycle, so call it when you come to the foreground,
+    /// and from your background-fetch handler -- Health Connect never
+    /// wakes the app on its own, and this release registers no
+    /// `HKObserverQuery` either, so nothing else will notice new data
+    /// while your app is closed. [HealthSubscription#isPushDelivery()]
+    /// answers false everywhere for the same reason.
+    ///
+    /// Overlapping calls are coalesced: a drain started while one is
+    /// already running does not read the same change window a second
+    /// time, it resolves alongside the one in flight.
     public final AsyncResource<Integer> drainChanges() {
         AsyncResource<Integer> out = new AsyncResource<Integer>();
         ensureSubscriptionsRestored();
+        // A second drain would snapshot the same anchors and read the
+        // same window, delivering every batch twice and letting two
+        // callbacks persist cursors in whatever order they finished.
+        synchronized (subscriptions) {
+            if (drainInFlight) {
+                pendingDrains.add(out);
+                return out;
+            }
+            drainInFlight = true;
+        }
         if (!isSupported()) {
-            out.complete(Integer.valueOf(0));
+            finishDrain(out, Integer.valueOf(0), null);
             return out;
         }
         List<HealthSubscription> subs = getSubscriptions();
         if (subs.isEmpty()) {
-            out.complete(Integer.valueOf(0));
+            finishDrain(out, Integer.valueOf(0), null);
             return out;
         }
         // The public resource resolves only once the deliveries this drain
@@ -1439,6 +1471,37 @@ public class HealthStore {
         portResult.onResult(new DrainGate(this, out));
         doDrainChanges(subs, portResult);
         return out;
+    }
+
+    /// Resolves this drain and every call that arrived while it ran.
+    ///
+    /// The coalesced callers get the same answer as the drain they waited
+    /// on, because it is the same work: reading the window a second time
+    /// would deliver every batch twice.
+    void finishDrain(AsyncResource<Integer> out, Integer value,
+            Throwable error) {
+        List<AsyncResource<Integer>> waiting;
+        synchronized (subscriptions) {
+            drainInFlight = false;
+            waiting = new ArrayList<AsyncResource<Integer>>(pendingDrains);
+            pendingDrains.clear();
+        }
+        resolve(out, value, error);
+        for (AsyncResource<Integer> pending : waiting) {
+            resolve(pending, value, error);
+        }
+    }
+
+    private static void resolve(AsyncResource<Integer> out, Integer value,
+            Throwable error) {
+        if (out.isDone()) {
+            return;
+        }
+        if (error != null) {
+            out.error(error);
+        } else {
+            out.complete(value);
+        }
     }
 
     /// Holds a drain's completion until its queued deliveries have run.
@@ -1455,7 +1518,7 @@ public class HealthStore {
         @Override
         public void onReady(Integer value, Throwable error) {
             if (error != null) {
-                out.error(error);
+                store.finishDrain(out, null, error);
                 return;
             }
             store.whenDeliveriesDrain(out, value);
@@ -1465,12 +1528,15 @@ public class HealthStore {
     /// Completes `out` once no delivery is outstanding.
     void whenDeliveriesDrain(final AsyncResource<Integer> out,
             final Integer value) {
+        boolean now;
         synchronized (subscriptions) {
-            if (pendingDeliveries <= 0) {
-                out.complete(value);
-                return;
+            now = pendingDeliveries <= 0;
+            if (!now) {
+                drainGates.add(new Object[] { out, value });
             }
-            drainGates.add(new Object[] { out, value });
+        }
+        if (now) {
+            finishDrain(out, value, null);
         }
     }
 
@@ -1485,7 +1551,9 @@ public class HealthStore {
             drainGates.clear();
         }
         for (Object[] g : ready) {
-            ((AsyncResource) g[0]).complete(g[1]);
+            // Through finishDrain, so the coalesced callers waiting behind
+            // this drain are released with it.
+            finishDrain((AsyncResource<Integer>) g[0], (Integer) g[1], null);
         }
     }
 
@@ -1659,6 +1727,12 @@ public class HealthStore {
 
     /// Guards the one-shot restore in [#ensureSubscriptionsRestored].
     private boolean subscriptionsRestored;
+    /// Whether a drain has started and not yet resolved. Guarded by
+    /// `subscriptions`.
+    private boolean drainInFlight;
+    /// Drains that arrived while one was already running.
+    private final List<AsyncResource<Integer>> pendingDrains =
+            new ArrayList<AsyncResource<Integer>>();
     /// Deliveries queued but not yet run; a drain waits for zero.
     private int pendingDeliveries;
     private final List<Object[]> drainGates = new ArrayList<Object[]>();

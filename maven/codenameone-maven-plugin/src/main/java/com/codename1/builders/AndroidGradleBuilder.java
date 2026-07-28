@@ -2048,6 +2048,23 @@ public class AndroidGradleBuilder extends Executor {
                     HealthManifestFragments.parseTypeList(readHint);
             java.util.List<String> writeTokens =
                     HealthManifestFragments.parseTypeList(writeHint);
+            // Declared, permitted, and unusable. Thirteen tokens have a
+            // Health Connect permission but no record class the bridge can
+            // read or delete, so an app declaring one shipped a health
+            // permission it could never exercise -- and Play asks what
+            // every health permission is for.
+            java.util.List<String> unreadable =
+                    HealthManifestFragments.unreadableTokens(readTokens);
+            unreadable.addAll(
+                    HealthManifestFragments.unreadableTokens(writeTokens));
+            if (!unreadable.isEmpty()) {
+                error("Health Connect support for " + unreadable
+                        + " is not implemented in this build, so declaring"
+                        + " it would request a permission the app cannot"
+                        + " use. Remove it from android.health.read /"
+                        + " android.health.write.",
+                        new RuntimeException("unsupported health token"));
+            }
             java.util.List<String> unknown =
                     HealthManifestFragments.unknownTokens(readTokens);
             unknown.addAll(HealthManifestFragments.unknownTokens(writeTokens));

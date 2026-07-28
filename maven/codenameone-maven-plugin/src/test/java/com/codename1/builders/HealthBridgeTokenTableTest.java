@@ -279,4 +279,31 @@ public class HealthBridgeTokenTableTest {
         }
         return out;
     }
+
+    /**
+     * The unreadable-token list matches what the bridge can actually map.
+     *
+     * <p>A token with a Health Connect permission but no record class
+     * produces an app carrying a health permission it can never exercise:
+     * the read fails as an invalid argument and a change subscription
+     * refuses the same token. The build rejects those, and this keeps the
+     * rejection list honest -- adding a `recordClassFor` branch without
+     * removing the token here would keep refusing a type that now works,
+     * and the reverse would let an unusable permission ship again.</p>
+     */
+    @Test
+    public void theUnreadableTokenListMatchesTheBridge() throws Exception {
+        String src = source();
+        int start = src.indexOf("private fun recordClassFor(");
+        assertTrue("the bridge must declare recordClassFor", start > 0);
+        String body = src.substring(start, src.indexOf("\n    }", start));
+        for (String token : bridgeTable().keySet()) {
+            boolean mapped = body.contains("\"" + token + "\"");
+            boolean rejected = !HealthManifestFragments.unreadableTokens(
+                    java.util.Collections.singletonList(token)).isEmpty();
+            assertEquals(token + ": a token the bridge cannot map must be"
+                    + " rejected by the build, and one it can map must not"
+                    + " be", !mapped, rejected);
+        }
+    }
 }

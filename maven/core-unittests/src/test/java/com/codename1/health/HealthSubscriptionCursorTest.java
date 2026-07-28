@@ -397,4 +397,40 @@ class HealthSubscriptionCursorTest extends UITestBase {
         public void healthDataChanged(HealthChangeBatch batch) {
         }
     }
+
+    /**
+     * Overlapping drains read the change window once.
+     *
+     * <p>Both callers used to snapshot the same anchors and enter the
+     * port's drain, so the platform read the same window twice, every
+     * batch was delivered twice, and two callbacks raced to persist the
+     * cursor. The second call now resolves alongside the first rather
+     * than starting work of its own.</p>
+     */
+    @Test
+    void overlappingDrainsAreCoalesced() throws Exception {
+        FakeHealthStore store = newStore();
+        SubscriptionRequest req = new SubscriptionRequest("coalesce")
+                .addType(HealthDataType.STEPS);
+        Collector listener = new Collector(1);
+        store.subscribe(req, listener);
+        store.batchesToFire.add(new HealthChangeBatch("coalesce",
+                req.getTypes(), samples(2), null, false,
+                HealthAnchor.of("c1"), 0L, false));
+
+        // The fake completes its drain synchronously, so the second call
+        // has to be made from inside the first to overlap it at all.
+        store.beforeDrain = new Runnable() {
+            public void run() {
+                store.drainChanges();
+            }
+        };
+        store.drainChanges();
+        waitFor(listener.latch, 5000);
+
+        assertEquals(1, store.drainCount,
+                "the second drain must not reach the port");
+        assertEquals(2, listener.seen.size(),
+                "and the batch is delivered once, not twice");
+    }
 }

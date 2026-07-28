@@ -38,6 +38,7 @@ import com.codename1.health.CategorySample;
 import com.codename1.health.HealthQuantity;
 import com.codename1.health.QuantitySample;
 import com.codename1.health.SeriesSample;
+import com.codename1.health.SessionSample;
 import com.codename1.health.SleepSample;
 import com.codename1.health.WorkoutSample;
 import com.codename1.health.nutrition.Nutrient;
@@ -241,6 +242,15 @@ public class LocalHealthStore extends HealthStore {
         copy.setId(s.getId());
         copy.setSource(s.getSource());
         copy.setRecordingMethod(s.getRecordingMethod());
+        // Title and notes live on SessionSample, above the shapes that
+        // carry them, so every per-shape branch missed them and a titled
+        // workout or sleep session lost both the moment it was written.
+        if (s instanceof SessionSample && copy instanceof SessionSample) {
+            SessionSample from = (SessionSample) s;
+            SessionSample to = (SessionSample) copy;
+            to.setTitle(from.getTitle());
+            to.setNotes(from.getNotes());
+        }
         for (Map.Entry<String, String> e : s.getMetadata().entrySet()) {
             copy.putMetadata(e.getKey(), e.getValue());
         }

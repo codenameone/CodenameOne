@@ -808,7 +808,13 @@ class CN1HealthConnectBridge(private val context: Context)
         val start = Instant.ofEpochMilli(f[2].toLong())
         val end = Instant.ofEpochMilli(f[3].toLong())
         val value = f[4].toDouble()
-        val zone = java.time.ZoneId.systemDefault().rules.getOffset(start)
+        // One offset per endpoint. Deriving both from `start` gave an
+        // interval crossing a daylight-saving transition the wrong local
+        // time at its end, which is exactly the metadata Health Connect
+        // keeps these for.
+        val rules = java.time.ZoneId.systemDefault().rules
+        val zone = rules.getOffset(start)
+        val endZone = rules.getOffset(end)
         // Field 6 is the portable RecordingMethod. Dropping it stored every
         // sample with the platform default, so other health apps could not
         // tell a value the user typed from one a device measured -- which
@@ -816,34 +822,34 @@ class CN1HealthConnectBridge(private val context: Context)
         val meta = metadataFor(if (f.size > 6) f[6] else "")
         return when (token) {
             "steps" -> StepsRecord(startTime = start, endTime = end,
-                startZoneOffset = zone, endZoneOffset = zone,
+                startZoneOffset = zone, endZoneOffset = endZone,
                 count = value.toLong(), metadata = meta)
 
             // Only the generic distance type is written. Writing a
             // cycling distance as a bare DistanceRecord would erase the
             // modality, and it would read back as walking distance.
             "distance_walking_running" -> DistanceRecord(startTime = start,
-                endTime = end, startZoneOffset = zone, endZoneOffset = zone,
+                endTime = end, startZoneOffset = zone, endZoneOffset = endZone,
                 distance = Length.meters(value), metadata = meta)
 
             "flights_climbed" -> FloorsClimbedRecord(startTime = start,
-                endTime = end, startZoneOffset = zone, endZoneOffset = zone,
+                endTime = end, startZoneOffset = zone, endZoneOffset = endZone,
                 floors = value, metadata = meta)
 
             "elevation_gained" -> ElevationGainedRecord(startTime = start,
-                endTime = end, startZoneOffset = zone, endZoneOffset = zone,
+                endTime = end, startZoneOffset = zone, endZoneOffset = endZone,
                 elevation = Length.meters(value), metadata = meta)
 
             "active_energy" -> ActiveCaloriesBurnedRecord(startTime = start,
-                endTime = end, startZoneOffset = zone, endZoneOffset = zone,
+                endTime = end, startZoneOffset = zone, endZoneOffset = endZone,
                 energy = Energy.kilocalories(value), metadata = meta)
 
             "wheelchair_pushes" -> WheelchairPushesRecord(startTime = start,
-                endTime = end, startZoneOffset = zone, endZoneOffset = zone,
+                endTime = end, startZoneOffset = zone, endZoneOffset = endZone,
                 count = value.toLong(), metadata = meta)
 
             "hydration" -> HydrationRecord(startTime = start, endTime = end,
-                startZoneOffset = zone, endZoneOffset = zone,
+                startZoneOffset = zone, endZoneOffset = endZone,
                 volume = Volume.liters(value), metadata = meta)
 
             "body_mass" -> WeightRecord(time = start, zoneOffset = zone,
@@ -896,7 +902,7 @@ class CN1HealthConnectBridge(private val context: Context)
             // write threw before it reached the insert.
             "heart_rate" -> HeartRateRecord(startTime = start,
                 endTime = if (end.isAfter(start)) end else start.plusMillis(1),
-                startZoneOffset = zone, endZoneOffset = zone,
+                startZoneOffset = zone, endZoneOffset = endZone,
                 samples = listOf(HeartRateRecord.Sample(time = start,
                     beatsPerMinute = value.toLong())), metadata = meta)
 

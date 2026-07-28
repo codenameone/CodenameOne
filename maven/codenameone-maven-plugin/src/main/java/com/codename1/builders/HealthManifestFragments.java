@@ -25,6 +25,7 @@ package com.codename1.builders;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -167,6 +168,48 @@ final class HealthManifestFragments {
      * dropping blanks. Tolerates whitespace and trailing commas, since the
      * value is hand-written in a properties file.
      */
+    /// Tokens with a Health Connect permission but no record class the
+    /// bridge can read or delete.
+    ///
+    /// Declaring one produced an app carrying a health permission it could
+    /// never use: the permission is granted, the read fails as an invalid
+    /// argument, and a change subscription refuses the same token. Play
+    /// asks why a permission is requested, and "we cannot actually use it"
+    /// is not an answer worth shipping.
+    ///
+    /// Kept in step with `CN1HealthConnectBridge.recordClassFor` by
+    /// `HealthBridgeTokenTableTest`, which parses the Kotlin and fails the
+    /// build when the two drift.
+    private static final Set<String> NO_RECORD_CLASS =
+            new HashSet<String>();
+
+    static {
+        NO_RECORD_CLASS.add("basal_energy");
+        NO_RECORD_CLASS.add("blood_pressure");
+        NO_RECORD_CLASS.add("dietary_energy");
+        NO_RECORD_CLASS.add("distance_cycling");
+        NO_RECORD_CLASS.add("distance_swimming");
+        NO_RECORD_CLASS.add("exercise_time");
+        NO_RECORD_CLASS.add("heart_rate_variability_sdnn");
+        NO_RECORD_CLASS.add("intermenstrual_bleeding");
+        NO_RECORD_CLASS.add("menstruation_flow");
+        NO_RECORD_CLASS.add("mindful_session");
+        NO_RECORD_CLASS.add("nutrition");
+        NO_RECORD_CLASS.add("waist_circumference");
+        NO_RECORD_CLASS.add("walking_heart_rate_average");
+    }
+
+    /// The declared tokens this build cannot service on Android.
+    static List<String> unreadableTokens(List<String> tokens) {
+        List<String> out = new ArrayList<String>();
+        for (String t : tokens) {
+            if (NO_RECORD_CLASS.contains(t) && !out.contains(t)) {
+                out.add(t);
+            }
+        }
+        return out;
+    }
+
     /// Whether `android.topDependency` declares a `kotlin-gradle-plugin`
     /// at all, however it spells the version.
     ///

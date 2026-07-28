@@ -110,9 +110,20 @@ public class FakeHealthStore extends HealthStore {
         out.complete(r);
     }
 
+    /// How many times the port's drain was actually entered.
+    public int drainCount;
+    /// Run on entry to the port drain, so a test can overlap two calls.
+    public Runnable beforeDrain;
+
     @Override
     protected void doDrainChanges(List<HealthSubscription> subscriptions,
             AsyncResource<Integer> out) {
+        drainCount++;
+        if (beforeDrain != null) {
+            Runnable r = beforeDrain;
+            beforeDrain = null;
+            r.run();
+        }
         int n = 0;
         for (HealthChangeBatch b : batchesToFire) {
             fireChanges(b);
