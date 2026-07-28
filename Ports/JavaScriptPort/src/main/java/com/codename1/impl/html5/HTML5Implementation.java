@@ -7433,8 +7433,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         }
 
-        final boolean fuseBlobHandler = useBlobHandler;
-        
         String buttonText = null;
         //String icon = null;
         if (useBlobHandler) {
@@ -7444,6 +7442,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             nativeButton.setMaterialIcon(FontImage.MATERIAL_SAVE);
         } else if (hasScheme(url, "data")) {
             registerSaveBlobHandlerDataUrl(fileName == null ? "download":fileName, url);
+            // A handler is registered now, exactly as in the Blob case, so the
+            // download path below must FIRE it. Leaving this false sent the
+            // confirmed OK to window.open() on the data: URL instead -- a tab
+            // rather than the download the Sheet advertised, and nothing at all
+            // where the browser blocks top-level data: navigation.
+            useBlobHandler = true;
             //popover.setContents("<button style='white-space:nowrap' onclick='window.cn1SaveBlobHandler();'><span style='font-size:3em;vertical-align:text-bottom;' class='glyphicon glyphicon-download; font-size: '/><span style='font-size:2em;vertical-align:top;'> Download "+(fileName!=null?fileName:"File")+"</span></button>");
             buttonText = "Click to Download "+(fileName!=null?fileName:"File");
             nativeButton.setText(buttonText);
@@ -7470,6 +7474,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
             openInNewWindowWithConfirmation(url, "Open this link?");
             return;
         }
+        // Captured after the chain: the data: branch registers a handler too,
+        // and capturing before it read false for that case.
+        final boolean fuseBlobHandler = useBlobHandler;
         final Runnable startDownload = new Runnable() {
             @Override
             public void run() {
