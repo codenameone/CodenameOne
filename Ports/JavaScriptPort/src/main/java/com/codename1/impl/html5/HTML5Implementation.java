@@ -6806,7 +6806,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     + "var cn1w = (!cn1a || cn1a.isActive) ? window.open(" + literal + ", '_blank') : null;"
                     + "if (!cn1w) { window.location.href = " + literal + "; }";
         } else {
-            script = guard + "window.open(" + literal + ", '_blank');";
+            // Report a blocked popup instead of returning as if it opened. The
+            // page-side null is the only evidence available -- there is no
+            // callback -- so turn it into a throw the host call propagates.
+            script = guard + "var cn1w = window.open(" + literal + ", '_blank');"
+                    + "if (!cn1w) { throw new Error('cn1: popup blocked'); }";
         }
         try {
             eval_(script);
@@ -6844,11 +6848,24 @@ public class HTML5Implementation extends CodenameOneImplementation {
             rest = url.substring(2);
         } else {
             int schemeEnd = url.indexOf("://");
-            if (schemeEnd < 0) {
-                // No authority to protect (mailto:, tel:, a bare storage path).
-                return ellipsizeTail(url);
+            if (schemeEnd >= 0) {
+                rest = url.substring(schemeEnd + 3);
+            } else {
+                int colon = url.indexOf(':');
+                if (colon > 0 && isSpecialScheme(url.substring(0, colon))) {
+                    // A special scheme tolerates missing slashes: browsers parse
+                    // http:host/path, and even http:/host/path, with host as the
+                    // authority. Without this the slashless form would skip the
+                    // parsing below and display its leading user info.
+                    rest = url.substring(colon + 1);
+                    while (rest.startsWith("/")) {
+                        rest = rest.substring(1);
+                    }
+                } else {
+                    // No authority to protect (mailto:, tel:, a bare path).
+                    return ellipsizeTail(url);
+                }
             }
-            rest = url.substring(schemeEnd + 3);
         }
         int authorityEnd = rest.length();
         for (int i = 0; i < rest.length(); i++) {
@@ -6882,6 +6899,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // A lone trailing "/" is not worth an ellipsis.
         boolean hasPath = rest.length() - authorityEnd > 1;
         return hasPath ? authority + "/" + DISPLAY_URL_ELLIPSIS : authority;
+    }
+
+    /**
+     * The WHATWG URL "special" schemes, which browsers parse with an authority
+     * even when the {@code //} is missing.
+     */
+    private static boolean isSpecialScheme(String scheme) {
+        return "http".equalsIgnoreCase(scheme)
+                || "https".equalsIgnoreCase(scheme)
+                || "ws".equalsIgnoreCase(scheme)
+                || "wss".equalsIgnoreCase(scheme)
+                || "ftp".equalsIgnoreCase(scheme);
     }
 
     /**
@@ -6950,6 +6979,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private boolean isGestureBackedHookAvailable() {
         return backsideHooksSemaphore > 0;
     }
+
+    /**
+     * Popup opens queued on a backside hook but not yet drained.
+     *
+     * <p>The semaphore counts pending drains, not unconsumed popup
+     * authorization. One gesture authorizes ONE {@code window.open()}: the
+     * first consumes the transient activation, so a second queued behind the
+     * same gesture drains in the same batch and is blocked. Only ever reserve a
+     * pending gesture for a single popup and send the rest to the Sheet, which
+     * earns them a gesture of their own.</p>
+     */
+    private int pendingPopupOpens;
 
     /**
      * True when the URL names something the browser itself can hand off, as
@@ -7046,11 +7087,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * worse than the Sheet.</p>
      */
     private void openInNewWindowWithConfirmation(final String url, String prompt) {
-        if (isGestureBackedHookAvailable()) {
+        if (isGestureBackedHookAvailable() && pendingPopupOpens == 0) {
+            pendingPopupOpens++;
             addBacksideHook(new JSRunnable() {
                 @Override
                 public void run() {
-                    openUrlOnMainThread(url, false, false);
+                    try {
+                        if (!openUrlOnMainThread(url, false, false)) {
+                            _log("execute(): popup blocked for " + url);
+                        }
+                    } finally {
+                        pendingPopupOpens--;
+                    }
                 }
             });
             return;
