@@ -1565,10 +1565,19 @@ public class AndroidGradleBuilder extends Executor {
                         // the build for BLE-only apps over Health Connect
                         // hints they have no use for. The usesClassMethod
                         // hook below decides for the facade.
+                        // Naming a class is not using the store. A
+                        // sensor-only app implements SensorSampleListener,
+                        // which puts HealthSample in its signature, and the
+                        // documented heart-rate example reads a value off a
+                        // QuantitySample -- both live outside the sensors
+                        // subpackage, so demanding Health Connect types and
+                        // a privacy-policy URL of a BLE-only app was the
+                        // exact failure the sensors exemption exists to
+                        // prevent. Store *calls* count, and the
+                        // usesClassMethod hook below sees those.
                         if (cls.indexOf("com/codename1/health/sensors/") != 0
-                                && !"com/codename1/health/Health".equals(cls)) {
-                            // Anything outside the sensors subpackage means
-                            // a real platform health store is in play.
+                                && !"com/codename1/health/Health".equals(cls)
+                                && !isSharedHealthModel(cls)) {
                             usesHealthStore = true;
                             usesHealthData = true;
                         }
@@ -2031,19 +2040,13 @@ public class AndroidGradleBuilder extends Executor {
                         + HealthManifestFragments.knownTokens(),
                         new RuntimeException("android.health.write unset"));
             }
-            // A workout is its own data type, so a declaration of some
-            // other type satisfies the emptiness checks above while the
-            // manifest still gets neither READ_EXERCISE nor WRITE_EXERCISE
-            // and every workout call is unauthorized at runtime.
-            if (usesHealthWorkout && !(readTypes.contains("workout")
-                    && writeTypes.contains("workout"))) {
-                error("This app uses the workout API, which reads and "
-                        + "writes exercise data, but does not declare the "
-                        + "workout type. Add it to both lists:\n"
-                        + "  android.health.read=workout\n"
-                        + "  android.health.write=workout",
-                        new RuntimeException("workout token undeclared"));
-            }
+            // No workout-token requirement. Android never reads or writes
+            // the WORKOUT type in this release -- HealthWire excludes it
+            // from both capability tables, and a recorded workout persists
+            // only its writable child samples and marks the session record
+            // as not persisted. Demanding READ_EXERCISE and WRITE_EXERCISE
+            // would make apps request permissions no runtime path uses, and
+            // invite a Play health-data declaration for the same nothing.
             java.util.List<String> readTokens =
                     HealthManifestFragments.parseTypeList(readHint);
             java.util.List<String> writeTokens =
@@ -6579,6 +6582,26 @@ public class AndroidGradleBuilder extends Executor {
 
     private static String maxInt(String a, String b) {
         return String.valueOf(Math.max(Integer.parseInt(a), Integer.parseInt(b)));
+    }
+
+    /// Whether `cls` is a health value type rather than the store.
+    ///
+    /// These travel through the BLE sensor layer, which needs no Health
+    /// Connect permission at all: a sensor callback is handed a
+    /// HealthSample, and reading a number off it names QuantitySample and
+    /// HealthQuantity. Counting those as store access made every
+    /// documented sensor-only app fail the health-hint gate.
+    private static boolean isSharedHealthModel(String cls) {
+        return "com/codename1/health/HealthSample".equals(cls)
+                || "com/codename1/health/QuantitySample".equals(cls)
+                || "com/codename1/health/SeriesSample".equals(cls)
+                || "com/codename1/health/CategorySample".equals(cls)
+                || "com/codename1/health/HealthQuantity".equals(cls)
+                || "com/codename1/health/HealthUnit".equals(cls)
+                || "com/codename1/health/HealthDataType".equals(cls)
+                || "com/codename1/health/HealthSource".equals(cls)
+                || "com/codename1/health/RecordingMethod".equals(cls)
+                || "com/codename1/health/BloodPressureSample".equals(cls);
     }
 
     static int compareVersions(String v1, String v2) {
