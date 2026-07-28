@@ -7162,7 +7162,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 rest = url.substring(schemeEnd + 3);
                 special = isSpecialScheme(url.substring(0, schemeEnd));
             } else {
-                int colon = url.indexOf(':');
+                int colon = schemeColon(url);
                 if (colon > 0 && isSpecialScheme(url.substring(0, colon))) {
                     // A special scheme tolerates missing slashes: browsers parse
                     // http:host/path, and even http:/host/path, with host as the
@@ -7195,9 +7195,24 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // Only reached when the scheme is special; the separator
                     // skip below covers http:/host as well as http:host.
                     special = true;
-                } else {
-                    // No authority to protect (mailto:, tel:, a bare path).
+                } else if (colon > 0) {
+                    // A scheme we do not parse an authority for (mailto:, tel:).
                     return ellipsizeTail(url);
+                } else {
+                    // No scheme at all, so the browser resolves it against the
+                    // page: the destination host is the page's own, and the
+                    // text is a path under it. Returning the text alone invited
+                    // reading "evil.example" as a host when the link goes to
+                    // <page host>/evil.example.
+                    String host = mainLocationPart("host");
+                    if (host == null || host.length() == 0) {
+                        return ellipsizeTail(url);
+                    }
+                    String path = url.startsWith("/") ? url : "/" + url;
+                    String combined = host + path;
+                    return combined.length() <= MAX_DISPLAY_URL_LENGTH
+                            ? combined
+                            : host + "/" + DISPLAY_URL_ELLIPSIS;
                 }
             }
         }
@@ -7248,6 +7263,32 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
+     * Index of the colon terminating a syntactically valid scheme, or -1 when
+     * the string carries none.
+     *
+     * <p>Shared so "does this have a scheme" is answered once. A colon inside a
+     * path -- {@code /host:8443/p}, {@code ./user:pw@host} -- is not one, and
+     * treating it as one made those read as unparsed schemes rather than as the
+     * page-relative references they are.</p>
+     */
+    private static int schemeColon(String url) {
+        int colon = url.indexOf(':');
+        if (colon < 1) {
+            return -1;
+        }
+        // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ), per RFC 3986.
+        for (int i = 0; i < colon; i++) {
+            char c = url.charAt(i);
+            boolean alpha = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+            boolean extra = i > 0 && ((c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.');
+            if (!alpha && !extra) {
+                return -1;
+            }
+        }
+        return colon;
+    }
+
+    /**
      * The page's own scheme, without the trailing colon, or null if unreadable.
      */
     private static String pageScheme() {
@@ -7273,7 +7314,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 || "https".equalsIgnoreCase(scheme)
                 || "ws".equalsIgnoreCase(scheme)
                 || "wss".equalsIgnoreCase(scheme)
-                || "ftp".equalsIgnoreCase(scheme);
+                || "ftp".equalsIgnoreCase(scheme)
+                // Special for PARSING, which is all this governs. Routing still
+                // sends file: to storage -- see isExternalUrl() -- but when one
+                // does reach the Sheet, file:\\\\host/p carries a real authority
+                // and must be read as one.
+                || "file".equalsIgnoreCase(scheme);
     }
 
     /**
@@ -7453,24 +7499,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // Scheme relative -- the page's own scheme applies.
             return true;
         }
-        int colon = url.indexOf(':');
         // RFC 3986 allows a single ALPHA scheme, so x:payload is a legitimate
-        // deep link. The usual reason to demand two characters is to avoid
-        // reading a Windows drive letter as a scheme, which cannot arise here:
-        // getFileSystemSeparator() is '/' on this port, so no storage path it
-        // hands us is drive qualified.
+        // deep link. A colon inside a path is not a scheme -- schemeColon()
+        // holds that grammar for every caller.
+        int colon = schemeColon(url);
         if (colon < 1) {
             return false;
-        }
-        // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ), per RFC 3986. A
-        // path that merely happens to contain a colon fails this.
-        for (int i = 0; i < colon; i++) {
-            char c = url.charAt(i);
-            boolean alpha = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-            boolean extra = i > 0 && ((c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.');
-            if (!alpha && !extra) {
-                return false;
-            }
         }
         // equalsIgnoreCase rather than toLowerCase(): case folding a scheme
         // through the default locale turns "FILE" into "fIle" under a Turkish
