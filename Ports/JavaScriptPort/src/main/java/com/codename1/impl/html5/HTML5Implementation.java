@@ -663,12 +663,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
             public void onTimer() {
                 backsideHooksSemaphore--;
                 //_log("Decrementing backsideHooksSemaphore: "+backsideHooksSemaphore);
-                if (backsideHooksSemaphore <= 0) {
-                    // Every delayed drain scheduled off that interaction has
-                    // run, so whatever activation it granted is spent. The next
-                    // popup has to earn a gesture of its own.
-                    popupReservedForGesture = false;
-                }
                 runBacksideHooks();
             }
         }, timeout);
@@ -746,6 +740,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private native static int _safariBacksideHookDelay();
     
     private void installBacksideHooksInUserInteraction() {
+        // A distinct interaction, so a popup reserved against the previous one
+        // no longer applies -- see popupReservedForGeneration.
+        gestureGeneration++;
         if (isIOS() || isSafari()) {
             debugLog("Installing backside hooks with delay "+safariBacksideHookDelay());
             runBacksideHooksInTimeout(safariBacksideHookDelay());
@@ -6847,15 +6844,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return "";
         }
         String rest;
+        // Special URLs also accept "\\" wherever they accept "/", so the
+        // authority ends there too -- otherwise https://evil.example\\<long
+        // trusted looking path> reads as one over-long authority and the tail
+        // rule below would show the attacker's suffix instead of the host.
+        boolean special;
         if (url.startsWith("//")) {
             // Protocol relative. isExternalUrl() accepts these, so they reach
             // the Sheet and carry an authority that needs the same parsing --
-            // indexOf("://") does not find one.
+            // indexOf("://") does not find one. The page's own scheme applies,
+            // which for a served app is http(s), so treat it as special.
             rest = url.substring(2);
+            special = true;
         } else {
             int schemeEnd = url.indexOf("://");
             if (schemeEnd >= 0) {
                 rest = url.substring(schemeEnd + 3);
+                special = isSpecialScheme(url.substring(0, schemeEnd));
             } else {
                 int colon = url.indexOf(':');
                 if (colon > 0 && isSpecialScheme(url.substring(0, colon))) {
@@ -6864,9 +6869,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // authority. Without this the slashless form would skip the
                     // parsing below and display its leading user info.
                     rest = url.substring(colon + 1);
-                    while (rest.startsWith("/")) {
+                    while (rest.startsWith("/") || rest.startsWith("\\")) {
                         rest = rest.substring(1);
                     }
+                    // Only reached when the scheme is special.
+                    special = true;
                 } else {
                     // No authority to protect (mailto:, tel:, a bare path).
                     return ellipsizeTail(url);
@@ -6876,7 +6883,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         int authorityEnd = rest.length();
         for (int i = 0; i < rest.length(); i++) {
             char c = rest.charAt(i);
-            if (c == '/' || c == '?' || c == '#') {
+            if (c == '/' || c == '?' || c == '#' || (special && c == '\\')) {
                 authorityEnd = i;
                 break;
             }
@@ -6987,21 +6994,28 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
-     * Whether the gesture currently represented by {@link #backsideHooksSemaphore}
-     * has already had a popup queued against it.
-     *
-     * <p>The semaphore counts pending drains, not unconsumed popup
-     * authorization. One gesture authorizes ONE {@code window.open()} -- the
-     * first consumes the transient activation -- yet
-     * {@code installBacksideHooksInUserInteraction()} schedules three drains
-     * (300ms, 1500ms, 5000ms) off a single interaction. Releasing the
-     * reservation when the first of those runs would let a later execute() read
-     * one of the remaining drains as a fresh gesture and queue a popup whose
-     * activation is already spent. So hold the reservation until the whole burst
-     * has expired, i.e. the semaphore falls back to zero, and send everything
-     * else to the Sheet, which earns a gesture of its own.</p>
+     * Identifies the user interaction currently in play. Bumped by
+     * {@link #installBacksideHooksInUserInteraction()}, which runs once per
+     * pointer or key event.
      */
-    private boolean popupReservedForGesture;
+    private int gestureGeneration;
+
+    /**
+     * The {@link #gestureGeneration} that has already had a popup queued
+     * against it, or -1.
+     *
+     * <p>One interaction authorizes ONE {@code window.open()}: the first
+     * consumes the transient activation, so anything else queued behind the
+     * same interaction is blocked. The count of pending drains cannot express
+     * this -- a single interaction schedules three (300ms, 1500ms, 5000ms), and
+     * a second interaction within five seconds raises the shared semaphore
+     * again before the first one's drains have run, so neither "the first drain
+     * ran" nor "the semaphore reached zero" marks a gesture boundary. Comparing
+     * generations does: a genuinely new interaction gets its own popup, while
+     * everything else in the same one goes to the Sheet and earns a gesture of
+     * its own.</p>
+     */
+    private int popupReservedForGeneration = -1;
 
     /**
      * True when {@code url} carries exactly {@code scheme}, compared without
@@ -7098,11 +7112,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * worse than the Sheet.</p>
      */
     private void openInNewWindowWithConfirmation(final String url, String prompt) {
-        if (isGestureBackedHookAvailable() && !popupReservedForGesture) {
-            // Held until the gesture's whole drain burst expires -- see the
-            // field. Not released here, where the first drain would free it
-            // while later drains from the same interaction are still pending.
-            popupReservedForGesture = true;
+        if (isGestureBackedHookAvailable() && popupReservedForGeneration != gestureGeneration) {
+            // Tied to the interaction rather than to any drain of it -- see the
+            // field. Never cleared; the next interaction simply carries a
+            // different generation.
+            popupReservedForGeneration = gestureGeneration;
             addBacksideHook(new JSRunnable() {
                 @Override
                 public void run() {
