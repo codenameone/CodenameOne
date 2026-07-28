@@ -7020,9 +7020,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // trusted looking path> reads as one over-long authority and the tail
         // rule below would show the attacker's suffix instead of the host.
         boolean special;
-        if (url.startsWith("//")) {
-            // Protocol relative. isExternalUrl() accepts these, so they reach
-            // the Sheet and carry an authority that needs the same parsing --
+        if (startsWithAuthorityMarker(url)) {
+            // Scheme relative. isExternalUrl() accepts these, so they reach the
+            // Sheet and carry an authority that needs the same parsing --
             // indexOf("://") does not find one. The page's own scheme applies,
             // which for a served app is http(s), so treat it as special.
             rest = url.substring(2);
@@ -7233,6 +7233,27 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
+     * True when the string opens with two path separators, which makes it
+     * scheme relative: the browser reads what follows as an authority.
+     *
+     * <p>Any combination of {@code /} and {@code \\} counts, because a special
+     * base URL -- and an app served over http(s) always has one -- treats them
+     * alike. So {@code \\\\host/p}, {@code \\/host/p} and {@code /\\host/p} all
+     * navigate to {@code host} exactly as {@code //host/p} does.</p>
+     *
+     * <p>Shared by every place that has to agree on where an authority starts:
+     * classification, the storage gate and the confirmation display. Answering
+     * this question separately in each is what let earlier authority shapes be
+     * fixed in one and missed in another.</p>
+     */
+    private static boolean startsWithAuthorityMarker(String url) {
+        return url.length() >= 2
+                && (url.charAt(0) == '/' || url.charAt(0) == '\\')
+                && (url.charAt(1) == '/' || url.charAt(1) == '\\');
+    }
+
+    /**
+     * True when {@code url} carries exactly {@code scheme}, compared without    /**
      * True when {@code url} carries exactly {@code scheme}, compared without
      * regard to case since URI schemes are case-insensitive. Guards the
      * {@code javascript:} and {@code data:} branches of {@link #execute(String)},
@@ -7271,7 +7292,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * unambiguous and skip the lookup that would have found it.</p>
      */
     private static boolean isUnambiguousBrowserUrl(String url) {
-        if (url.startsWith("//")) {
+        if (startsWithAuthorityMarker(url)) {
             return true;
         }
         int sep = url.indexOf("://");
@@ -7300,8 +7321,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * scheme at all, it names local content.</p>
      */
     private static boolean isExternalUrl(String url) {
-        if (url.startsWith("//")) {
-            // Protocol relative -- the page's own scheme applies.
+        if (startsWithAuthorityMarker(url)) {
+            // Scheme relative -- the page's own scheme applies.
             return true;
         }
         int colon = url.indexOf(':');
