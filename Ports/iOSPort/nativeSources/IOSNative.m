@@ -8584,7 +8584,7 @@ void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(CN1_T
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioUnit___java_lang_String_int_float_float_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
     JAVA_OBJECT path, JAVA_INT audioChannels, JAVA_FLOAT sampleRate, JAVA_OBJECT sampleBuffer) {
-#if defined(INCLUDE_MICROPHONE_USAGE) && !TARGET_OS_TV
+#if defined(INCLUDE_MICROPHONE_USAGE) && !TARGET_OS_TV && !TARGET_OS_WATCH
         __block CN1AudioUnit* recorder = nil;
          
         __block NSString *exStr = nil;
