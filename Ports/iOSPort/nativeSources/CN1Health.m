@@ -214,6 +214,33 @@ static void cn1hkReportError(JAVA_INT requestId, int code, NSString *msg) {
         fromNSString(getThreadLocalData(), msg));
 }
 
+// The portable code for a HealthKit error.
+//
+// The distinction that matters most here is retryable versus not. The
+// store is encrypted at rest and unreadable before the device's first
+// unlock -- exactly when a background drain runs -- and reporting that as
+// a denial sends the user to the permission screen for a condition that
+// will clear on its own, or makes an app discard buffered sensor and
+// workout data it should simply have written again a moment later.
+//
+// Anything unrecognised stays UNKNOWN rather than being guessed at: the
+// shared layer treats that as a plain failure, which is the honest answer
+// for an error this build has never seen.
+static int cn1hkErrorCode(NSError *error) {
+    if (error == nil) {
+        return CN1_HK_ERR_UNKNOWN;
+    }
+    switch ([error code]) {
+        case HKErrorDatabaseInaccessible:
+            return CN1_HK_ERR_DATABASE_INACCESSIBLE;
+        case HKErrorAuthorizationDenied:
+        case HKErrorAuthorizationNotDetermined:
+            return CN1_HK_ERR_AUTH_DENIED;
+        default:
+            return CN1_HK_ERR_UNKNOWN;
+    }
+}
+
 // ---------------------------------------------------------------------
 // Natives
 // ---------------------------------------------------------------------
@@ -294,7 +321,7 @@ com_codename1_impl_ios_IOSNative_hkRequestAuthorization___int_java_lang_String_1
                 com_codename1_impl_ios_IOSHealth_nativeHkAuthorizationResult___int_boolean_int_java_lang_String(
                     getThreadLocalData(), rid,
                     success ? JAVA_TRUE : JAVA_FALSE,
-                    error == nil ? -1 : CN1_HK_ERR_AUTH_DENIED,
+                    error == nil ? -1 : cn1hkErrorCode(error),
                     error == nil ? JAVA_NULL
                         : fromNSString(getThreadLocalData(),
                                        [error localizedDescription]));
@@ -318,9 +345,8 @@ static void cn1hkRunSampleQuery(JAVA_INT rid, NSString *portableId,
             // A locked device makes the store unreadable, which is
             // exactly when a background observer fires. It must stay
             // distinguishable from "no data" so callers can retry.
-            int code = ([error code] == HKErrorDatabaseInaccessible)
-                ? CN1_HK_ERR_DATABASE_INACCESSIBLE : CN1_HK_ERR_UNKNOWN;
-            cn1hkReportError(rid, code, [error localizedDescription]);
+            cn1hkReportError(rid, cn1hkErrorCode(error),
+                [error localizedDescription]);
             [portableId release];
             return;
         }
@@ -421,9 +447,8 @@ com_codename1_impl_ios_IOSNative_hkQuerySamples___int_java_lang_String_double_do
              completionHandler:^(HKSourceQuery *q, NSSet *sources,
                                  NSError *error) {
             if (error != nil) {
-                int code = ([error code] == HKErrorDatabaseInaccessible)
-                    ? CN1_HK_ERR_DATABASE_INACCESSIBLE : CN1_HK_ERR_UNKNOWN;
-                cn1hkReportError(rid, code, [error localizedDescription]);
+                cn1hkReportError(rid, cn1hkErrorCode(error),
+                    [error localizedDescription]);
                 [portableId release];
                 [wantedSources release];
                 return;
@@ -505,7 +530,11 @@ void com_codename1_impl_ios_IOSNative_hkSaveSamples___int_java_lang_String(
         [cn1hkStore saveObjects:samples withCompletion:
             ^(BOOL success, NSError *error) {
             if (!success) {
-                cn1hkReportError(rid, CN1_HK_ERR_AUTH_DENIED,
+                // Every failure used to be reported as a denial, so a
+                // save attempted before first unlock sent the app to the
+                // permission screen -- or made it discard buffered sensor
+                // and workout data -- for a condition that clears itself.
+                cn1hkReportError(rid, cn1hkErrorCode(error),
                     error ? [error localizedDescription] : @"save failed");
             } else {
                 com_codename1_impl_ios_IOSHealth_nativeHkSaveResult___int_java_lang_String(
