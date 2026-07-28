@@ -438,11 +438,17 @@ class WatchNativeBuilder {
         // previously emitted none, so a health-enabled watch app would fail at
         // runtime on the richest HealthKit target of all -- the watch is where
         // heart rate and workouts actually come from.
-        String healthShare = request.getArg("ios.NSHealthShareUsageDescription", null);
+        // Trimmed, and empty counts as absent -- the phone builder already
+        // works this way. A whitespace-only hint used to emit a blank
+        // purpose string that satisfied the check below, producing an
+        // entitled watch bundle whose disclosure said nothing.
+        String healthShare = trimToNull(request.getArg(
+                "ios.NSHealthShareUsageDescription", null));
         if (healthShare != null) {
             plistString(sb, "NSHealthShareUsageDescription", healthShare);
         }
-        String healthUpdate = request.getArg("ios.NSHealthUpdateUsageDescription", null);
+        String healthUpdate = trimToNull(request.getArg(
+                "ios.NSHealthUpdateUsageDescription", null));
         if (healthUpdate != null) {
             plistString(sb, "NSHealthUpdateUsageDescription", healthUpdate);
         }
@@ -454,6 +460,19 @@ class WatchNativeBuilder {
               .append("    </array>\n");
         }
         sb.append("</dict>\n</plist>\n");
+        // A workout session is HealthKit, so asking for one while opting
+        // out of HealthKit cannot be honoured either way round: the plist
+        // still declares the workout-processing background mode while the
+        // bundle goes unentitled, and the session fails at runtime.
+        if ("false".equalsIgnoreCase(healthHint)
+                && "true".equalsIgnoreCase(workoutProcessingHint)) {
+            owner.error("watchNative.health=false contradicts"
+                    + " watchNative.health.workoutProcessing=true. A"
+                    + " workout session is HealthKit, so the watch cannot"
+                    + " record one without the entitlement. Drop one of"
+                    + " the two hints.",
+                    new RuntimeException("contradictory watch health hints"));
+        }
         boolean watchHealth =
                 watchUsesHealth(healthShare != null || healthUpdate != null);
         if (needsPurposeString(watchHealth, healthShare, healthUpdate)) {
@@ -474,6 +493,15 @@ class WatchNativeBuilder {
         writeWatchEntitlements(request, appSrcDir, watchHealth);
         File plist = new File(appSrcDir, request.getMainClass() + "-Watch-Info.plist");
         owner.createFile(plist, sb.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** The value with surrounding space removed, or null when empty. */
+    static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.length() == 0 ? null : trimmed;
     }
 
     /**

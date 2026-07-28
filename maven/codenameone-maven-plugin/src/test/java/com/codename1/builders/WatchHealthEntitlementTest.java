@@ -26,6 +26,8 @@ import com.codename1.builders.BuildRequest;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -112,5 +114,25 @@ public class WatchHealthEntitlementTest {
         assertFalse(WatchNativeBuilder.needsPurposeString(true, null, "Writes"));
         // Not entitled, so nothing to disclose.
         assertFalse(WatchNativeBuilder.needsPurposeString(false, null, null));
+    }
+
+    /**
+     * A whitespace-only purpose string is no purpose string.
+     *
+     * <p>The phone builder already trims these. Here a blank hint emitted
+     * an empty {@code NSHealthShareUsageDescription} and satisfied the
+     * check that exists to stop an entitled watch shipping without a
+     * disclosure.</p>
+     */
+    @Test
+    void aBlankPurposeStringCountsAsMissing() {
+        assertNull(WatchNativeBuilder.trimToNull("   "));
+        assertNull(WatchNativeBuilder.trimToNull(""));
+        assertNull(WatchNativeBuilder.trimToNull(null));
+        assertEquals("Reads workouts",
+                WatchNativeBuilder.trimToNull("  Reads workouts  "));
+        assertTrue(WatchNativeBuilder.needsPurposeString(true,
+                WatchNativeBuilder.trimToNull("   "),
+                WatchNativeBuilder.trimToNull(null)));
     }
 }
