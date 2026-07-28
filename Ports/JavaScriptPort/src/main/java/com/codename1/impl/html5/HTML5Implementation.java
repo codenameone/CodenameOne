@@ -7116,33 +7116,38 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
-     * True for schemes that unambiguously address the browser, so offering the
-     * string to local storage first would be pointless.
+     * True when the string cannot plausibly be a storage key, so the storage
+     * lookup in {@link #execute(String)} can be skipped.
      *
-     * <p>Everything else is offered to storage first, because a stored key can
-     * be scheme-shaped: {@code report:2026.pdf} is a file, not a URI, and was
-     * downloadable before {@link #isExternalUrl(String)} began classifying by
-     * grammar. Custom deep links pass through unharmed -- {@code imdb:///find}
-     * simply is not in storage, so the lookup misses and classification
-     * proceeds.</p>
+     * <p>That means it opens with {@code //}, or with a SPECIAL scheme followed
+     * by {@code //}. Nobody names a stored file {@code https://example.com/x},
+     * and those are the overwhelming majority of links, so the common path pays
+     * nothing. Every other shape is offered to storage first -- slashless forms
+     * like {@code https:report.pdf} and {@code report:2026.pdf}, which a browser
+     * would happily parse as URLs but which a caller may just as legitimately
+     * have stored under that name, and also {@code file:///x} and custom
+     * {@code myapp://x}, which named local content or could be a key. Storage
+     * only wins if the key actually exists; a miss falls through to
+     * classification, so deep links are unaffected.</p>
+     *
+     * <p>Deciding this by scheme allowlist instead was wrong twice over: it
+     * regressed {@code report:2026.pdf}, then still regressed
+     * {@code https:report.pdf}. Ambiguity is a property of the shape, not of
+     * the scheme name.</p>
      */
-    private static boolean isBrowserOnlyScheme(String url) {
+    private static boolean isUnambiguousBrowserUrl(String url) {
         if (url.startsWith("//")) {
             return true;
         }
-        int colon = url.indexOf(':');
-        if (colon < 1) {
+        int sep = url.indexOf("://");
+        if (sep < 1) {
             return false;
         }
-        String scheme = url.substring(0, colon);
-        return isSpecialScheme(scheme)
-                || "mailto".equalsIgnoreCase(scheme)
-                || "tel".equalsIgnoreCase(scheme)
-                || "sms".equalsIgnoreCase(scheme)
-                || "data".equalsIgnoreCase(scheme)
-                || "blob".equalsIgnoreCase(scheme)
-                || "about".equalsIgnoreCase(scheme)
-                || "javascript".equalsIgnoreCase(scheme);
+        // Special schemes only. file:///x names local content, and a custom
+        // myapp://x could be a key as easily as a deep link; both were reaching
+        // the lookup before this branch and still should. What this skips is
+        // ordinary web links, which are the volume and are never keys.
+        return isSpecialScheme(url.substring(0, sep));
     }
 
     /**
@@ -7316,14 +7321,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
         String fileName = null;
         boolean useBlobHandler = false;
         Button nativeButton = new Button();
-        // Storage wins for anything that could name a key. Classifying by
-        // scheme grammar alone would skip the lookup for a stored file called
-        // report:2026.pdf, which is scheme-shaped but is a file; only the
-        // unambiguously browser-bound schemes skip it, so an ordinary link does
-        // not pay for a storage round trip. Looked up under the path exactly as
-        // given, since a key may legitimately open or close with a space and
-        // nothing here is parsed by the browser.
-        if (!isBrowserOnlyScheme(url) && exists(rawUrl)) {
+        // Storage wins for anything that could name a key -- a stored file may
+        // be called report:2026.pdf or https:report.pdf, both of which a
+        // browser would read as URLs. Only shapes that cannot be a key skip the
+        // lookup, since exists() costs up to two IndexedDB reads and ordinary
+        // https://... links should not pay for them. Looked up under the path
+        // exactly as given: a key may legitimately open or close with a space,
+        // and nothing here is parsed by the browser.
+        if (!isUnambiguousBrowserUrl(url) && exists(rawUrl)) {
             try {
                 Blob blob = openFileAsBlob(rawUrl);
                 char sep = getFileSystemSeparator();
