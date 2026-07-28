@@ -140,4 +140,48 @@ public class HealthScannerParityTest {
                 "the class-name branch must not set usesHealthData; it is"
                         + " set by the read and write call hooks");
     }
+
+    /**
+     * Both builders generate background-listener bindings.
+     *
+     * <p>iOS left {@code implementsInterface} empty on the reasoning that
+     * only Health Connect delivery survives process death. Cold launches
+     * do too: a restored subscription carries only the listener's class
+     * name, and without generated bindings the runtime cannot turn that
+     * back into an instance -- so even a manual {@code drainChanges()}
+     * after a restart delivered nothing at all.</p>
+     */
+    @Test
+    void bothBuildersGenerateListenerBindings() throws Exception {
+        for (String builder : new String[] {"AndroidGradleBuilder",
+                "IPhoneBuilder"}) {
+            String src = source(builder);
+            assertTrue(src.contains(
+                    "com/codename1/health/HealthBackgroundListener"),
+                    builder + " must collect background listeners");
+            assertTrue(src.contains("HealthListenerBindings.generate("),
+                    builder + " must generate the bindings");
+            assertTrue(src.contains("installStatement("),
+                    builder + " must install them at startup");
+        }
+    }
+
+    /**
+     * The HealthKit background-delivery entitlement is not inferred from
+     * polling calls.
+     *
+     * <p>Neither {@code subscribe()} nor {@code drainChanges()} registers
+     * an {@code HKObserverQuery}, so the entitlement they used to trigger
+     * bought nothing while demanding a provisioning-profile capability --
+     * and getting that wrong fails codesign with an opaque message.</p>
+     */
+    @Test
+    void backgroundDeliveryEntitlementComesOnlyFromTheHint()
+            throws Exception {
+        String src = source("IPhoneBuilder");
+        assertFalse(src.contains("usesHealthObserver"),
+                "the inferred observer flag should be gone");
+        assertTrue(src.contains("ios.health.backgroundDelivery"),
+                "the explicit hint still turns it on");
+    }
 }
