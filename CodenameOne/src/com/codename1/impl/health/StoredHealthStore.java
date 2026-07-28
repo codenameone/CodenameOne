@@ -59,6 +59,15 @@ public class StoredHealthStore extends LocalHealthStore {
 
     private boolean loaded;
 
+    /// The last blob known to be on disk.
+    ///
+    /// Held because `Storage.writeObject` *deletes* the entry when the
+    /// write fails -- so a failed save does not leave the previous
+    /// contents in place, it destroys them. Without this, one full disk
+    /// took every older record with it while the caller was told only
+    /// that the latest write had failed.
+    private String lastGood;
+
     public StoredHealthStore() {
         restore();
     }
@@ -81,6 +90,7 @@ public class StoredHealthStore extends LocalHealthStore {
         for (HealthSample s : restored) {
             addSampleDirect(s);
         }
+        lastGood = blob;
         // Only after the restore, so the writes it performs do not each
         // rewrite the file they are being read from.
         loaded = true;
@@ -91,22 +101,58 @@ public class StoredHealthStore extends LocalHealthStore {
         if (!loaded) {
             return true;
         }
+        String blob = null;
         try {
             // The return value matters: Storage reports a full or
             // unwritable store by answering false rather than throwing,
             // and ignoring it let a write be acknowledged as durable when
             // it only ever reached memory. The caller sees the failure
             // now, and the change is rolled back.
-            boolean written = Storage.getInstance().writeObject(KEY,
-                    LocalHealthCodec.encode(getAllSamples()));
-            if (!written) {
-                Log.p("CN1 Health: the local store could not be written");
+            blob = LocalHealthCodec.encode(getAllSamples());
+            if (writeBlob(blob)) {
+                lastGood = blob;
+                return true;
             }
-            return written;
         } catch (RuntimeException ex) {
             Log.p("CN1 Health: could not persist the local store (" + ex
                     + ")");
-            return false;
         }
+        restoreLastGood();
+        return false;
+    }
+
+    /// The single call that touches storage.
+    ///
+    /// Isolated so the failure this class exists to survive can be
+    /// reproduced in a test: `Storage.writeObject` deletes the entry and
+    /// answers false when it cannot write, and that combination is the
+    /// whole reason the previous blob has to be put back.
+    protected boolean writeBlob(String blob) {
+        return Storage.getInstance().writeObject(KEY, blob);
+    }
+
+    /// Puts the previous contents back after a failed save.
+    ///
+    /// `Storage.writeObject` deletes the entry when it fails, so by the
+    /// time it answers false the older data is already gone -- rolling
+    /// the in-memory change back is not enough on its own, and one full
+    /// disk would otherwise cost every record the app had ever written
+    /// rather than the one write that failed.
+    private void restoreLastGood() {
+        if (lastGood == null) {
+            return;
+        }
+        try {
+            if (writeBlob(lastGood)) {
+                Log.p("CN1 Health: the local store could not be written;"
+                        + " the previous contents were put back");
+                return;
+            }
+        } catch (RuntimeException ex) {
+            // Falls through to the warning below.
+        }
+        Log.p("CN1 Health: the local store could not be written and the"
+                + " previous contents could not be put back either; the"
+                + " app's health data is now only in memory");
     }
 }

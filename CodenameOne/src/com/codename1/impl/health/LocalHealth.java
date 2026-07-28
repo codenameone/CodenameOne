@@ -59,14 +59,21 @@ public class LocalHealth extends Health {
         this.store = store == null ? new LocalHealthStore() : store;
     }
 
+    /// Answered by the store rather than hard-coded, so the simulator's
+    /// "make health unavailable" action is visible where an app actually
+    /// checks. Hard-coding it meant an app that branched on
+    /// [#getAvailability()] -- which the guide tells it to do first --
+    /// never reached its unavailable-provider path and discovered the
+    /// simulation only when an operation failed.
     @Override
     public boolean isSupported() {
-        return true;
+        return store.isSupported();
     }
 
     @Override
     public HealthAvailability getAvailability() {
-        return HealthAvailability.LOCAL_ONLY;
+        return store.isSupported() ? HealthAvailability.LOCAL_ONLY
+                : HealthAvailability.NOT_SUPPORTED;
     }
 
     @Override

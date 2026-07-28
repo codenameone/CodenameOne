@@ -359,6 +359,33 @@ class SensorParserTest {
         assertEquals(1.654, m.getHeightMeters(), 1e-6);
     }
 
+    /**
+     * The predicate says "and", and the two fields are optional
+     * independently -- so a valid BMI beside an unavailable height must
+     * answer false, or a caller that gates on it goes on to use NaN.
+     */
+    @Test
+    void weightPresenceCheckRequiresBothFields() {
+        byte[] bmiOnly = new byte[] {
+            0x08,
+            0x10, 0x27,
+            0x2A, 0x00,                   // BMI 4.2
+            (byte) 0xFF, (byte) 0xFF      // height unavailable
+        };
+        WeightMeasurement m = WeightMeasurement.parse(bmiOnly);
+        assertNotNull(m);
+        assertFalse(m.hasBmiAndHeight());
+        assertTrue(Double.isNaN(m.getHeightMeters()));
+
+        byte[] both = new byte[] {
+            0x08,
+            0x10, 0x27,
+            0x2A, 0x00,
+            0x76, 0x06
+        };
+        assertTrue(WeightMeasurement.parse(both).hasBmiAndHeight());
+    }
+
     @Test
     void weightRejectsTruncatedPayloads() {
         assertNull(WeightMeasurement.parse(null));

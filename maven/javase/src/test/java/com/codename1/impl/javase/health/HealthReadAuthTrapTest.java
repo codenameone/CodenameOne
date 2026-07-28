@@ -504,4 +504,25 @@ class HealthReadAuthTrapTest {
                                 1_768_000_000_000L)))),
                 "a granted delete still works");
     }
+
+    /**
+     * The simulator's "make health unavailable" action must be visible
+     * where the guide tells an app to look -- the facade -- not only when
+     * an operation fails.
+     */
+    @Test
+    void simulatedUnavailabilityReachesTheFacade() {
+        com.codename1.impl.health.LocalHealth health =
+                new com.codename1.impl.health.LocalHealth(store);
+        assertTrue(health.isSupported());
+        assertEquals(com.codename1.health.HealthAvailability.LOCAL_ONLY,
+                health.getAvailability());
+
+        store.setAvailable(false);
+
+        assertFalse(health.isSupported(),
+                "an app branching on the facade must see the simulation");
+        assertEquals(com.codename1.health.HealthAvailability.NOT_SUPPORTED,
+                health.getAvailability());
+    }
 }

@@ -167,9 +167,15 @@ public final class WeightMeasurement {
         return bmi;
     }
 
-    /// `true` when this reading carried BMI and height.
+    /// `true` when this reading carried BMI **and** height.
+    ///
+    /// Both, as the name says. The two fields are optional
+    /// independently -- each carries its own `0xFFFF` unavailable value
+    /// and a scale that measured one but not the other sends both -- so
+    /// testing only the BMI let a caller that gated on this go on to use
+    /// a height of `NaN`.
     public boolean hasBmiAndHeight() {
-        return !Double.isNaN(bmi);
+        return !Double.isNaN(bmi) && !Double.isNaN(heightMeters);
     }
 
     /// The scale's user-profile index, or `-1` when absent. Family scales

@@ -362,4 +362,63 @@ class LocalHealthPersistenceTest extends UITestBase {
             return allowWrites;
         }
     }
+
+    /**
+     * A failed save must not take the older records with it.
+     *
+     * <p>{@code Storage.writeObject} deletes the entry when it fails, so
+     * by the time it answers false the previous contents are already
+     * gone. Rolling the in-memory change back is not enough on its own --
+     * without putting the old blob back, one full disk costs every record
+     * the app ever wrote rather than the single write that failed.</p>
+     */
+    @Test
+    void aFailedSaveKeepsTheRecordsThatWereAlreadyStored() throws Exception {
+        StoredHealthStore first = new StoredHealthStore();
+        first.write(one(QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(11, HealthUnit.COUNT), T0,
+                T0 + MINUTE))).get();
+
+        // A second store over the same entry whose next save fails the
+        // way a full disk does -- Storage deletes the entry and then
+        // answers false.
+        FailingOnceStore second = new FailingOnceStore();
+        AsyncResource<HealthWriteResult> doomed = second.write(
+                one(QuantitySample.create(HealthDataType.STEPS,
+                        new HealthQuantity(22, HealthUnit.COUNT), T0,
+                        T0 + MINUTE)));
+        assertNotNull(errorOf(doomed), "the write must be reported failed");
+
+        // Whatever the failure did, the earlier record must still be
+        // readable by a fresh store.
+        StoredHealthStore third = new StoredHealthStore();
+        List<HealthSample> back = third.readSamples(new SampleQuery()
+                .addType(HealthDataType.STEPS)
+                .setTimeRange(HealthTimeRange.between(T0 - MINUTE,
+                        T0 + 2 * MINUTE))).get();
+        assertEquals(1, back.size(),
+                "the previously stored record must survive a failed save");
+        assertEquals(11, ((QuantitySample) back.get(0))
+                .getValue(HealthUnit.COUNT), 0.001);
+    }
+
+    /**
+     * Fails its first save exactly as a full disk does -- deleting the
+     * entry first, then answering false -- and writes normally after.
+     */
+    private static final class FailingOnceStore extends StoredHealthStore {
+
+        private boolean failed;
+
+        @Override
+        protected boolean writeBlob(String blob) {
+            if (!failed) {
+                failed = true;
+                Storage.getInstance()
+                        .deleteStorageFile("cn1$health$local");
+                return false;
+            }
+            return super.writeBlob(blob);
+        }
+    }
 }
