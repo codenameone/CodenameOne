@@ -72,6 +72,21 @@ public final class WebMercator {
         return latRad * 180.0 / PI;
     }
 
+    /// The latitude that sits visually halfway between `southLat` and
+    /// `northLat` on a Mercator map -- the midpoint of their *projected* y
+    /// coordinates, converted back.
+    ///
+    /// This is not the arithmetic mean, because Mercator stretches distances
+    /// away from the equator. Latitudes 0 and 80 average to 40, but their
+    /// projected midpoint is about 57; centering a camera on 40 pushes the
+    /// northern edge of that band well outside a viewport sized to hold it.
+    /// Anything framing bounds must center this way for the fitted zoom to
+    /// actually contain them.
+    public static double centerLatitude(double southLat, double northLat) {
+        double midY = (latToWorldY(southLat, 0) + latToWorldY(northLat, 0)) / 2.0;
+        return worldYToLat(midY, 0);
+    }
+
     /// Hyperbolic sine, absent from the minimal device `Math`.
     public static double sinh(double x) {
         return (MathUtil.exp(x) - MathUtil.exp(-x)) / 2.0;

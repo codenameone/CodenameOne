@@ -350,7 +350,13 @@ public class NativeMap extends Container implements MapSurface {
             zoom = Math.max(provider.getMinZoom(mapId),
                     Math.min(provider.getMaxZoom(mapId), zoom));
         }
-        provider.setCamera(mapId, bounds.getCenter().getLatitude(),
+        // Center on the projected midpoint, not the arithmetic one: Mercator
+        // stretches away from the equator, so a tall band centered on the mean
+        // of its latitudes hangs off the top of the viewport the fit just
+        // sized for it.
+        provider.setCamera(mapId,
+                WebMercator.centerLatitude(bounds.getSouthWest().getLatitude(),
+                        bounds.getNorthEast().getLatitude()),
                 bounds.getCenter().getLongitude(), (float) zoom, 0, 0);
     }
 

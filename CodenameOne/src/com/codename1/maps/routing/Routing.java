@@ -105,18 +105,65 @@ public final class Routing {
                     + "so there is no other way to report the result");
         }
         RouteService routeService = getService();
+        final OnceOnly guarded = new OnceOnly(callback);
         if (!routeService.isAvailable()) {
             final String id = routeService.getId();
             CN.callSerially(new Runnable() {
                 @Override
                 public void run() {
-                    callback.routeFailed("The routing service '" + id
+                    guarded.routeFailed("The routing service '" + id
                             + "' is not ready to route; it may still need to be configured", null);
                 }
             });
             return;
         }
-        routeService.findRoutes(request, callback);
+        try {
+            routeService.findRoutes(request, guarded);
+        } catch (final RuntimeException e) {
+            // A service is required to answer through the callback, but this
+            // facade promises the app exactly one answer and cannot rely on a
+            // third-party implementation keeping its side of the bargain. The
+            // latch below makes this harmless if the service already reported.
+            CN.callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    guarded.routeFailed("The routing service failed: "
+                            + (e.getMessage() == null ? e.toString() : e.getMessage()), e);
+                }
+            });
+        }
+    }
+
+    /// Passes the first outcome through and swallows any that follow, so a
+    /// misbehaving [RouteService] cannot make [#findRoute(RouteRequest, RouteCallback)]
+    /// break its own exactly-once promise. Touched only on the event dispatch
+    /// thread, where every delivery is dispatched.
+    private static final class OnceOnly implements RouteCallback {
+
+        private final RouteCallback delegate;
+        private boolean delivered;
+
+        OnceOnly(RouteCallback delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void routesFound(List routes) {
+            if (delivered) {
+                return;
+            }
+            delivered = true;
+            delegate.routesFound(routes);
+        }
+
+        @Override
+        public void routeFailed(String message, Throwable error) {
+            if (delivered) {
+                return;
+            }
+            delivered = true;
+            delegate.routeFailed(message, error);
+        }
     }
 
     /// Draws the best route between `origin` and `destination` on `map` and

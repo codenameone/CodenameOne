@@ -280,7 +280,14 @@ public final class VectorMapEngine {
         double zx = worldW <= 0 ? getMaxZoom() : log2(usableW / worldW);
         double zy = worldH <= 0 ? getMaxZoom() : log2(usableH / worldH);
         setZoom(Math.min(zx, zy));
-        setCenter(bounds.getCenter());
+        // The vertical center has to be the projected midpoint, not the mean
+        // of the two latitudes: Mercator stretches away from the equator, so
+        // centering a tall band on its arithmetic middle leaves the poleward
+        // edge outside the viewport the zoom above just sized for it.
+        setCenter(new LatLng(
+                WebMercator.centerLatitude(bounds.getSouthWest().getLatitude(),
+                        bounds.getNorthEast().getLatitude()),
+                bounds.getCenter().getLongitude()));
     }
 
     private double worldSpanX(MapBounds b) {

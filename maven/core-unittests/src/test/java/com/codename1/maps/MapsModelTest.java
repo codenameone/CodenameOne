@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.codename1.maps.spi.MapProvider;
 import com.codename1.maps.spi.MapProviderRegistry;
+import com.codename1.maps.vector.WebMercator;
 import com.codename1.ui.PeerComponent;
 import java.util.ArrayList;
 import java.util.List;
@@ -270,6 +271,24 @@ class MapsModelTest {
         // by its height here.
         double fit = NativeMap.zoomToFit(world, 2048, 256, 0, 1.0);
         assertEquals(0.0, fit, 1e-6);
+    }
+
+    @Test
+    void mercatorCenterIsTheProjectedMidpointNotTheMean() {
+        // Mercator stretches away from the equator, so a band from 0 to 80
+        // is visually centred near 57, not 40. Centring on the mean leaves the
+        // northern edge outside a viewport the fitted zoom just sized for it.
+        assertEquals(57.045, WebMercator.centerLatitude(0, 80), 1e-3);
+        assertEquals(-57.045, WebMercator.centerLatitude(-80, 0), 1e-3);
+
+        // Symmetric bands still centre on the equator, and a degenerate band
+        // on itself.
+        assertEquals(0.0, WebMercator.centerLatitude(-45, 45), 1e-9);
+        assertEquals(37.7749, WebMercator.centerLatitude(37.7749, 37.7749), 1e-6);
+
+        // Near the equator the distortion is negligible, so it stays close to
+        // the arithmetic mean.
+        assertEquals(1.0, WebMercator.centerLatitude(0, 2), 1e-3);
     }
 
     @Test

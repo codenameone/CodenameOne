@@ -219,6 +219,13 @@ public class OsrmRouteService implements RouteService {
 
     private static Route parseRoute(Map json) throws IOException {
         List points = PolylineCodec.decode(string(json.get("geometry")));
+        if (points.isEmpty()) {
+            // The request always asks for overview=full, so a route with no
+            // decodable geometry is a malformed answer rather than a short
+            // one. Accepting it would draw an empty polyline and report
+            // success, which is worse than saying the response was bad.
+            throw new IOException("Malformed routing response: a route carried no geometry");
+        }
         List legs = new ArrayList();
         String summary = "";
         Object legsObj = json.get("legs");
@@ -512,6 +519,13 @@ public class OsrmRouteService implements RouteService {
                 return;
             }
             NetworkManager.getInstance().removeProgressListener(this);
+            if (delivered) {
+                // The common case: `postResponse` is queued onto the EDT ahead
+                // of this event, so a real result has already landed and there
+                // is nothing to back up. Checking here keeps the success path
+                // free of a pointless second hop.
+                return;
+            }
             failLater("The routing request ended without a result", null);
         }
 

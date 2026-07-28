@@ -224,6 +224,17 @@ class MapsRoutingTest {
     }
 
     @Test
+    void aRouteWithoutGeometryIsRejected() {
+        // The request always asks for overview=full, so a route with nothing
+        // decodable is a bad answer. Accepting it would draw an empty polyline
+        // and report success.
+        assertThrows(IOException.class,
+                () -> OsrmRouteService.parseResponse("{\"code\":\"Ok\",\"routes\":[{}]}"));
+        assertThrows(IOException.class, () -> OsrmRouteService.parseResponse(
+                "{\"code\":\"Ok\",\"routes\":[{\"geometry\":\"\",\"distance\":1,\"duration\":1}]}"));
+    }
+
+    @Test
     void reportsMalformedAndEmptyResponses() {
         assertThrows(IOException.class, () -> OsrmRouteService.parseResponse(null));
         assertThrows(IOException.class, () -> OsrmRouteService.parseResponse(""));
@@ -296,6 +307,27 @@ class MapsRoutingTest {
     }
 
     @Test
+    void aServiceThatThrowsStillProducesExactlyOneCallback() {
+        // findRoute promises the app one answer. A third-party service that
+        // throws instead of calling back must not turn that into silence.
+        Routing.setService(new ThrowingService(false));
+        CountingCallback counts = new CountingCallback();
+        Routing.findRoute(new LatLng(1, 2), new LatLng(3, 4), counts);
+        assertEquals(1, counts.failures, "a throwing service must still be reported");
+        assertEquals(0, counts.successes);
+    }
+
+    @Test
+    void aServiceThatReportsThenThrowsIsNotDeliveredTwice() {
+        // The latch matters as much as the guard: a service that calls back
+        // and then throws would otherwise produce two answers.
+        Routing.setService(new ThrowingService(true));
+        CountingCallback counts = new CountingCallback();
+        Routing.findRoute(new LatLng(1, 2), new LatLng(3, 4), counts);
+        assertEquals(1, counts.failures + counts.successes, "exactly one answer");
+    }
+
+    @Test
     void settingANullServiceRestoresTheDefault() {
         Routing.setService(new RecordingService());
         Routing.setService(null);
@@ -318,6 +350,51 @@ class MapsRoutingTest {
                 + "{\"name\":\"\",\"distance\":0,\"duration\":0,"
                 + "\"maneuver\":{\"type\":\"arrive\",\"location\":[-126.453,43.252]}}"
                 + "]}]}]}";
+    }
+
+    /** Counts how many times each outcome reached the application. */
+    private static final class CountingCallback implements RouteCallback {
+
+        private int successes;
+        private int failures;
+
+        @Override
+        public void routesFound(List routes) {
+            successes++;
+        }
+
+        @Override
+        public void routeFailed(String message, Throwable error) {
+            failures++;
+        }
+    }
+
+    /** A service that breaks the SPI contract, optionally after reporting. */
+    private static final class ThrowingService implements RouteService {
+
+        private final boolean reportFirst;
+
+        ThrowingService(boolean reportFirst) {
+            this.reportFirst = reportFirst;
+        }
+
+        @Override
+        public String getId() {
+            return "throwing";
+        }
+
+        @Override
+        public boolean isAvailable() {
+            return true;
+        }
+
+        @Override
+        public void findRoutes(RouteRequest request, RouteCallback cb) {
+            if (reportFirst) {
+                cb.routeFailed("reported before throwing", null);
+            }
+            throw new IllegalStateException("this service is broken");
+        }
     }
 
     /** A stand-in service that records the request instead of hitting the network. */
