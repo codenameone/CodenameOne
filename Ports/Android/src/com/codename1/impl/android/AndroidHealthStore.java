@@ -526,13 +526,42 @@ class AndroidHealthStore extends HealthStore {
         if (failIfNoBridge(out)) {
             return;
         }
+        drainFailure = null;
         drainFrom(new ArrayList<HealthSubscription>(subscriptions), 0, 0,
                 out);
+    }
+
+    /// The first failure this drain hit, or null.
+    ///
+    /// One field rather than state threaded through the recursion because
+    /// the shared layer runs one drain at a time -- a second call while
+    /// one is in flight is coalesced onto it rather than started.
+    private Throwable drainFailure;
+
+    /// Remembers a failure so the drain can report it once it has given
+    /// the healthy subscriptions their turn. The first one wins: it is
+    /// the one with a cause the caller can still act on.
+    private void noteDrainFailure(Throwable error) {
+        if (drainFailure == null) {
+            drainFailure = error;
+        }
     }
 
     private void drainFrom(List<HealthSubscription> subs, int index,
             int delivered, AsyncResource<Integer> out) {
         if (index >= subs.size()) {
+            if (drainFailure != null) {
+                // Surfaced, not swallowed. A subscription skipped because
+                // Health Connect refused the read otherwise resolved as a
+                // clean drain with nothing to report, which a caller
+                // cannot tell from genuinely no changes -- so nothing ever
+                // retried, and the skipped window was only picked up if
+                // the app happened to drain again for its own reasons.
+                Throwable failed = drainFailure;
+                drainFailure = null;
+                out.error(failed);
+                return;
+            }
             out.complete(Integer.valueOf(delivered));
             return;
         }
@@ -789,7 +818,10 @@ class AndroidHealthStore extends HealthStore {
             }
             // One failing subscription must not strand the others, and it
             // must not advance its own cursor. Skipping it leaves the
-            // token where it was so the next drain retries the same range.
+            // token where it was so the next drain retries the same range
+            // -- and the failure is reported once the rest have had their
+            // turn, so the caller knows there is something to retry.
+            noteDrainFailure(toException(code, message));
             AndroidHealth.onEdt(new SkipOne(this));
         }
 

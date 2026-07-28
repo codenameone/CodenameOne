@@ -4614,20 +4614,22 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private static IOSHealth health;
 
-    /// Returns the HealthKit-backed health entry point.
+    /// Returns the health entry point.
     ///
-    /// Throws before constructing anything when the app declares no
-    /// HealthKit privacy strings, following the precedent set by
-    /// getLocationManager(). A missing usage description is a developer
-    /// bug that gets the app rejected from the App Store, so it must be
-    /// impossible to swallow into an AsyncResource error nobody reads.
+    /// The missing-privacy-string diagnostic is *not* thrown here, and
+    /// that is deliberate. `Health.getInstance()` is also how an app
+    /// reaches `getSensors()`, which is pure Bluetooth LE and touches no
+    /// HealthKit at all -- the iOS builder knows this and injects neither
+    /// the framework nor the usage strings for a sensor-only app. Throwing
+    /// on the way in made that supported path impossible to use without
+    /// declaring HealthKit disclosures the app has no business declaring,
+    /// and which App Review would ask it to justify.
+    ///
+    /// It is thrown from [IOSHealth#getStore()] instead: that is the
+    /// first thing that actually needs HealthKit, and it is still before
+    /// anything can be swallowed into an AsyncResource error nobody reads.
     @Override
     public com.codename1.health.Health getHealth() {
-        if (!nativeInstance.checkHealthShareUsage()
-                && !nativeInstance.checkHealthUpdateUsage()) {
-            throw new com.codename1.health.HealthConfigurationException(
-                    IOSHealth.MISSING_USAGE_MESSAGE);
-        }
         synchronized (IOSImplementation.class) {
             if (health == null) {
                 health = new IOSHealth(nativeInstance);

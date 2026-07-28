@@ -290,14 +290,44 @@ class IOSHealthStore extends HealthStore {
     /// answer false so an app can tell how much this is worth.
     protected void doDrainChanges(List<HealthSubscription> subscriptions,
             AsyncResource<Integer> out) {
+        drainFailure = null;
         drainFrom(new ArrayList<HealthSubscription>(subscriptions), 0, 0,
                 out);
+    }
+
+    /// The first failure this drain hit, or null.
+    ///
+    /// One field rather than state threaded through the recursion because
+    /// the shared layer runs one drain at a time -- a second call while
+    /// one is in flight is coalesced onto it rather than started.
+    private Throwable drainFailure;
+
+    /// Remembers a failure so the drain can report it once it has given
+    /// the healthy subscriptions their turn. The first one wins: it is
+    /// the one with a cause the caller can still act on.
+    void noteDrainFailure(Throwable error) {
+        if (drainFailure == null) {
+            drainFailure = error;
+        }
     }
 
     void drainFrom(final List<HealthSubscription> subs,
             final int index, final int delivered,
             final AsyncResource<Integer> out) {
         if (index >= subs.size()) {
+            if (drainFailure != null) {
+                // Surfaced, not swallowed. A subscription skipped for
+                // HKErrorDatabaseInaccessible -- the device locked, before
+                // its first unlock, which is exactly when a background
+                // fetch runs -- otherwise resolved as a clean drain with
+                // nothing to report. The caller could not tell that from
+                // genuinely no changes, so the one error the API documents
+                // as retryable was the one error nobody ever retried.
+                Throwable failed = drainFailure;
+                drainFailure = null;
+                out.error(failed);
+                return;
+            }
             out.complete(Integer.valueOf(delivered));
             return;
         }
@@ -513,7 +543,10 @@ class IOSHealthStore extends HealthStore {
                 // everything the failed type produced in this window --
                 // permanently. HealthKit reporting
                 // HKErrorDatabaseInaccessible because the device is locked
-                // is exactly when this happens, and it is retryable.
+                // is exactly when this happens, and it is retryable -- so
+                // the failure is kept and reported once the remaining
+                // subscriptions have had their turn.
+                store.noteDrainFailure(error);
                 store.drainFrom(subs, index + 1, delivered, out);
                 return;
             }
@@ -574,7 +607,9 @@ class IOSHealthStore extends HealthStore {
             if (error != null) {
                 // Same reasoning as the ordinary page read: firing a
                 // partial batch would persist an anchor past records this
-                // read never returned.
+                // read never returned, and the failure is reported once
+                // the other subscriptions have had their turn.
+                store.noteDrainFailure(error);
                 store.drainFrom(subs, index + 1, delivered, out);
                 return;
             }

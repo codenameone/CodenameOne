@@ -69,8 +69,37 @@ public final class IOSHealth extends Health {
                 : HealthAvailability.NOT_SUPPORTED;
     }
 
+    /// The HealthKit-backed store.
+    ///
+    /// This is where the missing-privacy-string diagnostic is thrown,
+    /// rather than on the way into the facade: reaching the facade is
+    /// also how an app gets to [#getSensors()], which is pure Bluetooth
+    /// LE and needs no HealthKit at all. Throwing earlier made that
+    /// supported path unusable on iOS without declaring disclosures the
+    /// app does not need.
+    ///
+    /// Still thrown rather than reported: a missing usage description is
+    /// a developer bug that gets the app rejected from the App Store, so
+    /// it must not be swallowed into an AsyncResource error nobody reads.
+    /// [#getConfigurationProblems()] answers the same question without
+    /// throwing, for a diagnostics screen.
     public HealthStore getStore() {
+        requireUsageStrings();
         return store;
+    }
+
+    /// Recorded workouts, which persist through the store.
+    public com.codename1.health.workout.WorkoutManager getWorkouts() {
+        requireUsageStrings();
+        return super.getWorkouts();
+    }
+
+    private void requireUsageStrings() {
+        if (!nativeInstance.checkHealthShareUsage()
+                && !nativeInstance.checkHealthUpdateUsage()) {
+            throw new com.codename1.health.HealthConfigurationException(
+                    MISSING_USAGE_MESSAGE);
+        }
     }
 
     public AsyncResource<Boolean> openHealthSettings() {
@@ -91,9 +120,10 @@ public final class IOSHealth extends Health {
         return problems;
     }
 
-    /// The message used both here and by the build-hint diagnostic thrown
-    /// from [IOSImplementation#getHealth()], so a developer sees the same
-    /// wording from a diagnostics screen and from the exception.
+    /// The message used both by [#getConfigurationProblems()] and by the
+    /// build-hint diagnostic thrown from [#getStore()], so a developer
+    /// sees the same wording from a diagnostics screen and from the
+    /// exception.
     static final String MISSING_USAGE_MESSAGE =
             "This app uses com.codename1.health but declares no HealthKit "
             + "privacy strings. Add the ios.NSHealthShareUsageDescription "

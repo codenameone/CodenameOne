@@ -184,7 +184,7 @@ Health data is the most regulated data these APIs touch, and the build is strict
 [options="header"]
 |===
 | Hint | Effect
-| `ios.NSHealthShareUsageDescription` | Why your app reads health data. **Required**; the build fails without it.
+| `ios.NSHealthShareUsageDescription` | Why your app reads health data. **Required** if you touch the store; the build fails without it.
 | `ios.NSHealthUpdateUsageDescription` | Why your app writes health data. Required if you write.
 | `ios.health.backgroundDelivery` | Adds the background-delivery entitlement. Inferred from observer usage.
 | `ios.health.recalibrateEstimates` | Adds the estimate-recalibration entitlement.
@@ -208,6 +208,15 @@ Codename One **doesn't** inject a placeholder privacy string for health, unlike 
 The Android data types can't be inferred. A data type is referenced as a constant, which compiles to a field read, and the build server's class scanner records only type and method references -- so the permission set genuinely can't be derived from your bytecode. Declaring it explicitly also matches Google Play policy, which requires you to request exactly what you use. Health Connect additionally raises `minSdkVersion` to 26 and requires `targetSdkVersion` 30 or higher.
 
 NOTE: HealthKit is entitlement-gated, unlike CoreBluetooth. The `com.apple.developer.healthkit` capability must be enabled for your App ID and present in the provisioning profile you build with, or the build fails at code-signing.
+
+An app that only uses `Health.getSensors()` needs none of this. The sensor
+layer is built on `com.codename1.bluetooth.le` and touches no HealthKit, so
+the build injects neither the framework, nor the entitlement, nor the usage
+strings, and none of the hints above apply -- it needs
+`ios.NSBluetoothAlwaysUsageDescription` instead. Reaching for the store is
+what pulls HealthKit in, and it's `getStore()` rather than
+`Health.getInstance()` that reports a missing usage string, so the
+sensor-only path stays clear of the whole apparatus.
 
 === Privacy and store policy
 
