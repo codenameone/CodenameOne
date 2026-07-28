@@ -824,7 +824,26 @@ public class HealthStore {
             // adding it here made "total time covered" grow with the
             // number of spot readings.
             durationMillis += span <= 0 ? 0 : overlap;
-            if (s instanceof QuantitySample) {
+            if (s instanceof SeriesSample) {
+                // A series reaches here whole -- the local and simulator
+                // stores hold it that way and aggregate their records
+                // directly, without the read path's flattening. Counting
+                // it while contributing none of its measurements produced
+                // a null AVERAGE, MINIMUM, MAXIMUM and LATEST for a record
+                // full of values.
+                SeriesSample series = (SeriesSample) s;
+                for (int i = 0; i < series.size(); i++) {
+                    long at = series.getSampleStartMillis(i);
+                    if (at < from || at >= to) {
+                        continue;
+                    }
+                    inBucket.add(series.toQuantitySample(i));
+                    // Each measurement is a point reading: whole, and an
+                    // equal weight in the average.
+                    weights.add(Double.valueOf(1.0));
+                    durations.add(Double.valueOf(1));
+                }
+            } else if (s instanceof QuantitySample) {
                 inBucket.add((QuantitySample) s);
                 // Cumulative quantities are divisible, so a sample that
                 // straddles a boundary contributes in proportion. Discrete

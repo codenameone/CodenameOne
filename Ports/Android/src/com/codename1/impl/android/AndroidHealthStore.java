@@ -166,6 +166,15 @@ class AndroidHealthStore extends HealthStore {
         if (!isSupported() || type == null) {
             return HealthAuthorizationStatus.NOT_SUPPORTED;
         }
+        // Capability first. One Health Connect permission maps back to
+        // several portable tokens, so a granted READ_DISTANCE made
+        // DISTANCE_CYCLING look AUTHORIZED even though the bridge has no
+        // record class for it and every read of it is refused -- and the
+        // readable-but-unwritable series types answered about a write they
+        // could never perform.
+        if (write ? !isWritable(type) : !isTypeSupported(type)) {
+            return HealthAuthorizationStatus.NOT_SUPPORTED;
+        }
         refreshGrants();
         synchronized (granted) {
             if (!grantsLoaded) {

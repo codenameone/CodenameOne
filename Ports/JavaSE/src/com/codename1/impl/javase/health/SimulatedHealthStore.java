@@ -309,13 +309,54 @@ public class SimulatedHealthStore extends LocalHealthStore {
         super.doReadSamples(query, out);
     }
 
+    /// Aggregates obey the read script too.
+    ///
+    /// Aggregation reads the local records directly rather than going
+    /// through doReadSamples, so a type scripted DENIED_SILENT returned a
+    /// real total while the matching sample read came back empty -- the
+    /// developer got a chart from data the simulator was pretending they
+    /// could not see, which is precisely the trap this store exists to
+    /// spring.
     protected void doAggregate(com.codename1.health.AggregateQuery query,
             long[] boundaries,
             AsyncResource<List<com.codename1.health.AggregateResult>> out) {
         if (consumeFailure("aggregate", out)) {
             return;
         }
+        List<HealthDataType> types = query.getTypes();
+        for (int i = 0; i < types.size(); i++) {
+            ReadAuthScript script = scriptFor(types.get(i));
+            if (script == ReadAuthScript.GRANTED) {
+                continue;
+            }
+            if (script != ReadAuthScript.GRANTED_BUT_NO_DATA
+                    && (script == ReadAuthScript.DENIED_ERROR
+                            || policy == ReadAuthPolicy.ANDROID_EXPLICIT)) {
+                out.error(new HealthException(HealthError.UNAUTHORIZED,
+                        "read access to " + types.get(i).getId()
+                                + " was refused"));
+                return;
+            }
+            // Silently empty, matching the read: buckets with no data
+            // rather than an error, so an app cannot tell denial from an
+            // empty store here either.
+            out.complete(emptyBuckets(boundaries));
+            return;
+        }
         super.doAggregate(query, boundaries, out);
+    }
+
+    /// One empty result per bucket, so a denied aggregate looks exactly
+    /// like a range holding no data.
+    private static List<com.codename1.health.AggregateResult> emptyBuckets(
+            long[] boundaries) {
+        List<com.codename1.health.AggregateResult> out =
+                new java.util.ArrayList<com.codename1.health.AggregateResult>();
+        for (int i = 0; i + 1 < boundaries.length; i++) {
+            out.add(new com.codename1.health.AggregateResult(boundaries[i],
+                    boundaries[i + 1]));
+        }
+        return out;
     }
 
     protected void doWrite(List<HealthSample> samples,
@@ -341,10 +382,27 @@ public class SimulatedHealthStore extends LocalHealthStore {
         super.doWrite(samples, out);
     }
 
+    /// Deleting needs write authorization, as it does on Health Connect.
+    ///
+    /// Writes honoured the scripted status while deletes went straight
+    /// through, so a simulator test could delete records it was supposedly
+    /// not allowed to touch.
     protected void doDelete(HealthDeleteRequest request,
             AsyncResource<Integer> out) {
         if (consumeFailure("delete", out)) {
             return;
+        }
+        List<HealthDataType> types = request.getTypes();
+        for (int i = 0; i < types.size(); i++) {
+            HealthAuthorizationStatus status =
+                    getWriteAuthorizationStatus(types.get(i));
+            if (status == HealthAuthorizationStatus.DENIED
+                    || status == HealthAuthorizationStatus.NOT_DETERMINED) {
+                out.error(new HealthException(HealthError.UNAUTHORIZED,
+                        "write access to " + types.get(i).getId()
+                                + " is " + status));
+                return;
+            }
         }
         super.doDelete(request, out);
     }

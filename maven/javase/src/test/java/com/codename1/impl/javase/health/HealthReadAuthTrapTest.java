@@ -311,4 +311,77 @@ class HealthReadAuthTrapTest {
                 HealthAuthorizationStatus.AUTHORIZED);
         assertNull(errorOf(store.write(w)), "a granted write succeeds");
     }
+
+    /**
+     * A denied read denies the aggregate too.
+     *
+     * <p>Aggregation reads the local records directly rather than going
+     * through the sample path, so a type scripted DENIED_SILENT returned a
+     * real total while the matching sample read came back empty. A
+     * developer would have drawn a chart from data the simulator was
+     * pretending they could not see -- the exact trap this store exists to
+     * spring.</p>
+     */
+    @Test
+    void aDeniedReadDeniesTheAggregateToo() {
+        store.setReadAuthorizationPolicy(
+                SimulatedHealthStore.ReadAuthPolicy.IOS_OPAQUE);
+        store.setReadPermission(HealthDataType.HEART_RATE,
+                SimulatedHealthStore.ReadAuthScript.DENIED_SILENT);
+
+        AsyncResource<java.util.List<com.codename1.health.AggregateResult>>
+                r = store.aggregate(new com.codename1.health.AggregateQuery()
+                        .addType(HealthDataType.HEART_RATE)
+                        .addMetric(com.codename1.health.AggregateMetric.AVERAGE)
+                        .setTimeRange(HealthTimeRange.between(
+                                1_767_000_000_000L, 1_768_000_000_000L)));
+        assertNull(errorOf(r), "iOS denial stays silent here as well");
+        for (com.codename1.health.AggregateResult bucket : r.get()) {
+            assertNull(bucket.get(HealthDataType.HEART_RATE,
+                    com.codename1.health.AggregateMetric.AVERAGE),
+                    "a denied aggregate must not report a total");
+        }
+
+        store.setReadAuthorizationPolicy(
+                SimulatedHealthStore.ReadAuthPolicy.ANDROID_EXPLICIT);
+        Throwable err = errorOf(store.aggregate(
+                new com.codename1.health.AggregateQuery()
+                        .addType(HealthDataType.HEART_RATE)
+                        .addMetric(com.codename1.health.AggregateMetric.AVERAGE)
+                        .setTimeRange(HealthTimeRange.between(
+                                1_767_000_000_000L, 1_768_000_000_000L))));
+        assertNotNull(err, "Health Connect fails loudly here too");
+        assertEquals(HealthError.UNAUTHORIZED,
+                ((HealthException) err).getError());
+    }
+
+    /**
+     * Deleting needs write authorization, as it does on Health Connect.
+     *
+     * <p>Writes honoured the scripted status while deletes went straight
+     * through, so a test could delete records it was supposedly not
+     * allowed to touch.</p>
+     */
+    @Test
+    void aDeniedWriteDeniesTheDelete() {
+        store.setWritePermission(HealthDataType.HEART_RATE,
+                HealthAuthorizationStatus.DENIED);
+        Throwable err = errorOf(store.delete(
+                com.codename1.health.HealthDeleteRequest.byRange(
+                        HealthDataType.HEART_RATE,
+                        HealthTimeRange.between(1_767_000_000_000L,
+                                1_768_000_000_000L))));
+        assertNotNull(err, "an unauthorized delete must fail");
+        assertEquals(HealthError.UNAUTHORIZED,
+                ((HealthException) err).getError());
+
+        store.setWritePermission(HealthDataType.HEART_RATE,
+                HealthAuthorizationStatus.AUTHORIZED);
+        assertNull(errorOf(store.delete(
+                com.codename1.health.HealthDeleteRequest.byRange(
+                        HealthDataType.HEART_RATE,
+                        HealthTimeRange.between(1_767_000_000_000L,
+                                1_768_000_000_000L)))),
+                "a granted delete still works");
+    }
 }

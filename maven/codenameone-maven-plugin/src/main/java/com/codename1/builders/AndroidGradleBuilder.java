@@ -2548,14 +2548,34 @@ public class AndroidGradleBuilder extends Executor {
             // has to raise the version: a project that already sets
             // requireKotlinStdlib=1.9.22 with useGradle8=false is just as
             // broken, and the earlier nesting let it through.
-            if (!useGradle8) {
+            //
+            // The version that will actually run, not the flag that
+            // usually selects it. android.gradleVersion overrides the
+            // choice, so useGradle8=true with gradleVersion=6.5 satisfied
+            // the flag and then failed compiling the bridge with the very
+            // requirement this message states.
+            if (!useGradle8 || gradleVersionInt < 7) {
                 throw new BuildException(
                         "Health Connect requires Kotlin " + kotlinFloor
                         + ", whose Gradle plugin needs Gradle 6.8.3 or"
-                        + " newer, but this build sets"
-                        + " android.useGradle8=false and would use"
-                        + " Gradle 6.5. Set android.useGradle8=true to"
-                        + " build a health-enabled app.");
+                        + " newer, but this build would use Gradle "
+                        + gradleVersion + " (android.useGradle8="
+                        + useGradle8 + "). Set android.useGradle8=true and"
+                        + " leave android.gradleVersion unset to build a"
+                        + " health-enabled app.");
+            }
+            // androidx.health.connect is an AndroidX artifact. Without
+            // AndroidX the generator writes neither android.useAndroidX
+            // nor Jetifier, and Gradle's own dependency check rejects the
+            // project rather than building it. Forcing it on would change
+            // how every other dependency in the app resolves, which is not
+            // this block's call to make.
+            if (!useAndroidX) {
+                throw new BuildException(
+                        "Health Connect ships as an AndroidX library, but"
+                        + " this build sets android.useAndroidX=false."
+                        + " Remove that hint to build a health-enabled"
+                        + " app.");
             }
             String declaredKotlin =
                     request.getArg("requireKotlinStdlib", "").trim();

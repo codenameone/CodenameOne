@@ -397,4 +397,50 @@ class LocalHealthStoreTest extends UITestBase {
         });
         return err[0];
     }
+
+    /**
+     * Every sample shape is copied on the way in and on the way out.
+     *
+     * <p>Only {@link QuantitySample} used to be, so writing a workout, a
+     * sleep session or a nutrition entry left the store holding the
+     * caller's object -- editing it afterwards silently rewrote what was
+     * stored, and clearing its identifier broke deletion by id. A read
+     * handed the same object straight back, so the same edit worked in
+     * reverse.</p>
+     */
+    @Test
+    void everySampleShapeIsSnapshotOnWriteAndOnRead() throws Exception {
+        LocalHealthStore store = new LocalHealthStore();
+
+        WorkoutSample workout = WorkoutSample.create(
+                WorkoutActivityType.RUNNING, 1000L, 5000L);
+        workout.setId("workout-1");
+        workout.setActiveDurationMillis(4000L);
+        // The store assigns the identifier, as a platform would.
+        String assigned = store.write(workout).get().getSampleIds().get(0);
+        workout.setId("tampered");
+        workout.setActiveDurationMillis(0L);
+
+        List<HealthSample> read = store.readSamples(new SampleQuery()
+                .addType(HealthDataType.WORKOUT)
+                .setTimeRange(HealthTimeRange.between(0L, 10_000L))).get();
+        assertEquals(1, read.size());
+        WorkoutSample stored = (WorkoutSample) read.get(0);
+        assertNotSame(workout, stored, "the store must not alias the caller");
+        assertEquals(assigned, stored.getId(),
+                "an edit after the write must not reach the store");
+        assertEquals(4000L, stored.getActiveDurationMillis(),
+                "shape-specific state survives the write");
+
+        // And the object handed back is a copy too.
+        stored.setId("tampered-again");
+        stored.setActiveDurationMillis(0L);
+        WorkoutSample again = (WorkoutSample) store.readSamples(
+                new SampleQuery().addType(HealthDataType.WORKOUT)
+                        .setTimeRange(HealthTimeRange.between(0L, 10_000L)))
+                .get().get(0);
+        assertEquals(assigned, again.getId(),
+                "editing a read result must not reach the store either");
+        assertEquals(4000L, again.getActiveDurationMillis());
+    }
 }

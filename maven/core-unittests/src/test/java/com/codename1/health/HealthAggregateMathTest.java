@@ -200,4 +200,60 @@ class HealthAggregateMathTest {
                 AggregateMetric.TOTAL),
                 "no data and zero data are different facts");
     }
+
+    /**
+     * A series contributes its measurements, not just its existence.
+     *
+     * <p>The local and simulator stores hold a series whole and aggregate
+     * their records directly, without the read path's flattening. Counting
+     * the record while contributing none of its points produced a null
+     * AVERAGE, MINIMUM and MAXIMUM for a record full of values -- which
+     * reads as "no data" rather than as the bug it was.</p>
+     */
+    @Test
+    void aSeriesContributesItsMeasurementsToTheBucket() throws Exception {
+        long[] at = {NOON + MINUTE, NOON + 2 * MINUTE, NOON + 3 * MINUTE};
+        double[] bpm = {60, 70, 80};
+        SeriesSample series = SeriesSample.create(HealthDataType.HEART_RATE,
+                at[0], at[2], at, at, bpm, HealthUnit.COUNT_PER_MINUTE);
+
+        LocalHealthStore s = new LocalHealthStore();
+        List<HealthSample> in = new ArrayList<HealthSample>();
+        in.add(series);
+        s.write(in).get();
+
+        List<AggregateResult> b = s.aggregate(new AggregateQuery()
+                .addType(HealthDataType.HEART_RATE)
+                .addMetric(AggregateMetric.AVERAGE)
+                .addMetric(AggregateMetric.MINIMUM)
+                .addMetric(AggregateMetric.MAXIMUM)
+                .setTimeRange(HealthTimeRange.between(NOON, NOON + HOUR))
+                .setBucket(HealthInterval.hours(1))).get();
+
+        assertEquals(1, b.size());
+        assertEquals(70.0, value(b.get(0), HealthDataType.HEART_RATE,
+                AggregateMetric.AVERAGE), 1e-9);
+        assertEquals(60.0, value(b.get(0), HealthDataType.HEART_RATE,
+                AggregateMetric.MINIMUM), 1e-9);
+        assertEquals(80.0, value(b.get(0), HealthDataType.HEART_RATE,
+                AggregateMetric.MAXIMUM), 1e-9);
+    }
+
+    /**
+     * A series with no measurements is not a record. Writing one expanded
+     * to no wire records at all, and an empty batch is reported by both
+     * bridges as a successful write of nothing.
+     */
+    @Test
+    void anEmptySeriesIsRefused() {
+        assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        SeriesSample.create(HealthDataType.HEART_RATE,
+                                NOON, NOON, new long[0], new long[0],
+                                new double[0],
+                                HealthUnit.COUNT_PER_MINUTE);
+                    }
+                });
+    }
 }

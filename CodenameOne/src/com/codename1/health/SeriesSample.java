@@ -86,6 +86,15 @@ public final class SeriesSample extends HealthSample {
         if (unit == null) {
             throw new IllegalArgumentException("a series requires a unit");
         }
+        // A series with nothing in it is not a record, it is an absence of
+        // one. Writing it expanded to no wire records at all, and an empty
+        // batch is reported by both bridges as a successful write of
+        // nothing -- the caller was told it worked while the store never
+        // heard of it.
+        if (values.length == 0) {
+            throw new IllegalArgumentException(
+                    "a series needs at least one measurement");
+        }
         long[] s = new long[sampleStarts.length];
         long[] e = new long[sampleEnds.length];
         double[] v = new double[values.length];
