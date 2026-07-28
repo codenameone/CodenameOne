@@ -632,6 +632,30 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public void addBacksideHook(JSRunnable r) {
         backSideHooks.push(r);
     }
+
+    /**
+     * Hooks that only a gesture-backed drain may run.
+     *
+     * <p>{@link #backSideHooks} is also drained by the
+     * {@code platformHint.javascript.backsideHooksInterval} timer, which
+     * carries no transient activation. That is fine for media, but a
+     * {@code window.open()} drained from the polling timer is simply blocked --
+     * so a popup queued there can lose the race to the gesture's own timeout
+     * and never open. Anything needing activation goes here instead, where only
+     * {@link #runBacksideHooksInTimeout(int)} reaches it.</p>
+     */
+    private JSArray gestureOnlyHooks = JSArray.create();
+
+    private void addGestureOnlyHook(JSRunnable r) {
+        gestureOnlyHooks.push(r);
+    }
+
+    private void runGestureOnlyHooks() {
+        while (gestureOnlyHooks.getLength() > 0) {
+            JSRunnable r = (JSRunnable)gestureOnlyHooks.shift();
+            r.run();
+        }
+    }
     
     // Count the number of backside hook calls that are queued up
     private int backsideHooksSemaphore = 0;
@@ -663,6 +687,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
             public void onTimer() {
                 backsideHooksSemaphore--;
                 //_log("Decrementing backsideHooksSemaphore: "+backsideHooksSemaphore);
+                // This drain descends from a real interaction, so it is the
+                // only one allowed to run activation-dependent hooks.
+                runGestureOnlyHooks();
                 runBacksideHooks();
             }
         }, timeout);
@@ -7205,7 +7232,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // field. Never cleared; the next interaction simply carries a
             // different generation.
             popupReservedForGeneration = gestureGeneration;
-            addBacksideHook(new JSRunnable() {
+            addGestureOnlyHook(new JSRunnable() {
                 @Override
                 public void run() {
                     // openUrlOnMainThread reports the reason on failure --
@@ -7240,9 +7267,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // very thing the Sheet exists to recover from. That tap did
                 // install a backside hook though (pointer handling calls
                 // installBacksideHooksInUserInteraction), so queue the open on
-                // it and let the drain perform it inside the gesture. Same
-                // shape as the download confirmation in execute().
-                addBacksideHook(new JSRunnable() {
+                // it and let the drain perform it inside the gesture. On the
+                // gesture-only queue, or the polling interval could drain it
+                // first with no activation and block the link the user just
+                // confirmed.
+                addGestureOnlyHook(new JSRunnable() {
                     @Override
                     public void run() {
                         if (!openUrlOnMainThread(url, false, false)) {
@@ -7368,24 +7397,40 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 ? isBacksideHookAvailable()
                 : isGestureBackedHookAvailable();
         if (hookAvailable) {
-            addBacksideHook(new JSRunnable() {
+            JSRunnable hook = new JSRunnable() {
                 @Override
                 public void run() {
                     startDownload.run();
                 }
-            });
+            };
+            if (fuseBlobHandler) {
+                addBacksideHook(hook);
+            } else {
+                // The no-blob leg opens a popup, so it needs the activation
+                // only a gesture-backed drain carries -- same reason its gate
+                // above is the stricter one.
+                addGestureOnlyHook(hook);
+            }
 
         } else {
             String dlName = fileName == null ? "file" : fileName;
             createConfirmationSheet("Download file", "Download " + dlName + " now?", null, new Runnable() {
                 @Override
                 public void run() {
-                    addBacksideHook(new JSRunnable() {
+                    JSRunnable confirmed = new JSRunnable() {
                         @Override
                         public void run() {
                             startDownload.run();
                         }
-                    });
+                    };
+                    // Same split as the unconfirmed path above: the popup leg
+                    // needs the activation the OK tap just granted, which the
+                    // polling interval would not carry.
+                    if (fuseBlobHandler) {
+                        addBacksideHook(confirmed);
+                    } else {
+                        addGestureOnlyHook(confirmed);
+                    }
                 }
             }).show();
         }
