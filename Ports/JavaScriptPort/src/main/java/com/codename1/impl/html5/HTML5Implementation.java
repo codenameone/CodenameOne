@@ -6698,16 +6698,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private static final String EXECUTE_TARGET_SELF = "_self";
 
     /**
-     * Resolves the {@code javascript.execute.target} property, accepting the
-     * target names with or without the leading underscore.
+     * Resolves the {@code javascript.execute.target} property to one of the
+     * three documented values, falling back to {@code auto}. An unrecognized
+     * value is logged rather than silently accepted, so a typo is diagnosable
+     * instead of looking like the default was chosen deliberately.
      */
     private String executeTarget() {
         String target = Display.getInstance().getProperty("javascript.execute.target", EXECUTE_TARGET_AUTO);
-        if (EXECUTE_TARGET_SELF.equals(target) || "self".equals(target)) {
+        if (EXECUTE_TARGET_SELF.equals(target)) {
             return EXECUTE_TARGET_SELF;
         }
-        if (EXECUTE_TARGET_BLANK.equals(target) || "blank".equals(target) || "new".equals(target)) {
+        if (EXECUTE_TARGET_BLANK.equals(target)) {
             return EXECUTE_TARGET_BLANK;
+        }
+        if (!EXECUTE_TARGET_AUTO.equals(target)) {
+            _log("javascript.execute.target: unrecognized value '" + target
+                    + "', expected auto, _blank or _self. Using auto.");
         }
         return EXECUTE_TARGET_AUTO;
     }
@@ -6942,7 +6948,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 return false;
             }
         }
-        return !"file".equals(url.substring(0, colon).toLowerCase());
+        // equalsIgnoreCase rather than toLowerCase(): case folding a scheme
+        // through the default locale turns "FILE" into "fIle" under a Turkish
+        // locale and would classify a file: URL as external.
+        return !"file".equalsIgnoreCase(url.substring(0, colon));
     }
 
     /**
@@ -7045,7 +7054,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
         
         String buttonText = null;
         //String icon = null;
-        final String furl = url;
         if (useBlobHandler) {
             //popover.setContents("<button style='white-space:nowrap' onclick='window.cn1SaveBlobHandler();'><span style='font-size:3em;vertical-align:text-bottom;' class='glyphicon glyphicon-download'/><span style='font-size:2em;vertical-align:top;'> Download "+(fileName!=null?fileName:"File")+"</span></button>");
             buttonText = "Click to Download "+(fileName!=null?fileName:"File");
@@ -7063,7 +7071,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // isExternalUrl() is true for data: as well -- it does carry a
             // scheme -- so that branch MUST stay ahead of this one or data:
             // URLs would navigate instead of downloading.
-            openExternalUrl(furl);
+            openExternalUrl(url);
             return;
         } else {
             // A local/storage path we could not turn into a Blob: exists() said
@@ -7073,8 +7081,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // would point the page at a path the server does not serve and
             // unload the app instead of downloading anything. Best effort in a
             // new window, which is what this port did before.
-            _log("execute(): no downloadable content for " + furl);
-            openUrlOnMainThread(furl, false, false);
+            _log("execute(): no downloadable content for " + url);
+            openUrlOnMainThread(url, false, false);
             return;
         }
         final Runnable startDownload = new Runnable() {
@@ -7084,7 +7092,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     fireSaveBlobHandler();
                 } else {
                     _log("Opening URL in new window");
-                    openUrlOnMainThread(furl, false, false);
+                    openUrlOnMainThread(url, false, false);
                 }
             }
         };
