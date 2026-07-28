@@ -76,6 +76,20 @@ import java.util.Map;
 /// which is the right behaviour for a simulator that should start clean.
 public class LocalHealthStore extends HealthStore {
 
+    /// Held across a mutation *and* the persist it triggers, so the two
+    /// are one transaction.
+    ///
+    /// `samples` alone is not enough: it is released between changing the
+    /// list and encoding it, so two concurrent mutations could each
+    /// snapshot, then write in the opposite order, and the older snapshot
+    /// landed last. Both callers were told they had succeeded and a
+    /// deleted record came back on the next launch.
+    ///
+    /// Always taken *before* `samples`, never the other way round. Reads
+    /// take `samples` on its own and do not come here, so they are not
+    /// blocked by a save.
+    private final Object mutationLock = new Object();
+
     private final List<HealthSample> samples = new ArrayList<HealthSample>();
     private long nextId = 1;
 
@@ -391,39 +405,45 @@ public class LocalHealthStore extends HealthStore {
             AsyncResource<HealthWriteResult> out) {
         HealthWriteResult result = new HealthWriteResult();
         List<HealthSample> added = new ArrayList<HealthSample>();
-        synchronized (samples) {
-            for (HealthSample s : toWrite) {
-                String id = "local-" + (nextId++);
-                // The identifier goes on the stored copy only. Stamping
-                // the caller's object made this store the one place a
-                // write mutated its input -- and HealthSample.hashCode()
-                // switches from identity to the id once it is set, so a
-                // sample already in a HashSet or used as a map key became
-                // unreachable the moment it was written. The id reaches
-                // the caller through HealthWriteResult, as it does on
-                // every other platform.
-                //
-                // Stored as a copy: keeping the caller's object meant a
-                // later setId/setSource/putMetadata on it silently rewrote
-                // the stored record, and could make deleting by the
-                // returned id fail.
-                HealthSample stored = snapshot(s);
-                stored.setId(id);
-                samples.add(stored);
-                added.add(stored);
-                result.addSampleId(id);
+        boolean failed = false;
+        synchronized (mutationLock) {
+            synchronized (samples) {
+                for (HealthSample s : toWrite) {
+                    String id = "local-" + (nextId++);
+                    // The identifier goes on the stored copy only. Stamping
+                    // the caller's object made this store the one place a
+                    // write mutated its input -- and HealthSample.hashCode()
+                    // switches from identity to the id once it is set, so a
+                    // sample already in a HashSet or used as a map key became
+                    // unreachable the moment it was written. The id reaches
+                    // the caller through HealthWriteResult, as it does on
+                    // every other platform.
+                    //
+                    // Stored as a copy: keeping the caller's object meant a
+                    // later setId/setSource/putMetadata on it silently rewrote
+                    // the stored record, and could make deleting by the
+                    // returned id fail.
+                    HealthSample stored = snapshot(s);
+                    stored.setId(id);
+                    samples.add(stored);
+                    added.add(stored);
+                    result.addSampleId(id);
+                }
+            }
+            if (!persist()) {
+                // Rolled back rather than kept. `Storage.writeObject` reports
+                // a full or unwritable store by returning false, and a caller
+                // told the write succeeded would have a record that exists
+                // only until the process exits -- on the very ports whose
+                // whole claim is durability. Undoing it keeps memory and disk
+                // saying the same thing.
+                synchronized (samples) {
+                    samples.removeAll(added);
+                }
+                failed = true;
             }
         }
-        if (!persist()) {
-            // Rolled back rather than kept. `Storage.writeObject` reports
-            // a full or unwritable store by returning false, and a caller
-            // told the write succeeded would have a record that exists
-            // only until the process exits -- on the very ports whose
-            // whole claim is durability. Undoing it keeps memory and disk
-            // saying the same thing.
-            synchronized (samples) {
-                samples.removeAll(added);
-            }
+        if (failed) {
             failStorage(out);
             return;
         }
@@ -445,44 +465,50 @@ public class LocalHealthStore extends HealthStore {
     protected void doDelete(HealthDeleteRequest request,
             AsyncResource<Integer> out) {
         int removed = 0;
+        boolean failed = false;
         List<HealthSample> dropped = new ArrayList<HealthSample>();
-        synchronized (samples) {
-            if (request.isById()) {
-                List<String> ids = request.getSampleIds();
-                // The type is part of the request, and matching on the
-                // identifier alone ignored it. Health Connect deletes
-                // against a record class, so a stale or mispaired type and
-                // id removes nothing there while this store removed the
-                // record anyway -- the simulator being more destructive
-                // than the platform it stands in for.
-                List<HealthDataType> types = request.getTypes();
-                for (int i = samples.size() - 1; i >= 0; i--) {
-                    HealthSample s = samples.get(i);
-                    if (ids.contains(s.getId())
-                            && (types.isEmpty()
-                                    || types.contains(s.getType()))) {
-                        dropped.add(samples.remove(i));
-                        removed++;
+        synchronized (mutationLock) {
+            synchronized (samples) {
+                if (request.isById()) {
+                    List<String> ids = request.getSampleIds();
+                    // The type is part of the request, and matching on the
+                    // identifier alone ignored it. Health Connect deletes
+                    // against a record class, so a stale or mispaired type and
+                    // id removes nothing there while this store removed the
+                    // record anyway -- the simulator being more destructive
+                    // than the platform it stands in for.
+                    List<HealthDataType> types = request.getTypes();
+                    for (int i = samples.size() - 1; i >= 0; i--) {
+                        HealthSample s = samples.get(i);
+                        if (ids.contains(s.getId())
+                                && (types.isEmpty()
+                                        || types.contains(s.getType()))) {
+                            dropped.add(samples.remove(i));
+                            removed++;
+                        }
+                    }
+                } else {
+                    HealthTimeRange range = request.getTimeRange()
+                            .resolve(System.currentTimeMillis());
+                    for (int i = samples.size() - 1; i >= 0; i--) {
+                        HealthSample s = samples.get(i);
+                        if (request.getTypes().contains(s.getType())
+                                && s.getStartMillis() >= range.getStartMillis()
+                                && s.getStartMillis() < range.getEndMillis()) {
+                            dropped.add(samples.remove(i));
+                            removed++;
+                        }
                     }
                 }
-            } else {
-                HealthTimeRange range = request.getTimeRange()
-                        .resolve(System.currentTimeMillis());
-                for (int i = samples.size() - 1; i >= 0; i--) {
-                    HealthSample s = samples.get(i);
-                    if (request.getTypes().contains(s.getType())
-                            && s.getStartMillis() >= range.getStartMillis()
-                            && s.getStartMillis() < range.getEndMillis()) {
-                        dropped.add(samples.remove(i));
-                        removed++;
-                    }
+            }
+            if (removed > 0 && !persist()) {
+                synchronized (samples) {
+                    samples.addAll(dropped);
                 }
+                failed = true;
             }
         }
-        if (removed > 0 && !persist()) {
-            synchronized (samples) {
-                samples.addAll(dropped);
-            }
+        if (failed) {
             failStorage(out);
             return;
         }
@@ -564,19 +590,21 @@ public class LocalHealthStore extends HealthStore {
     /// Discards everything.
     public final void clear() {
         List<HealthSample> before;
-        synchronized (samples) {
-            before = new ArrayList<HealthSample>(samples);
-            samples.clear();
-        }
-        if (!persist()) {
-            // No result to fail -- this returns void -- so the least
-            // dishonest answer is to leave the store as it was rather
-            // than empty in memory and full on disk.
+        synchronized (mutationLock) {
             synchronized (samples) {
-                samples.addAll(before);
+                before = new ArrayList<HealthSample>(samples);
+                samples.clear();
             }
-            com.codename1.io.Log.p("CN1 Health: the local store could not"
-                    + " be cleared on disk, so it was left as it was");
+            if (!persist()) {
+                // No result to fail -- this returns void -- so the least
+                // dishonest answer is to leave the store as it was rather
+                // than empty in memory and full on disk.
+                synchronized (samples) {
+                    samples.addAll(before);
+                }
+                com.codename1.io.Log.p("CN1 Health: the local store could not"
+                        + " be cleared on disk, so it was left as it was");
+            }
         }
     }
 }

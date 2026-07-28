@@ -421,4 +421,143 @@ class LocalHealthPersistenceTest extends UITestBase {
             return super.writeBlob(blob);
         }
     }
+
+    /**
+     * A mutation and the save it triggers are one transaction.
+     *
+     * <p>Holding only the sample-list lock released it between changing
+     * the list and encoding it, so two concurrent mutations could each
+     * snapshot and then write in the opposite order -- the older snapshot
+     * landing last. Both callers were told they had succeeded, and a
+     * record deleted before the restart was back after it.</p>
+     *
+     * <p>Driven through a store that stalls inside the save, which is the
+     * window the race needs; without the transaction the stalled writer
+     * overwrites the delete that completed while it was parked.</p>
+     */
+    @Test
+    void aMutationAndItsSaveAreOneTransaction() throws Exception {
+        final StallingStore store = new StallingStore();
+        store.write(one(QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(1, HealthUnit.COUNT), T0,
+                T0 + MINUTE))).get();
+        List<HealthSample> stored = store.readSamples(query()).get();
+        assertEquals(1, stored.size());
+        final String firstId = stored.get(0).getId();
+
+        // A second write that parks inside persist, and a delete of the
+        // first record racing it.
+        store.stallNextSave = true;
+        final Throwable[] failure = new Throwable[1];
+        Thread writer = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    store.write(one(QuantitySample.create(
+                            HealthDataType.STEPS,
+                            new HealthQuantity(2, HealthUnit.COUNT),
+                            T0 + MINUTE, T0 + 2 * MINUTE))).get();
+                } catch (Throwable t) {
+                    failure[0] = t;
+                }
+            }
+        });
+        writer.start();
+        store.awaitStall();
+        final java.util.concurrent.CountDownLatch deleted =
+                new java.util.concurrent.CountDownLatch(1);
+        Thread deleter = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    store.delete(HealthDeleteRequest.byId(
+                            HealthDataType.STEPS, firstId)).get();
+                    deleted.countDown();
+                } catch (Throwable t) {
+                    failure[0] = t;
+                }
+            }
+        });
+        deleter.start();
+        // Wait for the delete to reach a decisive state rather than for a
+        // wall-clock interval: under the transaction it blocks on the
+        // same lock the parked write holds, and without it it runs to
+        // completion and the parked write then lands its stale snapshot
+        // on top. Timing out here would make the test pass for the wrong
+        // reason, so the loop below insists on one of the two.
+        Thread.State reached = awaitBlockedOrDone(deleter);
+        assertNotNull(reached, "the delete neither blocked nor finished");
+        store.releaseStall();
+        writer.join(10000);
+        deleter.join(10000);
+        assertNull(failure[0]);
+
+        // Whatever order they ran in, disk and memory must agree.
+        List<String> inMemory = new ArrayList<String>();
+        for (HealthSample s : store.readSamples(query()).get()) {
+            inMemory.add(s.getId());
+        }
+        List<String> onDisk = new ArrayList<String>();
+        for (HealthSample s : new StoredHealthStore()
+                .readSamples(query()).get()) {
+            onDisk.add(s.getId());
+        }
+        assertEquals(inMemory, onDisk,
+                "the saved store must match the one in memory");
+    }
+
+    /**
+     * Waits until {@code t} is either blocked on a monitor or finished,
+     * and reports which. Returns null if it does neither in time.
+     */
+    private static Thread.State awaitBlockedOrDone(Thread t)
+            throws InterruptedException {
+        for (int iter = 0; iter < 500; iter++) {
+            Thread.State state = t.getState();
+            if (state == Thread.State.BLOCKED
+                    || state == Thread.State.TERMINATED) {
+                return state;
+            }
+            Thread.sleep(10);
+        }
+        return null;
+    }
+
+    private static SampleQuery query() {
+        return new SampleQuery().addType(HealthDataType.STEPS)
+                .setTimeRange(HealthTimeRange.between(T0 - MINUTE,
+                        T0 + 10 * MINUTE));
+    }
+
+    /** A store whose save can be parked, opening the race window. */
+    private static final class StallingStore extends StoredHealthStore {
+
+        private volatile boolean stallNextSave;
+        private final java.util.concurrent.CountDownLatch stalled =
+                new java.util.concurrent.CountDownLatch(1);
+        private final java.util.concurrent.CountDownLatch release =
+                new java.util.concurrent.CountDownLatch(1);
+
+        void awaitStall() throws InterruptedException {
+            assertTrue(stalled.await(10, java.util.concurrent.TimeUnit
+                    .SECONDS), "the writer never reached the save");
+        }
+
+        void releaseStall() {
+            release.countDown();
+        }
+
+        @Override
+        protected boolean writeBlob(String blob) {
+            if (stallNextSave) {
+                stallNextSave = false;
+                stalled.countDown();
+                try {
+                    release.await(10,
+                            java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            return super.writeBlob(blob);
+        }
+    }
 }

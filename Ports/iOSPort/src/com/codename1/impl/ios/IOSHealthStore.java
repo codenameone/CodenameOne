@@ -270,8 +270,19 @@ class IOSHealthStore extends HealthStore {
     /// has elapsed since its last drain, with the anchor holding that
     /// timestamp.
     ///
-    /// This is not `HKAnchoredObjectQuery`: a real anchor would also
-    /// report deletions and would not re-read samples already seen. It is
+    /// This is not `HKAnchoredObjectQuery`, and the difference is more
+    /// than efficiency. The cursor is a *measurement* timestamp, so it
+    /// finds samples by when they were recorded rather than by when they
+    /// reached the store: a watch that syncs an hour late, or a reading
+    /// the user backdates, lands entirely behind the cursor and no later
+    /// drain will ever return it. A real anchor is ordered by insertion,
+    /// which is what makes it immune to that -- and it would report
+    /// deletions and stop re-reading samples already seen at the same
+    /// time. Until it lands, an app that must be complete rather than
+    /// merely current has to re-read its range periodically; the
+    /// developer guide says so where subscriptions are introduced.
+    ///
+    /// This is
     /// what makes subscriptions work at all on iOS today, and the window
     /// is closed only after the batch has been handled, so a crash re-reads
     /// rather than skips. Deletions are not reported --
