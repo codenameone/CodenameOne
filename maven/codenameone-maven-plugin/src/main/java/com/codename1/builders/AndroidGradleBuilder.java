@@ -2062,8 +2062,20 @@ public class AndroidGradleBuilder extends Executor {
             // permission. An availability-only app never presents the
             // rationale screen, so demanding a policy URL rejected a
             // harmless flow for a hint it would never use.
+            // The two special reads count as permissions in their own
+            // right: they are injected into the manifest whether or not
+            // any type list is populated, so a build declaring only
+            // android.health.background shipped READ_HEALTH_DATA_IN_
+            // BACKGROUND with a rationale screen that had no policy link
+            // to show -- exactly the Play rejection this gate exists to
+            // prevent.
+            boolean specialReads = "true".equalsIgnoreCase(request.getArg(
+                    "android.health.background", "false"))
+                    || "true".equalsIgnoreCase(request.getArg(
+                            "android.health.history", "false"));
             boolean requestsPermissions =
-                    !readTypes.isEmpty() || !writeTypes.isEmpty();
+                    !readTypes.isEmpty() || !writeTypes.isEmpty()
+                    || specialReads;
             // Trimmed before it is judged, and the trimmed value is what
             // gets emitted. A raw length test accepted "   " and wrote a
             // whitespace-only resource, so the rationale screen had no
