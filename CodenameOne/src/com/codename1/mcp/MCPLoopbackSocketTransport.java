@@ -289,8 +289,10 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         return true;
     }
 
+    /// Decodes straight out of the buffer. toByteArray() would copy the whole payload
+    /// first, which for a frame near the ceiling is megabytes of pointless duplication.
     private static String toUtf8(ByteArrayOutputStream buffer) throws IOException {
-        return new String(buffer.toByteArray(), "UTF-8");
+        return buffer.toString("UTF-8");
     }
 
     @Override

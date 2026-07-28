@@ -10871,6 +10871,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDebuggableBuild___R_boolean(CN1_
     // no provisioning profile to inspect, which is what the device path relies on.
     return JAVA_TRUE;
 #else
+    // The provisioning profile is fixed for the life of the process, so read and parse it
+    // once. This is consulted by the MCP gate and is public through
+    // Display.isDebuggableBuild(), so a caller is free to ask repeatedly, and file IO plus
+    // a plist parse per call would be a poor answer to that.
+    static JAVA_BOOLEAN cachedDebuggable = JAVA_FALSE;
+    static dispatch_once_t debuggableOnce;
+    dispatch_once(&debuggableOnce, ^{
     POOL_BEGIN();
     JAVA_BOOLEAN result = JAVA_FALSE;
     // get-task-allow is the entitlement that lets a debugger attach. Development and
@@ -10921,7 +10928,9 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDebuggableBuild___R_boolean(CN1_
     // Every path that could not read an answer leaves result JAVA_FALSE: an unreadable or
     // unexpected profile means "treat this as a release build", which withholds the
     // facility rather than exposing it.
-    return result;
+    cachedDebuggable = result;
+    });
+    return cachedDebuggable;
 #endif
 }
 
