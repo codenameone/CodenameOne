@@ -272,11 +272,11 @@ class WorkoutAndNutritionTest extends UITestBase {
                 .setLocationType(
                         com.codename1.health.workout.WorkoutLocationType
                                 .OUTDOOR)
-                .setKeepAliveInBackground(true)
                 .setTitle("Evening ride");
         assertEquals(WorkoutActivityType.CYCLING, c.getActivityType());
-        assertTrue(c.isKeepAliveInBackground());
         assertEquals("Evening ride", c.getTitle());
+        // Keepalive is covered on its own below: it is refused in this
+        // release, and this case asserted that it was stored.
     }
 
     @Test
@@ -473,5 +473,25 @@ class WorkoutAndNutritionTest extends UITestBase {
                 AggregateMetric.MINIMUM).getValue(
                         HealthUnit.COUNT_PER_MINUTE), 1e-9,
                 "but it still counts everywhere else");
+    }
+
+    /**
+     * Background keepalive is not implemented anywhere in this release,
+     * so the setter refuses it rather than storing a request nothing
+     * honours.
+     *
+     * <p>An accepted-but-ignored flag is the worst of the options here:
+     * the app cannot tell it was ignored until a user loses a workout to
+     * a suspended process.</p>
+     */
+    @Test
+    void backgroundKeepAliveIsRefusedRatherThanIgnored() {
+        WorkoutConfiguration c = new WorkoutConfiguration()
+                .setActivityType(WorkoutActivityType.RUNNING);
+        assertThrows(IllegalArgumentException.class,
+                () -> c.setKeepAliveInBackground(true));
+        // False is the default and stays accepted.
+        c.setKeepAliveInBackground(false);
+        assertFalse(c.isKeepAliveInBackground());
     }
 }

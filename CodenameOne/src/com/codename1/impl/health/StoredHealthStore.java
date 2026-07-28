@@ -87,20 +87,26 @@ public class StoredHealthStore extends LocalHealthStore {
     }
 
     @Override
-    protected void persist() {
+    protected boolean persist() {
         if (!loaded) {
-            return;
+            return true;
         }
         try {
-            Storage.getInstance().writeObject(KEY,
+            // The return value matters: Storage reports a full or
+            // unwritable store by answering false rather than throwing,
+            // and ignoring it let a write be acknowledged as durable when
+            // it only ever reached memory. The caller sees the failure
+            // now, and the change is rolled back.
+            boolean written = Storage.getInstance().writeObject(KEY,
                     LocalHealthCodec.encode(getAllSamples()));
+            if (!written) {
+                Log.p("CN1 Health: the local store could not be written");
+            }
+            return written;
         } catch (RuntimeException ex) {
-            // Said out loud rather than swallowed: the write the app just
-            // made looked like it succeeded, and it did -- in memory. If
-            // it cannot reach storage the app should be able to find out
-            // why from the log rather than from data missing next launch.
             Log.p("CN1 Health: could not persist the local store (" + ex
                     + ")");
+            return false;
         }
     }
 }

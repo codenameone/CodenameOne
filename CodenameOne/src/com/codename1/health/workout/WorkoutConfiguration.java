@@ -67,21 +67,40 @@ public final class WorkoutConfiguration {
     }
 
     /// Asks the operating system to keep the app running while the workout
-    /// records.
+    /// records. **Not available in this release** -- passing `true`
+    /// throws.
     ///
-    /// On watchOS and iOS 26 the workout session itself holds the process
-    /// alive and this needs nothing further. **On Android it requires a
-    /// foreground service**, so the app must set the
-    /// `android.health.foregroundService` build hint -- without it,
-    /// starting such a session fails configuration validation rather than
-    /// being silently killed mid-run.
+    /// Nothing honours it anywhere yet. Keeping the process alive needs
+    /// either a live `HKWorkoutSession`, which
+    /// [WorkoutManager#isLiveSessionSupported()] reports false for on
+    /// every platform here, or an Android foreground service, which the
+    /// build does not emit and for which no build hint exists. A setter
+    /// that stored the request and let the workout be killed mid-run
+    /// would be worse than one that refuses it: the app could not tell
+    /// the difference until a user lost a workout.
+    ///
+    /// Until then, record with the app in the foreground, and write what
+    /// you have collected rather than assuming the session will still be
+    /// running when the user comes back.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `keepAliveInBackground` is `true`.
     public WorkoutConfiguration setKeepAliveInBackground(
             boolean keepAliveInBackground) {
-        this.keepAliveInBackground = keepAliveInBackground;
+        if (keepAliveInBackground) {
+            throw new IllegalArgumentException("keeping the app alive"
+                    + " during a workout is not implemented on any"
+                    + " platform in this release; nothing would honour the"
+                    + " request and the workout would be lost when the OS"
+                    + " suspended the process");
+        }
+        this.keepAliveInBackground = false;
         return this;
     }
 
-    /// `true` when background recording was requested.
+    /// Always `false` in this release -- see
+    /// [#setKeepAliveInBackground(boolean)].
     public boolean isKeepAliveInBackground() {
         return keepAliveInBackground;
     }

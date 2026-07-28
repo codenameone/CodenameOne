@@ -25,6 +25,7 @@ package com.codename1.health;
 import com.codename1.health.nutrition.Nutrient;
 import com.codename1.health.nutrition.NutritionSample;
 import com.codename1.impl.health.StoredHealthStore;
+import com.codename1.util.AsyncResource;
 import com.codename1.io.Storage;
 import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.BeforeEach;
@@ -283,5 +284,82 @@ class LocalHealthPersistenceTest extends UITestBase {
                 .addType(HealthDataType.STEPS)
                 .setTimeRange(HealthTimeRange.between(T0 - MINUTE,
                         T0 + MINUTE))).get().isEmpty());
+    }
+
+    /**
+     * A store that cannot be written must not report the write as stored.
+     *
+     * <p>{@code Storage.writeObject} answers false for a full or
+     * unwritable store rather than throwing, and ignoring that let the
+     * caller be told a durable write succeeded when the record only ever
+     * reached memory -- on the very ports whose whole claim is
+     * durability. The change is rolled back so memory and disk agree.</p>
+     */
+    @Test
+    void aFailedPersistFailsTheWriteAndRollsItBack() throws Exception {
+        UnwritableStore store = new UnwritableStore();
+        AsyncResource<HealthWriteResult> write = store.write(
+                one(QuantitySample.create(HealthDataType.STEPS,
+                        new HealthQuantity(3, HealthUnit.COUNT), T0,
+                        T0 + MINUTE)));
+
+        assertNotNull(errorOf(write), "the write must not look successful");
+        assertEquals(HealthError.DATABASE_INACCESSIBLE,
+                ((HealthException) errorOf(write)).getError());
+        assertTrue(store.readSamples(new SampleQuery()
+                .addType(HealthDataType.STEPS)
+                .setTimeRange(HealthTimeRange.between(T0 - MINUTE,
+                        T0 + 2 * MINUTE))).get().isEmpty(),
+                "the rolled-back sample must not linger in memory");
+    }
+
+    /** A delete that cannot be persisted puts the records back. */
+    @Test
+    void aFailedPersistRestoresADelete() throws Exception {
+        UnwritableStore store = new UnwritableStore();
+        store.allowWrites = true;
+        store.write(one(QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(3, HealthUnit.COUNT), T0,
+                T0 + MINUTE))).get();
+        List<HealthSample> stored = store.readSamples(new SampleQuery()
+                .addType(HealthDataType.STEPS)
+                .setTimeRange(HealthTimeRange.between(T0 - MINUTE,
+                        T0 + 2 * MINUTE))).get();
+        assertEquals(1, stored.size());
+
+        store.allowWrites = false;
+        AsyncResource<Integer> delete = store.delete(
+                HealthDeleteRequest.byId(HealthDataType.STEPS,
+                        stored.get(0).getId()));
+
+        assertNotNull(errorOf(delete));
+        assertEquals(1, store.readSamples(new SampleQuery()
+                .addType(HealthDataType.STEPS)
+                .setTimeRange(HealthTimeRange.between(T0 - MINUTE,
+                        T0 + 2 * MINUTE))).get().size(),
+                "the record must come back when the delete cannot be"
+                        + " persisted");
+    }
+
+    private static Throwable errorOf(AsyncResource<?> r) {
+        final Throwable[] err = new Throwable[1];
+        r.except(new com.codename1.util.SuccessCallback<Throwable>() {
+            public void onSucess(Throwable t) {
+                err[0] = t;
+            }
+        });
+        return err[0];
+    }
+
+    /** A store whose backing storage refuses to take anything. */
+    private static final class UnwritableStore
+            extends com.codename1.impl.health.LocalHealthStore {
+
+        private boolean allowWrites;
+
+        @Override
+        protected boolean persist() {
+            return allowWrites;
+        }
     }
 }

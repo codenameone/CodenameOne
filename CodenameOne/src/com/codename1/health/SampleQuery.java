@@ -171,10 +171,21 @@ public final class SampleQuery {
     /// session reassembly. Defaults to 15 minutes.
     ///
     /// HealthKit stores sleep as a run of category samples with no session
-    /// object, so the port groups samples separated by less than this gap
-    /// into one [SleepSample]. Raise it if your users nap; lower it if
-    /// you would rather see brief wakings split the night. Ignored on
-    /// Android, where sessions are stored natively.
+    /// object, so the port is meant to group samples separated by less
+    /// than this gap into one [SleepSample]. Raise it if your users nap;
+    /// lower it if you would rather see brief wakings split the night.
+    /// Ignored on Android, where sessions are stored natively.
+    ///
+    /// #### It does nothing in this release
+    ///
+    /// The reassembly it configures is not implemented. The iOS type map
+    /// carries quantity types only, so [HealthDataType#SLEEP] is refused
+    /// before a query runs and there is no run of category samples for
+    /// this gap to group. The value is stored and returned faithfully and
+    /// changes no behaviour anywhere; it is kept rather than removed
+    /// because the grouping is the shape the port will need, and a
+    /// setting that silently did nothing without saying so is what this
+    /// note exists to prevent.
     public SampleQuery setSleepSessionGapMillis(long gapMillis) {
         this.sleepSessionGapMillis = gapMillis;
         return this;

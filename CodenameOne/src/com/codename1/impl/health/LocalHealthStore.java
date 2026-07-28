@@ -28,6 +28,8 @@ import com.codename1.health.AggregateResult;
 import com.codename1.health.HealthAggregationStyle;
 import com.codename1.health.HealthAuthorizationStatus;
 import com.codename1.health.HealthDataType;
+import com.codename1.health.HealthException;
+import com.codename1.health.HealthError;
 import com.codename1.health.HealthDeleteRequest;
 import com.codename1.health.HealthSample;
 import com.codename1.health.HealthStore;
@@ -388,6 +390,7 @@ public class LocalHealthStore extends HealthStore {
     protected void doWrite(List<HealthSample> toWrite,
             AsyncResource<HealthWriteResult> out) {
         HealthWriteResult result = new HealthWriteResult();
+        List<HealthSample> added = new ArrayList<HealthSample>();
         synchronized (samples) {
             for (HealthSample s : toWrite) {
                 String id = "local-" + (nextId++);
@@ -407,17 +410,42 @@ public class LocalHealthStore extends HealthStore {
                 HealthSample stored = snapshot(s);
                 stored.setId(id);
                 samples.add(stored);
+                added.add(stored);
                 result.addSampleId(id);
             }
         }
-        persist();
+        if (!persist()) {
+            // Rolled back rather than kept. `Storage.writeObject` reports
+            // a full or unwritable store by returning false, and a caller
+            // told the write succeeded would have a record that exists
+            // only until the process exits -- on the very ports whose
+            // whole claim is durability. Undoing it keeps memory and disk
+            // saying the same thing.
+            synchronized (samples) {
+                samples.removeAll(added);
+            }
+            failStorage(out);
+            return;
+        }
         completeInline(out, result);
+    }
+
+    /// Fails an operation that could not be made durable.
+    ///
+    /// `DATABASE_INACCESSIBLE` because that is the retryable "the store
+    /// would not take it" answer callers already handle from the phones;
+    /// a local store that is full or read-only is the same situation.
+    private static void failStorage(AsyncResource out) {
+        out.error(new HealthException(HealthError.DATABASE_INACCESSIBLE,
+                "the local health store could not be written; the change"
+                        + " was rolled back"));
     }
 
     @Override
     protected void doDelete(HealthDeleteRequest request,
             AsyncResource<Integer> out) {
         int removed = 0;
+        List<HealthSample> dropped = new ArrayList<HealthSample>();
         synchronized (samples) {
             if (request.isById()) {
                 List<String> ids = request.getSampleIds();
@@ -433,7 +461,7 @@ public class LocalHealthStore extends HealthStore {
                     if (ids.contains(s.getId())
                             && (types.isEmpty()
                                     || types.contains(s.getType()))) {
-                        samples.remove(i);
+                        dropped.add(samples.remove(i));
                         removed++;
                     }
                 }
@@ -445,14 +473,18 @@ public class LocalHealthStore extends HealthStore {
                     if (request.getTypes().contains(s.getType())
                             && s.getStartMillis() >= range.getStartMillis()
                             && s.getStartMillis() < range.getEndMillis()) {
-                        samples.remove(i);
+                        dropped.add(samples.remove(i));
                         removed++;
                     }
                 }
             }
         }
-        if (removed > 0) {
-            persist();
+        if (removed > 0 && !persist()) {
+            synchronized (samples) {
+                samples.addAll(dropped);
+            }
+            failStorage(out);
+            return;
         }
         completeInline(out, Integer.valueOf(removed));
     }
@@ -461,9 +493,17 @@ public class LocalHealthStore extends HealthStore {
     // extension points
     // ------------------------------------------------------------------
 
-    /// Called after every mutation. The in-memory base does nothing;
-    /// subclasses that persist override it.
-    protected void persist() {
+    /// Called after every mutation.
+    ///
+    /// #### Returns
+    ///
+    /// Whether the store is durable as a result. The in-memory base has
+    /// nothing to write and nothing to promise, so it answers `true`; a
+    /// persisting subclass answers `false` when the write did not land,
+    /// and the mutation that triggered it is rolled back and reported as
+    /// a failure rather than acknowledged as stored.
+    protected boolean persist() {
+        return true;
     }
 
     /// Whether `s` is visible to reads and aggregates at all.
@@ -523,9 +563,20 @@ public class LocalHealthStore extends HealthStore {
 
     /// Discards everything.
     public final void clear() {
+        List<HealthSample> before;
         synchronized (samples) {
+            before = new ArrayList<HealthSample>(samples);
             samples.clear();
         }
-        persist();
+        if (!persist()) {
+            // No result to fail -- this returns void -- so the least
+            // dishonest answer is to leave the store as it was rather
+            // than empty in memory and full on disk.
+            synchronized (samples) {
+                samples.addAll(before);
+            }
+            com.codename1.io.Log.p("CN1 Health: the local store could not"
+                    + " be cleared on disk, so it was left as it was");
+        }
     }
 }
