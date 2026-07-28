@@ -674,7 +674,24 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         }
         gestureOnlyHooks.add(new GestureHook(gestureGeneration, r));
+        if (pendingGestureDrains <= 0) {
+            // Generation matching keeps an older drain from taking this hook,
+            // but only a drain of THIS interaction will run it -- and there may
+            // be none left. Safari schedules a single 75/300ms drain, so an EDT
+            // slower than that would strand the hook forever and the confirmed
+            // link would do nothing at all. Schedule one. The activation is
+            // probably gone by now, but an attempt that reports failure beats
+            // silence: the caller logs it, or falls back to the Sheet.
+            runBacksideHooksInTimeout(0);
+        }
     }
+
+    /**
+     * Drains still scheduled for {@link #gestureGeneration}. Reset when a new
+     * interaction begins, since an older interaction's drains cannot run this
+     * one's hooks.
+     */
+    private int pendingGestureDrains;
 
     private void runGestureOnlyHooks(int generation) {
         // Collected before running: a hook may queue another one, and mutating
@@ -719,10 +736,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // Remember which interaction scheduled this drain, so it only runs the
         // activation-dependent hooks that same interaction queued.
         final int generation = gestureGeneration;
+        pendingGestureDrains++;
         Window.setTimeout(new TimerHandler() {
             @Override
             public void onTimer() {
                 backsideHooksSemaphore--;
+                if (generation == gestureGeneration) {
+                    pendingGestureDrains--;
+                }
                 //_log("Decrementing backsideHooksSemaphore: "+backsideHooksSemaphore);
                 // This drain descends from a real interaction, so it may run
                 // that interaction's activation-dependent hooks -- and only
@@ -807,8 +828,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     private void installBacksideHooksInUserInteraction() {
         // A distinct interaction, so a popup reserved against the previous one
-        // no longer applies -- see popupReservedForGeneration.
+        // no longer applies -- see popupReservedForGeneration -- and the
+        // previous one's outstanding drains cannot serve this one's hooks.
         gestureGeneration++;
+        pendingGestureDrains = 0;
         if (isIOS() || isSafari()) {
             debugLog("Installing backside hooks with delay "+safariBacksideHookDelay());
             runBacksideHooksInTimeout(safariBacksideHookDelay());
