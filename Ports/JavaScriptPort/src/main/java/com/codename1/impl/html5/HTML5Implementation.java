@@ -693,7 +693,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // link would do nothing at all. Schedule one. The activation is
             // probably gone by now, but an attempt that reports failure beats
             // silence: the caller logs it, or falls back to the Sheet.
-            runBacksideHooksInTimeout(0);
+            runBacksideHooksInTimeout(0, false);
         }
     }
 
@@ -756,7 +756,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * @param timeout 
      */
     private void runBacksideHooksInTimeout(int timeout) {
-        backsideHooksSemaphore++;
+        runBacksideHooksInTimeout(timeout, true);
+    }
+
+    /**
+     * @param fromInteraction true when a real pointer or key event scheduled
+     *   this drain. Only those raise {@link #backsideHooksSemaphore}, because
+     *   that is what {@link #isGestureBackedHookAvailable()} reads to decide a
+     *   popup may be attempted. A drain we schedule ourselves to rescue a
+     *   stranded hook carries no activation, so counting it there would claim a
+     *   gesture that does not exist and send a popup to be blocked instead of
+     *   to the Sheet.
+     */
+    private void runBacksideHooksInTimeout(int timeout, final boolean fromInteraction) {
+        if (fromInteraction) {
+            backsideHooksSemaphore++;
+        }
         //_log("Incrementing backsideHooksSemaphore: "+backsideHooksSemaphore);
         // Remember which interaction scheduled this drain, so it only runs the
         // activation-dependent hooks that same interaction queued.
@@ -765,7 +780,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         Window.setTimeout(new TimerHandler() {
             @Override
             public void onTimer() {
-                backsideHooksSemaphore--;
+                if (fromInteraction) {
+                    backsideHooksSemaphore--;
+                }
                 if (generation == gestureGeneration) {
                     pendingGestureDrains--;
                 }
@@ -7039,7 +7056,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private void addBacksideHookEnsuringDrain(JSRunnable r) {
         addBacksideHook(r);
         if (pendingGestureDrains <= 0 && backsideHooksIntervalHandle == 0) {
-            runBacksideHooksInTimeout(0);
+            runBacksideHooksInTimeout(0, false);
         }
     }
 
