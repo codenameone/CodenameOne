@@ -281,29 +281,46 @@ public class HealthBridgeTokenTableTest {
     }
 
     /**
-     * The unreadable-token list matches what the bridge can actually map.
+     * The rejection lists match what the bridge can actually do, per
+     * direction.
      *
-     * <p>A token with a Health Connect permission but no record class
-     * produces an app carrying a health permission it can never exercise:
-     * the read fails as an invalid argument and a change subscription
-     * refuses the same token. The build rejects those, and this keeps the
-     * rejection list honest -- adding a `recordClassFor` branch without
-     * removing the token here would keep refusing a type that now works,
-     * and the reverse would let an unusable permission ship again.</p>
+     * <p>A token with a Health Connect permission but no support in the
+     * requested direction produces an app carrying a health permission it
+     * can never exercise. Read and write differ:
+     * {@code readableRecordClassFor} refuses sleep and workout on top of
+     * whatever has no record class, and {@code toRecord} has its own,
+     * larger set of gaps -- a single symmetric list accepted
+     * {@code read=sleep} and {@code write=power}, both of which fail at
+     * runtime. This keeps both lists honest in both directions.</p>
      */
     @Test
-    public void theUnreadableTokenListMatchesTheBridge() throws Exception {
+    public void theRejectionListsMatchTheBridge() throws Exception {
         String src = source();
-        int start = src.indexOf("private fun recordClassFor(");
-        assertTrue("the bridge must declare recordClassFor", start > 0);
-        String body = src.substring(start, src.indexOf("\n    }", start));
+        String records = body(src, "private fun recordClassFor(");
+        String inserts = body(src, "private fun toRecord(");
+        // readableRecordClassFor subtracts these two from recordClassFor.
+        java.util.List<String> notRead = java.util.Arrays.asList(
+                "sleep", "workout");
         for (String token : bridgeTable().keySet()) {
-            boolean mapped = body.contains("\"" + token + "\"");
-            boolean rejected = !HealthManifestFragments.unreadableTokens(
-                    java.util.Collections.singletonList(token)).isEmpty();
-            assertEquals(token + ": a token the bridge cannot map must be"
-                    + " rejected by the build, and one it can map must not"
-                    + " be", !mapped, rejected);
+            boolean readable = records.contains("\"" + token + "\"")
+                    && !notRead.contains(token);
+            boolean writable = inserts.contains("\"" + token + "\" ->");
+            assertEquals(token + ": read capability and the build's read"
+                    + " rejection list must agree", !readable,
+                    !HealthManifestFragments.unreadableTokens(
+                            java.util.Collections.singletonList(token))
+                            .isEmpty());
+            assertEquals(token + ": write capability and the build's write"
+                    + " rejection list must agree", !writable,
+                    !HealthManifestFragments.unwritableTokens(
+                            java.util.Collections.singletonList(token))
+                            .isEmpty());
         }
+    }
+
+    private static String body(String src, String signature) {
+        int start = src.indexOf(signature);
+        assertTrue("the bridge must declare " + signature, start > 0);
+        return src.substring(start, src.indexOf("\n    }", start));
     }
 }

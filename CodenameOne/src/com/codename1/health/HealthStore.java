@@ -380,9 +380,18 @@ public class HealthStore {
                             // token would discard samples the token
                             // resumes past, losing them for good; the
                             // caller asked for a limit, not for a hole.
-                            while (next == null
-                                    && collected.size() > limit) {
-                                collected.remove(collected.size() - 1);
+                            //
+                            // And never inside a record. One series record
+                            // flattens into many samples sharing an id, so
+                            // cutting through it drops measurements that no
+                            // token and no repeat of this same query would
+                            // bring back -- a heart-rate record holding
+                            // more points than the limit would come back
+                            // permanently docked. Whole records only: the
+                            // last one is either kept entire, overshooting
+                            // the limit, or dropped entire.
+                            if (next == null && collected.size() > limit) {
+                                trimToRecordBoundary(collected, limit);
                             }
                             out.complete(collected);
                             return;
@@ -390,6 +399,35 @@ public class HealthStore {
                         readPageInto(query, collected, out, next);
                     }
                 });
+    }
+
+    /// Drops whole records from the tail until at most `limit` samples
+    /// remain, keeping the last record entire when cutting it would be
+    /// the only way to reach the limit.
+    ///
+    /// Samples flattened out of one series record share its identifier,
+    /// and nothing can return the half that a mid-record cut discards.
+    private static void trimToRecordBoundary(List<HealthSample> collected,
+            int limit) {
+        while (collected.size() > limit) {
+            String id = collected.get(collected.size() - 1).getId();
+            int from = collected.size() - 1;
+            while (from > 0 && sameRecord(collected.get(from - 1), id)) {
+                from--;
+            }
+            if (from < limit) {
+                // Dropping this record would take us under the limit, so
+                // it is the record the cut would fall inside. Keep it.
+                return;
+            }
+            while (collected.size() > from) {
+                collected.remove(collected.size() - 1);
+            }
+        }
+    }
+
+    private static boolean sameRecord(HealthSample s, String id) {
+        return id != null && id.equals(s.getId());
     }
 
     /// Reads a single page of samples. Prefer this over

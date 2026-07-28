@@ -2056,10 +2056,15 @@ public class AndroidGradleBuilder extends Executor {
             // read or delete, so an app declaring one shipped a health
             // permission it could never exercise -- and Play asks what
             // every health permission is for.
+            // Per direction, because the bridge's capabilities are per
+            // direction: reads refuse sleep and workout on top of whatever
+            // has no record class, and inserts have their own larger set
+            // of gaps. One symmetric list accepted read=sleep and
+            // write=power, both of which fail at runtime.
             java.util.List<String> unreadable =
                     HealthManifestFragments.unreadableTokens(readTokens);
             unreadable.addAll(
-                    HealthManifestFragments.unreadableTokens(writeTokens));
+                    HealthManifestFragments.unwritableTokens(writeTokens));
             if (!unreadable.isEmpty()) {
                 error("Health Connect support for " + unreadable
                         + " is not implemented in this build, so declaring"

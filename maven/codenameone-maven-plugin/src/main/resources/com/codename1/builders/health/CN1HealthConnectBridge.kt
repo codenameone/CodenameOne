@@ -296,15 +296,19 @@ class CN1HealthConnectBridge(private val context: Context)
             // memory, and the reply says so rather than pretending to be
             // complete -- with no token, because there is no next page to
             // ask for. Multi-type queries are single-page.
-            val singleType = types.length() == 1
-            val merged = if (singleType) perType[0]
-                else mergeByTime(perType, budget, ascending)
-            val truncated = !singleType && perType.sumOf { block ->
-                block.count { it == '\n' }
-            } > merged.count { it == '\n' }
-            if (truncated) {
-                outTokens.clear()
-            }
+            // Nothing is trimmed here, for either shape. Each type's
+            // token points after the records that type actually emitted,
+            // so dropping lines to meet a budget discards samples the
+            // token has already moved past -- and clearing the tokens to
+            // admit that produced the worst answer of all: a continuation
+            // flag with no continuation, which reads as a new query and
+            // repeats the first page forever. Every type is emitted whole
+            // in time order, the reply overshoots the limit by at most the
+            // tail of one page per type, and the shared layer trims for
+            // the caller on a record boundary.
+            val merged = if (types.length() == 1) perType[0]
+                else mergeByTime(perType, ascending)
+            val truncated = false
             sb.append(merged)
             // Trailer: what is left on the platform side. Reporting nothing
             // made every page look complete, so the caller's paging loop
@@ -353,7 +357,7 @@ class CN1HealthConnectBridge(private val context: Context)
      * The line format leads with id, type, start -- start is field 2 -- so
      * the merge sorts on that rather than re-parsing into records.
      */
-    private fun mergeByTime(blocks: List<String>, limit: Int,
+    private fun mergeByTime(blocks: List<String>,
                             ascending: Boolean): String {
         val lines = ArrayList<String>()
         for (block in blocks) {
@@ -369,34 +373,10 @@ class CN1HealthConnectBridge(private val context: Context)
         }
         val ordered = if (ascending) keyed else keyed.asReversed()
         val out = StringBuilder()
-        // The cut never falls inside a record. Every line from one series
-        // record shares its id, and Health Connect's token resumes after a
-        // whole record -- so trimming mid-record stranded the remaining
-        // samples with no token that could ever reach them. Overshooting
-        // the limit by the tail of one record is recoverable; losing it is
-        // not.
-        //
-        // Records are admitted, and admission is what the budget buys; the
-        // loop never breaks. Two earlier attempts stopped at the first
-        // line of an unseen record: comparing against only the previous
-        // line's id cut inside a record whose samples interleaved with
-        // another's (A1, B1, A2), and remembering which records had
-        // started still stopped at C1 in A1, B1, C1, A2 -- leaving A
-        // half-emitted while the token had advanced past all of it, so A2
-        // was unreachable for good. Skipping a line whose record was never
-        // admitted, rather than stopping on it, lets every admitted record
-        // run to its end and keeps the output in time order.
-        val admitted = HashSet<String>()
-        var emitted = 0
+        // Everything, in time order. Trimming here is what stranded
+        // records behind an already-advanced token; the shared layer
+        // applies the caller's limit, and does it on a record boundary.
         for (line in ordered) {
-            val id = line.substringBefore('\t')
-            if (!admitted.contains(id)) {
-                if (limit in 1..emitted) {
-                    continue
-                }
-                admitted.add(id)
-            }
-            emitted++
             out.append(line).append('\n')
         }
         return out.toString()
@@ -823,7 +803,7 @@ class CN1HealthConnectBridge(private val context: Context)
         return when (token) {
             "steps" -> StepsRecord(startTime = start, endTime = end,
                 startZoneOffset = zone, endZoneOffset = endZone,
-                count = value.toLong(), metadata = meta)
+                count = wholeCount(token, value), metadata = meta)
 
             // Only the generic distance type is written. Writing a
             // cycling distance as a bare DistanceRecord would erase the
@@ -846,7 +826,7 @@ class CN1HealthConnectBridge(private val context: Context)
 
             "wheelchair_pushes" -> WheelchairPushesRecord(startTime = start,
                 endTime = end, startZoneOffset = zone, endZoneOffset = endZone,
-                count = value.toLong(), metadata = meta)
+                count = wholeCount(token, value), metadata = meta)
 
             "hydration" -> HydrationRecord(startTime = start, endTime = end,
                 startZoneOffset = zone, endZoneOffset = endZone,
@@ -870,7 +850,7 @@ class CN1HealthConnectBridge(private val context: Context)
                 height = Length.meters(value), metadata = meta)
 
             "resting_heart_rate" -> RestingHeartRateRecord(time = start,
-                zoneOffset = zone, beatsPerMinute = value.toLong(),
+                zoneOffset = zone, beatsPerMinute = wholeCount(token, value),
                 metadata = meta)
 
             "oxygen_saturation" -> OxygenSaturationRecord(time = start,
@@ -904,7 +884,7 @@ class CN1HealthConnectBridge(private val context: Context)
                 endTime = if (end.isAfter(start)) end else start.plusMillis(1),
                 startZoneOffset = zone, endZoneOffset = endZone,
                 samples = listOf(HeartRateRecord.Sample(time = start,
-                    beatsPerMinute = value.toLong())), metadata = meta)
+                    beatsPerMinute = wholeCount(token, value))), metadata = meta)
 
             else -> throw IllegalArgumentException(
                 "Health Connect writes are not implemented for '" + token
@@ -1080,6 +1060,25 @@ class CN1HealthConnectBridge(private val context: Context)
     ///
     /// A fact about the record class, not an estimate: these five are the
     /// series-shaped types, the same set `appendWholeSeries` handles.
+    /**
+     * A count Health Connect can store, or a refusal.
+     *
+     * These records take a Long. `toLong()` truncates, so writing 1.9
+     * steps stored 1 and reported success -- silently changing health data
+     * on its way to disk, which is worse than refusing it. Whole values
+     * pass; anything else is rejected by name so the caller can decide how
+     * to round.
+     */
+    private fun wholeCount(token: String, value: Double): Long {
+        if (value != Math.floor(value) || value.isInfinite()) {
+            throw IllegalArgumentException(
+                "Health Connect stores " + token + " as a whole number, but"
+                    + " this sample is " + value
+                    + ". Round it before writing.")
+        }
+        return value.toLong()
+    }
+
     private fun isSeriesToken(token: String) = when (token) {
         "heart_rate", "power", "speed", "cycling_cadence",
         "running_cadence" -> true

@@ -90,7 +90,27 @@ public final class BloodPressureSample extends HealthSample {
     /// A reading given as explicit pressure quantities.
     public static BloodPressureSample create(HealthQuantity systolic,
             HealthQuantity diastolic, long instantMillis) {
+        // Dimension-checked here, because nothing downstream will. Shared
+        // write validation only converts QuantitySample, so a reading
+        // given in kilograms was stored by the local and simulator stores
+        // exactly as handed in, and only blew up later when something
+        // asked for it in mmHg.
+        requirePressure(systolic, "systolic");
+        requirePressure(diastolic, "diastolic");
         return new BloodPressureSample(systolic, diastolic, instantMillis);
+    }
+
+    private static void requirePressure(HealthQuantity q, String which) {
+        if (q == null) {
+            throw new IllegalArgumentException(
+                    "a blood pressure reading needs a " + which + " value");
+        }
+        if (!q.getUnit().isCompatibleWith(
+                HealthUnit.MILLIMETER_OF_MERCURY)) {
+            throw new IllegalArgumentException(which + " must be a pressure,"
+                    + " but " + q.getUnit().getSymbol() + " measures "
+                    + q.getUnit().getDimension());
+        }
     }
 
     /// The systolic pressure.
@@ -111,6 +131,12 @@ public final class BloodPressureSample extends HealthSample {
 
     /// Attaches the pulse recorded alongside the reading.
     public void setPulse(HealthQuantity pulse) {
+        if (pulse != null && !pulse.getUnit().isCompatibleWith(
+                HealthUnit.COUNT_PER_MINUTE)) {
+            throw new IllegalArgumentException("a pulse must be a frequency,"
+                    + " but " + pulse.getUnit().getSymbol() + " measures "
+                    + pulse.getUnit().getDimension());
+        }
         this.pulse = pulse;
     }
 

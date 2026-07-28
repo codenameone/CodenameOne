@@ -186,8 +186,17 @@ public abstract class WorkoutSession {
     }
 
     /// Abandons the workout without writing anything.
+    ///
+    /// A no-op once the workout has ended, and once [#end()] has been
+    /// called it is too late: the store write is already in flight, and
+    /// claiming to have abandoned the session while that write lands --
+    /// then having its callback move the state back to `ENDED` -- would
+    /// break the one promise in this method's name. Discard before ending,
+    /// or delete the samples afterwards through the identifiers the write
+    /// reports.
     public final void discard() {
-        if (state == WorkoutSessionState.ENDED) {
+        if (state == WorkoutSessionState.ENDED
+                || state == WorkoutSessionState.STOPPED) {
             return;
         }
         setState(WorkoutSessionState.FAILED);

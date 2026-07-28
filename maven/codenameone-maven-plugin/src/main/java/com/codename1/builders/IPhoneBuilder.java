@@ -904,8 +904,15 @@ public class IPhoneBuilder extends Executor {
                         // the build for BLE-only apps over Health Connect
                         // hints they have no use for. The usesClassMethod
                         // hook below decides for the facade.
+                        // The value types are exempt for the same reason the
+                        // sensors package is: a sensor callback is handed a
+                        // HealthSample and reading a number off it names
+                        // QuantitySample, so counting those as store use linked
+                        // HealthKit into a BLE-only binary and put it through
+                        // health processing it never asked for.
                         if (cls.indexOf("com/codename1/health/sensors/") != 0
-                                && !"com/codename1/health/Health".equals(cls)) {
+                                && !"com/codename1/health/Health".equals(cls)
+                                && !isSharedHealthModel(cls)) {
                             usesHealthStore = true;
                         }
                         if (cls.indexOf("com/codename1/health/workout/") == 0) {
@@ -3870,6 +3877,23 @@ public class IPhoneBuilder extends Executor {
     }
 
     private File xcodeProjectDir;
+
+    /// Whether `cls` is a health value type rather than the store.
+    ///
+    /// These travel through the BLE sensor layer, which needs no HealthKit
+    /// entitlement, no framework and no purpose string.
+    private static boolean isSharedHealthModel(String cls) {
+        return "com/codename1/health/HealthSample".equals(cls)
+                || "com/codename1/health/QuantitySample".equals(cls)
+                || "com/codename1/health/SeriesSample".equals(cls)
+                || "com/codename1/health/CategorySample".equals(cls)
+                || "com/codename1/health/HealthQuantity".equals(cls)
+                || "com/codename1/health/HealthUnit".equals(cls)
+                || "com/codename1/health/HealthDataType".equals(cls)
+                || "com/codename1/health/HealthSource".equals(cls)
+                || "com/codename1/health/RecordingMethod".equals(cls)
+                || "com/codename1/health/BloodPressureSample".equals(cls);
+    }
 
     public File getXcodeProjectDir() {
         return xcodeProjectDir;
