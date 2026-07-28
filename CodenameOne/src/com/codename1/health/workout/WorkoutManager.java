@@ -37,10 +37,17 @@ import com.codename1.util.AsyncResource;
 /// separate on purpose:
 ///
 /// - [#isLiveSessionSupported()] -- the OS runs a real session, keeping
-///   the app alive while it records. True on watchOS, on iOS 26 and later,
-///   and on Wear OS.
+///   the app alive while it records.
 /// - [#isSensorCollectionSupported()] -- the OS also gathers heart rate
 ///   and energy into that session by itself.
+///
+/// **Both are `false` on every platform in this release.** No port
+/// implements an OS-owned session yet, so every workout is recorded: the
+/// framework keeps the clock and the rollup, and persists what you feed
+/// it when the session ends. That is exactly the flow Google documents
+/// for Android phones, and it is why these are queryable facts rather
+/// than assumptions -- code that branches on them today keeps working
+/// unchanged when a port starts answering true.
 ///
 /// Where the second is false, a workout records only what you feed it.
 /// Building a UI with a live heart-rate readout without checking would
@@ -66,10 +73,13 @@ public class WorkoutManager {
     /// Whether the operating system provides a real workout session that
     /// keeps the app alive and owns the recording.
     ///
-    /// `false` on Android phones -- Health Connect has no such concept and
-    /// `androidx.health.services` is Wear OS only -- and on iOS before
-    /// version 26. [#startSession(WorkoutConfiguration)] still works
-    /// there, in recorded mode.
+    /// `false` everywhere in this release: no port overrides this, so a
+    /// workout is always recorded by the framework rather than owned by
+    /// the OS. Health Connect has no such concept at all on phones, and
+    /// `androidx.health.services` is Wear OS only; HealthKit does have
+    /// `HKWorkoutSession`, but nothing here drives it yet.
+    /// [#startSession(WorkoutConfiguration)] works regardless, in
+    /// recorded mode.
     public boolean isLiveSessionSupported() {
         return false;
     }

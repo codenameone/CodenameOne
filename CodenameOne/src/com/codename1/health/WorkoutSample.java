@@ -45,6 +45,36 @@ public final class WorkoutSample extends SessionSample {
     }
 
     /// Creates a workout spanning `[startMillis, endMillis]`.
+    /// Metadata key set on a workout the platform could not store as a
+    /// session record of its own.
+    ///
+    /// Neither HealthKit nor the Health Connect bridge accepts a workout
+    /// through the sample write path in this release. The child
+    /// measurements are persisted; the workout comes back for you to keep
+    /// or upload. Check for this rather than assuming [#getId()] is
+    /// populated.
+    ///
+    /// ```java
+    /// if (workout.getMetadata().containsKey(
+    ///         WorkoutSample.WORKOUT_NOT_PERSISTED)) {
+    ///     uploadToMyServer(workout);
+    /// }
+    /// ```
+    public static final String WORKOUT_NOT_PERSISTED =
+            "cn1.workoutNotPersisted";
+
+    /// Metadata key naming the data types the platform refused to store,
+    /// comma separated, or absent when everything fed in was persisted.
+    ///
+    /// Health Connect has no single-value write form for the
+    /// series-shaped types -- power, speed and both cadences -- which is
+    /// exactly what a bike or foot pod feeds into a workout. Those samples
+    /// cannot be stored there, so the workout names them rather than
+    /// dropping them silently and resolving as though nothing had
+    /// happened.
+    public static final String SAMPLES_NOT_PERSISTED =
+            "cn1.workout.samplesNotPersisted";
+
     public static WorkoutSample create(WorkoutActivityType activityType,
             long startMillis, long endMillis) {
         return new WorkoutSample(activityType, startMillis, endMillis);

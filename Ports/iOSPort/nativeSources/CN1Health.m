@@ -224,18 +224,6 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hkIsAvailable___R_boolean(
 }
 
 JAVA_BOOLEAN
-com_codename1_impl_ios_IOSNative_hkIsWorkoutSessionSupported___R_boolean(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-#ifdef CN1_HEALTH_WORKOUT_SESSION
-    return JAVA_TRUE;
-#else
-    // iOS before 26 has no live workout session; the portable layer
-    // records the workout itself instead.
-    return JAVA_FALSE;
-#endif
-}
-
-JAVA_BOOLEAN
 com_codename1_impl_ios_IOSNative_hkIsTypeSupported___java_lang_String_R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT typeId) {
     if (typeId == JAVA_NULL) {
@@ -542,12 +530,6 @@ void com_codename1_impl_ios_IOSNative_hkSaveSamples___int_java_lang_String(
 // ---------------------------------------------------------------------
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hkIsAvailable___R_boolean(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-    return JAVA_FALSE;
-}
-
-JAVA_BOOLEAN
-com_codename1_impl_ios_IOSNative_hkIsWorkoutSessionSupported___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return JAVA_FALSE;
 }

@@ -90,16 +90,13 @@ final class RecordedWorkoutSession extends WorkoutSession {
         }
     }
 
-    /// Set on the returned workout when the platform could not store the
-    /// session record itself.
-    ///
-    /// Neither HealthKit nor the Health Connect bridge accepts a workout
-    /// through the sample write path in this release. The child
-    /// measurements are persisted; the workout is returned for the caller
-    /// to keep or upload. Check for this rather than assuming getId() is
-    /// populated.
-    public static final String WORKOUT_NOT_PERSISTED =
-            "cn1.workoutNotPersisted";
+    /// The markers live on [WorkoutSample] because this class is not
+    /// public: an app told to check for one has to be able to name it.
+    private static final String SAMPLES_NOT_PERSISTED =
+            WorkoutSample.SAMPLES_NOT_PERSISTED;
+
+    private static final String WORKOUT_NOT_PERSISTED =
+            WorkoutSample.WORKOUT_NOT_PERSISTED;
 
     @Override
     protected void doEnd(final AsyncResource<WorkoutSample> out) {
@@ -120,18 +117,33 @@ final class RecordedWorkoutSession extends WorkoutSession {
         if (store.isWritable(HealthDataType.WORKOUT)) {
             toWrite.add(workout);
         }
+        StringBuilder rejected = new StringBuilder();
         synchronized (collected) {
             for (HealthSample s : collected) {
                 if (store.isWritable(s.getType())) {
                     toWrite.add(s);
+                } else {
+                    noteRejected(rejected, s.getType().getId());
                 }
             }
+        }
+        if (rejected.length() > 0) {
+            workout.putMetadata(SAMPLES_NOT_PERSISTED, rejected.toString());
         }
 
         if (!store.isSupported() || toWrite.isEmpty()) {
             // Nowhere to persist it, but the record itself is still real
             // and the caller may want to upload it themselves. Report the
             // workout rather than failing the whole session.
+            //
+            // The marker goes on here too. A workout with no writable
+            // child samples -- the ordinary no-sensor case on both mobile
+            // platforms -- took this path and came back with neither an id
+            // nor the signal that says why, which is the one thing a
+            // caller needs in order to keep the record itself.
+            if (!store.isWritable(HealthDataType.WORKOUT)) {
+                workout.putMetadata(WORKOUT_NOT_PERSISTED, "true");
+            }
             setState(WorkoutSessionState.ENDED);
             out.complete(workout);
             return;
@@ -161,6 +173,18 @@ final class RecordedWorkoutSession extends WorkoutSession {
                 out.complete(workout);
             }
         });
+    }
+
+    /// Adds `typeId` to the comma-separated rejected list, once.
+    private static void noteRejected(StringBuilder rejected, String typeId) {
+        String needle = "," + typeId + ",";
+        if (("," + rejected.toString() + ",").indexOf(needle) >= 0) {
+            return;
+        }
+        if (rejected.length() > 0) {
+            rejected.append(',');
+        }
+        rejected.append(typeId);
     }
 
     /// Copies the rolled-up energy and distance onto the record, leaving

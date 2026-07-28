@@ -306,4 +306,69 @@ class WorkoutAndNutritionTest extends UITestBase {
                 "nutrition is an interval-only type");
         assertSame(HealthDataType.NUTRITION, s.getType());
     }
+
+    /**
+     * A recorded workout says what it could not store.
+     *
+     * <p>Health Connect has no single-value write form for the
+     * series-shaped types -- power, speed and both cadences -- which is
+     * exactly what a bike or foot pod feeds into a workout. Those samples
+     * were dropped on the way to the store while {@code end()} resolved as
+     * though nothing had happened. They still cannot be stored, but the
+     * workout now names them so the app can keep them itself.</p>
+     */
+    @Test
+    void aRecordedWorkoutReportsSamplesItCouldNotStore() throws Exception {
+        final FakeHealthStore store = new FakeHealthStore();
+        // The mobile shape: the workout record itself has no write form,
+        // and neither do the series-backed sensor types.
+        store.unwritable.add(HealthDataType.WORKOUT);
+        store.unwritable.add(HealthDataType.POWER);
+        implementation.setHealth(new Health() {
+            @Override
+            public boolean isSupported() {
+                return true;
+            }
+
+            @Override
+            public HealthStore getStore() {
+                return store;
+            }
+        });
+        try {
+            WorkoutManager workouts = Health.getInstance().getWorkouts();
+            WorkoutSession session = workouts.startSession(
+                    new WorkoutConfiguration().setActivityType(
+                            WorkoutActivityType.CYCLING)).get();
+            session.start();
+            List<HealthSample> fed = new ArrayList<HealthSample>();
+            fed.add(FakeHealthStore.sample(HealthDataType.POWER,
+                    1000L, 1000L, 210));
+            fed.add(FakeHealthStore.sample(HealthDataType.ACTIVE_ENERGY,
+                    1000L, 2000L, 12));
+            session.addSamples(fed).get();
+
+            WorkoutSample done = session.end().get();
+            assertEquals("power", done.getMetadata().get(
+                    WorkoutSample.SAMPLES_NOT_PERSISTED),
+                    "the workout must name what it could not store");
+            assertEquals("true", done.getMetadata().get(
+                    WorkoutSample.WORKOUT_NOT_PERSISTED),
+                    "and say that the session record itself was not stored");
+            // Nothing writable at all -- the ordinary no-sensor workout on
+            // both mobile platforms. That path returns early, and used to
+            // come back with neither an id nor any explanation.
+            WorkoutSession bare = workouts.startSession(
+                    new WorkoutConfiguration().setActivityType(
+                            WorkoutActivityType.WALKING)).get();
+            bare.start();
+            WorkoutSample bareDone = bare.end().get();
+            assertEquals("true", bareDone.getMetadata().get(
+                    WorkoutSample.WORKOUT_NOT_PERSISTED),
+                    "an empty recorded workout still says it was not"
+                            + " persisted");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
 }

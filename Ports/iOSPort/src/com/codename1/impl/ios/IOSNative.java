@@ -1322,7 +1322,6 @@ public final class IOSNative {
     // app -- and the tvOS / Mac Catalyst slices, where HealthKit does not
     // exist -- still link.
     native boolean hkIsAvailable();
-    native boolean hkIsWorkoutSessionSupported();
     /// Whether the native layer can map this portable type onto a
     /// HealthKit type at all. Asked rather than assumed: a type with a
     /// canonical unit is not necessarily one HealthKit knows, and

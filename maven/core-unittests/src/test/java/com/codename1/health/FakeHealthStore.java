@@ -66,9 +66,14 @@ public class FakeHealthStore extends HealthStore {
         return supported && type != null;
     }
 
+    /// Types this fake refuses to write, so a caller can reproduce the
+    /// Health Connect shape where a readable type has no write form.
+    public final List<HealthDataType> unwritable =
+            new ArrayList<HealthDataType>();
+
     @Override
     public boolean isWritable(HealthDataType type) {
-        return isTypeSupported(type);
+        return isTypeSupported(type) && !unwritable.contains(type);
     }
 
     @Override

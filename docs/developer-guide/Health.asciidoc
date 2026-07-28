@@ -133,6 +133,8 @@ Where the second is false, **a workout records only what you feed it**. On an An
 
 `getStatistic(...)` returns `null` rather than a fabricated zero when nothing has been collected. Sessions aren't restored after the process dies -- a killed workout is over, `end()` was never called, and nothing is written.
 
+Ending a workout tells you what the platform would not keep. `WorkoutSample.WORKOUT_NOT_PERSISTED` is set when the session record itself has no write form -- neither mobile platform accepts one through this API -- and `WorkoutSample.SAMPLES_NOT_PERSISTED` names the data types whose samples were refused, comma separated. Power, speed and both cadences are the ones that bite: they're exactly what a bike or foot pod feeds in, and Health Connect has no single-value write form for any of them. Check both and upload what matters to you; the workout object itself is complete either way.
+
 === Bluetooth health sensors
 
 [source,java]
