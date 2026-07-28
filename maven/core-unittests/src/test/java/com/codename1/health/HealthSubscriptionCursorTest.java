@@ -561,6 +561,10 @@ class HealthSubscriptionCursorTest extends UITestBase {
                 HealthAnchor.of("live-token"), 0L, false));
         store.drainChanges();
         waitFor(waiting.latch, 5000);
+        // The latch counts down inside the listener, and the cursor is
+        // stored by the rest of that same runnable -- so waiting on the
+        // latch alone races the store rather than following it.
+        flushSerialCalls();
         assertEquals("live-token", sub.getAnchor().toStorableString());
 
         assertFalse(store.seedForTest(sub, HealthAnchor.of("baseline-token")),

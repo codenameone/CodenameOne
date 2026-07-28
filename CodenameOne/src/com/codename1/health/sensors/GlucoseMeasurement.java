@@ -64,6 +64,13 @@ public final class GlucoseMeasurement {
     /// offsets every record from it legitimately reports offsets months
     /// wide.
     private static final int TIME_OFFSET_UNKNOWN = -32768;
+
+    /// How far ahead of now a decoded measurement time may land before
+    /// the offset that produced it is treated as junk.
+    ///
+    /// A day, which is slack for a meter whose clock disagrees with the
+    /// phone's rather than a licence to stamp readings in the future.
+    private static final long MAX_SKEW_MILLIS = 24L * 60 * 60 * 1000;
     private static final int FLAG_CONCENTRATION = 0x02;
     private static final int FLAG_UNITS_MOL_PER_L = 0x04;
     private static final int FLAG_STATUS = 0x08;
@@ -125,8 +132,26 @@ public final class GlucoseMeasurement {
             // -- and on some paths stored -- a real glucose value under a
             // date the meter never claimed. Unknown means the base time is
             // the best answer available, so that is what is used.
+            //
+            // An offset that lands in the future is refused for a
+            // narrower reason: the measurement already happened, so a
+            // time after now is not a time it can have been taken at. A
+            // junk offset from a meter with a recent base time -- 32767
+            // moves it three weeks ahead -- otherwise produced a reading
+            // that getLatest() reported as the freshest there was,
+            // because its age came out negative.
+            //
+            // Deliberately *not* a bound on the offset itself. The
+            // Glucose Service recommends that a device restrict what a
+            // user can enter to a day either way, and says in the same
+            // breath that the field carries the full signed range, so a
+            // large offset is not by itself wrong -- only one that
+            // arrives at an impossible time is.
             if (baseTime >= 0 && offsetMinutes != TIME_OFFSET_UNKNOWN) {
-                timestamp = baseTime + offsetMinutes * 60000L;
+                long shifted = baseTime + offsetMinutes * 60000L;
+                if (shifted - System.currentTimeMillis() <= MAX_SKEW_MILLIS) {
+                    timestamp = shifted;
+                }
             }
         }
 

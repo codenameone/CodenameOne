@@ -517,9 +517,47 @@ class SensorParserTest {
                 sentinel.getTimestampMillis());
     }
 
-    /** Every other sint16 is a real offset, including large ones: a meter
-     *  that stamps one base time and offsets months of records from it is
-     *  doing what the profile describes. */
+    /**
+     * An offset that lands in the future is refused, and the base time
+     * stands instead.
+     *
+     * <p>The measurement already happened, so a time after now is not a
+     * time it can have been taken at. A meter stamping a recent base time
+     * and a junk offset -- 32767 minutes moves it three weeks ahead --
+     * produced a reading that {@code getLatest()} reported as the
+     * freshest there was, because its age came out negative.</p>
+     */
+    @Test
+    void glucoseRefusesAnOffsetThatLandsInTheFuture() {
+        java.util.Calendar now = java.util.Calendar.getInstance(
+                java.util.TimeZone.getTimeZone("UTC"));
+        int year = now.get(java.util.Calendar.YEAR);
+        byte[] payload = new byte[] {
+            0x03,
+            0x0C, 0x00,
+            (byte) (year & 0xFF), (byte) ((year >> 8) & 0xFF),
+            (byte) (now.get(java.util.Calendar.MONTH) + 1),
+            (byte) now.get(java.util.Calendar.DAY_OF_MONTH),
+            (byte) now.get(java.util.Calendar.HOUR_OF_DAY),
+            (byte) now.get(java.util.Calendar.MINUTE),
+            (byte) now.get(java.util.Calendar.SECOND),
+            (byte) 0xFF, 0x7F,            // +32767 minutes, three weeks on
+            0x5A, (byte) 0xB0,
+            0x11
+        };
+        GlucoseMeasurement m = GlucoseMeasurement.parse(payload);
+        assertNotNull(m);
+        assertTrue(m.getTimestampMillis()
+                        <= System.currentTimeMillis() + 60000L,
+                "a reading must not be stamped in the future");
+    }
+
+    /** A large offset is still a real offset, as long as it does not
+     *  arrive at a time the reading cannot have been taken at. The
+     *  Glucose Service recommends a device limit what a user may enter to
+     *  a day either way and says in the same breath that the field
+     *  carries the full signed range, so magnitude alone decides
+     *  nothing. */
     @Test
     void glucoseAppliesAnOrdinaryTimeOffset() {
         byte[] payload = new byte[] {

@@ -306,14 +306,26 @@ public class AsyncResource<V> extends Observable {
             @Override
             public void update(Observable obj, Object arg) {
                 if (isDone()) {
-                    complete[0] = true;
+                    // The flag is set inside the monitor, not beside it.
+                    // Set outside, a waiter could read it as false, and
+                    // only then be beaten to the monitor by this notify --
+                    // which it never hears, because it is not waiting yet.
                     synchronized (complete) {
+                        complete[0] = true;
                         complete.notifyAll();
                     }
                 }
             }
         };
         addObserver(observer);
+        if (isDone()) {
+            // Completed between the check at the top and the observer
+            // being attached. That notification went to nobody, so
+            // without this the wait below has nothing left to wake it.
+            synchronized (complete) {
+                complete[0] = true;
+            }
+        }
 
         while (!complete[0]) {
             if (timeout > 0 && System.currentTimeMillis() > startTime + timeout) {
@@ -324,6 +336,15 @@ public class AsyncResource<V> extends Observable {
                     @Override
                     public void run() {
                         synchronized (complete) {
+                            // Re-checked holding the monitor. The test in
+                            // the while condition is made without it, so
+                            // between that test and this wait the resource
+                            // can complete and notify an empty monitor --
+                            // and with no timeout the wait is then
+                            // permanent.
+                            if (complete[0]) {
+                                return;
+                            }
                             if (timeout > 0) {
                                 Util.wait(complete, (int) Math.max(1, timeout - (System.currentTimeMillis() - startTime)));
                             } else {
@@ -334,6 +355,9 @@ public class AsyncResource<V> extends Observable {
                 });
             } else {
                 synchronized (complete) {
+                    if (complete[0]) {
+                        break;
+                    }
                     if (timeout > 0) {
                         Util.wait(complete, (int) Math.max(1, timeout - (System.currentTimeMillis() - startTime)));
                     } else {

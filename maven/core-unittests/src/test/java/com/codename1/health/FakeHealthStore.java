@@ -42,6 +42,8 @@ public class FakeHealthStore extends HealthStore {
     public final List<SamplePage> pages = new ArrayList<SamplePage>();
     /** Queries the base class actually issued, in order. */
     public final List<SampleQuery> queriesSeen = new ArrayList<SampleQuery>();
+    /** The thread each of those queries arrived on, in order. */
+    public final List<String> readThreads = new ArrayList<String>();
     /** Chunks the base class actually issued to doWrite, in order. */
     public final List<List<HealthSample>> writeChunks =
             new ArrayList<List<HealthSample>>();
@@ -85,6 +87,7 @@ public class FakeHealthStore extends HealthStore {
     protected void doReadSamples(SampleQuery query,
             AsyncResource<SamplePage> out) {
         queriesSeen.add(query);
+        readThreads.add(Thread.currentThread().getName());
         if (pageIndex >= pages.size()) {
             out.complete(new SamplePage(new ArrayList<HealthSample>(), null,
                     false));

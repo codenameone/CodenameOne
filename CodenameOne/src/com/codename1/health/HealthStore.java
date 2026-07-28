@@ -26,6 +26,7 @@ import com.codename1.io.Preferences;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
+import com.codename1.util.EasyThread;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -345,7 +346,14 @@ public class HealthStore {
         // and mutating the caller's object would leave the last token
         // stuck on it -- so a query reused for a second read would
         // silently resume mid-way through the first.
-        readPageInto(copyForPaging(query), collected, out, null);
+        //
+        // Seeded from the caller's token, not from null. A continuation
+        // built the documented way -- take getNextPageToken() from a page
+        // and hand it back through setPageToken() -- restarted at the
+        // first page instead, so the caller got the data it already had
+        // and never reached the remainder it asked for.
+        readPageInto(copyForPaging(query), collected, out,
+                query.getPageToken());
         return out;
     }
 
@@ -464,16 +472,146 @@ public class HealthStore {
                     out.error(err);
                     return;
                 }
-                try {
-                    out.complete(postProcess(page, query));
-                } catch (HealthException ex) {
-                    out.error(ex);
-                }
+                // Onto the worker. Both mobile ports deliberately
+                // complete the raw resource on the EDT, so flattening,
+                // unit conversion, source filtering and the sort all ran
+                // there -- and this class promises in as many words that
+                // they do not. A hundred-thousand-point heart-rate page
+                // froze rendering for exactly as long as it took to
+                // convert.
+                postProcessOnWorker(page, query, out,
+                        Display.getInstance().isEdt());
             }
         });
         armTimeout(raw);
         doReadSamples(query, raw);
         return out;
+    }
+
+    /// The background thread heavy read post-processing runs on, and how
+    /// many tasks are still to run on it.
+    ///
+    /// One thread for all of them rather than one per store: a store is
+    /// per-port and there is only ever one in an app, but tests build
+    /// several.
+    ///
+    /// It lives only while there is work. A thread started through
+    /// [Display#startThread(Runnable,String)] is not a daemon, so a
+    /// permanent one keeps the whole process alive after everything else
+    /// has finished -- which in an app is invisible and under a test
+    /// runner is a JVM that never exits. Starting one costs
+    /// microseconds against a platform query that costs milliseconds,
+    /// so the burst is the right unit to hold it for.
+    private static EasyThread worker;
+    private static int workerTasks;
+
+    private static synchronized EasyThread acquireWorker() {
+        workerTasks++;
+        if (worker == null) {
+            worker = EasyThread.start("CN1 Health");
+        }
+        return worker;
+    }
+
+    /// Called by a worker task as it finishes, from the worker itself.
+    /// The thread stops after the task that released the last claim.
+    private static synchronized void releaseWorker() {
+        workerTasks--;
+        if (workerTasks <= 0 && worker != null) {
+            worker.kill();
+            worker = null;
+            workerTasks = 0;
+        }
+    }
+
+    /// Post-processes off the EDT and completes back on it.
+    private void postProcessOnWorker(final SamplePage page,
+            final SampleQuery query, final AsyncResource<SamplePage> out,
+            final boolean wasEdt) {
+        acquireWorker().run(new PostProcess(this, page, query, out, wasEdt));
+    }
+
+    /// Named rather than anonymous so the hop carries no synthetic
+    /// reference to the enclosing store
+    /// (SpotBugs `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class PostProcess implements Runnable {
+
+        private final HealthStore store;
+        private final SamplePage page;
+        private final SampleQuery query;
+        private final AsyncResource<SamplePage> out;
+        private final boolean wasEdt;
+
+        PostProcess(HealthStore store, SamplePage page, SampleQuery query,
+                AsyncResource<SamplePage> out, boolean wasEdt) {
+            this.store = store;
+            this.page = page;
+            this.query = query;
+            this.out = out;
+            this.wasEdt = wasEdt;
+        }
+
+        @Override
+        public void run() {
+            SamplePage done = null;
+            Throwable failed = null;
+            try {
+                done = store.postProcess(page, query);
+            } catch (Throwable t) {
+                failed = t;
+            }
+            try {
+                // Released after the hand-back, not before: when that
+                // runs inline it is what starts the next page, and
+                // releasing first would retire the thread and start
+                // another one for every page of a long read.
+                completeBack(wasEdt, out, done, failed);
+            } finally {
+                releaseWorker();
+            }
+        }
+    }
+
+    /// Hands a result back on the thread it would have arrived on had
+    /// the work been done inline.
+    ///
+    /// `wasEdt` is captured where the raw platform result landed, not
+    /// here -- here is always the worker. Both mobile ports complete on
+    /// the EDT and their callers rely on it, so those hop back; a store
+    /// that completes on a background thread of its own keeps doing that
+    /// rather than acquiring a dependency on the event loop being pumped.
+    private static <T> void completeBack(final boolean wasEdt,
+            final AsyncResource<T> out, final T value,
+            final Throwable failed) {
+        Runnable finish = new CompleteOnEdt<T>(out, value, failed);
+        if (wasEdt) {
+            Display.getInstance().callSerially(finish);
+        } else {
+            finish.run();
+        }
+    }
+
+    /// The [#completeBack] body, named for the same SpotBugs reason.
+    private static final class CompleteOnEdt<T> implements Runnable {
+
+        private final AsyncResource<T> out;
+        private final T value;
+        private final Throwable failed;
+
+        CompleteOnEdt(AsyncResource<T> out, T value, Throwable failed) {
+            this.out = out;
+            this.value = value;
+            this.failed = failed;
+        }
+
+        @Override
+        public void run() {
+            if (failed != null) {
+                out.error(failed);
+            } else {
+                out.complete(value);
+            }
+        }
     }
 
     /// True while `sub` is still the registered, active instance.
@@ -2357,8 +2495,13 @@ public class HealthStore {
 
         void next() {
             if (index >= types.size()) {
-                out.complete(store.aggregateSamples(query, boundaries,
-                        collected));
+                // On the worker for the same reason the read
+                // post-processing is: bucketing a year of heart rate is
+                // arithmetic over every sample, and the reads that feed
+                // it deliberately lift their page limit.
+                acquireWorker().run(new RollUp(store, query, boundaries,
+                        collected, out,
+                        Display.getInstance().isEdt()));
                 return;
             }
             SampleQuery q = new SampleQuery()
@@ -2390,6 +2533,48 @@ public class HealthStore {
                 collected.addAll(value);
             }
             next();
+        }
+    }
+
+    /// The fallback's final bucketing, run off the EDT.
+    private static final class RollUp implements Runnable {
+
+        private final HealthStore store;
+        private final AggregateQuery query;
+        private final long[] boundaries;
+        private final List<HealthSample> collected;
+        private final AsyncResource<List<AggregateResult>> out;
+        private final boolean wasEdt;
+
+        RollUp(HealthStore store, AggregateQuery query, long[] boundaries,
+                List<HealthSample> collected,
+                AsyncResource<List<AggregateResult>> out, boolean wasEdt) {
+            this.store = store;
+            this.query = query;
+            this.boundaries = boundaries;
+            this.collected = collected;
+            this.out = out;
+            this.wasEdt = wasEdt;
+        }
+
+        @Override
+        public void run() {
+            List<AggregateResult> done = null;
+            Throwable failed = null;
+            try {
+                done = store.aggregateSamples(query, boundaries, collected);
+            } catch (Throwable t) {
+                failed = t;
+            }
+            try {
+                // Released after the hand-back, not before: when that
+                // runs inline it is what starts the next page, and
+                // releasing first would retire the thread and start
+                // another one for every page of a long read.
+                completeBack(wasEdt, out, done, failed);
+            } finally {
+                releaseWorker();
+            }
         }
     }
 
