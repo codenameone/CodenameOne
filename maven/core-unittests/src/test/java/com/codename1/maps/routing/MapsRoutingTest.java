@@ -169,6 +169,33 @@ class MapsRoutingTest {
     }
 
     @Test
+    void roundaboutInstructionsNameTheExit() throws IOException {
+        // Without the exit number the instruction is useless at any roundabout
+        // with more than one way out.
+        assertEquals("At the roundabout take the 3rd exit onto Elm Street",
+                instructionFor("{\"type\":\"roundabout\",\"exit\":3}", "Elm Street"));
+        assertEquals("At the roundabout take the 1st exit onto Elm Street",
+                instructionFor("{\"type\":\"rotary\",\"exit\":1}", "Elm Street"));
+        assertEquals("At the roundabout take the 2nd exit",
+                instructionFor("{\"type\":\"roundabout\",\"exit\":2}", ""));
+        assertEquals("At the roundabout take the 11th exit",
+                instructionFor("{\"type\":\"roundabout\",\"exit\":11}", ""));
+
+        // No exit reported -> the old wording rather than a bogus "0th".
+        assertEquals("Enter the roundabout and exit onto Elm Street",
+                instructionFor("{\"type\":\"roundabout\"}", "Elm Street"));
+    }
+
+    private static String instructionFor(String maneuver, String roadName) throws IOException {
+        String json = "{\"code\":\"Ok\",\"routes\":[{\"geometry\":\"" + GEOMETRY + "\","
+                + "\"legs\":[{\"steps\":[{\"name\":\"" + roadName + "\",\"maneuver\":"
+                + maneuver + "}]}]}]}";
+        Route route = (Route) OsrmRouteService.parseResponse(json).get(0);
+        RouteLeg leg = (RouteLeg) route.getLegs().get(0);
+        return ((RouteStep) leg.getSteps().get(0)).getInstruction();
+    }
+
+    @Test
     void routeExposesDrawableGeometryAndBounds() throws IOException {
         Route route = (Route) OsrmRouteService.parseResponse(sampleResponse()).get(0);
 

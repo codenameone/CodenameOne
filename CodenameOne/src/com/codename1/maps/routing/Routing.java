@@ -113,37 +113,40 @@ public final class Routing {
             // caller exactly one asynchronous answer.
             RouteService routeService = getService();
             if (!routeService.isAvailable()) {
-                final String id = routeService.getId();
-                CN.callSerially(new Runnable() {
-                    @Override
-                    public void run() {
-                        guarded.routeFailed("The routing service '" + id
-                                + "' is not ready to route; it may still need to be configured",
-                                null);
-                    }
-                });
+                String reported = routeService.getId();
+                // A service is supposed to have an id, but quoting a null or
+                // blank one back at the user reads like a bug in the message.
+                final String id = reported == null || reported.length() == 0
+                        ? "unknown" : reported;
+                guarded.routeFailed("The routing service '" + id
+                        + "' is not ready to route; it may still need to be configured", null);
                 return;
             }
             routeService.findRoutes(request, guarded);
-        } catch (final RuntimeException e) {
+        } catch (RuntimeException e) {
             // A service is required to answer through the callback, but this
             // facade promises the app exactly one answer and cannot rely on a
             // third-party implementation keeping its side of the bargain. The
-            // latch below makes this harmless if the service already reported.
-            CN.callSerially(new Runnable() {
-                @Override
-                public void run() {
-                    guarded.routeFailed("The routing service failed: "
-                            + (e.getMessage() == null ? e.toString() : e.getMessage()), e);
-                }
-            });
+            // wrapper latches, so this is a no-op when the service already
+            // reported, and it handles getting onto the EDT.
+            guarded.routeFailed("The routing service failed: "
+                    + (e.getMessage() == null ? e.toString() : e.getMessage()), e);
         }
     }
 
-    /// Passes the first outcome through and swallows any that follow, so a
-    /// misbehaving [RouteService] cannot make [#findRoute(RouteRequest, RouteCallback)]
-    /// break its own exactly-once promise. Touched only on the event dispatch
-    /// thread, where every delivery is dispatched.
+    /// Enforces both halves of what [#findRoute(RouteRequest, RouteCallback)]
+    /// promises the application -- exactly one outcome, on the event dispatch
+    /// thread -- no matter how the [RouteService] behind it behaves.
+    ///
+    /// The SPI requires implementations to deliver once and on the EDT, but a
+    /// facade cannot assume a third-party implementation honors either. A
+    /// service that reports from a background thread, reports twice, or
+    /// reports concurrently with throwing would otherwise push its bug
+    /// straight through to application code that has every right to expect
+    /// the documented behavior. So the latch is claimed under a lock rather
+    /// than with a plain field read, and whatever wins is re-dispatched onto
+    /// the EDT (passed straight through when already there, so the common
+    /// case costs nothing).
     private static final class OnceOnly implements RouteCallback {
 
         private final RouteCallback delegate;
@@ -153,22 +156,50 @@ public final class Routing {
             this.delegate = delegate;
         }
 
-        @Override
-        public void routesFound(List routes) {
+        /// Claims the single delivery. Returns true for exactly one caller
+        /// however many threads race here.
+        private synchronized boolean claim() {
             if (delivered) {
-                return;
+                return false;
             }
             delivered = true;
-            delegate.routesFound(routes);
+            return true;
         }
 
         @Override
-        public void routeFailed(String message, Throwable error) {
-            if (delivered) {
+        public void routesFound(final List routes) {
+            if (!claim()) {
                 return;
             }
-            delivered = true;
-            delegate.routeFailed(message, error);
+            onEdt(new Runnable() {
+                @Override
+                public void run() {
+                    delegate.routesFound(routes);
+                }
+            });
+        }
+
+        @Override
+        public void routeFailed(final String message, final Throwable error) {
+            if (!claim()) {
+                return;
+            }
+            onEdt(new Runnable() {
+                @Override
+                public void run() {
+                    delegate.routeFailed(message, error);
+                }
+            });
+        }
+
+        /// Always queues rather than running inline when already on the EDT.
+        /// The contract is "returns immediately, answers later", and a
+        /// service that happens to answer synchronously would otherwise run
+        /// the application's callback before `findRoute` had returned -- the
+        /// caller would be re-entered mid-setup, and the timing would differ
+        /// between services for no reason the caller can see.
+        private static void onEdt(Runnable r) {
+            CN.callSerially(r);
         }
     }
 

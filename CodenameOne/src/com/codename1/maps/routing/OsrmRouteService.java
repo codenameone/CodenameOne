@@ -300,15 +300,17 @@ public class OsrmRouteService implements RouteService {
         String roadName = string(json.get("name"));
         String type = "";
         String modifier = "";
+        int exit = 0;
         LatLng start = null;
         Object maneuverObj = json.get("maneuver");
         if (maneuverObj instanceof Map) {
             Map maneuver = (Map) maneuverObj;
             type = string(maneuver.get("type"));
             modifier = string(maneuver.get("modifier"));
+            exit = (int) number(maneuver.get("exit"));
             start = parseLocation(maneuver.get("location"));
         }
-        return new RouteStep(describeManeuver(type, modifier, roadName), roadName,
+        return new RouteStep(describeManeuver(type, modifier, roadName, exit), roadName,
                 number(json.get("distance")), number(json.get("duration")), start,
                 PolylineCodec.decode(string(json.get("geometry"))));
     }
@@ -325,7 +327,8 @@ public class OsrmRouteService implements RouteService {
 
     /// Turns an OSRM maneuver into a readable instruction. OSRM itself returns
     /// only the structured maneuver, leaving the phrasing to the client.
-    private static String describeManeuver(String type, String modifier, String roadName) {
+    private static String describeManeuver(String type, String modifier, String roadName,
+                                           int exit) {
         String onto = roadName.length() > 0 ? " onto " + roadName : "";
         if ("depart".equals(type)) {
             return roadName.length() > 0 ? "Head out on " + roadName : "Start";
@@ -352,12 +355,37 @@ public class OsrmRouteService implements RouteService {
             return "Keep " + sideOf(modifier) + onto;
         }
         if ("roundabout".equals(type) || "rotary".equals(type)) {
+            // OSRM numbers the exit; without it the instruction is useless at
+            // every roundabout with more than one way out.
+            if (exit > 0) {
+                return "At the roundabout take the " + ordinal(exit) + " exit" + onto;
+            }
             return "Enter the roundabout and exit" + onto;
         }
         if (type.length() == 0) {
             return "Continue" + onto;
         }
         return capitalize(type) + onto;
+    }
+
+    /// English ordinal for a roundabout exit: 1st, 2nd, 3rd, 4th ... The
+    /// teens are the exception that catches naive implementations (11th, not
+    /// 11st), though a roundabout that large is hypothetical.
+    private static String ordinal(int n) {
+        int lastTwo = n % 100;
+        if (lastTwo >= 11 && lastTwo <= 13) {
+            return n + "th";
+        }
+        switch (n % 10) {
+            case 1:
+                return n + "st";
+            case 2:
+                return n + "nd";
+            case 3:
+                return n + "rd";
+            default:
+                return n + "th";
+        }
     }
 
     private static String turnPhrase(String modifier) {

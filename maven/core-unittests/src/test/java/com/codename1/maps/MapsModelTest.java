@@ -247,15 +247,14 @@ class MapsModelTest {
         assertNotNull(MapProviderRegistry.getProvider());
     }
 
-    /** A no-op MapProvider used to exercise the registry without any native peer. */
     // ---- NativeMap bounds fitting ----------------------------------------
 
     @Test
     void nativeMapSolvesTheZoomThatFitsBounds() {
         // The whole world spans exactly one 256pt tile at zoom 0, so a 256px
         // viewport fits it at zoom 0 and every doubling adds one level.
-        MapBounds world = new MapBounds(new LatLng(-85.05112878, -180),
-                new LatLng(85.05112878, 180));
+        MapBounds world = new MapBounds(new LatLng(-WebMercator.MAX_LATITUDE, -180),
+                new LatLng(WebMercator.MAX_LATITUDE, 180));
         assertEquals(0.0, NativeMap.zoomToFit(world, 256, 256, 0, 1.0), 1e-6);
         assertEquals(1.0, NativeMap.zoomToFit(world, 512, 512, 0, 1.0), 1e-6);
         assertEquals(2.0, NativeMap.zoomToFit(world, 1024, 1024, 0, 1.0), 1e-6);
@@ -332,6 +331,7 @@ class MapsModelTest {
         assertTrue(blockZoom > cityZoom, "block " + blockZoom + " should out-zoom city " + cityZoom);
     }
 
+    /** A no-op MapProvider used to exercise the registry without any native peer. */
     private static class StubProvider implements MapProvider {
         private final String id;
         private final boolean available;

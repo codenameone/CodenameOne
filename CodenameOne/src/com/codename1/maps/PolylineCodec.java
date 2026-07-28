@@ -47,8 +47,9 @@ public final class PolylineCodec {
     private static final int DEFAULT_PRECISION = 5;
     /// The smallest decimal precision that still scales coordinates at all.
     private static final int MIN_PRECISION = 1;
-    /// Comfortably past the precision 5/6/7 that real services emit, and the
-    /// largest power of ten a `double` still represents exactly.
+    /// Comfortably past the precision 5/6/7 that real services emit, while
+    /// keeping the scale well inside the range a `double` holds exactly, so
+    /// no accepted precision can round a coordinate wrongly.
     private static final int MAX_PRECISION = 10;
     private static final int CHUNK_BITS = 5;
     private static final int CHUNK_MASK = 0x1f;
