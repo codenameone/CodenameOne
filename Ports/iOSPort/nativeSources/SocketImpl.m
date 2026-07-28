@@ -27,6 +27,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <errno.h>
+#include <string.h>
 #include <arpa/inet.h>
 #include "xmlvm.h"
 #import "CodenameOne_GLViewController.h"

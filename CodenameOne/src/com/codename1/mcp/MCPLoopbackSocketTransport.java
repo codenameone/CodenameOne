@@ -289,10 +289,13 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         return true;
     }
 
-    /// Decodes straight out of the buffer. toByteArray() would copy the whole payload
-    /// first, which for a frame near the ceiling is megabytes of pointless duplication.
+    /// Note for anyone tempted by ByteArrayOutputStream.toString(String), which would
+    /// decode without toByteArray()'s copy: core is compiled against CLDC11
+    /// (Ports/CLDC11), whose ByteArrayOutputStream declares only the no-argument
+    /// toString(). The overload exists on the JDK and in the ParparVM runtime, so a Maven
+    /// build of core compiles it happily and the Ant build then fails.
     private static String toUtf8(ByteArrayOutputStream buffer) throws IOException {
-        return buffer.toString("UTF-8");
+        return new String(buffer.toByteArray(), "UTF-8");
     }
 
     @Override
