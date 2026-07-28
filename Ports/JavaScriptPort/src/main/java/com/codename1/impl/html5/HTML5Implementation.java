@@ -6812,6 +6812,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
+     * Longest URL the confirmation Sheet shows before it is ellipsized. Chosen
+     * to stay inside a narrow phone viewport at the default font.
+     */
+    private static final int MAX_DISPLAY_URL_LENGTH = 40;
+
+    /** Marker appended to a URL shortened for the confirmation Sheet. */
+    private static final String DISPLAY_URL_ELLIPSIS = "...";
+
+    /**
      * A raw URL has no spaces for {@code SpanLabel} to wrap on, so putting one
      * in the confirmation Sheet blew the content pane's preferred width past the
      * screen and pushed the buttons out of reach. Shorten it for display; the
@@ -6826,12 +6835,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (schemeEnd >= 0) {
             shortened = shortened.substring(schemeEnd + 3);
         }
-        if (shortened.length() > 40) {
+        if (shortened.length() > MAX_DISPLAY_URL_LENGTH) {
             int slash = shortened.indexOf('/');
-            if (slash > 0 && slash <= 40) {
-                shortened = shortened.substring(0, slash) + "/...";
+            if (slash > 0 && slash <= MAX_DISPLAY_URL_LENGTH) {
+                // Host fits: keep it whole and stand in for the path.
+                shortened = shortened.substring(0, slash) + "/" + DISPLAY_URL_ELLIPSIS;
             } else {
-                shortened = shortened.substring(0, 37) + "...";
+                shortened = shortened.substring(0, MAX_DISPLAY_URL_LENGTH - DISPLAY_URL_ELLIPSIS.length())
+                        + DISPLAY_URL_ELLIPSIS;
             }
         }
         return shortened;
@@ -6957,7 +6968,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 addBacksideHook(new JSRunnable() {
                     @Override
                     public void run() {
-                        openUrlOnMainThread(url, false, false);
+                        if (!openUrlOnMainThread(url, false, false)) {
+                            // The user confirmed and we still could not open.
+                            // Only reachable on a host bundle with no
+                            // eval-on-main handler, where the worker has no
+                            // page-side channel at all -- there is nothing
+                            // further to fall back to, and re-showing the Sheet
+                            // would just loop. Say so plainly in the log.
+                            _log("execute(): confirmed open failed, no page-side"
+                                    + " channel available for " + url);
+                        }
                     }
                 });
             }
