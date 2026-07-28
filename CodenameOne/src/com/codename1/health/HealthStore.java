@@ -434,7 +434,14 @@ public class HealthStore {
     /// happens when a listener throws and the rest of the page is dropped.
     void noteDeliveryDone(int abandoned) {
         synchronized (subscriptions) {
-            pendingDeliveries--;
+            // This delivery, plus the chunks that will never be queued
+            // because a listener threw. Counting only this one left the
+            // gate waiting on deliveries that could never arrive, so the
+            // drain never resolved at all.
+            pendingDeliveries -= 1 + Math.max(0, abandoned);
+            if (pendingDeliveries < 0) {
+                pendingDeliveries = 0;
+            }
         }
         releaseDrainGates();
     }
@@ -465,6 +472,25 @@ public class HealthStore {
         resource.onResult(new CancelTimer(timer));
     }
 
+    /// Delivers the timeout failure on the EDT.
+    private static final class FailTimedOut implements Runnable {
+        private final AsyncResource resource;
+
+        FailTimedOut(AsyncResource resource) {
+            this.resource = resource;
+        }
+
+        @Override
+        public void run() {
+            if (resource.isDone()) {
+                return;
+            }
+            resource.error(new HealthException(HealthError.TIMEOUT,
+                    "the platform did not answer within the configured"
+                            + " timeout"));
+        }
+    }
+
     /// Cancels a timeout timer once its operation has finished.
     private static final class CancelTimer implements AsyncResult {
         private final java.util.Timer timer;
@@ -493,11 +519,13 @@ public class HealthStore {
         @Override
         public void run() {
             timer.cancel();
-            if (!resource.isDone()) {
-                resource.error(new HealthException(HealthError.TIMEOUT,
-                        "the platform did not answer within the"
-                                + " configured operation timeout"));
+            if (resource.isDone()) {
+                return;
             }
+            // Failed on the EDT like every other completion. Erroring from
+            // the timer thread handed the application callback a thread it
+            // is documented never to see.
+            Display.getInstance().callSerially(new FailTimedOut(resource));
         }
     }
 
