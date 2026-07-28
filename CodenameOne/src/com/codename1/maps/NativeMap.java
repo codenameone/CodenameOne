@@ -377,11 +377,17 @@ public class NativeMap extends Container implements MapSurface {
         if (bounds == null || viewWidth <= 0 || viewHeight <= 0 || pixelRatio <= 0) {
             return Double.NaN;
         }
+        if (viewWidth - 2 * paddingPixels <= 0 || viewHeight - 2 * paddingPixels <= 0) {
+            // Padding has swallowed the viewport: there is no room left to fit
+            // anything into, and pretending it is one pixel wide would solve
+            // for an absurd zoom.
+            return Double.NaN;
+        }
         // Native map SDKs use the slippy convention, where a zoom level spans
         // 256 logical points; the component's size is in device pixels, so it
         // converts through the same density ratio the vector engine uses.
-        double usableWidth = Math.max(1, viewWidth - 2 * paddingPixels) / pixelRatio;
-        double usableHeight = Math.max(1, viewHeight - 2 * paddingPixels) / pixelRatio;
+        double usableWidth = (viewWidth - 2 * paddingPixels) / pixelRatio;
+        double usableHeight = (viewHeight - 2 * paddingPixels) / pixelRatio;
         double worldWidth = Math.abs(
                 WebMercator.lonToWorldX(bounds.getNorthEast().getLongitude(), 0)
                         - WebMercator.lonToWorldX(bounds.getSouthWest().getLongitude(), 0));

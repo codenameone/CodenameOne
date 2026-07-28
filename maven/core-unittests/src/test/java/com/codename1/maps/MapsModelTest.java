@@ -318,6 +318,12 @@ class MapsModelTest {
         MapBounds point = new MapBounds(new LatLng(37.7749, -122.4194),
                 new LatLng(37.7749, -122.4194));
         assertTrue(Double.isNaN(NativeMap.zoomToFit(point, 256, 256, 0, 1.0)));
+
+        // Padding that swallows the viewport leaves nothing to fit into;
+        // solving against a forced one-pixel window would give an absurd zoom.
+        assertTrue(Double.isNaN(NativeMap.zoomToFit(world, 256, 256, 128, 1.0)));
+        assertTrue(Double.isNaN(NativeMap.zoomToFit(world, 256, 256, 200, 1.0)));
+        assertFalse(Double.isNaN(NativeMap.zoomToFit(world, 256, 256, 127, 1.0)));
     }
 
     @Test

@@ -267,13 +267,19 @@ public final class VectorMapEngine {
         }
         // Convert the usable device-pixel viewport to logical map pixels (the
         // unit worldSpanX/Y are in) before solving for the zoom that fits.
-        double usableW = Math.max(1, viewWidth - 2 * padding) / pixelRatio;
-        double usableH = Math.max(1, viewHeight - 2 * padding) / pixelRatio;
+        // These "nothing to fit" cases keep the current zoom and merely
+        // recenter, matching NativeMap.zoomToFit so that MapSurface#fitBounds
+        // means the same thing on both surfaces.
         double worldW = worldSpanX(bounds);
         double worldH = worldSpanY(bounds);
-        double zx = worldW <= 0 ? getMaxZoom() : log2(usableW / worldW);
-        double zy = worldH <= 0 ? getMaxZoom() : log2(usableH / worldH);
-        setZoom(Math.min(zx, zy));
+        boolean roomToFit = viewWidth - 2 * padding > 0 && viewHeight - 2 * padding > 0;
+        if (roomToFit && (worldW > 0 || worldH > 0)) {
+            double usableW = (viewWidth - 2 * padding) / pixelRatio;
+            double usableH = (viewHeight - 2 * padding) / pixelRatio;
+            double zx = worldW <= 0 ? Double.MAX_VALUE : log2(usableW / worldW);
+            double zy = worldH <= 0 ? Double.MAX_VALUE : log2(usableH / worldH);
+            setZoom(Math.min(zx, zy));
+        }
         // The vertical center has to be the projected midpoint, not the mean
         // of the two latitudes: Mercator stretches away from the equator, so
         // centering a tall band on its arithmetic middle leaves the poleward

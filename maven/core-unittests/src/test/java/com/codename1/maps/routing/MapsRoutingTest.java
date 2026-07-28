@@ -186,6 +186,30 @@ class MapsRoutingTest {
                 instructionFor("{\"type\":\"roundabout\"}", "Elm Street"));
     }
 
+    @Test
+    void smallRoundaboutsKeepTheirTurnDirection() throws IOException {
+        // OSRM's "roundabout turn" is a small roundabout taken as an ordinary
+        // turn. It used to fall through to the generic wording, which read
+        // "Roundabout turn onto Main Street" and dropped the direction.
+        assertEquals("Turn left onto Main Street",
+                instructionFor("{\"type\":\"roundabout turn\",\"modifier\":\"left\"}",
+                        "Main Street"));
+        assertEquals("Exit the roundabout onto Main Street",
+                instructionFor("{\"type\":\"exit roundabout\"}", "Main Street"));
+    }
+
+    @Test
+    void legsAndStepsPresentButNotListsAreMalformed() {
+        // Absent is fine -- steps=false requests carry none. Present as
+        // something else is a bad response, and reading it as absent would
+        // hand back a half-populated route.
+        assertThrows(IOException.class, () -> OsrmRouteService.parseResponse(
+                "{\"code\":\"Ok\",\"routes\":[{\"geometry\":\"" + GEOMETRY + "\",\"legs\":7}]}"));
+        assertThrows(IOException.class, () -> OsrmRouteService.parseResponse(
+                "{\"code\":\"Ok\",\"routes\":[{\"geometry\":\"" + GEOMETRY
+                        + "\",\"legs\":[{\"steps\":\"x\"}]}]}"));
+    }
+
     private static String instructionFor(String maneuver, String roadName) throws IOException {
         String json = "{\"code\":\"Ok\",\"routes\":[{\"geometry\":\"" + GEOMETRY + "\","
                 + "\"legs\":[{\"steps\":[{\"name\":\"" + roadName + "\",\"maneuver\":"

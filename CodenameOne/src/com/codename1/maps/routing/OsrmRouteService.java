@@ -249,6 +249,23 @@ public class OsrmRouteService implements RouteService {
         return routes;
     }
 
+    /// Returns `value` when it is a list, `null` when the field was absent,
+    /// and throws when it is present as something else.
+    ///
+    /// Absent is legitimate -- a request with `steps=false` carries no steps.
+    /// Present-but-not-a-list is malformed, and quietly reading it as absent
+    /// would hand back a half-populated route instead of reporting the bad
+    /// response [#parseResponse(String)] promises to report.
+    private static List requireListOrNull(Object value, String what) throws IOException {
+        if (value == null) {
+            return null;
+        }
+        if (!(value instanceof List)) {
+            throw new IOException("Malformed routing response: " + what + " is not a list");
+        }
+        return (List) value;
+    }
+
     /// Casts a decoded JSON value that has to be an object, turning the
     /// malformed case into the [IOException] [#parseResponse(String)]
     /// documents rather than letting an unchecked cast escape a public API.
@@ -270,8 +287,8 @@ public class OsrmRouteService implements RouteService {
         }
         List legs = new ArrayList();
         String summary = "";
-        Object legsObj = json.get("legs");
-        if (legsObj instanceof List) {
+        Object legsObj = requireListOrNull(json.get("legs"), "route legs");
+        if (legsObj != null) {
             for (Object legObj : (List) legsObj) {
                 RouteLeg leg = parseLeg(requireObject(legObj, "route leg"));
                 legs.add(leg);
@@ -286,8 +303,8 @@ public class OsrmRouteService implements RouteService {
 
     private static RouteLeg parseLeg(Map json) throws IOException {
         List steps = new ArrayList();
-        Object stepsObj = json.get("steps");
-        if (stepsObj instanceof List) {
+        Object stepsObj = requireListOrNull(json.get("steps"), "route steps");
+        if (stepsObj != null) {
             for (Object stepObj : (List) stepsObj) {
                 steps.add(parseStep(requireObject(stepObj, "route step")));
             }
@@ -336,8 +353,15 @@ public class OsrmRouteService implements RouteService {
         if ("arrive".equals(type)) {
             return "Arrive at your destination";
         }
-        if ("turn".equals(type) || "end of road".equals(type)) {
+        if ("turn".equals(type) || "end of road".equals(type)
+                || "roundabout turn".equals(type)) {
+            // "roundabout turn" is OSRM's small-roundabout case, taken as an
+            // ordinary turn. Falling through to the generic wording gave
+            // "Roundabout turn onto Main Street" and threw the direction away.
             return turnPhrase(modifier) + onto;
+        }
+        if ("exit roundabout".equals(type) || "exit rotary".equals(type)) {
+            return "Exit the roundabout" + onto;
         }
         if ("continue".equals(type) || "new name".equals(type)) {
             return "Continue" + onto;
