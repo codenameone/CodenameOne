@@ -1060,6 +1060,23 @@ void cn1BibopBeginGcCycle(void);
 void cn1GcRegisterImmortalObj(JAVA_OBJECT o);
 static int cn1GcImmortalObjContains(JAVA_OBJECT o);
 static JAVA_BOOLEAN cn1SweepRemoving;
+// Set ONLY around passes that iterate authoritative object registries
+// (allObjectsInHeap, the BiBOP page registry). See the guard in gcMarkObject.
+//
+// PER THREAD, deliberately. Marking can run as a worker pool
+// (gcMarkDrainParallel); a process-wide flag would let a CONCURRENT worker bypass
+// the resolve guard on pointers that are not authoritative -- the precise case the
+// guard exists for. Serial marking is the current default
+// (gcMarkResolveThreadCount returns 1), so a global would happen to be safe today
+// and would silently stop being safe the moment parallel marking is re-enabled,
+// which the isolation comment there says is intended.
+//
+// Use CN1_GC_TRUSTED_BEGIN/END rather than assigning directly: they save and
+// restore, so nesting and any future early return cannot leak a trusted window
+// into unrelated marking.
+static __thread int cn1GcTrustedRoots = 0;
+#define CN1_GC_TRUSTED_BEGIN() int __cn1TrustSaved = cn1GcTrustedRoots; cn1GcTrustedRoots = 1
+#define CN1_GC_TRUSTED_END()   cn1GcTrustedRoots = __cn1TrustSaved
 #endif
 
 void codenameOneGCMark() {
@@ -1435,6 +1452,7 @@ void codenameOneGCMark() {
                                       memory_order_relaxed);
 #endif
             int gn = atomic_load_explicit(&gp->bumpIndex, memory_order_acquire);
+            CN1_GC_TRUSTED_BEGIN();  // page-slot walk: authoritative references
             for(int gi = 0 ; gi < gn ; gi++) {
                 JAVA_OBJECT go = cn1BibopSlot(gp, gi);
                 if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
@@ -1443,6 +1461,7 @@ void codenameOneGCMark() {
                     gcMarkObject(d, go, JAVA_FALSE);
                 }
             }
+            CN1_GC_TRUSTED_END();
             gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
         }
         gcMarkDrain(d);
@@ -1469,18 +1488,29 @@ void codenameOneGCMark() {
     // already walks in full, and only fresh entries are traced.
 #ifndef CN1_DISABLE_LEGACY_GRACE
     {
+        CN1_GC_TRUSTED_BEGIN();  // walking allObjectsInHeap: authoritative references
 #ifdef CN1_GC_VERIFY
     { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "legacy-grace-pass"; }
 #endif
         int gt = currentSizeOfAllObjectsInHeap;
         for(int gi = 0 ; gi < gt ; gi++) {
             JAVA_OBJECT go = allObjectsInHeap[gi];
-            if(go != JAVA_NULL && go->__codenameOneGcMark == -1
+            // ACQUIRE: the mark word is the publication point (see gcMarkObject);
+            // reading it plainly can let a weak-memory target observe the object
+            // without the preceding parentClsReference store.
+            if(go != JAVA_NULL
+               && __atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
                && go->__codenameOneParentClsReference != 0
                && go->__codenameOneParentClsReference->markFunction != 0) {
                 gcMarkObject(d, go, JAVA_FALSE);
             }
         }
+        // Trust covers ONLY the registry walk above. Every fresh entry is already
+        // stamped and queued, so the drain needs no trust -- and must not have it:
+        // it follows child words out of arbitrary mark functions, including those
+        // of dead objects kept alive by a conservative native-stack false positive,
+        // whose fields can dangle. That is precisely what the guard exists to stop.
+        CN1_GC_TRUSTED_END();
         gcMarkDrain(d);
     }
 #endif /* CN1_DISABLE_LEGACY_GRACE -- A/B escape hatch, mirrors CN1_DISABLE_SATB */
@@ -5251,7 +5281,17 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // Cost: one page/extent binary search per mark call, on the GC thread /
     // workers only (the mutator never calls gcMarkObject) -- GC-side passes
     // measured ~0% of wall time on this workload class.
-    if(cn1ConservativeResolve((void*)obj) != obj && !cn1GcImmortalObjContains(obj)) {
+    // TRUSTED CALLERS BYPASS THIS (issue 5425). The guard's job is to reject
+    // CONSERVATIVELY DERIVED pointers -- arbitrary machine words off a native stack
+    // that may not be objects at all. A caller that walked the object out of
+    // allObjectsInHeap or a BiBOP page slot has an authoritative reference and needs
+    // no proof; making it pass anyway means every object allocated after the cycle's
+    // extent snapshot is silently dropped, because the snapshot cannot contain it.
+    // That is exactly how a fresh object came to be grace-promoted by the sweep with
+    // its subtree never traced. Do NOT set this flag around anything that marks from
+    // a stack scan or a register file.
+    if(!cn1GcTrustedRoots
+       && cn1ConservativeResolve((void*)obj) != obj && !cn1GcImmortalObjContains(obj)) {
         return;
     }
 #endif
