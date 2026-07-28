@@ -6778,19 +6778,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     private boolean openUrlOnMainThread(String url, boolean sameWindow, boolean fallBackToSameWindow) {
         String literal = toJavaScriptStringLiteral(url);
+        // When the host bundle predates the __cn1_eval_on_main__ handler,
+        // port.js degrades to evaluating the script inside the worker. Opening
+        // fails loudly there (no window.open), but a same-window navigation
+        // would NOT: assigning to the worker's read-only location is a silent
+        // no-op in non-strict eval code, so execute() would appear to succeed
+        // and do nothing. Assert we are on the page so every variant fails
+        // detectably and the caller can degrade.
+        String guard = "if (typeof document === 'undefined') {"
+                + " throw new Error('cn1: not running on the page'); }";
         String script;
         if (sameWindow) {
-            script = "window.location.href = " + literal + ";";
+            script = guard + "window.location.href = " + literal + ";";
         } else if (fallBackToSameWindow) {
             // Only attempt the popup while the page still has transient user
             // activation -- otherwise the browser blocks it and shows its
             // "popup blocked" indicator before we navigate anyway. Browsers
             // without navigator.userActivation just try and let !cn1w decide.
-            script = "var cn1a = window.navigator && window.navigator.userActivation;"
+            script = guard
+                    + "var cn1a = window.navigator && window.navigator.userActivation;"
                     + "var cn1w = (!cn1a || cn1a.isActive) ? window.open(" + literal + ", '_blank') : null;"
                     + "if (!cn1w) { window.location.href = " + literal + "; }";
         } else {
-            script = "window.open(" + literal + ", '_blank');";
+            script = guard + "window.open(" + literal + ", '_blank');";
         }
         try {
             eval_(script);
@@ -6866,20 +6876,35 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
+     * True when the URL names something the browser itself can navigate to, as
+     * opposed to a path into local storage that {@link #execute(String)} is
+     * expected to turn into a download. Only these get the
+     * {@code javascript.execute.target} treatment -- pointing the current page
+     * at a storage path would unload the app and land on nothing.
+     */
+    private static boolean isExternalUrl(String url) {
+        return url.startsWith("http:") || url.startsWith("https:")
+                || url.startsWith("mailto:") || url.startsWith("tel:")
+                || url.startsWith("sms:");
+    }
+
+    /**
      * Opens a URL, or asks the user to, honoring the
      * {@code javascript.execute.target} property. See {@link #execute(String)}.
      */
     private void openExternalUrl(final String url) {
         String target = executeTarget();
-        if (EXECUTE_TARGET_SELF.equals(target)) {
-            openUrlOnMainThread(url, true, false);
+        if (EXECUTE_TARGET_SELF.equals(target)
+                && openUrlOnMainThread(url, true, false)) {
             return;
         }
         if (EXECUTE_TARGET_AUTO.equals(target)
                 && openUrlOnMainThread(url, false, true)) {
             return;
         }
-        // _blank, or auto on a host bundle without the eval-on-main handler:
+        // _blank, or _self / auto whose page-side script never ran because the
+        // host bundle predates the eval-on-main handler -- degrade rather than
+        // leave execute() with no effect at all:
         // a popup only survives inside a live user gesture, so ride the backside
         // hook when one is pending and otherwise ask the user, whose tap on the
         // Sheet becomes the gesture.
@@ -6925,10 +6950,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         String fileName = null;
         boolean useBlobHandler = false;
         Button nativeButton = new Button();
-        if (!url.startsWith("http:") &&
-                !url.startsWith("http:") &&
-                !url.startsWith("mailto:") &&
-                !url.startsWith("data:")) {
+        if (!isExternalUrl(url) && !url.startsWith("data:")) {
             if (exists(url)) {
                 try {
                     Blob blob = openFileAsBlob(url);
@@ -6964,8 +6986,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
             nativeButton.setText(buttonText);
             nativeButton.setMaterialIcon(FontImage.MATERIAL_SAVE);
             //icon = "save-file";
-        } else {
+        } else if (isExternalUrl(url)) {
             openExternalUrl(furl);
+            return;
+        } else {
+            // A local/storage path we could not turn into a Blob: exists() said
+            // no, or openFileAsBlob() threw (see downloadBytesAsFile above on
+            // how readily the storage round trip fails on this port). Keep it
+            // off the external-link target policy -- under auto or _self that
+            // would point the page at a path the server does not serve and
+            // unload the app instead of downloading anything. Best effort in a
+            // new window, which is what this port did before.
+            _log("execute(): no downloadable content for " + furl);
+            openUrlOnMainThread(furl, false, false);
             return;
         }
         final Runnable startDownload = new Runnable() {
