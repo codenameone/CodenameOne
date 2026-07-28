@@ -2653,7 +2653,17 @@ public class IPhoneBuilder extends Executor {
                 // this has no Bluetooth precedent. The profile must also
                 // carry the capability; without it the failure surfaces
                 // much later as an opaque codesign error.
-                if (request.getArg(
+                //
+                // Only for an app that touches health *data*. An
+                // availability-only app is deliberately allowed to build
+                // without purpose strings, because it accesses nothing --
+                // so entitling it demanded a provisioning profile with a
+                // capability its App ID may never have enabled, and an
+                // otherwise harmless getAvailability() call failed
+                // codesigning.
+                boolean entitleHealthKit = usesHealthRead || usesHealthWrite
+                        || usesHealthWorkout;
+                if (entitleHealthKit && request.getArg(
                         "ios.entitlements.com.apple.developer.healthkit",
                         null) == null) {
                     request.putArgument(

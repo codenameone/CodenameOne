@@ -444,7 +444,13 @@ class CN1HealthConnectBridge(private val context: Context)
         // guessed: it starts at one sample per record, which is exactly
         // right for every scalar type, and the first page of a series type
         // corrects it for every page after.
-        var samplesPerRecord = 1
+        // A series-shaped type is known to hold many samples per record,
+        // so the first page asks for one record rather than `limit` of
+        // them: nothing fetched can be given back, the token having
+        // already moved past it, so an oversized first page is memory
+        // spent that the estimate below can only avoid on page two. One
+        // extra round trip on a large series read is the cheaper mistake.
+        var samplesPerRecord = if (isSeriesToken(token)) limit else 1
         while (remaining > 0) {
             val wantRecords = maxOf(1, remaining / samplesPerRecord)
             val page = requireClient().readRecords(
@@ -967,8 +973,21 @@ class CN1HealthConnectBridge(private val context: Context)
     override fun getChangesToken(typesCsv: String,
                                  cb: HealthConnectDelegate.Callback) {
         run(cb) {
-            val types = typesCsv.split(",").filter { it.isNotBlank() }
-                .mapNotNull { recordClassFor(it.trim()) }.toSet()
+            // Every requested type must map. Dropping the unmapped ones
+            // returned a valid-looking token subscribed to a subset, so an
+            // app that asked for steps and blood pressure was told the
+            // subscription succeeded and then never saw a blood-pressure
+            // change -- the silent nothing this API refuses to produce.
+            val requested = typesCsv.split(",").filter { it.isNotBlank() }
+                .map { it.trim() }
+            val unmapped = requested.filter { recordClassFor(it) == null }
+            if (unmapped.isNotEmpty()) {
+                throw IllegalArgumentException(
+                    "Health Connect change subscriptions are not"
+                        + " implemented for " + unmapped.joinToString(", ")
+                        + " in this build")
+            }
+            val types = requested.mapNotNull { recordClassFor(it) }.toSet()
             if (types.isEmpty()) {
                 ""
             } else {
@@ -1050,6 +1069,16 @@ class CN1HealthConnectBridge(private val context: Context)
      * larger value is not clamped by the library, it is rejected.
      */
     private val MAX_PAGE_SIZE = 5000
+
+    /// Whether this type's records hold many samples each.
+    ///
+    /// A fact about the record class, not an estimate: these five are the
+    /// series-shaped types, the same set `appendWholeSeries` handles.
+    private fun isSeriesToken(token: String) = when (token) {
+        "heart_rate", "power", "speed", "cycling_cadence",
+        "running_cadence" -> true
+        else -> false
+    }
 
     private fun recordClassFor(token: String) = when (token) {
         "steps" -> StepsRecord::class
