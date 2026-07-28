@@ -155,8 +155,15 @@ public final class SampleQuery {
     ///
     /// Leave it on and both platforms return the same thing, so your code
     /// is identical across them. Turn it off when you need a series'
-    /// record identity -- to delete it, for instance -- and accept that
-    /// iOS, which has no such grouping, returns series of size 1.
+    /// record identity -- to delete it, for instance.
+    ///
+    /// **Only Health Connect and the local stores group measurements into
+    /// records**, so only they have anything to withhold. HealthKit
+    /// stores each measurement separately and the iOS port returns
+    /// ordinary [QuantitySample] objects whichever way this is set -- not
+    /// one-point series -- so code that turns flattening off and then
+    /// casts to [SeriesSample] fails there. Test the type rather than
+    /// assuming it.
     public SampleQuery setFlattenSeries(boolean flattenSeries) {
         this.flattenSeries = flattenSeries;
         return this;

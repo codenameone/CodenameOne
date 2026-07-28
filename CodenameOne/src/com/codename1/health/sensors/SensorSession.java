@@ -351,11 +351,17 @@ public class SensorSession {
                 session.pendingWrites.addAll(0, batch);
             }
             // Re-armed explicitly, but only while the session is still
-            // running. Rescheduling from a STOPPED session -- which is
-            // exactly where a permanent failure like a revoked permission
-            // lands -- retried forever, keeping the dead session alive and
-            // firing store writes and errors after shutdown.
-            if (session.getState() != SensorSessionState.STOPPED) {
+            // running. Rescheduling from a session that has ended --
+            // where a permanent failure like a revoked permission or an
+            // unavailable store lands -- retried forever, keeping the
+            // dead session alive and firing store writes and errors after
+            // shutdown.
+            //
+            // Both terminal states, not just STOPPED: the reconnect
+            // ladder retires a session as FAILED, which passed a
+            // stopped-only check and left exactly the session nobody
+            // holds a handle to retrying on a timer.
+            if (!session.isTerminal()) {
                 session.scheduleFlush(session.getOptions()
                         .getStoreBatchMillis());
             }
@@ -364,6 +370,18 @@ public class SensorSession {
                     : new HealthException(HealthError.UNKNOWN,
                             "could not persist sensor samples", error));
         }
+    }
+
+    /// Whether this session has ended, however it ended.
+    ///
+    /// `STOPPED` is the caller asking; `FAILED` is the framework giving
+    /// up. Nothing may be scheduled from either -- the session is gone
+    /// from the manager's registry, so a timer armed here is one nobody
+    /// can cancel.
+    final boolean isTerminal() {
+        SensorSessionState s = getState();
+        return s == SensorSessionState.STOPPED
+                || s == SensorSessionState.FAILED;
     }
 
     /// Decodes a payload into zero or more samples, or `null` when the

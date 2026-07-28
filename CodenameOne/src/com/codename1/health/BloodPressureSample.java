@@ -30,10 +30,20 @@ package com.codename1.health;
 /// HealthKit models blood pressure as an `HKCorrelation` wrapping two
 /// separate quantity samples; Health Connect has a single
 /// `BloodPressureRecord` and no correlation concept at all. This API
-/// follows Health Connect and the iOS port assembles and disassembles the
-/// correlation, because a portable `Correlation` type would be a fiction
-/// that only one platform actually has -- Android would have to synthesize
-/// it and every caller would have to destructure it.
+/// follows Health Connect, because a portable `Correlation` type would be
+/// a fiction that only one platform actually has -- Android would have to
+/// synthesize it and every caller would have to destructure it.
+///
+/// #### Local and simulator only in this release
+///
+/// Neither phone carries this shape. The iOS type map has no
+/// `blood_pressure` entry, so the correlation assembly the port will need
+/// is not written, and Health Connect's record is not mapped either: a
+/// read or write of [HealthDataType#BLOOD_PRESSURE] on a device is
+/// refused with [HealthError#TYPE_NOT_SUPPORTED] rather than dropped
+/// without a word. It works fully against the local and simulator
+/// stores. Until that changes, take the reading off the cuff's
+/// [com.codename1.health.sensors.SensorSession] and keep it yourself.
 public final class BloodPressureSample extends HealthSample {
 
     /// The body position was not recorded.

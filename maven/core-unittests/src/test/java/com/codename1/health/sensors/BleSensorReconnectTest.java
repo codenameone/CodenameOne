@@ -177,6 +177,21 @@ class BleSensorReconnectTest extends UITestBase {
             return "Fake Strap";
         }
 
+        /// Delivers a 0x2A37 notification with the given rate, as a
+        /// strap would.
+        void notifyHeartRate(int bpm) {
+            GattService hr = peripheralService();
+            if (hr == null) {
+                return;
+            }
+            fireNotification(hr.getCharacteristic(HR_MEASUREMENT),
+                    new byte[] { 0x00, (byte) bpm });
+        }
+
+        private GattService peripheralService() {
+            return getService(HR_SERVICE);
+        }
+
         void dropLink() {
             fireConnectionStateChanged(ConnectionState.DISCONNECTED,
                     new BluetoothException(BluetoothError.NOT_CONNECTED,
@@ -272,6 +287,134 @@ class BleSensorReconnectTest extends UITestBase {
                 AsyncResource<L2capChannel> out) {
             out.error(new BluetoothException(BluetoothError.NOT_SUPPORTED,
                     "no channels here"));
+        }
+    }
+
+    /**
+     * A session that has ended must not keep retrying its store writes.
+     *
+     * <p>The re-arm guard tested only for STOPPED, but the reconnect
+     * ladder retires a session as FAILED -- so exactly the session nobody
+     * holds a handle to any more, already gone from the manager's
+     * registry, went on firing writes and errors on a timer that nothing
+     * could cancel.</p>
+     */
+    @Test
+    void aFailedSessionStopsRetryingItsWrites() throws Exception {
+        CountingStore store = new CountingStore();
+        com.codename1.health.Health health =
+                new com.codename1.health.Health() {
+                    @Override
+                    public boolean isSupported() {
+                        return true;
+                    }
+
+                    @Override
+                    public com.codename1.health.HealthStore getStore() {
+                        return store;
+                    }
+                };
+        implementation.setHealth(health);
+        try {
+            FakePeripheral p = new FakePeripheral();
+            SensorSessionOptions options = new SensorSessionOptions()
+                    .setWriteToStore(true)
+                    .setStoreBatchMillis(10);
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE, options, p);
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+            assertEquals(SensorSessionState.STREAMING, session.getState());
+
+            // One reading, so a batch is pending, then a permanent
+            // failure while it is still unwritten.
+            final int[] samplesSeen = new int[1];
+            session.addListener(new SensorSampleListener() {
+                public void sensorSample(SensorSession s,
+                        com.codename1.health.HealthSample sample) {
+                    samplesSeen[0]++;
+                }
+
+                public void sensorStateChanged(SensorSession s,
+                        SensorSessionState state) {
+                }
+
+                public void sensorError(SensorSession s,
+                        com.codename1.health.HealthException error) {
+                }
+            });
+            p.notifyHeartRate(72);
+            flushSerialCalls();
+            assertTrue(samplesSeen[0] > 0,
+                    "the notification should have decoded to a sample");
+            // The batch has to have been attempted at least once, or
+            // the retry this guards against never had anything to retry
+            // and the test would pass for no reason.
+            int beforeFailure = pumpFor(200);
+            assertTrue(beforeFailure > 0,
+                    "the session should have tried to write its batch");
+
+            p.failDiscoveries = 99;
+            p.dropLink();
+            pumpUntil(session, SensorSessionState.FAILED);
+            assertTrue(session.isTerminal());
+
+            int afterFailure = pumpFor(300);
+            assertEquals(afterFailure, pumpFor(300),
+                    "a session that has ended must issue no further"
+                            + " writes; it issued more");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
+    /** Pumps the EDT for a while and reports the store's write count. */
+    private int pumpFor(long millis) throws Exception {
+        long until = System.currentTimeMillis() + millis;
+        while (System.currentTimeMillis() < until) {
+            flushSerialCalls();
+            Thread.sleep(10);
+        }
+        return CountingStore.writes;
+    }
+
+    /** A store that refuses every write and counts the attempts. */
+    private static final class CountingStore
+            extends com.codename1.health.HealthStore {
+
+        static int writes;
+
+        CountingStore() {
+            writes = 0;
+        }
+
+        @Override
+        public boolean isSupported() {
+            return true;
+        }
+
+        @Override
+        public boolean isTypeSupported(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        @Override
+        public boolean isWritable(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        @Override
+        protected void doWrite(
+                java.util.List<com.codename1.health.HealthSample> samples,
+                AsyncResource<com.codename1.health.HealthWriteResult> out) {
+            writes++;
+            out.error(new com.codename1.health.HealthException(
+                    com.codename1.health.HealthError.UNAUTHORIZED,
+                    "scripted permanent refusal"));
         }
     }
 }
