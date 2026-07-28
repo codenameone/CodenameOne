@@ -24,8 +24,18 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.bench.CommonWorkloads;
+import com.codename1.ui.CN;
+import com.codename1.ui.Display;
 
-/** Runs the canonical ParparVM common workloads inside every port app. */
+/**
+ * Runs the canonical ParparVM common workloads inside every port app.
+ *
+ * <p>The iOS simulator omits the allocation-heavy workloads because ParparVM's
+ * simulator mark-sweep collector can require several gigabytes for a single
+ * invocation. Device builds still exercise the complete workload set. Skipped
+ * workloads are emitted explicitly so that the port-status report distinguishes
+ * them from missing benchmark output.</p>
+ */
 public class CommonWorkloadBenchmarkTest extends BaseTest {
     private static final int WARMUP = 3;
     private static final int MEASUREMENTS = 5;
@@ -54,15 +64,21 @@ public class CommonWorkloadBenchmarkTest extends BaseTest {
             run("arrayRandom", new Workload() {
                 public long run() { return CommonWorkloads.arrayRandom(); }
             });
-            run("objectAllocation", new Workload() {
-                public long run() { return CommonWorkloads.objectAllocation(); }
-            });
-            run("hashMapChurn", new Workload() {
-                public long run() { return CommonWorkloads.hashMapChurn(); }
-            });
-            run("stringBuilding", new Workload() {
-                public long run() { return CommonWorkloads.stringBuilding(); }
-            });
+            if (isIosSimulator()) {
+                skip("objectAllocation", "ios-simulator-gc-footprint");
+                skip("hashMapChurn", "ios-simulator-gc-footprint");
+                skip("stringBuilding", "ios-simulator-gc-footprint");
+            } else {
+                run("objectAllocation", new Workload() {
+                    public long run() { return CommonWorkloads.objectAllocation(); }
+                });
+                run("hashMapChurn", new Workload() {
+                    public long run() { return CommonWorkloads.hashMapChurn(); }
+                });
+                run("stringBuilding", new Workload() {
+                    public long run() { return CommonWorkloads.stringBuilding(); }
+                });
+            }
             run("recursion", new Workload() {
                 public long run() { return CommonWorkloads.recursion(); }
             });
@@ -94,6 +110,14 @@ public class CommonWorkloadBenchmarkTest extends BaseTest {
         }
         sink ^= checksum;
         emit("benchmark id=" + id + " duration_ns=" + minimumNanos + " checksum=" + checksum);
+    }
+
+    private static boolean isIosSimulator() {
+        return CN.isSimulator() && "ios".equals(Display.getInstance().getPlatformName());
+    }
+
+    private static void skip(String id, String reason) {
+        emit("skipped id=" + id + " reason=" + reason);
     }
 
     private static void emit(String value) {

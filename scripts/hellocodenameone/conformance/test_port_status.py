@@ -114,6 +114,43 @@ class PortStatusTest(unittest.TestCase):
         self.assertEqual("fail", report["tests"]["StringApiTest"]["status"])
         self.assertEqual(["suite-error"], report["tests"]["StringApiTest"]["reasons"])
 
+    def test_performance_skips_are_complete_and_preserve_reasons(self):
+        expected = self.manifest["performance_benchmarks"]
+        skipped = {"objectAllocation", "hashMapChurn", "stringBuilding"}
+        log_text = "\n".join(
+            [
+                *[
+                    (
+                        f"CN1SS:PERF:skipped id={benchmark} "
+                        "reason=ios-simulator-gc-footprint"
+                        if benchmark in skipped
+                        else (
+                            f"CN1SS:PERF:benchmark id={benchmark} "
+                            "duration_ns=12000000 checksum=42"
+                        )
+                    )
+                    for benchmark in expected
+                ],
+                "CN1SS:PERF:complete benchmark_version=1 checksum=42",
+            ]
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "suite.log"
+            log_path.write_text(log_text, encoding="utf-8")
+            performance = port_status.parse_performance([log_path], expected, None)
+
+        self.assertEqual("complete", performance["status"])
+        self.assertEqual([], performance["missing"])
+        self.assertEqual(
+            {
+                benchmark: "ios-simulator-gc-footprint"
+                for benchmark in expected
+                if benchmark in skipped
+            },
+            performance["skipped"],
+        )
+        self.assertNotIn("objectAllocation", performance["benchmarks"])
+
     def test_strict_report_errors_reject_failures_missing_tests_and_incomplete_suite(self):
         report = {
             "suite_finished": False,
