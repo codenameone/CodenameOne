@@ -51,14 +51,19 @@ import java.util.Map;
 ///
 /// [#isLive()] tells you whether the operating system is running a real
 /// workout session -- keeping the app alive and collecting sensor data
-/// itself. That is the case on watchOS, on iOS 26 and later, and on Wear
-/// OS.
+/// itself. **It is false everywhere in this release**: the only
+/// implementation here is a recorded session, and
+/// [WorkoutManager#isLiveSessionSupported()] says so on every platform.
+/// `HKWorkoutSession` on watchOS and iOS 26, and the Wear OS exercise
+/// client, are what would change that answer; nothing here drives them
+/// yet. Do not assume the OS keeps your app alive or collects data for
+/// you -- backgrounding can end the process and take the session with it.
 ///
-/// On an Android phone it is not, because Health Connect has no such
-/// concept: Google's documented approach there is to record the session
-/// yourself and write it when it ends, which is exactly what a recorded
-/// session does. So a recorded session is not a degraded shim -- it is the
-/// platform-correct design -- but it does mean **nothing is collected
+/// On an Android phone it could not be live in any case, because Health
+/// Connect has no such concept: Google's documented approach there is to
+/// record the session yourself and write it when it ends, which is exactly
+/// what a recorded session does. So a recorded session is not a degraded
+/// shim -- it is the platform-correct design -- but it does mean **nothing is collected
 /// unless you feed it**, through [#addSamples(List)] or by attaching a
 /// Bluetooth sensor with
 /// [com.codename1.health.sensors.SensorSessionOptions#setWorkoutSession(WorkoutSession)].
@@ -262,10 +267,25 @@ public abstract class WorkoutSession {
             out.complete(Boolean.TRUE);
             return out;
         }
+        // Copied and filtered rather than passed through. rollUp ignores
+        // a null, but the list went on to be stored whole, and doEnd
+        // dereferences what it stored -- so a single null entry threw out
+        // of end() after the session had already moved to STOPPED,
+        // leaving the caller with neither a result nor a session it could
+        // retry.
+        List<HealthSample> kept = new ArrayList<HealthSample>(
+                samples.size());
         for (HealthSample sample : samples) {
-            rollUp(sample);
+            if (sample != null) {
+                rollUp(sample);
+                kept.add(sample);
+            }
         }
-        doAddSamples(samples, out);
+        if (kept.isEmpty()) {
+            out.complete(Boolean.TRUE);
+            return out;
+        }
+        doAddSamples(kept, out);
         return out;
     }
 

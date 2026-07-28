@@ -171,10 +171,17 @@ public final class HealthDataType {
     ///
     /// HealthKit models this as an `HKCorrelation` of two separate
     /// quantity samples; Health Connect has a single `BloodPressureRecord`
-    /// and no correlation concept at all. This API follows Health Connect,
-    /// and the iOS port assembles and disassembles the correlation. There
-    /// is deliberately no portable `Correlation` type, because it would be
-    /// a fiction maintained in one port only.
+    /// and no correlation concept at all. This API follows Health Connect.
+    /// There is deliberately no portable `Correlation` type, because it
+    /// would be a fiction maintained in one port only.
+    ///
+    /// **Local and simulator only in this release.** Neither phone carries
+    /// this type: the iOS map has no `blood_pressure` entry, so the
+    /// correlation assembly the port will need is not written yet, and
+    /// Health Connect's record is not mapped either. A read or write of it
+    /// on a device is refused with [HealthError#TYPE_NOT_SUPPORTED] rather
+    /// than dropped silently. Take the reading off the sensor session and
+    /// keep it yourself until then -- see [BloodPressureSample].
     public static final HealthDataType BLOOD_PRESSURE =
             define("blood_pressure", HealthDataKind.QUANTITY,
                     HealthUnit.MILLIMETER_OF_MERCURY,

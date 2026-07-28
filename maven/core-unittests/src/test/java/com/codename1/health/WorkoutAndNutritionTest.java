@@ -494,4 +494,38 @@ class WorkoutAndNutritionTest extends UITestBase {
         c.setKeepAliveInBackground(false);
         assertFalse(c.isKeepAliveInBackground());
     }
+
+    /**
+     * A null in the fed list must not reach the session's collection.
+     *
+     * <p>{@code rollUp} ignored it, but the list was stored whole and
+     * {@code doEnd} dereferences what it stored -- so one null threw out
+     * of {@code end()} after the session had already moved to STOPPED,
+     * leaving the caller with neither a result nor a session it could
+     * retry.</p>
+     */
+    @Test
+    void aNullSampleDoesNotBreakTheWorkoutAtTheEnd() {
+        WorkoutSession s = startedSession();
+        List<HealthSample> fed = new ArrayList<HealthSample>();
+        fed.add(FakeHealthStore.sample(HealthDataType.HEART_RATE,
+                1767225600000L, 1767225600000L, 140));
+        fed.add(null);
+        s.addSamples(fed);
+
+        AsyncResource<WorkoutSample> ended = s.end();
+        assertNull(errorOf(ended), "ending must not throw over a null");
+        assertNotNull(ended.get());
+    }
+
+    /** A list of nothing but nulls is accepted and adds nothing. */
+    @Test
+    void aListOfNullsAddsNothing() {
+        WorkoutSession s = startedSession();
+        List<HealthSample> fed = new ArrayList<HealthSample>();
+        fed.add(null);
+        AsyncResource<Boolean> added = s.addSamples(fed);
+        assertNull(errorOf(added));
+        assertEquals(Boolean.TRUE, added.get());
+    }
 }

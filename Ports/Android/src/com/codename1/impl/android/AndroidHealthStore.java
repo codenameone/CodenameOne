@@ -110,28 +110,21 @@ class AndroidHealthStore extends HealthStore {
         return isTypeSupported(type) && HealthWire.isAndroidDeletable(type);
     }
 
-    /// Health Connect computes these natively; anything else is derived
-    /// from raw samples by the shared base class.
+    /// Empty: nothing is computed natively yet.
+    ///
+    /// Health Connect does have an aggregate API, and this listed what it
+    /// could compute -- but `doAggregate` is deliberately not overridden
+    /// (see the note below it), so every one of those metrics is actually
+    /// derived by the shared base class from raw samples read back with
+    /// an effectively unbounded limit. A caller using this to decide that
+    /// a year-wide aggregate would stay platform-side got a large read
+    /// and the allocation that comes with it.
+    ///
+    /// The iOS store answers the same way, for the same reason. When the
+    /// bridge grows a real aggregate path this is where it gets
+    /// advertised, and not before.
     public List<AggregateMetric> getSupportedMetrics(HealthDataType type) {
-        List<AggregateMetric> out = new ArrayList<AggregateMetric>();
-        if (!isTypeSupported(type)) {
-            return out;
-        }
-        out.add(AggregateMetric.COUNT);
-        out.add(AggregateMetric.DURATION);
-        switch (type.getAggregationStyle()) {
-            case CUMULATIVE:
-                out.add(AggregateMetric.TOTAL);
-                break;
-            case DISCRETE:
-                out.add(AggregateMetric.AVERAGE);
-                out.add(AggregateMetric.MINIMUM);
-                out.add(AggregateMetric.MAXIMUM);
-                break;
-            default:
-                break;
-        }
-        return out;
+        return new ArrayList<AggregateMetric>();
     }
 
     /// Health Connect caps a single insert at 1000 records.
