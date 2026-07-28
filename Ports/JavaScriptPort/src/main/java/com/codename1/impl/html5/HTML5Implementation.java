@@ -7168,6 +7168,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // http:host/path, and even http:/host/path, with host as the
                     // authority. Without this the slashless form would skip the
                     // parsing below and display its leading user info.
+                    //
+                    // UNLESS the scheme matches the page's own. Then it is a
+                    // relative reference, not an authority: on an https page
+                    // https:example.com/p resolves under the page's host, with
+                    // example.com as the start of the PATH. Naming example.com
+                    // as the destination would be simply false.
+                    String scheme = url.substring(0, colon);
+                    String page = pageScheme();
+                    if (page != null && page.equalsIgnoreCase(scheme)) {
+                        String host = mainLocationPart("host");
+                        if (host != null && host.length() > 0) {
+                            return host + "/" + DISPLAY_URL_ELLIPSIS;
+                        }
+                        return ellipsizeTail(url);
+                    }
                     rest = url.substring(colon + 1);
                     // Only reached when the scheme is special; the separator
                     // skip below covers http:/host as well as http:host.
@@ -7222,6 +7237,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // A lone trailing "/" is not worth an ellipsis.
         boolean hasPath = rest.length() - authorityEnd > 1;
         return hasPath ? authority + "/" + DISPLAY_URL_ELLIPSIS : authority;
+    }
+
+    /**
+     * The page's own scheme, without the trailing colon, or null if unreadable.
+     */
+    private static String pageScheme() {
+        try {
+            String protocol = mainLocationPart("protocol");
+            if (protocol == null) {
+                return null;
+            }
+            return protocol.endsWith(":")
+                    ? protocol.substring(0, protocol.length() - 1)
+                    : protocol;
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     /**
