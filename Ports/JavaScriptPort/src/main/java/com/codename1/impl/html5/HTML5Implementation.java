@@ -6924,9 +6924,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return true;
         }
         int colon = url.indexOf(':');
-        // A single character before the colon is a Windows drive letter rather
-        // than a URI scheme; every scheme worth handing off is longer.
-        if (colon < 2) {
+        // RFC 3986 allows a single ALPHA scheme, so x:payload is a legitimate
+        // deep link. The usual reason to demand two characters is to avoid
+        // reading a Windows drive letter as a scheme, which cannot arise here:
+        // getFileSystemSeparator() is '/' on this port, so no storage path it
+        // hands us is drive qualified.
+        if (colon < 1) {
             return false;
         }
         // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ), per RFC 3986. A
