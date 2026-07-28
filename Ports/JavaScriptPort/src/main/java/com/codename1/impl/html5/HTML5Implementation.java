@@ -7267,46 +7267,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
-     * True when the string cannot plausibly be a storage key, so the storage
-     * lookup in {@link #execute(String)} can be skipped.
-     *
-     * <p>That means it opens with {@code //}, or with a SPECIAL scheme followed
-     * by {@code //}. Nobody names a stored file {@code https://example.com/x},
-     * and those are the overwhelming majority of links, so the common path pays
-     * nothing. Every other shape is offered to storage first -- slashless forms
-     * like {@code https:report.pdf} and {@code report:2026.pdf}, which a browser
-     * would happily parse as URLs but which a caller may just as legitimately
-     * have stored under that name, and also {@code file:///x} and custom
-     * {@code myapp://x}, which named local content or could be a key. Storage
-     * only wins if the key actually exists; a miss falls through to
-     * classification, so deep links are unaffected.</p>
-     *
-     * <p>Deciding this by scheme allowlist instead was wrong twice over: it
-     * regressed {@code report:2026.pdf}, then still regressed
-     * {@code https:report.pdf}. Ambiguity is a property of the shape, not of
-     * the scheme name.</p>
-     *
-     * <p>Takes the RAW string, the same one the lookup uses. Judging the
-     * normalized form would let {@code " https://example.com/report "} -- a
-     * perfectly legal key, since keys may carry surrounding whitespace -- look
-     * unambiguous and skip the lookup that would have found it.</p>
-     */
-    private static boolean isUnambiguousBrowserUrl(String url) {
-        if (startsWithAuthorityMarker(url)) {
-            return true;
-        }
-        int sep = url.indexOf("://");
-        if (sep < 1) {
-            return false;
-        }
-        // Special schemes only. file:///x names local content, and a custom
-        // myapp://x could be a key as easily as a deep link; both were reaching
-        // the lookup before this branch and still should. What this skips is
-        // ordinary web links, which are the volume and are never keys.
-        return isSpecialScheme(url.substring(0, sep));
-    }
-
-    /**
      * True when the URL names something the browser itself can hand off, as
      * opposed to a path into local storage that {@link #execute(String)} is
      * expected to turn into a download. Only these get the
@@ -7531,26 +7491,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
         String fileName = null;
         boolean useBlobHandler = false;
         Button nativeButton = new Button();
-        // Storage wins for anything that could name a key -- a stored file may
-        // be called report:2026.pdf or https:report.pdf, both of which a
-        // browser would read as URLs. Only shapes that cannot be a key skip the
-        // lookup, since exists() costs up to two IndexedDB reads and ordinary
-        // https://... links should not pay for them. Both the decision and the
-        // lookup read rawUrl: a key may legitimately open or close with a
-        // space, so judging the normalized form would skip the lookup for keys
-        // the lookup would have found.
-        // ...and only when normalization left the string untouched. If it
-        // changed anything, the raw form is not what the browser would parse,
-        // so it can still be a key in its own right -- "https://x/y\n" among
-        // them, which the shape test alone would wave through.
-        // data: carries its own payload and is claimed by its own branch
-        // below, so it is never a lookup candidate -- and must not become one:
-        // exists() would push a multi-megabyte base64 string through the host
-        // bridge as a key, twice, blocking the EDT for nothing. The parent
-        // implementation excluded data: here too.
-        boolean cannotBeStorageKey = hasScheme(url, "data")
-                || (isUnambiguousBrowserUrl(rawUrl) && rawUrl.equals(url));
-        if (!cannotBeStorageKey && exists(rawUrl)) {
+        // Storage names are unrestricted, so NO shape can be ruled out in
+        // advance: report:2026.pdf, https:report.pdf and https://example.com/x
+        // are all legal keys, and three successive attempts to characterize
+        // "cannot be a key" each regressed one of them. Consult storage for
+        // everything and let the miss decide. The parent implementation did
+        // the same for every shape but http:, mailto: and data:.
+        //
+        // data: stays excluded, and it is the only exclusion that holds up:
+        // there the string is the download's payload rather than a name, and
+        // exists() would push a multi-megabyte base64 blob through the host
+        // bridge as a key, twice, for something that can never match.
+        //
+        // Looked up under the path exactly as given -- a key may legitimately
+        // open or close with a space, and nothing here is parsed by the
+        // browser.
+        if (!hasScheme(url, "data") && exists(rawUrl)) {
             try {
                 Blob blob = openFileAsBlob(rawUrl);
                 char sep = getFileSystemSeparator();
