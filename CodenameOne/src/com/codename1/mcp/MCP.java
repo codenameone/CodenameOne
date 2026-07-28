@@ -50,8 +50,9 @@ public final class MCP {
     private static MCPServer server;
     /// Every access to these goes through the class monitor, because the port that
     /// registers a transport and the code asking whether one exists are not necessarily
-    /// the same thread. The accessors below are synchronized for that reason rather than
-    /// the fields being volatile, which this codebase does not use.
+    /// the same thread. The accessors below are synchronized for that reason, which also
+    /// keeps every read and write of this state on the one lock the rest of the class
+    /// already takes.
     private static StdioTransportFactory stdioTransportFactory;
     private static SocketTransportFactory socketTransportFactory;
     /// Lifts the release build block; see [#setAllowOnReleaseBuilds(boolean)].

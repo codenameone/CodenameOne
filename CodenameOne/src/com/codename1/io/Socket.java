@@ -230,9 +230,15 @@ public final class Socket {
             /// listener would quietly resurrect itself instead of stopping.
             private final AtomicBoolean stopped = new AtomicBoolean();
 
-            /// The backoff after a failed accept, split so a stop is noticed promptly.
-            private static final int BACKOFF_SLICES = 10;
+            /// The backoff after a failed accept. It starts short, doubles while the
+            /// failure persists and is capped, so a port that can never be bound settles
+            /// into one attempt every few seconds instead of two a second forever. Reset
+            /// as soon as an accept succeeds, so a listener that saw one bad moment is not
+            /// left sluggish. Slept in slices so a stop is still noticed promptly.
+            private static final int BACKOFF_MIN_MS = 50;
+            private static final int BACKOFF_MAX_MS = 5000;
             private static final int BACKOFF_SLICE_MS = 50;
+            private int backoffMs = BACKOFF_MIN_MS;
 
             @Override
             public void run() {
@@ -258,6 +264,7 @@ public final class Socket {
                         }
                         final SocketConnection sc = (SocketConnection) scClass.newInstance();
                         if (connection != null) {
+                            backoffMs = BACKOFF_MIN_MS;   // healthy again
                             sc.setConnected(true);
                             Display.getInstance().startThread(new Runnable() {
                                 @Override
@@ -279,12 +286,18 @@ public final class Socket {
                             // Slept in slices, re-testing the flag between them, so a stop
                             // arriving during the pause is acted on within a slice rather
                             // than after the whole backoff.
-                            for (int slice = 0; slice < BACKOFF_SLICES && !stopped.get(); slice++) {
+                            int waited = 0;
+                            while (waited < backoffMs && !stopped.get()) {
+                                int slice = Math.min(BACKOFF_SLICE_MS, backoffMs - waited);
                                 try {
-                                    Thread.sleep(BACKOFF_SLICE_MS);
+                                    Thread.sleep(slice);
                                 } catch (InterruptedException interrupted) {
                                     break;   // the loop re-tests stopped straight away
                                 }
+                                waited += slice;
+                            }
+                            if (backoffMs < BACKOFF_MAX_MS) {
+                                backoffMs = Math.min(backoffMs * 2, BACKOFF_MAX_MS);
                             }
                         }
                     }

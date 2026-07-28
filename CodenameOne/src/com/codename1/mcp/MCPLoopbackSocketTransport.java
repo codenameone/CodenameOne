@@ -22,6 +22,7 @@
  */
 package com.codename1.mcp;
 
+import com.codename1.io.Log;
 import com.codename1.io.Socket;
 import com.codename1.io.SocketConnection;
 
@@ -383,9 +384,28 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
     /// The per-connection callback the socket API instantiates. Public with a no-argument
     /// constructor because [Socket#listenLoopback] creates it reflectively.
     public static final class Connection extends SocketConnection {
+        /// The last failure reported, so a listener that cannot bind at all says so once
+        /// instead of once per retry. Only ever touched from the listener thread.
+        private static String lastReportedError;
+
         @Override
         public void connectionError(int errorCode, String message) {
-            // The listen loop reports its own failures; nothing useful to add per client.
+            // Without this the failure is silent: startSocketServer returns, the server
+            // reports itself running, and nothing can ever attach - a port already in use
+            // being the ordinary way that happens. Logged rather than thrown because this
+            // arrives on the listener thread, long after the caller has gone.
+            String description = "MCP socket listener failed: " + message + " (" + errorCode + ")";
+            if (description.equals(lastReportedError)) {
+                return;   // the same failure retrying; saying so once is enough
+            }
+            lastReportedError = description;
+            try {
+                Log.p(description, Log.ERROR);
+            } catch (Throwable loggingFailed) {
+                // The log routes through the platform implementation, which may not be
+                // registered yet when a server is started early in initialization.
+                System.err.println("[cn1.mcp] " + description);
+            }
         }
 
         @Override
