@@ -301,7 +301,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // scope third party dependency, say -- stays reportable, because nothing
         // puts those classes back before the translators run.
         boolean localJavascriptBuild = isLocalJavascriptBuild(buildTarget);
-        List<File> providedJars = new ArrayList<File>();
+        Set<File> providedJars = new LinkedHashSet<File>();
         for (Artifact artifact : project.getArtifacts()) {
             if (isSuppliedByBuildServer(artifact.getGroupId(), artifact.getArtifactId(), buildTarget)) {
                 File jar = getJar(artifact);
@@ -323,9 +323,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             for (String bundled : BUNDLE_ARTIFACT_ID_BLACKLIST) {
                 File jar = getJar(GROUP_ID, bundled);
                 if (jar != null && jar.isFile()) {
-                    if (!providedJars.contains(jar)) {
-                        providedJars.add(jar);
-                    }
+                    providedJars.add(jar);
                     if ("codenameone-core".equals(bundled)) {
                         coreResolved = true;
                     }
@@ -334,8 +332,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if (!coreResolved) {
                 // Every application class references the framework, so without its class
                 // list the check cannot tell a stale class from a framework class and would
-                // report false positives. Skipping is the only safe answer.
-                getLog().debug("Skipping the application class closure check because codenameone-core could not be resolved");
+                // report false positives. Skipping is the only safe answer, but say so
+                // loudly: a stale class will now reach the build unreported.
+                getLog().warn("Skipping the application class closure check for build target " + buildTarget
+                        + " because " + GROUP_ID + ":codenameone-core could not be resolved."
+                        + " Stale application classes will not be detected before the build runs.");
                 return;
             }
         }

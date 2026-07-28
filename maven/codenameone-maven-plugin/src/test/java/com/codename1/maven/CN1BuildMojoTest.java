@@ -91,6 +91,8 @@ public class CN1BuildMojoTest {
     @Test
     public void stripsKotlinStdlibOnlyForServerBuilds() {
         assertTrue(CN1BuildMojo.isStrippedFromStagedJar("org.jetbrains.kotlin", "kotlin-stdlib", "compile", "ios-device"));
+        // ios-source generates the Xcode project on this machine, so it is a local
+        // target and bundling kotlin-stdlib is simpler than having it re-supplied.
         assertFalse(CN1BuildMojo.isStrippedFromStagedJar("org.jetbrains.kotlin", "kotlin-stdlib", "compile", "ios-source"));
     }
 
