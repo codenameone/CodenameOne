@@ -1601,7 +1601,17 @@ public class AndroidGradleBuilder extends Executor {
                     // store; Health.getSensors() means BLE only. The class
                     // reference alone cannot tell them apart, so the facade
                     // is decided here.
-                    if ("com/codename1/health/Health".equals(cls)) {
+                    // A store method reached through a passed-in HealthStore
+                // never names Health at all, so the facade hook below
+                // cannot see it -- and without this the build skipped the
+                // type validation and shipped a manifest with no per-type
+                // permissions, leaving those calls unauthorized.
+                if (cls.indexOf("com/codename1/health/HealthStore") == 0) {
+                    usesHealth = true;
+                    usesHealthStore = true;
+                    usesHealthData = true;
+                }
+                if ("com/codename1/health/Health".equals(cls)) {
                         usesHealth = true;
                         if (method.startsWith("getStore")
                                 || method.startsWith("getWorkouts")
