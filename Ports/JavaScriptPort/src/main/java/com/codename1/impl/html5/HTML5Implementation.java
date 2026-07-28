@@ -6887,6 +6887,24 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
+     * True when a backside-hook drain is pending because of an actual user
+     * gesture, rather than merely because the polling interval enabled by
+     * {@code platformHint.javascript.backsideHooksInterval} is running.
+     *
+     * <p>{@link #isBacksideHookAvailable()} accepts either, which is right for
+     * media -- browsers relax autoplay once the page has engagement -- but not
+     * for a popup. The interval drains from {@code Window.setInterval}, which
+     * grants no transient activation, so a {@code window.open()} queued on it
+     * can be blocked with nothing shown to the user. The semaphore, in
+     * contrast, is only raised by
+     * {@code installBacksideHooksInUserInteraction()} off a real pointer or key
+     * event.</p>
+     */
+    private boolean isGestureBackedHookAvailable() {
+        return backsideHooksSemaphore > 0;
+    }
+
+    /**
      * True when the URL names something the browser itself can hand off, as
      * opposed to a path into local storage that {@link #execute(String)} is
      * expected to turn into a download. Only these get the
@@ -6942,9 +6960,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // host bundle predates the eval-on-main handler -- degrade rather than
         // leave execute() with no effect at all:
         // a popup only survives inside a live user gesture, so ride the backside
-        // hook when one is pending and otherwise ask the user, whose tap on the
-        // Sheet becomes the gesture.
-        if (isBacksideHookAvailable()) {
+        // hook when a gesture-backed one is pending and otherwise ask the user,
+        // whose tap on the Sheet becomes the gesture. Note this deliberately
+        // ignores an interval-only hook: draining from a timer would let the
+        // browser block the popup with nothing shown, which is worse than the
+        // Sheet that _blank promises.
+        if (isGestureBackedHookAvailable()) {
             addBacksideHook(new JSRunnable() {
                 @Override
                 public void run() {
