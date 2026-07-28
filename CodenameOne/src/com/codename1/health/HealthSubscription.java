@@ -107,16 +107,18 @@ public final class HealthSubscription {
 
     /// Whether the operating system wakes the app when new data arrives.
     ///
-    /// **`true` on iOS, `false` on Android.** Health Connect has no push
-    /// mechanism at all -- Google's own guidance is to poll -- so on
-    /// Android the framework drains changes at app start, on foreground,
-    /// and whenever you call [HealthStore#drainChanges()]. Wire that last
-    /// one into your background-fetch handler if you need anything better
-    /// than foreground-only.
+    /// **`false` on every platform in this release.** Health Connect has
+    /// no push mechanism at all -- Google's own guidance is to poll -- and
+    /// while HealthKit does offer `HKObserverQuery`, this release registers
+    /// none. Nothing here hooks the application lifecycle either, so
+    /// changes arrive exactly when you call [HealthStore#drainChanges()]
+    /// and at no other time: call it when you come to the foreground and
+    /// from your background-fetch handler.
     ///
     /// This is exposed as a queryable fact rather than hidden, because an
-    /// app that assumes push on Android will silently miss data for days
-    /// and its authors will never know why.
+    /// app that assumes push will silently miss data for days and its
+    /// authors will never know why -- no changes and no new data look
+    /// identical from the outside.
     public boolean isPushDelivery() {
         return pushDelivery;
     }

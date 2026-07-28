@@ -607,6 +607,40 @@ public abstract class Executor {
                                 }
 
                                 @Override
+                                public void visitInvokeDynamicInsn(String name,
+                                        String descriptor, Handle bootstrap,
+                                        Object... args) {
+                                    // A method reference -- store::readSamples,
+                                    // or a lambda body -- is an invokedynamic
+                                    // whose real target sits in the bootstrap
+                                    // arguments as a Handle. visitMethodInsn
+                                    // never sees it, so every such call was
+                                    // invisible to feature detection: obtaining
+                                    // the store registered, and the read it was
+                                    // obtained for did not.
+                                    if (args == null) {
+                                        return;
+                                    }
+                                    for (Object a : args) {
+                                        if (!(a instanceof Handle)) {
+                                            continue;
+                                        }
+                                        Handle h = (Handle) a;
+                                        if (h.getOwner() == null) {
+                                            continue;
+                                        }
+                                        scanner.usesClass(h.getOwner());
+                                        if (h.getName() != null
+                                                && !"<init>".equals(h.getName())
+                                                && !"<clinit>".equals(
+                                                        h.getName())) {
+                                            scanner.usesClassMethod(
+                                                    h.getOwner(), h.getName());
+                                        }
+                                    }
+                                }
+
+                                @Override
                                 public void visitJumpInsn(int i, Label label) {
                                 }
 

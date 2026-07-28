@@ -89,6 +89,14 @@ public final class WeightMeasurement {
         boolean imperial = (flags & FLAG_IMPERIAL) != 0;
 
         int rawWeight = r.uint16();
+        // 0xFFFF is the Weight Scale Service's "measurement unsuccessful"
+        // sentinel, not a weight. Scaling it produced 327.675 kg in SI
+        // mode and about 297 kg imperial, which the session then published
+        // and could write to the store as a real body mass -- the other
+        // medical parsers here already reject their failure values.
+        if (rawWeight == 0xFFFF) {
+            return null;
+        }
         double weightKg = imperial
                 ? rawWeight * WEIGHT_RESOLUTION_LB * LB_TO_KG
                 : rawWeight * WEIGHT_RESOLUTION_KG;

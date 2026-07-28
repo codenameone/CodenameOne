@@ -590,6 +590,7 @@ public class HealthStore {
         List<HealthSample> in = page.getSamples();
         List<HealthSample> outSamples = new ArrayList<HealthSample>(in.size());
         List<String> wanted = query.getSources();
+        boolean flattened = false;
         for (HealthSample s : in) {
             // Applied here, not only in the ports, because a port that
             // cannot express the filter natively would otherwise return
@@ -602,16 +603,71 @@ public class HealthStore {
             }
             if (query.isFlattenSeries() && s instanceof SeriesSample) {
                 SeriesSample series = (SeriesSample) s;
+                HealthTimeRange asked = query.getTimeRange() == null ? null
+                        : query.getTimeRange()
+                                .resolve(System.currentTimeMillis());
                 for (int j = 0; j < series.size(); j++) {
+                    // Each measurement against the requested range, not
+                    // just the record. A store matches the enclosing span,
+                    // so a one-minute query over an hour-long heart-rate
+                    // record returned the whole hour -- every point
+                    // outside the range the caller asked for.
+                    if (!inRange(asked, series.getSampleStartMillis(j),
+                            series.getSampleEndMillis(j))) {
+                        continue;
+                    }
                     outSamples.add(normalize(series.toQuantitySample(j),
                             query));
+                    flattened = true;
                 }
             } else {
                 outSamples.add(normalize(s, query));
             }
         }
+        if (flattened) {
+            // Sorted by measurement, because flattening changed what a
+            // "sample" is. A port orders records, and a series carries its
+            // own points in whatever order it was built with -- so an
+            // expanded page followed neither the requested direction nor
+            // any other, on the local store and on Health Connect alike.
+            java.util.Collections.sort(outSamples,
+                    new ByStart(query.isSortDescending()));
+        }
         return new SamplePage(outSamples, page.getNextPageToken(),
                 page.isTruncated());
+    }
+
+    /// Orders samples by when they were measured.
+    private static final class ByStart
+            implements java.util.Comparator<HealthSample> {
+        private final boolean descending;
+
+        ByStart(boolean descending) {
+            this.descending = descending;
+        }
+
+        public int compare(HealthSample a, HealthSample b) {
+            long x = a.getStartMillis();
+            long y = b.getStartMillis();
+            if (x == y) {
+                return 0;
+            }
+            return (x < y) != descending ? -1 : 1;
+        }
+    }
+
+    /// Half-open membership, the same rule the stores match records by:
+    /// an instant at the start is inside, an interval ending there is not.
+    private static boolean inRange(HealthTimeRange range, long start,
+            long end) {
+        if (range == null) {
+            return true;
+        }
+        if (start >= range.getEndMillis()) {
+            return false;
+        }
+        return start == end ? end >= range.getStartMillis()
+                : end > range.getStartMillis();
     }
 
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
