@@ -852,11 +852,26 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private native static int _safariBacksideHookDelay();
     
     private void installBacksideHooksInUserInteraction() {
-        // A distinct interaction, so a popup reserved against the previous one
-        // no longer applies -- see popupReservedForGeneration -- and the
-        // previous one's outstanding drains cannot serve this one's hooks.
-        gestureGeneration++;
-        pendingGestureDrains = 0;
+        installBacksideHooksInUserInteraction(true);
+    }
+
+    /**
+     * @param newInteraction true for a press or key down, which begins a new
+     *   interaction; false for the matching release, which belongs to the
+     *   interaction already in progress. A release refreshes the window's
+     *   activation and schedules more drains, but it is not a new gesture: a
+     *   press-time execute() tagged with the current generation must still be
+     *   servable by the release's drain, and a click shorter than the 300ms
+     *   delay -- the normal case -- always releases first.
+     */
+    private void installBacksideHooksInUserInteraction(boolean newInteraction) {
+        if (newInteraction) {
+            // A distinct interaction, so a popup reserved against the previous
+            // one no longer applies -- see popupReservedForGeneration -- and the
+            // previous one's outstanding drains cannot serve this one's hooks.
+            gestureGeneration++;
+            pendingGestureDrains = 0;
+        }
         if (isIOS() || isSafari()) {
             debugLog("Installing backside hooks with delay "+safariBacksideHookDelay());
             runBacksideHooksInTimeout(safariBacksideHookDelay());
@@ -1906,7 +1921,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 pointerState.setMouseDown(false);
 
                 pointerState.setLastTouchUpPosition(x, y);
-                installBacksideHooksInUserInteraction();
+                installBacksideHooksInUserInteraction(false);
                 applyMouseMetadata(me);
 
                 final Runnable releaseDispatch = new Runnable() {
@@ -2067,7 +2082,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 pointerState.setGrabbedDrag(false);
                 
                 TouchEvent me = (TouchEvent)evt;
-                installBacksideHooksInUserInteraction();
+                installBacksideHooksInUserInteraction(false);
                 nativeCallSerially(new Runnable() {
                     @Override
                     public void run() {
