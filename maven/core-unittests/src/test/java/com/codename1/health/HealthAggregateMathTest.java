@@ -227,6 +227,7 @@ class HealthAggregateMathTest {
                 .addMetric(AggregateMetric.AVERAGE)
                 .addMetric(AggregateMetric.MINIMUM)
                 .addMetric(AggregateMetric.MAXIMUM)
+                .addMetric(AggregateMetric.COUNT)
                 .setTimeRange(HealthTimeRange.between(NOON, NOON + HOUR))
                 .setBucket(HealthInterval.hours(1))).get();
 
@@ -237,6 +238,13 @@ class HealthAggregateMathTest {
                 AggregateMetric.MINIMUM), 1e-9);
         assertEquals(80.0, value(b.get(0), HealthDataType.HEART_RATE,
                 AggregateMetric.MAXIMUM), 1e-9);
+        // Three measurements, not one container. The same data read
+        // through a flattening store reports three, and a count that
+        // disagreed with the average it was computed from is worse than
+        // either number alone.
+        assertEquals(3.0, b.get(0).get(HealthDataType.HEART_RATE,
+                AggregateMetric.COUNT).getValue(HealthUnit.COUNT), 1e-9);
+        assertEquals(3, b.get(0).getSampleCount(HealthDataType.HEART_RATE));
     }
 
     /**

@@ -476,4 +476,36 @@ class LocalHealthStoreTest extends UITestBase {
                 .setTimeRange(HealthTimeRange.between(0L, 5000L))).get();
         assertEquals(id, read.get(0).getId());
     }
+
+    /**
+     * An id-based delete honours the type it was given.
+     *
+     * <p>Health Connect deletes against a record class, so a stale or
+     * mispaired type and id removes nothing there. Matching on the
+     * identifier alone made the local store more destructive than the
+     * platform it stands in for.</p>
+     */
+    @Test
+    void deletingByIdRespectsTheRequestedType() throws Exception {
+        LocalHealthStore store = new LocalHealthStore();
+        QuantitySample steps = QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(100, HealthUnit.COUNT), 1000L, 2000L);
+        String id = store.write(steps).get().getSampleIds().get(0);
+
+        // The right id, the wrong type: nothing is removed.
+        assertEquals(0, store.delete(HealthDeleteRequest.byId(
+                HealthDataType.BODY_MASS, id)).get().intValue());
+        assertEquals(1, store.readSamples(new SampleQuery()
+                .addType(HealthDataType.STEPS)
+                .setTimeRange(HealthTimeRange.between(0L, 5000L)))
+                .get().size());
+
+        // The pair the write actually produced does remove it.
+        assertEquals(1, store.delete(HealthDeleteRequest.byId(
+                HealthDataType.STEPS, id)).get().intValue());
+        assertEquals(0, store.readSamples(new SampleQuery()
+                .addType(HealthDataType.STEPS)
+                .setTimeRange(HealthTimeRange.between(0L, 5000L)))
+                .get().size());
+    }
 }

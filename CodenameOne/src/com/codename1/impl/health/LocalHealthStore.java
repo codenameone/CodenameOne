@@ -401,8 +401,18 @@ public class LocalHealthStore extends HealthStore {
         synchronized (samples) {
             if (request.isById()) {
                 List<String> ids = request.getSampleIds();
+                // The type is part of the request, and matching on the
+                // identifier alone ignored it. Health Connect deletes
+                // against a record class, so a stale or mispaired type and
+                // id removes nothing there while this store removed the
+                // record anyway -- the simulator being more destructive
+                // than the platform it stands in for.
+                List<HealthDataType> types = request.getTypes();
                 for (int i = samples.size() - 1; i >= 0; i--) {
-                    if (ids.contains(samples.get(i).getId())) {
+                    HealthSample s = samples.get(i);
+                    if (ids.contains(s.getId())
+                            && (types.isEmpty()
+                                    || types.contains(s.getType()))) {
                         samples.remove(i);
                         removed++;
                     }

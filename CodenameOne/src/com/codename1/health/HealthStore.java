@@ -811,7 +811,10 @@ public class HealthStore {
             if (!sourceAllowed(s, query)) {
                 continue;
             }
-            count++;
+            // Counted after the shape is expanded, not here. A series is
+            // one record holding many measurements, and counting the
+            // container reported COUNT as 1 for a three-point series while
+            // the same data read through a flattening store reported 3.
             // Clip to the bucket. A two-hour workout spanning two hourly
             // buckets contributes one hour to each, not two hours to both;
             // adding the whole span to every bucket it touches inflates
@@ -847,13 +850,17 @@ public class HealthStore {
                     if (at < from || at >= to) {
                         continue;
                     }
+                    count++;
                     inBucket.add(series.toQuantitySample(i));
                     // Each measurement is a point reading: whole, and an
                     // equal weight in the average.
                     weights.add(Double.valueOf(1.0));
                     durations.add(Double.valueOf(1));
                 }
-            } else if (s instanceof QuantitySample) {
+            } else {
+                count++;
+            }
+            if (s instanceof QuantitySample) {
                 inBucket.add((QuantitySample) s);
                 // Cumulative quantities are divisible, so a sample that
                 // straddles a boundary contributes in proportion. Discrete
