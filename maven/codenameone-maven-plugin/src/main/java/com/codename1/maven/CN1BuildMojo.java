@@ -214,6 +214,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         return buildTarget != null && buildTarget.contains("javascript") && isLocalBuildTarget(buildTarget);
     }
 
+    // A null build target never reaches these from the mojo -- the parameter is
+    // required -- but they are static and package private, so treat an absent
+    // target as "not local": the conservative answer, since it keeps the server
+    // supplied artifacts out of the staged jar rather than throwing.
+
     /**
      * Whether the build itself re-supplies the artifact's classes after they
      * are left out of the staged jar: codenameone-core and java-runtime come
@@ -609,6 +614,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     public static final String BUILD_TARGET_LINUX_NATIVE = Executor.BUILD_TARGET_LINUX_NATIVE;
 
     private static boolean isLocalBuildTarget(String buildTarget) {
+        if (buildTarget == null) {
+            return false;
+        }
         // windows-device (BUILD_TARGET_WINDOWS_NATIVE) is a *cloud* build: it sends
         // a "win32" build to the server (see the windows-device target in
         // buildxml-template.xml), mirroring linux-device. Only the explicit

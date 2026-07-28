@@ -110,6 +110,14 @@ public class CN1BuildMojoTest {
     }
 
     @Test
+    public void toleratesAnAbsentBuildTarget() {
+        assertTrue(CN1BuildMojo.isSuppliedByBuildServer("com.codenameone", "codenameone-core", null));
+        assertFalse(CN1BuildMojo.isSuppliedByBuildServer("com.thirdparty", "some-api", null));
+        assertFalse(CN1BuildMojo.isLocalJavascriptBuild(null));
+        assertTrue(CN1BuildMojo.isStrippedFromStagedJar("com.codenameone", "codenameone-core", "provided", null));
+    }
+
+    @Test
     public void onlyTheFrameworkCountsAsSuppliedByTheBuildServer() {
         assertTrue(CN1BuildMojo.isSuppliedByBuildServer("com.codenameone", "codenameone-core", "ios-device"));
         assertTrue(CN1BuildMojo.isSuppliedByBuildServer("com.codenameone", "java-runtime", "ios-source"));
