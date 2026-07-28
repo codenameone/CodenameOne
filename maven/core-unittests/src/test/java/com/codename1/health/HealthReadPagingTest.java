@@ -113,4 +113,69 @@ class HealthReadPagingTest extends UITestBase {
                 "the second is asked for by whatever post-processed the"
                         + " first, and that must not be the caller");
     }
+
+    /**
+     * A write that fails on its first chunk reports no partial result.
+     *
+     * <p>{@code getPartialResult()} is documented as null unless an
+     * earlier chunk was committed, and it exists so a caller can retry
+     * without duplicating what is already stored. An empty-but-present
+     * result reads as "some of this went in", so a caller written to
+     * avoid duplicates suppressed a retry that was perfectly safe --
+     * and every ordinary single-sample write took that branch, because
+     * the first chunk is the only chunk.</p>
+     */
+    @Test
+    void aWriteThatFailsOnItsFirstChunkHasNoPartialResult() {
+        FakeHealthStore store = new FakeHealthStore();
+        store.failWriteChunk = 0;
+        List<HealthSample> one = new ArrayList<HealthSample>();
+        one.add(FakeHealthStore.sample(HealthDataType.STEPS,
+                1000L, 2000L, 5));
+
+        HealthException failed = assertThrows(HealthException.class,
+                () -> {
+                    try {
+                        store.write(one).get();
+                    } catch (Throwable t) {
+                        throw t.getCause() instanceof HealthException
+                                ? (HealthException) t.getCause() : t;
+                    }
+                });
+        assertNull(failed.getPartialResult(),
+                "nothing was committed, so there is nothing partial");
+    }
+
+    /**
+     * A write that fails after a chunk went in reports what did.
+     *
+     * <p>The other half of the same contract: without this the caller
+     * sees only the failure, retries the whole batch, and writes the
+     * committed samples a second time.</p>
+     */
+    @Test
+    void aWriteThatFailsLaterReportsTheCommittedChunk() {
+        FakeHealthStore store = new FakeHealthStore();
+        store.maxWriteBatch = 1;
+        store.failWriteChunk = 1;
+        List<HealthSample> two = new ArrayList<HealthSample>();
+        two.add(FakeHealthStore.sample(HealthDataType.STEPS,
+                1000L, 2000L, 5));
+        two.add(FakeHealthStore.sample(HealthDataType.STEPS,
+                2000L, 3000L, 6));
+
+        HealthException failed = assertThrows(HealthException.class,
+                () -> {
+                    try {
+                        store.write(two).get();
+                    } catch (Throwable t) {
+                        throw t.getCause() instanceof HealthException
+                                ? (HealthException) t.getCause() : t;
+                    }
+                });
+        assertNotNull(failed.getPartialResult(),
+                "the first chunk is in the store and must be reported");
+        assertEquals(1,
+                failed.getPartialResult().getSampleIds().size());
+    }
 }

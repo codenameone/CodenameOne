@@ -52,6 +52,8 @@ public class FakeHealthStore extends HealthStore {
     /** Batches the port hands to fireChanges when drainChanges runs. */
     public final List<HealthChangeBatch> batchesToFire =
             new ArrayList<HealthChangeBatch>();
+    /** When set, the port drain fails after firing its batches. */
+    public HealthException failDrainAfterFiring;
 
     public int maxWriteBatch = 1000;
     public boolean supported = true;
@@ -150,6 +152,13 @@ public class FakeHealthStore extends HealthStore {
             n += fireChanges(b);
         }
         batchesToFire.clear();
+        if (failDrainAfterFiring != null) {
+            // The shape a real port produces when one subscription is
+            // refused after the healthy ones have already queued their
+            // batches.
+            out.error(failDrainAfterFiring);
+            return;
+        }
         out.complete(Integer.valueOf(n));
     }
 

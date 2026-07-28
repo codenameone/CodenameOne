@@ -24,10 +24,12 @@ package com.codename1.health;
 
 import com.codename1.junit.UITestBase;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.AsyncResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -570,6 +572,73 @@ class HealthSubscriptionCursorTest extends UITestBase {
         assertFalse(store.seedForTest(sub, HealthAnchor.of("baseline-token")),
                 "a baseline that lands late must not rewind the cursor");
         assertEquals("live-token", sub.getAnchor().toStorableString());
+        store.unsubscribe(id);
+    }
+
+    /**
+     * A drain that fails still waits for the deliveries it already
+     * queued.
+     *
+     * <p>A drain can fail on its last subscription having already handed
+     * batches over for the healthy ones. Completing straight away let the
+     * error callback start the next drain before those had persisted
+     * their cursors, so the same window was read and delivered twice.
+     * That went from a corner case to the ordinary one when the ports
+     * stopped swallowing a skipped subscription.</p>
+     *
+     * <p>Held deterministically rather than raced: the listener blocks
+     * until this test releases it, so the delivery is unambiguously
+     * outstanding at the moment the port reports its failure.</p>
+     */
+    @Test
+    void aFailedDrainWaitsForTheBatchesItAlreadyQueued() throws Exception {
+        final FakeHealthStore store = newStore();
+        String id = "failed-drain-" + System.nanoTime();
+        final CountDownLatch hold = new CountDownLatch(1);
+        final CountDownLatch delivering = new CountDownLatch(1);
+        HealthSubscription sub = store.subscribe(
+                new SubscriptionRequest(id).addType(HealthDataType.STEPS),
+                new HealthChangeListener() {
+                    public void healthDataChanged(HealthChangeBatch b) {
+                        delivering.countDown();
+                        try {
+                            hold.await(5, TimeUnit.SECONDS);
+                        } catch (InterruptedException ex) {
+                            throw new RuntimeException(ex);
+                        }
+                    }
+                });
+
+        store.batchesToFire.add(new HealthChangeBatch(id, sub.getTypes(),
+                samples(2), null, false, HealthAnchor.of("after-batch"),
+                0L, false));
+        store.failDrainAfterFiring = new HealthException(
+                HealthError.DATABASE_INACCESSIBLE, "device locked");
+
+        final Throwable[] reported = new Throwable[1];
+        final CountDownLatch done = new CountDownLatch(1);
+        AsyncResource<Integer> drain = store.drainChanges();
+        drain.onResult(new AsyncResult<Integer>() {
+            public void onReady(Integer value, Throwable err) {
+                reported[0] = err;
+                done.countDown();
+            }
+        });
+
+        assertTrue(delivering.await(5, TimeUnit.SECONDS),
+                "the batch must reach the listener");
+        assertFalse(drain.isDone(),
+                "the drain must not report its failure while a delivery"
+                        + " it queued is still running");
+
+        hold.countDown();
+        assertTrue(done.await(5, TimeUnit.SECONDS),
+                "and it must report once that delivery has finished");
+        assertNotNull(reported[0], "the failure must reach the caller");
+        assertEquals("after-batch",
+                store.getSubscriptions().get(0).getAnchor()
+                        .toStorableString(),
+                "with the delivered batch's cursor persisted");
         store.unsubscribe(id);
     }
 }

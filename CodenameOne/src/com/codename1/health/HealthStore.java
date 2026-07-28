@@ -56,10 +56,24 @@ import java.util.Map;
 ///
 /// #### Threading
 ///
-/// Every method may be called from the EDT and returns immediately. Every
-/// callback arrives on the EDT. Post-processing of large result sets --
-/// unit conversion across a hundred thousand samples -- happens on a
-/// shared background thread, so nothing here blocks the UI.
+/// Every method may be called from the EDT and returns immediately.
+///
+/// Change deliveries -- [HealthChangeListener] and
+/// [HealthBackgroundListener] -- always arrive on the EDT.
+///
+/// **Results of the operations you start do not carry that guarantee.**
+/// They arrive on whichever thread produced the answer: the platform SDK's
+/// callback thread on iOS and Android, and on the local-backed ports --
+/// desktop, JavaScript, the simulator -- the thread that made the call. So
+/// a read started from a worker thread on the desktop calls you back on
+/// that worker, and touching the UI from there needs your own
+/// `callSerially`. [Health] and the developer guide say the same; this
+/// used to claim an unconditional EDT guarantee that the local store never
+/// offered.
+///
+/// Post-processing of large result sets -- unit conversion across a
+/// hundred thousand samples -- happens on a shared background thread, so
+/// nothing here blocks the UI.
 public class HealthStore {
 
     private static final String PREF_SUBS = "cn1$health$subs";
@@ -1503,7 +1517,19 @@ public class HealthStore {
                                             HealthError.UNKNOWN,
                                             "the write failed partway",
                                             err);
-                            wrapped.setPartialResult(accumulated);
+                            if (!accumulated.getSampleIds().isEmpty()) {
+                                // Only when a chunk actually committed.
+                                // getPartialResult() is documented as null
+                                // unless an earlier chunk went in, and an
+                                // empty-but-present result reads as "some
+                                // of this is already stored" -- so a
+                                // caller written to avoid duplicates
+                                // suppressed a retry that was perfectly
+                                // safe. Every single-sample write failure
+                                // took that branch, because the first
+                                // chunk is the only chunk.
+                                wrapped.setPartialResult(accumulated);
+                            }
                             out.error(wrapped);
                             return;
                         }
@@ -1877,26 +1903,31 @@ public class HealthStore {
 
         @Override
         public void onReady(Integer value, Throwable error) {
-            if (error != null) {
-                store.finishDrain(out, null, error);
-                return;
-            }
-            store.whenDeliveriesDrain(out, value);
+            // Errors wait on the delivery queue exactly as successes do.
+            // A drain can fail on its last subscription having already
+            // queued batches for the healthy ones, and finishing straight
+            // away let the error callback start the next drain before
+            // those had persisted their cursors -- so the window they
+            // covered was read and delivered a second time. That became
+            // ordinary the moment the ports started reporting a skipped
+            // subscription instead of swallowing it.
+            store.whenDeliveriesDrain(out, value, error);
         }
     }
 
-    /// Completes `out` once no delivery is outstanding.
+    /// Completes `out` once no delivery is outstanding, with `value` or
+    /// with `error`.
     void whenDeliveriesDrain(final AsyncResource<Integer> out,
-            final Integer value) {
+            final Integer value, final Throwable error) {
         boolean now;
         synchronized (subscriptions) {
             now = pendingDeliveries <= 0;
             if (!now) {
-                drainGates.add(new Object[] { out, value });
+                drainGates.add(new Object[] { out, value, error });
             }
         }
         if (now) {
-            finishDrain(out, value, null);
+            finishDrain(out, error == null ? value : null, error);
         }
     }
 
@@ -1913,7 +1944,8 @@ public class HealthStore {
         for (Object[] g : ready) {
             // Through finishDrain, so the coalesced callers waiting behind
             // this drain are released with it.
-            finishDrain((AsyncResource<Integer>) g[0], (Integer) g[1], null);
+            finishDrain((AsyncResource<Integer>) g[0], (Integer) g[1],
+                    (Throwable) g[2]);
         }
     }
 
