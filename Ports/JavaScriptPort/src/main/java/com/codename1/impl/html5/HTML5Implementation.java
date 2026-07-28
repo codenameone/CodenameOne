@@ -6586,10 +6586,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
 
-    @JSBody(params={"url", "target"}, script="window.open(url, target)")
-    private native static void windowOpen(String url, String target);
-
-   
     // The original implementations of register/fire SaveBlobHandler ran their
     // scripts inside the worker, where ``document`` doesn't exist -- the
     // generated download <a> element / .click() trick threw the moment the
@@ -6678,7 +6674,233 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @JSBody(params={"js"}, script="eval(js)")
     private native static void eval_(String js);
-    
+
+    /**
+     * Value of the {@code javascript.execute.target} property: open in a new
+     * window/tab and silently fall back to navigating the current page when the
+     * browser blocks the popup. This is the default -- it is the only mode that
+     * never needs a confirmation Sheet.
+     */
+    private static final String EXECUTE_TARGET_AUTO = "auto";
+
+    /**
+     * Value of the {@code javascript.execute.target} property: only ever open a
+     * new window/tab. When the browser blocks it (no live user gesture) a
+     * confirmation Sheet is shown so the user's tap on it supplies the gesture.
+     */
+    private static final String EXECUTE_TARGET_BLANK = "_blank";
+
+    /**
+     * Value of the {@code javascript.execute.target} property: always navigate
+     * the page the app is running in. Never blocked, never shows a Sheet, but
+     * it unloads the app.
+     */
+    private static final String EXECUTE_TARGET_SELF = "_self";
+
+    /**
+     * Resolves the {@code javascript.execute.target} property, accepting the
+     * target names with or without the leading underscore.
+     */
+    private String executeTarget() {
+        String target = Display.getInstance().getProperty("javascript.execute.target", EXECUTE_TARGET_AUTO);
+        if (EXECUTE_TARGET_SELF.equals(target) || "self".equals(target)) {
+            return EXECUTE_TARGET_SELF;
+        }
+        if (EXECUTE_TARGET_BLANK.equals(target) || "blank".equals(target) || "new".equals(target)) {
+            return EXECUTE_TARGET_BLANK;
+        }
+        return EXECUTE_TARGET_AUTO;
+    }
+
+    /**
+     * Quotes a string as a JavaScript string literal so it can be embedded in a
+     * script handed to {@link #eval_(String)}.
+     */
+    private static String toJavaScriptStringLiteral(String value) {
+        StringBuilder sb = new StringBuilder(value.length() + 8);
+        sb.append('"');
+        int len = value.length();
+        for (int i = 0; i < len; i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '"':
+                    sb.append("\\\"");
+                    break;
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
+                case '<':
+                    // Avoid terminating an enclosing script element early.
+                    sb.append("\\u003c");
+                    break;
+                default:
+                    if (c < ' ' || c > 126) {
+                        String hex = Integer.toHexString(c);
+                        sb.append("\\u");
+                        for (int j = hex.length(); j < 4; j++) {
+                            sb.append('0');
+                        }
+                        sb.append(hex);
+                    } else {
+                        sb.append(c);
+                    }
+                    break;
+            }
+        }
+        sb.append('"');
+        return sb.toString();
+    }
+
+    /**
+     * Hands a URL to the page's main thread for opening. {@code window} and
+     * {@code window.open} do not exist inside the Web Worker the app runs in, so
+     * this routes through the eval-on-main host bridge (see the
+     * {@code eval_} binding in port.js) where the page's real window lives.
+     *
+     * @param url the URL to open
+     * @param sameWindow when true navigate the current page, when false open a
+     *   new window/tab
+     * @param fallBackToSameWindow when opening a new window, navigate the
+     *   current page instead if the browser blocked the popup. The check runs
+     *   inside the page-side script because the popup verdict is only knowable
+     *   there.
+     * @return true if the script reached the page, false if the main-thread
+     *   bridge is unavailable and the caller should degrade
+     */
+    private boolean openUrlOnMainThread(String url, boolean sameWindow, boolean fallBackToSameWindow) {
+        String literal = toJavaScriptStringLiteral(url);
+        String script;
+        if (sameWindow) {
+            script = "window.location.href = " + literal + ";";
+        } else if (fallBackToSameWindow) {
+            // Only attempt the popup while the page still has transient user
+            // activation -- otherwise the browser blocks it and shows its
+            // "popup blocked" indicator before we navigate anyway. Browsers
+            // without navigator.userActivation just try and let !cn1w decide.
+            script = "var cn1a = window.navigator && window.navigator.userActivation;"
+                    + "var cn1w = (!cn1a || cn1a.isActive) ? window.open(" + literal + ", '_blank') : null;"
+                    + "if (!cn1w) { window.location.href = " + literal + "; }";
+        } else {
+            script = "window.open(" + literal + ", '_blank');";
+        }
+        try {
+            eval_(script);
+            return true;
+        } catch (Throwable t) {
+            _log("Failed to open URL on the main thread: " + t);
+            return false;
+        }
+    }
+
+    /**
+     * A raw URL has no spaces for {@code SpanLabel} to wrap on, so putting one
+     * in the confirmation Sheet blew the content pane's preferred width past the
+     * screen and pushed the buttons out of reach. Shorten it for display; the
+     * full URL is never needed to answer "open this link?".
+     */
+    static String shortenUrlForDisplay(String url) {
+        if (url == null) {
+            return "";
+        }
+        String shortened = url;
+        int schemeEnd = shortened.indexOf("://");
+        if (schemeEnd >= 0) {
+            shortened = shortened.substring(schemeEnd + 3);
+        }
+        if (shortened.length() > 40) {
+            int slash = shortened.indexOf('/');
+            if (slash > 0 && slash <= 40) {
+                shortened = shortened.substring(0, slash) + "/...";
+            } else {
+                shortened = shortened.substring(0, 37) + "...";
+            }
+        }
+        return shortened;
+    }
+
+    /**
+     * Builds the "browser blocked this, please confirm" Sheet used by
+     * {@link #execute(String)}. The message, the (shortened) URL and the buttons
+     * each get their own row: the old single-row BorderLayout put the buttons
+     * east of a label whose preferred width was the whole URL, which pushed them
+     * off screen where they could not be tapped.
+     */
+    private Sheet createConfirmationSheet(String title, String message, String detail, final Runnable onConfirm) {
+        final Sheet sheet = new Sheet(null, title);
+        SpanLabel messageLabel = new SpanLabel(message);
+        Button ok = new Button("OK");
+        Button cancel = new Button("Cancel");
+        ok.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                sheet.back();
+                onConfirm.run();
+            }
+        });
+        cancel.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                sheet.back();
+            }
+        });
+        sheet.getContentPane().setLayout(BoxLayout.y());
+        sheet.getContentPane().add(messageLabel);
+        if (detail != null && detail.length() > 0) {
+            // A plain Label truncates with an ellipsis when it does not fit,
+            // unlike SpanLabel which would just overflow on an unbreakable URL.
+            Label detailLabel = new Label(detail);
+            detailLabel.setEndsWith3Points(true);
+            sheet.getContentPane().add(detailLabel);
+        }
+        sheet.getContentPane().add(FlowLayout.encloseCenter(cancel, ok));
+        return sheet;
+    }
+
+    /**
+     * Opens a URL, or asks the user to, honoring the
+     * {@code javascript.execute.target} property. See {@link #execute(String)}.
+     */
+    private void openExternalUrl(final String url) {
+        String target = executeTarget();
+        if (EXECUTE_TARGET_SELF.equals(target)) {
+            openUrlOnMainThread(url, true, false);
+            return;
+        }
+        if (EXECUTE_TARGET_AUTO.equals(target)
+                && openUrlOnMainThread(url, false, true)) {
+            return;
+        }
+        // _blank, or auto on a host bundle without the eval-on-main handler:
+        // a popup only survives inside a live user gesture, so ride the backside
+        // hook when one is pending and otherwise ask the user, whose tap on the
+        // Sheet becomes the gesture.
+        if (isBacksideHookAvailable()) {
+            addBacksideHook(new JSRunnable() {
+                @Override
+                public void run() {
+                    openUrlOnMainThread(url, false, false);
+                }
+            });
+            return;
+        }
+        createConfirmationSheet("Open Link", "Open this link in a new window?",
+                shortenUrlForDisplay(url), new Runnable() {
+            @Override
+            public void run() {
+                openUrlOnMainThread(url, false, false);
+            }
+        }).show();
+    }
+
     @Override
     public void execute(String url) {
         if (url.startsWith("javascript:")) {
@@ -6730,80 +6952,43 @@ public class HTML5Implementation extends CodenameOneImplementation {
             nativeButton.setMaterialIcon(FontImage.MATERIAL_SAVE);
             //icon = "save-file";
         } else {
-            //popover.setContents("<a href='"+url+"' target='_blank'>Open URL in New Window</a>");
-            if (isBacksideHookAvailable()) {
-                addBacksideHook(new JSRunnable() {
-                    public void run() {
-                        window.open(furl, "New Window");
-                    }
-                });
-                
-            } else {
-                final Sheet sheet = new Sheet(null, "Open Link");
-                SpanLabel l = new SpanLabel("Open "+url+" in a new window?");
-                Button ok = new Button("OK");
-                Button cancel = new Button("Cancel");
-                ok.addActionListener(new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        sheet.back();
-                        CN.execute(furl);
-                    }
-                });
-                cancel.addActionListener(new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        sheet.back();
-                    }
-                });
-                sheet.getContentPane().setLayout(BoxLayout.y());
-                sheet.getContentPane().add(BorderLayout.centerEastWest(l, FlowLayout.encloseIn(ok, cancel), null));
-                sheet.show();
-                
-            }
+            openExternalUrl(furl);
             return;
-            
         }
+        final Runnable startDownload = new Runnable() {
+            @Override
+            public void run() {
+                if (fuseBlobHandler) {
+                    fireSaveBlobHandler();
+                } else {
+                    _log("Opening URL in new window");
+                    openUrlOnMainThread(furl, false, false);
+                }
+            }
+        };
         if (isBacksideHookAvailable()) {
             addBacksideHook(new JSRunnable() {
+                @Override
                 public void run() {
-                    if (fuseBlobHandler) {
-                        fireSaveBlobHandler();
-                    } else {
-                        _log("Opening URL in new window");
-                        window.open(furl, "New Window");
-                    }
+                    startDownload.run();
                 }
             });
 
         } else {
-            final Sheet sheet = new Sheet(null, "Download file");
             String dlName = fileName == null ? "file" : fileName;
-            SpanLabel l = new SpanLabel("Download "+dlName+" now?");
-            Button ok = new Button("OK");
-            Button cancel = new Button("Cancel");
-            ok.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    sheet.back();
+            createConfirmationSheet("Download file", "Download " + dlName + " now?", null, new Runnable() {
+                @Override
+                public void run() {
                     addBacksideHook(new JSRunnable() {
+                        @Override
                         public void run() {
-                            if (fuseBlobHandler) {
-                                fireSaveBlobHandler();
-                            } else {
-                                window.open(furl, "New Window");
-                            }
+                            startDownload.run();
                         }
                     });
                 }
-            });
-            cancel.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    sheet.back();
-                }
-            });
-            sheet.getContentPane().setLayout(BoxLayout.y());
-            sheet.getContentPane().add(BorderLayout.centerEastWest(l, FlowLayout.encloseIn(ok, cancel), null));
-            sheet.show();
+            }).show();
         }
-        
+
     }
 
     

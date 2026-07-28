@@ -664,6 +664,11 @@ public class CN extends CN1Constants {
     /// }
     /// ```
     ///
+    /// On the JavaScript port this can open a new tab, navigate the current page
+    /// or show a confirmation `Sheet`, depending on the
+    /// `javascript.execute.target` property. See [Display#execute(String)] for
+    /// the details.
+    ///
     /// #### Parameters
     ///
     /// - `url`: the url to execute

@@ -609,7 +609,7 @@ NOTE: The Chrome App Launcher lists apps installed both via the Chrome Web Store
 
 People don't like it when the browser automatically starts playing sounds, or opening links without their permission. For this reason, modern browsers restrict your ability to programmatically do these things, unless they're in response to a user action, like a mouse click.
 
-If your app needs to play media (for example, `Media.play()`), or open a link (for example, `Display.execute("...")`) without the user actually interacting physically (for example, key press or pointer press), then it will display a popup dialog confirming that the user actually wants to perform this action.
+If your app needs to play media (for example, `Media.play()`) without the user actually interacting physically (for example, key press or pointer press), then it will display a popup dialog confirming that the user actually wants to perform this action. Opening a link (for example, `Display.execute("...")`) used to do the same, but now defaults to navigating the current page instead of prompting -- see <<opening-links>> below.
 
 Sometimes this dialog may affect the utility of the app. For example, suppose you want to play a video in response to a voice command. Having to press an "OK" button after the command, may be annoying. For such cases, you can use the `platformHint.javascript.backsideHooksInterval` property to *poll* for media play requests on an authorized event.
 
@@ -621,6 +621,36 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 WARNING: Don't abuse this feature. You should enable this polling when necessary. For example, If your app enables the user to listen for voice commands, enable polling for the period of time that it's listening. When the user wants to stop listening, you should also stop the polling by setting the interval to "0."
+
+[id="opening-links", reftext="Opening links"]
+==== Choosing where a link opens
+
+Opening a link deserves its own note, because the restriction above bites almost every app that calls `Display.execute()`. Codename One dispatches events on its own EDT, so by the time your action listener runs, the browser no longer sees the tap as an ongoing user gesture and refuses to open a new window. Navigating the page the app already runs in has no such restriction: it always works, at the cost of unloading the app.
+
+The port picks between those two with the `javascript.execute.target` property:
+
+[cols="1,4"]
+|===
+|Value |Behavior
+
+|`auto`
+|The default. Opens a new tab while the page still has user activation, and navigates the current page when it doesn't. No confirmation sheet is ever shown.
+
+|`_blank`
+|Only ever opens a new tab. When the browser blocks that, the port shows a confirmation sheet whose OK button supplies the gesture the browser wanted. This was the behavior before the property existed.
+
+|`_self`
+|Always navigates the page the app runs in.
+|===
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava009Snippet.java[tag=working-with-javascript-java-009,indent=0]
+----
+
+NOTE: Under `auto` and `_self` the app is unloaded whenever the current page navigates away, so persist anything you need before you call `execute()`. Pick `_blank` when keeping the app alive matters more than avoiding the sheet.
+
+The property only affects external links. A `javascript:` URL still evaluates on the page, and a `data:` URL or a path to a local file still becomes a download.
 
 [id="browsercomponent-lifecycle", reftext="BrowserComponent Lifecycle"]
 === BrowserComponent lifecycle

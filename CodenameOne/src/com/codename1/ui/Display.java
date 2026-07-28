@@ -4082,6 +4082,33 @@ public final class Display extends CN1Constants {
     /// `simulator-hooks.properties` format and the positional `itemN` / `labelN`
     /// conventions.
     ///
+    /// #### JavaScript port
+    ///
+    /// Browsers only let a page open a new window/tab from inside a live user
+    /// gesture, and Codename One dispatches events on its own EDT so by the time
+    /// your listener calls this method the browser no longer considers a gesture
+    /// to be in progress. The JavaScript port therefore resolves the
+    /// `javascript.execute.target` property to decide what to do:
+    ///
+    /// - `auto` (the default) opens a new tab when the page still has user
+    ///   activation and otherwise navigates the page the app is running in. No
+    ///   confirmation prompt is ever shown, but note that navigating the current
+    ///   page unloads the app.
+    /// - `_blank` only ever opens a new tab. When the browser would block it the
+    ///   port shows a confirmation `Sheet` whose OK button supplies the missing
+    ///   gesture. This was the behavior before the property existed.
+    /// - `_self` always navigates the page the app is running in.
+    ///
+    /// Set it before the call, for example in your `init` method:
+    ///
+    /// ```java
+    /// Display.getInstance().setProperty("javascript.execute.target", "_self");
+    /// ```
+    ///
+    /// The property is ignored on every other platform, and on all targets a
+    /// `javascript:` URL, a `data:` URL or a path to a local file keeps its
+    /// existing meaning.
+    ///
     /// #### Parameters
     ///
     /// - `url`: the url to execute
