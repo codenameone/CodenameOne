@@ -7004,6 +7004,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private boolean popupReservedForGesture;
 
     /**
+     * True when {@code url} carries exactly {@code scheme}, compared without
+     * regard to case since URI schemes are case-insensitive. Guards the
+     * {@code javascript:} and {@code data:} branches of {@link #execute(String)},
+     * which would otherwise let {@code JavaScript:} slip through to the
+     * external-link path.
+     */
+    private static boolean hasScheme(String url, String scheme) {
+        return url.length() > scheme.length()
+                && url.charAt(scheme.length()) == ':'
+                && url.regionMatches(true, 0, scheme, 0, scheme.length());
+    }
+
+    /**
      * True when the URL names something the browser itself can hand off, as
      * opposed to a path into local storage that {@link #execute(String)} is
      * expected to turn into a download. Only these get the
@@ -7017,19 +7030,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * URLs. {@code file:} is the exception: like the bare paths that carry no
      * scheme at all, it names local content.</p>
      */
-    /**
-     * True when {@code url} carries exactly {@code scheme}, compared without
-     * regard to case since URI schemes are case-insensitive. Guards the
-     * {@code javascript:} and {@code data:} branches of {@link #execute(String)},
-     * which would otherwise let {@code JavaScript:} slip through to the
-     * external-link path.
-     */
-    private static boolean hasScheme(String url, String scheme) {
-        return url.length() > scheme.length()
-                && url.charAt(scheme.length()) == ':'
-                && url.regionMatches(true, 0, scheme, 0, scheme.length());
-    }
-
     private static boolean isExternalUrl(String url) {
         if (url.startsWith("//")) {
             // Protocol relative -- the page's own scheme applies.
@@ -7106,9 +7106,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
             addBacksideHook(new JSRunnable() {
                 @Override
                 public void run() {
-                    if (!openUrlOnMainThread(url, false, false)) {
-                        _log("execute(): popup blocked for " + url);
-                    }
+                    // openUrlOnMainThread reports the reason on failure --
+                    // popup blocked or no page-side channel -- so do not
+                    // second-guess it with a duplicate line here.
+                    openUrlOnMainThread(url, false, false);
                 }
             });
             return;
@@ -7129,14 +7130,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     @Override
                     public void run() {
                         if (!openUrlOnMainThread(url, false, false)) {
-                            // The user confirmed and we still could not open.
-                            // Only reachable on a host bundle with no
-                            // eval-on-main handler, where the worker has no
-                            // page-side channel at all -- there is nothing
-                            // further to fall back to, and re-showing the Sheet
-                            // would just loop. Say so plainly in the log.
-                            _log("execute(): confirmed open failed, no page-side"
-                                    + " channel available for " + url);
+                            // The user confirmed and it still did not open.
+                            // openUrlOnMainThread has already logged why; note
+                            // only that this was the confirmed attempt, which
+                            // is the end of the line -- re-showing the Sheet
+                            // from here would just loop.
+                            _log("execute(): confirmed open did not succeed for "
+                                    + url);
                         }
                     }
                 });
