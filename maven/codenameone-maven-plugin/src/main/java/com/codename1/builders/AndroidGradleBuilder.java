@@ -1628,11 +1628,17 @@ public class AndroidGradleBuilder extends Executor {
                 if (cls.indexOf("com/codename1/health/HealthStore") == 0) {
                     usesHealth = true;
                     usesHealthStore = true;
-                    usesHealthData = true;
                     usesHealthWrite |=
                             HealthManifestFragments.isWriteCall(method);
                     usesHealthRead |=
                             HealthManifestFragments.isReadCall(method);
+                    // Data access, not merely touching the store. The
+                    // capability probes -- isSupported, isTypeSupported,
+                    // isWritable, getSupportedTypes -- read no records and
+                    // need no permission, so demanding declared types for
+                    // them made a build that only asks "is this available"
+                    // request permissions it never uses.
+                    usesHealthData |= usesHealthRead || usesHealthWrite;
                 }
                 if ("com/codename1/health/Health".equals(cls)) {
                         usesHealth = true;
@@ -1647,9 +1653,15 @@ public class AndroidGradleBuilder extends Executor {
                         // a data type; availability and the settings
                         // shortcuts do not, so they must not force a
                         // permission declaration the app never uses.
-                        if (method.startsWith("getStore")) {
-                            usesHealthData = true;
-                        }
+                        // getStore() installs the bridge but is not itself data
+
+                        // access: an app that takes the handle to probe
+
+                        // isTypeSupported reads nothing. The HealthStore method
+
+                        // hook above sets usesHealthData when a real read or
+
+                        // write is called.
                         if (method.startsWith("getWorkouts")) {
                             usesHealthWorkout = true;
                             // A workout reads and writes exercise data, so
