@@ -879,7 +879,14 @@ public class HealthStore {
         List<QuantitySample> inBucket = new ArrayList<QuantitySample>();
         List<Double> weights = new ArrayList<Double>();
         List<Double> durations = new ArrayList<Double>();
-        long durationMillis = 0;
+        // The clipped spans themselves, not a running total. DURATION is
+        // documented as time covered, and two samples of one type really
+        // do overlap -- a phone and a watch both recording, or a series
+        // whose measurements are intervals. Added up, `[0,10]` beside
+        // `[5,15]` reported 20ms of a 15ms bucket, and a bucket can no
+        // more hold more time than it is wide than a night can hold more
+        // sleep than it lasted.
+        List<long[]> covered = new ArrayList<long[]>();
         int count = 0;
         for (HealthSample s : samples) {
             if (s.getType() != type) {
@@ -950,8 +957,11 @@ public class HealthStore {
             // A series is accounted for measurement by measurement in the
             // branch below, so its enclosing span must not be added here
             // as well.
-            if (!(s instanceof SeriesSample)) {
-                durationMillis += span <= 0 ? 0 : overlap;
+            if (!(s instanceof SeriesSample) && span > 0 && overlap > 0) {
+                covered.add(new long[] {
+                    Math.max(from, s.getStartMillis()),
+                    Math.min(to, s.getEndMillis())
+                });
             }
             if (s instanceof SeriesSample) {
                 // A series reaches here whole -- the local and simulator
@@ -995,7 +1005,11 @@ public class HealthStore {
                                     : 1.0));
                     durations.add(Double.valueOf(
                             pointSpan <= 0 ? 1 : pointOverlap));
-                    durationMillis += pointSpan <= 0 ? 0 : pointOverlap;
+                    if (pointSpan > 0 && pointOverlap > 0) {
+                        covered.add(new long[] {
+                            Math.max(from, at), Math.min(to, until)
+                        });
+                    }
                 }
             } else {
                 count++;
@@ -1026,8 +1040,9 @@ public class HealthStore {
                 continue;
             }
             if (metric == AggregateMetric.DURATION) {
-                bucket.put(type, metric, new HealthQuantity(durationMillis,
-                        HealthUnit.MILLISECOND));
+                bucket.put(type, metric,
+                        new HealthQuantity(coveredMillis(covered),
+                                HealthUnit.MILLISECOND));
                 continue;
             }
             if (inBucket.isEmpty() || unit == null) {
@@ -1036,6 +1051,50 @@ public class HealthStore {
             bucket.put(type, metric, new HealthQuantity(
                     compute(metric, inBucket, unit, weights, durations),
                     unit));
+        }
+    }
+
+    /// Time actually covered by a set of spans, counting an overlap once.
+    ///
+    /// Both mobile stores fall back to this shared aggregation, so summing
+    /// the spans instead put the error everywhere: two sources recording
+    /// the same walk, or one series whose measurements are intervals, and
+    /// DURATION exceeded the bucket it was measured over. Clamping to the
+    /// bucket width would have hidden that rather than fixed it -- the
+    /// figure would still be wrong for every bucket wide enough not to hit
+    /// the clamp.
+    private static long coveredMillis(List<long[]> spans) {
+        if (spans.isEmpty()) {
+            return 0;
+        }
+        Collections.sort(spans, ByFrom.INSTANCE);
+        long total = 0;
+        long openFrom = spans.get(0)[0];
+        long openTo = spans.get(0)[1];
+        for (int iter = 1; iter < spans.size(); iter++) {
+            long[] span = spans.get(iter);
+            if (span[0] > openTo) {
+                total += openTo - openFrom;
+                openFrom = span[0];
+                openTo = span[1];
+            } else if (span[1] > openTo) {
+                openTo = span[1];
+            }
+        }
+        return total + openTo - openFrom;
+    }
+
+    /// Sorts spans by start so the merge above only has to look at the one
+    /// span it currently has open.
+    private static final class ByFrom implements java.util.Comparator<long[]> {
+
+        static final ByFrom INSTANCE = new ByFrom();
+
+        public int compare(long[] a, long[] b) {
+            if (a[0] == b[0]) {
+                return 0;
+            }
+            return a[0] < b[0] ? -1 : 1;
         }
     }
 

@@ -25,7 +25,9 @@ package com.codename1.builders;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -36,11 +38,22 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class HealthListenerBindingsTest {
 
-    private static List<String> list(String... values) {
-        List<String> out = new ArrayList<String>();
+    /**
+     * Binary names whose source names need no separator translation --
+     * top-level classes, where the two are the same string.
+     */
+    private static Map<String, String> list(String... values) {
+        Map<String, String> out = new LinkedHashMap<String, String>();
         for (String v : values) {
-            out.add(v);
+            out.put(v, v);
         }
+        return out;
+    }
+
+    /** One listener whose binary and source names differ. */
+    private static Map<String, String> named(String binary, String source) {
+        Map<String, String> out = new LinkedHashMap<String, String>();
+        out.put(binary, source);
         return out;
     }
 
@@ -100,9 +113,10 @@ class HealthListenerBindingsTest {
     @Test
     void noListenersGeneratesNothing() {
         assertNull(HealthListenerBindings.generate(null));
-        assertNull(HealthListenerBindings.generate(new ArrayList<String>()));
+        assertNull(HealthListenerBindings.generate(
+                new LinkedHashMap<String, String>()));
         assertNull(HealthListenerBindings.installStatement(
-                new ArrayList<String>()));
+                new LinkedHashMap<String, String>()));
     }
 
     @Test
@@ -129,7 +143,7 @@ class HealthListenerBindingsTest {
     @Test
     void nestedListenersUseSourceNamesInTheConstructorCall() {
         String src = HealthListenerBindings.generate(
-                list("com.example.Outer$Inner"));
+                named("com.example.Outer$Inner", "com.example.Outer.Inner"));
         assertNotNull(src);
         assertTrue(src.contains("\"com.example.Outer$Inner\".equals(className)"),
                 "the key must be the binary name Class.getName() returns");
@@ -137,5 +151,32 @@ class HealthListenerBindingsTest {
                 "the constructor call must use the dotted source name");
         assertFalse(src.contains("new com.example.Outer$Inner()"),
                 "new Outer$Inner() is not valid Java source");
+    }
+
+    @Test
+    void dollarsInATopLevelNameAreNotSeparators() {
+        // A dollar is a legal Java identifier character, so this is an
+        // ordinary top-level class -- and translating the dollar emitted
+        // `new app.Step.Listener()`, naming a type that does not exist and
+        // failing javac. The caller supplies the source name from the
+        // class file's InnerClasses metadata; the generator does not
+        // guess.
+        String src = HealthListenerBindings.generate(
+                named("app.Step$Listener", "app.Step$Listener"));
+        assertNotNull(src);
+        assertTrue(src.contains("\"app.Step$Listener\".equals(className)"),
+                "the key must be the binary name");
+        assertTrue(src.contains("return new app.Step$Listener();"),
+                "a dollar that separates nothing must survive");
+        assertFalse(src.contains("new app.Step.Listener()"),
+                "app.Step is not a type");
+    }
+
+    /** A nested class may itself carry a dollar in its simple name. */
+    @Test
+    void aNestedNameKeepsItsOwnDollar() {
+        String src = HealthListenerBindings.generate(
+                named("app.Outer$Step$Listener", "app.Outer.Step$Listener"));
+        assertTrue(src.contains("return new app.Outer.Step$Listener();"));
     }
 }

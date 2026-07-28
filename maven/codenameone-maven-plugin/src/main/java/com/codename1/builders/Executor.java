@@ -427,6 +427,20 @@ public abstract class Executor {
          * instead of resolving a name reflectively at runtime.</p>
          */
         public void implementsInterface(String cls, String iface);
+
+        /**
+         * Reports that {@code cls} is a member of {@code outer}, as the
+         * class file's own {@code InnerClasses} attribute states it.
+         *
+         * <p>Nesting cannot be inferred from the binary name: a dollar is
+         * a legal Java identifier character, so a top-level
+         * {@code app.Step$Listener} is a class somebody may really have
+         * written and a generated {@code new app.Step.Listener()} would
+         * not compile. Only the attribute knows which dollars separate
+         * anything.</p>
+         */
+        public default void declaresEnclosedBy(String cls, String outer) {
+        }
     }
 
     public static interface InternalClassRemapper {
@@ -501,8 +515,11 @@ public abstract class Executor {
                     is.close();
                     ClassVisitor classVisitor = new ClassVisitor(Opcodes.ASM9) {
 
+                        private String scannedName;
+
                         @Override
                         public void visit(int i, int i1, String string, String string1, String superName, String[] interfaces) {
+                            scannedName = string;
                             scanner.usesClass(superName);
                             for (String s : interfaces) {
                                 scanner.usesClass(s);
@@ -529,6 +546,14 @@ public abstract class Executor {
 
                         @Override
                         public void visitInnerClass(String string, String string1, String string2, int i) {
+                            // Only the entry naming this very class, and
+                            // only when it has an outer -- a null one is an
+                            // anonymous or local class, which is neither
+                            // nameable nor a member of anything.
+                            if (string != null && string.equals(scannedName)
+                                    && string1 != null) {
+                                scanner.declaresEnclosedBy(string, string1);
+                            }
                         }
 
                         @Override

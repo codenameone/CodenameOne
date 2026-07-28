@@ -25,6 +25,7 @@ package com.codename1.builders;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Generates the source of the health background-listener factory that the
@@ -70,11 +71,12 @@ final class HealthListenerBindings {
      *                           implementing
      *                           {@code HealthBackgroundListener}
      */
-    static String generate(List<String> listenerClassNames) {
-        if (listenerClassNames == null || listenerClassNames.isEmpty()) {
+    static String generate(Map<String, String> sourceByBinaryName) {
+        if (sourceByBinaryName == null || sourceByBinaryName.isEmpty()) {
             return null;
         }
-        List<String> sorted = new ArrayList<String>(listenerClassNames);
+        List<String> sorted =
+                new ArrayList<String>(sourceByBinaryName.keySet());
         Collections.sort(sorted);
 
         StringBuilder sb = new StringBuilder();
@@ -107,7 +109,19 @@ final class HealthListenerBindings {
             // persisted. The constructor call needs the SOURCE name, where
             // a nested class is separated by a dot rather than a dollar --
             // `new Outer$Inner()` is not valid Java.
-            String sourceName = binaryName.replace('$', '.');
+            //
+            // The two are supplied separately rather than derived from one
+            // another. Translating every dollar was wrong in both
+            // directions: a dollar is a legal Java identifier character, so
+            // a top-level `app.Step$Listener` became an uncompilable
+            // `new app.Step.Listener()`, and a nested class whose own
+            // simple name contains one lost it. Only the caller, which has
+            // the class files' InnerClasses metadata, can tell which
+            // dollars separate anything.
+            String sourceName = sourceByBinaryName.get(binaryName);
+            if (sourceName == null) {
+                continue;
+            }
             sb.append("        if (\"").append(binaryName)
                     .append("\".equals(className)) {\n");
             sb.append("            return new ").append(sourceName)
@@ -124,8 +138,8 @@ final class HealthListenerBindings {
      * The statement injected into app startup to install the factory, or
      * {@code null} when nothing was generated.
      */
-    static String installStatement(List<String> listenerClassNames) {
-        if (listenerClassNames == null || listenerClassNames.isEmpty()) {
+    static String installStatement(Map<String, String> sourceByBinaryName) {
+        if (sourceByBinaryName == null || sourceByBinaryName.isEmpty()) {
             return null;
         }
         return FQCN + ".install();\n";

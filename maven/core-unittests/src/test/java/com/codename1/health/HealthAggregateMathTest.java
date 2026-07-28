@@ -91,6 +91,60 @@ class HealthAggregateMathTest {
     }
 
     /**
+     * DURATION is time covered, so two samples that overlap count the
+     * overlap once. Summed instead, a bucket reported more time than it
+     * is wide -- and both mobile stores fall back to this same shared
+     * aggregation, so the error was everywhere at once.
+     */
+    @Test
+    void overlappingIntervalsCountTheOverlapOnce() throws Exception {
+        LocalHealthStore s = store(
+                FakeHealthStore.sample(HealthDataType.EXERCISE_TIME,
+                        NOON, NOON + 10 * MINUTE, 10),
+                FakeHealthStore.sample(HealthDataType.EXERCISE_TIME,
+                        NOON + 5 * MINUTE, NOON + 15 * MINUTE, 10));
+        List<AggregateResult> b = hourly(s, HealthDataType.EXERCISE_TIME,
+                AggregateMetric.DURATION, NOON, NOON + HOUR);
+        assertEquals(1, b.size());
+        assertEquals(15 * MINUTE,
+                b.get(0).get(HealthDataType.EXERCISE_TIME,
+                        AggregateMetric.DURATION)
+                        .getValue(HealthUnit.MILLISECOND), 1.0);
+    }
+
+    /** Disjoint intervals in one bucket still add up. */
+    @Test
+    void disjointIntervalsStillSum() throws Exception {
+        LocalHealthStore s = store(
+                FakeHealthStore.sample(HealthDataType.EXERCISE_TIME,
+                        NOON, NOON + 10 * MINUTE, 10),
+                FakeHealthStore.sample(HealthDataType.EXERCISE_TIME,
+                        NOON + 20 * MINUTE, NOON + 25 * MINUTE, 5));
+        List<AggregateResult> b = hourly(s, HealthDataType.EXERCISE_TIME,
+                AggregateMetric.DURATION, NOON, NOON + HOUR);
+        assertEquals(15 * MINUTE,
+                b.get(0).get(HealthDataType.EXERCISE_TIME,
+                        AggregateMetric.DURATION)
+                        .getValue(HealthUnit.MILLISECOND), 1.0);
+    }
+
+    /** One interval wholly inside another is not extra time. */
+    @Test
+    void anIntervalContainedInAnotherAddsNothing() throws Exception {
+        LocalHealthStore s = store(
+                FakeHealthStore.sample(HealthDataType.EXERCISE_TIME,
+                        NOON, NOON + 30 * MINUTE, 30),
+                FakeHealthStore.sample(HealthDataType.EXERCISE_TIME,
+                        NOON + 5 * MINUTE, NOON + 10 * MINUTE, 5));
+        List<AggregateResult> b = hourly(s, HealthDataType.EXERCISE_TIME,
+                AggregateMetric.DURATION, NOON, NOON + HOUR);
+        assertEquals(30 * MINUTE,
+                b.get(0).get(HealthDataType.EXERCISE_TIME,
+                        AggregateMetric.DURATION)
+                        .getValue(HealthUnit.MILLISECOND), 1.0);
+    }
+
+    /**
      * A cumulative value spanning two buckets is split in proportion, so
      * the buckets still sum to the original.
      */
