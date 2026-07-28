@@ -1062,7 +1062,21 @@ static int cn1GcImmortalObjContains(JAVA_OBJECT o);
 static JAVA_BOOLEAN cn1SweepRemoving;
 // Set ONLY around passes that iterate authoritative object registries
 // (allObjectsInHeap, the BiBOP page registry). See the guard in gcMarkObject.
-static int cn1GcTrustedRoots = 0;
+//
+// PER THREAD, deliberately. Marking can run as a worker pool
+// (gcMarkDrainParallel); a process-wide flag would let a CONCURRENT worker bypass
+// the resolve guard on pointers that are not authoritative -- the precise case the
+// guard exists for. Serial marking is the current default
+// (gcMarkResolveThreadCount returns 1), so a global would happen to be safe today
+// and would silently stop being safe the moment parallel marking is re-enabled,
+// which the isolation comment there says is intended.
+//
+// Use CN1_GC_TRUSTED_BEGIN/END rather than assigning directly: they save and
+// restore, so nesting and any future early return cannot leak a trusted window
+// into unrelated marking.
+static __thread int cn1GcTrustedRoots = 0;
+#define CN1_GC_TRUSTED_BEGIN() int __cn1TrustSaved = cn1GcTrustedRoots; cn1GcTrustedRoots = 1
+#define CN1_GC_TRUSTED_END()   cn1GcTrustedRoots = __cn1TrustSaved
 #endif
 
 void codenameOneGCMark() {
@@ -1438,7 +1452,7 @@ void codenameOneGCMark() {
                                       memory_order_relaxed);
 #endif
             int gn = atomic_load_explicit(&gp->bumpIndex, memory_order_acquire);
-            cn1GcTrustedRoots = 1;   // page-slot walk: authoritative references
+            CN1_GC_TRUSTED_BEGIN();  // page-slot walk: authoritative references
             for(int gi = 0 ; gi < gn ; gi++) {
                 JAVA_OBJECT go = cn1BibopSlot(gp, gi);
                 if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
@@ -1447,7 +1461,7 @@ void codenameOneGCMark() {
                     gcMarkObject(d, go, JAVA_FALSE);
                 }
             }
-            cn1GcTrustedRoots = 0;
+            CN1_GC_TRUSTED_END();
             gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
         }
         gcMarkDrain(d);
@@ -1474,7 +1488,7 @@ void codenameOneGCMark() {
     // already walks in full, and only fresh entries are traced.
 #ifndef CN1_DISABLE_LEGACY_GRACE
     {
-        cn1GcTrustedRoots = 1;   // walking allObjectsInHeap: authoritative references
+        CN1_GC_TRUSTED_BEGIN();  // walking allObjectsInHeap: authoritative references
 #ifdef CN1_GC_VERIFY
     { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "legacy-grace-pass"; }
 #endif
@@ -1496,7 +1510,7 @@ void codenameOneGCMark() {
         // it follows child words out of arbitrary mark functions, including those
         // of dead objects kept alive by a conservative native-stack false positive,
         // whose fields can dangle. That is precisely what the guard exists to stop.
-        cn1GcTrustedRoots = 0;
+        CN1_GC_TRUSTED_END();
         gcMarkDrain(d);
     }
 #endif /* CN1_DISABLE_LEGACY_GRACE -- A/B escape hatch, mirrors CN1_DISABLE_SATB */
