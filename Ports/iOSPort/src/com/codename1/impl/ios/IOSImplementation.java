@@ -7870,6 +7870,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         return dDensity;
     }
+
+    @Override
+    public boolean isSimulator() {
+        return nativeInstance.isSimulator();
+    }
     
     double ppi = 0;
     private static final double PPI_458 = 18.031496062992126;

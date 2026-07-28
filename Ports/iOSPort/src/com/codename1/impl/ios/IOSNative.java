@@ -478,6 +478,7 @@ public final class IOSNative {
     native String getUDID();
     native String getOSVersion();
     native String getDeviceName();
+    native boolean isSimulator();
     // The hardware/marketing model identifier (e.g. "iPhone15,2"). Unlike
     // getDeviceName() -- which returns the user-assigned device name and is
     // therefore personally identifying -- this is safe to use for analytics

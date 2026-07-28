@@ -6727,6 +6727,14 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceName__(CN1_THREAD_STATE_MU
 #endif // !TARGET_OS_WATCH
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isSimulator___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_SIMULATOR
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceHardwareModel__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     // hw.machine is the hardware/marketing model identifier (e.g. "iPhone15,2").
     // On the simulator it is the host arch; we map that to a stable label so the
