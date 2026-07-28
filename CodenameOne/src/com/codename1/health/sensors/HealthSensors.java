@@ -151,7 +151,13 @@ public class HealthSensors {
             if (error == null || listener == null) {
                 return;
             }
-            listener.scanFailed(error instanceof HealthException
+            // Through the same hop the unsupported-BLE path uses. This
+            // callback runs wherever the scan failed -- the caller's
+            // thread for a synchronous start failure, the platform's for
+            // a later onScanFailed -- and SensorDiscoveryListener
+            // promises the EDT, so a listener that touched the UI here
+            // would have raced.
+            notifyScanFailed(listener, error instanceof HealthException
                     ? (HealthException) error
                     : new HealthException(HealthError.SENSOR_DISCONNECTED,
                             "the Bluetooth scan could not be started",

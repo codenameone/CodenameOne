@@ -508,4 +508,36 @@ class LocalHealthStoreTest extends UITestBase {
                 .setTimeRange(HealthTimeRange.between(0L, 5000L)))
                 .get().size());
     }
+
+    /**
+     * A unit conversion on the write path must not cost the sample its
+     * source.
+     *
+     * <p>It made the same measurement filterable or not depending on
+     * which unit the caller happened to use: a weight in kilograms kept
+     * its source, and one in pounds -- converted on the way in -- came
+     * back excluded from every {@code addSource()} query.</p>
+     */
+    @Test
+    void aConvertedWriteKeepsItsSource() throws Exception {
+        LocalHealthStore store = new LocalHealthStore();
+        QuantitySample inPounds = QuantitySample.create(
+                HealthDataType.BODY_MASS,
+                new HealthQuantity(154, HealthUnit.POUND), 1767225600000L);
+        inPounds.setSource(new HealthSource("com.example.scales", "Scales",
+                null, null, null));
+        List<HealthSample> batch = new ArrayList<HealthSample>();
+        batch.add(inPounds);
+        store.write(batch).get();
+
+        List<HealthSample> filtered = store.readSamples(new SampleQuery()
+                .addType(HealthDataType.BODY_MASS)
+                .addSource("com.example.scales")
+                .setTimeRange(HealthTimeRange.between(1767225000000L,
+                        1767226000000L))).get();
+        assertEquals(1, filtered.size(),
+                "the converted sample must still match its own source");
+        assertEquals("com.example.scales",
+                filtered.get(0).getSource().getBundleId());
+    }
 }

@@ -1422,6 +1422,13 @@ public class HealthStore {
                 : QuantitySample.create(type, q.getQuantity().in(preferred),
                         q.getStartMillis(), q.getEndMillis());
         converted.setRecordingMethod(q.getRecordingMethod());
+        // The source travels too, as it already does on the read-side
+        // conversion. Dropping it here made the same measurement
+        // filterable or not depending on which unit the caller happened
+        // to write it in: a weight in kilograms kept its source and one
+        // in pounds came back excluded from every addSource() query and
+        // every source-filtered aggregate.
+        converted.setSource(q.getSource());
         // Metadata travels with the sample. Losing it merely because the
         // caller asked for pounds instead of kilograms would drop the
         // correlation identifier this API tells them to keep there.
