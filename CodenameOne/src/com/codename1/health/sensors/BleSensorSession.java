@@ -242,46 +242,51 @@ final class BleSensorSession extends SensorSession {
         // pressure, weight and temperature are indicate-only.
         final GattNotificationListener listener =
                 new GattNotificationListener() {
-            @Override
-            public void valueChanged(GattCharacteristic characteristic,
-                    byte[] value) {
-                // A notification can still arrive between stop() and the
-                // CCCD actually being disarmed. Dropping it here keeps a
-                // finished session from delivering one more reading.
-                if (isStopped()) {
-                    return;
-                }
-                onMeasurement(value, System.currentTimeMillis());
-            }
-        };
+                    @Override
+                    public void valueChanged(
+                            GattCharacteristic characteristic,
+                            byte[] value) {
+                        // A notification can still arrive between stop()
+                        // and the CCCD actually being disarmed. Dropping
+                        // it here keeps a finished session from
+                        // delivering one more reading.
+                        if (isStopped()) {
+                            return;
+                        }
+                        onMeasurement(value, System.currentTimeMillis());
+                    }
+                };
         peripheral.subscribe(measurement, listener)
                 .onResult(new AsyncResult<Boolean>() {
-            public void onReady(Boolean value, Throwable err) {
-                // Stopping does not cancel a subscribe already in flight,
-                // and the reconnect path issues one without anybody
-                // waiting on it. A completion arriving after stop() used
-                // to move the session from STOPPED back to STREAMING --
-                // already unregistered from the manager and disconnected,
-                // yet reporting itself live and delivering notifications.
-                // Stopped is terminal.
-                if (isStopped()) {
-                    unsubscribeLate(listener);
-                    return;
-                }
-                if (err != null) {
-                    failStart(out, err);
-                    return;
-                }
-                setState(SensorSessionState.STREAMING);
-                // A run of failures only retires the session when it is
-                // uninterrupted: a strap that reconnects cleanly has
-                // spent whatever budget it used getting there.
-                reconnectFailures = 0;
-                if (out != null) {
-                    out.complete(BleSensorSession.this);
-                }
-            }
-        });
+                    @Override
+                    public void onReady(Boolean value, Throwable err) {
+                        // Stopping does not cancel a subscribe already in
+                        // flight, and the reconnect path issues one
+                        // without anybody waiting on it. A completion
+                        // arriving after stop() used to move the session
+                        // from STOPPED back to STREAMING -- already
+                        // unregistered from the manager and disconnected,
+                        // yet reporting itself live and delivering
+                        // notifications. Stopped is terminal.
+                        if (isStopped()) {
+                            unsubscribeLate(listener);
+                            return;
+                        }
+                        if (err != null) {
+                            failStart(out, err);
+                            return;
+                        }
+                        setState(SensorSessionState.STREAMING);
+                        // A run of failures only retires the session when
+                        // it is uninterrupted: a strap that reconnects
+                        // cleanly has spent whatever budget it used
+                        // getting there.
+                        reconnectFailures = 0;
+                        if (out != null) {
+                            out.complete(BleSensorSession.this);
+                        }
+                    }
+                });
     }
 
     /// Whether this session has been stopped for good.

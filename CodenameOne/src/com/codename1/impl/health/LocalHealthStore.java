@@ -45,7 +45,6 @@ import com.codename1.health.nutrition.Nutrient;
 import com.codename1.health.nutrition.NutritionSample;
 import com.codename1.health.SampleQuery;
 import com.codename1.health.SamplePage;
-import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
 import java.util.ArrayList;
@@ -472,8 +471,29 @@ public class LocalHealthStore extends HealthStore {
         synchronized (samples) {
             if (sample.getId() == null) {
                 sample.setId("local-" + (nextId++));
+            } else {
+                // A restored sample brings its own identifier back, and
+                // the counter has to clear it or the first write after a
+                // restart hands out an id something already holds --
+                // making a delete-by-id remove the wrong record.
+                reserveId(sample.getId());
             }
             samples.add(sample);
+        }
+    }
+
+    /// Moves the generator past an identifier that already exists.
+    private void reserveId(String id) {
+        if (!id.startsWith("local-")) {
+            return;
+        }
+        try {
+            long n = Long.parseLong(id.substring("local-".length()));
+            if (n >= nextId) {
+                nextId = n + 1;
+            }
+        } catch (NumberFormatException ex) {
+            // Not one of ours; nothing to reserve.
         }
     }
 

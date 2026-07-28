@@ -219,6 +219,7 @@ public final class SleepSample extends SessionSample {
 
         static final ByStart INSTANCE = new ByStart();
 
+        @Override
         public int compare(SleepStageInterval a, SleepStageInterval b) {
             long left = a.getStartMillis();
             long right = b.getStartMillis();

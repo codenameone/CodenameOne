@@ -7044,7 +7044,11 @@ public final class Display extends CN1Constants {
             return cause;
         }
 
-        public void setCause(Throwable t) {
+        // Overrides nothing -- Throwable has no setCause, and adding the
+        // annotation PMD asks for does not compile. Suppressed rather than
+        // "fixed": this file only reaches the analyser at all because the
+        // health entry point was added to it.
+        public void setCause(Throwable t) { //NOPMD MissingOverride
             this.cause = t;
         }
 

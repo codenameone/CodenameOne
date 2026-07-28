@@ -279,34 +279,88 @@ public class SimulatedHealthStore extends LocalHealthStore {
         }
         List<HealthDataType> types = query.getTypes();
         for (int i = 0; i < types.size(); i++) {
-            ReadAuthScript script = scriptFor(types.get(i));
-            if (script == ReadAuthScript.GRANTED
-                    || script == ReadAuthScript.GRANTED_BUT_NO_DATA) {
-                continue;
-            }
-            if (script == ReadAuthScript.DENIED_ERROR
-                    || policy == ReadAuthPolicy.ANDROID_EXPLICIT) {
+            if (failsRead(types.get(i))) {
                 out.error(new HealthException(HealthError.UNAUTHORIZED,
                         "read access to " + types.get(i).getId()
                                 + " was refused"));
                 return;
             }
-            // IOS_OPAQUE + DENIED_SILENT or NOT_DETERMINED: an empty
-            // result and no error, indistinguishable from having no data.
-            out.complete(new SamplePage(
-                    new java.util.ArrayList<HealthSample>(), null, false));
-            return;
         }
-        for (int i = 0; i < types.size(); i++) {
-            if (scriptFor(types.get(i))
-                    == ReadAuthScript.GRANTED_BUT_NO_DATA) {
-                out.complete(new SamplePage(
-                        new java.util.ArrayList<HealthSample>(), null,
-                        false));
+        // Emptiness is per type, not per query. A type scripted to yield
+        // nothing -- GRANTED_BUT_NO_DATA, or a silent denial under the
+        // iOS policy -- used to empty the whole page, so adding one such
+        // type to a query made unrelated steps and heart rate disappear
+        // too. That is not what either platform does, and it turned the
+        // simulator's most valuable script into a misleading one.
+        AsyncResource<SamplePage> unfiltered =
+                new AsyncResource<SamplePage>();
+        // Registered before the call, because the shared store completes
+        // inline -- attaching afterwards would be attaching to a result
+        // that has already been delivered.
+        unfiltered.onResult(new HideEmptyTypes(this, out));
+        super.doReadSamples(query, unfiltered);
+    }
+
+    /// Drops the records of types scripted to yield nothing, leaving the
+    /// rest of the page alone.
+    ///
+    /// Filtering the finished page rather than the query keeps every other
+    /// query semantic -- sort, limit, sources, flattening -- exactly as
+    /// the shared store implements it. A page can come back shorter than
+    /// the limit as a result, which is also what a real store does when
+    /// some of what it found is not yours to see.
+    private static final class HideEmptyTypes
+            implements com.codename1.util.AsyncResult<SamplePage> {
+
+        private final SimulatedHealthStore store;
+        private final AsyncResource<SamplePage> out;
+
+        HideEmptyTypes(SimulatedHealthStore store,
+                AsyncResource<SamplePage> out) {
+            this.store = store;
+            this.out = out;
+        }
+
+        public void onReady(SamplePage page, Throwable error) {
+            if (error != null) {
+                out.error(error);
                 return;
             }
+            List<HealthSample> kept = new java.util.ArrayList<HealthSample>();
+            for (HealthSample s : page.getSamples()) {
+                if (!store.hidesData(s.getType())) {
+                    kept.add(s);
+                }
+            }
+            out.complete(new SamplePage(kept, page.getNextPageToken(),
+                    page.isTruncated()));
         }
-        super.doReadSamples(query, out);
+    }
+
+    /// Whether a read of `type` fails outright rather than coming back
+    /// empty. An error is an exception, not an absence, so it is the one
+    /// case that still fails the whole query.
+    private boolean failsRead(HealthDataType type) {
+        ReadAuthScript script = scriptFor(type);
+        if (script == ReadAuthScript.GRANTED
+                || script == ReadAuthScript.GRANTED_BUT_NO_DATA) {
+            return false;
+        }
+        return script == ReadAuthScript.DENIED_ERROR
+                || policy == ReadAuthPolicy.ANDROID_EXPLICIT;
+    }
+
+    /// Whether `type` contributes nothing while the rest of the query
+    /// proceeds -- scripted as granted-but-empty, or silently denied
+    /// under the iOS policy, which an app cannot tell apart and neither
+    /// can this.
+    private boolean hidesData(HealthDataType type) {
+        ReadAuthScript script = scriptFor(type);
+        if (script == ReadAuthScript.GRANTED_BUT_NO_DATA) {
+            return true;
+        }
+        return script != ReadAuthScript.GRANTED
+                && policy != ReadAuthPolicy.ANDROID_EXPLICIT;
     }
 
     /// Aggregates obey the read script too.
@@ -325,38 +379,31 @@ public class SimulatedHealthStore extends LocalHealthStore {
         }
         List<HealthDataType> types = query.getTypes();
         for (int i = 0; i < types.size(); i++) {
-            ReadAuthScript script = scriptFor(types.get(i));
-            if (script == ReadAuthScript.GRANTED) {
-                continue;
-            }
-            if (script != ReadAuthScript.GRANTED_BUT_NO_DATA
-                    && (script == ReadAuthScript.DENIED_ERROR
-                            || policy == ReadAuthPolicy.ANDROID_EXPLICIT)) {
+            if (failsRead(types.get(i))) {
                 out.error(new HealthException(HealthError.UNAUTHORIZED,
                         "read access to " + types.get(i).getId()
                                 + " was refused"));
                 return;
             }
-            // Silently empty, matching the read: buckets with no data
-            // rather than an error, so an app cannot tell denial from an
-            // empty store here either.
-            out.complete(emptyBuckets(boundaries));
-            return;
         }
-        super.doAggregate(query, boundaries, out);
-    }
-
-    /// One empty result per bucket, so a denied aggregate looks exactly
-    /// like a range holding no data.
-    private static List<com.codename1.health.AggregateResult> emptyBuckets(
-            long[] boundaries) {
-        List<com.codename1.health.AggregateResult> out =
-                new java.util.ArrayList<com.codename1.health.AggregateResult>();
-        for (int i = 0; i + 1 < boundaries.length; i++) {
-            out.add(new com.codename1.health.AggregateResult(boundaries[i],
-                    boundaries[i + 1]));
+        // Per type, exactly as the read is. Emptying every metric because
+        // one type in the query was scripted to yield nothing made a
+        // scripted heart-rate gap erase the step total beside it, and a
+        // developer would reasonably read that as a bug in their own
+        // aggregation rather than as the script doing its job.
+        //
+        // Done by withholding the records rather than by editing the
+        // finished buckets: the shared aggregation is what must produce
+        // the answer, since it is the same code both mobile stores fall
+        // back to and the whole point of aggregating here is to exercise
+        // it.
+        List<HealthSample> visible = new java.util.ArrayList<HealthSample>();
+        for (HealthSample s : getAllSamples()) {
+            if (!hidesData(s.getType())) {
+                visible.add(s);
+            }
         }
-        return out;
+        out.complete(aggregateSamples(query, boundaries, visible));
     }
 
     protected void doWrite(List<HealthSample> samples,

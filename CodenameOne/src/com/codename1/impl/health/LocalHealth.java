@@ -41,9 +41,16 @@ public class LocalHealth extends Health {
 
     private final LocalHealthStore store;
 
-    /// Creates a local health entry point backed by an in-memory store.
+    /// Creates a local health entry point backed by a store that survives
+    /// a restart.
+    ///
+    /// Durability is what [HealthAvailability#LOCAL_ONLY] promises on the
+    /// ports that use this constructor -- the data is only ever this app's
+    /// own, which is not the same as being gone next launch. The simulator
+    /// passes its own scripted store to the other constructor precisely so
+    /// it does *not* get this.
     public LocalHealth() {
-        this(new LocalHealthStore());
+        this(new StoredHealthStore());
     }
 
     /// Creates a local health entry point backed by `store`, so a port can

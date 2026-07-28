@@ -142,6 +142,84 @@ class HealthReadAuthTrapTest {
         assertTrue(read.get().isEmpty());
     }
 
+    /**
+     * A type scripted to yield nothing empties itself, not the query.
+     *
+     * <p>Adding one such type used to blank the whole page, so unrelated
+     * steps disappeared alongside the heart rate the script was hiding --
+     * and a developer would reasonably read that as a bug in their own
+     * code rather than as the script working. Neither platform behaves
+     * that way: HealthKit hands back what it will show you and stays quiet
+     * about the rest.</p>
+     */
+    @Test
+    void oneEmptyTypeDoesNotEmptyTheOthers() {
+        List<HealthSample> seed = new ArrayList<HealthSample>();
+        seed.add(QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(2500, HealthUnit.COUNT),
+                1_767_225_600_000L, 1_767_225_660_000L));
+        store.seed(seed);
+        store.setReadAuthorizationPolicy(
+                SimulatedHealthStore.ReadAuthPolicy.IOS_OPAQUE);
+        store.setReadPermission(HealthDataType.HEART_RATE,
+                SimulatedHealthStore.ReadAuthScript.GRANTED_BUT_NO_DATA);
+        store.setReadPermission(HealthDataType.STEPS,
+                SimulatedHealthStore.ReadAuthScript.GRANTED);
+
+        AsyncResource<List<HealthSample>> read = store.readSamples(
+                new SampleQuery().addType(HealthDataType.HEART_RATE)
+                        .addType(HealthDataType.STEPS)
+                        .setTimeRange(HealthTimeRange.between(
+                                1_767_000_000_000L, 1_768_000_000_000L)));
+        assertNull(errorOf(read));
+        List<HealthSample> back = read.get();
+        assertEquals(1, back.size(), "the granted type still contributes");
+        assertEquals(HealthDataType.STEPS, back.get(0).getType());
+    }
+
+    /** The same rule for aggregates, which take a separate path. */
+    @Test
+    void oneEmptyTypeDoesNotEmptyTheAggregate() {
+        // Both types are cumulative, because a metric applies to every
+        // type in the query and TOTAL is not meaningful for a discrete
+        // one.
+        List<HealthSample> seed = new ArrayList<HealthSample>();
+        seed.add(QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(2500, HealthUnit.COUNT),
+                1_767_225_600_000L, 1_767_225_660_000L));
+        seed.add(QuantitySample.create(
+                HealthDataType.DISTANCE_WALKING_RUNNING,
+                new HealthQuantity(1800, HealthUnit.METER),
+                1_767_225_600_000L, 1_767_225_660_000L));
+        store.seed(seed);
+        store.setReadAuthorizationPolicy(
+                SimulatedHealthStore.ReadAuthPolicy.IOS_OPAQUE);
+        store.setReadPermission(HealthDataType.DISTANCE_WALKING_RUNNING,
+                SimulatedHealthStore.ReadAuthScript.GRANTED_BUT_NO_DATA);
+        store.setReadPermission(HealthDataType.STEPS,
+                SimulatedHealthStore.ReadAuthScript.GRANTED);
+
+        AsyncResource<List<com.codename1.health.AggregateResult>> agg =
+                store.aggregate(new com.codename1.health.AggregateQuery()
+                        .addType(HealthDataType.DISTANCE_WALKING_RUNNING)
+                        .addType(HealthDataType.STEPS)
+                        .addMetric(com.codename1.health.AggregateMetric.TOTAL)
+                        .setTimeRange(HealthTimeRange.between(
+                                1_767_000_000_000L, 1_768_000_000_000L)));
+        assertNull(errorOf(agg));
+        List<com.codename1.health.AggregateResult> buckets = agg.get();
+        assertFalse(buckets.isEmpty());
+        com.codename1.health.HealthQuantity steps = buckets.get(0).get(
+                HealthDataType.STEPS,
+                com.codename1.health.AggregateMetric.TOTAL);
+        assertNotNull(steps, "the granted type still aggregates");
+        assertEquals(2500, steps.getValue(HealthUnit.COUNT), 0.001);
+        assertNull(buckets.get(0).get(
+                HealthDataType.DISTANCE_WALKING_RUNNING,
+                com.codename1.health.AggregateMetric.TOTAL),
+                "and the hidden type still contributes nothing");
+    }
+
     /** Health Connect answers honestly and fails loudly. */
     @Test
     void androidDeniedReadFailsWithUnauthorized() {

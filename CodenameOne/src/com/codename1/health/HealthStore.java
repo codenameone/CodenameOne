@@ -472,7 +472,9 @@ public class HealthStore {
             return false;
         }
         synchronized (subscriptions) {
-            return subscriptions.get(sub.getId()) == sub;
+            // Identity on purpose: the question is whether *this* handle
+            // is the one still registered, not whether an equal one is.
+            return subscriptions.get(sub.getId()) == sub; //NOPMD CompareObjectsWithEquals
         }
     }
 
@@ -630,7 +632,7 @@ public class HealthStore {
             // own points in whatever order it was built with -- so an
             // expanded page followed neither the requested direction nor
             // any other, on the local store and on Health Connect alike.
-            java.util.Collections.sort(outSamples,
+            Collections.sort(outSamples,
                     new ByStart(query.isSortDescending()));
         }
         return new SamplePage(outSamples, page.getNextPageToken(),
@@ -646,6 +648,7 @@ public class HealthStore {
             this.descending = descending;
         }
 
+        @Override
         public int compare(HealthSample a, HealthSample b) {
             long x = a.getStartMillis();
             long y = b.getStartMillis();
@@ -786,7 +789,8 @@ public class HealthStore {
                             + preferred.getDimension() + " but the series is"
                             + " in " + series.getUnit().getSymbol());
         }
-        if (series.getUnit() == preferred) {
+        // Units are interned, so identity is the intended test.
+        if (series.getUnit() == preferred) { //NOPMD CompareObjectsWithEquals
             return series;
         }
         int n = series.size();
@@ -959,8 +963,8 @@ public class HealthStore {
             // as well.
             if (!(s instanceof SeriesSample) && span > 0 && overlap > 0) {
                 covered.add(new long[] {
-                    Math.max(from, s.getStartMillis()),
-                    Math.min(to, s.getEndMillis())
+                        Math.max(from, s.getStartMillis()),
+                        Math.min(to, s.getEndMillis()),
                 });
             }
             if (s instanceof SeriesSample) {
@@ -1007,7 +1011,7 @@ public class HealthStore {
                             pointSpan <= 0 ? 1 : pointOverlap));
                     if (pointSpan > 0 && pointOverlap > 0) {
                         covered.add(new long[] {
-                            Math.max(from, at), Math.min(to, until)
+                                Math.max(from, at), Math.min(to, until),
                         });
                     }
                 }
@@ -1090,6 +1094,7 @@ public class HealthStore {
 
         static final ByFrom INSTANCE = new ByFrom();
 
+        @Override
         public int compare(long[] a, long[] b) {
             if (a[0] == b[0]) {
                 return 0;

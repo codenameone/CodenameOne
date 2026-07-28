@@ -1,0 +1,34 @@
+{
+  "status": "ok",
+  "matches": [
+    {
+      "rule": "WHEN_WHERE",
+      "category": "STYLE",
+      "message": "It might be better to use \u2018time\u2019 with the time-relative pronoun \u2018when\u2019. (Alternatively, use \u2018in/on which\u2019.)",
+      "line": 93012,
+      "offset": 889942,
+      "length": 10,
+      "context": "... can return twenty. Query one type at a time where the cap has to be exact, which is what ...",
+      "replacements": [
+        "time when"
+      ]
+    },
+    {
+      "rule": "A_INFINITIVE",
+      "category": "GRAMMAR",
+      "message": "The verb \u2018write\u2019 does not usually follow articles like \u2018the\u2019. Check that \u2018write\u2019 is spelled correctly; using \u2018write\u2019 as a noun may be non-standard.",
+      "line": 93036,
+      "offset": 891433,
+      "length": 9,
+      "context": "... to HealthKit or Health Connect at all; the write is refused with X rather than reported ...",
+      "replacements": [
+        "to write",
+        "the White",
+        "the trite",
+        "the white",
+        "the writ"
+      ]
+    }
+  ],
+  "total": 2
+}
