@@ -632,6 +632,106 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public void addBacksideHook(JSRunnable r) {
         backSideHooks.push(r);
     }
+
+    /**
+     * Hooks that only a gesture-backed drain may run.
+     *
+     * <p>{@link #backSideHooks} is also drained by the
+     * {@code platformHint.javascript.backsideHooksInterval} timer, which
+     * carries no transient activation. That is fine for media, but a
+     * {@code window.open()} drained from the polling timer is simply blocked --
+     * so a popup queued there can lose the race to the gesture's own timeout
+     * and never open. Anything needing activation goes here instead, where only
+     * {@link #runBacksideHooksInTimeout(int)} reaches it.</p>
+     */
+    private final java.util.ArrayList<GestureHook> gestureOnlyHooks =
+            new java.util.ArrayList<GestureHook>();
+
+    /** A hook paired with the interaction that queued it. */
+    private static class GestureHook {
+        final int generation;
+        final JSRunnable runnable;
+        /** Run on the EDT instead, if a newer interaction supersedes this one. */
+        final Runnable superseded;
+
+        GestureHook(int generation, JSRunnable runnable, Runnable superseded) {
+            this.generation = generation;
+            this.runnable = runnable;
+            this.superseded = superseded;
+        }
+    }
+
+    /**
+     * Queues a hook that only a drain scheduled by the CURRENT interaction may
+     * run. A drain descending from an earlier interaction carries that one's
+     * activation, which is spent or expiring, so letting it consume this hook
+     * would leave the popup blocked.
+     */
+    private void addGestureOnlyHook(JSRunnable r, Runnable superseded) {
+        // Backstop against unbounded growth: a hook whose interaction is long
+        // past can no longer be drained. Eight generations is only about four
+        // rapid clicks, since press and release each advance one, so this is
+        // reachable in ordinary use -- drop the hook, but hand it to its
+        // fallback rather than losing the request. Silently discarding it left
+        // an execute() with no popup, no Sheet and no trace.
+        for (int i = gestureOnlyHooks.size() - 1; i >= 0; i--) {
+            GestureHook stale = gestureOnlyHooks.get(i);
+            if (gestureGeneration - stale.generation > 8) {
+                gestureOnlyHooks.remove(i);
+                _log("execute(): a queued open aged out before its drain ran");
+                if (stale.superseded != null) {
+                    callSerially(stale.superseded);
+                }
+            }
+        }
+        gestureOnlyHooks.add(new GestureHook(gestureGeneration, r, superseded));
+        if (pendingGestureDrains <= 0) {
+            // Generation matching keeps an older drain from taking this hook,
+            // but only a drain of THIS interaction will run it -- and there may
+            // be none left. Safari schedules a single 75/300ms drain, so an EDT
+            // slower than that would strand the hook forever and the confirmed
+            // link would do nothing at all. Schedule one. The activation is
+            // probably gone by now, but an attempt that reports failure beats
+            // silence: the caller logs it, or falls back to the Sheet.
+            runBacksideHooksInTimeout(0, false);
+        }
+    }
+
+    /**
+     * Drains still scheduled for {@link #gestureGeneration}. Reset when a new
+     * interaction begins, since an older interaction's drains cannot run this
+     * one's hooks.
+     */
+    private int pendingGestureDrains;
+
+    private void runGestureOnlyHooks(int generation) {
+        // Collected before running: a hook may queue another one, and mutating
+        // the list mid-iteration would break it.
+        java.util.ArrayList<GestureHook> due = new java.util.ArrayList<GestureHook>();
+        for (int i = 0; i < gestureOnlyHooks.size(); i++) {
+            if (gestureOnlyHooks.get(i).generation == generation) {
+                due.add(gestureOnlyHooks.get(i));
+            }
+        }
+        gestureOnlyHooks.removeAll(due);
+        // Transient activation belongs to the WINDOW, not to this generation.
+        // If a newer interaction has since occurred, running these would spend
+        // the activation it just granted -- the newer interaction's own popup
+        // would then be blocked, having done nothing wrong. Hand them to their
+        // fallback instead.
+        boolean superseded = generation != gestureGeneration;
+        for (int i = 0; i < due.size(); i++) {
+            GestureHook hook = due.get(i);
+            if (superseded) {
+                _log("execute(): a newer interaction superseded a queued open");
+                if (hook.superseded != null) {
+                    callSerially(hook.superseded);
+                }
+            } else {
+                hook.runnable.run();
+            }
+        }
+    }
     
     // Count the number of backside hook calls that are queued up
     private int backsideHooksSemaphore = 0;
@@ -656,13 +756,42 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * @param timeout 
      */
     private void runBacksideHooksInTimeout(int timeout) {
-        backsideHooksSemaphore++;
+        runBacksideHooksInTimeout(timeout, true);
+    }
+
+    /**
+     * @param fromInteraction true when a real pointer or key event scheduled
+     *   this drain. Only those raise {@link #backsideHooksSemaphore}, because
+     *   that is what {@link #isGestureBackedHookAvailable()} reads to decide a
+     *   popup may be attempted. A drain we schedule ourselves to rescue a
+     *   stranded hook carries no activation, so counting it there would claim a
+     *   gesture that does not exist and send a popup to be blocked instead of
+     *   to the Sheet.
+     */
+    private void runBacksideHooksInTimeout(int timeout, final boolean fromInteraction) {
+        if (fromInteraction) {
+            backsideHooksSemaphore++;
+        }
         //_log("Incrementing backsideHooksSemaphore: "+backsideHooksSemaphore);
+        // Remember which interaction scheduled this drain, so it only runs the
+        // activation-dependent hooks that same interaction queued.
+        final int generation = gestureGeneration;
+        pendingGestureDrains++;
         Window.setTimeout(new TimerHandler() {
             @Override
             public void onTimer() {
-                backsideHooksSemaphore--;
+                if (fromInteraction) {
+                    backsideHooksSemaphore--;
+                }
+                if (generation == gestureGeneration) {
+                    pendingGestureDrains--;
+                }
                 //_log("Decrementing backsideHooksSemaphore: "+backsideHooksSemaphore);
+                // This drain descends from a real interaction, so it may run
+                // that interaction's activation-dependent hooks -- and only
+                // those: an older drain still pending carries an activation
+                // that is spent or expiring.
+                runGestureOnlyHooks(generation);
                 runBacksideHooks();
             }
         }, timeout);
@@ -740,6 +869,26 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private native static int _safariBacksideHookDelay();
     
     private void installBacksideHooksInUserInteraction() {
+        installBacksideHooksInUserInteraction(true);
+    }
+
+    /**
+     * @param newInteraction true for a press or key down, which begins a new
+     *   interaction; false for the matching release, which belongs to the
+     *   interaction already in progress. A release refreshes the window's
+     *   activation and schedules more drains, but it is not a new gesture: a
+     *   press-time execute() tagged with the current generation must still be
+     *   servable by the release's drain, and a click shorter than the 300ms
+     *   delay -- the normal case -- always releases first.
+     */
+    private void installBacksideHooksInUserInteraction(boolean newInteraction) {
+        if (newInteraction) {
+            // A distinct interaction, so a popup reserved against the previous
+            // one no longer applies -- see popupReservedForGeneration -- and the
+            // previous one's outstanding drains cannot serve this one's hooks.
+            gestureGeneration++;
+            pendingGestureDrains = 0;
+        }
         if (isIOS() || isSafari()) {
             debugLog("Installing backside hooks with delay "+safariBacksideHookDelay());
             runBacksideHooksInTimeout(safariBacksideHookDelay());
@@ -1789,7 +1938,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 pointerState.setMouseDown(false);
 
                 pointerState.setLastTouchUpPosition(x, y);
-                installBacksideHooksInUserInteraction();
+                installBacksideHooksInUserInteraction(false);
                 applyMouseMetadata(me);
 
                 final Runnable releaseDispatch = new Runnable() {
@@ -1950,7 +2099,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 pointerState.setGrabbedDrag(false);
                 
                 TouchEvent me = (TouchEvent)evt;
-                installBacksideHooksInUserInteraction();
+                installBacksideHooksInUserInteraction(false);
                 nativeCallSerially(new Runnable() {
                     @Override
                     public void run() {
@@ -2376,7 +2525,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 JavaScriptKeyboardInteractionAdapter.handleKeyUp(new JavaScriptKeyboardInteractionAdapter.BacksideHooks() {
                     @Override
                     public void installBacksideHooksInUserInteraction() {
-                        HTML5Implementation.this.installBacksideHooksInUserInteraction();
+                        HTML5Implementation.this.installBacksideHooksInUserInteraction(false);
                     }
                 }, new JavaScriptKeyboardInteractionAdapter.KeyDispatch() {
                     @Override
@@ -2457,7 +2606,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }, new JavaScriptKeyboardInteractionAdapter.BacksideHooks() {
                     @Override
                     public void installBacksideHooksInUserInteraction() {
-                        HTML5Implementation.this.installBacksideHooksInUserInteraction();
+                        HTML5Implementation.this.installBacksideHooksInUserInteraction(false);
                     }
                 }, new JavaScriptKeyboardInteractionAdapter.KeyDispatch() {
                     @Override
@@ -6586,10 +6735,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
 
-    @JSBody(params={"url", "target"}, script="window.open(url, target)")
-    private native static void windowOpen(String url, String target);
-
-   
     // The original implementations of register/fire SaveBlobHandler ran their
     // scripts inside the worker, where ``document`` doesn't exist -- the
     // generated download <a> element / .click() trick threw the moment the
@@ -6678,11 +6823,820 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @JSBody(params={"js"}, script="eval(js)")
     private native static void eval_(String js);
-    
+
+    /**
+     * Value of the {@code javascript.execute.target} property: open in a new
+     * window/tab and silently fall back to navigating the current page when the
+     * browser blocks the popup. This is the default -- it is the only mode that
+     * never needs a confirmation Sheet.
+     */
+    private static final String EXECUTE_TARGET_AUTO = "auto";
+
+    /**
+     * Value of the {@code javascript.execute.target} property: only ever open a
+     * new window/tab. When the browser blocks it (no live user gesture) a
+     * confirmation Sheet is shown so the user's tap on it supplies the gesture.
+     */
+    private static final String EXECUTE_TARGET_BLANK = "_blank";
+
+    /**
+     * Value of the {@code javascript.execute.target} property: always navigate
+     * the page the app is running in. Never blocked, never shows a Sheet, but
+     * it unloads the app.
+     */
+    private static final String EXECUTE_TARGET_SELF = "_self";
+
+    /**
+     * Resolves the {@code javascript.execute.target} property to one of the
+     * three documented values, falling back to {@code auto}. An unrecognized
+     * value is logged rather than silently accepted, so a typo is diagnosable
+     * instead of looking like the default was chosen deliberately.
+     */
+    private String executeTarget() {
+        String target = Display.getInstance().getProperty("javascript.execute.target", EXECUTE_TARGET_AUTO);
+        if (EXECUTE_TARGET_SELF.equals(target)) {
+            return EXECUTE_TARGET_SELF;
+        }
+        if (EXECUTE_TARGET_BLANK.equals(target)) {
+            return EXECUTE_TARGET_BLANK;
+        }
+        if (!EXECUTE_TARGET_AUTO.equals(target)) {
+            _log("javascript.execute.target: unrecognized value '" + target
+                    + "', expected auto, _blank or _self. Using auto.");
+        }
+        return EXECUTE_TARGET_AUTO;
+    }
+
+    /**
+     * Quotes a string as a JavaScript string literal so it can be embedded in a
+     * script handed to {@link #eval_(String)}.
+     */
+    private static String toJavaScriptStringLiteral(String value) {
+        StringBuilder sb = new StringBuilder(value.length() + 8);
+        sb.append('"');
+        int len = value.length();
+        for (int i = 0; i < len; i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '"':
+                    sb.append("\\\"");
+                    break;
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
+                case '<':
+                    // Avoid terminating an enclosing script element early.
+                    sb.append("\\u003c");
+                    break;
+                default:
+                    if (c < ' ' || c > 126) {
+                        String hex = Integer.toHexString(c);
+                        sb.append("\\u");
+                        for (int j = hex.length(); j < 4; j++) {
+                            sb.append('0');
+                        }
+                        sb.append(hex);
+                    } else {
+                        sb.append(c);
+                    }
+                    break;
+            }
+        }
+        sb.append('"');
+        return sb.toString();
+    }
+
+    /**
+     * Severs {@code window.opener} on a window we just opened, so the page in
+     * it cannot navigate the app's own page (reverse tabnabbing).
+     *
+     * <p>Deliberately not the {@code noopener} window feature: that makes
+     * {@code window.open()} return null in every browser, which would destroy
+     * the only signal available for telling a blocked popup from a successful
+     * one. Clearing the property gets the same protection while keeping the
+     * handle. Wrapped, since the assignment can throw once the new window has
+     * navigated cross-origin.</p>
+     */
+    private static final String SEVER_OPENER = "try { cn1w.opener = null; } catch (e) {}";
+
+    /**
+     * Hands a URL to the page's main thread for opening. {@code window} and
+     * {@code window.open} do not exist inside the Web Worker the app runs in, so
+     * this routes through the eval-on-main host bridge (see the
+     * {@code eval_} binding in port.js) where the page's real window lives.
+     *
+     * @param url the URL to open
+     * @param sameWindow when true navigate the current page, when false open a
+     *   new window/tab
+     * @param fallBackToSameWindow when opening a new window, navigate the
+     *   current page instead if the browser blocked the popup. The check runs
+     *   inside the page-side script because the popup verdict is only knowable
+     *   there.
+     * @return true if the script reached the page, false if the main-thread
+     *   bridge is unavailable and the caller should degrade
+     */
+    private boolean openUrlOnMainThread(String url, boolean sameWindow, boolean fallBackToSameWindow) {
+        String literal = toJavaScriptStringLiteral(url);
+        // When the host bundle predates the __cn1_eval_on_main__ handler,
+        // port.js degrades to evaluating the script inside the worker. Opening
+        // fails loudly there (no window.open), but a same-window navigation
+        // would NOT: assigning to the worker's read-only location is a silent
+        // no-op in non-strict eval code, so execute() would appear to succeed
+        // and do nothing. Assert we are on the page so every variant fails
+        // detectably and the caller can degrade.
+        String guard = "if (typeof document === 'undefined') {"
+                + " throw new Error('cn1: not running on the page'); }";
+        String script;
+        if (sameWindow) {
+            script = guard + "window.location.href = " + literal + ";";
+        } else if (fallBackToSameWindow) {
+            // Only attempt the popup while the page still has transient user
+            // activation -- otherwise the browser blocks it and shows its
+            // "popup blocked" indicator before we navigate anyway. Browsers
+            // without navigator.userActivation just try and let !cn1w decide.
+            script = guard
+                    + "var cn1a = window.navigator && window.navigator.userActivation;"
+                    + "var cn1w = (!cn1a || cn1a.isActive) ? window.open(" + literal + ", '_blank') : null;"
+                    + "if (!cn1w) { window.location.href = " + literal + "; } else { " + SEVER_OPENER + " }";
+        } else {
+            // Report a blocked popup instead of returning as if it opened. The
+            // page-side null is the only evidence available -- there is no
+            // callback -- so turn it into a throw the host call propagates.
+            script = guard + "var cn1w = window.open(" + literal + ", '_blank');"
+                    + "if (!cn1w) { throw new Error('cn1: popup blocked'); }"
+                    + SEVER_OPENER;
+        }
+        try {
+            // Wrapped in a function: __cn1_eval_on_main__ runs this through
+            // indirect eval, so a bare "var cn1w" would land on the page's
+            // global object -- clobbering an identically named global of the
+            // embedding page, and throwing outright against a top-level let or
+            // const of that name, which would break the default popup path.
+            eval_("(function(){" + script + "})();");
+            return true;
+        } catch (Throwable t) {
+            _log("Failed to open URL on the main thread: " + t);
+            return false;
+        }
+    }
+
+    /**
+     * Longest URL the confirmation Sheet shows before it is ellipsized. Chosen
+     * to stay inside a narrow phone viewport at the default font.
+     */
+    private static final int MAX_DISPLAY_URL_LENGTH = 40;
+
+    /** Marker appended to a URL shortened for the confirmation Sheet. */
+    private static final String DISPLAY_URL_ELLIPSIS = "...";
+
+    /** 0 unknown, 1 reachable, -1 not reachable. */
+    private int mainThreadBridgeState;
+
+    /**
+     * Whether scripts can reach the page at all, cached after one probe.
+     *
+     * <p>A host bundle predating the {@code __cn1_eval_on_main__} handler leaves
+     * the worker with no page-side channel, so every open fails. Knowing that
+     * up front matters because the recovery for a blocked popup -- ask the user
+     * -- is worthless here: the Sheet would promise something no button on it
+     * can deliver.</p>
+     */
+    private boolean isMainThreadBridgeAvailable() {
+        if (mainThreadBridgeState == 0) {
+            try {
+                // A no-op that asserts page context, nothing else.
+                eval_("if (typeof document === 'undefined') {"
+                        + " throw new Error('cn1: not running on the page'); }");
+                mainThreadBridgeState = 1;
+            } catch (Throwable t) {
+                mainThreadBridgeState = -1;
+            }
+        }
+        return mainThreadBridgeState == 1;
+    }
+
+    /**
+     * Tells the user a link cannot be opened, for the one case where no
+     * confirmation could help. Informational, so a single dismiss button.
+     */
+    private void showCannotOpenMessage(String url) {
+        final Sheet sheet = new Sheet(null, "Open Link");
+        SpanLabel message = new SpanLabel(
+                "This app cannot open links. Its web runtime is out of date.");
+        Button close = new Button("Close");
+        close.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                sheet.back();
+            }
+        });
+        sheet.getContentPane().setLayout(BoxLayout.y());
+        sheet.getContentPane().add(message);
+        Label detail = new Label(shortenUrlForDisplay(url));
+        detail.setEndsWith3Points(true);
+        sheet.getContentPane().add(detail);
+        sheet.getContentPane().add(FlowLayout.encloseCenter(close));
+        sheet.show();
+    }
+
+
+    /**
+     * Hands a {@code data:} download to the bridge's structured handler.
+     *
+     * <p>Three constraints apply and the current bridge can satisfy only two.
+     * The download must happen once; a blocked attempt should be retryable; and
+     * the payload must not be copied more than necessary. Registering fires the
+     * click eagerly, so re-firing the stash duplicates it. Clicking the anchor
+     * ourselves through eval-on-main avoids that and restores the retry, but
+     * escapes a multi-megabyte base64 string into JavaScript source, builds
+     * several payload-sized copies of it and makes the page parse it as code.</p>
+     *
+     * <p>So: register and return. One download, and the payload travels once as
+     * structured host-call data rather than as source text. The retry is what is
+     * given up, and recovering it needs a bridge-side change --
+     * {@code __cn1_register_save_blob_dataurl__} would have to accept a
+     * no-eager-fire flag -- which lives in the translator, not here.</p>
+     */
+    private void downloadDataUrl(String dataUrl, String fileName) {
+        registerSaveBlobHandlerDataUrl(fileName, dataUrl);
+    }
+
+    /**
+     * A raw URL has no spaces for {@code SpanLabel} to wrap on, so putting one
+     * in the confirmation Sheet blew the content pane's preferred width past the
+     * screen and pushed the buttons out of reach. Shorten it for display; the
+     * full URL is never needed to answer "open this link?".
+     */
+    static String shortenUrlForDisplay(String url) {
+        if (url == null) {
+            return "";
+        }
+        String rest;
+        // Special URLs also accept "\\" wherever they accept "/", so the
+        // authority ends there too -- otherwise https://evil.example\\<long
+        // trusted looking path> reads as one over-long authority and the tail
+        // rule below would show the attacker's suffix instead of the host.
+        boolean special;
+        if (startsWithAuthorityMarker(url)) {
+            // Scheme relative. isExternalUrl() accepts these, so they reach the
+            // Sheet and carry an authority that needs the same parsing --
+            // indexOf("://") does not find one. The page's own scheme applies,
+            // which for a served app is http(s), so treat it as special.
+            rest = url.substring(2);
+            special = true;
+        } else {
+            int schemeEnd = url.indexOf("://");
+            if (schemeEnd >= 0) {
+                rest = url.substring(schemeEnd + 3);
+                special = isSpecialScheme(url.substring(0, schemeEnd));
+            } else {
+                int colon = schemeColon(url);
+                if (colon > 0 && isSpecialScheme(url.substring(0, colon))) {
+                    // A special scheme tolerates missing slashes: browsers parse
+                    // http:host/path, and even http:/host/path, with host as the
+                    // authority. Without this the slashless form would skip the
+                    // parsing below and display its leading user info.
+                    //
+                    // UNLESS the scheme matches the page's own. Then it is a
+                    // relative reference, not an authority: on an https page
+                    // https:example.com/p resolves under the page's host, with
+                    // example.com as the start of the PATH. Naming example.com
+                    // as the destination would be simply false.
+                    String scheme = url.substring(0, colon);
+                    String page = pageScheme();
+                    // ...and only when fewer than two separators follow the
+                    // colon. Two of them, in any mix of "/" and "\\", are an
+                    // authority marker that outranks the same-scheme rule:
+                    // https:\\\\evil.example/p navigates to evil.example even
+                    // from an https page, so claiming the app's own host there
+                    // would name a destination the browser is not going to.
+                    boolean authorityFollows =
+                            startsWithAuthorityMarker(url.substring(colon + 1));
+                    if (!authorityFollows && page != null && page.equalsIgnoreCase(scheme)) {
+                        String host = mainLocationPart("host");
+                        if (host != null && host.length() > 0) {
+                            return host + "/" + DISPLAY_URL_ELLIPSIS;
+                        }
+                        return ellipsizeTail(url);
+                    }
+                    rest = url.substring(colon + 1);
+                    // Only reached when the scheme is special; the separator
+                    // skip below covers http:/host as well as http:host.
+                    special = true;
+                } else if (colon > 0) {
+                    // A scheme we do not parse an authority for (mailto:, tel:).
+                    return ellipsizeTail(url);
+                } else {
+                    // No scheme at all, so the browser resolves it against the
+                    // page: the destination host is the page's own, and the
+                    // text is a path under it. Returning the text alone invited
+                    // reading "evil.example" as a host when the link goes to
+                    // <page host>/evil.example.
+                    String host = mainLocationPart("host");
+                    if (host == null || host.length() == 0) {
+                        return ellipsizeTail(url);
+                    }
+                    String path = url.startsWith("/") ? url : "/" + url;
+                    String combined = host + path;
+                    return combined.length() <= MAX_DISPLAY_URL_LENGTH
+                            ? combined
+                            : host + "/" + DISPLAY_URL_ELLIPSIS;
+                }
+            }
+        }
+        if (special) {
+            // Browsers ignore any number of separators after the scheme, so
+            // https:////host and https:/\\/host both open host. Skip them, or
+            // the scan below stops on the leftover separator, reads an empty
+            // authority and falls back to showing the raw prefix.
+            while (rest.startsWith("/") || rest.startsWith("\\")) {
+                rest = rest.substring(1);
+            }
+            if (rest.length() == 0) {
+                return ellipsizeTail(url);
+            }
+        }
+        int authorityEnd = rest.length();
+        for (int i = 0; i < rest.length(); i++) {
+            char c = rest.charAt(i);
+            if (c == '/' || c == '?' || c == '#' || (special && c == '\\')) {
+                authorityEnd = i;
+                break;
+            }
+        }
+        String authority = rest.substring(0, authorityEnd);
+        // Everything before the last '@' is user info. An attacker picks it
+        // freely and can spell it to read like a trusted host, so showing it --
+        // or truncating the display in the middle of it -- would let
+        // https://www.paypal.com@evil.example/ be confirmed as "www.paypal.com".
+        // What confirming actually opens is the host, so show only that.
+        int at = authority.lastIndexOf('@');
+        if (at >= 0) {
+            authority = authority.substring(at + 1);
+        }
+        if (authority.length() == 0) {
+            // Scheme-relative or path-only, e.g. imdb:///find?q=godfather.
+            return ellipsizeTail(rest);
+        }
+        if (authority.length() > MAX_DISPLAY_URL_LENGTH) {
+            // Keep the END of an over-long host: the registrable domain is the
+            // rightmost labels, so dropping the front is what preserves the
+            // part that decides where the link goes.
+            authority = DISPLAY_URL_ELLIPSIS + authority.substring(
+                    authority.length() - (MAX_DISPLAY_URL_LENGTH - DISPLAY_URL_ELLIPSIS.length()));
+        }
+        // A lone trailing "/" is not worth an ellipsis.
+        boolean hasPath = rest.length() - authorityEnd > 1;
+        return hasPath ? authority + "/" + DISPLAY_URL_ELLIPSIS : authority;
+    }
+
+    /**
+     * Index of the colon terminating a syntactically valid scheme, or -1 when
+     * the string carries none.
+     *
+     * <p>Shared so "does this have a scheme" is answered once. A colon inside a
+     * path -- {@code /host:8443/p}, {@code ./user:pw@host} -- is not one, and
+     * treating it as one made those read as unparsed schemes rather than as the
+     * page-relative references they are.</p>
+     */
+    private static int schemeColon(String url) {
+        int colon = url.indexOf(':');
+        if (colon < 1) {
+            return -1;
+        }
+        // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ), per RFC 3986.
+        for (int i = 0; i < colon; i++) {
+            char c = url.charAt(i);
+            boolean alpha = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+            boolean extra = i > 0 && ((c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.');
+            if (!alpha && !extra) {
+                return -1;
+            }
+        }
+        return colon;
+    }
+
+    /**
+     * The page's own scheme, without the trailing colon, or null if unreadable.
+     */
+    private static String pageScheme() {
+        try {
+            String protocol = mainLocationPart("protocol");
+            if (protocol == null) {
+                return null;
+            }
+            return protocol.endsWith(":")
+                    ? protocol.substring(0, protocol.length() - 1)
+                    : protocol;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * The WHATWG URL "special" schemes, which browsers parse with an authority
+     * even when the {@code //} is missing.
+     */
+    private static boolean isSpecialScheme(String scheme) {
+        return "http".equalsIgnoreCase(scheme)
+                || "https".equalsIgnoreCase(scheme)
+                || "ws".equalsIgnoreCase(scheme)
+                || "wss".equalsIgnoreCase(scheme)
+                || "ftp".equalsIgnoreCase(scheme)
+                // Special for PARSING, which is all this governs. Routing still
+                // sends file: to storage -- see isExternalUrl() -- but when one
+                // does reach the Sheet, file:\\\\host/p carries a real authority
+                // and must be read as one.
+                || "file".equalsIgnoreCase(scheme);
+    }
+
+    /**
+     * Trims a string with no authority to protect down to the display cap.
+     */
+    private static String ellipsizeTail(String value) {
+        if (value.length() <= MAX_DISPLAY_URL_LENGTH) {
+            return value;
+        }
+        return value.substring(0, MAX_DISPLAY_URL_LENGTH - DISPLAY_URL_ELLIPSIS.length())
+                + DISPLAY_URL_ELLIPSIS;
+    }
+
+    /**
+     * Builds the "browser blocked this, please confirm" Sheet used by
+     * {@link #execute(String)}. The message, the (shortened) URL and the buttons
+     * each get their own row: the old single-row BorderLayout put the buttons
+     * east of a label whose preferred width was the whole URL, which pushed them
+     * off screen where they could not be tapped.
+     */
+    private Sheet createConfirmationSheet(String title, String message, String detail, final Runnable onConfirm) {
+        final Sheet sheet = new Sheet(null, title);
+        SpanLabel messageLabel = new SpanLabel(message);
+        Button ok = new Button("OK");
+        Button cancel = new Button("Cancel");
+        ok.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                sheet.back();
+                onConfirm.run();
+            }
+        });
+        cancel.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                sheet.back();
+            }
+        });
+        sheet.getContentPane().setLayout(BoxLayout.y());
+        sheet.getContentPane().add(messageLabel);
+        if (detail != null && detail.length() > 0) {
+            // A plain Label truncates with an ellipsis when it does not fit,
+            // unlike SpanLabel which would just overflow on an unbreakable URL.
+            Label detailLabel = new Label(detail);
+            detailLabel.setEndsWith3Points(true);
+            sheet.getContentPane().add(detailLabel);
+        }
+        sheet.getContentPane().add(FlowLayout.encloseCenter(cancel, ok));
+        return sheet;
+    }
+
+    /**
+     * True when a backside-hook drain is pending because of an actual user
+     * gesture, rather than merely because the polling interval enabled by
+     * {@code platformHint.javascript.backsideHooksInterval} is running.
+     *
+     * <p>{@link #isBacksideHookAvailable()} accepts either, which is right for
+     * media -- browsers relax autoplay once the page has engagement -- but not
+     * for a popup. The interval drains from {@code Window.setInterval}, which
+     * grants no transient activation, so a {@code window.open()} queued on it
+     * can be blocked with nothing shown to the user. The semaphore, in
+     * contrast, is only raised by
+     * {@code installBacksideHooksInUserInteraction()} off a real pointer or key
+     * event.</p>
+     */
+    private boolean isGestureBackedHookAvailable() {
+        return backsideHooksSemaphore > 0;
+    }
+
+    /**
+     * Identifies the user interaction currently in play. Bumped by
+     * {@link #installBacksideHooksInUserInteraction()}, which runs once per
+     * pointer or key event.
+     */
+    private int gestureGeneration;
+
+    /**
+     * The {@link #gestureGeneration} that has already had a popup queued
+     * against it, or -1.
+     *
+     * <p>One interaction authorizes ONE {@code window.open()}: the first
+     * consumes the transient activation, so anything else queued behind the
+     * same interaction is blocked. The count of pending drains cannot express
+     * this -- a single interaction schedules three (300ms, 1500ms, 5000ms), and
+     * a second interaction within five seconds raises the shared semaphore
+     * again before the first one's drains have run, so neither "the first drain
+     * ran" nor "the semaphore reached zero" marks a gesture boundary. Comparing
+     * generations does: a genuinely new interaction gets its own popup, while
+     * everything else in the same one goes to the Sheet and earns a gesture of
+     * its own.</p>
+     */
+    private int popupReservedForGeneration = -1;
+
+    /**
+     * Applies the cleanup a browser performs before it parses a URL: strip
+     * leading and trailing C0 controls and spaces, then remove every tab and
+     * newline wherever they appear.
+     *
+     * <p>Applied once at the top of {@link #execute(String)} so classification,
+     * the confirmation Sheet's display and the URL actually handed to the page
+     * all see the same string. Parsing the raw input separately in each place is
+     * what let " https:host@evil.example/" be classified and displayed off a
+     * scheme of {@code " https"} while the browser navigated to
+     * {@code evil.example}.</p>
+     */
+    static String normalizeUrlForParsing(String url) {
+        if (url == null) {
+            return null;
+        }
+        int start = 0;
+        int end = url.length();
+        while (start < end && url.charAt(start) <= ' ') {
+            start++;
+        }
+        while (end > start && url.charAt(end - 1) <= ' ') {
+            end--;
+        }
+        StringBuilder sb = new StringBuilder(end - start);
+        for (int i = start; i < end; i++) {
+            char c = url.charAt(i);
+            if (c != '\t' && c != '\n' && c != '\r') {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * True when the string opens with two path separators, which makes it
+     * scheme relative: the browser reads what follows as an authority.
+     *
+     * <p>Any combination of {@code /} and {@code \\} counts, because a special
+     * base URL -- and an app served over http(s) always has one -- treats them
+     * alike. So {@code \\\\host/p}, {@code \\/host/p} and {@code /\\host/p} all
+     * navigate to {@code host} exactly as {@code //host/p} does.</p>
+     *
+     * <p>Shared by every place that has to agree on where an authority starts:
+     * classification, the storage gate and the confirmation display. Answering
+     * this question separately in each is what let earlier authority shapes be
+     * fixed in one and missed in another.</p>
+     */
+    private static boolean startsWithAuthorityMarker(String url) {
+        return url.length() >= 2
+                && (url.charAt(0) == '/' || url.charAt(0) == '\\')
+                && (url.charAt(1) == '/' || url.charAt(1) == '\\');
+    }
+
+    /**
+     * True when {@code url} carries exactly {@code scheme}, compared without
+     * regard to case since URI schemes are case-insensitive. Guards the
+     * {@code javascript:} and {@code data:} branches of {@link #execute(String)},
+     * which would otherwise let {@code JavaScript:} slip through to the
+     * external-link path.
+     */
+    private static boolean hasScheme(String url, String scheme) {
+        return url.length() > scheme.length()
+                && url.charAt(scheme.length()) == ':'
+                && url.regionMatches(true, 0, scheme, 0, scheme.length());
+    }
+
+    /**
+     * True when the URL names something the browser itself can hand off, as
+     * opposed to a path into local storage that {@link #execute(String)} is
+     * expected to turn into a download. Only these get the
+     * {@code javascript.execute.target} treatment -- pointing the current page
+     * at a storage path would unload the app and land on nothing.
+     *
+     * <p>Anything carrying a URI scheme qualifies, whatever its case. That
+     * deliberately includes custom deep links such as the {@code imdb:///find}
+     * example in {@code Display.execute}'s javadoc, which the browser passes to
+     * a registered handler, and it includes protocol-relative {@code //host/path}
+     * URLs. {@code file:} is the exception: like the bare paths that carry no
+     * scheme at all, it names local content.</p>
+     */
+    private static boolean isExternalUrl(String url) {
+        if (startsWithAuthorityMarker(url)) {
+            // Scheme relative -- the page's own scheme applies.
+            return true;
+        }
+        // RFC 3986 allows a single ALPHA scheme, so x:payload is a legitimate
+        // deep link. A colon inside a path is not a scheme -- schemeColon()
+        // holds that grammar for every caller.
+        int colon = schemeColon(url);
+        if (colon < 1) {
+            return false;
+        }
+        // equalsIgnoreCase rather than toLowerCase(): case folding a scheme
+        // through the default locale turns "FILE" into "fIle" under a Turkish
+        // locale and would classify a file: URL as external.
+        return !"file".equalsIgnoreCase(url.substring(0, colon));
+    }
+
+    /**
+     * Opens a URL, or asks the user to, honoring the
+     * {@code javascript.execute.target} property. See {@link #execute(String)}.
+     */
+    private void openExternalUrl(final String url) {
+        String target = executeTarget();
+        if (EXECUTE_TARGET_SELF.equals(target)
+                && openUrlOnMainThread(url, true, false)) {
+            return;
+        }
+        if (EXECUTE_TARGET_AUTO.equals(target)
+                && openUrlOnMainThread(url, false, true)) {
+            return;
+        }
+        // _blank, or _self / auto whose page-side script never ran because the
+        // host bundle predates the eval-on-main handler -- degrade rather than
+        // leave execute() with no effect at all.
+        //
+        // Only _blank actually asked for a new window. Under auto or _self the
+        // Sheet is a compatibility fallback the caller never requested, so
+        // promising a new window there would describe behavior they did not
+        // choose.
+        openInNewWindowWithConfirmation(url, EXECUTE_TARGET_BLANK.equals(target)
+                ? "Open this link in a new window?"
+                : "Open this link?");
+    }
+
+    /**
+     * Opens {@code url} in a new window/tab the gesture-aware way: a popup only
+     * survives inside a live user gesture, so ride a backside hook when a
+     * gesture-backed one is pending and otherwise ask the user, whose tap on the
+     * Sheet becomes the gesture.
+     *
+     * <p>An interval-only hook is deliberately not enough here. Draining from a
+     * timer would let the browser block the popup with nothing shown, which is
+     * worse than the Sheet.</p>
+     */
+    private void openInNewWindowWithConfirmation(final String url, final String prompt) {
+        if (!isMainThreadBridgeAvailable()) {
+            // Guarded here rather than at each caller: every popup path funnels
+            // through this method, and putting it in openExternalUrl() alone
+            // left the local-path fallback and the download legs prompting for
+            // something no button could deliver.
+            _log("execute(): no page-side channel on this host bundle, cannot open " + url);
+            showCannotOpenMessage(url);
+            return;
+        }
+        if (isGestureBackedHookAvailable() && popupReservedForGeneration != gestureGeneration) {
+            // Tied to the interaction rather than to any drain of it -- see the
+            // field. Never cleared; the next interaction simply carries a
+            // different generation.
+            popupReservedForGeneration = gestureGeneration;
+            addGestureOnlyHook(new JSRunnable() {
+                @Override
+                public void run() {
+                    // openUrlOnMainThread reports the reason on failure --
+                    // popup blocked or no page-side channel -- so do not
+                    // second-guess it with a duplicate line here.
+                    if (!openUrlOnMainThread(url, false, false)) {
+                        // A browser setting, an extension or an activation that
+                        // expired before the drain can still block the one
+                        // reserved attempt. Fall back to asking rather than
+                        // leaving the caller with a dead click. Hop to the EDT
+                        // first -- this runs on a hook drain.
+                        callSerially(new Runnable() {
+                            @Override
+                            public void run() {
+                                showOpenConfirmation(url, prompt);
+                            }
+                        });
+                    }
+                }
+            }, new Runnable() {
+                @Override
+                public void run() {
+                    // Superseded by a newer interaction. Ask rather than
+                    // re-queue: queueing again would open this URL off a
+                    // gesture the user made for something else.
+                    showOpenConfirmation(url, prompt);
+                }
+            });
+            return;
+        }
+        showOpenConfirmation(url, prompt);
+    }
+
+    /**
+     * Asks the user whether to open {@code url}, and on OK queues the open
+     * against the tap that answered. Always shows the Sheet -- never queues a
+     * popup on its own -- so it is safe as the fallback for a hook that could
+     * not run.
+     */
+    private void showOpenConfirmation(final String url, final String prompt) {
+        if (!isMainThreadBridgeAvailable()) {
+            // Reached directly by the superseded and blocked-popup fallbacks,
+            // which bypass the entry point above.
+            _log("execute(): no page-side channel on this host bundle, cannot open " + url);
+            showCannotOpenMessage(url);
+            return;
+        }
+        createConfirmationSheet("Open Link", prompt,
+                shortenUrlForDisplay(url), new Runnable() {
+            @Override
+            public void run() {
+                // This callback runs on the EDT, by which point the browser no
+                // longer counts the OK tap as an ongoing gesture -- opening
+                // from here would be discarded by a popup blocker, which is the
+                // very thing the Sheet exists to recover from. That tap did
+                // install a backside hook though (pointer handling calls
+                // installBacksideHooksInUserInteraction), so queue the open on
+                // it and let the drain perform it inside the gesture. On the
+                // gesture-only queue, or the polling interval could drain it
+                // first with no activation and block the link the user just
+                // confirmed.
+                addGestureOnlyHook(new JSRunnable() {
+                    @Override
+                    public void run() {
+                        if (!openUrlOnMainThread(url, false, false)) {
+                            // The user confirmed and it still did not open --
+                            // a browser setting, an extension, or an activation
+                            // that expired before this drain. Do not stop at a
+                            // log: they acted and deserve a way through. Offer
+                            // the current tab, which needs no activation and so
+                            // cannot be blocked in turn. Not a loop -- that
+                            // path is a navigation, not another popup.
+                            _log("execute(): confirmed open did not succeed for "
+                                    + url);
+                            callSerially(new Runnable() {
+                                @Override
+                                public void run() {
+                                    showBlockedPopupFallback(url);
+                                }
+                            });
+                        }
+                    }
+                }, new Runnable() {
+                    @Override
+                    public void run() {
+                        // The confirming tap was superseded before its drain
+                        // ran. Ask again rather than spend the newer gesture.
+                        showOpenConfirmation(url, prompt);
+                    }
+                });
+            }
+        }).show();
+    }
+
+    /**
+     * Last resort after a confirmed open was blocked anyway: offer the current
+     * tab, which needs no activation and so cannot be blocked in turn.
+     */
+    private void showBlockedPopupFallback(final String url) {
+        if (!isMainThreadBridgeAvailable()) {
+            _log("execute(): no page-side channel on this host bundle, cannot open " + url);
+            showCannotOpenMessage(url);
+            return;
+        }
+        createConfirmationSheet("Open Link",
+                "Your browser blocked the new window."
+                        + " Open this link in the current tab instead?",
+                shortenUrlForDisplay(url), new Runnable() {
+            @Override
+            public void run() {
+                openUrlOnMainThread(url, true, false);
+            }
+        }).show();
+    }
+
     @Override
-    public void execute(String url) {
-        if (url.startsWith("javascript:")) {
-            String cmd = url.substring(url.indexOf(":")+1);
+    public void execute(String rawUrl) {
+        // Normalization exists to make classification, the Sheet's display and
+        // the string handed to the page agree on what the BROWSER will parse.
+        // It is therefore only applied to those: a javascript: payload and a
+        // storage path are consumed verbatim below, since stripping their tabs
+        // and newlines would change a program's meaning and a key's identity.
+        if (rawUrl == null) {
+            // Pre-existing behavior was an NPE off the first startsWith. There
+            // is nothing to open, so say so and return rather than crash the
+            // caller's EDT.
+            _log("execute(): ignoring null URL");
+            return;
+        }
+        final String url = normalizeUrlForParsing(rawUrl);
+        if (hasScheme(url, "javascript")) {
+            // Payload taken from the raw string. Normalizing it would splice
+            // out newlines that terminate a // comment and tabs that separate
+            // tokens, silently changing what the caller asked to run.
+            String cmd = rawUrl.substring(rawUrl.indexOf(":")+1);
             eval_(cmd);
             return;
         }
@@ -6690,120 +7644,149 @@ public class HTML5Implementation extends CodenameOneImplementation {
         String fileName = null;
         boolean useBlobHandler = false;
         Button nativeButton = new Button();
-        if (!url.startsWith("http:") &&
-                !url.startsWith("http:") &&
-                !url.startsWith("mailto:") &&
-                !url.startsWith("data:")) {
-            if (exists(url)) {
-                try {
-                    Blob blob = openFileAsBlob(url);
-                    char sep = getFileSystemSeparator();
-                    fileName = url;
-                    if (fileName.indexOf(sep) >=0) {
-                        fileName = fileName.substring(fileName.lastIndexOf(sep)+1);
-                    }
-                    registerSaveBlobHandler(fileName, blob);
-                    useBlobHandler = true;
-
-                } catch (Throwable ex) {
-                    // openFileAsBlob failed -- fall through to the no-blob-handler
-                    // branch below which opens the URL in a new window instead.
+        // Storage names are unrestricted, so NO shape can be ruled out in
+        // advance: report:2026.pdf, https:report.pdf and https://example.com/x
+        // are all legal keys, and three successive attempts to characterize
+        // "cannot be a key" each regressed one of them. Consult storage for
+        // everything and let the miss decide. The parent implementation did
+        // the same for every shape but http:, mailto: and data:.
+        //
+        // data: stays excluded, and it is the only exclusion that holds up:
+        // there the string is the download's payload rather than a name, and
+        // exists() would push a multi-megabyte base64 blob through the host
+        // bridge as a key, twice, for something that can never match.
+        //
+        // Looked up under the path exactly as given -- a key may legitimately
+        // open or close with a space, and nothing here is parsed by the
+        // browser.
+        if (!hasScheme(url, "data") && exists(rawUrl)) {
+            try {
+                Blob blob = openFileAsBlob(rawUrl);
+                char sep = getFileSystemSeparator();
+                fileName = rawUrl;
+                if (fileName.indexOf(sep) >= 0) {
+                    fileName = fileName.substring(fileName.lastIndexOf(sep) + 1);
                 }
+                registerSaveBlobHandler(fileName, blob);
+                useBlobHandler = true;
+            } catch (Throwable ex) {
+                // openFileAsBlob failed -- fall through to the no-blob-handler
+                // branch below which opens the URL in a new window instead.
             }
         }
 
-        final boolean fuseBlobHandler = useBlobHandler;
-        
         String buttonText = null;
         //String icon = null;
-        final String furl = url;
         if (useBlobHandler) {
             //popover.setContents("<button style='white-space:nowrap' onclick='window.cn1SaveBlobHandler();'><span style='font-size:3em;vertical-align:text-bottom;' class='glyphicon glyphicon-download'/><span style='font-size:2em;vertical-align:top;'> Download "+(fileName!=null?fileName:"File")+"</span></button>");
             buttonText = "Click to Download "+(fileName!=null?fileName:"File");
             nativeButton.setText(buttonText);
             nativeButton.setMaterialIcon(FontImage.MATERIAL_SAVE);
-        } else if (url.startsWith("data:")) {
-            registerSaveBlobHandlerDataUrl(fileName == null ? "download":fileName, url);
-            //popover.setContents("<button style='white-space:nowrap' onclick='window.cn1SaveBlobHandler();'><span style='font-size:3em;vertical-align:text-bottom;' class='glyphicon glyphicon-download; font-size: '/><span style='font-size:2em;vertical-align:top;'> Download "+(fileName!=null?fileName:"File")+"</span></button>");
-            buttonText = "Click to Download "+(fileName!=null?fileName:"File");
-            nativeButton.setText(buttonText);
-            nativeButton.setMaterialIcon(FontImage.MATERIAL_SAVE);
-            //icon = "save-file";
-        } else {
-            //popover.setContents("<a href='"+url+"' target='_blank'>Open URL in New Window</a>");
-            if (isBacksideHookAvailable()) {
-                addBacksideHook(new JSRunnable() {
-                    public void run() {
-                        window.open(furl, "New Window");
-                    }
-                });
-                
-            } else {
-                final Sheet sheet = new Sheet(null, "Open Link");
-                SpanLabel l = new SpanLabel("Open "+url+" in a new window?");
-                Button ok = new Button("OK");
-                Button cancel = new Button("Cancel");
-                ok.addActionListener(new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        sheet.back();
-                        CN.execute(furl);
-                    }
-                });
-                cancel.addActionListener(new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        sheet.back();
-                    }
-                });
-                sheet.getContentPane().setLayout(BoxLayout.y());
-                sheet.getContentPane().add(BorderLayout.centerEastWest(l, FlowLayout.encloseIn(ok, cancel), null));
-                sheet.show();
-                
-            }
+        } else if (hasScheme(url, "data")) {
+            // The RAW URL, not the normalized one: normalization strips tabs
+            // and newlines anywhere in the string, and this value is the
+            // download's payload, not something we are only classifying. Same
+            // rule as the javascript: payload and the storage key -- normalize
+            // what the browser parses, never what it carries.
+            downloadDataUrl(rawUrl, fileName == null ? "download" : fileName);
             return;
-            
+        } else if (isExternalUrl(url)) {
+            // Reached only by URLs the data: branch above did not claim.
+            // isExternalUrl() is true for data: as well -- it does carry a
+            // scheme -- so that branch MUST stay ahead of this one or data:
+            // URLs would navigate instead of downloading.
+            openExternalUrl(url);
+            return;
+        } else {
+            // A local/storage path we could not turn into a Blob: exists() said
+            // no, or openFileAsBlob() threw (see downloadBytesAsFile above on
+            // how readily the storage round trip fails on this port). Keep it
+            // off the external-link target policy -- under auto or _self that
+            // would point the page at a path the server does not serve and
+            // unload the app instead of downloading anything. Best effort in a
+            // new window, which is what this port did before -- and through the
+            // gesture-aware path, since opening straight from the EDT would let
+            // the browser block the popup with no confirmation shown.
+            _log("execute(): no downloadable content for " + url);
+            openInNewWindowWithConfirmation(url, "Open this link?");
+            return;
         }
-        if (isBacksideHookAvailable()) {
-            addBacksideHook(new JSRunnable() {
-                public void run() {
-                    if (fuseBlobHandler) {
-                        fireSaveBlobHandler();
-                    } else {
-                        _log("Opening URL in new window");
-                        window.open(furl, "New Window");
-                    }
+        // A final copy of useBlobHandler, needed because the anonymous classes
+        // below cannot capture it -- it is assigned in the branches above and
+        // so is not effectively final. Captured AFTER the chain: the data:
+        // branch registers a handler too, and capturing beforehand read false
+        // for that case and sent the download down the popup leg.
+        final boolean handlerRegistered = useBlobHandler;
+        final Runnable startDownload = new Runnable() {
+            @Override
+            public void run() {
+                if (handlerRegistered) {
+                    fireSaveBlobHandler();
+                } else {
+                    _log("Opening URL in new window");
+                    openUrlOnMainThread(url, false, false);
                 }
-            });
+            }
+        };
+        // Firing the registered blob handler is a download, which browsers gate
+        // on engagement rather than transient activation, so an interval-only
+        // hook is good enough for it. The no-blob-handler leg opens a popup
+        // instead, and that does need a real gesture -- draining it from a timer
+        // would let the browser block it with no Sheet shown. Pick the gate that
+        // matches the leg this run will actually take.
+        boolean hookAvailable = handlerRegistered
+                ? isBacksideHookAvailable()
+                : isGestureBackedHookAvailable();
+        if (hookAvailable) {
+            JSRunnable hook = new JSRunnable() {
+                @Override
+                public void run() {
+                    startDownload.run();
+                }
+            };
+            if (handlerRegistered) {
+                addBacksideHook(hook);
+            } else {
+                // The no-blob leg opens a popup, so it needs the activation
+                // only a gesture-backed drain carries -- same reason its gate
+                // above is the stricter one. If a newer interaction supersedes
+                // it, ask rather than spend that interaction's activation.
+                addGestureOnlyHook(hook, new Runnable() {
+                    @Override
+                    public void run() {
+                        showOpenConfirmation(url, "Open this link?");
+                    }
+                });
+            }
 
         } else {
-            final Sheet sheet = new Sheet(null, "Download file");
             String dlName = fileName == null ? "file" : fileName;
-            SpanLabel l = new SpanLabel("Download "+dlName+" now?");
-            Button ok = new Button("OK");
-            Button cancel = new Button("Cancel");
-            ok.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    sheet.back();
-                    addBacksideHook(new JSRunnable() {
+            createConfirmationSheet("Download file", "Download " + dlName + " now?", null, new Runnable() {
+                @Override
+                public void run() {
+                    JSRunnable confirmed = new JSRunnable() {
+                        @Override
                         public void run() {
-                            if (fuseBlobHandler) {
-                                fireSaveBlobHandler();
-                            } else {
-                                window.open(furl, "New Window");
-                            }
+                            startDownload.run();
                         }
-                    });
+                    };
+                    // Same split as the unconfirmed path above: the popup leg
+                    // needs the activation the OK tap just granted, which the
+                    // polling interval would not carry.
+                    if (handlerRegistered) {
+                        addBacksideHook(confirmed);
+                    } else {
+                        addGestureOnlyHook(confirmed, new Runnable() {
+                            @Override
+                            public void run() {
+                                showOpenConfirmation(url, "Open this link?");
+                            }
+                        });
+                    }
                 }
-            });
-            cancel.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    sheet.back();
-                }
-            });
-            sheet.getContentPane().setLayout(BoxLayout.y());
-            sheet.getContentPane().add(BorderLayout.centerEastWest(l, FlowLayout.encloseIn(ok, cancel), null));
-            sheet.show();
+            }).show();
         }
-        
+
     }
 
     
