@@ -335,8 +335,9 @@ public abstract class WorkoutSession {
     // ------------------------------------------------------------------
 
     /// Folds one sample into the running totals, minima, maxima, averages
-    /// and latest values. Shared by every port, so a recorded session on
-    /// Android and a live one on watchOS report statistics the same way.
+    /// and latest values. Shared by every port, so a session reports its
+    /// statistics the same way wherever it runs -- and would go on doing
+    /// so if a live session were feeding it instead of the app.
     private void rollUp(HealthSample sample) {
         if (sample instanceof SeriesSample) {
             // A heart-rate trace fed in whole is workout data like any

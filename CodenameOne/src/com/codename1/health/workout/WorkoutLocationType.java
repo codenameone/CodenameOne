@@ -24,8 +24,12 @@ package com.codename1.health.workout;
 
 /// Whether a workout happens indoors or outdoors.
 ///
-/// More than a label: on watchOS this selects whether GPS is used, which
-/// materially changes both the distance calculation and battery drain.
+/// A label in this release: nothing here drives a live workout session,
+/// so it is recorded with the workout and read back rather than acted on.
+/// It is more than a label on a live session -- on watchOS it selects
+/// whether GPS is used, which materially changes both the distance
+/// calculation and battery drain -- so set it correctly now and the
+/// behaviour follows when live sessions arrive.
 public enum WorkoutLocationType {
 
     /// Not specified; the platform decides.

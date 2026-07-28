@@ -51,11 +51,16 @@ public final class SensorSessionOptions {
     /// store. **Defaults to `false`, and that default is deliberate.**
     ///
     /// During a workout on watchOS -- and on iOS 26 and later -- the
-    /// operating system is already recording heart rate into HealthKit
-    /// itself. A strap that also writes its own heart-rate samples
-    /// produces two overlapping sets for the same minutes, and every
-    /// downstream average, maximum and chart is then computed over
-    /// double-counted data.
+    /// operating system records heart rate into HealthKit itself. A strap
+    /// that also writes its own heart-rate samples then produces two
+    /// overlapping sets for the same minutes, and every downstream
+    /// average, maximum and chart is computed over double-counted data.
+    ///
+    /// This release drives no live workout session, so that overlap comes
+    /// from a workout the user started elsewhere -- in Apple's own Workout
+    /// app, say -- rather than from one of yours. The default stays
+    /// `false` regardless: turning it on is a decision about somebody
+    /// else's data as much as your own.
     ///
     /// If you are recording a workout, attach the session to it with
     /// [#setWorkoutSession(WorkoutSession)] instead: samples land in the

@@ -29,9 +29,13 @@ import com.codename1.health.HealthException;
 /// on the EDT.
 public interface WorkoutSessionListener {
 
-    /// The session moved to a new state, including transitions the app did
-    /// not request -- watchOS ends a session when the wearer starts
-    /// another workout.
+    /// The session moved to a new state.
+    ///
+    /// Every transition is one the app asked for in this release, since
+    /// recorded sessions are the only kind here. The callback exists for
+    /// the unrequested ones a live session brings -- watchOS ends one when
+    /// the wearer starts another workout -- so that code written against
+    /// it keeps working when that arrives.
     void workoutStateChanged(WorkoutSession session,
             WorkoutSessionState state);
 
