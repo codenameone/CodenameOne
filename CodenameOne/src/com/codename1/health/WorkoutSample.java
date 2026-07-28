@@ -164,7 +164,26 @@ public final class WorkoutSample extends SessionSample {
     }
 
     /// Sets the paused-time-excluded duration.
+    ///
+    /// Any negative value means "not reported separately", which is what
+    /// [#getActiveDurationMillis()] answers with the wall duration.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the value exceeds the workout's
+    ///   own duration.
     public void setActiveDurationMillis(long activeDurationMillis) {
+        // Active time excludes pauses, so it cannot exceed the span it is
+        // a subset of. Unchecked, the local and simulator stores kept a
+        // workout claiming more time exercising than it lasted, and every
+        // pace, average and "time moving" drawn from it was wrong in a way
+        // that looks like a units bug somewhere else entirely.
+        if (activeDurationMillis > getDurationMillis()) {
+            throw new IllegalArgumentException("a workout's active duration"
+                    + " excludes pauses and cannot exceed its own duration"
+                    + " of " + getDurationMillis() + "ms, got "
+                    + activeDurationMillis + "ms");
+        }
         this.activeDurationMillis = activeDurationMillis;
     }
 

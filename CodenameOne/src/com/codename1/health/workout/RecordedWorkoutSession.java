@@ -103,7 +103,15 @@ final class RecordedWorkoutSession extends WorkoutSession {
         final WorkoutSample workout = WorkoutSample.create(
                 getConfiguration().getActivityType(), getStartedAtMillis(),
                 getEndedAtMillis());
-        workout.setActiveDurationMillis(getElapsedMillis());
+        // Clamped only against the two clock reads inside end(): the
+        // accumulated total and the end timestamp are taken a few
+        // instructions apart, and a wall clock that steps backwards
+        // between them can make the first exceed the second by a
+        // millisecond. The setter rejects anything larger, which is the
+        // right answer for a caller supplying its own figure and the
+        // wrong one for losing a real workout to an NTP correction.
+        workout.setActiveDurationMillis(Math.min(getElapsedMillis(),
+                workout.getDurationMillis()));
         workout.setTitle(getConfiguration().getTitle());
         applyTotals(workout);
 

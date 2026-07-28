@@ -322,6 +322,43 @@ class SensorParserTest {
         assertEquals(1.77, m.getHeightMeters(), 1e-9);
     }
 
+    /**
+     * A scale that reports the BMI/height field but could not measure one
+     * of them sends the profile's 0xFFFF. Scaled rather than checked, that
+     * surfaced as a BMI of 6553.5 and a height of about 6.5 kilometres --
+     * next to a weight that is perfectly real, so nothing about the
+     * reading looks suspect.
+     */
+    @Test
+    void weightTreatsUnavailableBmiAndHeightAsMissing() {
+        byte[] payload = new byte[] {
+            0x08,                         // BMI/height present, SI units
+            0x10, 0x27,                   // 10000 * 0.005 = 50 kg
+            (byte) 0xFF, (byte) 0xFF,     // BMI unavailable
+            (byte) 0xFF, (byte) 0xFF      // height unavailable
+        };
+        WeightMeasurement m = WeightMeasurement.parse(payload);
+        assertNotNull(m);
+        assertEquals(50.0, m.getWeightKg(), 1e-6);
+        assertTrue(Double.isNaN(m.getBmi()));
+        assertTrue(Double.isNaN(m.getHeightMeters()));
+    }
+
+    /** One unavailable field does not discard the other. */
+    @Test
+    void weightKeepsTheHeightWhenOnlyBmiIsUnavailable() {
+        byte[] payload = new byte[] {
+            0x08,
+            0x10, 0x27,
+            (byte) 0xFF, (byte) 0xFF,     // BMI unavailable
+            0x76, 0x06                    // 1654 * 0.001 = 1.654 m
+        };
+        WeightMeasurement m = WeightMeasurement.parse(payload);
+        assertNotNull(m);
+        assertTrue(Double.isNaN(m.getBmi()));
+        assertEquals(1.654, m.getHeightMeters(), 1e-6);
+    }
+
     @Test
     void weightRejectsTruncatedPayloads() {
         assertNull(WeightMeasurement.parse(null));

@@ -61,6 +61,27 @@ class WorkoutAndNutritionTest extends UITestBase {
         assertNull(w.getTotalDistance());
     }
 
+    /**
+     * Active duration excludes pauses, so it is a subset of the span and
+     * cannot exceed it. Stored unchecked, every pace and average drawn
+     * from the workout was wrong in a way that looks like a units bug
+     * somewhere else.
+     */
+    @Test
+    void activeDurationCannotExceedTheWorkoutItself() {
+        WorkoutSample w = WorkoutSample.create(WorkoutActivityType.RUNNING,
+                1767225600000L, 1767225600000L + 60000L);
+        assertThrows(IllegalArgumentException.class,
+                () -> w.setActiveDurationMillis(60001L));
+        // The whole span is legal -- a workout with no pauses.
+        w.setActiveDurationMillis(60000L);
+        assertEquals(60000L, w.getActiveDurationMillis());
+        // And a negative still means "not reported separately", which
+        // reads back as the wall duration.
+        w.setActiveDurationMillis(-1L);
+        assertEquals(60000L, w.getActiveDurationMillis());
+    }
+
     /** Any unit of the right dimension is accepted, and null still means
      *  the total was never measured. */
     @Test

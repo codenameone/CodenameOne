@@ -53,6 +53,10 @@ public final class WeightMeasurement {
     private static final int FLAG_USER_ID = 0x04;
     private static final int FLAG_BMI_HEIGHT = 0x08;
 
+    /// The value the profile reserves, in every one of these fields, for
+    /// "the scale could not measure this".
+    private static final int UNAVAILABLE = 0xFFFF;
+
     private static final double WEIGHT_RESOLUTION_KG = 0.005;
     private static final double WEIGHT_RESOLUTION_LB = 0.01;
     private static final double HEIGHT_RESOLUTION_M = 0.001;
@@ -94,7 +98,7 @@ public final class WeightMeasurement {
         // mode and about 297 kg imperial, which the session then published
         // and could write to the store as a real body mass -- the other
         // medical parsers here already reject their failure values.
-        if (rawWeight == 0xFFFF) {
+        if (rawWeight == UNAVAILABLE) {
             return null;
         }
         double weightKg = imperial
@@ -112,13 +116,24 @@ public final class WeightMeasurement {
         double bmi = Double.NaN;
         double heightM = Double.NaN;
         if ((flags & FLAG_BMI_HEIGHT) != 0) {
+            // Each field carries its own 0xFFFF "unavailable" value, and a
+            // scale that measured one but not the other still sends both.
+            // Scaled rather than checked, they surfaced as a BMI of 6553.5
+            // and a height of about 6.5 kilometres -- numbers an app has no
+            // reason to distrust, next to a weight that is perfectly real.
+            // NaN is what the getters already document for absent.
+            int rawBmi = r.uint16();
             // BMI is always transmitted with a resolution of 0.1,
             // regardless of the unit flag.
-            bmi = r.uint16() * 0.1;
+            if (rawBmi != UNAVAILABLE) {
+                bmi = rawBmi * 0.1;
+            }
             int rawHeight = r.uint16();
-            heightM = imperial
-                    ? rawHeight * HEIGHT_RESOLUTION_IN * IN_TO_M
-                    : rawHeight * HEIGHT_RESOLUTION_M;
+            if (rawHeight != UNAVAILABLE) {
+                heightM = imperial
+                        ? rawHeight * HEIGHT_RESOLUTION_IN * IN_TO_M
+                        : rawHeight * HEIGHT_RESOLUTION_M;
+            }
         }
 
         if (!r.isValid()) {
