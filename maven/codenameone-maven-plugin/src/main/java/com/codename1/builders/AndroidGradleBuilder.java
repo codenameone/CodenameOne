@@ -1663,19 +1663,12 @@ public class AndroidGradleBuilder extends Executor {
                                 || method.startsWith("getAvailability")) {
                             usesHealthStore = true;
                         }
-                        // getStore() is the only one of those that leads to
-                        // a data type; availability and the settings
-                        // shortcuts do not, so they must not force a
-                        // permission declaration the app never uses.
-                        // getStore() installs the bridge but is not itself data
-
-                        // access: an app that takes the handle to probe
-
-                        // isTypeSupported reads nothing. The HealthStore method
-
-                        // hook above sets usesHealthData when a real read or
-
-                        // write is called.
+                        // getStore() installs the bridge but is not itself
+                        // data access: an app that takes the handle to probe
+                        // isTypeSupported reads nothing, and availability and
+                        // the settings shortcuts read nothing either. The
+                        // HealthStore method hook above sets usesHealthData
+                        // when a real read or write is called.
                         if (method.startsWith("getWorkouts")) {
                             usesHealthWorkout = true;
                             // A workout reads and writes exercise data, so

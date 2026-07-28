@@ -997,6 +997,20 @@ public class IPhoneBuilder extends Executor {
                     // store; Health.getSensors() means BLE only. The class
                     // reference alone cannot tell them apart, so the facade
                     // is decided here.
+                    // Sensor write-through is HealthKit use. An app enables
+                    // it with SensorSessionOptions.setWriteToStore(true) and
+                    // need never name HealthStore, so the sensors-package
+                    // exemption -- there so a BLE-only app is not linked
+                    // against HealthKit -- hid the one call in that package
+                    // that genuinely needs it, and the build omitted the
+                    // framework, the entitlement and the purpose-string check.
+                    if ("com/codename1/health/sensors/SensorSessionOptions"
+                            .equals(cls)
+                            && method.startsWith("setWriteToStore")) {
+                        usesHealth = true;
+                        usesHealthStore = true;
+                        usesHealthWrite = true;
+                    }
                     if ("com/codename1/health/Health".equals(cls)) {
                         usesHealth = true;
                         if (method.startsWith("getStore")

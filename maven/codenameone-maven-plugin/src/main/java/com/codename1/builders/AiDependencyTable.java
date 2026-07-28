@@ -245,6 +245,14 @@ public final class AiDependencyTable {
                 .iosFrameworks("CoreBluetooth")
                 .iosPlist("NSBluetoothAlwaysUsageDescription",
                          "Communicates with nearby heart rate and fitness sensors.")
+                // The iOS 12 key as well, exactly as the Bluetooth entry
+                // above carries it. NSBluetoothAlwaysUsageDescription
+                // arrived in iOS 13, and iOS 12 checks the older key
+                // before letting CoreBluetooth start -- so a sensor-only
+                // app naming this facade rather than com.codename1.bluetooth
+                // was terminated on the supported floor.
+                .iosPlist("NSBluetoothPeripheralUsageDescription",
+                         "Communicates with nearby heart rate and fitness sensors.")
                 .description("Bluetooth health sensors (heart rate, power, cadence, scales, cuffs, glucose)"));
 
         // On-device Stable Diffusion: bundled Core ML model on iOS,
