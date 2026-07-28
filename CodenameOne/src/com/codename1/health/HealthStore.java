@@ -1167,6 +1167,18 @@ public class HealthStore {
                 request.getId(), request.getTypes(), isPushDelivery(),
                 request.isDeliverSamples(), request.isIncludeDeletions(),
                 request.getMaxSamplesPerBatch());
+        HealthAnchor stored = loadAnchor(request.getId());
+        // The new handle carries the persisted cursor.
+        //
+        // The anchor used to reach doSubscribe() alone, which neither
+        // mobile store overrides, while both drains read sub.getAnchor().
+        // So re-registering an id -- replacing a listener, or restoring a
+        // subscription at launch -- started the next drain from a fresh
+        // baseline and silently discarded everything accumulated since the
+        // last one.
+        if (stored != null) {
+            sub.noteDelivery(stored, 0L);
+        }
         synchronized (subscriptions) {
             HealthSubscription existing = subscriptions.get(request.getId());
             if (existing != null) {
@@ -1179,9 +1191,18 @@ public class HealthStore {
                 liveListeners.put(request.getId(), listener);
             }
         }
+        if (listener != null) {
+            // An id previously bound to a background listener class keeps
+            // that binding in Preferences, and restoration after a
+            // relaunch resolves it. Replacing such a subscription with an
+            // in-memory listener would then deliver its changes to the
+            // very class the app had just replaced. The Class overload
+            // writes the binding back immediately after this returns.
+            Preferences.delete(PREF_LISTENER + request.getId());
+        }
         rememberSubscription(request);
         if (isSupported()) {
-            doSubscribe(request, loadAnchor(request.getId()));
+            doSubscribe(request, stored);
         }
         return sub;
     }

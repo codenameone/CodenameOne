@@ -167,6 +167,44 @@ final class HealthManifestFragments {
      * dropping blanks. Tolerates whitespace and trailing commas, since the
      * value is hand-written in a properties file.
      */
+    /// The `kotlin-gradle-plugin` version an app declares for itself in
+    /// `android.topDependency`, or null when it declares none.
+    ///
+    /// A declaration there wins outright: the Gradle generator sees a
+    /// custom plugin line and skips adding its own, so raising
+    /// `requireKotlinStdlib` to the Health Connect floor changed nothing
+    /// and the bridge was compiled by whatever compiler the app pinned.
+    /// The build has to look at what was actually declared.
+    ///
+    /// Only the numeric prefix is returned: `2.0.0-Beta1` comes back as
+    /// `2.0.0`. The caller compares this segment by segment with
+    /// `Integer.parseInt`, so a qualifier left on the end would throw and
+    /// fail the build on a version that is perfectly acceptable. Dropping
+    /// it can only round a prerelease up to its release, which is the
+    /// forgiving direction for a floor check.
+    static String declaredKotlinPluginVersion(String topDependency) {
+        if (topDependency == null) {
+            return null;
+        }
+        int at = topDependency.indexOf(KOTLIN_PLUGIN);
+        if (at < 0) {
+            return null;
+        }
+        int from = at + KOTLIN_PLUGIN.length();
+        int to = from;
+        while (to < topDependency.length()
+                && "0123456789.".indexOf(topDependency.charAt(to)) >= 0) {
+            to++;
+        }
+        while (to > from && topDependency.charAt(to - 1) == '.') {
+            to--;
+        }
+        return to > from ? topDependency.substring(from, to) : null;
+    }
+
+    private static final String KOTLIN_PLUGIN =
+            "org.jetbrains.kotlin:kotlin-gradle-plugin:";
+
     /// Whether a `HealthStore` method reads data.
     ///
     /// Health Connect permissions are directional, so the build has to know

@@ -363,13 +363,20 @@ class CN1HealthConnectBridge(private val context: Context)
         // samples with no token that could ever reach them. Overshooting
         // the limit by the tail of one record is recoverable; losing it is
         // not.
-        var recordId: String? = null
+        // Membership, not adjacency. Two overlapping series records
+        // interleave once their samples are sorted by time -- A1, B1, A2 --
+        // so comparing against only the previous line's id cut inside
+        // record A while believing it had finished it. Health Connect's
+        // token has already advanced past both fetched records and the
+        // truncation path clears it, so A2 would have been unreachable for
+        // good. A record already started is always finished.
+        val started = HashSet<String>()
         for ((i, line) in ordered.withIndex()) {
             val id = line.substringBefore('\t')
-            if (limit in 1..i && id != recordId) {
+            if (limit in 1..i && !started.contains(id)) {
                 break
             }
-            recordId = id
+            started.add(id)
             out.append(line).append('\n')
         }
         return out.toString()

@@ -2567,6 +2567,27 @@ public class AndroidGradleBuilder extends Executor {
                         + (declaredKotlin.length() == 0
                                 ? "the default" : declaredKotlin));
             }
+            // A kotlin-gradle-plugin the app declares for itself wins:
+            // the Gradle generator skips adding its own line when it sees
+            // one, so raising requireKotlinStdlib above changed nothing
+            // and the bridge was compiled by whatever compiler was pinned.
+            // Overriding a version the app asked for would break whatever
+            // it wanted that compiler for, so say so instead.
+            String declaredPlugin =
+                    HealthManifestFragments.declaredKotlinPluginVersion(
+                            request.getArg("android.topDependency", ""));
+            if (declaredPlugin != null
+                    && compareVersions(declaredPlugin, kotlinFloor) < 0) {
+                error("This app declares kotlin-gradle-plugin "
+                        + declaredPlugin + " in android.topDependency, but "
+                        + "Health Connect needs Kotlin " + kotlinFloor
+                        + " or newer to compile the bridge. A plugin "
+                        + "declared there replaces the one this build would "
+                        + "otherwise add, so raise it to " + kotlinFloor
+                        + " or drop the declaration.",
+                        new RuntimeException("kotlin plugin below the "
+                                + "Health Connect floor"));
+            }
         }
 
         // Android Auto glue: when the app references com.codename1.car, copy the injected

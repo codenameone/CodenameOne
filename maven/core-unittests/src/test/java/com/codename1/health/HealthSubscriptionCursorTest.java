@@ -338,4 +338,63 @@ class HealthSubscriptionCursorTest extends UITestBase {
         assertTrue(drained.await(5, java.util.concurrent.TimeUnit.SECONDS),
                 "a drain must not wait on chunks that were never queued");
     }
+
+    /**
+     * Re-registering an id resumes from the persisted cursor.
+     *
+     * <p>The saved anchor reached `doSubscribe` alone, which neither
+     * mobile store overrides, while both drains read `sub.getAnchor()`.
+     * Replacing a listener -- or restoring a subscription at launch --
+     * therefore started the next drain from a fresh baseline and silently
+     * discarded every change accumulated since the last one.</p>
+     */
+    @Test
+    void replacingASubscriptionKeepsItsCursor() {
+        FakeHealthStore store = newStore();
+        SubscriptionRequest req = new SubscriptionRequest("resumed")
+                .addType(HealthDataType.STEPS);
+        Collector first = new Collector(1);
+        store.subscribe(req, first);
+        store.batchesToFire.add(new HealthChangeBatch("resumed",
+                req.getTypes(), samples(1), null, false,
+                HealthAnchor.of("cursor-1"), 0L, false));
+        store.drainChanges();
+        waitFor(first.latch, 5000);
+
+        HealthSubscription replaced = store.subscribe(req, new Collector(1));
+        assertNotNull(replaced.getAnchor(),
+                "a replacement must not start from a fresh baseline");
+        assertEquals("cursor-1", replaced.getAnchor().toStorableString());
+    }
+
+    /**
+     * Replacing a background subscription with an in-memory one drops the
+     * persisted binding.
+     *
+     * <p>Otherwise the next launch restores the old background listener
+     * class and delivers the replacement's changes to exactly the listener
+     * the app had replaced.</p>
+     */
+    @Test
+    void anInMemoryListenerClearsAStaleBackgroundBinding() {
+        FakeHealthStore store = newStore();
+        SubscriptionRequest req = new SubscriptionRequest("rebound")
+                .addType(HealthDataType.STEPS);
+        store.subscribe(req, TestBackgroundListener.class);
+        assertNotNull(com.codename1.io.Preferences.get(
+                "cn1$health$listener$rebound", null),
+                "the background binding is persisted");
+
+        store.subscribe(req, new Collector(1));
+        assertNull(com.codename1.io.Preferences.get(
+                "cn1$health$listener$rebound", null),
+                "an in-memory listener must not leave the old class bound");
+    }
+
+    /** A no-op background listener, only ever named. */
+    public static class TestBackgroundListener
+            implements HealthBackgroundListener {
+        public void healthDataChanged(HealthChangeBatch batch) {
+        }
+    }
 }

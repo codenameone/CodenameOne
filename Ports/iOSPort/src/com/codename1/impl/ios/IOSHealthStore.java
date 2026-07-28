@@ -351,15 +351,26 @@ class IOSHealthStore extends HealthStore {
     /// rather than past the samples that did not fit. The window is read
     /// oldest-first, so the last sample is the newest one delivered.
     ///
+    /// The resume point is that sample's **start**, not its end, because
+    /// start is what HealthKit sorted the page by. A steps interval
+    /// running 10:00-12:00 can be the last one returned while a record
+    /// starting at 10:30 sorts after it and did not fit; resuming at 12:00
+    /// would step straight over that record and lose it for good.
+    /// Resuming at the start re-reads the samples already delivered in
+    /// that final instant, which is the same duplicate-rather-than-skip
+    /// trade the drain makes everywhere else.
+    ///
     /// Never earlier than `since + 1`: a window whose very first sample
     /// overflows the limit would otherwise re-read the same page forever.
+    /// That floor can only bite when a whole page shares one timestamp,
+    /// and standing still is the worse failure.
     private static long advanceTo(long safeUntil, long since,
             SamplePage page) {
         if (page == null || !page.isTruncated() || page.isEmpty()) {
             return safeUntil;
         }
         List<HealthSample> samples = page.getSamples();
-        long last = samples.get(samples.size() - 1).getEndMillis();
+        long last = samples.get(samples.size() - 1).getStartMillis();
         if (last <= since) {
             last = since + 1;
         }

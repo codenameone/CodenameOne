@@ -355,4 +355,37 @@ class HealthManifestFragmentsTest {
         assertFalse(HealthManifestFragments.isReadCall(null));
         assertFalse(HealthManifestFragments.isWriteCall(null));
     }
+
+    /**
+     * A `kotlin-gradle-plugin` the app declares for itself is visible to
+     * the build.
+     *
+     * <p>The Gradle generator skips adding its own plugin line when
+     * `android.topDependency` already declares one, so raising
+     * `requireKotlinStdlib` to the Health Connect floor changed nothing
+     * and the bridge was compiled by whatever compiler the app pinned.
+     * The build has to read what was actually declared.</p>
+     */
+    @Test
+    void declaredKotlinPluginVersionIsReadFromTopDependency() {
+        assertEquals("1.7.22",
+                HealthManifestFragments.declaredKotlinPluginVersion(
+                        "classpath 'org.jetbrains.kotlin:"
+                        + "kotlin-gradle-plugin:1.7.22'\n"));
+        assertEquals("1.9.22",
+                HealthManifestFragments.declaredKotlinPluginVersion(
+                        "classpath \"org.jetbrains.kotlin:"
+                        + "kotlin-gradle-plugin:1.9.22\"\n"));
+        // The qualifier is dropped: the caller parses each segment as an
+        // int, so leaving it on would throw on a version that is fine.
+        assertEquals("2.0.0",
+                HealthManifestFragments.declaredKotlinPluginVersion(
+                        "classpath 'org.jetbrains.kotlin:"
+                        + "kotlin-gradle-plugin:2.0.0-Beta1'"));
+        // No declaration at all, so nothing to enforce against.
+        assertNull(HealthManifestFragments.declaredKotlinPluginVersion(
+                "classpath 'com.google.gms:google-services:4.3.15'"));
+        assertNull(HealthManifestFragments.declaredKotlinPluginVersion(""));
+        assertNull(HealthManifestFragments.declaredKotlinPluginVersion(null));
+    }
 }
