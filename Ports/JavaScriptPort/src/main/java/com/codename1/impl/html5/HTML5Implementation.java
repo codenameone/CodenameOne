@@ -7558,17 +7558,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // rule as the javascript: payload and the storage key -- normalize
             // what the browser parses, never what it carries.
             registerSaveBlobHandlerDataUrl(fileName == null ? "download":fileName, rawUrl);
-            // A handler is registered now, exactly as in the Blob case, so the
-            // download path below must FIRE it. Leaving this false sent the
-            // confirmed OK to window.open() on the data: URL instead -- a tab
-            // rather than the download the Sheet advertised, and nothing at all
-            // where the browser blocks top-level data: navigation.
-            useBlobHandler = true;
-            //popover.setContents("<button style='white-space:nowrap' onclick='window.cn1SaveBlobHandler();'><span style='font-size:3em;vertical-align:text-bottom;' class='glyphicon glyphicon-download; font-size: '/><span style='font-size:2em;vertical-align:top;'> Download "+(fileName!=null?fileName:"File")+"</span></button>");
-            buttonText = "Click to Download "+(fileName!=null?fileName:"File");
-            nativeButton.setText(buttonText);
-            nativeButton.setMaterialIcon(FontImage.MATERIAL_SAVE);
-            //icon = "save-file";
+            // Registration IS the download: browser_bridge.js's
+            // __cn1_register_save_blob_dataurl__ clicks the anchor immediately
+            // and only stashes a copy in case that click was blocked. So return
+            // here. Firing the stash as well downloads the file twice, and the
+            // old behavior of falling through to window.open() on the data: URL
+            // opened a spurious tab the browser then blocked. Nothing further
+            // to do on this path.
+            _log("execute(): data: URL handed to the download handler");
+            return;
         } else if (isExternalUrl(url)) {
             // Reached only by URLs the data: branch above did not claim.
             // isExternalUrl() is true for data: as well -- it does carry a
