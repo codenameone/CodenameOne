@@ -627,13 +627,9 @@ public class OsrmRouteService implements RouteService {
                 return;
             }
             detach();
-            if (delivered) {
-                // The common case: `postResponse` is queued onto the EDT ahead
-                // of this event, so a real result has already landed and there
-                // is nothing to back up. Checking here keeps the success path
-                // free of a pointless second hop.
-                return;
-            }
+            // failLater claims first and returns immediately when the delivery
+            // is already spoken for, so the common case -- a real result
+            // already landed or is queued -- costs nothing here.
             failLater("The routing request ended without a result", null);
         }
 
@@ -684,31 +680,49 @@ public class OsrmRouteService implements RouteService {
             NetworkManager.getInstance().removeProgressListener(this);
         }
 
-        private void deliverRoutes() {
+        /// Takes ownership of the single delivery, returning true for exactly
+        /// one caller. Claiming is separate from delivering so an outcome that
+        /// still has to hop to the EDT can stake its claim *now*: otherwise the
+        /// backstop, which also runs on the EDT, could slip its generic
+        /// "ended without a result" in ahead of the real reason while that hop
+        /// was still queued.
+        private synchronized boolean claim() {
             if (delivered) {
-                return;
+                return false;
             }
             delivered = true;
+            return true;
+        }
+
+        private void deliverRoutes() {
+            if (!claim()) {
+                return;
+            }
             detach();
             callback.routesFound(routes);
         }
 
         private void deliverFailure(String message, Throwable err) {
-            if (delivered) {
+            if (!claim()) {
                 return;
             }
-            delivered = true;
             detach();
             callback.routeFailed(message, err);
         }
 
         /// Both network failure hooks run on the network thread, so the
         /// callback contract (always the EDT) is honored by hopping over.
+        /// The claim is taken before the hop, not inside it, so nothing can
+        /// deliver a different outcome while this one is still queued.
         private void failLater(final String message, final Throwable err) {
+            if (!claim()) {
+                return;
+            }
+            detach();
             CN.callSerially(new Runnable() {
                 @Override
                 public void run() {
-                    deliverFailure(message, err);
+                    callback.routeFailed(message, err);
                 }
             });
         }

@@ -143,22 +143,42 @@ static CN1AppleMap *cn1MapFor(int mapId) {
     return [cn1AppleMaps() objectForKey:[NSNumber numberWithInt:mapId]];
 }
 
-static float spanToZoom(double lonDelta) {
+// MapSurface documents zoom as the standard slippy-map scale, where a level
+// spans 256 points and the visible degrees therefore depend on how wide the
+// view is. MapKit works in a degree span instead, so the two conversions below
+// have to bring the viewport width into it. The earlier 360/2^zoom form
+// ignored the view entirely, which made a zoom mean one thing here and another
+// on every other provider -- and made a fitted region come out too small, so
+// bounds the caller asked to frame ended up clipped.
+static double cn1MapWidthPoints(CN1AppleMap *m) {
+    // Before the view is laid out there is no width to reason about; 256 makes
+    // the formulas degenerate to the historical behavior rather than divide by
+    // zero.
+    if (m == nil || m.mapView == nil) {
+        return 256.0;
+    }
+    double w = m.mapView.bounds.size.width;
+    return w > 0 ? w : 256.0;
+}
+
+static float spanToZoom(double lonDelta, double widthPoints) {
     if (lonDelta <= 0) {
         return 0;
     }
-    return (float)(log(360.0 / lonDelta) / log(2.0));
+    return (float)(log(360.0 * widthPoints / (256.0 * lonDelta)) / log(2.0));
 }
 
-static double zoomToSpan(float zoom) {
-    return 360.0 / pow(2.0, zoom);
+static double zoomToSpan(float zoom, double widthPoints) {
+    return 360.0 * widthPoints / (256.0 * pow(2.0, zoom));
 }
 
 JAVA_LONG com_codename1_maps_MapProviderImpl_nativeCreate___int_double_double_float_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon, JAVA_FLOAT zoom) {
     __block CN1AppleMap *m = nil;
-    double span = zoomToSpan((float)zoom);
     void (^createBlock)(void) = ^{
         m = [[CN1AppleMap alloc] initWithMapId:(int)mapId];
+        // Resolved after the view exists so its width can be used when it
+        // already has one.
+        double span = zoomToSpan((float)zoom, cn1MapWidthPoints(m));
         MKCoordinateRegion region = MKCoordinateRegionMake(
             CLLocationCoordinate2DMake(lat, lon), MKCoordinateSpanMake(span, span));
         [m.mapView setRegion:region animated:NO];
@@ -182,8 +202,10 @@ void com_codename1_maps_MapProviderImpl_nativeDeinit___int(CN1_THREAD_STATE_MULT
 void com_codename1_maps_MapProviderImpl_nativeSetCamera___int_double_double_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon, JAVA_FLOAT zoom) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
     if (!m) { return; }
-    double span = zoomToSpan((float)zoom);
     dispatch_async(dispatch_get_main_queue(), ^{
+        // The view's width is only safe to read on the main thread, and it is
+        // needed to turn a slippy zoom into a MapKit span.
+        double span = zoomToSpan((float)zoom, cn1MapWidthPoints(m));
         MKCoordinateRegion region = MKCoordinateRegionMake(
             CLLocationCoordinate2DMake(lat, lon), MKCoordinateSpanMake(span, span));
         [m.mapView setRegion:region animated:YES];
@@ -202,7 +224,7 @@ JAVA_DOUBLE com_codename1_maps_MapProviderImpl_nativeGetLon___int_R_double(CN1_T
 
 JAVA_FLOAT com_codename1_maps_MapProviderImpl_nativeGetZoom___int_R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
-    return m ? spanToZoom(m.mapView.region.span.longitudeDelta) : 0;
+    return m ? spanToZoom(m.mapView.region.span.longitudeDelta, cn1MapWidthPoints(m)) : 0;
 }
 
 JAVA_LONG com_codename1_maps_MapProviderImpl_nativeAddMarker___int_double_double_java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon, JAVA_OBJECT title) {
