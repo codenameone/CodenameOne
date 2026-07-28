@@ -28,6 +28,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -113,5 +114,30 @@ public class HealthScannerParityTest {
                     && after.contains("usesHealthWrite"),
                     builder + " must set both directions at getWorkouts");
         }
+    }
+
+    /**
+     * Naming a store type is not using it, so the class-name branch must
+     * not set {@code usesHealthData} -- that flag is what demands
+     * {@code android.health.read}/{@code write} hints and fails the build
+     * without them.
+     *
+     * <p>This is a twin-drift guard rather than a rule the reviewer
+     * questioned: the BuildDaemon copy of this scanner had already been
+     * corrected while the plugin copy still set the flag here, so the same
+     * app built locally demanded hints that the cloud build did not. The
+     * flag belongs on the real read and write calls, which the
+     * {@code usesClassMethod} hook sees.</p>
+     */
+    @Test
+    void namingAStoreTypeDoesNotDemandDirectionHints() throws Exception {
+        String src = source("AndroidGradleBuilder");
+        int at = src.indexOf("!isSharedHealthModel(cls)");
+        assertTrue(at > 0, "the class-name branch must still be there");
+        String branch = src.substring(at,
+                Math.min(src.length(), at + 200));
+        assertFalse(branch.contains("usesHealthData"),
+                "the class-name branch must not set usesHealthData; it is"
+                        + " set by the read and write call hooks");
     }
 }

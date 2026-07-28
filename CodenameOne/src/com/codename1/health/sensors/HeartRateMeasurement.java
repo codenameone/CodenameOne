@@ -111,6 +111,14 @@ public final class HeartRateMeasurement {
         int[] rr;
         if ((flags & FLAG_RR_INTERVALS) != 0) {
             // The count is not transmitted: whatever remains is RR data.
+            // An odd remainder is a truncated notification, not a run of
+            // pairs with a spare byte. Rounding down accepted the packet
+            // and silently dropped half an interval -- which this parser
+            // exists to feed into an HRV calculation, where a missing beat
+            // interval is not a rounding error.
+            if ((r.remaining() & 1) != 0) {
+                return null;
+            }
             int count = r.remaining() / 2;
             rr = new int[count];
             for (int i = 0; i < count; i++) {

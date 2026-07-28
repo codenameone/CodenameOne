@@ -617,29 +617,27 @@ class AndroidHealthStore extends HealthStore {
             // The cursor is dropped by the shared delivery path once the
             // listener has actually been told to resynchronise; doing it
             // here would lose the expired token to a listener that threw.
-            boolean sent = fireChanges(new HealthChangeBatch(sub.getId(),
+            int sent = fireChanges(new HealthChangeBatch(sub.getId(),
                     sub.getTypes(), null, null, true, null, Long.MAX_VALUE,
                     false));
-            drainFrom(subs, index + 1, sent ? delivered + 1 : delivered,
-                    out);
+            drainFrom(subs, index + 1, delivered + sent, out);
         }
 
         void deliver(String payload) {
             int count = delivered;
             HealthSubscription sub = subs.get(index);
             if (baseline) {
-                if (fireChanges(new HealthChangeBatch(sub.getId(),
+                // Counted per delivery a listener actually received: a
+                // subscription restored with no live listener and no
+                // persisted class queues nothing, and a page split by the
+                // per-batch cap arrives as several deliveries, which is
+                // what drainChanges reports.
+                count += fireChanges(new HealthChangeBatch(sub.getId(),
                         sub.getTypes(), null, null, false,
                         // Foreground: no OS deadline. Reporting 0 made a listener
                         // that budgets against getDeadlineMillis() treat every
                         // ordinary drain as already out of time.
-                        HealthAnchor.of(payload.trim()), Long.MAX_VALUE, false))) {
-                    // Counted only when a listener actually received it: a
-                    // subscription restored with no live listener and no
-                    // persisted class queues nothing, and a drain reporting
-                    // batches nobody got reads as handled.
-                    count++;
-                }
+                        HealthAnchor.of(payload.trim()), Long.MAX_VALUE, false));
             } else {
                 HealthChangePage page =
                         HealthWire.decodeChangePage(payload);
@@ -649,16 +647,14 @@ class AndroidHealthStore extends HealthStore {
                     drainFrom(subs, index + 1, count, out);
                     return;
                 }
-                if (fireChanges(new HealthChangeBatch(sub.getId(),
+                count += fireChanges(new HealthChangeBatch(sub.getId(),
                         sub.getTypes(), page.getAdded(),
                         page.getDeletedIds(), page.isExpired(),
                         // Foreground: no OS deadline. Reporting 0 made a listener
                         // that budgets against getDeadlineMillis() treat every
                         // ordinary drain as already out of time.
                         HealthAnchor.of(page.getNextToken()), Long.MAX_VALUE,
-                        page.hasMore()))) {
-                    count++;
-                }
+                        page.hasMore()));
             }
             drainFrom(subs, index + 1, count, out);
         }
@@ -689,15 +685,15 @@ class AndroidHealthStore extends HealthStore {
     /// Named rather than anonymous so it carries no synthetic reference
     /// (SpotBugs `SIC_INNER_SHOULD_BE_STATIC_ANON`).
     private static final class ResyncOne implements Runnable {
-        private final ChangeRead read;
+        private final DrainStep step;
 
-        ResyncOne(ChangeRead read) {
-            this.read = read;
+        ResyncOne(DrainStep step) {
+            this.step = step;
         }
 
         @Override
         public void run() {
-            read.resync();
+            step.resync();
         }
     }
 

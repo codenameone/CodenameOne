@@ -23,6 +23,7 @@
 package com.codename1.health;
 
 import com.codename1.junit.UITestBase;
+import com.codename1.util.AsyncResource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -141,6 +142,34 @@ class HealthSubscriptionCursorTest extends UITestBase {
                 "exactly one batch may advance the cursor");
         assertNotNull(listener.anchors.get(listener.anchors.size() - 1),
                 "and it must be the last one");
+    }
+
+    /**
+     * `drainChanges` resolves with the number of batches the listener
+     * received, so a capped page counts once per delivery.
+     *
+     * <p>It used to count once per page handed to `fireChanges`, which
+     * meant three callbacks were reported as one -- the one number a
+     * caller has to reconcile against what its own listener saw.</p>
+     */
+    @Test
+    void theDrainCountMatchesTheDeliveriesTheListenerSaw() {
+        FakeHealthStore store = newStore();
+        Collector listener = new Collector(3);
+        SubscriptionRequest req = new SubscriptionRequest("cap-count")
+                .addType(HealthDataType.STEPS)
+                .setMaxSamplesPerBatch(2);
+        store.subscribe(req, listener);
+
+        store.batchesToFire.add(new HealthChangeBatch("cap-count",
+                req.getTypes(), samples(5), null, false,
+                HealthAnchor.of("cursor-after-page"), 0L, false));
+        AsyncResource<Integer> drained = store.drainChanges();
+        waitFor(listener.latch, 5000);
+
+        assertEquals(3, listener.batches);
+        assertEquals(Integer.valueOf(3), drained.get(),
+                "the drain must report what the listener actually got");
     }
 
     /** An uncapped batch is delivered as one, carrying its anchor. */

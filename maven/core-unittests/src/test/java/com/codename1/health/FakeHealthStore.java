@@ -126,8 +126,12 @@ public class FakeHealthStore extends HealthStore {
         }
         int n = 0;
         for (HealthChangeBatch b : batchesToFire) {
-            fireChanges(b);
-            n++;
+            // Per delivery queued, not per batch handed in: the shared
+            // layer splits a batch over the subscription's cap, and
+            // drainChanges is documented as a count of batches the
+            // listener received. Counting the input here made the fake
+            // disagree with both real ports.
+            n += fireChanges(b);
         }
         batchesToFire.clear();
         out.complete(Integer.valueOf(n));

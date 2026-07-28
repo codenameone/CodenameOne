@@ -324,13 +324,32 @@ final class BleSensorSession extends SensorSession {
             failReconnect(wrapped);
             return;
         }
-        setState(SensorSessionState.FAILED);
-        forgetFromManager();
+        endSession();
         if (out != null) {
             out.error(wrapped);
         } else {
             fireError(wrapped);
         }
+    }
+
+    /// Terminal teardown for a session that has failed.
+    ///
+    /// Every step matters and each was missing at some point. The listener
+    /// goes first so the disconnect below is not mistaken for a dropped
+    /// link and retried. The link is dropped because a failure after a
+    /// successful connect -- discovery or subscribe, on the first attempt
+    /// or the last reconnect -- otherwise left a live, unusable connection
+    /// and a registered listener behind a handle the caller had been told
+    /// was finished, with nothing but an explicit `stop()` to reclaim
+    /// them.
+    private void endSession() {
+        if (reconnectListener != null) {
+            peripheral.removeConnectionListener(reconnectListener);
+            reconnectListener = null;
+        }
+        setState(SensorSessionState.FAILED);
+        forgetFromManager();
+        peripheral.disconnect();
     }
 
     private HealthException wrapStartFailure(Throwable err) {
@@ -356,8 +375,7 @@ final class BleSensorSession extends SensorSession {
     private void failReconnect(HealthException wrapped) {
         reconnectFailures++;
         if (reconnectFailures >= MAX_RECONNECT_FAILURES) {
-            setState(SensorSessionState.FAILED);
-            forgetFromManager();
+            endSession();
             fireError(wrapped);
             return;
         }

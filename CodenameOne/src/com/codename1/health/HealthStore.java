@@ -1709,9 +1709,18 @@ public class HealthStore {
     /// ordering means a crash inside a listener costs one redelivered
     /// batch rather than losing the data permanently -- the opposite
     /// ordering would advance past data the app never actually processed.
-    protected final boolean fireChanges(final HealthChangeBatch batch) {
+    ///
+    /// #### Returns
+    ///
+    /// How many deliveries were queued -- `0` when nothing was, and more
+    /// than one when the subscription's per-batch cap split the page.
+    /// Ports add this to the count they resolve `drainChanges` with, which
+    /// is documented as a number of batches: returning a yes/no counted a
+    /// page of 250 additions capped at 100 as one batch while the listener
+    /// was called three times.
+    protected final int fireChanges(final HealthChangeBatch batch) {
         if (batch == null) {
-            return false;
+            return 0;
         }
         final String id = batch.getSubscriptionId();
         HealthChangeListener live;
@@ -1721,7 +1730,7 @@ public class HealthStore {
             sub = subscriptions.get(id);
         }
         if (sub == null) {
-            return false;
+            return 0;
         }
         final HealthChangeListener target = live != null ? live
                 : resolveBackgroundListener(id);
@@ -1730,7 +1739,7 @@ public class HealthStore {
             // relaunch with no live listener and no persisted class. The
             // caller counts what it delivers, and a drain reporting
             // batches nobody received reads as handled when it was not.
-            return false;
+            return 0;
         }
         final HealthSubscription subscription = sub;
         // A cap splits the batch into successive deliveries rather than
@@ -1750,7 +1759,7 @@ public class HealthStore {
         Display.getInstance().callSerially(
                 makeDeliveryRunnable(this, target, chunks, 0,
                         subscription));
-        return true;
+        return chunks.size();
     }
 
     /// Built in a static method so the `Runnable` carries no synthetic

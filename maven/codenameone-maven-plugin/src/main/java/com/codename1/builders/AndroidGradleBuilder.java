@@ -1579,7 +1579,6 @@ public class AndroidGradleBuilder extends Executor {
                                 && !"com/codename1/health/Health".equals(cls)
                                 && !isSharedHealthModel(cls)) {
                             usesHealthStore = true;
-                            usesHealthData = true;
                         }
                         if (cls.indexOf("com/codename1/health/workout/") == 0) {
                             usesHealthWorkout = true;

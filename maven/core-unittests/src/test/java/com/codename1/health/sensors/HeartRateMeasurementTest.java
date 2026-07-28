@@ -195,13 +195,27 @@ class HeartRateMeasurementTest {
     }
 
     /**
-     * An odd trailing byte in the RR region is dropped rather than read past
-     * the end of the array.
+     * An odd trailing byte in the RR region is a truncated notification,
+     * not a run of pairs with a spare byte.
+     *
+     * <p>This used to be accepted with the byte dropped, on the reasoning
+     * that not reading past the array was enough. It is not: the intervals
+     * this parser exists to expose feed an HRV calculation, and half a
+     * beat interval silently discarded is a wrong answer rather than a
+     * rounding error. Truncated payloads return null, which is what the
+     * rest of the parser already promises.</p>
      */
     @Test
-    void oddTrailingByteInRrRegionIsIgnoredSafely() {
+    void oddTrailingByteInRrRegionIsATruncatedPayload() {
+        assertNull(HeartRateMeasurement.parse(
+                new byte[] { 0x10, 60, 0x00, 0x04, 0x11 }));
+    }
+
+    /** The same payload without the spare byte still decodes. */
+    @Test
+    void completeRrPairsStillDecode() {
         HeartRateMeasurement m = HeartRateMeasurement.parse(
-                new byte[] { 0x10, 60, 0x00, 0x04, 0x11 });
+                new byte[] { 0x10, 60, 0x00, 0x04 });
         assertNotNull(m);
         assertEquals(1, m.getRrIntervalCount());
         assertEquals(1000.0, m.getRrIntervalMillis(0), 1e-6);

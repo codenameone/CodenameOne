@@ -77,20 +77,51 @@ import java.util.List;
 ///
 /// #### Threading
 ///
-/// Every method may be called from the EDT and returns immediately; every
-/// callback is delivered on the EDT. The one qualification is
-/// [HealthBackgroundListener], which may run with no visible UI after the
-/// OS relaunched your app in the background.
+/// Every method may be called from the EDT and returns immediately.
+///
+/// Change deliveries -- [HealthChangeListener] and
+/// [HealthBackgroundListener] -- always arrive on the EDT. A background
+/// delivery may run with no visible UI, after the OS relaunched your app.
+///
+/// **Results of the operations you start do not carry that guarantee.**
+/// They arrive on whichever thread produced the answer: the platform SDK's
+/// callback thread on iOS and Android, and on desktop, the simulator and
+/// JavaScript -- where the store is local rather than platform-backed --
+/// the very thread that made the call. So a query started off the EDT can
+/// resolve off the EDT. Touch components from those callbacks through
+/// `Display.getInstance().callSerially(...)`, or start the operation from
+/// the EDT in the first place, which is the usual case and where the
+/// distinction never arises.
 ///
 /// #### Platform support
 ///
-/// - **iOS / watchOS** -- HealthKit, including background delivery and
-///   (on watchOS, and on iOS 26 and later) live workout sessions. Requires
-///   the HealthKit entitlement and privacy usage strings; the build fails
-///   with an actionable message if they are missing.
-/// - **Android** -- Health Connect, including exercise sessions. Requires
-///   the provider app, a privacy-policy declaration and per-type
-///   permissions declared through build hints.
+/// - **iOS / watchOS** -- HealthKit. Requires the HealthKit entitlement
+///   and privacy usage strings; the build fails with an actionable message
+///   if they are missing.
+/// - **Android** -- Health Connect. Requires the provider app, a
+///   privacy-policy declaration and per-type permissions declared through
+///   build hints.
+///
+/// Two capabilities are deliberately **not** claimed by either mobile
+/// store in this release, and both stores answer `false` rather than
+/// pretending:
+///
+/// - **Background delivery.** Nothing relaunches or wakes your app for
+///   new data on either platform, so subscriptions deliver when you call
+///   [HealthStore#drainChanges()] and at no other time. Wire that into
+///   your foreground path, or into `BackgroundFetch`. Ask
+///   [HealthStore#isBackgroundDeliverySupported()] rather than assuming;
+///   HealthKit's `HKObserverQuery` would change this answer on iOS, and
+///   nothing here registers one yet.
+/// - **Live workout sessions.** Workouts are recorded rather than
+///   OS-owned everywhere: your app feeds samples in and the session is
+///   written on `end()`. This is what Google documents for Android
+///   phones, and it is what iOS does here too even though `HKWorkoutSession`
+///   exists on watchOS and iOS 26. Check
+///   [com.codename1.health.workout.WorkoutManager#isLiveSessionSupported()]
+///   and
+///   [com.codename1.health.workout.WorkoutManager#isSensorCollectionSupported()]
+///   before designing around either.
 /// - **JavaSE simulator** -- a scriptable virtual health store
 ///   (Simulate -> Health Simulation) with synthetic data, permission
 ///   scripting and fault injection.
