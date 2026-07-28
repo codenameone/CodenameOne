@@ -6770,6 +6770,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
+     * Severs {@code window.opener} on a window we just opened, so the page in
+     * it cannot navigate the app's own page (reverse tabnabbing).
+     *
+     * <p>Deliberately not the {@code noopener} window feature: that makes
+     * {@code window.open()} return null in every browser, which would destroy
+     * the only signal available for telling a blocked popup from a successful
+     * one. Clearing the property gets the same protection while keeping the
+     * handle. Wrapped, since the assignment can throw once the new window has
+     * navigated cross-origin.</p>
+     */
+    private static final String SEVER_OPENER = "try { cn1w.opener = null; } catch (e) {}";
+
+    /**
      * Hands a URL to the page's main thread for opening. {@code window} and
      * {@code window.open} do not exist inside the Web Worker the app runs in, so
      * this routes through the eval-on-main host bridge (see the
@@ -6807,13 +6820,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             script = guard
                     + "var cn1a = window.navigator && window.navigator.userActivation;"
                     + "var cn1w = (!cn1a || cn1a.isActive) ? window.open(" + literal + ", '_blank') : null;"
-                    + "if (!cn1w) { window.location.href = " + literal + "; }";
+                    + "if (!cn1w) { window.location.href = " + literal + "; } else { " + SEVER_OPENER + " }";
         } else {
             // Report a blocked popup instead of returning as if it opened. The
             // page-side null is the only evidence available -- there is no
             // callback -- so turn it into a throw the host call propagates.
             script = guard + "var cn1w = window.open(" + literal + ", '_blank');"
-                    + "if (!cn1w) { throw new Error('cn1: popup blocked'); }";
+                    + "if (!cn1w) { throw new Error('cn1: popup blocked'); }"
+                    + SEVER_OPENER;
         }
         try {
             eval_(script);
@@ -7028,6 +7042,40 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private int popupReservedForGeneration = -1;
 
     /**
+     * Applies the cleanup a browser performs before it parses a URL: strip
+     * leading and trailing C0 controls and spaces, then remove every tab and
+     * newline wherever they appear.
+     *
+     * <p>Applied once at the top of {@link #execute(String)} so classification,
+     * the confirmation Sheet's display and the URL actually handed to the page
+     * all see the same string. Parsing the raw input separately in each place is
+     * what let " https:host@evil.example/" be classified and displayed off a
+     * scheme of {@code " https"} while the browser navigated to
+     * {@code evil.example}.</p>
+     */
+    static String normalizeUrlForParsing(String url) {
+        if (url == null) {
+            return null;
+        }
+        int start = 0;
+        int end = url.length();
+        while (start < end && url.charAt(start) <= ' ') {
+            start++;
+        }
+        while (end > start && url.charAt(end - 1) <= ' ') {
+            end--;
+        }
+        StringBuilder sb = new StringBuilder(end - start);
+        for (int i = start; i < end; i++) {
+            char c = url.charAt(i);
+            if (c != '\t' && c != '\n' && c != '\r') {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
      * True when {@code url} carries exactly {@code scheme}, compared without
      * regard to case since URI schemes are case-insensitive. Guards the
      * {@code javascript:} and {@code data:} branches of {@link #execute(String)},
@@ -7183,7 +7231,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
-    public void execute(String url) {
+    public void execute(String rawUrl) {
+        // Everything below -- classification, the Sheet's display, and the
+        // string handed to the page -- works from this one normalized form.
+        final String url = normalizeUrlForParsing(rawUrl);
         if (hasScheme(url, "javascript")) {
             String cmd = url.substring(url.indexOf(":")+1);
             eval_(cmd);
@@ -7193,10 +7244,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         String fileName = null;
         boolean useBlobHandler = false;
         Button nativeButton = new Button();
-        // Only a local path can name storage content to wrap in a Blob.
-        // isExternalUrl() is false for exactly those, and true for everything
-        // with a scheme -- data: included, which carries its own payload and is
-        // claimed by its own branch further down.
+        // Only local content can name storage to wrap in a Blob, which is
+        // what isExternalUrl() is false for: bare paths, and file: URLs, whose
+        // scheme names local content too. Everything else with a scheme is
+        // true, data: included -- that carries its own payload and is claimed
+        // by its own branch further down.
         if (!isExternalUrl(url)) {
             if (exists(url)) {
                 try {
