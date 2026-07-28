@@ -251,7 +251,15 @@ public final class Routing {
                     routeFailed("The routing service returned no route", null);
                     return;
                 }
-                Route best = (Route) routes.get(0);
+                Object first = routes.get(0);
+                if (!(first instanceof Route)) {
+                    // Same reasoning as the empty case: a service that hands
+                    // back null or something that isn't a Route shouldn't
+                    // surface as an NPE or a ClassCastException on the EDT.
+                    routeFailed("The routing service returned something that is not a route", null);
+                    return;
+                }
+                Route best = (Route) first;
                 map.addPolyline(best.toPolyline());
                 if (best.getBounds() != null) {
                     map.fitBounds(best.getBounds(), CN.convertToPixels(4));

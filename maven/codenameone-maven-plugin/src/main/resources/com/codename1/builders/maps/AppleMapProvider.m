@@ -195,9 +195,21 @@ static double zoomToSpan(float zoom, double widthPoints) {
     return 360.0 * widthPoints / (256.0 * pow(2.0, zoom));
 }
 
+// MKMapView state (bounds, region, centerCoordinate) may only be read on the
+// main thread. The Codename One iOS EDT runs on the main thread, so most calls
+// arrive there already and a dispatch_sync would deadlock; only marshal when
+// the caller really is on a background thread.
+static void cn1RunOnMain(void (^block)(void)) {
+    if ([NSThread isMainThread]) {
+        block();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), block);
+    }
+}
+
 JAVA_LONG com_codename1_maps_MapProviderImpl_nativeCreate___int_double_double_float_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon, JAVA_FLOAT zoom) {
     __block CN1AppleMap *m = nil;
-    void (^createBlock)(void) = ^{
+    cn1RunOnMain(^{
         m = [[CN1AppleMap alloc] initWithMapId:(int)mapId];
         // Resolved after the view exists so its width can be used when it
         // already has one.
@@ -206,15 +218,7 @@ JAVA_LONG com_codename1_maps_MapProviderImpl_nativeCreate___int_double_double_fl
             CLLocationCoordinate2DMake(lat, lon), MKCoordinateSpanMake(span, span));
         [m.mapView setRegion:region animated:NO];
         [cn1AppleMaps() setObject:m forKey:[NSNumber numberWithInt:(int)mapId]];
-    };
-    // The Codename One iOS EDT runs on the main thread, so a dispatch_sync to
-    // the main queue from here would deadlock. Create inline when already on
-    // the main thread; only marshal when invoked from a background thread.
-    if ([NSThread isMainThread]) {
-        createBlock();
-    } else {
-        dispatch_sync(dispatch_get_main_queue(), createBlock);
-    }
+    });
     return (JAVA_LONG)((BRIDGE_CAST void*)m.mapView);
 }
 
@@ -237,17 +241,30 @@ void com_codename1_maps_MapProviderImpl_nativeSetCamera___int_double_double_floa
 
 JAVA_DOUBLE com_codename1_maps_MapProviderImpl_nativeGetLat___int_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
-    return m ? m.mapView.centerCoordinate.latitude : 0;
+    if (!m) { return 0; }
+    __block double lat = 0;
+    cn1RunOnMain(^{ lat = m.mapView.centerCoordinate.latitude; });
+    return lat;
 }
 
 JAVA_DOUBLE com_codename1_maps_MapProviderImpl_nativeGetLon___int_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
-    return m ? m.mapView.centerCoordinate.longitude : 0;
+    if (!m) { return 0; }
+    __block double lon = 0;
+    cn1RunOnMain(^{ lon = m.mapView.centerCoordinate.longitude; });
+    return lon;
 }
 
 JAVA_FLOAT com_codename1_maps_MapProviderImpl_nativeGetZoom___int_R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
-    return m ? spanToZoom(m.mapView.region.span.longitudeDelta, cn1MapWidthPoints(m)) : 0;
+    if (!m) { return 0; }
+    // The span and the width have to come from the same main-thread read, or
+    // a resize between them would convert one region against another's width.
+    __block float zoom = 0;
+    cn1RunOnMain(^{
+        zoom = spanToZoom(m.mapView.region.span.longitudeDelta, cn1MapWidthPoints(m));
+    });
+    return zoom;
 }
 
 JAVA_LONG com_codename1_maps_MapProviderImpl_nativeAddMarker___int_double_double_java_lang_String_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon, JAVA_OBJECT title) {
@@ -339,28 +356,40 @@ void com_codename1_maps_MapProviderImpl_nativeRemoveAll___int(CN1_THREAD_STATE_M
 JAVA_INT com_codename1_maps_MapProviderImpl_nativeScreenX___int_double_double_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
     if (!m) { return 0; }
-    CGPoint p = [m.mapView convertCoordinate:CLLocationCoordinate2DMake(lat, lon) toPointToView:m.mapView];
+    __block CGPoint p = CGPointZero;
+    cn1RunOnMain(^{
+        p = [m.mapView convertCoordinate:CLLocationCoordinate2DMake(lat, lon) toPointToView:m.mapView];
+    });
     return (JAVA_INT)p.x;
 }
 
 JAVA_INT com_codename1_maps_MapProviderImpl_nativeScreenY___int_double_double_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_DOUBLE lat, JAVA_DOUBLE lon) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
     if (!m) { return 0; }
-    CGPoint p = [m.mapView convertCoordinate:CLLocationCoordinate2DMake(lat, lon) toPointToView:m.mapView];
+    __block CGPoint p = CGPointZero;
+    cn1RunOnMain(^{
+        p = [m.mapView convertCoordinate:CLLocationCoordinate2DMake(lat, lon) toPointToView:m.mapView];
+    });
     return (JAVA_INT)p.y;
 }
 
 JAVA_DOUBLE com_codename1_maps_MapProviderImpl_nativeLat___int_int_int_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_INT x, JAVA_INT y) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
     if (!m) { return 0; }
-    CLLocationCoordinate2D c = [m.mapView convertPoint:CGPointMake(x, y) toCoordinateFromView:m.mapView];
+    __block CLLocationCoordinate2D c = CLLocationCoordinate2DMake(0, 0);
+    cn1RunOnMain(^{
+        c = [m.mapView convertPoint:CGPointMake(x, y) toCoordinateFromView:m.mapView];
+    });
     return c.latitude;
 }
 
 JAVA_DOUBLE com_codename1_maps_MapProviderImpl_nativeLon___int_int_int_R_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT mapId, JAVA_INT x, JAVA_INT y) {
     CN1AppleMap *m = cn1MapFor((int)mapId);
     if (!m) { return 0; }
-    CLLocationCoordinate2D c = [m.mapView convertPoint:CGPointMake(x, y) toCoordinateFromView:m.mapView];
+    __block CLLocationCoordinate2D c = CLLocationCoordinate2DMake(0, 0);
+    cn1RunOnMain(^{
+        c = [m.mapView convertPoint:CGPointMake(x, y) toCoordinateFromView:m.mapView];
+    });
     return c.longitude;
 }
 

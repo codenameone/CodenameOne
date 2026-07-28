@@ -32,9 +32,19 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.codename1.maps.CameraChangeListener;
+import com.codename1.maps.CameraPosition;
+import com.codename1.maps.Circle;
 import com.codename1.maps.LatLng;
 import com.codename1.maps.MapBounds;
+import com.codename1.maps.MapSurface;
+import com.codename1.maps.MapTapListener;
+import com.codename1.maps.Marker;
+import com.codename1.maps.MarkerOptions;
+import com.codename1.maps.Polygon;
 import com.codename1.maps.Polyline;
+import com.codename1.ui.Component;
+import com.codename1.ui.geom.Point;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -417,6 +427,33 @@ class MapsRoutingTest {
     }
 
     @Test
+    void showRouteReportsFailureWhenTheRouteListHoldsANull() {
+        // A nonempty list is not the same as a usable one. The facade guards
+        // null and empty lists; a null element has to fail the same way rather
+        // than surface as an NPE on the EDT with nothing reported to the app.
+        Routing.setService(new MalformedListService(null));
+        RecordingMap map = new RecordingMap();
+        CountingCallback counts = new CountingCallback();
+        Routing.showRoute(map, new RouteRequest(new LatLng(1, 2), new LatLng(3, 4)), counts);
+        assertEquals(1, counts.failures);
+        assertEquals(0, counts.successes);
+        assertEquals(0, map.polylines, "nothing should have been drawn");
+    }
+
+    @Test
+    void showRouteReportsFailureWhenTheRouteListHoldsSomethingElse() {
+        // Same guard, the ClassCastException half: the list is raw, so a
+        // service can put anything in it.
+        Routing.setService(new MalformedListService("route"));
+        RecordingMap map = new RecordingMap();
+        CountingCallback counts = new CountingCallback();
+        Routing.showRoute(map, new RouteRequest(new LatLng(1, 2), new LatLng(3, 4)), counts);
+        assertEquals(1, counts.failures);
+        assertEquals(0, counts.successes);
+        assertEquals(0, map.polylines, "nothing should have been drawn");
+    }
+
+    @Test
     void settingANullServiceRestoresTheDefault() {
         Routing.setService(new RecordingService());
         Routing.setService(null);
@@ -534,6 +571,181 @@ class MapsRoutingTest {
         public void findRoutes(RouteRequest request, RouteCallback cb) {
             lastRequest = request;
             cb.routesFound(new ArrayList());
+        }
+    }
+
+    /** A service that reports a nonempty list whose contents break the contract. */
+    private static final class MalformedListService implements RouteService {
+
+        private final Object element;
+
+        MalformedListService(Object element) {
+            this.element = element;
+        }
+
+        @Override
+        public String getId() {
+            return "malformed";
+        }
+
+        @Override
+        public boolean isAvailable() {
+            return true;
+        }
+
+        @Override
+        public void findRoutes(RouteRequest request, RouteCallback cb) {
+            List routes = new ArrayList();
+            routes.add(element);
+            cb.routesFound(routes);
+        }
+    }
+
+    /** Records what showRoute drew, and does nothing else. */
+    private static final class RecordingMap implements MapSurface {
+
+        private int polylines;
+        private int fits;
+
+        @Override
+        public Polyline addPolyline(Polyline polyline) {
+            polylines++;
+            return polyline;
+        }
+
+        @Override
+        public void fitBounds(MapBounds bounds, int paddingPixels) {
+            fits++;
+        }
+
+        @Override
+        public CameraPosition getCameraPosition() {
+            return null;
+        }
+
+        @Override
+        public void setCameraPosition(CameraPosition position) {
+        }
+
+        @Override
+        public void moveCamera(LatLng target, double zoom) {
+        }
+
+        @Override
+        public double getZoom() {
+            return 0;
+        }
+
+        @Override
+        public void setZoom(double zoom) {
+        }
+
+        @Override
+        public double getMinZoom() {
+            return 0;
+        }
+
+        @Override
+        public double getMaxZoom() {
+            return 0;
+        }
+
+        @Override
+        public LatLng getCenter() {
+            return null;
+        }
+
+        @Override
+        public void setCenter(LatLng center) {
+        }
+
+        @Override
+        public MapBounds getVisibleRegion() {
+            return null;
+        }
+
+        @Override
+        public Marker addMarker(MarkerOptions options) {
+            return null;
+        }
+
+        @Override
+        public void removeMarker(Marker marker) {
+        }
+
+        @Override
+        public void removePolyline(Polyline polyline) {
+        }
+
+        @Override
+        public Polygon addPolygon(Polygon polygon) {
+            return null;
+        }
+
+        @Override
+        public void removePolygon(Polygon polygon) {
+        }
+
+        @Override
+        public Circle addCircle(Circle circle) {
+            return null;
+        }
+
+        @Override
+        public void removeCircle(Circle circle) {
+        }
+
+        @Override
+        public void clearMapObjects() {
+        }
+
+        @Override
+        public Point latLngToScreen(LatLng coord) {
+            return null;
+        }
+
+        @Override
+        public LatLng screenToLatLng(int x, int y) {
+            return null;
+        }
+
+        @Override
+        public void addTapListener(MapTapListener l) {
+        }
+
+        @Override
+        public void removeTapListener(MapTapListener l) {
+        }
+
+        @Override
+        public void addLongPressListener(MapTapListener l) {
+        }
+
+        @Override
+        public void removeLongPressListener(MapTapListener l) {
+        }
+
+        @Override
+        public void addCameraChangeListener(CameraChangeListener l) {
+        }
+
+        @Override
+        public void removeCameraChangeListener(CameraChangeListener l) {
+        }
+
+        @Override
+        public boolean isNativeMap() {
+            return false;
+        }
+
+        @Override
+        public boolean isLoadingTiles() {
+            return false;
+        }
+
+        @Override
+        public Component asComponent() {
+            return null;
         }
     }
 }
