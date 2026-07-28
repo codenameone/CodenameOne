@@ -1287,6 +1287,18 @@
         "source_slug": "rich-text-without-webview",
         "scheduled_at": "2026-07-28T09:00:00+00:00"
       }
+    },
+    "codename-one-mcp-server": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cms4s9s1g00010akefydl34ro",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a68c3fc698247b1f9d5ea47",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-28T15:01:09+00:00"
+      }
     }
   }
 }
