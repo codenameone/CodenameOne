@@ -2051,9 +2051,14 @@ public class AndroidGradleBuilder extends Executor {
             // harmless flow for a hint it would never use.
             boolean requestsPermissions =
                     !readTypes.isEmpty() || !writeTypes.isEmpty();
-            if (requestsPermissions
-                    && request.getArg("android.health.privacyPolicyUrl", "")
-                    .length() == 0) {
+            // Trimmed before it is judged, and the trimmed value is what
+            // gets emitted. A raw length test accepted "   " and wrote a
+            // whitespace-only resource, so the rationale screen had no
+            // usable link while the build reported the policy requirement
+            // as satisfied.
+            String policyUrl = request.getArg(
+                    "android.health.privacyPolicyUrl", "").trim();
+            if (requestsPermissions && policyUrl.length() == 0) {
                 // Play requires a privacy policy for health permissions and
                 // the rationale screen has to link to it, so a missing URL
                 // means a rejected app rather than a broken build later.
@@ -2071,8 +2076,7 @@ public class AndroidGradleBuilder extends Executor {
                 additionalKeyVals += "    <string name=\""
                         + HealthManifestFragments.POLICY_URL_RESOURCE
                         + "\">"
-                        + xmlize(request.getArg(
-                                "android.health.privacyPolicyUrl", ""))
+                        + xmlize(policyUrl)
                         + "</string>\n";
             }
             if (targetSDKVersionInt < 30) {
