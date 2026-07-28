@@ -383,6 +383,16 @@ class IOSHealthStore extends HealthStore {
             // query returns is only ever read once -- anchoring at `now`
             // regardless meant everything past the limit was skipped for
             // good, silently, on exactly the busiest subscriptions.
+            //
+            // And the batch is trimmed to match, so that it holds exactly
+            // what falls before the cursor it carries. The types are read
+            // one at a time over the same window: a busy one truncating
+            // pulls the cursor back, and the sparse ones read after it --
+            // or already read before it -- kept their samples from the
+            // rest of the window. Those sit beyond the persisted anchor,
+            // so the next drain reads the same range and delivers them a
+            // second time. Trimming defers them by one drain instead.
+            dropAtOrAfter(collected, safeUntil, now);
             int sent = fireChanges(new HealthChangeBatch(sub.getId(), sub.getTypes(),
                     collected, null, false,
                     // Foreground: no OS deadline. Reporting 0 made a listener
@@ -406,6 +416,35 @@ class IOSHealthStore extends HealthStore {
         readSamplePage(q).onResult(new ChangeRead(this, subs, index,
                 delivered, out, types, typeIndex, collected, since, now,
                 safeUntil));
+    }
+
+    /// Drops everything at or after the cursor this batch will persist,
+    /// so a batch holds exactly the samples that fall before its own
+    /// anchor.
+    ///
+    /// A sample starting exactly at the cursor goes too. The next window
+    /// begins there and is inclusive of it, so keeping it would guarantee
+    /// the duplicate rather than risk one -- and nothing is lost, because
+    /// that same next window returns it.
+    ///
+    /// Only when the cursor was pulled back. An untruncated drain anchors
+    /// at `now` and everything it read already starts before that.
+    ///
+    /// The one duplicate this cannot remove is an interval that starts
+    /// before the cursor and ends after it: the next window matches it on
+    /// its end, and dropping it here would starve a long-running record
+    /// that overlaps every cursor it ever meets. That is the timestamp
+    /// cursor's own limitation, not this trim's.
+    private static void dropAtOrAfter(List<HealthSample> collected,
+            long safeUntil, long now) {
+        if (safeUntil >= now) {
+            return;
+        }
+        for (int i = collected.size() - 1; i >= 0; i--) {
+            if (collected.get(i).getStartMillis() >= safeUntil) {
+                collected.remove(i);
+            }
+        }
     }
 
     /// Re-reads the single instant a page turned out to be entirely made
