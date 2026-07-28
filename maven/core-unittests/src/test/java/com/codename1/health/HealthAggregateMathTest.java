@@ -256,4 +256,40 @@ class HealthAggregateMathTest {
                     }
                 });
     }
+
+    /**
+     * An interval ending exactly at the range start is outside it.
+     *
+     * <p>A calendar bucket can begin before the requested range -- a daily
+     * bucket on a noon-to-midnight query starts at midnight -- and a `<`
+     * test let an interval ending at noon through. It was then counted and
+     * fed into the average, minimum and maximum while contributing zero
+     * overlap, so the first bucket was contaminated by data from outside
+     * the query.</p>
+     */
+    @Test
+    void anIntervalEndingAtTheRangeStartIsExcluded() throws Exception {
+        LocalHealthStore s = store(
+                FakeHealthStore.sample(HealthDataType.HEART_RATE,
+                        NOON - HOUR, NOON, 200),
+                FakeHealthStore.sample(HealthDataType.HEART_RATE,
+                        NOON + MINUTE, NOON + MINUTE, 60));
+
+        // A calendar bucket starts at midnight, before the query does,
+        // which is what exposes the boundary.
+        List<AggregateResult> b = s.aggregate(new AggregateQuery()
+                .addType(HealthDataType.HEART_RATE)
+                .addMetric(AggregateMetric.MAXIMUM)
+                .addMetric(AggregateMetric.COUNT)
+                .setTimeRange(HealthTimeRange.between(NOON, NOON + HOUR))
+                .setBucket(HealthInterval.calendarDays(1,
+                        java.util.TimeZone.getTimeZone("UTC")))).get();
+
+        assertEquals(60.0, value(b.get(0), HealthDataType.HEART_RATE,
+                AggregateMetric.MAXIMUM), 1e-9,
+                "the reading that ended at the range start is outside it");
+        assertEquals(1.0, b.get(0).get(HealthDataType.HEART_RATE,
+                AggregateMetric.COUNT).getValue(HealthUnit.COUNT), 1e-9,
+                "and it is not counted either");
+    }
 }

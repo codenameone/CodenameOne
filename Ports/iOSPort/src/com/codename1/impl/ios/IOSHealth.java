@@ -110,7 +110,41 @@ public final class IOSHealth extends Health {
     static synchronized int takeId(AsyncResource resource) {
         int id = nextRequestId++;
         REQUESTS.put(Integer.valueOf(id), resource);
+        // Every cleanup path used to sit inside a native callback, so a
+        // native call that never called back -- the shared timeout fires
+        // and completes the resource instead -- left its entry, and its
+        // LIMITS entry, in the registry for the life of the process.
+        // Completion is the one event that always happens, whichever side
+        // produced it.
+        resource.onResult(new Forget(id));
         return id;
+    }
+
+    /// Drops a request's registry state once its resource is done,
+    /// whatever finished it.
+    ///
+    /// Built as a named static class so it carries no synthetic reference
+    /// to anything (SpotBugs `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class Forget
+            implements com.codename1.util.AsyncResult<Object> {
+        private final int requestId;
+
+        Forget(int requestId) {
+            this.requestId = requestId;
+        }
+
+        @Override
+        public void onReady(Object value, Throwable error) {
+            forget(requestId);
+        }
+    }
+
+    /// Removes a request's registry entries. Safe to call twice: the
+    /// native callback path takes the resource out first, and this runs
+    /// afterwards on the completion it caused.
+    static synchronized void forget(int requestId) {
+        REQUESTS.remove(Integer.valueOf(requestId));
+        LIMITS.remove(Integer.valueOf(requestId));
     }
 
     /// Registers a read whose page must report truncation.

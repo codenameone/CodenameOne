@@ -794,7 +794,17 @@ public class HealthStore {
             // to an aggregate starting at noon instead of their
             // proportional five minutes. The bucket arithmetic below
             // already clips, so keeping it here is safe.
-            if (s.getEndMillis() < range.getStartMillis()
+            // Half-open, matching the bucket test above and the sample
+            // query. A `<` test let an interval ending exactly at the
+            // range start through: with a calendar bucket that begins
+            // before the requested range -- a daily bucket on a
+            // noon-to-midnight query -- it was counted, and contributed to
+            // the average, minimum and maximum with zero overlap. An
+            // instant at the start is inside; an interval ending there is
+            // not.
+            if ((s.isInstantaneous()
+                        ? s.getEndMillis() < range.getStartMillis()
+                        : s.getEndMillis() <= range.getStartMillis())
                     || s.getStartMillis() >= range.getEndMillis()) {
                 continue;
             }

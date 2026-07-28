@@ -435,7 +435,18 @@ class CN1HealthConnectBridge(private val context: Context)
         var remaining = if (limit > 0) limit else Int.MAX_VALUE
         var emitted = 0
         var pageToken: String? = resumeToken
+        // Samples seen per record so far. The caller's limit counts
+        // samples while pageSize counts records, and one series record
+        // holds many samples -- so asking for `remaining` records fetched
+        // far more than was wanted. Nothing fetched is ever discarded (the
+        // page token has already moved past it), which makes the overshoot
+        // real memory rather than a rounding error. This is measured, not
+        // guessed: it starts at one sample per record, which is exactly
+        // right for every scalar type, and the first page of a series type
+        // corrects it for every page after.
+        var samplesPerRecord = 1
         while (remaining > 0) {
+            val wantRecords = maxOf(1, remaining / samplesPerRecord)
             val page = requireClient().readRecords(
                 ReadRecordsRequest(type, timeRangeFilter = filter,
                     // Source filtering happens here rather than after the
@@ -444,7 +455,7 @@ class CN1HealthConnectBridge(private val context: Context)
                     // and ignoring it silently inflates every total.
                     dataOriginFilter = origins,
                     ascendingOrder = ascending,
-                    pageSize = minOf(remaining, MAX_PAGE_SIZE),
+                    pageSize = minOf(wantRecords, MAX_PAGE_SIZE),
                     pageToken = pageToken))
             // Counted in emitted lines, not records. One heart-rate record
             // holds many samples and appendOne flattens them, so a
@@ -458,6 +469,9 @@ class CN1HealthConnectBridge(private val context: Context)
             var lines = 0
             for (record in page.records) {
                 lines += appendOne(sb, record, token, flatten)
+            }
+            if (page.records.isNotEmpty()) {
+                samplesPerRecord = maxOf(1, lines / page.records.size)
             }
             remaining -= lines
             emitted += lines

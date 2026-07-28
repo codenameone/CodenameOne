@@ -371,11 +371,19 @@ public class LocalHealthStore extends HealthStore {
         synchronized (samples) {
             for (HealthSample s : toWrite) {
                 String id = "local-" + (nextId++);
-                s.setId(id);
-                // Stored as a copy where one can be made. Keeping the
-                // caller's object meant later setId/setSource/putMetadata
-                // on it silently rewrote the stored record -- and could
-                // make deleting by the returned id fail.
+                // The identifier goes on the stored copy only. Stamping
+                // the caller's object made this store the one place a
+                // write mutated its input -- and HealthSample.hashCode()
+                // switches from identity to the id once it is set, so a
+                // sample already in a HashSet or used as a map key became
+                // unreachable the moment it was written. The id reaches
+                // the caller through HealthWriteResult, as it does on
+                // every other platform.
+                //
+                // Stored as a copy: keeping the caller's object meant a
+                // later setId/setSource/putMetadata on it silently rewrote
+                // the stored record, and could make deleting by the
+                // returned id fail.
                 HealthSample stored = snapshot(s);
                 stored.setId(id);
                 samples.add(stored);

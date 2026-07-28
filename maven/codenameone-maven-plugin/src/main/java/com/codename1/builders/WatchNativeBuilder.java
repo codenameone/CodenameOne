@@ -588,10 +588,15 @@ class WatchNativeBuilder {
         // The same gate the entitlements file itself uses. Pointing the
         // target at a file that is not written, or writing one the target
         // never signs with, are two different ways to be wrong.
-        boolean phoneUsesHealth =
-                request.getArg("ios.NSHealthShareUsageDescription", null) != null
-                || request.getArg("ios.NSHealthUpdateUsageDescription",
-                        null) != null;
+        // Trimmed, exactly as writeWatchInfoPlist trims them. A raw null
+        // check here saw a whitespace-only hint as health usage and
+        // pointed CODE_SIGN_ENTITLEMENTS at an entitlements file the plist
+        // pass had decided not to write, so Xcode failed on a missing
+        // file.
+        boolean phoneUsesHealth = trimToNull(request.getArg(
+                "ios.NSHealthShareUsageDescription", null)) != null
+                || trimToNull(request.getArg(
+                        "ios.NSHealthUpdateUsageDescription", null)) != null;
         if (!watchUsesHealth(phoneUsesHealth)) {
             return "";
         }

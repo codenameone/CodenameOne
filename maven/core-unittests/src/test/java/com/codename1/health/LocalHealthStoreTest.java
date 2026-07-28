@@ -443,4 +443,37 @@ class LocalHealthStoreTest extends UITestBase {
                 "editing a read result must not reach the store either");
         assertEquals(4000L, again.getActiveDurationMillis());
     }
+
+    /**
+     * A write does not stamp an identifier onto the caller's sample.
+     *
+     * <p>This was the one store that mutated its input. {@code
+     * HealthSample.hashCode()} switches from identity to the id once one
+     * is set, so a sample already held in a {@code HashSet} or used as a
+     * map key became unreachable the moment it was written. The id reaches
+     * the caller through {@link HealthWriteResult}, as on every other
+     * platform.</p>
+     */
+    @Test
+    void writingDoesNotStampAnIdOntoTheCallersSample() throws Exception {
+        LocalHealthStore store = new LocalHealthStore();
+        QuantitySample sample = QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(100, HealthUnit.COUNT), 1000L, 2000L);
+
+        java.util.Set<HealthSample> held =
+                new java.util.HashSet<HealthSample>();
+        held.add(sample);
+
+        String id = store.write(sample).get().getSampleIds().get(0);
+        assertNull(sample.getId(),
+                "the caller's sample must come back untouched");
+        assertTrue(held.contains(sample),
+                "a sample used as a key must stay reachable after a write");
+
+        // And the stored record does carry the identifier the result named.
+        List<HealthSample> read = store.readSamples(new SampleQuery()
+                .addType(HealthDataType.STEPS)
+                .setTimeRange(HealthTimeRange.between(0L, 5000L))).get();
+        assertEquals(id, read.get(0).getId());
+    }
 }

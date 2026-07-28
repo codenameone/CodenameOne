@@ -195,7 +195,14 @@ public class HealthBridgeTokenTableTest {
         assertTrue(start > 0);
         String body = src.substring(start, src.indexOf("\n    }", start));
         assertTrue("the page size must be capped",
-                body.contains("minOf(remaining, MAX_PAGE_SIZE)"));
+                body.contains(", MAX_PAGE_SIZE)"));
+        // pageSize counts records while the caller's limit counts samples,
+        // and one series record holds many. Asking for `remaining` records
+        // over-fetched by that factor, and nothing fetched can be given
+        // back -- the token has already moved past it.
+        assertTrue("the record budget must be converted from the sample"
+                + " budget rather than used as-is",
+                body.contains("samplesPerRecord"));
         assertTrue("and further pages must be followed, or a caller asking"
                 + " for more than one page silently loses the rest",
                 body.contains("pageToken"));
