@@ -98,18 +98,33 @@ class CN1HealthConnectBridge(private val context: Context)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val client: HealthConnectClient? by lazy {
-        try {
-            if (HealthConnectClient.getSdkStatus(context)
-                    == HealthConnectClient.SDK_AVAILABLE) {
-                HealthConnectClient.getOrCreate(context)
-            } else {
+    private var cachedClient: HealthConnectClient? = null
+
+    /**
+     * The client, created on first successful attempt.
+     *
+     * Only a *successful* client is cached. A lazy property remembered the
+     * null from a first attempt made before Health Connect was installed
+     * or updated, so a user who completed provider setup and came back --
+     * without the process being killed -- had `sdkStatus()` report
+     * availability while every call still failed, until they force-quit
+     * the app.
+     */
+    private val client: HealthConnectClient?
+        get() {
+            cachedClient?.let { return it }
+            return try {
+                if (HealthConnectClient.getSdkStatus(context)
+                        == HealthConnectClient.SDK_AVAILABLE) {
+                    HealthConnectClient.getOrCreate(context)
+                        .also { cachedClient = it }
+                } else {
+                    null
+                }
+            } catch (t: Throwable) {
                 null
             }
-        } catch (t: Throwable) {
-            null
         }
-    }
 
     override fun sdkStatus(): Int = try {
         when (HealthConnectClient.getSdkStatus(context)) {

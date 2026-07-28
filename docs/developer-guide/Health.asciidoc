@@ -154,6 +154,8 @@ Speed and cadence sensors transmit cumulative counters rather than rates, with c
 
 `SensorSessionOptions.setWriteToStore(...)` defaults to `false` on purpose. When the OS is recording heart rate into HealthKit during a workout, a strap that also writes its own samples double-counts in every downstream average. Attach the session to the workout with `setWorkoutSession(...)` instead; turn write-through on for standalone measurements the OS knows nothing about, such as a weight from a scale.
 
+A heart-rate session reports the rate. RR intervals are decoded by `HeartRateMeasurement` but aren't delivered as samples -- they're the input to an HRV calculation, not a measurement of it, and no platform has a data type that would store them. If you need HRV, subscribe to characteristic `0x2A37` through `com.codename1.bluetooth.le` and call `HeartRateMeasurement.parse(...)` on the raw value yourself; both are public API.
+
 Blood pressure is the exception: it's two values in one reading, which HealthKit models as a correlation and Health Connect as its own record type, and neither is implemented in this release. A cuff reading routed to the store fails with `TYPE_NOT_SUPPORTED` on both phones rather than being dropped without a word; the local and simulator stores keep it fine. Read it off the session and persist it yourself for now.
 
 === Nutrition

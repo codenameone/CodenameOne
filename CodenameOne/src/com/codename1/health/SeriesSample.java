@@ -111,6 +111,14 @@ public final class SeriesSample extends HealthSample {
         // toQuantitySample() -- inside the read callback, where it takes
         // the whole page with it.
         for (int i = 0; i < values.length; i++) {
+            // Same rule as HealthQuantity: a series carries raw doubles
+            // rather than quantities, so nothing else would have caught a
+            // NaN on the way into a store.
+            if (Double.isNaN(values[i]) || Double.isInfinite(values[i])) {
+                throw new IllegalArgumentException("measurement " + i
+                        + " of this series is not a finite number: "
+                        + values[i]);
+            }
             if (sampleEnds[i] < sampleStarts[i]) {
                 throw new IllegalArgumentException("measurement " + i
                         + " of this series ends before it starts: "

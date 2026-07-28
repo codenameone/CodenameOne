@@ -45,6 +45,9 @@ package com.codename1.health.sensors;
 public final class CyclingPowerMeasurement {
 
     private static final int FLAG_PEDAL_BALANCE = 0x0001;
+    /// Set when the balance is measured against the left pedal; clear
+    /// means the reference is unknown, which is a different reading.
+    private static final int FLAG_BALANCE_REFERENCE_LEFT = 0x0002;
     // 0x0002 pedal-power-balance reference and 0x0008 accumulated-torque
     // source are single-bit qualifiers on the two fields below rather than
     // presence flags, so they shift nothing and are not read here.
@@ -60,6 +63,7 @@ public final class CyclingPowerMeasurement {
 
     private final int instantaneousPowerWatts;
     private final double pedalPowerBalancePercent;
+    private final boolean pedalPowerBalanceLeft;
     private final long wheelRevolutions;
     private final int lastWheelEventTime;
     private final int crankRevolutions;
@@ -67,11 +71,13 @@ public final class CyclingPowerMeasurement {
     private final int accumulatedEnergyKilojoules;
 
     private CyclingPowerMeasurement(int instantaneousPowerWatts,
-            double pedalPowerBalancePercent, long wheelRevolutions,
+            double pedalPowerBalancePercent, boolean pedalPowerBalanceLeft,
+            long wheelRevolutions,
             int lastWheelEventTime, int crankRevolutions,
             int lastCrankEventTime, int accumulatedEnergyKilojoules) {
         this.instantaneousPowerWatts = instantaneousPowerWatts;
         this.pedalPowerBalancePercent = pedalPowerBalancePercent;
+        this.pedalPowerBalanceLeft = pedalPowerBalanceLeft;
         this.wheelRevolutions = wheelRevolutions;
         this.lastWheelEventTime = lastWheelEventTime;
         this.crankRevolutions = crankRevolutions;
@@ -90,9 +96,15 @@ public final class CyclingPowerMeasurement {
         int power = r.sint16();
 
         double balance = Double.NaN;
+        boolean balanceLeft = false;
         if ((flags & FLAG_PEDAL_BALANCE) != 0) {
             // Transmitted in halves of a percent.
             balance = r.uint8() * 0.5;
+            // The reference qualifier travels with it. Dropping it made a
+            // left-referenced reading and an unknown-reference one
+            // indistinguishable, while the getter told callers to consult
+            // a bit they had no way to see.
+            balanceLeft = (flags & FLAG_BALANCE_REFERENCE_LEFT) != 0;
         }
         if ((flags & FLAG_ACCUMULATED_TORQUE) != 0) {
             r.skip(2);
@@ -132,8 +144,8 @@ public final class CyclingPowerMeasurement {
         if (!r.isValid()) {
             return null;
         }
-        return new CyclingPowerMeasurement(power, balance, wheelRevs,
-                wheelTime, crankRevs, crankTime, energy);
+        return new CyclingPowerMeasurement(power, balance, balanceLeft,
+                wheelRevs, wheelTime, crankRevs, crankTime, energy);
     }
 
     /// Instantaneous power in watts. **May be negative** -- see the class
@@ -142,9 +154,20 @@ public final class CyclingPowerMeasurement {
         return instantaneousPowerWatts;
     }
 
+    /// Whether [#getPedalPowerBalancePercent()] is measured against the
+    /// left pedal.
+    ///
+    /// `false` also means "the meter did not say", which is not the same
+    /// as "the right pedal" -- check
+    /// [#getPedalPowerBalancePercent()] for `NaN` first to tell an absent
+    /// reading from an unqualified one.
+    public boolean isPedalPowerBalanceLeft() {
+        return pedalPowerBalanceLeft;
+    }
+
     /// The share of power contributed by one pedal, as a percentage, or
-    /// `Double.NaN` when absent. Which pedal it refers to depends on the
-    /// reference bit; most meters report the left.
+    /// `Double.NaN` when absent. Which pedal it refers to is reported by
+    /// [#isPedalPowerBalanceLeft()]; most meters report the left.
     public double getPedalPowerBalancePercent() {
         return pedalPowerBalancePercent;
     }

@@ -45,6 +45,16 @@ public final class HealthQuantity {
     ///
     /// - `IllegalArgumentException`: if `unit` is null.
     public HealthQuantity(double value, HealthUnit unit) {
+        // NaN and the infinities are not measurements. The local store
+        // persisted them happily and every later total, average, minimum
+        // and maximum inherited them, while a mobile store would have
+        // rejected the same write -- so the simulator was the one place a
+        // malformed number could get in and look fine.
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            throw new IllegalArgumentException(
+                    "a health quantity must be a finite number, got "
+                            + value);
+        }
         if (unit == null) {
             throw new IllegalArgumentException("a quantity requires a unit");
         }

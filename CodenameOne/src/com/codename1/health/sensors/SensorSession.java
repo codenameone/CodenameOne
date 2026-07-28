@@ -380,6 +380,15 @@ public class SensorSession {
             if (m == null) {
                 return null;
             }
+            // Only the rate becomes a sample. RR intervals are decoded by
+            // the parser and have no health data type to be a sample of --
+            // they are the input to HRV, not a measurement of it, and
+            // inventing a type for them would put a number in the store
+            // that no platform can read back. An app that needs them
+            // subscribes to 0x2A37 through com.codename1.bluetooth.le and
+            // calls HeartRateMeasurement.parse itself; both are public,
+            // and SensorSessionOptions#setWriteToStore documents the
+            // route. See HeartRateMeasurement#getRrIntervalCount().
             out.add(quantity(HealthDataType.HEART_RATE, m.getHeartRate(),
                     HealthUnit.COUNT_PER_MINUTE, at));
             return out;
