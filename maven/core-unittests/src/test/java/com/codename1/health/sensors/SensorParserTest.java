@@ -415,4 +415,46 @@ class SensorParserTest {
             assertNotNull(p.getMeasurementUuid());
         }
     }
+
+    // ------------------------------------------------------------------
+    // cumulative counters
+    // ------------------------------------------------------------------
+
+    /**
+     * A stopped wheel repeats its counter and timestamp forever.
+     *
+     * <p>Returning NaN for every repeat left a live cadence display frozen
+     * at the last moving value, so a rider waiting at a light still read
+     * 90 rpm. After enough repeats to rule out a duplicate packet the
+     * tracker reports zero, which is what is actually happening.</p>
+     */
+    @Test
+    void aStoppedSensorEventuallyReportsZero() {
+        CumulativeCounterTracker t = new CumulativeCounterTracker(
+                0x10000L, 1024);
+        assertTrue(Double.isNaN(t.update(100, 0)),
+                "the first notification has no baseline");
+        double moving = t.update(110, 1024);
+        assertEquals(600.0, moving, 0.1, "10 revolutions in one second");
+
+        // The sensor stops: same counter, same event time, repeatedly.
+        assertTrue(Double.isNaN(t.update(110, 1024)),
+                "one repeat could still be a duplicate packet");
+        assertEquals(0.0, t.update(110, 1024), 0.001,
+                "a sustained repeat means stopped, not unknown");
+        assertEquals(0.0, t.update(110, 1024), 0.001);
+    }
+
+    /** Movement after a stop resumes reporting a real rate. */
+    @Test
+    void movementAfterAStopReportsAgain() {
+        CumulativeCounterTracker t = new CumulativeCounterTracker(
+                0x10000L, 1024);
+        t.update(100, 0);
+        t.update(110, 1024);
+        t.update(110, 1024);
+        assertEquals(0.0, t.update(110, 1024), 0.001);
+        assertEquals(300.0, t.update(115, 2048), 0.1,
+                "five revolutions in the next second");
+    }
 }

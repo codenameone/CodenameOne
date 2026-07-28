@@ -54,6 +54,7 @@ final class CumulativeCounterTracker {
 
     private long lastRevolutions = -1;
     private int lastEventTime = -1;
+    private int duplicates;
 
     /// Creates a tracker.
     ///
@@ -98,11 +99,28 @@ final class CumulativeCounterTracker {
         lastEventTime = eventTime;
 
         if (timeDelta == 0) {
-            return Double.NaN;
+            // A stopped wheel or crank repeats the same counter and the
+            // same event time. Suppressing the sample indefinitely left a
+            // live metric frozen at whatever it last read -- a rider who
+            // stops at a light kept showing 90 rpm. After enough repeats
+            // to be sure it is a stop rather than a duplicate packet, say
+            // zero, which is the truth.
+            duplicates++;
+            return duplicates >= STOPPED_AFTER_DUPLICATES ? 0.0
+                    : Double.NaN;
         }
+        duplicates = 0;
         double seconds = timeDelta / (double) timeTicksPerSecond;
         return revDelta / seconds * 60.0;
     }
+
+    /// Consecutive identical notifications before the sensor is treated
+    /// as stopped rather than merely repeating a packet.
+    ///
+    /// Two is enough to distinguish the two cases at the roughly 1 Hz
+    /// these profiles notify at, and short enough that a live display
+    /// reaches zero while the rider is still at the light.
+    private static final int STOPPED_AFTER_DUPLICATES = 2;
 
     /// Forgets the baseline, so the next notification establishes a new
     /// one. Called on reconnect: a sensor that power-cycled restarts its
@@ -111,5 +129,6 @@ final class CumulativeCounterTracker {
     void reset() {
         lastRevolutions = -1;
         lastEventTime = -1;
+        duplicates = 0;
     }
 }
