@@ -236,14 +236,30 @@ final class HealthManifestFragments {
                         || method.startsWith("aggregate")
                         || method.startsWith("subscribe")
                         || method.startsWith("hasAnyData")
-                        || method.startsWith("drainChanges"));
+                        || method.startsWith("drainChanges")
+                        || isBothDirections(method));
+    }
+
+    /// Calls that could be asking for either direction, so they count as
+    /// both.
+    ///
+    /// `requestAuthorization` takes a list of `HealthAccess` values, and a
+    /// list built at runtime is invisible to bytecode scanning -- the iOS
+    /// builder already treats this call as needing both purpose strings
+    /// for exactly that reason. Classifying it as neither let an app that
+    /// asks for write access while declaring only `android.health.read`
+    /// pass the build and ship a manifest without the permission it
+    /// requested.
+    private static boolean isBothDirections(String method) {
+        return method.startsWith("requestAuthorization");
     }
 
     /// Whether a `HealthStore` method changes stored data. A delete counts:
     /// Health Connect authorizes it with the write permission.
     static boolean isWriteCall(String method) {
         return method != null
-                && (method.startsWith("write") || method.startsWith("delete"));
+                && (method.startsWith("write") || method.startsWith("delete")
+                        || isBothDirections(method));
     }
 
     static List<String> parseTypeList(String hintValue) {

@@ -68,10 +68,18 @@ public final class SamplePage {
     /// `true` when the query's limit cut the result short and more data
     /// matched than was returned.
     ///
-    /// Distinct from having a next-page token: a page can be the last one
-    /// and still be truncated, which means the store stopped early rather
-    /// than running out of data. Worth surfacing rather than quietly
-    /// showing a partial total.
+    /// **Not a paging instruction.** Page on
+    /// [#getNextPageToken()] and nothing else. Truncated with a null token
+    /// is the store saying the rest is unreachable through this query --
+    /// Health Connect resumes per record type, so a page merged from
+    /// several types has no token that could return what the merge
+    /// dropped. Looping on this flag instead re-issues the same first page
+    /// forever. Narrow the range, raise the limit, or query one type at a
+    /// time.
+    ///
+    /// A page can also be the last one and still be truncated, which means
+    /// the store stopped early rather than running out of data -- worth
+    /// surfacing rather than quietly showing a partial total.
     public boolean isTruncated() {
         return truncated;
     }

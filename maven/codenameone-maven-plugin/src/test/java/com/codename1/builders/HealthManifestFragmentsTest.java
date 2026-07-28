@@ -388,4 +388,22 @@ class HealthManifestFragmentsTest {
         assertNull(HealthManifestFragments.declaredKotlinPluginVersion(""));
         assertNull(HealthManifestFragments.declaredKotlinPluginVersion(null));
     }
+
+    /**
+     * {@code requestAuthorization} counts as both directions.
+     *
+     * <p>Its {@code HealthAccess} list is built at runtime and is opaque
+     * to bytecode scanning -- the iOS builder already demands both purpose
+     * strings for exactly that reason. Matching neither classifier let an
+     * app that asks for write access while declaring only
+     * {@code android.health.read} pass the build and ship a manifest
+     * without the permission it had just requested.</p>
+     */
+    @Test
+    void requestAuthorizationCountsAsBothDirections() {
+        assertTrue(HealthManifestFragments.isReadCall(
+                "requestAuthorization"));
+        assertTrue(HealthManifestFragments.isWriteCall(
+                "requestAuthorization"));
+    }
 }

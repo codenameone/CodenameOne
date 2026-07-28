@@ -278,16 +278,28 @@ class CN1HealthConnectBridge(private val context: Context)
             if (outTokens.values.all { it.isEmpty() }) {
                 outTokens.clear()
             }
-            // Merged in time order and trimmed to the caller's limit.
+            // A single type is never trimmed here.
             //
-            // Trimming and paging cannot both be honoured for a multi-type
-            // query: a Health Connect token advances its own type, so a
-            // sample dropped by the merge has no token that would return
-            // it. The limit wins, because it is what bounds memory, and
-            // the reply says it was truncated rather than pretending to be
-            // complete. Multi-type queries are therefore single-page.
-            val merged = mergeByTime(perType, budget, ascending)
-            val truncated = perType.sumOf { block ->
+            // Its token resumes after the records already fetched, so a
+            // record dropped by the trim is behind the token and gone for
+            // good -- and clearing the token to signal that only made the
+            // next call restart from the beginning and fetch the same page
+            // again. appendRecords already bounds the read by the limit at
+            // page granularity, so the overshoot is at most the tail of one
+            // page and the shared layer trims it for the caller while the
+            // token still points at the right place.
+            //
+            // Trimming and paging genuinely cannot both be honoured across
+            // several types: a Health Connect token advances its own type,
+            // so a sample dropped by the merge has no token that would
+            // return it. There the limit wins, because it is what bounds
+            // memory, and the reply says so rather than pretending to be
+            // complete -- with no token, because there is no next page to
+            // ask for. Multi-type queries are single-page.
+            val singleType = types.length() == 1
+            val merged = if (singleType) perType[0]
+                else mergeByTime(perType, budget, ascending)
+            val truncated = !singleType && perType.sumOf { block ->
                 block.count { it == '\n' }
             } > merged.count { it == '\n' }
             if (truncated) {

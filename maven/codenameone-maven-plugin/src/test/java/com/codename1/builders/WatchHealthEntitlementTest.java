@@ -95,4 +95,22 @@ public class WatchHealthEntitlementTest {
         assertTrue(builder("com.acme.WatchApp", "com.acme.MyApp", null, "true")
                 .watchUsesHealth(false));
     }
+
+    /**
+     * An entitled watch must have a purpose string of its own.
+     *
+     * <p>{@code watchNative.health=true} on a watch with no phone
+     * HealthKit hints entitled and signed the bundle while its Info.plist
+     * carried neither purpose string. The build passed and the watch was
+     * refused the moment it asked for authorization -- and this build
+     * never invents a purpose string, so it has to stop instead.</p>
+     */
+    @Test
+    void anEntitledWatchNeedsAPurposeString() {
+        assertTrue(WatchNativeBuilder.needsPurposeString(true, null, null));
+        assertFalse(WatchNativeBuilder.needsPurposeString(true, "Reads", null));
+        assertFalse(WatchNativeBuilder.needsPurposeString(true, null, "Writes"));
+        // Not entitled, so nothing to disclose.
+        assertFalse(WatchNativeBuilder.needsPurposeString(false, null, null));
+    }
 }

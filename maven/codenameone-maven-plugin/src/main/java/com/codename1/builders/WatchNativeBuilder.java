@@ -454,10 +454,40 @@ class WatchNativeBuilder {
               .append("    </array>\n");
         }
         sb.append("</dict>\n</plist>\n");
-        writeWatchEntitlements(request, appSrcDir,
-                watchUsesHealth(healthShare != null || healthUpdate != null));
+        boolean watchHealth =
+                watchUsesHealth(healthShare != null || healthUpdate != null);
+        if (needsPurposeString(watchHealth, healthShare, healthUpdate)) {
+            // Entitled but with no purpose string in its own Info.plist,
+            // which builds cleanly and then fails the moment the watch asks
+            // for authorization. Apple requires a specific string and this
+            // build never invents one, so the developer has to supply it.
+            owner.error("This app enables HealthKit on the watch"
+                    + " (watchNative.health), but declares neither"
+                    + " ios.NSHealthShareUsageDescription nor"
+                    + " ios.NSHealthUpdateUsageDescription. The watch has"
+                    + " its own Info.plist, and watchOS refuses a HealthKit"
+                    + " authorization request from a bundle with no purpose"
+                    + " string. Set the one that matches what the watch"
+                    + " does.",
+                    new RuntimeException("watch health usage string unset"));
+        }
+        writeWatchEntitlements(request, appSrcDir, watchHealth);
         File plist = new File(appSrcDir, request.getMainClass() + "-Watch-Info.plist");
         owner.createFile(plist, sb.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Whether the build has to stop for a missing watch purpose string.
+     *
+     * <p>An entitled bundle with no purpose string in its own Info.plist
+     * builds cleanly and then fails the moment it asks for authorization.
+     * Only reachable through {@code watchNative.health}: every other route
+     * to an entitled watch runs through the phone's strings, which are
+     * copied into the watch plist.</p>
+     */
+    static boolean needsPurposeString(boolean watchUsesHealth,
+            String healthShare, String healthUpdate) {
+        return watchUsesHealth && healthShare == null && healthUpdate == null;
     }
 
     /**
