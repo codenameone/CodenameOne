@@ -120,8 +120,8 @@ public class FakeHealthStore extends HealthStore {
             new ArrayList<HealthAnchor>();
 
     /** Seeds a cursor the way a port does at registration. */
-    public void seedForTest(String subscriptionId, HealthAnchor anchor) {
-        seedAnchor(subscriptionId, anchor);
+    public boolean seedForTest(HealthSubscription sub, HealthAnchor anchor) {
+        return seedAnchor(sub, anchor);
     }
 
     @Override

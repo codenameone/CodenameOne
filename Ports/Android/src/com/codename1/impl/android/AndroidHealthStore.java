@@ -45,8 +45,11 @@ import com.codename1.impl.health.HealthWire;
 import com.codename1.util.AsyncResource;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /// The Health Connect-backed store, driving the injected
@@ -536,6 +539,17 @@ class AndroidHealthStore extends HealthStore {
         HealthSubscription sub = subs.get(index);
         HealthAnchor anchor = sub.getAnchor();
         String token = anchor == null ? null : anchor.toStorableString();
+        if ((token == null || token.length() == 0)
+                && isBaselineInFlight(sub)) {
+            // Its starting cursor is still being issued. Taking a second
+            // one here is what makes the window real: two baselines then
+            // race, the later one wins, and every change between them is
+            // lost for good. There is nothing to report from a baseline
+            // in any case, so skip to the next subscription and let the
+            // one in flight land.
+            drainFrom(subs, index + 1, delivered, out);
+            return;
+        }
         if (token == null || token.length() == 0) {
             // The first drain only establishes a baseline. A Health
             // Connect token describes changes from the moment it is
@@ -563,17 +577,98 @@ class AndroidHealthStore extends HealthStore {
     /// Failure is not fatal: the token stays absent and the first drain
     /// establishes it exactly as before, which is worse than this but
     /// better than a subscription that never works.
+    ///
+    /// The token is issued asynchronously, so a small window remains
+    /// between `subscribe()` returning and the token existing. Health
+    /// Connect cannot close it -- a token describes changes from the
+    /// moment it is issued and there is no way to ask for one as of an
+    /// earlier instant -- so the window is made as small as the platform
+    /// allows and the subscription is held un-established until the token
+    /// lands, which is what stops a drain from racing it.
     @Override
     protected void doSubscribe(SubscriptionRequest request,
-            HealthAnchor anchor) {
-        if (anchor != null || delegate() == null) {
+            HealthSubscription subscription) {
+        if (subscription == null || subscription.getAnchor() != null
+                || delegate() == null) {
             return;
         }
+        markBaselineInFlight(subscription);
         delegate().getChangesToken(typesCsv(request.getTypes()),
-                new BaselineToken(this, request.getId()));
+                new BaselineToken(this, subscription));
     }
 
-    /// Persists the token a subscription starts from.
+    /// Subscriptions whose starting cursor is still being issued, and
+    /// when the request went out.
+    ///
+    /// Keyed on the live handle rather than the id: an id can be
+    /// re-registered while the first request is still in flight, and the
+    /// two answers must not be confused for one another.
+    private final Map<HealthSubscription, Long> baselinesInFlight =
+            new HashMap<HealthSubscription, Long>();
+
+    /// How long a baseline request is believed in flight before a drain
+    /// stops waiting for it. A subscription whose token request was lost
+    /// -- a bridge that never calls back either way -- would otherwise
+    /// never drain again, which is a worse failure than the duplicate
+    /// baseline the waiting exists to prevent.
+    private static final long BASELINE_TIMEOUT_MILLIS = 30000L;
+
+    private void markBaselineInFlight(HealthSubscription sub) {
+        synchronized (baselinesInFlight) {
+            baselinesInFlight.put(sub,
+                    Long.valueOf(System.currentTimeMillis()));
+        }
+    }
+
+    private void clearBaselineInFlight(HealthSubscription sub) {
+        synchronized (baselinesInFlight) {
+            baselinesInFlight.remove(sub);
+        }
+    }
+
+    /// A subscription that is torn down while its baseline is in flight
+    /// is forgotten here too. The callback would drop its seed anyway --
+    /// the handle is no longer registered -- but nothing else would ever
+    /// look at the entry again, so it would sit in the map for the life
+    /// of the process.
+    @Override
+    protected void doUnsubscribe(String subscriptionId) {
+        synchronized (baselinesInFlight) {
+            Iterator<HealthSubscription> it =
+                    baselinesInFlight.keySet().iterator();
+            while (it.hasNext()) {
+                if (it.next().getId().equals(subscriptionId)) {
+                    it.remove();
+                }
+            }
+        }
+    }
+
+    private boolean isBaselineInFlight(HealthSubscription sub) {
+        synchronized (baselinesInFlight) {
+            Long since = baselinesInFlight.get(sub);
+            if (since == null) {
+                return false;
+            }
+            if (System.currentTimeMillis() - since.longValue()
+                    > BASELINE_TIMEOUT_MILLIS) {
+                baselinesInFlight.remove(sub);
+                com.codename1.io.Log.p("CN1 Health: the baseline change"
+                        + " token for " + sub.getId() + " never arrived;"
+                        + " this drain establishes one instead");
+                return false;
+            }
+            return true;
+        }
+    }
+
+    /// Seeds the token a subscription starts from.
+    ///
+    /// Holds the live handle, not the id: by the time this answers, the
+    /// subscription may have been stopped or replaced by a new one under
+    /// the same id, and `seedAnchor` drops the seed in both cases rather
+    /// than restoring a cursor `unsubscribe()` discarded or handing a
+    /// fresh subscription a token issued for a different type set.
     ///
     /// Named rather than anonymous so it carries no synthetic reference
     /// to the enclosing store (SpotBugs `SIC_INNER_SHOULD_BE_STATIC_ANON`).
@@ -581,32 +676,63 @@ class AndroidHealthStore extends HealthStore {
             implements HealthConnectDelegate.Callback {
 
         private final AndroidHealthStore store;
-        private final String subscriptionId;
+        private final HealthSubscription subscription;
 
-        BaselineToken(AndroidHealthStore store, String subscriptionId) {
+        BaselineToken(AndroidHealthStore store,
+                HealthSubscription subscription) {
             this.store = store;
-            this.subscriptionId = subscriptionId;
+            this.subscription = subscription;
         }
 
         @Override
-        public void onSuccess(String payload) {
-            if (payload == null || payload.trim().length() == 0) {
-                return;
-            }
-            // The live handle as well as the persisted copy: the drains
-            // read the handle, so persisting alone left the next drain
-            // taking a fresh baseline and skipping the very window this
-            // token exists to cover.
-            store.seedAnchor(subscriptionId,
-                    HealthAnchor.of(payload.trim()));
+        public void onSuccess(final String payload) {
+            // Onto the EDT: the cursor on the handle is read there by
+            // every drain, and this answer arrives on whatever thread the
+            // bridge's coroutine finished on.
+            AndroidHealth.onEdt(new SeedBaseline(store, subscription,
+                    payload));
         }
 
         @Override
         public void onError(int code, String message) {
+            store.clearBaselineInFlight(subscription);
             com.codename1.io.Log.p("CN1 Health: could not take a baseline"
-                    + " change token for " + subscriptionId + " ("
+                    + " change token for " + subscription.getId() + " ("
                     + message + "); the first drain will establish one,"
                     + " and changes before it are not reported");
+        }
+    }
+
+    /// Applies a baseline token on the EDT.
+    private static final class SeedBaseline implements Runnable {
+
+        private final AndroidHealthStore store;
+        private final HealthSubscription subscription;
+        private final String payload;
+
+        SeedBaseline(AndroidHealthStore store,
+                HealthSubscription subscription, String payload) {
+            this.store = store;
+            this.subscription = subscription;
+            this.payload = payload;
+        }
+
+        public void run() {
+            try {
+                if (payload == null || payload.trim().length() == 0) {
+                    return;
+                }
+                // The live handle as well as the persisted copy: the
+                // drains read the handle, so persisting alone left the
+                // next drain taking a fresh baseline and skipping the
+                // very window this token exists to cover.
+                store.seedAnchor(subscription,
+                        HealthAnchor.of(payload.trim()));
+            } finally {
+                // Cleared last, and whatever happened: a subscription
+                // left marked in flight is one no drain ever advances.
+                store.clearBaselineInFlight(subscription);
+            }
         }
     }
 

@@ -428,6 +428,82 @@ class WorkoutAndNutritionTest extends UITestBase {
     }
 
     /**
+     * Every distance category counts toward the workout total.
+     *
+     * <p>The rollup picked the first category that answered, and never
+     * looked at {@code DISTANCE_SWIMMING} at all -- so a recorded swim
+     * came back with no total distance despite the samples that produced
+     * it being right there, and a triathlon reported the run while
+     * silently discarding the ride and the swim.</p>
+     */
+    @Test
+    void everyDistanceCategoryReachesTheWorkoutTotal() throws Exception {
+        final FakeHealthStore store = new FakeHealthStore();
+        // The mobile shape, and what keeps this deterministic: neither
+        // platform accepts a workout record through the sample write
+        // path, so end() returns the rolled-up sample without writing it
+        // -- and a session that started and ended inside the same
+        // millisecond is not rejected for marking a single instant.
+        store.unwritable.add(HealthDataType.WORKOUT);
+        implementation.setHealth(new Health() {
+            @Override
+            public boolean isSupported() {
+                return true;
+            }
+
+            @Override
+            public HealthStore getStore() {
+                return store;
+            }
+        });
+        try {
+            WorkoutManager workouts = Health.getInstance().getWorkouts();
+
+            WorkoutSession swim = workouts.startSession(
+                    new WorkoutConfiguration().setActivityType(
+                            WorkoutActivityType.SWIMMING)).get();
+            swim.start();
+            List<HealthSample> laps = new ArrayList<HealthSample>();
+            laps.add(FakeHealthStore.sample(
+                    HealthDataType.DISTANCE_SWIMMING, 1000L, 2000L, 750));
+            swim.addSamples(laps).get();
+            WorkoutSample swimDone = swim.end().get();
+            assertNotNull(swimDone.getTotalDistance(),
+                    "a swim fed distance samples must report a total");
+            assertEquals(750, swimDone.getTotalDistance()
+                    .getValue(HealthUnit.METER), 1e-9);
+
+            WorkoutSession tri = workouts.startSession(
+                    new WorkoutConfiguration().setActivityType(
+                            WorkoutActivityType.OTHER)).get();
+            tri.start();
+            List<HealthSample> legs = new ArrayList<HealthSample>();
+            legs.add(FakeHealthStore.sample(
+                    HealthDataType.DISTANCE_SWIMMING, 1000L, 2000L, 1500));
+            legs.add(FakeHealthStore.sample(
+                    HealthDataType.DISTANCE_CYCLING, 2000L, 3000L, 40000));
+            legs.add(FakeHealthStore.sample(
+                    HealthDataType.DISTANCE_WALKING_RUNNING,
+                    3000L, 4000L, 10000));
+            tri.addSamples(legs).get();
+            WorkoutSample triDone = tri.end().get();
+            assertEquals(51500, triDone.getTotalDistance()
+                    .getValue(HealthUnit.METER), 1e-9,
+                    "every leg counts, not the first one that answers");
+
+            // Still null with nothing fed in: no distance and zero
+            // distance are different facts.
+            WorkoutSession bare = workouts.startSession(
+                    new WorkoutConfiguration().setActivityType(
+                            WorkoutActivityType.WALKING)).get();
+            bare.start();
+            assertNull(bare.end().get().getTotalDistance());
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
+    /**
      * A series fed to a workout counts toward its statistics, and LATEST
      * follows the timestamp rather than the arrival order.
      *

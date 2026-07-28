@@ -483,13 +483,13 @@ class HealthSubscriptionCursorTest extends UITestBase {
         String id = "seeded-" + System.nanoTime();
         SubscriptionRequest req = new SubscriptionRequest(id)
                 .addType(HealthDataType.STEPS);
-        store.subscribe(req, listener);
+        HealthSubscription sub = store.subscribe(req, listener);
         store.drainChanges();
         assertEquals(1, store.anchorsSeen.size());
         assertNull(store.anchorsSeen.get(0),
                 "a new subscription starts with no cursor");
 
-        store.seedForTest(id, HealthAnchor.of("baseline-token"));
+        assertTrue(store.seedForTest(sub, HealthAnchor.of("baseline-token")));
         store.drainChanges();
 
         assertEquals(1, store.anchorsSeen.size());
@@ -497,6 +497,75 @@ class HealthSubscriptionCursorTest extends UITestBase {
                 "the drain must see the seeded cursor on the handle");
         assertEquals("baseline-token",
                 store.anchorsSeen.get(0).toStorableString());
+        store.unsubscribe(id);
+    }
+
+    /**
+     * A cursor issued for a subscription that has since been cancelled is
+     * dropped, not applied.
+     *
+     * <p>The platform call that produces it starts before the
+     * cancellation and can land arbitrarily late. Applying it then would
+     * restore a cursor {@code unsubscribe()} promised to discard, and --
+     * worse -- hand it to a fresh subscription that happens to reuse the
+     * id, which may be watching an entirely different set of types.</p>
+     */
+    @Test
+    void aCursorSeededForACancelledSubscriptionIsDropped() {
+        FakeHealthStore store = newStore();
+        String id = "stale-" + System.nanoTime();
+        SubscriptionRequest req = new SubscriptionRequest(id)
+                .addType(HealthDataType.STEPS);
+        HealthSubscription first = store.subscribe(req, new Collector(1));
+        store.unsubscribe(id);
+
+        assertFalse(store.seedForTest(first, HealthAnchor.of("stale-token")),
+                "a seed for a stopped subscription must be refused");
+        assertNull(com.codename1.io.Preferences.get(
+                "cn1$health$anchor$" + id, null),
+                "and it must not reach the persisted cursor either");
+
+        // The same id, registered again while that answer was in flight.
+        HealthSubscription second = store.subscribe(
+                new SubscriptionRequest(id).addType(HealthDataType.BODY_MASS),
+                new Collector(1));
+        assertFalse(store.seedForTest(first, HealthAnchor.of("stale-token")),
+                "and the replacement must not inherit it");
+        assertNull(second.getAnchor());
+        store.unsubscribe(id);
+    }
+
+    /**
+     * A seed never rewinds a cursor that has already moved.
+     *
+     * <p>A drain that runs while the starting cursor is being issued
+     * establishes one of its own. Letting the late answer overwrite it
+     * would send the next drain back to an earlier point and re-deliver
+     * changes the app has already been told about.</p>
+     */
+    @Test
+    void aSeedDoesNotRewindACursorThatHasAdvanced() {
+        FakeHealthStore store = newStore();
+        String id = "advanced-" + System.nanoTime();
+        HealthSubscription sub;
+
+        Collector waiting = new Collector(1);
+        store.subscribe(new SubscriptionRequest(id)
+                .addType(HealthDataType.STEPS), waiting);
+        sub = store.getSubscriptions().get(0);
+        List<HealthSample> one = new ArrayList<HealthSample>();
+        one.add(FakeHealthStore.sample(HealthDataType.STEPS, 1000L, 2000L,
+                7));
+        store.batchesToFire.add(new HealthChangeBatch(id,
+                sub.getTypes(), one, null, false,
+                HealthAnchor.of("live-token"), 0L, false));
+        store.drainChanges();
+        waitFor(waiting.latch, 5000);
+        assertEquals("live-token", sub.getAnchor().toStorableString());
+
+        assertFalse(store.seedForTest(sub, HealthAnchor.of("baseline-token")),
+                "a baseline that lands late must not rewind the cursor");
+        assertEquals("live-token", sub.getAnchor().toStorableString());
         store.unsubscribe(id);
     }
 }

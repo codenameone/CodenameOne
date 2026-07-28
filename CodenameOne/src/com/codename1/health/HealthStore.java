@@ -1590,7 +1590,7 @@ public class HealthStore {
         }
         rememberSubscription(request);
         if (isSupported()) {
-            doSubscribe(request, stored);
+            doSubscribe(request, sub);
         }
         return sub;
     }
@@ -2009,24 +2009,40 @@ public class HealthStore {
                 Preferences.get(PREF_ANCHOR + subscriptionId, null));
     }
 
-    /// Seeds a subscription's cursor in memory *and* on disk.
+    /// Seeds a subscription's starting cursor in memory *and* on disk,
+    /// for a port that establishes one at registration -- the Health
+    /// Connect baseline token, say.
     ///
-    /// A port that establishes a starting cursor at registration -- the
-    /// Health Connect baseline token, say -- has to reach the live
-    /// handle, because that is what the drains read. Persisting alone
-    /// looked correct and did nothing: the next drain still found a null
-    /// anchor on the handle, took a fresh cursor, and skipped exactly the
-    /// window the seed existed to cover.
-    protected final void seedAnchor(String subscriptionId,
+    /// Both halves are needed. Persisting alone looked correct and did
+    /// nothing: the next drain still found a null anchor on the handle,
+    /// took a fresh cursor, and skipped exactly the window the seed
+    /// existed to cover.
+    ///
+    /// The seed is *dropped*, not applied, in two cases, because the
+    /// cursor it carries comes from a platform call that started earlier
+    /// and may land arbitrarily late:
+    ///
+    /// - the handle is no longer the registered one. It was stopped, or
+    ///   replaced by a new subscription reusing the id. Applying it would
+    ///   restore a cursor `unsubscribe()` promised to discard, or hand a
+    ///   fresh subscription a cursor issued for a different set of types.
+    /// - the handle already has a cursor. Something has advanced past
+    ///   this seed -- a drain that ran while it was in flight, or a
+    ///   restored cursor from a previous launch -- and rewinding to it
+    ///   would re-deliver changes the app has already been told about.
+    ///
+    /// Returns whether the seed was applied, so a port can tell a dropped
+    /// seed from an accepted one.
+    protected final boolean seedAnchor(HealthSubscription subscription,
             HealthAnchor anchor) {
-        HealthSubscription sub;
-        synchronized (subscriptions) {
-            sub = subscriptions.get(subscriptionId);
+        if (subscription == null || anchor == null
+                || !isStillRegistered(subscription)
+                || subscription.getAnchor() != null) {
+            return false;
         }
-        if (sub != null) {
-            sub.seedAnchor(anchor);
-        }
-        storeAnchor(subscriptionId, anchor);
+        subscription.seedAnchor(anchor);
+        storeAnchor(subscription.getId(), anchor);
+        return true;
     }
 
     /// Persists a cursor. Called by [#fireChanges(HealthChangeBatch)]
@@ -2142,7 +2158,7 @@ public class HealthStore {
                 subscriptions.put(req.getId(), sub);
             }
             if (isSupported()) {
-                doSubscribe(req, restored);
+                doSubscribe(req, sub);
             }
         }
     }
@@ -2408,11 +2424,17 @@ public class HealthStore {
         out.complete(HealthRequestStatus.UNKNOWN);
     }
 
-    /// Registers a platform observer, resuming from `anchor` when one was
-    /// persisted. Called on registration and again on
-    /// [#restoreSubscriptions()].
+    /// Registers a platform observer for `subscription`, resuming from
+    /// [HealthSubscription#getAnchor()] when a cursor was persisted.
+    /// Called on registration and again on [#restoreSubscriptions()].
+    ///
+    /// The live handle is passed rather than the bare anchor because a
+    /// port that establishes a starting cursor asynchronously has to be
+    /// able to tell, when its answer arrives, whether the registration it
+    /// answers for is still the current one -- see
+    /// [#seedAnchor(HealthSubscription,HealthAnchor)].
     protected void doSubscribe(SubscriptionRequest request,
-            HealthAnchor anchor) {
+            HealthSubscription subscription) {
     }
 
     /// Tears down a platform observer.

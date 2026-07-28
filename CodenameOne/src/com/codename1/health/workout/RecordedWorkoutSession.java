@@ -204,15 +204,32 @@ final class RecordedWorkoutSession extends WorkoutSession {
         if (energy != null) {
             workout.setTotalEnergy(energy.in(HealthUnit.KILOCALORIE));
         }
-        HealthQuantity distance = getStatistic(
-                HealthDataType.DISTANCE_WALKING_RUNNING,
-                AggregateMetric.TOTAL);
-        if (distance == null) {
-            distance = getStatistic(HealthDataType.DISTANCE_CYCLING,
+        // Summed across every distance category, not the first one that
+        // answers. Picking one dropped a swim entirely -- nothing here
+        // looked at DISTANCE_SWIMMING at all, so a recorded swim came
+        // back with no total despite the samples that produced it being
+        // right there -- and in a triathlon it reported the walk and
+        // silently discarded the ride.
+        double metres = 0;
+        boolean any = false;
+        HealthDataType[] categories = {
+            HealthDataType.DISTANCE_WALKING_RUNNING,
+            HealthDataType.DISTANCE_CYCLING,
+            HealthDataType.DISTANCE_SWIMMING,
+        };
+        for (HealthDataType category : categories) {
+            HealthQuantity leg = getStatistic(category,
                     AggregateMetric.TOTAL);
+            if (leg != null) {
+                metres += leg.getValue(HealthUnit.METER);
+                any = true;
+            }
         }
-        if (distance != null) {
-            workout.setTotalDistance(distance.in(HealthUnit.METER));
+        // Still null when nothing was fed in: a workout with no distance
+        // samples and one covering zero metres are different facts.
+        if (any) {
+            workout.setTotalDistance(
+                    new HealthQuantity(metres, HealthUnit.METER));
         }
     }
 }
