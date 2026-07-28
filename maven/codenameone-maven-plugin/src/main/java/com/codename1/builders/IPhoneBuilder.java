@@ -130,14 +130,9 @@ public class IPhoneBuilder extends Executor {
         return t.length() == 0 ? null : t;
     }
 
-    /// Health background listeners this app declares, by binary name,
-    /// plus what is needed to name them in generated source.
-    private final java.util.List<String> healthBackgroundListeners =
-            new java.util.ArrayList<String>();
-    private final java.util.List<String> healthListenerInternalNames =
-            new java.util.ArrayList<String>();
-    private final java.util.Map<String, String> healthEnclosing =
-            new java.util.HashMap<String, String>();
+    /// What the scan saw about health background listeners, and which of
+    /// them the generated factory can actually construct.
+    private final HealthListenerScan healthScan = new HealthListenerScan();
 
     private boolean usesHealthRead;
     private boolean usesHealthWrite;
@@ -833,19 +828,23 @@ public class IPhoneBuilder extends Executor {
                 // after a restart delivered nothing.
                 @Override
                 public void implementsInterface(String cls, String iface) {
-                    if ("com/codename1/health/HealthBackgroundListener"
-                            .equals(iface)) {
-                        String fqcn = cls.replace('/', '.');
-                        if (!healthBackgroundListeners.contains(fqcn)) {
-                            healthBackgroundListeners.add(fqcn);
-                            healthListenerInternalNames.add(cls);
-                        }
-                    }
+                    healthScan.implementsInterface(cls, iface);
                 }
 
                 @Override
                 public void declaresEnclosedBy(String cls, String outer) {
-                    healthEnclosing.put(cls, outer);
+                    healthScan.declaresEnclosedBy(cls, outer);
+                }
+
+                @Override
+                public void declaresPublicType(String cls) {
+                    healthScan.declaresPublicType(cls);
+                }
+
+                @Override
+                public void declaresType(String cls, String superName,
+                        boolean isConcrete) {
+                    healthScan.declaresType(cls, superName, isConcrete);
                 }
 
                 @Override
@@ -1673,7 +1672,7 @@ public class IPhoneBuilder extends Executor {
         // SVG immediately. Skipped silently for apps that have no SVGs.
         String healthBindingsInstall = "";
         String healthInstallStatement = HealthListenerBindings
-                .installStatement(healthListenerSourceNames());
+                .installStatement(healthScan.resolve());
         if (healthInstallStatement != null) {
             healthBindingsInstall = "            "
                     + healthInstallStatement;
@@ -2133,8 +2132,11 @@ public class IPhoneBuilder extends Executor {
         // translates the result. Generated rather than resolved
         // reflectively: a direct constructor call is a reference the
         // translator follows, and a name passed to Class.forName is not.
+        for (String warning : healthScan.warnings()) {
+            log("WARNING: " + warning);
+        }
         String healthBindingsSource =
-                HealthListenerBindings.generate(healthListenerSourceNames());
+                HealthListenerBindings.generate(healthScan.resolve());
         if (healthBindingsSource != null) {
             File healthBindingsFile = new File(stubSource,
                     HealthListenerBindings.sourcePath());
@@ -2147,7 +2149,7 @@ public class IPhoneBuilder extends Executor {
                         "Failed to write the health listener bindings", ex);
             }
             log("Generated health background-listener bindings for "
-                    + healthBackgroundListeners);
+                    + healthScan.resolve().keySet());
         }
         String javacPath = System.getProperty("java.home") + "/../bin/javac";
         if (!new File(javacPath).exists()) {
@@ -5853,42 +5855,5 @@ public class IPhoneBuilder extends Executor {
         return out.toString();
     }
 
-
-    /// Binary name to the name a generated `new` expression must use.
-    ///
-    /// Built after the scan: the interfaces a class implements are
-    /// reported before its `InnerClasses` attribute, so the nesting is
-    /// not known when the listener is first seen.
-    private java.util.Map<String, String> healthListenerSourceNames() {
-        java.util.Map<String, String> out =
-                new java.util.LinkedHashMap<String, String>();
-        for (int iter = 0; iter < healthListenerInternalNames.size();
-                iter++) {
-            String internal = healthListenerInternalNames.get(iter);
-            out.put(internal.replace('/', '.'),
-                    healthSourceNameOf(internal));
-        }
-        return out;
-    }
-
-    /// The name a generated constructor call has to use for `cls`, from
-    /// the class file's own `InnerClasses` metadata rather than by
-    /// translating dollars -- a dollar is a legal Java identifier
-    /// character, so neither direction of the guess is safe.
-    private String healthSourceNameOf(String cls) {
-        java.util.Set<String> seen = new java.util.HashSet<String>();
-        String simpleNames = "";
-        String current = cls;
-        while (seen.add(current)) {
-            String outer = healthEnclosing.get(current);
-            if (outer == null || !current.startsWith(outer + "$")) {
-                return (current + simpleNames).replace('/', '.');
-            }
-            simpleNames = "." + current.substring(outer.length() + 1)
-                    + simpleNames;
-            current = outer;
-        }
-        return cls.replace('/', '.');
-    }
 
 }

@@ -441,6 +441,25 @@ public abstract class Executor {
          */
         public default void declaresEnclosedBy(String cls, String outer) {
         }
+
+        /**
+         * Reports a type, its superclass, and whether the generated
+         * bindings could build it with {@code new X()} -- that is, it is
+         * a public, non-abstract, non-interface class with a public
+         * no-argument constructor.
+         *
+         * <p>Needed because the class that <em>declares</em> a listener
+         * interface is often not the one to bind: an abstract base cannot
+         * be constructed, and the concrete subclass never names the
+         * interface itself.</p>
+         */
+        public default void declaresType(String cls, String superName,
+                boolean isConstructible) {
+        }
+
+        /** Reports that {@code cls} is public. */
+        public default void declaresPublicType(String cls) {
+        }
     }
 
     public static interface InternalClassRemapper {
@@ -516,14 +535,44 @@ public abstract class Executor {
                     ClassVisitor classVisitor = new ClassVisitor(Opcodes.ASM9) {
 
                         private String scannedName;
+                        private String scannedSuper;
+                        private boolean scannedPublic;
+                        private boolean scannedConcrete;
+                        private boolean scannedHasPublicNoArgCtor;
 
                         @Override
-                        public void visit(int i, int i1, String string, String string1, String superName, String[] interfaces) {
+                        public void visit(int i, int accessFlags, String string, String string1, String superName, String[] interfaces) {
                             scannedName = string;
+                            scannedSuper = superName;
+                            // ACC_PUBLIC 0x0001, ACC_INTERFACE 0x0200,
+                            // ACC_ABSTRACT 0x0400. A class the generated
+                            // bindings construct from another package has
+                            // to be public and buildable; the constructor
+                            // is checked in visitMethod.
+                            scannedPublic = (accessFlags & 0x0001) != 0;
+                            scannedConcrete = (accessFlags & 0x0200) == 0
+                                    && (accessFlags & 0x0400) == 0
+                                    && scannedPublic;
+                            scannedHasPublicNoArgCtor = false;
                             scanner.usesClass(superName);
                             for (String s : interfaces) {
                                 scanner.usesClass(s);
                                 scanner.implementsInterface(string, s);
+                            }
+                        }
+
+                        @Override
+                        public void visitEnd() {
+                            // Reported here rather than in visit(): the
+                            // InnerClasses attribute arrives in between
+                            // and can still rule the class out.
+                            if (scannedName != null) {
+                                if (scannedPublic) {
+                                    scanner.declaresPublicType(scannedName);
+                                }
+                                scanner.declaresType(scannedName,
+                                        scannedSuper, scannedConcrete
+                                                && scannedHasPublicNoArgCtor);
                             }
                         }
 
@@ -553,6 +602,12 @@ public abstract class Executor {
                             if (string != null && string.equals(scannedName)
                                     && string1 != null) {
                                 scanner.declaresEnclosedBy(string, string1);
+                                // ACC_STATIC 0x0008. A non-static member
+                                // class needs an enclosing instance, so
+                                // `new Outer.Inner()` would not compile.
+                                if ((i & 0x0008) == 0) {
+                                    scannedConcrete = false;
+                                }
                             }
                         }
 
@@ -566,6 +621,16 @@ public abstract class Executor {
 
                         @Override
                         public MethodVisitor visitMethod(int i, final String methodName, String string1, String string2, String[] strings) {
+                            // ACC_PUBLIC 0x0001. The generated bindings
+                            // call `new Listener()` from another package,
+                            // so anything less than a public no-argument
+                            // constructor produces source that does not
+                            // compile.
+                            if ("<init>".equals(methodName)
+                                    && "()V".equals(string1)
+                                    && (i & 0x0001) != 0) {
+                                scannedHasPublicNoArgCtor = true;
+                            }
                             return new MethodVisitor(Opcodes.ASM9) {
                                 @Override
                                 public AnnotationVisitor visitAnnotationDefault() {
@@ -721,9 +786,6 @@ public abstract class Executor {
                             };
                         }
 
-                        @Override
-                        public void visitEnd() {
-                        }
                     };
                     try {
                         r.accept(classVisitor, ClassReader.EXPAND_FRAMES);

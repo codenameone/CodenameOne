@@ -427,58 +427,9 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesHealthRead;
     private boolean usesHealthWrite;
     private boolean usesHealthWorkout;
-    /// What each scanned nested class is a member of, from its own
-    /// `InnerClasses` attribute. Absent for top-level classes.
-    private final java.util.Map<String, String> healthEnclosing =
-            new java.util.HashMap<String, String>();
-    /// The listeners above, by internal name, so a source name can be
-    /// built once the whole scan has reported its nesting. The scan
-    /// reports the implemented interfaces before the InnerClasses
-    /// attribute, so this cannot be resolved as they arrive.
-    private final java.util.List<String> healthListenerInternalNames =
-            new java.util.ArrayList<String>();
-    private final java.util.List<String> healthBackgroundListeners =
-            new java.util.ArrayList<String>();
-
-    /// Binary name to the name a generated `new` expression must use.
-    ///
-    /// Built after the scan rather than during it: the interfaces a class
-    /// implements are reported before its `InnerClasses` attribute, so the
-    /// nesting is not yet known when the listener is first seen.
-    private java.util.Map<String, String> healthListenerSourceNames() {
-        java.util.Map<String, String> out =
-                new java.util.LinkedHashMap<String, String>();
-        for (int iter = 0; iter < healthListenerInternalNames.size();
-                iter++) {
-            String internal = healthListenerInternalNames.get(iter);
-            out.put(internal.replace('/', '.'), sourceNameOf(internal));
-        }
-        return out;
-    }
-
-    /// The name a generated constructor call has to use for `cls`.
-    ///
-    /// Built from the `InnerClasses` metadata rather than by translating
-    /// dollars, because a dollar is a legal Java identifier character and
-    /// both directions of the guess are wrong: a top-level
-    /// `app.Step$Listener` became an uncompilable
-    /// `new app.Step.Listener()`, and a nested class whose own simple name
-    /// contains a dollar lost it.
-    private String sourceNameOf(String cls) {
-        java.util.Set<String> seen = new java.util.HashSet<String>();
-        String simpleNames = "";
-        String current = cls;
-        while (seen.add(current)) {
-            String outer = healthEnclosing.get(current);
-            if (outer == null || !current.startsWith(outer + "$")) {
-                return (current + simpleNames).replace('/', '.');
-            }
-            simpleNames = "." + current.substring(outer.length() + 1)
-                    + simpleNames;
-            current = outer;
-        }
-        return cls.replace('/', '.');
-    }
+    /// What the scan saw about health background listeners, and which of
+    /// them the generated factory can actually construct.
+    private final HealthListenerScan healthScan = new HealthListenerScan();
 
     // Computed while the permissions are assembled but consumed later, at
     // the points where <queries>, the <application> body and the gradle
@@ -1442,18 +1393,23 @@ public class AndroidGradleBuilder extends Executor {
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
                 @Override
                 public void implementsInterface(String cls, String iface) {
-                    if ("com/codename1/health/HealthBackgroundListener".equals(iface)) {
-                        String fqcn = cls.replace('/', '.');
-                        if (!healthBackgroundListeners.contains(fqcn)) {
-                            healthBackgroundListeners.add(fqcn);
-                            healthListenerInternalNames.add(cls);
-                        }
-                    }
+                    healthScan.implementsInterface(cls, iface);
                 }
 
                 @Override
                 public void declaresEnclosedBy(String cls, String outer) {
-                    healthEnclosing.put(cls, outer);
+                    healthScan.declaresEnclosedBy(cls, outer);
+                }
+
+                @Override
+                public void declaresPublicType(String cls) {
+                    healthScan.declaresPublicType(cls);
+                }
+
+                @Override
+                public void declaresType(String cls, String superName,
+                        boolean isConcrete) {
+                    healthScan.declaresType(cls, superName, isConcrete);
                 }
 
 
@@ -2624,8 +2580,11 @@ public class AndroidGradleBuilder extends Executor {
         // Health background-listener bindings: generated rather than
         // resolved reflectively, so each listener is reached through a
         // direct constructor call that shrinking and obfuscation follow.
+        for (String warning : healthScan.warnings()) {
+            log("WARNING: " + warning);
+        }
         String healthBindingsSource =
-                HealthListenerBindings.generate(healthListenerSourceNames());
+                HealthListenerBindings.generate(healthScan.resolve());
         if (healthBindingsSource != null) {
             File bindingsFile = new File(srcDir,
                     HealthListenerBindings.sourcePath());
@@ -2638,7 +2597,7 @@ public class AndroidGradleBuilder extends Executor {
                         "Failed to write the health listener bindings", ex);
             }
             log("Generated health background-listener bindings for "
-                    + healthBackgroundListeners);
+                    + healthScan.resolve().keySet());
         }
 
         // Health Connect bridge: Kotlin, because androidx.health.connect
@@ -5348,7 +5307,8 @@ public class AndroidGradleBuilder extends Executor {
                 + " " + request.getArg("android.proguardKeep", "") + "\n"
                 + (usesHealthStore
                         ? HealthManifestFragments.proguardKeepRules(
-                                healthBackgroundListeners)
+                                new java.util.ArrayList<String>(
+                                        healthScan.resolve().keySet()))
                         : "")
                 + googlePlayObfuscation
                 + "-keep class com.google.mygson.**{\n"
@@ -6108,7 +6068,7 @@ public class AndroidGradleBuilder extends Executor {
         // background -- see HealthListenerBindings for why that matters on
         // shrunk and obfuscated builds.
         String healthBindings = HealthListenerBindings.installStatement(
-                healthListenerSourceNames());
+                healthScan.resolve());
         if (healthBindings != null) {
             retVal += healthBindings;
         }

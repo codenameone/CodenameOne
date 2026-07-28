@@ -156,11 +156,15 @@ public class HealthScannerParityTest {
         for (String builder : new String[] {"AndroidGradleBuilder",
                 "IPhoneBuilder"}) {
             String src = source(builder);
+            assertTrue(src.contains("healthScan.implementsInterface("),
+                    builder + " must feed the shared listener scan");
+            assertTrue(src.contains("healthScan.declaresType("),
+                    builder + " must report constructibility, or an"
+                            + " abstract declarer gets bound instead of"
+                            + " its usable subclass");
             assertTrue(src.contains(
-                    "com/codename1/health/HealthBackgroundListener"),
-                    builder + " must collect background listeners");
-            assertTrue(src.contains("HealthListenerBindings.generate("),
-                    builder + " must generate the bindings");
+                    "HealthListenerBindings.generate(healthScan.resolve())"),
+                    builder + " must generate from the resolved set");
             assertTrue(src.contains("installStatement("),
                     builder + " must install them at startup");
         }
