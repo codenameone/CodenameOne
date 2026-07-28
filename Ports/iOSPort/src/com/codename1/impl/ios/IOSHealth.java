@@ -183,6 +183,11 @@ public final class IOSHealth extends Health {
     static void nativeHkRequestError(int requestId, int errorCode,
             String message) {
         AsyncResource r = take(requestId);
+        // Dropped here too, not only on the success path: a read that
+        // failed -- the locked-device case, which is exactly when
+        // background queries run -- otherwise left its entry in the static
+        // map for the life of the process.
+        takeLimit(requestId);
         if (r == null) {
             return;
         }

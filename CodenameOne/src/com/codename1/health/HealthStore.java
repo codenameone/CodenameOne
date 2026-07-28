@@ -428,6 +428,16 @@ public class HealthStore {
         return out;
     }
 
+    /// True while `sub` is still the registered, active instance.
+    boolean isStillRegistered(HealthSubscription sub) {
+        if (sub == null || !sub.isActive()) {
+            return false;
+        }
+        synchronized (subscriptions) {
+            return subscriptions.get(sub.getId()) == sub;
+        }
+    }
+
     /// Records that one queued delivery has finished.
     ///
     /// `abandoned` is how many later chunks will never be queued, which
@@ -1338,6 +1348,14 @@ public class HealthStore {
             }
 
             private boolean runDelivery() {
+                // The subscription can be stopped between queuing this and
+                // running it. Delivering then would call a listener the
+                // app has cancelled, and persisting the cursor would undo
+                // what unsubscribe() promised to discard -- or overwrite
+                // the cursor of a new subscription reusing the same id.
+                if (!store.isStillRegistered(subscription)) {
+                    return true;
+                }
                 try {
                     listener.healthDataChanged(batch);
                 } catch (Throwable t) {
@@ -1846,12 +1864,37 @@ public class HealthStore {
     }
 
     private static void failNotSupported(AsyncResource out) {
-        out.error(new HealthException(HealthError.NOT_SUPPORTED,
-                "health data is not available on this platform"));
+        fail(out, HealthError.NOT_SUPPORTED,
+                "health data is not available on this platform");
     }
 
+    /// Fails on the EDT, like every other completion.
+    ///
+    /// These are the shared fast paths -- rejected validation, an
+    /// unsupported store -- and they answer without ever reaching a port.
+    /// Completing inline handed a caller on a worker thread its callback
+    /// on that thread, so the guarantee held for every real platform
+    /// answer and broke for every rejected one.
     private static void fail(AsyncResource out, HealthError error,
             String message) {
-        out.error(new HealthException(error, message));
+        Display.getInstance().callSerially(new FailOnEdt(out,
+                new HealthException(error, message)));
+    }
+
+    private static final class FailOnEdt implements Runnable {
+        private final AsyncResource resource;
+        private final HealthException error;
+
+        FailOnEdt(AsyncResource resource, HealthException error) {
+            this.resource = resource;
+            this.error = error;
+        }
+
+        @Override
+        public void run() {
+            if (!resource.isDone()) {
+                resource.error(error);
+            }
+        }
     }
 }
