@@ -700,8 +700,8 @@ public class HealthStore {
         converted.setSource(q.getSource());
         converted.setRecordingMethod(q.getRecordingMethod());
         // Metadata travels with the sample. Losing it merely because the
-        // caller asked for pounds instead of kilograms would drop the
-        // correlation identifier this API tells them to keep there.
+        // caller asked for pounds instead of kilograms would drop
+        // whatever the caller put there, on one unit and not another.
         //
         // Copied entry by entry: getMetadata() hands back an unmodifiable
         // view, so putAll on it throws and would have failed the whole
@@ -1430,8 +1430,8 @@ public class HealthStore {
         // every source-filtered aggregate.
         converted.setSource(q.getSource());
         // Metadata travels with the sample. Losing it merely because the
-        // caller asked for pounds instead of kilograms would drop the
-        // correlation identifier this API tells them to keep there.
+        // caller asked for pounds instead of kilograms would drop
+        // whatever the caller put there, on one unit and not another.
         //
         // Copied entry by entry: getMetadata() hands back an unmodifiable
         // view, so putAll on it throws and would have failed the whole

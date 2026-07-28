@@ -156,9 +156,15 @@ public abstract class HealthSample {
                 ? RecordingMethod.UNKNOWN : recordingMethod;
     }
 
-    /// Free-form metadata carried alongside the sample, never null. Use it
-    /// for your own correlation identifier, since [#getId()] is not stable
-    /// across a reinstall.
+    /// Free-form metadata carried alongside the sample, never null.
+    ///
+    /// **Not a place for a correlation identifier**, tempting as it
+    /// looks. It round-trips through the local and simulator stores but
+    /// is not written to HealthKit or Health Connect in this release, so
+    /// on a phone it is gone the moment the sample is read back -- and
+    /// [#getId()] is no substitute either, being platform-assigned and
+    /// unstable across a reinstall. Keep the identifier in your own
+    /// storage and correlate on that.
     public final Map<String, String> getMetadata() {
         if (metadata == null) {
             return Collections.emptyMap();

@@ -190,9 +190,9 @@ public final class SeriesSample extends HealthSample {
         q.setSource(getSource());
         q.setRecordingMethod(getRecordingMethod());
         // Metadata too. Flattening is the default read shape, so dropping
-        // it here meant a series written to the local store with a
-        // correlation identifier came back as quantities carrying none --
-        // while the same sample written whole round-tripped fine.
+        // it here meant a series written to the local store with metadata
+        // came back as quantities carrying none -- while the same sample
+        // written whole round-tripped fine.
         for (java.util.Map.Entry<String, String> e
                 : getMetadata().entrySet()) {
             q.putMetadata(e.getKey(), e.getValue());
