@@ -353,10 +353,19 @@ class CN1HealthConnectBridge(private val context: Context)
         }
         val ordered = if (ascending) keyed else keyed.asReversed()
         val out = StringBuilder()
+        // The cut never falls inside a record. Every line from one series
+        // record shares its id, and Health Connect's token resumes after a
+        // whole record -- so trimming mid-record stranded the remaining
+        // samples with no token that could ever reach them. Overshooting
+        // the limit by the tail of one record is recoverable; losing it is
+        // not.
+        var recordId: String? = null
         for ((i, line) in ordered.withIndex()) {
-            if (limit in 1..i) {
+            val id = line.substringBefore('\t')
+            if (limit in 1..i && id != recordId) {
                 break
             }
+            recordId = id
             out.append(line).append('\n')
         }
         return out.toString()
