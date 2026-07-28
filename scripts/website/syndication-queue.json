@@ -2,22 +2,6 @@
   "_comment": "Queue of browser-only syndication tasks (Medium, DZone, Hashnode) drained by a local syndication tool that runs on the maintainer's machine inside an already-signed-in browser session. Tasks are appended by scripts/website/queue_browser_syndication.py which is invoked by the daily blog-syndication workflow, and the local tool writes the resulting URLs back into syndication-state.json.",
   "tasks": [
     {
-      "id": "linkedin:2026-07-28-1200-codenameone-rich-text-without-webview",
-      "site": "linkedin",
-      "kind": "social",
-      "slug": "2026-07-28-1200-codenameone-rich-text-without-webview",
-      "source_slug": "rich-text-without-webview",
-      "account": "codenameone",
-      "title": "A lightweight rich text component without a web view",
-      "canonical": "https://www.codenameone.com/blog/rich-text-without-webview/",
-      "cover_image_url": "https://www.codenameone.com/blog/rich-text-without-webview.jpg",
-      "body_text": "There is a large gap between a `SpanLabel` and a browser.\n\n`RichTextComponent` fills it with a lightweight Codename One component that renders:\n\n\u2022 HTML, Markdown, AsciiDoc, and a practical RTF subset\n\u2022 headings, lists, links, inline images, colors, and highlights\n\u2022 application-built styled runs\n\u2022 height-for-width measurement inside ordinary layouts\n\nIt shares the document model and run painter with `RichTextArea`, but carries no caret, keyboard session, undo stack, or formatting toolbar.\n\nLinks are application actions. Images come from an application resolver. Imported HTML is document data and does not execute scripts.\n\nUse `BrowserComponent` for a real web page. Formatted application content no longer needs one.\n\nhttps://www.codenameone.com/blog/rich-text-without-webview/",
-      "scheduled_at": "2026-07-28T09:00:00+00:00",
-      "scheduled_local": "2026-07-28T12:00+03:00",
-      "timezone": "Asia/Jerusalem",
-      "queued_at": "2026-07-26T06:52:36+00:00"
-    },
-    {
       "id": "linkedin:2026-07-29-1200-shai-compact-strings-parparvm",
       "site": "linkedin",
       "kind": "social",

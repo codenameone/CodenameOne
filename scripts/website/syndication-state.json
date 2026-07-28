@@ -1278,6 +1278,15 @@
         "url": "https://medium.com/p/f324aeae88e9/edit",
         "syndicated_at": "2026-07-27T17:02:02+00:00"
       }
+    },
+    "2026-07-28-1200-codenameone-rich-text-without-webview": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/company/5041007/admin/page-posts/published/",
+        "syndicated_at": "2026-07-28T09:01:03+00:00",
+        "account": "codenameone",
+        "source_slug": "rich-text-without-webview",
+        "scheduled_at": "2026-07-28T09:00:00+00:00"
+      }
     }
   }
 }
