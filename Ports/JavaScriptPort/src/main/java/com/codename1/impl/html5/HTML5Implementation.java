@@ -651,10 +651,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private static class GestureHook {
         final int generation;
         final JSRunnable runnable;
+        /** Run on the EDT instead, if a newer interaction supersedes this one. */
+        final Runnable superseded;
 
-        GestureHook(int generation, JSRunnable runnable) {
+        GestureHook(int generation, JSRunnable runnable, Runnable superseded) {
             this.generation = generation;
             this.runnable = runnable;
+            this.superseded = superseded;
         }
     }
 
@@ -664,7 +667,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * activation, which is spent or expiring, so letting it consume this hook
      * would leave the popup blocked.
      */
-    private void addGestureOnlyHook(JSRunnable r) {
+    private void addGestureOnlyHook(JSRunnable r, Runnable superseded) {
         // Backstop against unbounded growth: a hook whose interaction is long
         // past can no longer be drained, which only happens if the EDT took
         // longer than the whole 5s drain burst to reach us.
@@ -673,7 +676,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 gestureOnlyHooks.remove(i);
             }
         }
-        gestureOnlyHooks.add(new GestureHook(gestureGeneration, r));
+        gestureOnlyHooks.add(new GestureHook(gestureGeneration, r, superseded));
         if (pendingGestureDrains <= 0) {
             // Generation matching keeps an older drain from taking this hook,
             // but only a drain of THIS interaction will run it -- and there may
@@ -703,8 +706,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         }
         gestureOnlyHooks.removeAll(due);
+        // Transient activation belongs to the WINDOW, not to this generation.
+        // If a newer interaction has since occurred, running these would spend
+        // the activation it just granted -- the newer interaction's own popup
+        // would then be blocked, having done nothing wrong. Hand them to their
+        // fallback instead.
+        boolean superseded = generation != gestureGeneration;
         for (int i = 0; i < due.size(); i++) {
-            due.get(i).runnable.run();
+            GestureHook hook = due.get(i);
+            if (superseded) {
+                _log("execute(): a newer interaction superseded a queued open");
+                if (hook.superseded != null) {
+                    callSerially(hook.superseded);
+                }
+            } else {
+                hook.runnable.run();
+            }
         }
     }
     
@@ -7314,21 +7331,37 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         // A browser setting, an extension or an activation that
                         // expired before the drain can still block the one
                         // reserved attempt. Fall back to asking rather than
-                        // leaving the caller with a dead click. Re-entering is
-                        // safe and cannot loop: this generation's reservation is
-                        // already spent, so it lands on the Sheet. Hop to the
-                        // EDT first -- this runs on a hook drain.
+                        // leaving the caller with a dead click. Hop to the EDT
+                        // first -- this runs on a hook drain.
                         callSerially(new Runnable() {
                             @Override
                             public void run() {
-                                openInNewWindowWithConfirmation(url, prompt);
+                                showOpenConfirmation(url, prompt);
                             }
                         });
                     }
                 }
+            }, new Runnable() {
+                @Override
+                public void run() {
+                    // Superseded by a newer interaction. Ask rather than
+                    // re-queue: queueing again would open this URL off a
+                    // gesture the user made for something else.
+                    showOpenConfirmation(url, prompt);
+                }
             });
             return;
         }
+        showOpenConfirmation(url, prompt);
+    }
+
+    /**
+     * Asks the user whether to open {@code url}, and on OK queues the open
+     * against the tap that answered. Always shows the Sheet -- never queues a
+     * popup on its own -- so it is safe as the fallback for a hook that could
+     * not run.
+     */
+    private void showOpenConfirmation(final String url, final String prompt) {
         createConfirmationSheet("Open Link", prompt,
                 shortenUrlForDisplay(url), new Runnable() {
             @Override
@@ -7359,20 +7392,35 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             callSerially(new Runnable() {
                                 @Override
                                 public void run() {
-                                    createConfirmationSheet("Open Link",
-                                            "Your browser blocked the new window."
-                                                    + " Open this link in the current tab instead?",
-                                            shortenUrlForDisplay(url), new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            openUrlOnMainThread(url, true, false);
-                                        }
-                                    }).show();
+                                    showBlockedPopupFallback(url);
                                 }
                             });
                         }
                     }
+                }, new Runnable() {
+                    @Override
+                    public void run() {
+                        // The confirming tap was superseded before its drain
+                        // ran. Ask again rather than spend the newer gesture.
+                        showOpenConfirmation(url, prompt);
+                    }
                 });
+            }
+        }).show();
+    }
+
+    /**
+     * Last resort after a confirmed open was blocked anyway: offer the current
+     * tab, which needs no activation and so cannot be blocked in turn.
+     */
+    private void showBlockedPopupFallback(final String url) {
+        createConfirmationSheet("Open Link",
+                "Your browser blocked the new window."
+                        + " Open this link in the current tab instead?",
+                shortenUrlForDisplay(url), new Runnable() {
+            @Override
+            public void run() {
+                openUrlOnMainThread(url, true, false);
             }
         }).show();
     }
@@ -7517,8 +7565,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             } else {
                 // The no-blob leg opens a popup, so it needs the activation
                 // only a gesture-backed drain carries -- same reason its gate
-                // above is the stricter one.
-                addGestureOnlyHook(hook);
+                // above is the stricter one. If a newer interaction supersedes
+                // it, ask rather than spend that interaction's activation.
+                addGestureOnlyHook(hook, new Runnable() {
+                    @Override
+                    public void run() {
+                        showOpenConfirmation(url, "Open this link?");
+                    }
+                });
             }
 
         } else {
@@ -7538,7 +7592,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     if (handlerRegistered) {
                         addBacksideHook(confirmed);
                     } else {
-                        addGestureOnlyHook(confirmed);
+                        addGestureOnlyHook(confirmed, new Runnable() {
+                            @Override
+                            public void run() {
+                                showOpenConfirmation(url, "Open this link?");
+                            }
+                        });
                     }
                 }
             }).show();
