@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2021, 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.maven;
 
 import com.codename1.ant.SortedProperties;
@@ -77,5 +99,23 @@ public class CN1BuildMojoTest {
         assertFalse(CN1BuildMojo.isStrippedFromStagedJar("com.mycompany", "myproject-common", "compile", "ios-source"));
         assertFalse(CN1BuildMojo.isStrippedFromStagedJar("com.codenameone", "cn1-admob-lib", "compile", "ios-device"));
         assertTrue(CN1BuildMojo.isStrippedFromStagedJar("org.junit.jupiter", "junit-jupiter", "test", "ios-device"));
+    }
+
+    @Test
+    public void keepsArtifactsWithoutAScope() {
+        // A null scope is not a statement that the artifact is outside the application.
+        assertFalse(CN1BuildMojo.isStrippedFromStagedJar("com.mycompany", "some-lib", null, "ios-device"));
+    }
+
+    @Test
+    public void onlyTheFrameworkCountsAsSuppliedByTheBuildServer() {
+        assertTrue(CN1BuildMojo.isSuppliedByBuildServer("com.codenameone", "codenameone-core", "ios-device"));
+        assertTrue(CN1BuildMojo.isSuppliedByBuildServer("com.codenameone", "java-runtime", "ios-source"));
+        assertTrue(CN1BuildMojo.isSuppliedByBuildServer("org.jetbrains.kotlin", "kotlin-stdlib", "ios-device"));
+        assertFalse(CN1BuildMojo.isSuppliedByBuildServer("com.codenameone", "codenameone-core", "local-javascript"));
+        // A `provided` scope third party dependency is stripped from the jar but nobody
+        // puts it back, so a reference into it stays reportable.
+        assertTrue(CN1BuildMojo.isStrippedFromStagedJar("com.thirdparty", "some-api", "provided", "ios-device"));
+        assertFalse(CN1BuildMojo.isSuppliedByBuildServer("com.thirdparty", "some-api", "ios-device"));
     }
 }

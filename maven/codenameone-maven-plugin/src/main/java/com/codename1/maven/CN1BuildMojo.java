@@ -215,13 +215,29 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     }
 
     /**
+     * Whether the build itself re-supplies the artifact's classes after they
+     * are left out of the staged jar: codenameone-core and java-runtime come
+     * from the build server (or, for a local JavaScript build, stay in the jar
+     * so ParparVM's translator can see them), and kotlin-stdlib comes from the
+     * build server too. This is deliberately narrower than
+     * {@link #isStrippedFromStagedJar}: a reference into anything else that is
+     * left out really is a reference to a class nobody will supply.
+     */
+    static boolean isSuppliedByBuildServer(String groupId, String artifactId, String buildTarget) {
+        if (GROUP_ID.equals(groupId) && contains(artifactId, BUNDLE_ARTIFACT_ID_BLACKLIST)) {
+            return !isLocalJavascriptBuild(buildTarget);
+        }
+        return !isLocalBuildTarget(buildTarget)
+                && "org.jetbrains.kotlin".equals(groupId)
+                && "kotlin-stdlib".equals(artifactId);
+    }
+
+    /**
      * Whether the given artifact is left out of the jar-with-dependencies that
-     * is staged for the build. The build server re-supplies its own copy of
-     * codenameone-core, java-runtime and kotlin-stdlib, and non-compile scopes
-     * are not part of the application in the first place, so references into
-     * them are satisfied even though their classes are not in the jar. Shared
-     * by the jar assembly and the class closure check so the two can never
-     * disagree about what is actually missing.
+     * is staged for the build, either because the build re-supplies it or
+     * because its scope says it is not part of the application. Shared by the
+     * jar assembly and the class closure check so the two can never disagree
+     * about what is in the jar.
      */
     static boolean isStrippedFromStagedJar(String groupId, String artifactId, String scope, String buildTarget) {
         if (GROUP_ID.equals(groupId) && contains(artifactId, BUNDLE_ARTIFACT_ID_BLACKLIST)) {
@@ -231,14 +247,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             // directory.
             return !isLocalJavascriptBuild(buildTarget);
         }
-        if (!isLocalBuildTarget(buildTarget)
-                && "org.jetbrains.kotlin".equals(groupId)
-                && "kotlin-stdlib".equals(artifactId)) {
+        if (isSuppliedByBuildServer(groupId, artifactId, buildTarget)) {
             // When sending to the build server, we'll strip the kotlin-stdlib and the server will
             // provide it. For local builds, it's easier to just include it.
             return true;
         }
-        return !"compile".equals(scope);
+        // An artifact with no scope was never scoped out of the application, so
+        // keep its classes rather than dropping them from the jar.
+        return scope != null && !"compile".equals(scope);
     }
 
     private boolean isStrippedFromStagedJar(Artifact artifact) {
@@ -280,12 +296,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
             }
         }
-        // Classes stripped from the staged jar that the build server re-supplies:
-        // references into them are not missing.
+        // Classes left out of the staged jar that the build re-supplies: references
+        // into them are not missing. Anything else that was left out -- a `provided`
+        // scope third party dependency, say -- stays reportable, because nothing
+        // puts those classes back before the translators run.
         boolean localJavascriptBuild = isLocalJavascriptBuild(buildTarget);
         List<File> providedJars = new ArrayList<File>();
         for (Artifact artifact : project.getArtifacts()) {
-            if (isStrippedFromStagedJar(artifact)) {
+            if (isSuppliedByBuildServer(artifact.getGroupId(), artifact.getArtifactId(), buildTarget)) {
                 File jar = getJar(artifact);
                 if (jar != null && jar.isFile()) {
                     providedJars.add(jar);
