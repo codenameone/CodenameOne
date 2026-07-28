@@ -6953,7 +6953,58 @@ public class HTML5Implementation extends CodenameOneImplementation {
     /** Marker appended to a URL shortened for the confirmation Sheet. */
     private static final String DISPLAY_URL_ELLIPSIS = "...";
 
+    /** 0 unknown, 1 reachable, -1 not reachable. */
+    private int mainThreadBridgeState;
+
     /**
+     * Whether scripts can reach the page at all, cached after one probe.
+     *
+     * <p>A host bundle predating the {@code __cn1_eval_on_main__} handler leaves
+     * the worker with no page-side channel, so every open fails. Knowing that
+     * up front matters because the recovery for a blocked popup -- ask the user
+     * -- is worthless here: the Sheet would promise something no button on it
+     * can deliver.</p>
+     */
+    private boolean isMainThreadBridgeAvailable() {
+        if (mainThreadBridgeState == 0) {
+            try {
+                // A no-op that asserts page context, nothing else.
+                eval_("if (typeof document === 'undefined') {"
+                        + " throw new Error('cn1: not running on the page'); }");
+                mainThreadBridgeState = 1;
+            } catch (Throwable t) {
+                mainThreadBridgeState = -1;
+            }
+        }
+        return mainThreadBridgeState == 1;
+    }
+
+    /**
+     * Tells the user a link cannot be opened, for the one case where no
+     * confirmation could help. Informational, so a single dismiss button.
+     */
+    private void showCannotOpenMessage(String url) {
+        final Sheet sheet = new Sheet(null, "Open Link");
+        SpanLabel message = new SpanLabel(
+                "This app cannot open links. Its web runtime is out of date.");
+        Button close = new Button("Close");
+        close.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                sheet.back();
+            }
+        });
+        sheet.getContentPane().setLayout(BoxLayout.y());
+        sheet.getContentPane().add(message);
+        Label detail = new Label(shortenUrlForDisplay(url));
+        detail.setEndsWith3Points(true);
+        sheet.getContentPane().add(detail);
+        sheet.getContentPane().add(FlowLayout.encloseCenter(close));
+        sheet.show();
+    }
+
+    /**
+     * A raw URL has no spaces for {@code SpanLabel} to wrap on, so putting one    /**
      * A raw URL has no spaces for {@code SpanLabel} to wrap on, so putting one
      * in the confirmation Sheet blew the content pane's preferred width past the
      * screen and pushed the buttons out of reach. Shorten it for display; the
@@ -7300,6 +7351,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // Sheet is a compatibility fallback the caller never requested, so
         // promising a new window there would describe behavior they did not
         // choose.
+        if (!isMainThreadBridgeAvailable()) {
+            // No page-side channel at all, so no button could make this work.
+            // Say so instead of showing a confirmation that cannot succeed.
+            _log("execute(): no page-side channel on this host bundle, cannot open " + url);
+            showCannotOpenMessage(url);
+            return;
+        }
         openInNewWindowWithConfirmation(url, EXECUTE_TARGET_BLANK.equals(target)
                 ? "Open this link in a new window?"
                 : "Open this link?");
