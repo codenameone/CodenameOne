@@ -6869,15 +6869,25 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // authority. Without this the slashless form would skip the
                     // parsing below and display its leading user info.
                     rest = url.substring(colon + 1);
-                    while (rest.startsWith("/") || rest.startsWith("\\")) {
-                        rest = rest.substring(1);
-                    }
-                    // Only reached when the scheme is special.
+                    // Only reached when the scheme is special; the separator
+                    // skip below covers http:/host as well as http:host.
                     special = true;
                 } else {
                     // No authority to protect (mailto:, tel:, a bare path).
                     return ellipsizeTail(url);
                 }
+            }
+        }
+        if (special) {
+            // Browsers ignore any number of separators after the scheme, so
+            // https:////host and https:/\\/host both open host. Skip them, or
+            // the scan below stops on the leftover separator, reads an empty
+            // authority and falls back to showing the raw prefix.
+            while (rest.startsWith("/") || rest.startsWith("\\")) {
+                rest = rest.substring(1);
+            }
+            if (rest.length() == 0) {
+                return ellipsizeTail(url);
             }
         }
         int authorityEnd = rest.length();
@@ -7111,7 +7121,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * timer would let the browser block the popup with nothing shown, which is
      * worse than the Sheet.</p>
      */
-    private void openInNewWindowWithConfirmation(final String url, String prompt) {
+    private void openInNewWindowWithConfirmation(final String url, final String prompt) {
         if (isGestureBackedHookAvailable() && popupReservedForGeneration != gestureGeneration) {
             // Tied to the interaction rather than to any drain of it -- see the
             // field. Never cleared; the next interaction simply carries a
@@ -7123,7 +7133,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // openUrlOnMainThread reports the reason on failure --
                     // popup blocked or no page-side channel -- so do not
                     // second-guess it with a duplicate line here.
-                    openUrlOnMainThread(url, false, false);
+                    if (!openUrlOnMainThread(url, false, false)) {
+                        // A browser setting, an extension or an activation that
+                        // expired before the drain can still block the one
+                        // reserved attempt. Fall back to asking rather than
+                        // leaving the caller with a dead click. Re-entering is
+                        // safe and cannot loop: this generation's reservation is
+                        // already spent, so it lands on the Sheet. Hop to the
+                        // EDT first -- this runs on a hook drain.
+                        callSerially(new Runnable() {
+                            @Override
+                            public void run() {
+                                openInNewWindowWithConfirmation(url, prompt);
+                            }
+                        });
+                    }
                 }
             });
             return;
