@@ -116,6 +116,17 @@ public final class SeriesSample extends HealthSample {
                         + " of this series ends before it starts: "
                         + sampleStarts[i] + " > " + sampleEnds[i]);
             }
+            // Inside the record, too. Reads match the enclosing span
+            // first, so a point outside it is unreachable by a query
+            // around itself and yet gets flattened into the answer for a
+            // query around the record -- returning a sample the caller's
+            // range does not contain.
+            if (sampleStarts[i] < startMillis || sampleEnds[i] > endMillis) {
+                throw new IllegalArgumentException("measurement " + i
+                        + " of this series falls outside the record's span "
+                        + startMillis + ".." + endMillis + ": "
+                        + sampleStarts[i] + ".." + sampleEnds[i]);
+            }
         }
         long[] s = new long[sampleStarts.length];
         long[] e = new long[sampleEnds.length];

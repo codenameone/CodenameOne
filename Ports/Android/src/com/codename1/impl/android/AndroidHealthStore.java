@@ -205,6 +205,61 @@ class AndroidHealthStore extends HealthStore {
         d.grantedPermissions(new GrantsCallback(this));
     }
 
+    /// Refreshes the grant snapshot and resolves `out` once it has landed.
+    ///
+    /// Falls back to resolving immediately when there is no delegate to
+    /// ask: the flow did complete, and blocking on a refresh that can
+    /// never arrive would be worse than an unrefreshed cache.
+    private void refreshGrantsThen(final AsyncResource<Boolean> out) {
+        HealthConnectDelegate d = delegate();
+        if (d == null) {
+            out.complete(Boolean.TRUE);
+            return;
+        }
+        synchronized (granted) {
+            grantsRequested = true;
+        }
+        d.grantedPermissions(new GrantsThenComplete(this, out));
+    }
+
+    /// Records the refreshed grants, then resolves the authorization.
+    ///
+    /// Named rather than anonymous so it carries no synthetic reference
+    /// (SpotBugs `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class GrantsThenComplete
+            implements HealthConnectDelegate.Callback {
+        private final AndroidHealthStore store;
+        private final AsyncResource<Boolean> out;
+
+        GrantsThenComplete(AndroidHealthStore store,
+                AsyncResource<Boolean> out) {
+            this.store = store;
+            this.out = out;
+        }
+
+        public void onSuccess(final String payload) {
+            AndroidHealth.onEdt(new Runnable() {
+                public void run() {
+                    store.rememberGrants(payload);
+                    store.clearGrantsRequest();
+                    out.complete(Boolean.TRUE);
+                }
+            });
+        }
+
+        public void onError(final int code, final String message) {
+            AndroidHealth.onEdt(new Runnable() {
+                public void run() {
+                    // The sheet still completed. An unreadable grant list
+                    // leaves the cache as it was rather than failing an
+                    // authorization the user did go through.
+                    store.clearGrantsRequest();
+                    out.complete(Boolean.TRUE);
+                }
+            });
+        }
+    }
+
     private void rememberGrants(String csv) {
         synchronized (granted) {
             granted.clear();
@@ -371,11 +426,15 @@ class AndroidHealthStore extends HealthStore {
                             synchronized (granted) {
                                 grantsLoaded = false;
                             }
-                            refreshGrants();
-                            // True because the flow completed, matching the
-                            // documented contract -- not because everything
-                            // was granted.
-                            out.complete(Boolean.TRUE);
+                            // Resolved only once the refreshed snapshot has
+                            // landed. Completing first meant an app that
+                            // checked getReadAuthorizationStatus from this
+                            // very callback saw NOT_DETERMINED -- the cache
+                            // having just been cleared -- with nothing to
+                            // tell it when to look again. True because the
+                            // flow completed, matching the documented
+                            // contract, not because anything was granted.
+                            refreshGrantsThen(out);
                         }
                     });
                 } catch (Throwable t) {

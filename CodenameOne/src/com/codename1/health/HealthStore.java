@@ -1166,8 +1166,19 @@ public class HealthStore {
             ends[i] = series.getSampleEndMillis(from + i);
             values[i] = series.getSampleValue(from + i, series.getUnit());
         }
-        SeriesSample part = SeriesSample.create(series.getType(), starts[0],
-                ends[n - 1], starts, ends, values, series.getUnit());
+        // The span is the extent of the slice, not its first start and
+        // last end. Nothing documents the arrays as chronological, and on
+        // an unordered series those two are not the bounds -- the factory
+        // would reject the slice outright when the last point is the
+        // earliest, or accept a span that excludes points it contains.
+        long spanStart = starts[0];
+        long spanEnd = ends[0];
+        for (int i = 1; i < n; i++) {
+            spanStart = Math.min(spanStart, starts[i]);
+            spanEnd = Math.max(spanEnd, ends[i]);
+        }
+        SeriesSample part = SeriesSample.create(series.getType(), spanStart,
+                spanEnd, starts, ends, values, series.getUnit());
         part.setId(series.getId());
         part.setSource(series.getSource());
         part.setRecordingMethod(series.getRecordingMethod());
@@ -1537,6 +1548,12 @@ public class HealthStore {
         // the same page a second time.
         AsyncResource<Integer> portResult = new AsyncResource<Integer>();
         portResult.onResult(new DrainGate(this, out));
+        // Armed like every other platform call. Without it a delegate that
+        // never calls back leaves DrainGate unrun and `drainInFlight` set
+        // for the life of the process, so this drain and every coalesced
+        // one behind it wait forever -- the coalescing turning one lost
+        // callback into a permanently dead subscription.
+        armTimeout(portResult);
         doDrainChanges(subs, portResult);
         return out;
     }
