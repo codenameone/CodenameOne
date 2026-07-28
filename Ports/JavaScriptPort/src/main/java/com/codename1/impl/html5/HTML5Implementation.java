@@ -7464,7 +7464,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // changed anything, the raw form is not what the browser would parse,
         // so it can still be a key in its own right -- "https://x/y\n" among
         // them, which the shape test alone would wave through.
-        boolean cannotBeStorageKey = isUnambiguousBrowserUrl(rawUrl) && rawUrl.equals(url);
+        // data: carries its own payload and is claimed by its own branch
+        // below, so it is never a lookup candidate -- and must not become one:
+        // exists() would push a multi-megabyte base64 string through the host
+        // bridge as a key, twice, blocking the EDT for nothing. The parent
+        // implementation excluded data: here too.
+        boolean cannotBeStorageKey = hasScheme(url, "data")
+                || (isUnambiguousBrowserUrl(rawUrl) && rawUrl.equals(url));
         if (!cannotBeStorageKey && exists(rawUrl)) {
             try {
                 Blob blob = openFileAsBlob(rawUrl);
