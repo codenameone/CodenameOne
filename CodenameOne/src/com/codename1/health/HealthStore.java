@@ -2235,15 +2235,9 @@ public class HealthStore {
 
     /// Fails inline, on the calling thread.
     ///
-    /// Deliberately *not* marshalled through `callSerially`. Nothing else
-    /// in this class marshals an [AsyncResource] completion: rejected
-    /// validation errors inline, and a port completes on whichever thread
-    /// its SDK called back on. Routing only these fast paths through the
-    /// EDT would make the store's threading depend on *why* a call failed,
-    /// and would deadlock [AsyncResource#get()] wherever no event thread is
-    /// pumping. The EDT hop belongs where a callback reaches app code that
-    /// did not ask for it -- change delivery and the timeout thread -- and
-    /// both of those do hop.
+    /// Matches [com.codename1.impl.health.LocalHealthStore] rather than the
+    /// mobile ports, which marshal to the EDT. Both are documented; see the
+    /// note there for why the hop is not in place yet.
     private static void fail(AsyncResource out, HealthError error,
             String message) {
         out.error(new HealthException(error, message));

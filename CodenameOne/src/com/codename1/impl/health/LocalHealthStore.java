@@ -45,6 +45,7 @@ import com.codename1.health.nutrition.Nutrient;
 import com.codename1.health.nutrition.NutritionSample;
 import com.codename1.health.SampleQuery;
 import com.codename1.health.SamplePage;
+import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 
 import java.util.ArrayList;
@@ -209,16 +210,22 @@ public class LocalHealthStore extends HealthStore {
 
     /// Completes inline, on the calling thread.
     ///
-    /// This used to hop through `callSerially` on the premise that
-    /// HealthStore guarantees every callback on the EDT and that the
-    /// mobile ports honour it. Neither is so: HealthStore completes an
-    /// AsyncResource on whichever thread produced the answer, and a port
-    /// completes on whichever thread its SDK called back on. Hopping only
-    /// here made this store the odd one out, and would deadlock
-    /// AsyncResource.get() wherever nothing is pumping an event thread.
+    /// **This does not match the mobile ports, and that is a known gap.**
+    /// `IOSHealth` marshals through `Display.callSerially` and
+    /// `AndroidHealthStore` through `AndroidHealth.onEdt`, so on a phone
+    /// every callback does arrive on the EDT as
+    /// [com.codename1.health.Health] promises. Here it arrives on whichever
+    /// thread called.
     ///
-    /// The EDT hop belongs where a callback reaches app code that did not
-    /// ask for it -- change delivery -- and that is done in HealthStore.
+    /// Marshalling this store the same way is written and reverted: moving
+    /// the completion onto the EDT makes the whole result chain --
+    /// paging, unit normalization, series flattening -- run there too, and
+    /// anything those throw escapes the EDT runnable instead of failing
+    /// the resource, so the caller waits forever. That is a real defect in
+    /// the completion path rather than in the hop, and it wants fixing
+    /// first. Until then, inline delivery is the behaviour that cannot
+    /// hang, and the developer guide says so rather than promising the
+    /// EDT everywhere.
     private static void completeInline(AsyncResource out, Object value) {
         out.complete(value);
     }

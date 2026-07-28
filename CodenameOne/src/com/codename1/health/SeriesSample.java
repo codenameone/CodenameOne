@@ -105,6 +105,18 @@ public final class SeriesSample extends HealthSample {
             throw new IllegalArgumentException(
                     "a series needs at least one measurement");
         }
+        // Every measurement, not just the enclosing span. A point whose
+        // end precedes its start was accepted here and written to the
+        // local store, and then the default flattened read threw out of
+        // toQuantitySample() -- inside the read callback, where it takes
+        // the whole page with it.
+        for (int i = 0; i < values.length; i++) {
+            if (sampleEnds[i] < sampleStarts[i]) {
+                throw new IllegalArgumentException("measurement " + i
+                        + " of this series ends before it starts: "
+                        + sampleStarts[i] + " > " + sampleEnds[i]);
+            }
+        }
         long[] s = new long[sampleStarts.length];
         long[] e = new long[sampleEnds.length];
         double[] v = new double[values.length];

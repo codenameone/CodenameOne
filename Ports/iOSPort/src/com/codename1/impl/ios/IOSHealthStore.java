@@ -298,7 +298,10 @@ class IOSHealthStore extends HealthStore {
             // subscription never delivers anything at all.
             fireChanges(new HealthChangeBatch(sub.getId(), sub.getTypes(),
                     null, null, false,
-                    HealthAnchor.of(String.valueOf(now)), 0L, false));
+                    // Foreground: no OS deadline. Reporting 0 made a listener
+                    // that budgets against getDeadlineMillis() treat every
+                    // ordinary drain as already out of time.
+                    HealthAnchor.of(String.valueOf(now)), Long.MAX_VALUE, false));
             drainFrom(subs, index + 1, delivered + 1, out);
             return;
         }
@@ -329,7 +332,10 @@ class IOSHealthStore extends HealthStore {
             // good, silently, on exactly the busiest subscriptions.
             fireChanges(new HealthChangeBatch(sub.getId(), sub.getTypes(),
                     collected, null, false,
-                    HealthAnchor.of(String.valueOf(safeUntil)), 0L,
+                    // Foreground: no OS deadline. Reporting 0 made a listener
+                    // that budgets against getDeadlineMillis() treat every
+                    // ordinary drain as already out of time.
+                    HealthAnchor.of(String.valueOf(safeUntil)), Long.MAX_VALUE,
                     safeUntil < now));
             drainFrom(subs, index + 1, delivered + 1, out);
             return;

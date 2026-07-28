@@ -536,7 +536,10 @@ class AndroidHealthStore extends HealthStore {
             if (baseline) {
                 fireChanges(new HealthChangeBatch(sub.getId(),
                         sub.getTypes(), null, null, false,
-                        HealthAnchor.of(payload.trim()), 0L, false));
+                        // Foreground: no OS deadline. Reporting 0 made a listener
+                        // that budgets against getDeadlineMillis() treat every
+                        // ordinary drain as already out of time.
+                        HealthAnchor.of(payload.trim()), Long.MAX_VALUE, false));
             } else {
                 HealthChangePage page =
                         HealthWire.decodeChangePage(payload);
@@ -549,7 +552,10 @@ class AndroidHealthStore extends HealthStore {
                 fireChanges(new HealthChangeBatch(sub.getId(),
                         sub.getTypes(), page.getAdded(),
                         page.getDeletedIds(), page.isExpired(),
-                        HealthAnchor.of(page.getNextToken()), 0L,
+                        // Foreground: no OS deadline. Reporting 0 made a listener
+                        // that budgets against getDeadlineMillis() treat every
+                        // ordinary drain as already out of time.
+                        HealthAnchor.of(page.getNextToken()), Long.MAX_VALUE,
                         page.hasMore()));
                 count++;
             }
