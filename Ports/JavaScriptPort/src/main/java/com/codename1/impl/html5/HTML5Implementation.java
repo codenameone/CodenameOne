@@ -7089,6 +7089,36 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
+     * True for schemes that unambiguously address the browser, so offering the
+     * string to local storage first would be pointless.
+     *
+     * <p>Everything else is offered to storage first, because a stored key can
+     * be scheme-shaped: {@code report:2026.pdf} is a file, not a URI, and was
+     * downloadable before {@link #isExternalUrl(String)} began classifying by
+     * grammar. Custom deep links pass through unharmed -- {@code imdb:///find}
+     * simply is not in storage, so the lookup misses and classification
+     * proceeds.</p>
+     */
+    private static boolean isBrowserOnlyScheme(String url) {
+        if (url.startsWith("//")) {
+            return true;
+        }
+        int colon = url.indexOf(':');
+        if (colon < 1) {
+            return false;
+        }
+        String scheme = url.substring(0, colon);
+        return isSpecialScheme(scheme)
+                || "mailto".equalsIgnoreCase(scheme)
+                || "tel".equalsIgnoreCase(scheme)
+                || "sms".equalsIgnoreCase(scheme)
+                || "data".equalsIgnoreCase(scheme)
+                || "blob".equalsIgnoreCase(scheme)
+                || "about".equalsIgnoreCase(scheme)
+                || "javascript".equalsIgnoreCase(scheme);
+    }
+
+    /**
      * True when the URL names something the browser itself can hand off, as
      * opposed to a path into local storage that {@link #execute(String)} is
      * expected to turn into a download. Only these get the
@@ -7250,30 +7280,26 @@ public class HTML5Implementation extends CodenameOneImplementation {
         String fileName = null;
         boolean useBlobHandler = false;
         Button nativeButton = new Button();
-        // Only local content can name storage to wrap in a Blob, which is
-        // what isExternalUrl() is false for: bare paths, and file: URLs, whose
-        // scheme names local content too. Everything else with a scheme is
-        // true, data: included -- that carries its own payload and is claimed
-        // by its own branch further down.
-        if (!isExternalUrl(url)) {
-            // Looked up under the path exactly as given: a storage key may
-            // legitimately open or close with a space, and nothing here is
-            // parsed by the browser.
-            if (exists(rawUrl)) {
-                try {
-                    Blob blob = openFileAsBlob(rawUrl);
-                    char sep = getFileSystemSeparator();
-                    fileName = rawUrl;
-                    if (fileName.indexOf(sep) >=0) {
-                        fileName = fileName.substring(fileName.lastIndexOf(sep)+1);
-                    }
-                    registerSaveBlobHandler(fileName, blob);
-                    useBlobHandler = true;
-
-                } catch (Throwable ex) {
-                    // openFileAsBlob failed -- fall through to the no-blob-handler
-                    // branch below which opens the URL in a new window instead.
+        // Storage wins for anything that could name a key. Classifying by
+        // scheme grammar alone would skip the lookup for a stored file called
+        // report:2026.pdf, which is scheme-shaped but is a file; only the
+        // unambiguously browser-bound schemes skip it, so an ordinary link does
+        // not pay for a storage round trip. Looked up under the path exactly as
+        // given, since a key may legitimately open or close with a space and
+        // nothing here is parsed by the browser.
+        if (!isBrowserOnlyScheme(url) && exists(rawUrl)) {
+            try {
+                Blob blob = openFileAsBlob(rawUrl);
+                char sep = getFileSystemSeparator();
+                fileName = rawUrl;
+                if (fileName.indexOf(sep) >= 0) {
+                    fileName = fileName.substring(fileName.lastIndexOf(sep) + 1);
                 }
+                registerSaveBlobHandler(fileName, blob);
+                useBlobHandler = true;
+            } catch (Throwable ex) {
+                // openFileAsBlob failed -- fall through to the no-blob-handler
+                // branch below which opens the URL in a new window instead.
             }
         }
 
