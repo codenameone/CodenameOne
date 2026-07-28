@@ -644,16 +644,50 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * and never open. Anything needing activation goes here instead, where only
      * {@link #runBacksideHooksInTimeout(int)} reaches it.</p>
      */
-    private JSArray gestureOnlyHooks = JSArray.create();
+    private final java.util.ArrayList<GestureHook> gestureOnlyHooks =
+            new java.util.ArrayList<GestureHook>();
 
-    private void addGestureOnlyHook(JSRunnable r) {
-        gestureOnlyHooks.push(r);
+    /** A hook paired with the interaction that queued it. */
+    private static class GestureHook {
+        final int generation;
+        final JSRunnable runnable;
+
+        GestureHook(int generation, JSRunnable runnable) {
+            this.generation = generation;
+            this.runnable = runnable;
+        }
     }
 
-    private void runGestureOnlyHooks() {
-        while (gestureOnlyHooks.getLength() > 0) {
-            JSRunnable r = (JSRunnable)gestureOnlyHooks.shift();
-            r.run();
+    /**
+     * Queues a hook that only a drain scheduled by the CURRENT interaction may
+     * run. A drain descending from an earlier interaction carries that one's
+     * activation, which is spent or expiring, so letting it consume this hook
+     * would leave the popup blocked.
+     */
+    private void addGestureOnlyHook(JSRunnable r) {
+        // Backstop against unbounded growth: a hook whose interaction is long
+        // past can no longer be drained, which only happens if the EDT took
+        // longer than the whole 5s drain burst to reach us.
+        for (int i = gestureOnlyHooks.size() - 1; i >= 0; i--) {
+            if (gestureGeneration - gestureOnlyHooks.get(i).generation > 8) {
+                gestureOnlyHooks.remove(i);
+            }
+        }
+        gestureOnlyHooks.add(new GestureHook(gestureGeneration, r));
+    }
+
+    private void runGestureOnlyHooks(int generation) {
+        // Collected before running: a hook may queue another one, and mutating
+        // the list mid-iteration would break it.
+        java.util.ArrayList<GestureHook> due = new java.util.ArrayList<GestureHook>();
+        for (int i = 0; i < gestureOnlyHooks.size(); i++) {
+            if (gestureOnlyHooks.get(i).generation == generation) {
+                due.add(gestureOnlyHooks.get(i));
+            }
+        }
+        gestureOnlyHooks.removeAll(due);
+        for (int i = 0; i < due.size(); i++) {
+            due.get(i).runnable.run();
         }
     }
     
@@ -682,14 +716,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private void runBacksideHooksInTimeout(int timeout) {
         backsideHooksSemaphore++;
         //_log("Incrementing backsideHooksSemaphore: "+backsideHooksSemaphore);
+        // Remember which interaction scheduled this drain, so it only runs the
+        // activation-dependent hooks that same interaction queued.
+        final int generation = gestureGeneration;
         Window.setTimeout(new TimerHandler() {
             @Override
             public void onTimer() {
                 backsideHooksSemaphore--;
                 //_log("Decrementing backsideHooksSemaphore: "+backsideHooksSemaphore);
-                // This drain descends from a real interaction, so it is the
-                // only one allowed to run activation-dependent hooks.
-                runGestureOnlyHooks();
+                // This drain descends from a real interaction, so it may run
+                // that interaction's activation-dependent hooks -- and only
+                // those: an older drain still pending carries an activation
+                // that is spent or expiring.
+                runGestureOnlyHooks(generation);
                 runBacksideHooks();
             }
         }, timeout);
