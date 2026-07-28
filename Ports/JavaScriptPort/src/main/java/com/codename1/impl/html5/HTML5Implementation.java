@@ -7012,7 +7012,69 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
-     * A raw URL has no spaces for {@code SpanLabel} to wrap on, so putting one    /**
+     * Downloads a {@code data:} URL by clicking a generated anchor on the page.
+     *
+     * <p>The same technique {@code browser_bridge.js} uses, run from here so it
+     * happens exactly ONCE and at a moment we choose. Its
+     * {@code __cn1_register_save_blob_dataurl__} fires the click eagerly and
+     * stashes a copy for a later retry, which is only resolvable by knowing
+     * whether the eager click was allowed -- and {@code a.click()} reports that
+     * to nobody. Doing it ourselves sidesteps the question: there is no eager
+     * click to duplicate, and no stash left unfired.</p>
+     */
+    private boolean downloadDataUrlOnMainThread(String dataUrl, String fileName) {
+        String script = "if (typeof document === 'undefined') {"
+                + " throw new Error('cn1: not running on the page'); }"
+                + "var cn1a = document.createElement('a');"
+                + "cn1a.href = " + toJavaScriptStringLiteral(dataUrl) + ";"
+                + "cn1a.download = " + toJavaScriptStringLiteral(fileName) + ";"
+                + "document.body.appendChild(cn1a);"
+                + "cn1a.click();"
+                + "document.body.removeChild(cn1a);";
+        try {
+            eval_(script);
+            return true;
+        } catch (Throwable t) {
+            _log("Failed to download a data: URL on the main thread: " + t);
+            return false;
+        }
+    }
+
+    /**
+     * Runs a {@code data:} download once, riding a pending hook when there is
+     * one and otherwise asking, so a blocked attempt still has a user-driven
+     * retry. Uses the shared hook queue: a download is gated on engagement
+     * rather than transient activation, exactly as the Blob leg is.
+     */
+    private void downloadDataUrl(final String dataUrl, final String fileName) {
+        if (!isMainThreadBridgeAvailable()) {
+            // No page-side channel of our own, so the bridge's register handler
+            // -- whose eager click is its own trigger -- is all that is left.
+            // One attempt and no retry, which is what this bundle can manage.
+            _log("execute(): no page-side channel, leaving the data: download to the bridge");
+            registerSaveBlobHandlerDataUrl(fileName, dataUrl);
+            return;
+        }
+        final JSRunnable click = new JSRunnable() {
+            @Override
+            public void run() {
+                downloadDataUrlOnMainThread(dataUrl, fileName);
+            }
+        };
+        if (isBacksideHookAvailable()) {
+            addBacksideHook(click);
+            return;
+        }
+        createConfirmationSheet("Download file", "Download " + fileName + " now?",
+                null, new Runnable() {
+            @Override
+            public void run() {
+                addBacksideHook(click);
+            }
+        }).show();
+    }
+
+    /**
      * A raw URL has no spaces for {@code SpanLabel} to wrap on, so putting one
      * in the confirmation Sheet blew the content pane's preferred width past the
      * screen and pushed the buttons out of reach. Shorten it for display; the
@@ -7261,7 +7323,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
-     * True when {@code url} carries exactly {@code scheme}, compared without    /**
      * True when {@code url} carries exactly {@code scheme}, compared without
      * regard to case since URI schemes are case-insensitive. Guards the
      * {@code javascript:} and {@code data:} branches of {@link #execute(String)},
@@ -7557,15 +7618,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // download's payload, not something we are only classifying. Same
             // rule as the javascript: payload and the storage key -- normalize
             // what the browser parses, never what it carries.
-            registerSaveBlobHandlerDataUrl(fileName == null ? "download":fileName, rawUrl);
-            // Registration IS the download: browser_bridge.js's
-            // __cn1_register_save_blob_dataurl__ clicks the anchor immediately
-            // and only stashes a copy in case that click was blocked. So return
-            // here. Firing the stash as well downloads the file twice, and the
-            // old behavior of falling through to window.open() on the data: URL
-            // opened a spurious tab the browser then blocked. Nothing further
-            // to do on this path.
-            _log("execute(): data: URL handed to the download handler");
+            downloadDataUrl(rawUrl, fileName == null ? "download" : fileName);
             return;
         } else if (isExternalUrl(url)) {
             // Reached only by URLs the data: branch above did not claim.
