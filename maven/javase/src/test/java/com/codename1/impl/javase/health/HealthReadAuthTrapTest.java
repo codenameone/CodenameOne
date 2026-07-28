@@ -177,6 +177,48 @@ class HealthReadAuthTrapTest {
         assertEquals(HealthDataType.STEPS, back.get(0).getType());
     }
 
+    /**
+     * A hidden record must not spend the query's limit.
+     *
+     * <p>The first fix filtered the finished page, which is applied after
+     * the shared store has sorted and cut to the limit -- so a hidden
+     * record that sorted first ate the only slot and a limit-one query
+     * came back empty with a visible record sitting right behind it. The
+     * records nobody can see are withheld before the sort now.</p>
+     */
+    @Test
+    void aHiddenRecordDoesNotSpendTheLimit() {
+        List<HealthSample> seed = new ArrayList<HealthSample>();
+        // The steps sample is older, so a descending read reaches the
+        // hidden heart-rate sample first.
+        seed.add(QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(2500, HealthUnit.COUNT),
+                1_767_225_000_000L, 1_767_225_060_000L));
+        seed.add(QuantitySample.create(HealthDataType.HEART_RATE,
+                new HealthQuantity(70, HealthUnit.COUNT_PER_MINUTE),
+                1_767_225_600_000L));
+        store.seed(seed);
+        store.setReadAuthorizationPolicy(
+                SimulatedHealthStore.ReadAuthPolicy.IOS_OPAQUE);
+        store.setReadPermission(HealthDataType.HEART_RATE,
+                SimulatedHealthStore.ReadAuthScript.GRANTED_BUT_NO_DATA);
+        store.setReadPermission(HealthDataType.STEPS,
+                SimulatedHealthStore.ReadAuthScript.GRANTED);
+
+        AsyncResource<List<HealthSample>> read = store.readSamples(
+                new SampleQuery().addType(HealthDataType.HEART_RATE)
+                        .addType(HealthDataType.STEPS)
+                        .setSortDescending(true)
+                        .setLimit(1)
+                        .setTimeRange(HealthTimeRange.between(
+                                1_767_000_000_000L, 1_768_000_000_000L)));
+        assertNull(errorOf(read));
+        List<HealthSample> back = read.get();
+        assertEquals(1, back.size(),
+                "the visible record should fill the budget");
+        assertEquals(HealthDataType.STEPS, back.get(0).getType());
+    }
+
     /** The same rule for aggregates, which take a separate path. */
     @Test
     void oneEmptyTypeDoesNotEmptyTheAggregate() {

@@ -292,49 +292,19 @@ public class SimulatedHealthStore extends LocalHealthStore {
         // type to a query made unrelated steps and heart rate disappear
         // too. That is not what either platform does, and it turned the
         // simulator's most valuable script into a misleading one.
-        AsyncResource<SamplePage> unfiltered =
-                new AsyncResource<SamplePage>();
-        // Registered before the call, because the shared store completes
-        // inline -- attaching afterwards would be attaching to a result
-        // that has already been delivered.
-        unfiltered.onResult(new HideEmptyTypes(this, out));
-        super.doReadSamples(query, unfiltered);
+        //
+        // Withheld through the store's visibility hook rather than by
+        // filtering the finished page, which is where the first attempt
+        // at this went wrong: the shared store sorts and cuts to the
+        // limit before returning, so a hidden record that sorted first
+        // ate a slot and a limit-one query came back empty with a visible
+        // record sitting right behind it.
+        super.doReadSamples(query, out);
     }
 
-    /// Drops the records of types scripted to yield nothing, leaving the
-    /// rest of the page alone.
-    ///
-    /// Filtering the finished page rather than the query keeps every other
-    /// query semantic -- sort, limit, sources, flattening -- exactly as
-    /// the shared store implements it. A page can come back shorter than
-    /// the limit as a result, which is also what a real store does when
-    /// some of what it found is not yours to see.
-    private static final class HideEmptyTypes
-            implements com.codename1.util.AsyncResult<SamplePage> {
-
-        private final SimulatedHealthStore store;
-        private final AsyncResource<SamplePage> out;
-
-        HideEmptyTypes(SimulatedHealthStore store,
-                AsyncResource<SamplePage> out) {
-            this.store = store;
-            this.out = out;
-        }
-
-        public void onReady(SamplePage page, Throwable error) {
-            if (error != null) {
-                out.error(error);
-                return;
-            }
-            List<HealthSample> kept = new java.util.ArrayList<HealthSample>();
-            for (HealthSample s : page.getSamples()) {
-                if (!store.hidesData(s.getType())) {
-                    kept.add(s);
-                }
-            }
-            out.complete(new SamplePage(kept, page.getNextPageToken(),
-                    page.isTruncated()));
-        }
+    @Override
+    protected boolean isVisible(HealthSample s) {
+        return !hidesData(s.getType());
     }
 
     /// Whether a read of `type` fails outright rather than coming back
@@ -386,24 +356,13 @@ public class SimulatedHealthStore extends LocalHealthStore {
                 return;
             }
         }
-        // Per type, exactly as the read is. Emptying every metric because
-        // one type in the query was scripted to yield nothing made a
-        // scripted heart-rate gap erase the step total beside it, and a
-        // developer would reasonably read that as a bug in their own
-        // aggregation rather than as the script doing its job.
-        //
-        // Done by withholding the records rather than by editing the
-        // finished buckets: the shared aggregation is what must produce
-        // the answer, since it is the same code both mobile stores fall
-        // back to and the whole point of aggregating here is to exercise
-        // it.
-        List<HealthSample> visible = new java.util.ArrayList<HealthSample>();
-        for (HealthSample s : getAllSamples()) {
-            if (!hidesData(s.getType())) {
-                visible.add(s);
-            }
-        }
-        out.complete(aggregateSamples(query, boundaries, visible));
+        // Per type, exactly as the read is, and through the same
+        // visibility hook. Emptying every metric because one type in the
+        // query was scripted to yield nothing made a scripted heart-rate
+        // gap erase the step total beside it, and a developer would
+        // reasonably read that as a bug in their own aggregation rather
+        // than as the script doing its job.
+        super.doAggregate(query, boundaries, out);
     }
 
     protected void doWrite(List<HealthSample> samples,

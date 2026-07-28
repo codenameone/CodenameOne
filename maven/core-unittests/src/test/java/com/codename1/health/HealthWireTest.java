@@ -532,4 +532,30 @@ class HealthWireTest {
         });
         return err[0];
     }
+
+    /**
+     * Nutrition is local and simulator only in this release, and the
+     * documentation now says so. This pins the two gates both ports
+     * consult, so the claim cannot quietly stop being true.
+     */
+    @Test
+    void nutritionIsNotCarriedToEitherPhone() {
+        assertFalse(HealthWire.isAndroidSupported(HealthDataType.NUTRITION),
+                "Health Connect has no mapping for the record shape");
+        assertFalse(HealthWire.isAndroidWritable(HealthDataType.NUTRITION));
+
+        java.util.List<HealthSample> batch =
+                new java.util.ArrayList<HealthSample>();
+        batch.add(com.codename1.health.nutrition.NutritionSample.create(
+                1767225600000L));
+        assertNotNull(HealthWire.unsupportedForWrite(batch),
+                "a nutrition entry must be refused, not written as"
+                        + " something else");
+    }
+
+    /** The dietary quantities that do reach the phones still do. */
+    @Test
+    void dietaryQuantitiesAreStillCarried() {
+        assertTrue(HealthWire.isAndroidSupported(HealthDataType.HYDRATION));
+    }
 }

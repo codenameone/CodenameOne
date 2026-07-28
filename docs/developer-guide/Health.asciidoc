@@ -162,6 +162,8 @@ Blood pressure is the exception: it's two values in one reading, which HealthKit
 
 `com.codename1.health.nutrition` logs food and drink as a sparse set of nutrient amounts. A logged apple sets four fields and a scanned packaged food might set thirty; both platforms model this as a record with several dozen optional fields, and `NutritionSample` keeps that sparseness explicit rather than exposing forty nullable getters. A nutrient that was never measured reads back as `null`, not zero -- the same distinction aggregate buckets make, and one that matters to someone managing their sodium.
 
+`HealthDataType.NUTRITION` is local and simulator only in this release. Neither the wire format nor either port's type map knows the multi-nutrient record shape, so a read or write of it on a phone is refused with `TYPE_NOT_SUPPORTED` before it reaches the platform rather than being dropped without a word. Individual dietary quantities do reach the phones as ordinary quantity samples -- `HYDRATION` on both, `DIETARY_ENERGY` on iOS -- so use those when the number has to land in the user's real health store.
+
 === Build configuration
 
 Health data is the most regulated data these APIs touch, and the build is strict about it.

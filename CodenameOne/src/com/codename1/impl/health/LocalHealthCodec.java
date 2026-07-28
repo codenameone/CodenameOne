@@ -143,7 +143,7 @@ final class LocalHealthCodec {
         if ("Q".equals(shape)) {
             HealthQuantity q = ((QuantitySample) s).getQuantity();
             sb.append(esc(q.getUnit().getSymbol())).append(FIELD)
-                    .append(q.getValue(q.getUnit()));
+                    .append(q.getRawValue());
             return;
         }
         if ("C".equals(shape)) {
@@ -208,8 +208,12 @@ final class LocalHealthCodec {
                 HealthQuantity q = n.getNutrient(nut);
                 sb.append(esc(nut.getId())).append(PART)
                         .append(esc(q.getUnit().getSymbol())).append(PART)
-                        .append(q.getValue(q.getUnit()));
+                        .append(q.getRawValue());
             }
+            // Appended after the nutrients rather than beside the meal
+            // type, so a store written before this field existed still
+            // decodes -- it simply has no food name, which is what it had.
+            sb.append(FIELD).append(esc(n.getFoodName()));
             return;
         }
         if ("BP".equals(shape)) {
@@ -236,7 +240,7 @@ final class LocalHealthCodec {
             return;
         }
         sb.append(esc(q.getUnit().getSymbol())).append(FIELD)
-                .append(q.getValue(q.getUnit()));
+                .append(q.getRawValue());
     }
 
     private static String shapeOf(HealthSample s) {
@@ -380,6 +384,9 @@ final class LocalHealthCodec {
                                 unit);
                     }
                 }
+            }
+            if (f.size() > 16) {
+                n.setFoodName(unesc(f.get(16)));
             }
             return n;
         }

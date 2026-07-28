@@ -54,9 +54,17 @@ import java.util.Map;
 ///
 /// #### Meal type
 ///
-/// Health Connect records which meal an entry belongs to; HealthKit does
-/// not, and the iOS port carries it in sample metadata. Either way
-/// [#getMealType()] round-trips.
+/// Health Connect records which meal an entry belongs to and HealthKit
+/// does not, so [#getMealType()] round-trips through the local store and
+/// would ride in sample metadata on iOS once that mapping exists.
+///
+/// #### Local and simulator only in this release
+///
+/// Neither phone carries this shape yet -- see the package
+/// documentation. A read or write of
+/// [HealthDataType#NUTRITION] on iOS or Android is refused with
+/// [HealthError#TYPE_NOT_SUPPORTED]; everything here works against the
+/// local store.
 public final class NutritionSample extends SessionSample {
 
     /// The entry is not attributed to a particular meal.

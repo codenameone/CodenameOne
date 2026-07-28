@@ -32,4 +32,19 @@
 /// exposing forty nullable getters: an entry carries only the nutrients
 /// that were actually measured, and a nutrient that was never measured
 /// reads back as null rather than zero.
+///
+/// #### Local and simulator only in this release
+///
+/// [com.codename1.health.HealthDataType#NUTRITION] is **not** carried to
+/// HealthKit or Health Connect yet: neither the wire format nor either
+/// port's type map knows the multi-nutrient record shape, so a read or a
+/// write of it on a phone is refused with
+/// [com.codename1.health.HealthError#TYPE_NOT_SUPPORTED] before it
+/// reaches the platform. It works fully against the local store -- the
+/// simulator, and the desktop, Windows, Linux and JavaScript ports.
+///
+/// Individual dietary quantities do reach the phones and are ordinary
+/// [com.codename1.health.QuantitySample]s rather than entries here:
+/// `HYDRATION` on both platforms, and `DIETARY_ENERGY` on iOS. Use those
+/// when the number has to land in the user's real health store.
 package com.codename1.health.nutrition;

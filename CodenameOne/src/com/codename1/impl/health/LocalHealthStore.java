@@ -159,7 +159,7 @@ public class LocalHealthStore extends HealthStore {
         List<HealthSample> matched = new ArrayList<HealthSample>();
         synchronized (samples) {
             for (HealthSample s : samples) {
-                if (matches(s, query, range)) {
+                if (isVisible(s) && matches(s, query, range)) {
                     // A copy, not the stored object. Query results are
                     // snapshots: handing out the live record let caller
                     // code mutate the store through setId/setSource/
@@ -368,9 +368,13 @@ public class LocalHealthStore extends HealthStore {
     @Override
     protected void doAggregate(AggregateQuery query, long[] boundaries,
             AsyncResource<List<AggregateResult>> out) {
-        List<HealthSample> snapshot;
+        List<HealthSample> snapshot = new ArrayList<HealthSample>();
         synchronized (samples) {
-            snapshot = new ArrayList<HealthSample>(samples);
+            for (HealthSample s : samples) {
+                if (isVisible(s)) {
+                    snapshot.add(s);
+                }
+            }
         }
         completeInline(out, aggregateSamples(query, boundaries, snapshot));
     }
@@ -460,6 +464,19 @@ public class LocalHealthStore extends HealthStore {
     /// Called after every mutation. The in-memory base does nothing;
     /// subclasses that persist override it.
     protected void persist() {
+    }
+
+    /// Whether `s` is visible to reads and aggregates at all.
+    ///
+    /// The simulator hides the records of a type scripted to yield
+    /// nothing, and it has to happen *here* rather than by filtering the
+    /// answer: a page is sorted and cut to the limit before it is
+    /// returned, so a hidden record that sorts first would otherwise eat
+    /// a slot and a limit-one query could come back empty while a visible
+    /// record sat behind it. Records nobody can see must not compete for
+    /// the budget.
+    protected boolean isVisible(HealthSample s) {
+        return true;
     }
 
     /// Inserts a sample without going through validation, for a subclass

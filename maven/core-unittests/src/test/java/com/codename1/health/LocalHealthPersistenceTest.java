@@ -198,6 +198,7 @@ class LocalHealthPersistenceTest extends UITestBase {
         n.setNutrient(Nutrient.PROTEIN, 12);
         n.setNutrient(Nutrient.TOTAL_FAT, 3.5);
         n.setMealType(NutritionSample.MEAL_LUNCH);
+        n.setFoodName("cheese sandwich");
 
         List<HealthSample> back = roundTrip(n, HealthDataType.NUTRITION);
         assertEquals(1, back.size());
@@ -206,6 +207,10 @@ class LocalHealthPersistenceTest extends UITestBase {
         assertEquals(12, r.getNutrient(Nutrient.PROTEIN)
                 .getValue(Nutrient.PROTEIN.getUnit()), 0.001);
         assertEquals(NutritionSample.MEAL_LUNCH, r.getMealType());
+        // Carried by the in-memory snapshot path and originally missed
+        // here, which is the whole failure mode a codec has: a field
+        // nobody looks at until a restart.
+        assertEquals("cheese sandwich", r.getFoodName());
     }
 
     @Test
