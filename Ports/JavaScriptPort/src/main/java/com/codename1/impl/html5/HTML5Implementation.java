@@ -7332,13 +7332,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // Sheet is a compatibility fallback the caller never requested, so
         // promising a new window there would describe behavior they did not
         // choose.
-        if (!isMainThreadBridgeAvailable()) {
-            // No page-side channel at all, so no button could make this work.
-            // Say so instead of showing a confirmation that cannot succeed.
-            _log("execute(): no page-side channel on this host bundle, cannot open " + url);
-            showCannotOpenMessage(url);
-            return;
-        }
         openInNewWindowWithConfirmation(url, EXECUTE_TARGET_BLANK.equals(target)
                 ? "Open this link in a new window?"
                 : "Open this link?");
@@ -7355,6 +7348,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * worse than the Sheet.</p>
      */
     private void openInNewWindowWithConfirmation(final String url, final String prompt) {
+        if (!isMainThreadBridgeAvailable()) {
+            // Guarded here rather than at each caller: every popup path funnels
+            // through this method, and putting it in openExternalUrl() alone
+            // left the local-path fallback and the download legs prompting for
+            // something no button could deliver.
+            _log("execute(): no page-side channel on this host bundle, cannot open " + url);
+            showCannotOpenMessage(url);
+            return;
+        }
         if (isGestureBackedHookAvailable() && popupReservedForGeneration != gestureGeneration) {
             // Tied to the interaction rather than to any drain of it -- see the
             // field. Never cleared; the next interaction simply carries a
@@ -7401,6 +7403,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * not run.
      */
     private void showOpenConfirmation(final String url, final String prompt) {
+        if (!isMainThreadBridgeAvailable()) {
+            // Reached directly by the superseded and blocked-popup fallbacks,
+            // which bypass the entry point above.
+            _log("execute(): no page-side channel on this host bundle, cannot open " + url);
+            showCannotOpenMessage(url);
+            return;
+        }
         createConfirmationSheet("Open Link", prompt,
                 shortenUrlForDisplay(url), new Runnable() {
             @Override
@@ -7453,6 +7462,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * tab, which needs no activation and so cannot be blocked in turn.
      */
     private void showBlockedPopupFallback(final String url) {
+        if (!isMainThreadBridgeAvailable()) {
+            _log("execute(): no page-side channel on this host bundle, cannot open " + url);
+            showCannotOpenMessage(url);
+            return;
+        }
         createConfirmationSheet("Open Link",
                 "Your browser blocked the new window."
                         + " Open this link in the current tab instead?",
