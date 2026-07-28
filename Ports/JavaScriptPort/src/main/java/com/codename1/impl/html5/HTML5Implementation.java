@@ -7441,7 +7441,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             nativeButton.setText(buttonText);
             nativeButton.setMaterialIcon(FontImage.MATERIAL_SAVE);
         } else if (hasScheme(url, "data")) {
-            registerSaveBlobHandlerDataUrl(fileName == null ? "download":fileName, url);
+            // The RAW URL, not the normalized one: normalization strips tabs
+            // and newlines anywhere in the string, and this value is the
+            // download's payload, not something we are only classifying. Same
+            // rule as the javascript: payload and the storage key -- normalize
+            // what the browser parses, never what it carries.
+            registerSaveBlobHandlerDataUrl(fileName == null ? "download":fileName, rawUrl);
             // A handler is registered now, exactly as in the Blob case, so the
             // download path below must FIRE it. Leaving this false sent the
             // confirmed OK to window.open() on the data: URL instead -- a tab
@@ -7474,13 +7479,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
             openInNewWindowWithConfirmation(url, "Open this link?");
             return;
         }
-        // Captured after the chain: the data: branch registers a handler too,
-        // and capturing before it read false for that case.
-        final boolean fuseBlobHandler = useBlobHandler;
+        // A final copy of useBlobHandler, needed because the anonymous classes
+        // below cannot capture it -- it is assigned in the branches above and
+        // so is not effectively final. Captured AFTER the chain: the data:
+        // branch registers a handler too, and capturing beforehand read false
+        // for that case and sent the download down the popup leg.
+        final boolean handlerRegistered = useBlobHandler;
         final Runnable startDownload = new Runnable() {
             @Override
             public void run() {
-                if (fuseBlobHandler) {
+                if (handlerRegistered) {
                     fireSaveBlobHandler();
                 } else {
                     _log("Opening URL in new window");
@@ -7494,7 +7502,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // instead, and that does need a real gesture -- draining it from a timer
         // would let the browser block it with no Sheet shown. Pick the gate that
         // matches the leg this run will actually take.
-        boolean hookAvailable = fuseBlobHandler
+        boolean hookAvailable = handlerRegistered
                 ? isBacksideHookAvailable()
                 : isGestureBackedHookAvailable();
         if (hookAvailable) {
@@ -7504,7 +7512,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     startDownload.run();
                 }
             };
-            if (fuseBlobHandler) {
+            if (handlerRegistered) {
                 addBacksideHook(hook);
             } else {
                 // The no-blob leg opens a popup, so it needs the activation
@@ -7527,7 +7535,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // Same split as the unconfirmed path above: the popup leg
                     // needs the activation the OK tap just granted, which the
                     // polling interval would not carry.
-                    if (fuseBlobHandler) {
+                    if (handlerRegistered) {
                         addBacksideHook(confirmed);
                     } else {
                         addGestureOnlyHook(confirmed);
