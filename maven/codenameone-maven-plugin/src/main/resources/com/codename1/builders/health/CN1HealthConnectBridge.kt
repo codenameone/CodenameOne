@@ -559,24 +559,32 @@ class CN1HealthConnectBridge(private val context: Context)
             // and the page token resumes after the whole page, so they
             // could never be read again. Overshooting the caller's limit
             // is recoverable; skipping records is not.
+            //
+            // A fetched page is always finished, ceiling or no ceiling.
+            // Stopping partway looks like it protects the bound and does
+            // not: the platform token resumes after the *whole* page, so
+            // the records left unprocessed could never be read again --
+            // and on a final page it would hand topByTime a fragment to
+            // select from while treating it as the complete range. The
+            // ceiling is held by how large a page is asked for, which is
+            // decided before anything is fetched.
             var lines = 0
             var points = 0
             for (record in page.records) {
                 val w = appendOne(out, record, token, flatten, ascending)
                 lines += w.lines
                 points += w.points
-                // A capped read stops the moment the ceiling is reached,
-                // mid-page if need be. It can afford to: it selects from
-                // what it scanned and hands back no token, so abandoning
-                // the rest of a page strands nothing. An uncapped read
-                // cannot -- its token resumes past the whole page -- and
-                // is held to the ceiling by the page sizing above.
-                if (capped && points >= remaining) {
-                    break
-                }
             }
             if (page.records.isNotEmpty()) {
-                samplesPerRecord = maxOf(1, lines / page.records.size)
+                // Measured in points for a series, lines for everything
+                // else. An unflattened series emits one line per record
+                // however many points it holds, so measuring lines put
+                // the density at about one and the next page asked for
+                // sixty-four dense records -- sizing the page by the
+                // number that was not the one being bounded.
+                samplesPerRecord = maxOf(1,
+                    (if (isSeriesToken(token)) points else lines)
+                        / page.records.size)
             }
             // The ceiling counts points and the caller's limit counts
             // lines. For a flattened read they are the same number; for
@@ -671,13 +679,23 @@ class CN1HealthConnectBridge(private val context: Context)
     private fun appendOne(sb: StringBuilder, record: Record,
                           token: String, flatten: Boolean,
                           ascending: Boolean = true): Written {
-        val wholeSeries = appendWholeSeries(sb, record, token, ascending)
-        if (!flatten && wholeSeries >= 0) {
-            // One line, and as many points as it actually serialized.
-            // The two are counted separately because the caller's limit
-            // is in lines while the memory ceiling is in points -- and a
-            // single unflattened record can carry thousands.
-            return Written(1, wholeSeries)
+        // Only when flattening is off, because this *writes*. Hoisting
+        // the call out of the condition to read its count emitted the
+        // whole-record line and then fell through to the per-sample
+        // branch, so every flattened read carried the record and its
+        // samples both -- the same measurements twice, with the count
+        // reporting only half of them.
+        if (!flatten) {
+            val wholeSeries = appendWholeSeries(sb, record, token,
+                ascending)
+            if (wholeSeries >= 0) {
+                // One line, and as many points as it actually
+                // serialized. The two are counted separately because the
+                // caller's limit is in lines while the memory ceiling is
+                // in points, and a single unflattened record can carry
+                // thousands.
+                return Written(1, wholeSeries)
+            }
         }
         when (record) {
             is StepsRecord -> interval(sb, record, token,
