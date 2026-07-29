@@ -44,13 +44,31 @@ public final class ShieldToken {
     private final long ttlMillis;
     private final String binding;
 
+    /// Monotonic reference captured at construction. `System.currentTimeMillis()`
+    /// is the wall clock: it can be stepped backwards or forwards, by the user or
+    /// by NTP, which would keep a lapsed token looking valid or expire a good one
+    /// early. Elapsed time is measured from here instead; `fetchedAt` is retained
+    /// only because it is meaningful to a human reading a log.
+    private final long fetchedNanos;
+
     public ShieldToken(String value, ShieldStatus status, long fetchedAt,
             long ttlMillis, String binding) {
+        this(value, status, fetchedAt, ttlMillis, binding, System.nanoTime());
+    }
+
+    /// Test seam: lets a test place the token at a chosen point in its lifetime.
+    /// Not public, because an app supplying its own reference could only make a
+    /// lapsed token look fresh.
+    ShieldToken(String value, ShieldStatus status, long fetchedAt,
+            long ttlMillis, String binding, long fetchedNanos) {
         this.value = value;
-        this.status = status == null ? ShieldStatus.OK : status;
+        // A missing status is an engine bug, not a success. Defaulting to OK
+        // would make isValid() true and attach a token nobody vouched for.
+        this.status = status == null ? ShieldStatus.NOT_INITIALIZED : status;
         this.fetchedAt = fetchedAt;
         this.ttlMillis = ttlMillis;
         this.binding = binding;
+        this.fetchedNanos = fetchedNanos;
     }
 
     /// The opaque token to place in the request header. May be null when [#getStatus()] is not
@@ -66,7 +84,8 @@ public final class ShieldToken {
 
     /// Milliseconds until this token stops being worth sending, or 0 once it has lapsed.
     public long getMillisUntilExpiry() {
-        long remaining = (fetchedAt + ttlMillis) - System.currentTimeMillis();
+        long elapsed = (System.nanoTime() - fetchedNanos) / 1000000L;
+        long remaining = ttlMillis - elapsed;
         return remaining > 0 ? remaining : 0;
     }
 
@@ -81,7 +100,7 @@ public final class ShieldToken {
         if (ttlMillis <= 0) {
             return true;
         }
-        long used = System.currentTimeMillis() - fetchedAt;
+        long used = (System.nanoTime() - fetchedNanos) / 1000000L;
         return used * 100 >= ttlMillis * thresholdPercent;
     }
 
@@ -100,9 +119,19 @@ public final class ShieldToken {
         return binding.equals(data);
     }
 
+    /// When this token was fetched, in wall-clock time.
+    ///
+    /// For correlating a client log with a server log, and nothing else --
+    /// lifetime decisions use the monotonic reference instead, for the reasons
+    /// in the class documentation.
+    public long getFetchedAt() {
+        return fetchedAt;
+    }
+
     /// Never renders the token value -- these strings end up in logs.
     public String toString() {
         return "ShieldToken[status=" + status.getId()
+                + ", fetchedAt=" + fetchedAt
                 + ", validMs=" + getMillisUntilExpiry()
                 + ", bound=" + (binding != null) + "]";
     }

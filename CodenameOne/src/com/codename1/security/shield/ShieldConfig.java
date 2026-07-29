@@ -101,14 +101,29 @@ public final class ShieldConfig {
     public ShieldConfig protect(String hostPattern, HostPolicy policy) {
         if (hostPattern != null && hostPattern.length() > 0) {
             hostPolicies.put(hostPattern.toLowerCase(),
-                    policy == null ? HostPolicy.PROTECTED : policy);
+                    policy == null ? implicitPolicy() : policy);
         }
         return this;
     }
 
-    /// Registers a host with [HostPolicy#PROTECTED].
+    /// Registers a host with the default policy, which honours
+    /// [#defaultFailureMode(FailureMode)].
     public ShieldConfig protect(String hostPattern) {
-        return protect(hostPattern, HostPolicy.PROTECTED);
+        return protect(hostPattern, implicitPolicy());
+    }
+
+    /// The policy used when a host is registered without an explicit one.
+    ///
+    /// Built from [#defaultFailureMode(FailureMode)] rather than returning the
+    /// [HostPolicy#PROTECTED] constant, whose mode is always
+    /// [FailureMode#OPEN] -- otherwise setting a fail-closed default would
+    /// silently do nothing for every host registered the short way, which is
+    /// most of them.
+    private HostPolicy implicitPolicy() {
+        if (defaultFailureMode == FailureMode.OPEN) {
+            return HostPolicy.PROTECTED;
+        }
+        return new HostPolicy(true, true, defaultFailureMode);
     }
 
     public String getEndpoint() {

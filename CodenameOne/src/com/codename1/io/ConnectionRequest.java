@@ -954,6 +954,12 @@ public class ConnectionRequest implements IOProgressListener {
             return true;
         }
         pinFailure = null;
+        // Each attempt gets its own chain. This field is populated lazily and
+        // survives retries and redirects, so without clearing it the guard would
+        // vet the previous connection's certificates -- accepting an unpinned
+        // certificate on a retried request, or rejecting a redirect to a
+        // differently pinned host.
+        sslCertificates = null;
         if (cacheMode == CachingMode.OFFLINE || cacheMode == CachingMode.OFFLINE_FIRST) {
             InputStream is = null; //NOPMD CloseResource
             try {

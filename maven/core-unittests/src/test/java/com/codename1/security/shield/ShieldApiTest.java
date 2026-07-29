@@ -106,25 +106,54 @@ class ShieldApiTest {
         assertTrue(new ShieldToken("t", ShieldStatus.OK, now, 60000, null).isValid());
         assertFalse(new ShieldToken(null, ShieldStatus.OK, now, 60000, null).isValid());
         assertFalse(new ShieldToken("t", ShieldStatus.REJECTED, now, 60000, null).isValid());
-        assertFalse(new ShieldToken("t", ShieldStatus.OK, now - 120000, 60000, null).isValid());
+        assertFalse(new ShieldToken("t", ShieldStatus.OK, now, 60000, null,
+                System.nanoTime() - 120_000_000_000L).isValid());
     }
 
     @Test
     void expiredTokenReportsZeroRatherThanNegativeRemainingTime() {
-        ShieldToken t = new ShieldToken("t", ShieldStatus.OK,
-                System.currentTimeMillis() - 120000, 60000, null);
+        ShieldToken t = new ShieldToken("t", ShieldStatus.OK, System.currentTimeMillis(),
+                60000, null, System.nanoTime() - 120_000_000_000L);
         assertEquals(0, t.getMillisUntilExpiry());
+    }
+
+    /**
+     * Lifetime is measured monotonically, so moving the wall clock cannot make a
+     * lapsed token look fresh -- which on a rooted device is something the
+     * attacker can simply do.
+     */
+    @Test
+    void lifetimeIgnoresTheWallClock() {
+        // fetchedAt is deliberately far in the future; only the monotonic
+        // reference should matter.
+        ShieldToken t = new ShieldToken("t", ShieldStatus.OK,
+                System.currentTimeMillis() + 3_600_000L, 60000, null, System.nanoTime());
+        assertTrue(t.isValid());
+        assertTrue(t.getMillisUntilExpiry() > 0);
+
+        ShieldToken lapsed = new ShieldToken("t", ShieldStatus.OK,
+                System.currentTimeMillis() + 3_600_000L, 60000, null,
+                System.nanoTime() - 120_000_000_000L);
+        assertFalse(lapsed.isValid());
+    }
+
+    /** A null status is an engine bug; treating it as OK would attach an unvouched token. */
+    @Test
+    void aMissingStatusIsNotTreatedAsSuccess() {
+        ShieldToken t = new ShieldToken("t", null, System.currentTimeMillis(), 60000, null);
+        assertFalse(t.getStatus().isSuccess());
+        assertFalse(t.isValid());
     }
 
     @Test
     void refreshTriggersOnceThresholdShareOfLifetimeIsUsed() {
         long now = System.currentTimeMillis();
         // 10% used, 50% threshold -> no refresh yet.
-        assertFalse(new ShieldToken("t", ShieldStatus.OK, now - 1000, 10000, null)
-                .shouldRefresh(50));
+        assertFalse(new ShieldToken("t", ShieldStatus.OK, now, 10000, null,
+                System.nanoTime() - 1_000_000_000L).shouldRefresh(50));
         // 60% used -> refresh.
-        assertTrue(new ShieldToken("t", ShieldStatus.OK, now - 6000, 10000, null)
-                .shouldRefresh(50));
+        assertTrue(new ShieldToken("t", ShieldStatus.OK, now, 10000, null,
+                System.nanoTime() - 6_000_000_000L).shouldRefresh(50));
     }
 
     @Test
@@ -181,6 +210,38 @@ class ShieldApiTest {
     void hostMatchingIsCaseInsensitive() {
         ShieldConfig c = new ShieldConfig().protect("API.Example.COM");
         assertSame(HostPolicy.PROTECTED, c.policyFor("api.example.com"));
+    }
+
+    /**
+     * defaultFailureMode has to reach hosts registered the short way, which is
+     * most of them -- otherwise setting a fail-closed default silently does
+     * nothing, which is the worst possible outcome for a security setting.
+     */
+    @Test
+    void defaultFailureModeAppliesToHostsRegisteredWithoutAnExplicitPolicy() {
+        ShieldConfig c = new ShieldConfig()
+                .defaultFailureMode(FailureMode.CLOSED)
+                .protect("api.example.com");
+        HostPolicy p = c.policyFor("api.example.com");
+        assertEquals(FailureMode.CLOSED, p.getFailureMode());
+        assertTrue(p.isAttachToken());
+        assertTrue(p.isEnforcePins());
+    }
+
+    @Test
+    void anExplicitPolicyStillWinsOverTheDefaultFailureMode() {
+        ShieldConfig c = new ShieldConfig()
+                .defaultFailureMode(FailureMode.CLOSED)
+                .protect("api.example.com", HostPolicy.PROTECTED);
+        assertEquals(FailureMode.OPEN, c.policyFor("api.example.com").getFailureMode());
+    }
+
+    @Test
+    void aNullPolicyAlsoPicksUpTheDefaultFailureMode() {
+        ShieldConfig c = new ShieldConfig()
+                .defaultFailureMode(FailureMode.CLOSED)
+                .protect("api.example.com", null);
+        assertEquals(FailureMode.CLOSED, c.policyFor("api.example.com").getFailureMode());
     }
 
     @Test
