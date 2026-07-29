@@ -169,7 +169,7 @@ class JavaSEWearableBridge implements WearableBridge {
             }
             // Our own write must not come back to us as a peer change.
             synchronized (seenData) {
-                seenData.put(f.getName(), new Long(f.lastModified()));
+                seenData.put(f.getName(), Long.valueOf(f.lastModified()));
             }
         } catch (IOException err) {
             com.codename1.io.Log.p("Wearable simulator: failed to publish " + path + ": " + err);
@@ -375,7 +375,7 @@ class JavaSEWearableBridge implements WearableBridge {
         synchronized (seenData) {
             for (File f : files) {
                 if (f.isFile()) {
-                    seenData.put(f.getName(), new Long(f.lastModified()));
+                    seenData.put(f.getName(), Long.valueOf(f.lastModified()));
                 }
             }
         }
@@ -402,7 +402,7 @@ class JavaSEWearableBridge implements WearableBridge {
                     continue;
                 }
                 synchronized (seenData) {
-                    seenData.put(f.getName(), new Long(stamp));
+                    seenData.put(f.getName(), Long.valueOf(stamp));
                 }
                 try {
                     WearableConnection.deliverDataChanged(decodePath(f.getName()), readFully(f));

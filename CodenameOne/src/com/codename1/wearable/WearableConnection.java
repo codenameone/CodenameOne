@@ -195,7 +195,7 @@ public final class WearableConnection {
         if (reply != null) {
             synchronized (pendingReplies) {
                 token = nextReplyToken++;
-                pendingReplies.put(new Integer(token), reply);
+                pendingReplies.put(Integer.valueOf(token), reply);
             }
         }
         b.sendMessage(message.getPath(), message.toByteArray(), token);
@@ -405,7 +405,7 @@ public final class WearableConnection {
     public static void deliverReply(int replyToken, final byte[] payload, final String error) {
         final WearableReplyHandler handler;
         synchronized (pendingReplies) {
-            handler = pendingReplies.remove(new Integer(replyToken));
+            handler = pendingReplies.remove(Integer.valueOf(replyToken));
         }
         if (handler == null) {
             return;

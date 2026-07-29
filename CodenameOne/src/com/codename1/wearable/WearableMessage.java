@@ -136,7 +136,7 @@ public class WearableMessage {
     ///
     /// this message, for chaining
     public WearableMessage put(String key, int value) {
-        return set(key, new Integer(value));
+        return set(key, Integer.valueOf(value));
     }
 
     /// Adds a long value.
@@ -150,7 +150,7 @@ public class WearableMessage {
     ///
     /// this message, for chaining
     public WearableMessage put(String key, long value) {
-        return set(key, new Long(value));
+        return set(key, Long.valueOf(value));
     }
 
     /// Adds a double value.
@@ -164,7 +164,7 @@ public class WearableMessage {
     ///
     /// this message, for chaining
     public WearableMessage put(String key, double value) {
-        return set(key, new Double(value));
+        return set(key, Double.valueOf(value));
     }
 
     /// Adds a boolean value.
