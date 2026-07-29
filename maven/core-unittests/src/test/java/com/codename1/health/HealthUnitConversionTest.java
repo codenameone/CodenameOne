@@ -190,6 +190,37 @@ class HealthUnitConversionTest {
     }
 
     /**
+     * A series must be in chronological order, and says so rather than
+     * being quietly accepted.
+     *
+     * <p>Readers rely on it: one asked for the newest measurements of a
+     * long record takes them from the end rather than sorting half a
+     * million of them to find out where they are, so an unordered series
+     * would be answered with the wrong points and nothing would look
+     * wrong.</p>
+     */
+    @Test
+    void anOutOfOrderSeriesIsRefused() {
+        long[] starts = {2000L, 1000L};
+        long[] ends = {2000L, 1000L};
+        double[] values = {60, 62};
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> SeriesSample.create(HealthDataType.HEART_RATE,
+                        1000L, 2000L, starts, ends, values,
+                        HealthUnit.COUNT_PER_MINUTE));
+        assertTrue(ex.getMessage().contains("chronological"),
+                "the refusal must name the contract, got: "
+                        + ex.getMessage());
+
+        // Equal timestamps are still fine: two readings can share one.
+        long[] same = {1000L, 1000L};
+        assertNotNull(SeriesSample.create(HealthDataType.HEART_RATE,
+                1000L, 1000L, same, same, values,
+                HealthUnit.COUNT_PER_MINUTE));
+    }
+
+    /**
      * A series the caller asked to keep whole still answers in the unit
      * the query asked for.
      *

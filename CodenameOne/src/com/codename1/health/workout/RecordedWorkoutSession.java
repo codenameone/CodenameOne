@@ -27,6 +27,7 @@ import com.codename1.health.Health;
 import com.codename1.health.HealthDataType;
 import com.codename1.health.HealthQuantity;
 import com.codename1.health.HealthSample;
+import com.codename1.impl.health.HealthWire;
 import com.codename1.health.HealthStore;
 import com.codename1.health.HealthUnit;
 import com.codename1.health.HealthWriteResult;
@@ -77,8 +78,16 @@ final class RecordedWorkoutSession extends WorkoutSession {
     @Override
     protected void doAddSamples(List<HealthSample> samples,
             AsyncResource<Boolean> out) {
+        // Copies. What is kept here is written when the workout ends,
+        // which can be an hour later, and an app that edited or reused a
+        // sample after handing it over changed the child record the
+        // workout persists -- its source, its identifier, its metadata --
+        // rather than the reading it fed in.
         synchronized (collected) {
-            collected.addAll(samples);
+            for (HealthSample s : samples) {
+                HealthSample copy = HealthWire.copyOf(s);
+                collected.add(copy == null ? s : copy);
+            }
         }
         out.complete(Boolean.TRUE);
     }
@@ -122,8 +131,18 @@ final class RecordedWorkoutSession extends WorkoutSession {
         // reject the whole batch -- failing the session and discarding the
         // child samples that would have been written perfectly well.
         List<HealthSample> toWrite = new ArrayList<HealthSample>();
-        if (store.isWritable(HealthDataType.WORKOUT)) {
+        // A workout that began and ended inside the same millisecond has
+        // no interval to record, and WORKOUT is an interval-only type, so
+        // shared validation refuses it -- and refuses the whole batch with
+        // it, taking the child samples that were perfectly writable. That
+        // is the failure this list exists to avoid, so the same treatment
+        // applies: leave it out and say so.
+        boolean workoutWritable = store.isWritable(HealthDataType.WORKOUT)
+                && !workout.isInstantaneous();
+        if (workoutWritable) {
             toWrite.add(workout);
+        } else {
+            workout.putMetadata(WORKOUT_NOT_PERSISTED, "true");
         }
         StringBuilder rejected = new StringBuilder();
         synchronized (collected) {
@@ -149,9 +168,6 @@ final class RecordedWorkoutSession extends WorkoutSession {
             // platforms -- took this path and came back with neither an id
             // nor the signal that says why, which is the one thing a
             // caller needs in order to keep the record itself.
-            if (!store.isWritable(HealthDataType.WORKOUT)) {
-                workout.putMetadata(WORKOUT_NOT_PERSISTED, "true");
-            }
             setState(WorkoutSessionState.ENDED);
             out.complete(workout);
             return;

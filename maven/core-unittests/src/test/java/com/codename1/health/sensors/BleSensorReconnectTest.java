@@ -505,6 +505,97 @@ class BleSensorReconnectTest extends UITestBase {
     }
 
     /**
+     * The buffered batch is what the sensor reported, not what the app
+     * did to the objects it was handed.
+     *
+     * <p>The same instances go to the listeners and to {@code getLatest()}
+     * and sit in the write buffer for up to a full
+     * {@code storeBatchMillis}. An app that edited one -- its metadata,
+     * its identifier, its source -- changed what was about to be
+     * persisted, so the store recorded a provenance the sensor never
+     * reported.</p>
+     */
+    @Test
+    void editingADeliveredSampleDoesNotChangeWhatIsStored()
+            throws Exception {
+        final RecordingStore store = new RecordingStore();
+        implementation.setHealth(new com.codename1.health.Health() {
+            @Override
+            public boolean isSupported() {
+                return true;
+            }
+
+            @Override
+            public com.codename1.health.HealthStore getStore() {
+                return store;
+            }
+        });
+        try {
+            FakePeripheral p = new FakePeripheral();
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE,
+                    new SensorSessionOptions().setWriteToStore(true)
+                            .setStoreBatchMillis(10), p);
+            started.add(session);
+            session.start(new AsyncResource<SensorSession>());
+            flushSerialCalls();
+            p.notifyHeartRate(72);
+            flushSerialCalls();
+
+            // What the app was handed, edited before the batch goes out.
+            com.codename1.health.HealthSample delivered =
+                    session.getLatest(
+                            com.codename1.health.HealthDataType.HEART_RATE);
+            assertNotNull(delivered, "the reading must reach the app");
+            delivered.putMetadata("edited", "yes");
+
+            pumpFor(400, store);
+            assertFalse(store.written.isEmpty(), "the batch must be written");
+            assertNull(store.written.get(0).getMetadata().get("edited"),
+                    "the store must hold what the sensor reported");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
+    /// Keeps what it was asked to write, so a test can look at it.
+    private static final class RecordingStore
+            extends com.codename1.health.HealthStore implements WriteCounter {
+
+        final java.util.List<com.codename1.health.HealthSample> written =
+                new ArrayList<com.codename1.health.HealthSample>();
+
+        public int writeCount() {
+            return written.size();
+        }
+
+        @Override
+        public boolean isSupported() {
+            return true;
+        }
+
+        @Override
+        public boolean isTypeSupported(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        @Override
+        public boolean isWritable(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        @Override
+        protected void doWrite(
+                java.util.List<com.codename1.health.HealthSample> samples,
+                AsyncResource<com.codename1.health.HealthWriteResult> out) {
+            written.addAll(samples);
+            out.complete(new com.codename1.health.HealthWriteResult());
+        }
+    }
+
+    /**
      * Samples of a type the store will never accept are dropped, not
      * retried.
      *

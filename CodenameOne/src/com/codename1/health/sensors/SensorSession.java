@@ -30,6 +30,7 @@ import com.codename1.health.workout.WorkoutSession;
 import com.codename1.health.HealthException;
 import com.codename1.health.HealthQuantity;
 import com.codename1.health.HealthSample;
+import com.codename1.impl.health.HealthWire;
 import com.codename1.health.HealthStore;
 import com.codename1.health.HealthWriteResult;
 import com.codename1.health.HealthUnit;
@@ -317,10 +318,22 @@ public class SensorSession {
         // Batched rather than written per notification: a strap notifies
         // about once a second, and a store round trip per reading would
         // spend more time in the platform than in the app.
+        // Copies, not the instances just handed to the listeners and
+        // held by getLatest(). The batch sits here for up to a full
+        // storeBatchMillis, and an app that edited a reading it had been
+        // given -- its source, its identifier, its metadata -- changed
+        // what was about to be persisted, so the store recorded a
+        // provenance the sensor never reported.
+        List<HealthSample> buffered = new ArrayList<HealthSample>(
+                samples.size());
+        for (HealthSample s : samples) {
+            HealthSample copy = HealthWire.copyOf(s);
+            buffered.add(copy == null ? s : copy);
+        }
         boolean startTimer = false;
         synchronized (pendingWrites) {
             startTimer = pendingWrites.isEmpty();
-            pendingWrites.addAll(samples);
+            pendingWrites.addAll(buffered);
         }
         if (startTimer) {
             // Armed when the batch opens rather than checked when the next

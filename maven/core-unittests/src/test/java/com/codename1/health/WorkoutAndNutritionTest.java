@@ -319,6 +319,64 @@ class WorkoutAndNutritionTest extends UITestBase {
                         + " session's own copy");
     }
 
+    /**
+     * A workout persists the reading it was fed, not the object.
+     *
+     * <p>What {@code addSamples()} accepts is written when the workout
+     * ends, which can be an hour later. An app that edited or reused the
+     * sample in between changed the child record the workout persists --
+     * its source, its identifier, its metadata -- rather than the reading
+     * it actually fed in.</p>
+     */
+    @Test
+    void editingASampleAfterFeedingItDoesNotChangeTheWorkout() {
+        final com.codename1.impl.health.LocalHealthStore store =
+                new com.codename1.impl.health.LocalHealthStore();
+        implementation.setHealth(new Health() {
+            @Override
+            public boolean isSupported() {
+                return true;
+            }
+
+            @Override
+            public HealthStore getStore() {
+                return store;
+            }
+        });
+        try {
+            WorkoutManager m = new WorkoutManager();
+            WorkoutSession s = m.startSession(
+                    new WorkoutConfiguration()).get();
+            s.start();
+
+            QuantitySample fed = QuantitySample.create(
+                    HealthDataType.HEART_RATE,
+                    new HealthQuantity(150, HealthUnit.COUNT_PER_MINUTE),
+                    1000L, 1000L);
+            fed.putMetadata("strap", "chest");
+            List<HealthSample> batch = new ArrayList<HealthSample>();
+            batch.add(fed);
+            s.addSamples(batch);
+
+            // The app reuses its own object for the next reading.
+            fed.putMetadata("strap", "wrist");
+
+            s.end().get();
+
+            List<HealthSample> stored = store.readSamples(new SampleQuery()
+                    .addType(HealthDataType.HEART_RATE)
+                    .setTimeRange(HealthTimeRange.between(0L, 100000L)))
+                    .get();
+            assertEquals(1, stored.size(),
+                    "the reading must reach the store");
+            assertEquals("chest", stored.get(0).getMetadata().get("strap"),
+                    "the workout must persist what it was fed, not what"
+                            + " the caller did to its object afterwards");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
     @Test
     void workoutSampleTotalsAreNullUntilSet() {
         WorkoutSample w = WorkoutSample.create(WorkoutActivityType.RUNNING,

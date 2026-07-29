@@ -133,6 +133,19 @@ public final class SeriesSample extends HealthSample {
                         + " of this series ends before it starts: "
                         + sampleStarts[i] + " > " + sampleEnds[i]);
             }
+            // Chronological, as the contract above states, and now
+            // enforced: a reader asked for the newest measurements of a
+            // long record takes them from the end rather than sorting
+            // half a million of them to find out where they are, so an
+            // unordered series would have been answered with the wrong
+            // points and no sign that anything was amiss.
+            if (i > 0 && sampleStarts[i] < sampleStarts[i - 1]) {
+                throw new IllegalArgumentException("measurement " + i
+                        + " of this series starts before the one before"
+                        + " it: " + sampleStarts[i] + " < "
+                        + sampleStarts[i - 1] + "; a series must be in"
+                        + " chronological order");
+            }
             // Inside the record, too. Reads match the enclosing span
             // first, so a point outside it is unreachable by a query
             // around itself and yet gets flattened into the answer for a
