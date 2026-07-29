@@ -560,6 +560,20 @@ class WatchNativeBuilder {
         if (!usesHealth) {
             return;
         }
+        owner.createFile(new File(appSrcDir,
+                request.getMainClass() + "-Watch.entitlements"),
+                watchEntitlementsPlist(request, workoutProcessingHint)
+                        .getBytes(StandardCharsets.UTF_8));
+    }
+
+    /// The watch target's entitlements, as the plist text that is signed.
+    ///
+    /// Separated from writing it so the capability set can be asserted
+    /// without a build: every key here is one the watch does not inherit
+    /// from the phone, and a missing one fails at runtime rather than at
+    /// build time.
+    static String watchEntitlementsPlist(BuildRequest request,
+            String workoutProcessingHint) {
         StringBuilder sb = new StringBuilder();
         sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
           .append("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" ")
@@ -573,10 +587,18 @@ class WatchNativeBuilder {
             sb.append("    <key>com.apple.developer.healthkit")
               .append(".background-delivery</key>\n    <true/>\n");
         }
+        // Recalibration too, for the same reason background delivery is
+        // here: the watch is signed with this file and nothing else, so a
+        // capability the phone was granted does not reach it. The estimate
+        // recalibration a workout performs runs in shared code, on the
+        // target where it is most likely to run at all.
+        if ("true".equalsIgnoreCase(request.getArg(
+                "ios.health.recalibrateEstimates", "false"))) {
+            sb.append("    <key>com.apple.developer.healthkit")
+              .append(".recalibrate-estimates</key>\n    <true/>\n");
+        }
         sb.append("</dict>\n</plist>\n");
-        owner.createFile(new File(appSrcDir,
-                request.getMainClass() + "-Watch.entitlements"),
-                sb.toString().getBytes(StandardCharsets.UTF_8));
+        return sb.toString();
     }
 
     /**

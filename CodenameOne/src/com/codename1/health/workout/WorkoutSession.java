@@ -569,17 +569,26 @@ public abstract class WorkoutSession {
     /// Moves to a new state and notifies listeners. Ports call this for
     /// transitions the platform initiated.
     protected final void setState(WorkoutSessionState newState) {
-        Object[] snapshot;
         synchronized (stateLock) {
             if (newState == null || newState == state) {
                 return;
             }
             state = newState;
-            snapshot = listenerSnapshot();
-        }
-        if (snapshot != null) {
-            Display.getInstance().callSerially(
-                    makeStateRunnable(this, snapshot, newState));
+            // Published under the lock, so listeners are told about the
+            // transitions in the order they happened. Enqueued outside
+            // it, a transition that had already released the lock could
+            // hand its notification to the EDT after end() had handed
+            // over STOPPED, and an app would watch an ended workout
+            // appear to resume while getState() said otherwise.
+            //
+            // Only the enqueue: callSerially appends and returns, and the
+            // runnable runs later on the EDT, so no listener runs while
+            // this is held.
+            Object[] snapshot = listenerSnapshot();
+            if (snapshot != null) {
+                Display.getInstance().callSerially(
+                        makeStateRunnable(this, snapshot, newState));
+            }
         }
     }
 

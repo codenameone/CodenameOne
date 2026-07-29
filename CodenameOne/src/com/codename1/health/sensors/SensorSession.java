@@ -809,11 +809,28 @@ public class SensorSession {
                 return false;
             }
             state = newState;
+            // Published under the lock, so listeners are told about the
+            // transitions in the order they happened. Enqueued outside
+            // it, a transition that had already released the lock could
+            // hand its notification to the EDT after stop() had handed
+            // over STOPPED -- so an app watched a stopped session appear
+            // to start connecting again, while getState() said STOPPED.
+            // The store guard above kept the state honest and said
+            // nothing about the order the news arrived in.
+            //
+            // Only the enqueue. callSerially appends to a queue and
+            // returns, and the runnable runs later on the EDT, so nothing
+            // waits for a listener while this is held.
+            Object[] snapshot = listenerSnapshot();
+            if (snapshot != null) {
+                Display.getInstance().callSerially(
+                        makeStateRunnable(this, snapshot, newState));
+            }
         }
-        // Everything below runs outside the lock. The teardown it
-        // triggers takes the buffer's monitor and the listener snapshot,
-        // and holding this one across them would order the two locks
-        // against every other path that touches both.
+        // The teardown below runs outside the lock: it takes the buffer's
+        // monitor and cancels a timer, and holding this one across them
+        // would order the two locks against every other path that touches
+        // both.
         if (isTerminal()) {
             // Nothing may be scheduled from a terminal state, and that
             // includes what was scheduled just before reaching one: the
@@ -828,11 +845,6 @@ public class SensorSession {
                 flushingStopped = true;
             }
             cancelFlush();
-        }
-        Object[] snapshot = listenerSnapshot();
-        if (snapshot != null) {
-            Display.getInstance().callSerially(
-                    makeStateRunnable(this, snapshot, newState));
         }
         return true;
     }

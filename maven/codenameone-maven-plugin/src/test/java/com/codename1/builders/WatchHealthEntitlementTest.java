@@ -62,6 +62,57 @@ public class WatchHealthEntitlementTest {
         return b;
     }
 
+    private static BuildRequest entitlementRequest(String backgroundDelivery,
+            String recalibrate) {
+        BuildRequest r = new BuildRequest();
+        r.setMainClass("com.acme.MyApp");
+        if (backgroundDelivery != null) {
+            r.putArgument("ios.health.backgroundDelivery", backgroundDelivery);
+        }
+        if (recalibrate != null) {
+            r.putArgument("ios.health.recalibrateEstimates", recalibrate);
+        }
+        return r;
+    }
+
+    private static final String RECALIBRATE =
+            "com.apple.developer.healthkit.recalibrate-estimates";
+    private static final String BACKGROUND =
+            "com.apple.developer.healthkit.background-delivery";
+
+    /**
+     * The watch is signed with its own entitlements and inherits nothing,
+     * so a capability the phone was granted has to be repeated here.
+     * Recalibration is performed by shared workout code, on the target
+     * where it is most likely to run at all.
+     */
+    @Test
+    void recalibrationReachesTheWatchEntitlements() {
+        String plist = WatchNativeBuilder.watchEntitlementsPlist(
+                entitlementRequest(null, "true"), null);
+        assertTrue(plist.contains(RECALIBRATE),
+                "the watch must carry the capability the hint asked for:\n"
+                        + plist);
+        assertTrue(plist.contains("com.apple.developer.healthkit</key>"),
+                "and the base entitlement is always there");
+    }
+
+    @Test
+    void theWatchAsksForNoCapabilityItWasNotGiven() {
+        String plist = WatchNativeBuilder.watchEntitlementsPlist(
+                entitlementRequest(null, null), null);
+        assertFalse(plist.contains(RECALIBRATE),
+                "an unrequested capability must not be claimed:\n" + plist);
+        assertFalse(plist.contains(BACKGROUND), plist);
+    }
+
+    /** Workout processing implies background delivery, as before. */
+    @Test
+    void workoutProcessingStillImpliesBackgroundDelivery() {
+        assertTrue(WatchNativeBuilder.watchEntitlementsPlist(
+                entitlementRequest(null, null), "true").contains(BACKGROUND));
+    }
+
     /** Sharing the phone's main class means sharing its health usage. */
     @Test
     void sharedMainInheritsPhoneHealthUsage() {

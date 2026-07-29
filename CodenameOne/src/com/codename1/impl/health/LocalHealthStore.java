@@ -437,9 +437,19 @@ public class LocalHealthStore extends HealthStore {
         HealthWriteResult result = new HealthWriteResult();
         List<HealthSample> added = new ArrayList<HealthSample>();
         boolean failed = false;
+        // Every copy taken before anything is stored. snapshot() refuses
+        // a shape this build cannot copy, and refusing partway through
+        // left the batch's earlier samples in the store with the rollback
+        // below skipped -- a phantom partial write, visible until the
+        // process exited and gone after it.
+        List<HealthSample> copies = new ArrayList<HealthSample>(
+                toWrite.size());
+        for (HealthSample s : toWrite) {
+            copies.add(snapshot(s));
+        }
         synchronized (mutationLock) {
             synchronized (samples) {
-                for (HealthSample s : toWrite) {
+                for (HealthSample stored : copies) {
                     String id = "local-" + (nextId++);
                     // The identifier goes on the stored copy only. Stamping
                     // the caller's object made this store the one place a
@@ -454,7 +464,6 @@ public class LocalHealthStore extends HealthStore {
                     // later setId/setSource/putMetadata on it silently rewrote
                     // the stored record, and could make deleting by the
                     // returned id fail.
-                    HealthSample stored = snapshot(s);
                     stored.setId(id);
                     samples.add(stored);
                     added.add(stored);

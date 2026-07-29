@@ -375,6 +375,41 @@ class LocalHealthStoreTest extends UITestBase {
         assertTrue(page.isTruncated());
     }
 
+    /**
+     * A shape the store cannot copy fails the whole batch, not half of it.
+     *
+     * <p>{@code snapshot()} refuses a sample shape this build has no copy
+     * for, and refusing partway through a batch left the earlier samples
+     * in the store with the rollback skipped -- a write the caller was
+     * never told succeeded, visible until the process exited and gone
+     * afterwards.</p>
+     */
+    @Test
+    void anUncopyableShapeLeavesNothingBehind() {
+        writeSteps(utc(2026, 1, 1, 9), utc(2026, 1, 1, 10), 1200);
+        List<HealthSample> batch = new ArrayList<HealthSample>();
+        batch.add(QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(50, HealthUnit.COUNT),
+                utc(2026, 1, 1, 11), utc(2026, 1, 1, 12)));
+        batch.add(new HealthSample(HealthDataType.STEPS,
+                utc(2026, 1, 1, 13), utc(2026, 1, 1, 14)) {
+        });
+
+        try {
+            store.write(batch).get();
+        } catch (RuntimeException expected) {
+            // The refusal itself is not what this pins down.
+        }
+
+        List<HealthSample> read = store.readSamples(new SampleQuery()
+                .addType(HealthDataType.STEPS)
+                .setTimeRange(HealthTimeRange.between(utc(2026, 1, 1, 0),
+                        utc(2026, 1, 2, 0)))).get();
+        assertEquals(1, read.size(),
+                "only the sample written before the failing batch may"
+                        + " remain, got: " + read.size());
+    }
+
     @Test
     void descendingSortReturnsNewestFirst() {
         writeSteps(utc(2026, 1, 1, 9), utc(2026, 1, 1, 10), 100);
