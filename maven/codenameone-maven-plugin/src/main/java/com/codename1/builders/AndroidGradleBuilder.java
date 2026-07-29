@@ -310,6 +310,10 @@ public class AndroidGradleBuilder extends Executor {
     // activities). Gates the surfaces.json parse, the per-kind widget provider codegen, the
     // pre-baked layout resources and the manifest receivers/trampoline activity.
     private boolean usesSurfaces;
+    // Set when the app references com.codename1.wearable.* (the phone-to-watch link). Gates the
+    // play-services-wearable dependency, the WearableListenerService manifest entry and the
+    // injected Data Layer glue.
+    private boolean usesWearable;
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
@@ -1466,6 +1470,13 @@ public class AndroidGradleBuilder extends Executor {
                         usesSurfaces = true;
                     }
 
+                    // Phone-to-watch link (com.codename1.wearable.*). Gated on actual usage so the
+                    // play-services-wearable dependency, the listener service and the injected Data
+                    // Layer glue are only added for apps that talk to their watch app.
+                    if (!usesWearable && cls.indexOf("com/codename1/wearable/") == 0) {
+                        usesWearable = true;
+                    }
+
                     if (cls.equals("com/codename1/background/ForegroundService")) {
                         usesForegroundService = true;
                     }
@@ -2294,6 +2305,29 @@ public class AndroidGradleBuilder extends Executor {
                                 + "\n" + compile + "(\"androidx.car.app:app:" + carAppVersion + "\") { exclude group: 'androidx.media' }\n"
                                 + compile + "(\"androidx.car.app:app-projected:" + carAppVersion + "\") { exclude group: 'androidx.media' }\n");
             }
+        }
+
+        // Wearable Data Layer glue: when the app references com.codename1.wearable, copy the
+        // injected WearableBridge + WearableListenerService (typed against play-services-wearable)
+        // into the generated project and add the dependency. The Android port itself cannot
+        // reference play-services-wearable, which is why these ship as .java resources here and are
+        // only added for apps that talk to a watch.
+        if (usesWearable) {
+            File wearImpl = new File(srcDir, "com/codename1/impl/android");
+            wearImpl.mkdirs();
+            String[] glue = {"CN1WearableBridge.java", "CN1WearableListenerService.java"};
+            for (String g : glue) {
+                InputStream gin = getResourceAsStream("/com/codename1/builders/wearable/" + g);
+                if (gin == null) {
+                    throw new BuildException("Missing wearable glue resource " + g);
+                }
+                try {
+                    copy(gin, new FileOutputStream(new File(wearImpl, g)));
+                } catch (IOException ex) {
+                    throw new BuildException("Failed to write wearable glue " + g, ex);
+                }
+            }
+            playServicesWear = true;
         }
 
         // External surfaces (com.codename1.surfaces): parse the build-time kinds manifest,
@@ -3200,6 +3234,23 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        // The Data Layer starts this service to deliver a message or a data change even when the
+        // app is not running -- which is the whole point, and why com.codename1.wearable queues
+        // callbacks across a cold start. Both the message and data-changed actions are needed: the
+        // system dispatches them separately.
+        String wearableListenerService = "";
+        if (usesWearable) {
+            wearableListenerService =
+                    "        <service android:name=\"com.codename1.impl.android.CN1WearableListenerService\" android:exported=\"true\">\n"
+                    + "            <intent-filter>\n"
+                    + "                <action android:name=\"com.google.android.gms.wearable.MESSAGE_RECEIVED\" />\n"
+                    + "                <action android:name=\"com.google.android.gms.wearable.DATA_CHANGED\" />\n"
+                    + "                <action android:name=\"com.google.android.gms.wearable.CAPABILITY_CHANGED\" />\n"
+                    + "                <data android:scheme=\"wear\" android:host=\"*\" android:pathPrefix=\"/cn1\" />\n"
+                    + "            </intent-filter>\n"
+                    + "        </service>\n";
+        }
+
         if (foregroundServicePermission) {
             permissions += permissionAdd(request, "\"android.permission.FOREGROUND_SERVICE\"",
                     "    <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />\n");
@@ -3591,6 +3642,7 @@ public class AndroidGradleBuilder extends Executor {
                 + remoteControlService
                 + hceService
                 + carAppService
+                + wearableListenerService
                 + surfacesManifestEntries
                 + "    </application>\n"
                 + "    <uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" />\n"
