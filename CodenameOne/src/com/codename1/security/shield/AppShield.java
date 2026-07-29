@@ -24,6 +24,7 @@ package com.codename1.security.shield;
 
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Log;
+import com.codename1.io.NetworkManager;
 import com.codename1.security.shield.spi.ShieldEngine;
 import com.codename1.security.shield.spi.ShieldEngineRegistry;
 import com.codename1.ui.Display;
@@ -107,6 +108,30 @@ public final class AppShield {
             // A failure inside the engine must not stop the app from starting.
             Log.e(t);
             setStatus(ShieldStatus.UNPROTECTED);
+        }
+        installNetworkGuard();
+    }
+
+    /// Hooks the shield into the network stack, which is what makes
+    /// [ShieldConfig#protect(String, HostPolicy)] take effect on ordinary requests. Without it a
+    /// registered host would carry a policy nothing consults.
+    ///
+    /// Installed even when no engine is present: the guard is inert in that case (the default
+    /// engine issues no tokens and enforces no pins) and installing unconditionally keeps the
+    /// behaviour identical whether or not the enterprise engine was injected.
+    private static void installNetworkGuard() {
+        try {
+            NetworkManager.setNetworkGuard(new ShieldNetworkGuard());
+        } catch (IllegalStateException e) {
+            // The slot seals after the first install. An app that installed its
+            // own guard keeps it; say so rather than failing startup, because the
+            // consequence is that protected hosts are not decorated automatically
+            // and that is worth knowing about.
+            Log.p("AppShield: a network guard is already installed, so protected hosts will "
+                    + "not be decorated automatically. Call AppShield.attach(request) from "
+                    + "your own guard if you need both.");
+        } catch (Throwable t) {
+            Log.e(t);
         }
     }
 

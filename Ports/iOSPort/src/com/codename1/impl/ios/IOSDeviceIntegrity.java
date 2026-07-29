@@ -352,6 +352,11 @@ final class IOSDeviceIntegrity {
                 PendingRequest retry = new PendingRequest(pending.result, pending.nonce,
                         PendingRequest.OP_GENERATE_KEY, null);
                 retry.retried = true;
+                // resetAttestation() clears the flag, so set it again before
+                // starting the replacement: otherwise a request arriving before
+                // the recovery callback sees no key and no bootstrap running,
+                // generates a second rate-limited key and races this one.
+                instance.bootstrapInFlight = true;
                 int rid = register(retry);
                 instance.nativeInstance.appAttestGenerateKey(rid);
             }
