@@ -351,13 +351,10 @@ public class Sheet extends Container {
     /// Original padding values to prevent accumulation when showing the sheet multiple times.
     /// These are set the first time the sheet is shown and used as the base for safe area calculations.
     private int[] originalPadding = null;
-    /// Padding of the content pane as it was before a hand written `RoundRectBorder` inset it by its
-    /// corner radius, in top, bottom, left, right order and in the units of `#contentPaneInsetUnits`.
-    /// Null while no inset is applied, so restyling the sheet with a border that asks for no inset
-    /// puts the padding back instead of leaving the inset of the previous border behind.
-    private float[] contentPaneInset = null;
-    /// Padding units of the content pane as they were before the inset, null for pixels.
-    private byte[] contentPaneInsetUnits = null;
+    /// The padding a hand written `RoundRectBorder` replaced on the content pane, null while no
+    /// inset is applied. Restyling the sheet with a border that asks for no inset puts this back
+    /// rather than leaving the inset of the previous border behind.
+    private ContentPaneInset contentPaneInset;
     private Form form;
     private final Rectangle sheetBounds = new Rectangle();
     private boolean trackSheetBounds;
@@ -805,8 +802,17 @@ public class Sheet extends Container {
         // CSS asked for, so an inset here is padding the author never wrote, and on an empty
         // content pane it becomes a gap under the title, see issue 5488.
         if (border instanceof RoundRectBorder && !((RoundRectBorder) border).isCssBoxModel()) {
-            rememberContentPanePadding();
+            // The inset pads the current style of the content pane, so that is the style the
+            // padding is taken from and the one it is later put back into
+            Style contentStyle = contentPane.getStyle();
+            if (contentPaneInset == null || !contentPaneInset.isIntact(contentStyle)) {
+                // Nothing was inset yet, or what was inset is gone: a theme refresh replaced
+                // the style, or the padding was changed since. Either way the padding in front of
+                // us now is the one to preserve
+                contentPaneInset = new ContentPaneInset(contentStyle);
+            }
             $(contentPane).setPaddingMillimeters(((RoundRectBorder) border).getCornerRadius());
+            contentPaneInset.recordApplied(contentStyle);
         } else {
             // Restyling the sheet with a border that wants no inset has to take the inset of the
             // previous border back off, otherwise the gap survives the restyle
@@ -939,40 +945,16 @@ public class Sheet extends Container {
         }
     }
 
-    /// Stores the padding of the content pane as it is before the corner radius of a hand written
-    /// border insets it. Only the first inset is recorded, so showing the sheet again does not
-    /// record the inset as if it were the padding of the developer.
-    ///
-    /// The inset is written by the component selector, which pads the current style of the content
-    /// pane rather than all of its styles, so this reads that same style and
-    /// `#restoreContentPanePadding` writes back to it. The selected, pressed and disabled styles
-    /// are never insetted and so have nothing to restore.
-    private void rememberContentPanePadding() {
-        if (contentPaneInset != null) {
-            return;
-        }
-        Style cps = contentPane.getStyle();
-        contentPaneInset = new float[]{
-                cps.getPaddingFloatValue(false, Component.TOP),
-                cps.getPaddingFloatValue(false, Component.BOTTOM),
-                cps.getPaddingFloatValue(false, Component.LEFT),
-                cps.getPaddingFloatValue(false, Component.RIGHT)
-        };
-        byte[] units = cps.getPaddingUnit();
-        contentPaneInsetUnits = units == null ? null : new byte[]{units[0], units[1], units[2], units[3]};
-    }
-
-    /// Puts back the padding `#rememberContentPanePadding` stored, doing nothing when no inset was
-    /// ever applied so a content pane the developer padded is left alone.
+    /// Puts back the padding the corner radius of a hand written border replaced, when that inset
+    /// is still there to take off. Nothing happens when no inset was applied, when the style it was
+    /// applied to has since been replaced, by a theme refresh for instance, or when the padding has
+    /// been changed since, so a content pane padded by the developer is left as they left it.
     private void restoreContentPanePadding() {
         if (contentPaneInset == null) {
             return;
         }
-        Style cps = contentPane.getStyle();
-        cps.setPaddingUnit(contentPaneInsetUnits);
-        cps.setPadding(contentPaneInset[0], contentPaneInset[1], contentPaneInset[2], contentPaneInset[3]);
+        contentPaneInset.restore(contentPane.getStyle());
         contentPaneInset = null;
-        contentPaneInsetUnits = null;
     }
 
     /// Gets the position where the Sheet is to be displayed.
@@ -1487,5 +1469,87 @@ public class Sheet extends Container {
             g.setAlpha(alph);
         }
 
+    }
+
+    /// The padding of the content pane as it was before the corner radius of a hand written
+    /// `RoundRectBorder` replaced it, kept alongside the style that was padded and the padding the
+    /// inset wrote there. Restoring writes the old padding back only into a style that still holds
+    /// exactly what the inset left, so a theme refresh that swaps the style, or a developer padding
+    /// the content pane between two shows, drops the snapshot rather than overwriting their work.
+    ///
+    /// The inset is applied through the component selector, which pads the current style of the
+    /// content pane rather than all of its styles, so only that one style is ever recorded. The
+    /// selected, pressed and disabled styles are not part of the inset and have nothing to restore.
+    private static class ContentPaneInset {
+        private final Style style;
+        private final float[] padding;
+        private final byte[] units;
+        private float[] appliedPadding;
+        private byte[] appliedUnits;
+
+        ContentPaneInset(Style style) {
+            this.style = style;
+            padding = paddingOf(style);
+            units = unitsOf(style);
+        }
+
+        /// Records what the inset left in the style, which is what `#isIntact` looks for later.
+        void recordApplied(Style inset) {
+            appliedPadding = paddingOf(inset);
+            appliedUnits = unitsOf(inset);
+        }
+
+        /// True when the given style is the one that was inset and still holds that inset.
+        boolean isIntact(Style current) {
+            return current == style //NOPMD CompareObjectsWithEquals
+                    && appliedPadding != null
+                    && same(paddingOf(current), appliedPadding)
+                    && same(unitsOf(current), appliedUnits);
+        }
+
+        /// Puts the padding back if the inset it replaced is still in place, otherwise leaves the
+        /// style alone.
+        void restore(Style current) {
+            if (!isIntact(current)) {
+                return;
+            }
+            current.setPaddingUnit(units);
+            current.setPadding(padding[0], padding[1], padding[2], padding[3]);
+        }
+
+        private static float[] paddingOf(Style s) {
+            return new float[]{
+                    s.getPaddingFloatValue(false, Component.TOP),
+                    s.getPaddingFloatValue(false, Component.BOTTOM),
+                    s.getPaddingFloatValue(false, Component.LEFT),
+                    s.getPaddingFloatValue(false, Component.RIGHT)
+            };
+        }
+
+        private static byte[] unitsOf(Style s) {
+            byte[] u = s.getPaddingUnit();
+            return u == null ? null : new byte[]{u[0], u[1], u[2], u[3]};
+        }
+
+        private static boolean same(float[] a, float[] b) {
+            for (int i = 0; i < a.length; i++) {
+                if (a[i] != b[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static boolean same(byte[] a, byte[] b) {
+            if (a == null || b == null) {
+                return a == b; //NOPMD CompareObjectsWithEquals
+            }
+            for (int i = 0; i < a.length; i++) {
+                if (a[i] != b[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 }

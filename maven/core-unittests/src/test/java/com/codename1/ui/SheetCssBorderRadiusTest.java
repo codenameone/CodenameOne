@@ -138,9 +138,9 @@ class SheetCssBorderRadiusTest extends UITestBase {
 
         Style contentStyle = sheet.getContentPane().getStyle();
         assertEquals(Display.getInstance().convertToPixels(1f), contentStyle.getPaddingTop(),
-                "the padding of the developer comes back, in millimetres");
+                "the padding of the developer comes back, in the unit it was written in");
         assertEquals(Display.getInstance().convertToPixels(2f), contentStyle.getPaddingLeftNoRTL(),
-                "the padding of the developer comes back, in millimetres");
+                "the padding of the developer comes back, in the unit it was written in");
         assertEquals(Style.UNIT_TYPE_DIPS, contentStyle.getPaddingUnit()[Component.TOP],
                 "the padding unit of the developer comes back too");
     }
@@ -165,6 +165,41 @@ class SheetCssBorderRadiusTest extends UITestBase {
                 "the selected style of the content pane is not part of the inset");
         assertEquals(9, sheet.getContentPane().getPressedStyle().getPaddingTop(),
                 "the pressed style of the content pane is not part of the inset");
+    }
+
+    @FormTest
+    void aThemeRefreshBetweenShowsDropsTheSnapshot() {
+        // Replacing the style of the content pane, which is what a theme refresh does, takes the
+        // inset with it. The snapshot then describes a style nobody is using any more and writing
+        // it into the fresh style would undo the theme.
+        Sheet sheet = showSheet(RoundRectBorder.create().cornerRadius(4f));
+
+        Style fresh = new Style(sheet.getContentPane().getStyle());
+        fresh.setPadding(3, 3, 3, 3);
+        fresh.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+        sheet.getContentPane().setUnselectedStyle(fresh);
+
+        sheet.getAllStyles().setBorder(cssBorder());
+        show(sheet);
+
+        assertEquals(3, sheet.getContentPane().getStyle().getPaddingTop(),
+                "the padding of the new style survives, the stale snapshot is dropped");
+    }
+
+    @FormTest
+    void paddingChangedBetweenShowsIsNotOverwritten() {
+        // The developer padding the content pane after the inset went on is saying what they want
+        // it to be. Restoring may not put the pre-inset padding back over that.
+        Sheet sheet = showSheet(RoundRectBorder.create().cornerRadius(4f));
+
+        sheet.getContentPane().getStyle().setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+        sheet.getContentPane().getStyle().setPadding(5, 5, 5, 5);
+
+        sheet.getAllStyles().setBorder(cssBorder());
+        show(sheet);
+
+        assertEquals(5, sheet.getContentPane().getStyle().getPaddingTop(),
+                "padding set after the inset wins over the snapshot");
     }
 
     private RoundRectBorder cssBorder() {
