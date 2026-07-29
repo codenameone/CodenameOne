@@ -183,7 +183,7 @@ public final class HealthDataType {
     /// than dropped silently. Take the reading off the sensor session and
     /// keep it yourself until then -- see [BloodPressureSample].
     public static final HealthDataType BLOOD_PRESSURE =
-            define("blood_pressure", HealthDataKind.QUANTITY,
+            define("blood_pressure", HealthDataKind.COMPOSITE,
                     HealthUnit.MILLIMETER_OF_MERCURY,
                     HealthAggregationStyle.DISCRETE, false);
 

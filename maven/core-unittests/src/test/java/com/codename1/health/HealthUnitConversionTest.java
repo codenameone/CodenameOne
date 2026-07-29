@@ -199,6 +199,29 @@ class HealthUnitConversionTest {
      * would be answered with the wrong points and nothing would look
      * wrong.</p>
      */
+    /**
+     * Blood pressure is not a quantity type.
+     *
+     * <p>Classifying it as one let generic code dispatch on the kind,
+     * cast a stored reading to {@link QuantitySample} and fail with a
+     * ClassCastException -- and let a caller build a one-number quantity
+     * for a reading that is a systolic *and* a diastolic.</p>
+     */
+    @Test
+    void bloodPressureIsACompositeRatherThanAQuantity() {
+        assertEquals(HealthDataKind.COMPOSITE,
+                HealthDataType.BLOOD_PRESSURE.getKind(),
+                "a reading made of two numbers is not a quantity");
+        assertThrows(IllegalArgumentException.class,
+                () -> QuantitySample.create(HealthDataType.BLOOD_PRESSURE,
+                        new HealthQuantity(120,
+                                HealthUnit.MILLIMETER_OF_MERCURY),
+                        1000L),
+                "and the quantity factory must refuse it");
+        // The composite factory is unaffected.
+        assertNotNull(BloodPressureSample.create(120, 80, 1000L));
+    }
+
     @Test
     void anOutOfOrderSeriesIsRefused() {
         long[] starts = {2000L, 1000L};

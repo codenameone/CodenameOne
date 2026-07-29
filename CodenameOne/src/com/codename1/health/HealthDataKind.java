@@ -47,5 +47,16 @@ public enum HealthDataKind {
 
     /// A bounded activity with child data -- a workout, a night's sleep.
     /// Produces a [SessionSample] subclass.
-    SESSION
+    SESSION,
+
+    /// A reading made of several named values that only mean something
+    /// together -- a blood pressure, which is a systolic *and* a
+    /// diastolic. Produces [BloodPressureSample].
+    ///
+    /// It is not [#QUANTITY]. Calling it one let generic code dispatch on
+    /// the kind, cast a stored reading to [QuantitySample] and fail with
+    /// a ClassCastException -- and let a caller build a one-number
+    /// quantity for a type that has no single number, which the platforms
+    /// then had to refuse or, worse, store as half a reading.
+    COMPOSITE
 }

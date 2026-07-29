@@ -605,19 +605,24 @@ public class LocalHealthStore extends HealthStore {
     public final void clear() {
         List<HealthSample> before;
         synchronized (mutationLock) {
+            // Held through the persist and the rollback, as the write and
+            // delete paths are. Released in between, a reader saw an empty
+            // store that was about to be restored -- and unlike a failed
+            // write, this one has no resource to report the failure on, so
+            // that reader had nothing at all to tell it the emptiness was
+            // never real.
             synchronized (samples) {
                 before = new ArrayList<HealthSample>(samples);
                 samples.clear();
-            }
-            if (!persist()) {
-                // No result to fail -- this returns void -- so the least
-                // dishonest answer is to leave the store as it was rather
-                // than empty in memory and full on disk.
-                synchronized (samples) {
+                if (!persist()) {
+                    // No result to fail -- this returns void -- so the
+                    // least dishonest answer is to leave the store as it
+                    // was rather than empty in memory and full on disk.
                     samples.addAll(before);
+                    com.codename1.io.Log.p("CN1 Health: the local store"
+                            + " could not be cleared on disk, so it was"
+                            + " left as it was");
                 }
-                com.codename1.io.Log.p("CN1 Health: the local store could not"
-                        + " be cleared on disk, so it was left as it was");
             }
         }
     }
