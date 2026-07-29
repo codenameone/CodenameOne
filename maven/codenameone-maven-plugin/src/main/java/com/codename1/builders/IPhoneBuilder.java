@@ -1146,7 +1146,16 @@ public class IPhoneBuilder extends Executor {
                                 || method.startsWith("getWorkouts")
                                 || method.startsWith("openHealthSettings")
                                 || method.startsWith("openProviderSetup")
-                                || method.startsWith("getAvailability")) {
+                                || method.startsWith("getAvailability")
+                                // The probes need the backend as much as a read
+                                // does: isSupported() asks the Health Connect
+                                // delegate whether it is there and hkIsAvailable()
+                                // asks the native, and neither exists unless the
+                                // build bundles them -- so an app whose only health
+                                // call was "is this supported?" was told no on every
+                                // device, for ever, because it had asked.
+                                || method.startsWith("isSupported")
+                                || method.startsWith("getConfigurationProblems")) {
                             usesHealthStore = true;
                         }
                         if (method.startsWith("getWorkouts")) {

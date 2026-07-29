@@ -86,6 +86,31 @@ public class HealthScannerParityTest {
     }
 
     /**
+     * A probe needs the backend bundled, on both platforms.
+     *
+     * <p>{@code isSupported()} asks the Health Connect delegate whether
+     * it is registered, and on iOS it asks the native whether HealthKit
+     * is there -- neither of which exists unless the build bundles them.
+     * An app whose only health call was "is this supported?" was
+     * therefore told no on every device, for ever, because it had
+     * asked.</p>
+     */
+    @Test
+    void bothScannersTreatSupportProbesAsStoreUse() throws Exception {
+        for (String builder : new String[] {"AndroidGradleBuilder",
+                "IPhoneBuilder"}) {
+            String src = source(builder);
+            assertTrue(src.contains("method.startsWith(\"isSupported\")"),
+                    builder + " must bundle the backend for isSupported(),"
+                            + " or the probe answers no on every device");
+            assertTrue(src.contains(
+                    "method.startsWith(\"getConfigurationProblems\")"),
+                    builder + " must bundle it for the diagnostics probe"
+                            + " too, which reports whether it is there");
+        }
+    }
+
+    /**
      * The shared value types are not store use on either platform. A
      * sensor callback names {@code HealthSample} whatever else it does.
      */
