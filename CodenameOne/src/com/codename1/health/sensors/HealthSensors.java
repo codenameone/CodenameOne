@@ -113,6 +113,14 @@ public class HealthSensors {
                 ? HealthSensorProfile.values() : s.getProfiles();
 
         ScanSettings bleSettings = new ScanSettings();
+        if (s.isLowPower()) {
+            // The setting was accepted and then ignored, so a scan asking
+            // to be gentle on the battery ran at the balanced duty cycle
+            // anyway -- and a background or long-running scan is exactly
+            // where the caller meant it.
+            bleSettings.setScanMode(com.codename1.bluetooth.le.ScanMode
+                    .LOW_POWER);
+        }
         for (HealthSensorProfile wantedItem : wanted) {
             bleSettings.addFilter(new ScanFilter()
                     .setServiceUuid(wantedItem.getServiceUuid()));

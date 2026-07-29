@@ -100,4 +100,33 @@ class SensorScanFailureTest extends UITestBase {
         assertTrue(scan.isScanning());
         scan.stop();
     }
+
+    /**
+     * A low-power scan asks the radio for a low-power scan.
+     *
+     * <p>{@code SensorScanSettings.setLowPower(true)} was accepted and
+     * then never read, so a scan meant to be gentle on the battery ran at
+     * the balanced duty cycle -- and a background or long-running scan is
+     * exactly where the caller meant it.</p>
+     */
+    @Test
+    void aLowPowerScanReachesTheRadio() {
+        SensorScan scan = Health.getInstance().getSensors().startScan(
+                new SensorScanSettings().setLowPower(true),
+                new Recorder());
+        flushSerialCalls();
+        assertEquals(com.codename1.bluetooth.le.ScanMode.LOW_POWER,
+                fake.getFakeLE().startedWithMode,
+                "the setting must reach the platform scan");
+        scan.stop();
+        flushSerialCalls();
+
+        SensorScan normal = Health.getInstance().getSensors().startScan(
+                new SensorScanSettings(), new Recorder());
+        flushSerialCalls();
+        assertEquals(com.codename1.bluetooth.le.ScanMode.BALANCED,
+                fake.getFakeLE().startedWithMode,
+                "and the default is unchanged");
+        normal.stop();
+    }
 }

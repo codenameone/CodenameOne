@@ -71,6 +71,10 @@ public class FakeHealthStore extends HealthStore {
     public AsyncResource<HealthWriteResult> lateWrite;
     /** When set, doWrite keeps the resource instead of answering. */
     public boolean holdWrite;
+    /** When set, doReadSamples keeps the resource instead of answering. */
+    public boolean holdRead;
+    /** The resource a held read is waiting on. */
+    public AsyncResource<SamplePage> heldRead;
 
     /** Shortens the per-operation safety timeout for a test. */
     public void setOperationTimeoutForTest(int millis) {
@@ -120,6 +124,10 @@ public class FakeHealthStore extends HealthStore {
             AsyncResource<SamplePage> out) {
         queriesSeen.add(query);
         readThreads.add(Thread.currentThread().getName());
+        if (holdRead) {
+            heldRead = out;
+            return;
+        }
         if (pageIndex >= pages.size()) {
             out.complete(new SamplePage(new ArrayList<HealthSample>(), null,
                     false));

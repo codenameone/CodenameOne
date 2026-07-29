@@ -53,7 +53,7 @@ public final class IOSHealth extends Health {
 
     IOSHealth(IOSNative nativeInstance) {
         this.nativeInstance = nativeInstance;
-        this.store = new IOSHealthStore(nativeInstance);
+        this.store = new IOSHealthStore(nativeInstance, this);
     }
 
     public boolean isSupported() {
@@ -84,7 +84,6 @@ public final class IOSHealth extends Health {
     /// [#getConfigurationProblems()] answers the same question without
     /// throwing, for a diagnostics screen.
     public HealthStore getStore() {
-        requireUsageStrings();
         return store;
     }
 
@@ -94,7 +93,17 @@ public final class IOSHealth extends Health {
         return super.getWorkouts();
     }
 
-    private void requireUsageStrings() {
+    /// Throws when the app declares no HealthKit purpose string.
+    ///
+    /// Called from the operations that read or write, not from
+    /// [#getStore()]. An app that only asks the store what it supports --
+    /// isTypeSupported, isWritable, getSupportedTypes -- reads nothing,
+    /// and the iOS builder deliberately lets such an app build with no
+    /// purpose string because there is no truthful text to demand of it.
+    /// Throwing on the way to the store made that build fail at runtime
+    /// instead, which is the failure the builder's exemption exists to
+    /// avoid.
+    void requireUsageStrings() {
         if (!nativeInstance.checkHealthShareUsage()
                 && !nativeInstance.checkHealthUpdateUsage()) {
             throw new com.codename1.health.HealthConfigurationException(

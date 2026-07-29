@@ -736,6 +736,14 @@ class CN1HealthConnectBridge(private val context: Context)
                 return Written(1, wholeSeries)
             }
         }
+        // Counted as the filter lets them through, not as the
+        // record holds them: an overlapping record contributes only
+        // its in-window measurements, and reporting the rest inflated
+        // the emitted count -- which marks a complete result truncated,
+        // spends the scan budget on points that were discarded, and can
+        // refuse a small window for exceeding a ceiling it never
+        // approached.
+        var written = 0
         when (record) {
             is StepsRecord -> interval(sb, record, token,
                 record.startTime, record.endTime,
@@ -811,6 +819,7 @@ class CN1HealthConnectBridge(private val context: Context)
                 if (inWindow(window, it.time.toEpochMilli())) {
                     sample(sb, record, token, it.time.toEpochMilli(),
                         it.beatsPerMinute.toDouble(), "count/min")
+                    written++
                 }
             }
 
@@ -818,6 +827,7 @@ class CN1HealthConnectBridge(private val context: Context)
                 if (inWindow(window, it.time.toEpochMilli())) {
                     sample(sb, record, token, it.time.toEpochMilli(),
                         it.power.inWatts, "W")
+                    written++
                 }
             }
 
@@ -825,6 +835,7 @@ class CN1HealthConnectBridge(private val context: Context)
                 if (inWindow(window, it.time.toEpochMilli())) {
                     sample(sb, record, token, it.time.toEpochMilli(),
                         it.speed.inMetersPerSecond, "m/s")
+                    written++
                 }
             }
 
@@ -832,6 +843,7 @@ class CN1HealthConnectBridge(private val context: Context)
                 if (inWindow(window, it.time.toEpochMilli())) {
                     sample(sb, record, token, it.time.toEpochMilli(),
                         it.revolutionsPerMinute, "count/min")
+                    written++
                 }
             }
 
@@ -839,6 +851,7 @@ class CN1HealthConnectBridge(private val context: Context)
                 if (inWindow(window, it.time.toEpochMilli())) {
                     sample(sb, record, token, it.time.toEpochMilli(),
                         it.rate, "count/min")
+                    written++
                 }
             }
 
@@ -854,11 +867,11 @@ class CN1HealthConnectBridge(private val context: Context)
         // shared layer trims for the caller while the token still resumes
         // at the right place.
         val n = when (record) {
-            is HeartRateRecord -> record.samples.size
-            is PowerRecord -> record.samples.size
-            is SpeedRecord -> record.samples.size
-            is CyclingPedalingCadenceRecord -> record.samples.size
-            is StepsCadenceRecord -> record.samples.size
+            is HeartRateRecord -> written
+            is PowerRecord -> written
+            is SpeedRecord -> written
+            is CyclingPedalingCadenceRecord -> written
+            is StepsCadenceRecord -> written
             else -> 1
         }
         return Written(n, n)

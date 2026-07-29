@@ -374,6 +374,21 @@ public class HealthStore {
         return out;
     }
 
+    /// A copy of `query` as it stands right now, page token included.
+    ///
+    /// Every read takes one before it dispatches. `SampleQuery` is a
+    /// mutable builder and a caller is entitled to reuse it for the next
+    /// request the moment the call returns -- but the answer arrives
+    /// later and is post-processed then, so a unit or a source filter
+    /// changed in between converted, filtered and sorted the page by a
+    /// query nobody had submitted. A changed source list made it silently
+    /// empty.
+    private static SampleQuery snapshot(SampleQuery query) {
+        SampleQuery copy = copyForPaging(query);
+        copy.setPageToken(query.getPageToken());
+        return copy;
+    }
+
     /// A shallow copy of `query` that paging may mutate freely.
     private static SampleQuery copyForPaging(SampleQuery query) {
         SampleQuery copy = new SampleQuery()
@@ -469,18 +484,22 @@ public class HealthStore {
     /// [#readSamples(SampleQuery)] for high-frequency types, so peak
     /// memory stays bounded regardless of how much history exists.
     public final AsyncResource<SamplePage> readSamplePage(
-            final SampleQuery query) {
+            final SampleQuery caller) {
         final AsyncResource<SamplePage> out = new AsyncResource<SamplePage>();
         if (failIfUnsupported(out)) {
             return out;
         }
         try {
-            query.validate();
-            requireSupportedTypes(query.getTypes());
+            caller.validate();
+            requireSupportedTypes(caller.getTypes());
         } catch (HealthException ex) {
             out.error(ex);
             return out;
         }
+        // Taken before dispatch and used for both the platform call and
+        // the post-processing, which happen at different times -- see
+        // snapshot().
+        final SampleQuery query = snapshot(caller);
         final AsyncResource<SamplePage> raw = new OneShot<SamplePage>();
         raw.onResult(new AsyncResult<SamplePage>() {
             @Override

@@ -23,6 +23,7 @@
 package com.codename1.health;
 
 import com.codename1.junit.UITestBase;
+import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
 import org.junit.jupiter.api.Test;
 
@@ -265,5 +266,43 @@ class HealthReadPagingTest extends UITestBase {
         flushSerialCalls();
         assertEquals(1, outcomes[0],
                 "a late answer must not report a second outcome");
+    }
+
+    /**
+     * Mutating the query after the call does not change the answer.
+     *
+     * <p>{@code SampleQuery} is a mutable builder and a caller is
+     * entitled to reuse it as soon as the call returns -- but the answer
+     * arrives later and used to be post-processed against the object as
+     * it stood by then, so a unit or source filter changed in between
+     * converted, filtered and sorted the page by a query nobody had
+     * submitted. A changed source list made it silently empty.</p>
+     */
+    @Test
+    void mutatingTheQueryAfterTheCallDoesNotChangeTheAnswer()
+            throws Exception {
+        FakeHealthStore store = new FakeHealthStore();
+        store.holdRead = true;
+        List<HealthSample> one = new ArrayList<HealthSample>();
+        one.add(FakeHealthStore.sample(HealthDataType.STEPS,
+                1000L, 2000L, 5));
+
+        SampleQuery q = new SampleQuery()
+                .addType(HealthDataType.STEPS)
+                .setTimeRange(HealthTimeRange.between(0L, 10000L));
+        AsyncResource<SamplePage> page = store.readSamplePage(q);
+
+        // The caller reuses its builder for the next request while this
+        // one is still in flight.
+        q.addSource("com.example.other");
+        q.setUnit(HealthUnit.KILOMETER);
+
+        assertNotNull(store.heldRead);
+        store.heldRead.complete(new SamplePage(one, null, false));
+        SamplePage got = page.get();
+
+        assertEquals(1, got.getSamples().size(),
+                "the source filter added after the call must not drop the"
+                        + " sample this read had already asked for");
     }
 }

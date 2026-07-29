@@ -96,8 +96,12 @@ public class FakeBluetoothLE extends BluetoothLE {
         return scanSupported;
     }
 
+    /** The merged scan mode as of the last platform start. */
+    public com.codename1.bluetooth.le.ScanMode startedWithMode;
+
     @Override
     protected void startPlatformScan() {
+        startedWithMode = getAggregateScanMode();
         if (startFailure != null) {
             RuntimeException ex = startFailure;
             startFailure = null;

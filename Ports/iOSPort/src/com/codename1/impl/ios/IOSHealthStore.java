@@ -61,9 +61,19 @@ class IOSHealthStore extends HealthStore {
 
     private final IOSNative nativeInstance;
 
-    IOSHealthStore(IOSNative nativeInstance) {
+    IOSHealthStore(IOSNative nativeInstance, IOSHealth facade) {
         this.nativeInstance = nativeInstance;
+        this.facade = facade;
     }
+
+    /// The facade, asked to validate the purpose strings before anything
+    /// that actually touches HealthKit data.
+    ///
+    /// The check used to sit on getStore(), which made an app that only
+    /// asks the store what it supports fail at runtime -- and the iOS
+    /// builder deliberately lets such an app build with no purpose
+    /// string, because a capability probe reads nothing.
+    private final IOSHealth facade;
 
     public boolean isSupported() {
         return nativeInstance.hkIsAvailable();
@@ -192,6 +202,7 @@ class IOSHealthStore extends HealthStore {
 
     protected void doRequestAuthorization(List<HealthAccess> access,
             AsyncResource<Boolean> out) {
+        facade.requireUsageStrings();
         List<String> read = new ArrayList<String>();
         List<String> share = new ArrayList<String>();
         for (int i = 0; i < access.size(); i++) {
@@ -210,6 +221,7 @@ class IOSHealthStore extends HealthStore {
 
     protected void doReadSamples(SampleQuery query,
             AsyncResource<SamplePage> out) {
+        facade.requireUsageStrings();
         List<HealthDataType> types = query.getTypes();
         if (types.size() != 1) {
             // HKSampleQuery is per sample type. The shared layer could be
@@ -249,6 +261,7 @@ class IOSHealthStore extends HealthStore {
 
     protected void doWrite(List<HealthSample> samples,
             AsyncResource<HealthWriteResult> out) {
+        facade.requireUsageStrings();
         HealthSample rejected = HealthWire.unsupportedForWrite(samples);
         if (rejected != null) {
             // The payload cannot carry this shape, and the native side
@@ -290,6 +303,7 @@ class IOSHealthStore extends HealthStore {
     /// answer false so an app can tell how much this is worth.
     protected void doDrainChanges(List<HealthSubscription> subscriptions,
             AsyncResource<Integer> out) {
+        facade.requireUsageStrings();
         synchronized (drainLock) {
             drainFailure = null;
         }
