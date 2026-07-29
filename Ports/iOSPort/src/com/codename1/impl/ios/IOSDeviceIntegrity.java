@@ -724,6 +724,21 @@ final class IOSDeviceIntegrity {
                     SecureStorage.getInstance().set(KEY_RETRY_AFTER,
                             Long.toString(deadline));
                     instance.currentBackoff = Math.min(backoff * 2, MAX_BACKOFF_MILLIS);
+                    if (pending.op == PendingRequest.OP_ATTEST) {
+                        // Apple told us it did not process this attestation, so the key
+                        // is untouched and the started marker has nothing left to
+                        // protect. Clearing it is what makes the next attempt re-attest
+                        // THIS key: the marker means "submitted, outcome unknown", and
+                        // the interrupted-attestation branch answers an unknown outcome
+                        // by discarding the key, since a spent one-time attestation
+                        // cannot be resubmitted. Applied to an explicit
+                        // serverUnavailable, that reasoning burns a rate-limited
+                        // hardware key on every Apple outage -- once per backoff, until
+                        // the device is throttled by the recovery rather than by the
+                        // outage. A failed removal leaves the marker in place, which is
+                        // the conservative state this branch used to reach anyway.
+                        SecureStorage.getInstance().remove(KEY_ATTEST_STARTED);
+                    }
                 }
                 if (pending.op != PendingRequest.OP_ASSERT) {
                     // Still the same acquisition: releasing here and reacquiring would
