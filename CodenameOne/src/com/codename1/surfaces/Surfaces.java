@@ -96,13 +96,19 @@ public final class Surfaces {
         if (kind == null) {
             return;
         }
-        for (WidgetKind k : registeredKinds) {
-            if (k.getId().equals(kind.getId())) {
-                registeredKinds.remove(k);
-                break;
+        // The whole API is callable from any thread, so a registration racing a publish (or
+        // another registration) must not leave a reader walking a list that is being mutated
+        // underneath it. Every touch of registeredKinds holds this lock, and readers copy out
+        // rather than iterate the live list.
+        synchronized (registeredKinds) {
+            for (WidgetKind k : registeredKinds) {
+                if (k.getId().equals(kind.getId())) {
+                    registeredKinds.remove(k);
+                    break;
+                }
             }
+            registeredKinds.add(kind);
         }
-        registeredKinds.add(kind);
         SurfaceBridge b = bridgeInternal();
         if (b != null) {
             b.registerWidgetKind(SurfaceSerializer.serializeKind(kind));
@@ -111,13 +117,17 @@ public final class Surfaces {
 
     /// Returns the widget kinds registered so far.
     public static List<WidgetKind> getRegisteredKinds() {
-        return new ArrayList<WidgetKind>(registeredKinds);
+        synchronized (registeredKinds) {
+            return new ArrayList<WidgetKind>(registeredKinds);
+        }
     }
 
     static boolean isKindRegistered(String kindId) {
-        for (WidgetKind k : registeredKinds) {
-            if (k.getId().equals(kindId)) {
-                return true;
+        synchronized (registeredKinds) {
+            for (WidgetKind k : registeredKinds) {
+                if (k.getId().equals(kindId)) {
+                    return true;
+                }
             }
         }
         return false;
@@ -319,7 +329,9 @@ public final class Surfaces {
             actionHandler = null;
             pendingActions.clear();
         }
-        registeredKinds.clear();
+        synchronized (registeredKinds) {
+            registeredKinds.clear();
+        }
         SurfaceDiagnostics.reset();
     }
 

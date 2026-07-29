@@ -787,6 +787,60 @@ class SurfaceTest {
     }
 
     @Test
+    void kindRegistryToleratesConcurrentRegistrationAndPublish() throws Exception {
+        // The surfaces API is callable from any thread, so registering a kind can overlap a
+        // publish; the diagnostics kind lookup must not walk the live list while it mutates.
+        // Being a race, this reproduces the unsynchronized failure roughly one run in three --
+        // it can under-report a regression but never false-fails once the locking is correct.
+        Surfaces.setDiagnosticsEnabled(Boolean.TRUE);
+        Surfaces.setBridge(new FakeBridge());
+        // Pad the registry and look the target up LAST, so the lookup walks the whole list and
+        // genuinely overlaps the writer instead of hitting on element zero.
+        for (int i = 0; i < 200; i++) {
+            Surfaces.registerWidgetKind(new WidgetKind("filler" + i));
+        }
+        Surfaces.registerWidgetKind(new WidgetKind("hot"));
+        final List<Throwable> failures =
+                java.util.Collections.synchronizedList(new ArrayList<Throwable>());
+        final java.util.concurrent.CountDownLatch go =
+                new java.util.concurrent.CountDownLatch(1);
+        Thread writer = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    go.await();
+                    for (int i = 0; i < 2000; i++) {
+                        // re-registering an existing id removes then re-adds: two mutations per
+                        // call, and the removal shifts every element after it
+                        Surfaces.registerWidgetKind(new WidgetKind("filler" + (i % 200)));
+                    }
+                } catch (Throwable t) {
+                    failures.add(t);
+                }
+            }
+        });
+        Thread reader = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    go.await();
+                    for (int i = 0; i < 2000; i++) {
+                        Surfaces.publish("hot", new WidgetTimeline()
+                                .setContent(new SurfaceText("x")));
+                        Surfaces.getRegisteredKinds();
+                    }
+                } catch (Throwable t) {
+                    failures.add(t);
+                }
+            }
+        });
+        writer.start();
+        reader.start();
+        go.countDown();
+        writer.join();
+        reader.join();
+        assertTrue(failures.isEmpty(), String.valueOf(failures));
+    }
+
+    @Test
     void diagnosticsCanBeForcedOff() {
         Surfaces.setDiagnosticsEnabled(Boolean.FALSE);
         assertFalse(Surfaces.isDiagnosticsEnabled());

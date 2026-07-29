@@ -122,10 +122,14 @@ final class SurfaceDiagnostics {
                 + "encode blocks the calling thread on the platform UI thread while the pixels are "
                 + "read back off the GPU, so doing it on the EDT freezes the app even though the "
                 + "simulator handles it instantly. Fix it either way: publish off the EDT, or hand "
-                + "SurfaceImage an EncodedImage - EncodedImage.create(\"/icon.png\") for a bundled "
-                + "resource, or EncodedImage.createFromImage(img, false) once for a generated one - "
-                + "which ships the PNG bytes with no native work at all. This check runs only in "
-                + "the simulator; see Surfaces.setDiagnosticsEnabled(Boolean).");
+                + "SurfaceImage an EncodedImage, which ships the PNG bytes with no native work at "
+                + "all. For bundled art that is EncodedImage.create(\"/icon.png\"). For generated "
+                + "art, convert ONCE with EncodedImage.createFromImage(img, false) and cache the "
+                + "result - and run that conversion off the EDT (inside invokeAndBlock or on a "
+                + "background thread), because it performs this very same encode: converting here "
+                + "on the EDT would pay the stall this check is stopping and hide it from the "
+                + "check. This check runs only in the simulator; see "
+                + "Surfaces.setDiagnosticsEnabled(Boolean).");
     }
 
     /// Fails when a timeline is published for a kind that was never registered.
