@@ -723,13 +723,26 @@ public class SensorSession {
         }
     }
 
-    protected final void setState(SensorSessionState newState) {
+    /// Moves to `newState`, reporting whether the move happened.
+    ///
+    /// A refusal is not merely a no-op for the caller: it means the
+    /// session went terminal underneath, and whatever the caller was
+    /// about to do next -- connect a peripheral, arm a timer -- would be
+    /// done on behalf of a session that has already been torn down.
+    protected final boolean setState(SensorSessionState newState) {
         synchronized (stateLock) {
             if (newState == SensorSessionState.STREAMING) {
                 streamed = true;
             }
-            if (newState == null || newState == state) {
-                return;
+            if (newState == null) {
+                return false;
+            }
+            if (newState == state) {
+                // Already there, which is not a refusal: the caller's
+                // desired state holds, so it may carry on. Reporting this
+                // as failure made reconnect() abandon a ladder that was
+                // simply already in CONNECTING.
+                return true;
             }
             if (state == SensorSessionState.STOPPED
                     || state == SensorSessionState.FAILED) {
@@ -741,7 +754,7 @@ public class SensorSession {
                 // disconnected reported itself live, and queued
                 // notifications passed the very guard that had just been
                 // set against them.
-                return;
+                return false;
             }
             state = newState;
         }
@@ -769,6 +782,7 @@ public class SensorSession {
             Display.getInstance().callSerially(
                     makeStateRunnable(this, snapshot, newState));
         }
+        return true;
     }
 
     /// Delivers a sample to listeners on the EDT.

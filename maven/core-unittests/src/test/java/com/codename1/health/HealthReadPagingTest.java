@@ -305,4 +305,40 @@ class HealthReadPagingTest extends UITestBase {
                 "the source filter added after the call must not drop the"
                         + " sample this read had already asked for");
     }
+
+    /**
+     * Paging asks each page for what is still wanted.
+     *
+     * <p>A port may cap a single page below the caller's limit -- the
+     * Android bridge bounds a reply to keep the heap in hand -- and
+     * resending the original limit on every continuation asked for a
+     * fresh capful each time. A limit of three over a cap of two
+     * collected two twice, overshooting by nearly a whole cap, and could
+     * not be trimmed because the page still carried a token.</p>
+     */
+    @Test
+    void pagingAsksEachPageForWhatIsStillWanted() throws Exception {
+        FakeHealthStore store = new FakeHealthStore();
+        List<HealthSample> first = new ArrayList<HealthSample>();
+        first.add(FakeHealthStore.sample(HealthDataType.STEPS,
+                1000L, 2000L, 1));
+        first.add(FakeHealthStore.sample(HealthDataType.STEPS,
+                2000L, 3000L, 2));
+        store.pages.add(new SamplePage(first, "page-2", false));
+        List<HealthSample> second = new ArrayList<HealthSample>();
+        second.add(FakeHealthStore.sample(HealthDataType.STEPS,
+                3000L, 4000L, 3));
+        store.pages.add(new SamplePage(second, null, false));
+
+        store.readSamples(new SampleQuery()
+                .addType(HealthDataType.STEPS)
+                .setLimit(3)
+                .setTimeRange(HealthTimeRange.between(0L, 10000L))).get();
+
+        assertEquals(2, store.queriesSeen.size());
+        assertEquals(3, store.queriesSeen.get(0).getLimit(),
+                "the first page asks for the whole limit");
+        assertEquals(1, store.queriesSeen.get(1).getLimit(),
+                "and the second asks only for what is left");
+    }
 }

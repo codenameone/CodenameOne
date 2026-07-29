@@ -91,7 +91,13 @@ final class BleSensorSession extends SensorSession {
     /// Connects, discovers and subscribes, resolving `out` once
     /// measurements can start arriving.
     void start(final AsyncResource<SensorSession> out) {
-        setState(SensorSessionState.CONNECTING);
+        if (!setState(SensorSessionState.CONNECTING)) {
+            // stop() won between the check above and this line. The
+            // session is already disconnected and off the registry, so
+            // connecting the peripheral now would leave a stopped
+            // session holding a live link that nothing will close.
+            return;
+        }
         boolean needsListener;
         synchronized (reconnectLock) {
             needsListener = getOptions().isAutoReconnect()

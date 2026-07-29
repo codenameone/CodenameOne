@@ -370,7 +370,7 @@ public class HealthStore {
         // first page instead, so the caller got the data it already had
         // and never reached the remainder it asked for.
         readPageInto(copyForPaging(query), collected, out,
-                query.getPageToken());
+                query.getPageToken(), query.getLimit());
         return out;
     }
 
@@ -434,8 +434,18 @@ public class HealthStore {
 
     private void readPageInto(final SampleQuery query,
             final List<HealthSample> collected,
-            final AsyncResource<List<HealthSample>> out, String pageToken) {
+            final AsyncResource<List<HealthSample>> out, String pageToken,
+            final int limit) {
         query.setPageToken(pageToken);
+        // What is still wanted, not what was wanted to begin with. A port
+        // may cap a single page below the caller's limit -- the Android
+        // bridge bounds a reply to keep the heap in hand -- and resending
+        // the original limit on every continuation asked for a fresh
+        // capful each time. A limit of thirty thousand over a twenty
+        // thousand cap collected twenty thousand twice, stopped at forty,
+        // and could not be trimmed because the page still carried a
+        // token.
+        query.setLimit(Math.max(1, limit - collected.size()));
         readSamplePage(query).onResult(
                 new AsyncResult<SamplePage>() {
                     @Override
@@ -446,7 +456,6 @@ public class HealthStore {
                         }
                         collected.addAll(page.getSamples());
                         String next = page.getNextPageToken();
-                        int limit = query.getLimit();
                         if (next == null || collected.size() >= limit) {
                             // Trim only when this is genuinely the end.
                             // Trimming a page that has a continuation
@@ -469,7 +478,7 @@ public class HealthStore {
                             out.complete(collected);
                             return;
                         }
-                        readPageInto(query, collected, out, next);
+                        readPageInto(query, collected, out, next, limit);
                     }
                 });
     }

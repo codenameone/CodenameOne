@@ -1363,7 +1363,7 @@ class CN1HealthConnectBridge(private val context: Context)
      */
     private fun appendChangedRecord(sb: StringBuilder, op: String,
                                     record: Record) {
-        val token = TOKEN_FOR_RECORD[record.javaClass.simpleName]
+        val token = tokenForRecord(record)
         val body = StringBuilder()
         // Always flattened. A subscription has no query on it to carry the
         // option, and the change page is a notification of what moved
@@ -1516,33 +1516,49 @@ class CN1HealthConnectBridge(private val context: Context)
         else -> null
     }
 
-    private val TOKEN_FOR_RECORD: Map<String, String> = mapOf(
-        "StepsRecord" to "steps",
-        "DistanceRecord" to "distance_walking_running",
-        "FloorsClimbedRecord" to "flights_climbed",
-        "ElevationGainedRecord" to "elevation_gained",
-        "ActiveCaloriesBurnedRecord" to "active_energy",
-        "WheelchairPushesRecord" to "wheelchair_pushes",
-        "HydrationRecord" to "hydration",
-        "HeartRateRecord" to "heart_rate",
-        "RestingHeartRateRecord" to "resting_heart_rate",
-        "OxygenSaturationRecord" to "oxygen_saturation",
-        "RespiratoryRateRecord" to "respiratory_rate",
-        "BodyTemperatureRecord" to "body_temperature",
-        "BasalBodyTemperatureRecord" to "basal_body_temperature",
-        "Vo2MaxRecord" to "vo2_max",
-        "BloodGlucoseRecord" to "blood_glucose",
-        "WeightRecord" to "body_mass",
-        "LeanBodyMassRecord" to "lean_body_mass",
-        "BoneMassRecord" to "bone_mass",
-        "BodyFatRecord" to "body_fat_percentage",
-        "HeightRecord" to "height",
-        "PowerRecord" to "power",
-        "SpeedRecord" to "speed",
-        "CyclingPedalingCadenceRecord" to "cycling_cadence",
-        "StepsCadenceRecord" to "running_cadence",
-        "SleepSessionRecord" to "sleep",
-        "ExerciseSessionRecord" to "workout")
+    /**
+     * The portable token a changed record belongs to, or null when this
+     * build does not map it.
+     *
+     * Matched on the type rather than on `javaClass.simpleName`. The
+     * generated keep rules preserve this bridge and the listener classes
+     * and say nothing about `androidx.health.connect.client.records.*`,
+     * so a release shrinker is free to rename those -- and every name
+     * comparison then misses, the change is emitted as an identity with
+     * no type and no value, and the token still advances past it. The
+     * sample is unrecoverable and nothing reports an error. `appendOne`
+     * and `recordClassFor` already match on the type; this was the one
+     * place that did not.
+     */
+    private fun tokenForRecord(record: Record): String? = when (record) {
+        is StepsRecord -> "steps"
+        is DistanceRecord -> "distance_walking_running"
+        is FloorsClimbedRecord -> "flights_climbed"
+        is ElevationGainedRecord -> "elevation_gained"
+        is ActiveCaloriesBurnedRecord -> "active_energy"
+        is WheelchairPushesRecord -> "wheelchair_pushes"
+        is HydrationRecord -> "hydration"
+        is HeartRateRecord -> "heart_rate"
+        is RestingHeartRateRecord -> "resting_heart_rate"
+        is OxygenSaturationRecord -> "oxygen_saturation"
+        is RespiratoryRateRecord -> "respiratory_rate"
+        is BasalBodyTemperatureRecord -> "basal_body_temperature"
+        is BodyTemperatureRecord -> "body_temperature"
+        is Vo2MaxRecord -> "vo2_max"
+        is BloodGlucoseRecord -> "blood_glucose"
+        is WeightRecord -> "body_mass"
+        is LeanBodyMassRecord -> "lean_body_mass"
+        is BoneMassRecord -> "bone_mass"
+        is BodyFatRecord -> "body_fat_percentage"
+        is HeightRecord -> "height"
+        is PowerRecord -> "power"
+        is SpeedRecord -> "speed"
+        is CyclingPedalingCadenceRecord -> "cycling_cadence"
+        is StepsCadenceRecord -> "running_cadence"
+        is SleepSessionRecord -> "sleep"
+        is ExerciseSessionRecord -> "workout"
+        else -> null
+    }
 
     /**
      * Portable token to Health Connect permission suffix.
