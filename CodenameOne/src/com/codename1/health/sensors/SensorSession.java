@@ -271,13 +271,31 @@ public class SensorSession {
                             + "measurement"));
             return;
         }
-        for (HealthSample s : samples) {
-            synchronized (latest) {
-                latest.put(s.getType().getId(), s);
+        // Decoding stays outside the lock, since it touches nothing
+        // shared; everything that publishes the reading happens inside
+        // it, because ending the session takes the same lock.
+        //
+        // The transport's own check was check-then-act: it passed, stop()
+        // ran, and the reading was published anyway -- delivered to
+        // listeners of a session already gone from the registry, routed
+        // into a workout that had ended, and with write-through on,
+        // appended to a buffer whose final flush had already gone. That
+        // last one is the worst of the three: the append arms a timer
+        // that then refuses to drain, because teardown has set
+        // flushingStopped, so the sample is never persisted and nothing
+        // says so.
+        synchronized (stateLock) {
+            if (isTerminal()) {
+                return;
             }
-            fireSample(s);
+            for (HealthSample s : samples) {
+                synchronized (latest) {
+                    latest.put(s.getType().getId(), s);
+                }
+                fireSample(s);
+            }
+            route(samples);
         }
-        route(samples);
     }
 
     /// Sends decoded samples wherever the options said they should go.

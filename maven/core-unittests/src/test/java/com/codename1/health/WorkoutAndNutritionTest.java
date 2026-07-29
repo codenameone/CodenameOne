@@ -309,6 +309,14 @@ class WorkoutAndNutritionTest extends UITestBase {
         assertEquals(1, s.getConfiguration().getCollectedTypes().size(),
                 "and the collected types must be a snapshot too, got: "
                         + s.getConfiguration().getCollectedTypes());
+
+        // Nor through what the session hands back: returning the private
+        // copy would only move the problem one call along, since doEnd
+        // reads that same instance when it persists the workout.
+        s.getConfiguration().setTitle("Evening ride");
+        assertEquals("Morning run", s.getConfiguration().getTitle(),
+                "what getConfiguration() returns must not be the"
+                        + " session's own copy");
     }
 
     @Test

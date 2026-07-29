@@ -113,7 +113,18 @@ public abstract class WorkoutSession {
     }
 
     /// The configuration this session was started with.
+    ///
+    /// A copy, so that reconfiguring what this returns cannot change a
+    /// workout already under way -- the same reason the session took a
+    /// snapshot of what it was given. Without it the constructor's
+    /// snapshot only moved the problem: `getConfiguration().setTitle(..)`
+    /// reached the very instance `doEnd` reads when it persists.
     public final WorkoutConfiguration getConfiguration() {
+        return configuration.copy();
+    }
+
+    /// The session's own copy, which is not handed out.
+    final WorkoutConfiguration configuration() {
         return configuration;
     }
 

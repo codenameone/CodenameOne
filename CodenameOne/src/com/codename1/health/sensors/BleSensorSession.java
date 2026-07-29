@@ -303,10 +303,15 @@ final class BleSensorSession extends SensorSession {
                             GattCharacteristic characteristic,
                             byte[] value) {
                         // A notification can still arrive between stop()
-                        // and the CCCD actually being disarmed. Dropping
-                        // it here keeps a finished session from
-                        // delivering one more reading.
-                        if (isStopped()) {
+                        // and the CCCD actually being disarmed. An early
+                        // out only: onMeasurement makes the same check
+                        // atomically with the teardown, which this one
+                        // cannot, since the state can change between it
+                        // and the call below.
+                        //
+                        // Both terminal states, not STOPPED alone -- the
+                        // reconnect ladder retires a session as FAILED.
+                        if (isTerminal()) {
                             return;
                         }
                         onMeasurement(value, System.currentTimeMillis());
@@ -324,7 +329,7 @@ final class BleSensorSession extends SensorSession {
                         // unregistered from the manager and disconnected,
                         // yet reporting itself live and delivering
                         // notifications. Stopped is terminal.
-                        if (isStopped()) {
+                        if (isTerminal()) {
                             unsubscribeLate(listener);
                             return;
                         }
@@ -349,16 +354,6 @@ final class BleSensorSession extends SensorSession {
 
     /// Whether this session has ended, however it ended.
     ///
-    /// Both terminal states, not STOPPED alone. The reconnect ladder
-    /// retires a session as FAILED, and an indication the transport had
-    /// already queued then passed a stopped-only check: it reached the
-    /// listeners after the session was over, and with write-through on it
-    /// landed in a buffer whose final flush had already run and whose
-    /// timer is disarmed -- so it could never be persisted either.
-    private boolean isStopped() {
-        return isTerminal();
-    }
-
     /// Tears down a subscription that completed after the session stopped.
     ///
     /// Best effort: the peripheral is normally already disconnected by
@@ -382,7 +377,7 @@ final class BleSensorSession extends SensorSession {
     /// throw on the BLE callback thread.
     private void failStart(AsyncResource<SensorSession> out, Throwable err) {
         HealthException wrapped = wrapStartFailure(err);
-        if (out == null && !isStopped()) {
+        if (out == null && !isTerminal()) {
             // No caller waiting means this came from the reconnect ladder,
             // and a session that has streamed before is one the caller
             // still wants. Failing it here retired the whole session over

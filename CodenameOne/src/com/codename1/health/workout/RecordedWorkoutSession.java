@@ -101,7 +101,7 @@ final class RecordedWorkoutSession extends WorkoutSession {
     @Override
     protected void doEnd(final AsyncResource<WorkoutSample> out) {
         final WorkoutSample workout = WorkoutSample.create(
-                getConfiguration().getActivityType(), getStartedAtMillis(),
+                configuration().getActivityType(), getStartedAtMillis(),
                 getEndedAtMillis());
         // Clamped only against the two clock reads inside end(): the
         // accumulated total and the end timestamp are taken a few
@@ -112,7 +112,7 @@ final class RecordedWorkoutSession extends WorkoutSession {
         // wrong one for losing a real workout to an NTP correction.
         workout.setActiveDurationMillis(Math.min(getElapsedMillis(),
                 workout.getDurationMillis()));
-        workout.setTitle(getConfiguration().getTitle());
+        workout.setTitle(configuration().getTitle());
         applyTotals(workout);
 
         final HealthStore store = Health.getInstance().getStore();
