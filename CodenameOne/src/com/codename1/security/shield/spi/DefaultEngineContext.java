@@ -66,6 +66,14 @@ final class DefaultEngineContext implements EngineContext {
         }
     }
 
+    public void confirmPlatformAttestation() {
+        try {
+            DeviceIntegrity.confirmAttestation();
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
     public String[] getPlatformCompromiseReasons() {
         try {
             String[] r = DeviceIntegrity.getCompromiseReasons();

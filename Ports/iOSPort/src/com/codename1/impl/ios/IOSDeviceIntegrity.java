@@ -90,8 +90,28 @@ final class IOSDeviceIntegrity {
     private static final String KEY_STATE = "cn1.appattest.state";
     private static final String KEY_RETRY_AFTER = "cn1.appattest.retryAfter";
 
+    private static final String KEY_PENDING_SINCE = "cn1.appattest.pendingSince";
+
     private static final String STATE_NEW = "new";
     private static final String STATE_ATTESTED = "attested";
+    /**
+     * Apple returned the attestation object, but no backend has acknowledged
+     * recording the key yet. See {@link #confirmAttestation()}.
+     */
+    private static final String STATE_PENDING = "pending";
+
+    /**
+     * How long a key may sit unacknowledged before it is treated as registered
+     * anyway.
+     *
+     * <p>Needed because acknowledgement is optional: a caller using
+     * {@code DeviceIntegrity.requestIntegrityToken} directly, without the shield
+     * engine, never calls {@link #confirmAttestation()}. Without an expiry such
+     * an app would sit in the pending state forever and re-attest on every
+     * request, which is exactly the rate-limit burn this class exists to avoid.
+     * A minute comfortably covers a registration round trip on a slow link.</p>
+     */
+    private static final long REGISTRATION_GRACE_MILLIS = 60L * 1000L;
 
     // Ordinals from DeviceCheck's DCError enum, which declares no explicit
     // values: unknownSystemFailure, featureUnsupported, invalidInput,
@@ -148,12 +168,36 @@ final class IOSDeviceIntegrity {
         store.remove(KEY_ID);
         store.remove(KEY_STATE);
         store.remove(KEY_RETRY_AFTER);
+        store.remove(KEY_PENDING_SINCE);
         synchronized (flowLock) {
             currentBackoff = MIN_BACKOFF_MILLIS;
             bootstrapInFlight = false;
             // Any callback still outstanding now belongs to an abandoned flow.
             generation++;
             failBootstrapWaiters("App Attest state was reset while a bootstrap was in flight");
+        }
+    }
+
+    /**
+     * Acknowledges that a backend has recorded this device's attested public key,
+     * moving it from {@code pending} to {@code attested} so subsequent requests
+     * take the cheap assertion path.
+     *
+     * <p>Until this is called -- or the grace window expires -- requests are
+     * refused with a retry hint rather than asserting. An assertion references a
+     * key by identifier only, so one sent before the server has the public key is
+     * simply unknown to it: the server rejects it, the app reads that as an
+     * invalid key, and resets a key that was in fact perfectly good. The whole
+     * point of attest-once is not to burn keys that way.</p>
+     */
+    void confirmAttestation() {
+        SecureStorage store = SecureStorage.getInstance();
+        if (!STATE_PENDING.equals(store.get(KEY_STATE))) {
+            return;
+        }
+        synchronized (flowLock) {
+            store.set(KEY_STATE, STATE_ATTESTED);
+            store.remove(KEY_PENDING_SINCE);
         }
     }
 
@@ -192,7 +236,26 @@ final class IOSDeviceIntegrity {
             }
             SecureStorage store = SecureStorage.getInstance();
             String keyId = store.get(KEY_ID);
-            boolean attested = STATE_ATTESTED.equals(store.get(KEY_STATE));
+            String state = store.get(KEY_STATE);
+            if (STATE_PENDING.equals(state) && keyId != null && keyId.length() > 0) {
+                if (registrationGraceRemaining() > 0) {
+                    // The key is attested with Apple but no backend has confirmed
+                    // recording it. Asserting now would present a key identifier
+                    // the server cannot resolve, which reads as an invalid key and
+                    // costs a needless reset -- so refuse briefly instead.
+                    r.error(new RuntimeException("App Attest is completing first-run "
+                            + "registration for this device; retry shortly"));
+                    return r;
+                }
+                // Nobody acknowledged within the window. Either the consumer does
+                // not participate in acknowledgement at all, or its registration
+                // call was lost. Assume registered rather than re-attesting on
+                // every request forever.
+                store.set(KEY_STATE, STATE_ATTESTED);
+                store.remove(KEY_PENDING_SINCE);
+                state = STATE_ATTESTED;
+            }
+            boolean attested = STATE_ATTESTED.equals(state);
             if (keyId == null || keyId.length() == 0 || !attested) {
                 // Checked before branching on the key state, not after: between
                 // key generation persisting the id and its attestation
@@ -227,6 +290,29 @@ final class IOSDeviceIntegrity {
             assertWithKey(r, nonce, keyId);
         }
         return r;
+    }
+
+    /**
+     * Milliseconds left in the registration grace window, or 0 once it has run
+     * out. A pending timestamp from the future -- a clock the user moved back --
+     * is treated as expired rather than as an unbounded wait.
+     */
+    private static long registrationGraceRemaining() {
+        String since = SecureStorage.getInstance().get(KEY_PENDING_SINCE);
+        if (since == null || since.length() == 0) {
+            return 0;
+        }
+        long started;
+        try {
+            started = Long.parseLong(since);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+        long elapsed = System.currentTimeMillis() - started;
+        if (elapsed < 0 || elapsed >= REGISTRATION_GRACE_MILLIS) {
+            return 0;
+        }
+        return REGISTRATION_GRACE_MILLIS - elapsed;
     }
 
     // --- flow steps ------------------------------------------------------
@@ -320,23 +406,23 @@ final class IOSDeviceIntegrity {
             fail(pending, "App Attest attestation returned no data");
             return;
         }
-        // Optimistic: Apple accepted the attestation, but only the backend can
-        // confirm it recorded the key. If it later rejects, the app calls
-        // DeviceIntegrity.resetAttestation() and we start over.
+        // Apple accepted the attestation, but only the backend can confirm it
+        // recorded the key, so the key becomes pending rather than attested.
+        // Every caller -- queued or newly arriving -- is told to retry until
+        // confirmAttestation() lands or the grace window expires; otherwise a
+        // caller arriving right after this callback would sail past the queue and
+        // assert against a key the server has never seen. If the backend later
+        // rejects it, the app calls DeviceIntegrity.resetAttestation() instead.
         SecureStorage store = SecureStorage.getInstance();
-        store.set(KEY_STATE, STATE_ATTESTED);
+        store.set(KEY_STATE, STATE_PENDING);
+        store.set(KEY_PENDING_SINCE, Long.toString(System.currentTimeMillis()));
         if (instance != null) {
             synchronized (instance.flowLock) {
                 instance.currentBackoff = MIN_BACKOFF_MILLIS;
                 instance.bootstrapInFlight = false;
-                // Deliberately NOT asserted here. Apple has returned the
-                // attestation object, but the backend has not seen it yet -- the
-                // first caller's token is only completed below, and registration
-                // happens after that. An assertion sent now would reference a key
-                // the server does not know, which it would reject and which would
-                // trigger a pointless invalid-key reset. Queued callers are told
-                // to retry instead; by then the key is registered and their
-                // request costs one cheap assertion.
+                // Deliberately NOT asserted here, for the reason above. Queued
+                // callers are told to retry; by then the key is registered and
+                // their request costs one cheap assertion.
                 instance.failBootstrapWaiters("App Attest is completing first-run "
                         + "registration for this device; retry shortly");
             }

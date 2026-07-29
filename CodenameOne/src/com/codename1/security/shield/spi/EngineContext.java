@@ -51,6 +51,11 @@ public interface EngineContext {
     /// Used when the service reports that the device's attestation key is unknown to it.
     void resetPlatformAttestation();
 
+    /// Acknowledges that the verifying service recorded the attested key, releasing the client to use
+    /// cheap assertions from here on. Call it once the service has accepted an attestation token; until
+    /// then the platform refuses to assert against a key the service cannot yet resolve.
+    void confirmPlatformAttestation();
+
     /// Platform-detected compromise reasons, such as `root` or `frida`.
     String[] getPlatformCompromiseReasons();
 

@@ -128,7 +128,7 @@ public class MCPServer {
         this.screenshotEnabled = screenshotEnabled;
     }
 
-    public boolean isRunning() {
+    public synchronized boolean isRunning() {
         return running;
     }
 
@@ -139,10 +139,15 @@ public class MCPServer {
         }
         this.transport = transport;
         running = true;
+        // Captured for the thread rather than read back off the field. A later start()
+        // replaces the field, and a reader thread that followed it would end up serving a
+        // transport the server no longer considers its own -- while the transport it was
+        // actually given was never closed.
+        final MCPTransport mine = transport;
         Thread readerThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                runLoop();
+                runLoop(mine);
             }
         }, "cn1-mcp-server");
         readerThread.start();
@@ -156,9 +161,34 @@ public class MCPServer {
         }
     }
 
-    private void runLoop() {
+    /// True while `t` is still the transport this server is serving over. False once stop()
+    /// has run, or once a restart handed the server a different transport -- in both cases
+    /// the thread holding `t` owns it alone and has to close it itself.
+    private synchronized boolean isCurrent(MCPTransport t) {
+        return running && transport == t; // NOPMD identity is the question, not equality
+    }
+
+    /// Clears the running flag, but only on behalf of the transport that is still current.
+    /// A thread unwinding from a superseded transport must not stop a server that has since
+    /// been restarted over a new one.
+    private synchronized void stopIfCurrent(MCPTransport t) {
+        if (transport == t) { // NOPMD identity: is this still our transport?
+            running = false;
+        }
+    }
+
+    private void runLoop(MCPTransport t) {
+        // Opening is deferred to this thread, so by the time it happens the server may
+        // already have been stopped or restarted. Either way stop()'s close() ran against a
+        // transport that had not opened yet and therefore released nothing, so opening now
+        // would leave a transport registered with nobody left to close it. That registration
+        // is process-wide: every later open() is refused on the grounds that an agent is
+        // already being served.
+        if (!isCurrent(t)) {
+            return;
+        }
         try {
-            transport.open();
+            t.open();
         } catch (IOException ex) {
             // The transport failed to start listening. Log defensively: the CN1 Log
             // routes through the platform implementation, which may not be registered
@@ -169,13 +199,20 @@ public class MCPServer {
             } catch (Throwable logErr) {
                 System.err.println("[cn1.mcp] transport open failed: " + ex);
             }
-            running = false;
+            stopIfCurrent(t);
+            t.close();
             return;
         }
-        while (running) {
+        if (!isCurrent(t)) {
+            // Same window, the far side of it: the server moved on while open() was in
+            // flight. Undo the registration this thread just took.
+            t.close();
+            return;
+        }
+        while (isCurrent(t)) {
             String line;
             try {
-                line = transport.readMessage();
+                line = t.readMessage();
             } catch (IOException ex) {
                 break;
             }
@@ -188,14 +225,14 @@ public class MCPServer {
             String response = handleMessage(line);
             if (response != null) {
                 try {
-                    transport.writeMessage(response);
+                    t.writeMessage(response);
                 } catch (IOException ex) {
                     break;
                 }
             }
         }
-        running = false;
-        transport.close();
+        stopIfCurrent(t);
+        t.close();
     }
 
     /// Handles one inbound JSON-RPC message and returns the response line, or null

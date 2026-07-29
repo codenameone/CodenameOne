@@ -127,6 +127,23 @@ public final class DeviceIntegrity {
         Display.getInstance().resetAttestation();
     }
 
+    /// Tells the attestation layer that your backend has recorded the attested key, so later requests
+    /// can use cheap assertions instead of attesting again.
+    ///
+    /// This matters on iOS. The first token of a device's life is an attestation, which carries the
+    /// public key; every token after it is an assertion, which carries only the key's identifier. An
+    /// assertion sent before the backend has stored that public key is unresolvable, and the natural
+    /// reading of that rejection -- the key is invalid -- would throw away a key that was perfectly
+    /// good and burn one of Apple's rate limited attestations replacing it. So requests made between
+    /// the attestation and this acknowledgement are refused with a retry hint rather than asserted.
+    ///
+    /// Call it once, after the response accepting the attestation token. Not calling it is safe but
+    /// slower: the client assumes registration succeeded after a short grace period. No-op on Android
+    /// and where attestation is unsupported.
+    public static void confirmAttestation() {
+        Display.getInstance().confirmAttestation();
+    }
+
     /// Non-exiting RASP check. Returns true when the device shows signs of being rooted, jailbroken,
     /// running under dynamic instrumentation (e.g. Frida) or otherwise tampered. Unlike the
     /// `android.rootCheck` / `ios.detectJailbreak` launch gates this never terminates the app, so it is

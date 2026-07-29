@@ -6865,6 +6865,12 @@ public final class Display extends CN1Constants {
         impl.resetAttestation();
     }
 
+    /// Acknowledges that a backend recorded the attested key. See
+    /// `com.codename1.security.DeviceIntegrity#confirmAttestation()`.
+    public void confirmAttestation() {
+        impl.confirmAttestation();
+    }
+
     /// Returns digests of the certificates the running app is signed with. Low level hook for the
     /// attestation layer, which reports them to a verifying service; an on-device comparison proves
     /// nothing on its own. Empty where the platform has no such concept.

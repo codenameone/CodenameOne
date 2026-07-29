@@ -929,25 +929,26 @@ public class ConnectionRequest implements IOProgressListener {
     /// True when the certificate chain for this request should be fetched and vetted, either
     /// because the request opted in itself or because the installed [NetworkGuard] pins this host.
     private boolean shouldInspectCertificates() {
-        if (checkSSLCertificates) {
-            return true;
-        }
         NetworkGuard guard = NetworkManager.getNetworkGuard();
         if (guard == null) {
-            return false;
+            return checkSSLCertificates;
         }
         try {
             if (guard.isCertificateCheckRequired(url)) {
                 // Ask the platform for the richer chain details (public key
                 // digests, per-certificate grouping). Off by default so every
-                // existing caller keeps seeing byte-identical data.
+                // existing caller keeps seeing byte-identical data. Asked even
+                // when the request already opted in on its own: otherwise a
+                // request that calls setCheckSSLCertificates(true) hands the
+                // guard a chain with no public key digests at all, and a guard
+                // pinning the SPKI would reject a perfectly valid chain.
                 collectPublicKeyDigests = true;
                 return true;
             }
         } catch (Throwable t) {
             Log.e(t);
         }
-        return false;
+        return checkSSLCertificates;
     }
 
     /// Performs the actual network request on behalf of the network manager
@@ -1180,6 +1181,11 @@ public class ConnectionRequest implements IOProgressListener {
                 responseErrorMessge = impl.getResponseMessage(connection);
                 handleErrorResponseCode(responseCode, responseErrorMessge);
                 if (!isReadResponseForErrors()) {
+                    // Capture before the early return. A 401/403 is exactly the
+                    // response a guard needs to see -- it is how a token layer
+                    // learns its token was refused -- and this branch is the
+                    // common configuration for the requests that carry one.
+                    captureGuardHeaders(connection);
                     return true;
                 }
             }

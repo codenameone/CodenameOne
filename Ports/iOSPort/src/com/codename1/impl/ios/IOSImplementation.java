@@ -4580,6 +4580,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         deviceIntegrity().resetAttestation();
     }
 
+    @Override
+    public void confirmAttestation() {
+        deviceIntegrity().confirmAttestation();
+    }
+
     private IOSDeviceIntegrity deviceIntegrity() {
         if (deviceIntegrity == null) {
             deviceIntegrity = new IOSDeviceIntegrity(nativeInstance);

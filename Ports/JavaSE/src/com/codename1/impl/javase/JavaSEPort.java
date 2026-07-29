@@ -19051,6 +19051,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    public void confirmAttestation() {
+        // No client-side key here either, so there is nothing to acknowledge.
+    }
+
+    @Override
     public boolean isDeviceCompromised() {
         return JavaSEShield.simReasons().length > 0;
     }

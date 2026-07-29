@@ -11272,6 +11272,13 @@ public abstract class CodenameOneImplementation {
     public void resetAttestation() {
     }
 
+    /// Acknowledges that a verifying backend has recorded the attested key, so subsequent requests can
+    /// take the cheap assertion path. See
+    /// [com.codename1.security.DeviceIntegrity#confirmAttestation()]. No-op where attestation holds no
+    /// client-side key.
+    public void confirmAttestation() {
+    }
+
     /// Returns digests of the certificates the running application is actually signed with, so a build
     /// can be compared against the identity it was built under and repackaging can be reported.
     ///
