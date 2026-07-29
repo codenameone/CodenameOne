@@ -490,6 +490,36 @@ final class IOSDeviceIntegrity {
 
     // ---- Callbacks invoked from native code (do not rename) ----------------
 
+    /**
+     * Fails a request and the bootstrap it was driving.
+     *
+     * <p>For the branches that give up before touching storage. Failing only the
+     * initiating request there left {@code bootstrapInFlight} set, so every caller
+     * already queued behind it -- and every caller that arrived afterwards and was queued
+     * because a bootstrap looked live -- waited on a bootstrap that had already stopped,
+     * with nothing left to release them. The mid-flow storage failures got this right;
+     * these two did not.</p>
+     *
+     * <p>A stale request only fails itself: a reset has already cleared the flag and
+     * failed the waiters, and clearing it again would clear the flag belonging to the
+     * replacement bootstrap that reset started.</p>
+     */
+    private static void failBootstrapAttempt(PendingRequest pending, String msg) {
+        if (instance == null) {
+            fail(pending, msg);
+            return;
+        }
+        synchronized (instance.flowLock) {
+            if (isStale(pending)) {
+                fail(pending, "App Attest state was reset while this request was in flight");
+                return;
+            }
+            instance.bootstrapInFlight = false;
+            fail(pending, msg);
+            instance.failBootstrapWaiters(msg);
+        }
+    }
+
     /** Called from native once a fresh hardware key exists. */
     public static void nativeKeyGenerated(final int requestId, final String keyId) {
         PendingRequest pending = take(requestId);
@@ -497,7 +527,8 @@ final class IOSDeviceIntegrity {
             return;
         }
         if (keyId == null || keyId.length() == 0) {
-            fail(pending, "App Attest key generation returned no identifier");
+            failBootstrapAttempt(pending,
+                    "App Attest key generation returned no identifier");
             return;
         }
         // The staleness check and the writes it guards happen under the same lock a
@@ -540,7 +571,9 @@ final class IOSDeviceIntegrity {
             return;
         }
         if (attestationB64 == null) {
-            fail(pending, "App Attest attestation returned no data");
+            // Same cleanup as key generation returning nothing: this bootstrap is over,
+            // and the queue behind it has to be told.
+            failBootstrapAttempt(pending, "App Attest attestation returned no data");
             return;
         }
         if (instance == null) {
