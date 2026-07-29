@@ -95,6 +95,13 @@ public final class GlucoseMeasurement {
     private final int sequenceNumber;
     private final long timestampMillis;
     private final double mmolPerLiter;
+    /// The fluid-type code the profile assigns to control solution.
+    ///
+    /// A meter can say "this is not blood" through either nibble of the
+    /// type-and-location byte, and they are independent: some report the
+    /// type and leave the location unknown.
+    public static final int TYPE_CONTROL_SOLUTION = 10;
+
     private final int sampleLocation;
     private final int sampleType;
     private final boolean contextFollows;
@@ -163,7 +170,15 @@ public final class GlucoseMeasurement {
             double raw = Ieee11073.sfloat(r.uint16());
             int typeAndLocation = r.uint8();
             type = typeAndLocation & 0x0F;
-            location = (typeAndLocation >> 4) & 0x0F;
+            int reportedLocation = (typeAndLocation >> 4) & 0x0F;
+            // The profile defines 1 to 4 and reserves 5 to 14; 15 means
+            // "not available", which is what unknown already says.
+            // getSampleLocation() promises a SAMPLE_LOCATION_ constant,
+            // so a meter sending a reserved nibble would otherwise hand
+            // the app a location nothing in the profile means.
+            location = reportedLocation >= SAMPLE_LOCATION_FINGER
+                    && reportedLocation <= SAMPLE_LOCATION_CONTROL_SOLUTION
+                    ? reportedLocation : SAMPLE_LOCATION_UNKNOWN;
             if ((flags & FLAG_UNITS_MOL_PER_L) != 0) {
                 // Transmitted in mol/L; 1 mol/L is 1000 mmol/L.
                 mmol = raw * 1000.0;
@@ -245,8 +260,16 @@ public final class GlucoseMeasurement {
 
     /// `true` when this reading came from control solution rather than
     /// blood and must not be stored as a glucose measurement.
+    ///
+    /// Either nibble settles it. The profile carries control solution as
+    /// a fluid type *and* as a sample location, and they are independent
+    /// -- a meter that reports type 10 while leaving the location
+    /// unknown is stating plainly that this is calibration fluid, and
+    /// reading only the location published it as the user's blood
+    /// glucose.
     public boolean isControlSolution() {
-        return sampleLocation == SAMPLE_LOCATION_CONTROL_SOLUTION;
+        return sampleLocation == SAMPLE_LOCATION_CONTROL_SOLUTION
+                || sampleType == TYPE_CONTROL_SOLUTION;
     }
 
     @Override

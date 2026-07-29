@@ -502,6 +502,56 @@ class SensorParserTest {
         assertTrue(m.isControlSolution());
     }
 
+    /**
+     * The fluid type says it just as plainly as the location does.
+     *
+     * <p>The profile carries control solution as a type *and* as a
+     * location, and they are independent: a meter reporting type 10 with
+     * an unknown location is stating that this is calibration fluid, and
+     * reading only the location published it as the user's blood
+     * glucose.</p>
+     */
+    @Test
+    void glucoseFlagsControlSolutionByTypeAlone() {
+        byte[] payload = new byte[] {
+            0x02,
+            0x0A, 0x00,
+            (byte) 0xEA, 0x07, 1, 1, 12, 0, 0,
+            0x5A, (byte) 0xB0,
+            0x0A                          // type 10 = control solution,
+                                          // location 0 = unknown
+        };
+        GlucoseMeasurement m = GlucoseMeasurement.parse(payload);
+        assertNotNull(m);
+        assertEquals(GlucoseMeasurement.SAMPLE_LOCATION_UNKNOWN,
+                m.getSampleLocation());
+        assertTrue(m.isControlSolution(),
+                "control solution reported by type must not be stored as"
+                        + " a blood glucose reading");
+    }
+
+    /**
+     * A reserved sample location is not a location. The profile defines
+     * 1 to 4 and reserves the rest, while getSampleLocation() promises a
+     * SAMPLE_LOCATION_ constant.
+     */
+    @Test
+    void glucoseReservedSampleLocationReadsAsUnknown() {
+        byte[] payload = new byte[] {
+            0x02,
+            0x0B, 0x00,
+            (byte) 0xEA, 0x07, 1, 1, 12, 0, 0,
+            0x5A, (byte) 0xB0,
+            0x71                          // location 7 = reserved
+        };
+        GlucoseMeasurement m = GlucoseMeasurement.parse(payload);
+        assertNotNull(m, "the reading itself is still valid");
+        assertEquals(GlucoseMeasurement.SAMPLE_LOCATION_UNKNOWN,
+                m.getSampleLocation());
+        assertFalse(m.isControlSolution(),
+                "and a reserved location is not control solution either");
+    }
+
     @Test
     void glucoseWithoutConcentrationIsAPlaceholderRecord() {
         byte[] payload = new byte[] {
