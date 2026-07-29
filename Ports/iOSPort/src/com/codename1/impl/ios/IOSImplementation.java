@@ -4572,10 +4572,19 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public com.codename1.util.AsyncResource<String> requestIntegrityToken(String nonce) {
+        return deviceIntegrity().requestToken(nonce);
+    }
+
+    @Override
+    public void resetAttestation() {
+        deviceIntegrity().resetAttestation();
+    }
+
+    private IOSDeviceIntegrity deviceIntegrity() {
         if (deviceIntegrity == null) {
             deviceIntegrity = new IOSDeviceIntegrity(nativeInstance);
         }
-        return deviceIntegrity.requestToken(nonce);
+        return deviceIntegrity;
     }
 
     @Override
@@ -9821,11 +9830,45 @@ public class IOSImplementation extends CodenameOneImplementation {
     public String[] getSSLCertificates(Object connection, String url) throws IOException {
         NetworkConnection conn =  (NetworkConnection)connection;
         //conn.ensureConnection();
-        return conn.getSSLCertificates(url);
+        return stripExtendedCertificateEntries(conn.getSSLCertificates(url));
+    }
+
+    /**
+     * The native side always emits the chain-grouping and public-key entries,
+     * because the certificate string is built once during the TLS handshake and
+     * cannot be regenerated on demand. Callers of the legacy flat form must not
+     * see them, or an existing checkSSLCertificates override that rejects on any
+     * unrecognised entry would start failing every request.
+     */
+    private static String[] stripExtendedCertificateEntries(String[] entries) {
+        if (entries == null || entries.length == 0) {
+            return new String[0];
+        }
+        java.util.ArrayList<String> out = new java.util.ArrayList<String>(entries.length);
+        for (int i = 0; i < entries.length; i++) {
+            String e = entries[i];
+            if (e == null || e.startsWith("CHAIN:") || e.startsWith("SPKI-SHA-256:")) {
+                continue;
+            }
+            out.add(e);
+        }
+        return out.toArray(new String[out.size()]);
+    }
+
+    @Override
+    public String[] getSSLCertificatesEx(Object connection, String url) throws IOException {
+        NetworkConnection conn = (NetworkConnection)connection;
+        String[] certs = conn.getSSLCertificates(url);
+        return certs == null ? new String[0] : certs;
     }
 
     @Override
     public boolean canGetSSLCertificates() {
+        return true;
+    }
+
+    @Override
+    public boolean canGetPublicKeyDigests() {
         return true;
     }
 
@@ -12518,8 +12561,51 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isJailbrokenDevice() {
+        if (getCompromiseReasons().length > 0) {
+            return true;
+        }
+        // Kept as a last resort, but note it only ever returns true when the app
+        // also declares cydia in ios.applicationQueriesSchemes -- on iOS 9 and up
+        // canOpenURL returns false for undeclared schemes regardless of what is
+        // installed. That is why it cannot be the primary signal.
         Boolean b = canExecute("cydia://package/com.example.package");
         return b != null && b.booleanValue();
+    }
+
+    /**
+     * Real jailbreak and instrumentation signals, from the same native probes the
+     * {@code ios.detectJailbreak} launch gate uses -- but reported rather than
+     * fatal, so an app can degrade gracefully instead of being killed at launch.
+     */
+    @Override
+    public String[] getCompromiseReasons() {
+        String[] signals = deviceIntegrity().jailbreakSignals();
+        if (signals.length == 0) {
+            return signals;
+        }
+        java.util.ArrayList<String> out = new java.util.ArrayList<String>();
+        boolean jailbreakReported = false;
+        for (int i = 0; i < signals.length; i++) {
+            String s = signals[i];
+            if ("hookLib".equals(s) || "dyldInsert".equals(s)) {
+                if (!out.contains("frida")) {
+                    // Reported under the cross-platform name for a hooking
+                    // framework so app code does not need a per-platform branch.
+                    out.add("frida");
+                }
+            } else if ("traced".equals(s)) {
+                out.add("debugger");
+            } else if (!jailbreakReported) {
+                jailbreakReported = true;
+                out.add("jailbreak");
+            }
+        }
+        return out.toArray(new String[out.size()]);
+    }
+
+    @Override
+    public boolean isDeviceCompromised() {
+        return getCompromiseReasons().length > 0;
     }
 
     @Override

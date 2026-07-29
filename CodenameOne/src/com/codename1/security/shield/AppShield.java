@@ -1,0 +1,434 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.shield;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
+import com.codename1.security.shield.spi.ShieldEngine;
+import com.codename1.security.shield.spi.ShieldEngineRegistry;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import java.util.Hashtable;
+import java.util.Vector;
+
+/// API shielding: proves to your own backend that a request came from a genuine, unmodified build
+/// of your app running on a device that has not been tampered with.
+///
+/// #### How it differs from [com.codename1.security.DeviceIntegrity]
+///
+/// `DeviceIntegrity` is the raw platform primitive -- it hands you a Play Integrity or App Attest
+/// blob and leaves verification, policy and enforcement to you. `AppShield` is the managed layer
+/// on top: the attestation is verified server side against Apple and Google, evaluated against a
+/// policy you control, and turned into a short-lived signed token your backend can check with a
+/// few lines of middleware. Both remain available and `DeviceIntegrity` keeps working unchanged;
+/// an app that only needs the raw blob should keep using it.
+///
+/// #### The shape of the thing
+///
+/// ```java
+/// AppShield.init(new ShieldConfig()
+///     .protect("api.mybank.example", HostPolicy.PROTECTED));
+///
+/// // ...then just make requests. Protected hosts get the header and the pin check.
+/// ConnectionRequest r = new ConnectionRequest("https://api.mybank.example/transfer", true);
+/// NetworkManager.getInstance().addToQueueAndWait(r);
+/// ```
+///
+/// Your backend rejects any request whose token is missing, expired or unsigned. That check is
+/// where the security actually lives -- not in this class. A device the attacker fully controls
+/// can always strip a header; what it cannot do is mint a token, because the token is signed by a
+/// service the attacker does not control, on the strength of a statement from Apple or Google.
+///
+/// #### When the engine is absent
+///
+/// Builds without the enterprise attestation engine -- open-source builds, and any project not
+/// entitled to it -- get a working, inert implementation. [#isProtected()] returns false,
+/// [#fetchToken()] completes with [ShieldStatus#UNPROTECTED] rather than hanging, [#attach] does
+/// nothing, and no request is ever blocked. The API is safe to call unconditionally; there is no
+/// need to guard call sites.
+///
+/// #### Threading
+///
+/// [#fetchToken()] is asynchronous. [#attach(ConnectionRequest)] blocks and must not be called on
+/// the EDT -- in normal use you never call it yourself, because a protected host is handled
+/// automatically on the network thread.
+public final class AppShield {
+
+    private static ShieldConfig config;
+    private static boolean initialized;
+    private static ShieldStatus lastStatus = ShieldStatus.NOT_INITIALIZED;
+    private static final Vector listeners = new Vector();
+    private static final Hashtable runtimeHosts = new Hashtable();
+
+    private AppShield() {
+    }
+
+    // -----------------------------------------------------------------
+    // Lifecycle
+    // -----------------------------------------------------------------
+
+    /// Initializes the shield. Call once during app startup, after `Display.init`.
+    ///
+    /// Safe to call in a build with no attestation engine: it logs one line and leaves the shield
+    /// inert. Calling it twice is a no-op.
+    public static void init(ShieldConfig cfg) {
+        synchronized (AppShield.class) {
+            if (initialized) {
+                return;
+            }
+            config = cfg == null ? new ShieldConfig() : cfg;
+            initialized = true;
+        }
+        ShieldEngine engine = ShieldEngineRegistry.getEngine();
+        try {
+            engine.initialize(contextForEngine(), config);
+            setStatus(engine.isAvailable() ? ShieldStatus.OK : ShieldStatus.UNPROTECTED);
+        } catch (Throwable t) {
+            // A failure inside the engine must not stop the app from starting.
+            Log.e(t);
+            setStatus(ShieldStatus.UNPROTECTED);
+        }
+    }
+
+    /// True when a real attestation engine is present and available. False in an open-source or
+    /// unentitled build, and in the simulator unless simulation is switched on.
+    public static boolean isProtected() {
+        return ShieldEngineRegistry.getEngine().isAvailable();
+    }
+
+    /// The active engine's name, for diagnostics and support logs.
+    public static String getEngineName() {
+        return ShieldEngineRegistry.getEngine().getName();
+    }
+
+    /// The configuration passed to [#init(ShieldConfig)], or defaults if it has not been called.
+    public static ShieldConfig getConfig() {
+        synchronized (AppShield.class) {
+            if (config == null) {
+                config = new ShieldConfig();
+            }
+            return config;
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Tokens
+    // -----------------------------------------------------------------
+
+    /// Fetches a time-limited token, reusing the cached one when it is still good.
+    public static AsyncResource<ShieldToken> fetchToken() {
+        return fetchToken(null);
+    }
+
+    /// Fetches a token bound to specific request data.
+    ///
+    /// Binding ties the token to one request, so a token lifted off a captured request cannot be
+    /// replayed against a different one. Worth the extra round trip on the calls that matter --
+    /// a transfer, a password change -- and not worth it on the rest, which should use the plain
+    /// [#fetchToken()].
+    ///
+    /// @param bindingData the data to bind to, typically a digest of the request body
+    public static AsyncResource<ShieldToken> fetchToken(final String bindingData) {
+        final AsyncResource<ShieldToken> result = new AsyncResource<ShieldToken>();
+        if (!initialized) {
+            result.error(new ShieldException(ShieldStatus.NOT_INITIALIZED,
+                    "AppShield.init(...) has not been called"));
+            return result;
+        }
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            public void run() {
+                try {
+                    ShieldToken token = ShieldEngineRegistry.getEngine().fetchToken(bindingData);
+                    setStatus(token.getStatus());
+                    result.complete(token);
+                } catch (ShieldException e) {
+                    setStatus(e.getStatus());
+                    result.error(e);
+                } catch (Throwable t) {
+                    setStatus(ShieldStatus.SERVICE_DOWN);
+                    result.error(t);
+                }
+            }
+        });
+        return result;
+    }
+
+    /// Discards any cached token. Call this when your backend rejects a token, so the next request
+    /// re-attests rather than replaying the token that was just refused.
+    public static void invalidateToken() {
+        try {
+            ShieldEngineRegistry.getEngine().invalidate();
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Request binding
+    // -----------------------------------------------------------------
+
+    /// Attaches the attestation header to a request.
+    ///
+    /// **Blocks** while a token is fetched, so it must be called on a network thread. Requests to
+    /// hosts registered via [ShieldConfig#protect(String, HostPolicy)] are handled automatically
+    /// and do not need this; use it for a request built outside the normal path.
+    ///
+    /// Honours the host's [FailureMode]: under [FailureMode#OPEN] a token failure leaves the
+    /// request untouched, under [FailureMode#CLOSED] it propagates.
+    public static void attach(ConnectionRequest request) throws ShieldException {
+        if (request == null || !initialized) {
+            return;
+        }
+        String host = hostOf(request.getUrl());
+        HostPolicy policy = policyFor(host);
+        if (!policy.isAttachToken()) {
+            return;
+        }
+        try {
+            ShieldToken token = ShieldEngineRegistry.getEngine().fetchToken(null);
+            setStatus(token.getStatus());
+            if (token.isValid()) {
+                request.addRequestHeader(getConfig().getTokenHeader(), token.getValue());
+                return;
+            }
+            failOrContinue(policy, new ShieldException(token.getStatus(),
+                    "No valid attestation token for " + host));
+        } catch (ShieldException e) {
+            setStatus(e.getStatus());
+            failOrContinue(policy, e);
+        }
+    }
+
+    private static void failOrContinue(HostPolicy policy, ShieldException e) throws ShieldException {
+        if (policy.getFailureMode() == FailureMode.CLOSED) {
+            throw e;
+        }
+        Log.p("AppShield: continuing without a token (" + e.getStatus().getId()
+                + "); host policy is fail-open.");
+    }
+
+    /// The headers a protected URL should carry, for network paths that do not go through
+    /// `ConnectionRequest` -- notably `BrowserComponent.setURL(url, headers)`.
+    ///
+    /// Returns an empty table when the host is unprotected or no token is available. Never blocks:
+    /// it uses the cached token only, because the callers are typically on the EDT.
+    ///
+    /// Note this covers only the initial navigation. Requests the loaded page makes itself are not
+    /// visible to the framework and cannot be given a token or pinned.
+    public static Hashtable headersFor(String url) {
+        Hashtable out = new Hashtable();
+        if (!initialized || url == null) {
+            return out;
+        }
+        if (!policyFor(hostOf(url)).isAttachToken()) {
+            return out;
+        }
+        ShieldToken token = getCachedToken();
+        if (token != null && token.isValid()) {
+            out.put(getConfig().getTokenHeader(), token.getValue());
+        }
+        return out;
+    }
+
+    /// The cached token without triggering a fetch. May be null or lapsed. Never blocks.
+    public static ShieldToken getCachedToken() {
+        try {
+            return ShieldEngineRegistry.getEngine().getCachedToken();
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Host policy
+    // -----------------------------------------------------------------
+
+    /// Registers a protected host after [#init(ShieldConfig)], for a backend discovered at
+    /// runtime.
+    public static void addProtectedHost(String host, HostPolicy policy) {
+        if (host != null && host.length() > 0) {
+            runtimeHosts.put(host.toLowerCase(),
+                    policy == null ? HostPolicy.PROTECTED : policy);
+        }
+    }
+
+    /// The policy in force for a host. Returns [HostPolicy#UNPROTECTED] for anything not
+    /// registered, which is the great majority of hosts an app talks to.
+    public static HostPolicy policyFor(String host) {
+        if (host == null) {
+            return HostPolicy.UNPROTECTED;
+        }
+        Object runtime = runtimeHosts.get(host.toLowerCase());
+        if (runtime != null) {
+            return (HostPolicy) runtime;
+        }
+        return getConfig().policyFor(host);
+    }
+
+    // -----------------------------------------------------------------
+    // Pinning
+    // -----------------------------------------------------------------
+
+    /// The pin set currently in force. Never null; may be [PinSet#EMPTY].
+    public static PinSet getPinSet() {
+        try {
+            PinSet set = ShieldEngineRegistry.getEngine().getPinSet();
+            return set == null ? PinSet.EMPTY : set;
+        } catch (Throwable t) {
+            return PinSet.EMPTY;
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // RASP
+    // -----------------------------------------------------------------
+
+    /// The runtime self-protection observations recorded so far, combining what the engine
+    /// detected with anything the app or a library reported to [ShieldSignals].
+    ///
+    /// Informational. The attestation service applies the policy, and it may reach a different
+    /// conclusion than a naive reading of this array -- an emulator signal, for instance, is
+    /// normal on a developer's machine.
+    public static ShieldSignal[] getSignals() {
+        ShieldSignal[] fromEngine;
+        try {
+            fromEngine = ShieldEngineRegistry.getEngine().collectSignals();
+        } catch (Throwable t) {
+            fromEngine = new ShieldSignal[0];
+        }
+        if (fromEngine != null) {
+            for (int i = 0; i < fromEngine.length; i++) {
+                ShieldSignals.add(fromEngine[i]);
+            }
+        }
+        return ShieldSignals.snapshot();
+    }
+
+    /// The most recent token status. [ShieldStatus#NOT_INITIALIZED] before [#init(ShieldConfig)].
+    public static ShieldStatus getStatus() {
+        synchronized (AppShield.class) {
+            return lastStatus;
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Observation
+    // -----------------------------------------------------------------
+
+    /// Registers a listener for status and signal changes. Callbacks arrive on the EDT.
+    public static void addListener(ShieldListener l) {
+        if (l == null) {
+            return;
+        }
+        synchronized (listeners) {
+            if (!listeners.contains(l)) {
+                listeners.addElement(l);
+            }
+        }
+        ShieldSignals.addListener(l);
+    }
+
+    public static void removeListener(ShieldListener l) {
+        synchronized (listeners) {
+            listeners.removeElement(l);
+        }
+        ShieldSignals.removeListener(l);
+    }
+
+    // -----------------------------------------------------------------
+    // Internals
+    // -----------------------------------------------------------------
+
+    private static void setStatus(ShieldStatus status) {
+        if (status == null) {
+            return;
+        }
+        ShieldListener[] copy;
+        synchronized (AppShield.class) {
+            if (status.equals(lastStatus)) {
+                return;
+            }
+            lastStatus = status;
+        }
+        synchronized (listeners) {
+            if (listeners.isEmpty()) {
+                return;
+            }
+            copy = new ShieldListener[listeners.size()];
+            listeners.copyInto(copy);
+        }
+        Display.getInstance().callSerially(new StatusDispatch(copy, status));
+    }
+
+    private static final class StatusDispatch implements Runnable {
+        private final ShieldListener[] targets;
+        private final ShieldStatus status;
+
+        StatusDispatch(ShieldListener[] targets, ShieldStatus status) {
+            this.targets = targets;
+            this.status = status;
+        }
+
+        public void run() {
+            for (int i = 0; i < targets.length; i++) {
+                targets[i].statusChanged(status);
+            }
+        }
+    }
+
+    /// Extracts the host from a URL without pulling in a URL parser. Returns null when the URL is
+    /// not absolute, in which case the host is treated as unprotected.
+    static String hostOf(String url) {
+        if (url == null) {
+            return null;
+        }
+        int scheme = url.indexOf("://");
+        if (scheme < 0) {
+            return null;
+        }
+        int start = scheme + 3;
+        int end = url.length();
+        for (int i = start; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        String authority = url.substring(start, end);
+        // Strip userinfo and port.
+        int at = authority.lastIndexOf('@');
+        if (at >= 0) {
+            authority = authority.substring(at + 1);
+        }
+        int colon = authority.lastIndexOf(':');
+        if (colon >= 0 && authority.indexOf(']') < colon) {
+            authority = authority.substring(0, colon);
+        }
+        return authority.length() == 0 ? null : authority.toLowerCase();
+    }
+
+    private static com.codename1.security.shield.spi.EngineContext contextForEngine() {
+        return ShieldEngineRegistry.getDefaultContext();
+    }
+}

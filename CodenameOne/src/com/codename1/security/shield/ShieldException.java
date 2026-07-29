@@ -6,39 +6,42 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-#import <Foundation/Foundation.h>
+package com.codename1.security.shield;
 
-//#define CN1_DETECT_JAILBREAK 1
+import java.io.IOException;
 
-/**
- * Runs every jailbreak / hooking probe and returns the ones that fired as a
- * comma separated list of stable codes, or an empty string on a clean device.
- * Codes: dyldInsert, hookLib, jailbreakFile, restrictedWrite, traced.
- *
- * Always compiled, independent of CN1_DETECT_JAILBREAK, because
- * DeviceIntegrity.getCompromiseReasons() surfaces these at runtime without
- * terminating the app. Returns an empty string on the simulator.
- */
-NSString *cn1JailbreakSignals(void);
+/// Raised when a shield operation cannot produce a usable token, or when a request to a protected
+/// host is refused because its certificate chain matched no configured pin.
+///
+/// Extends `IOException` so it flows through the normal `ConnectionRequest` error path rather than
+/// needing its own handling. Always check [#getStatus()] before deciding what to show the user:
+/// [ShieldStatus#isTransient()] distinguishes "could not reach the service" from "this device was
+/// rejected", and those deserve very different UX.
+public class ShieldException extends IOException {
 
-#ifdef CN1_DETECT_JAILBREAK
-/**
- * Legacy hard gate kept for the ios.detectJailbreak build hint: runs
- * cn1JailbreakSignals() and terminates the process if anything fired.
- */
-void cn1DetectJailbreakBypassesAndExit(void);
-#endif
+    private final ShieldStatus status;
+
+    public ShieldException(ShieldStatus status, String message) {
+        super(message);
+        this.status = status == null ? ShieldStatus.NOT_INITIALIZED : status;
+    }
+
+    /// Why the operation failed. Never null.
+    public ShieldStatus getStatus() {
+        return status;
+    }
+}

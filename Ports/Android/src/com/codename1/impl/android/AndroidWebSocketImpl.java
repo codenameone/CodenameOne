@@ -162,6 +162,7 @@ class AndroidWebSocketImpl extends WebSocketImpl {
             }
             req.append("\r\n");
         }
+        appendRequestHeaders(req);
         req.append("\r\n");
         out.write(req.toString().getBytes(ASCII));
         out.flush();

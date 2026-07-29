@@ -191,6 +191,16 @@ public class ConnectionRequest implements IOProgressListener {
     private String destinationStorage;
     private SSLCertificate[] sslCertificates;
     private boolean checkSSLCertificates;
+
+    /// Set when a [NetworkGuard] rejected this request's certificate chain, so the failure can be
+    /// rethrown as itself instead of surfacing as a generic connection error (or, worse, as a
+    /// successful empty response).
+    private IOException pinFailure;
+
+    /// Whether to ask the platform for the richer certificate details that include public-key
+    /// digests. Off unless a guard says this host is pinned, so every existing caller keeps
+    /// receiving byte-identical data from [#getSSLCertificates()].
+    private boolean collectPublicKeyDigests;
     /// A flag that turns off checking for invalid certificates.
     private boolean insecure;
     /// The request body can be used instead of arguments to pass JSON data to a restful request,
@@ -881,19 +891,52 @@ public class ConnectionRequest implements IOProgressListener {
             //throw new RuntimeException("checkCertificates() can only be explicitly called on platforms that require native callbacks for checking certificates.");
             return true;
         }
-        if (!checkSSLCertificates) {
+        if (!shouldInspectCertificates()) {
             // If the request doesn't require checking SSL certificates, then this returns true.
             // meaning that it checks out OK.
             return true;
         }
         try {
-            checkSSLCertificates(getSSLCertificates());
+            SSLCertificate[] certs = getSSLCertificates();
+            checkSSLCertificates(certs);
+            NetworkGuard guard = NetworkManager.getNetworkGuard();
+            if (guard != null) {
+                guard.checkCertificates(this, certs);
+            }
             return !shouldStop();
         } catch (IOException ex) {
+            // Retained so the failure surfaces as a real error rather than an
+            // empty successful response. This callback can only answer with a
+            // boolean; performOperationComplete rethrows it.
+            pinFailure = ex;
             Log.e(ex);
             return false;
         }
 
+    }
+
+    /// True when the certificate chain for this request should be fetched and vetted, either
+    /// because the request opted in itself or because the installed [NetworkGuard] pins this host.
+    private boolean shouldInspectCertificates() {
+        if (checkSSLCertificates) {
+            return true;
+        }
+        NetworkGuard guard = NetworkManager.getNetworkGuard();
+        if (guard == null) {
+            return false;
+        }
+        try {
+            if (guard.isCertificateCheckRequired(url)) {
+                // Ask the platform for the richer chain details (public key
+                // digests, per-certificate grouping). Off by default so every
+                // existing caller keeps seeing byte-identical data.
+                collectPublicKeyDigests = true;
+                return true;
+            }
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+        return false;
     }
 
     /// Performs the actual network request on behalf of the network manager
@@ -909,6 +952,16 @@ public class ConnectionRequest implements IOProgressListener {
     boolean performOperationComplete() throws IOException {
         if (shouldStop()) {
             return true;
+        }
+        pinFailure = null;
+        NetworkGuard requestGuard = NetworkManager.getNetworkGuard();
+        if (requestGuard != null) {
+            // Deliberately here rather than in initConnection(): that method is
+            // protected, and a subclass that overrides it without calling super
+            // would silently lose the decoration. Also deliberately not in
+            // NetworkThread.prepare(), which runs inside the queue lock where a
+            // blocking token fetch would stall every other request.
+            requestGuard.beforeRequest(this);
         }
         if (cacheMode == CachingMode.OFFLINE || cacheMode == CachingMode.OFFLINE_FIRST) {
             InputStream is = null; //NOPMD CloseResource
@@ -980,16 +1033,30 @@ public class ConnectionRequest implements IOProgressListener {
                     }
                 }
             }
-            if (checkSSLCertificates && canGetSSLCertificates() &&
+            if (shouldInspectCertificates() && canGetSSLCertificates() &&
                     // For iOS only... it needs to use a callback from native code
                     // for checking the SSL certificates - otherwise it will send
                     // empty POST bodies.
                     !Util.getImplementation().checkSSLCertificatesRequiresCallbackFromNative()) {
                 sslCertificates = getSSLCertificatesImpl(connection, url);
+                // The request's own hook runs first and unchanged, so an app that
+                // already pins by overriding it keeps working; the guard layers on.
                 checkSSLCertificates(sslCertificates);
+                NetworkGuard certGuard = NetworkManager.getNetworkGuard();
+                if (certGuard != null) {
+                    certGuard.checkCertificates(this, sslCertificates);
+                }
                 if (shouldStop()) {
                     return true;
                 }
+            }
+            if (pinFailure != null) {
+                // Raised by the iOS native callback, which can only answer with a
+                // boolean. Surfacing it here is what stops a rejected chain from
+                // looking like a successful zero-byte response to the caller.
+                IOException toThrow = pinFailure;
+                pinFailure = null;
+                throw toThrow;
             }
             if (isWriteRequest()) {
                 progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
@@ -1139,6 +1206,17 @@ public class ConnectionRequest implements IOProgressListener {
                     }
                 }
             }
+        } catch (IOException ioe) {
+            // On iOS the certificate check runs in a native callback that can only
+            // answer with a boolean, so the connection fails with a generic error
+            // some way after the real cause. Substitute the recorded cause, or the
+            // caller sees "connection reset" for what was actually a pin mismatch.
+            if (pinFailure != null) {
+                IOException cause = pinFailure;
+                pinFailure = null;
+                throw cause;
+            }
+            throw ioe;
         } finally {
             // always cleanup connections/streams even in case of an exception
             impl.cleanup(output);
@@ -1550,8 +1628,61 @@ public class ConnectionRequest implements IOProgressListener {
         return sslCertificates;
     }
 
+    /// Parses the richer per-certificate form of the platform's certificate list.
+    ///
+    /// Entries arrive as `algorithm:value`, exactly as in the flat form, with a `CHAIN:<n>`
+    /// delimiter starting each certificate's group. Anything before the first delimiter is treated
+    /// as the leaf, so a port that reports digests without grouping still yields usable data.
+    static SSLCertificate[] parseGroupedCertificates(String[] entries) {
+        java.util.Vector out = new java.util.Vector();
+        SSLCertificate current = null;
+        int index = 0;
+        for (int i = 0; i < entries.length; i++) {
+            String entry = entries[i];
+            if (entry == null) {
+                continue;
+            }
+            int splitPos = entry.indexOf(':');
+            if (splitPos == -1) {
+                continue;
+            }
+            String algorithm = entry.substring(0, splitPos);
+            String value = entry.substring(splitPos + 1);
+            if ("CHAIN".equals(algorithm)) {
+                current = new SSLCertificate();
+                try {
+                    current.chainIndex = Integer.parseInt(value);
+                } catch (NumberFormatException nfe) {
+                    current.chainIndex = index;
+                }
+                index++;
+                out.addElement(current);
+                continue;
+            }
+            if (current == null) {
+                current = new SSLCertificate();
+                current.chainIndex = index++;
+                out.addElement(current);
+            }
+            if ("SPKI-SHA-256".equals(algorithm)) {
+                current.publicKeyDigest = value;
+                current.publicKeyDigestAlgorithm = "SHA-256";
+            } else if (current.certificateUniqueKey == null) {
+                current.certificateAlgorithm = algorithm;
+                current.certificateUniqueKey = value;
+            }
+        }
+        SSLCertificate[] arr = new SSLCertificate[out.size()];
+        out.copyInto(arr);
+        return arr;
+    }
+
     private SSLCertificate[] getSSLCertificatesImpl(Object connection, String url) throws IOException {
-        String[] sslCerts = Util.getImplementation().getSSLCertificates(connection, url);
+        CodenameOneImplementation impl = Util.getImplementation();
+        if (collectPublicKeyDigests && impl.canGetPublicKeyDigests()) {
+            return parseGroupedCertificates(impl.getSSLCertificatesEx(connection, url));
+        }
+        String[] sslCerts = impl.getSSLCertificates(connection, url);
         SSLCertificate[] out = new SSLCertificate[sslCerts.length];
         int i = 0;
         for (String sslCertStr : sslCerts) {
@@ -3032,6 +3163,9 @@ public class ConnectionRequest implements IOProgressListener {
 
         private String certificateUniqueKey;
         private String certificateAlgorithm;
+        private String publicKeyDigest;
+        private String publicKeyDigestAlgorithm;
+        private int chainIndex;
 
         /// Gets a fingerprint for the SSL certificate encoded using the algorithm
         /// specified by `#getCertificteAlgorithm()`
@@ -3046,6 +3180,46 @@ public class ConnectionRequest implements IOProgressListener {
         /// The algorithm used to encode the certificate fingerprint.
         public String getCertificteAlgorithm() {
             return certificateAlgorithm;
+        }
+
+        /// Same value as [#getCertificteUniqueKey()], under a spelling that is not a typo.
+        /// The original name is kept because existing code calls it.
+        public String getFingerprint() {
+            return certificateUniqueKey;
+        }
+
+        /// Same value as [#getCertificteAlgorithm()], under a spelling that is not a typo.
+        public String getFingerprintAlgorithm() {
+            return certificateAlgorithm;
+        }
+
+        /// A base64 digest of this certificate's subject public key info, or null when the
+        /// platform did not supply one.
+        ///
+        /// Prefer this over [#getFingerprint()] when pinning. A whole-certificate fingerprint
+        /// changes every time the certificate is renewed, even on the same key pair, so pinning it
+        /// means an expiry can take the app offline. The public key survives renewal.
+        ///
+        /// Populated only when something asked for it -- an installed [NetworkGuard] that pins
+        /// this host. Otherwise it stays null so existing certificate handling is unaffected.
+        public String getPublicKeyDigest() {
+            return publicKeyDigest;
+        }
+
+        /// The digest algorithm behind [#getPublicKeyDigest()], normally `SHA-256`.
+        public String getPublicKeyDigestAlgorithm() {
+            return publicKeyDigestAlgorithm;
+        }
+
+        /// Position in the chain the server presented; 0 is the leaf. Meaningful only when the
+        /// platform reported per-certificate grouping, otherwise 0.
+        public int getChainIndex() {
+            return chainIndex;
+        }
+
+        /// True for the server's own certificate as opposed to an issuer in the chain.
+        public boolean isLeaf() {
+            return chainIndex == 0;
         }
     }
 

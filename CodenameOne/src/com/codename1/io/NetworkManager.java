@@ -207,6 +207,42 @@ public final class NetworkManager {
         return INSTANCE;
     }
 
+    private static volatile NetworkGuard networkGuard;
+    private static boolean networkGuardSealed;
+
+    /// Installs the app-wide [NetworkGuard].
+    ///
+    /// The first call wins and the slot then seals. A guard can veto requests and enforce
+    /// certificate pins, so allowing it to be replaced at runtime would let any code that runs
+    /// later -- including code an attacker injected -- swap in a permissive one.
+    ///
+    /// @throws IllegalStateException if a guard is already installed
+    public static void setNetworkGuard(NetworkGuard guard) {
+        if (guard == null) {
+            throw new IllegalArgumentException("guard is null");
+        }
+        synchronized (NetworkManager.class) {
+            if (networkGuardSealed) {
+                throw new IllegalStateException("A network guard is already installed");
+            }
+            networkGuard = guard;
+            networkGuardSealed = true;
+        }
+    }
+
+    /// The installed guard, or null when none was installed.
+    public static NetworkGuard getNetworkGuard() {
+        return networkGuard;
+    }
+
+    /// Test hook: drops the installed guard and unseals the slot.
+    static void resetNetworkGuardForTesting() {
+        synchronized (NetworkManager.class) {
+            networkGuard = null;
+            networkGuardSealed = false;
+        }
+    }
+
     void resetAPN() {
         autoDetected = false;
     }
@@ -1131,6 +1167,16 @@ public final class NetworkManager {
                 }
                 if (requestWasCompleted) {
                     req.complete = true;
+                }
+                NetworkGuard guard = networkGuard;
+                if (guard != null) {
+                    try {
+                        guard.afterResponse(req, req.getResponseCode());
+                    } catch (Throwable t) {
+                        // A guard's bookkeeping must never turn a completed
+                        // request into a failed one.
+                        Log.e(t);
+                    }
                 }
                 // Read once into a local. A listener removed from the EDT --
                 // which is where postResponse() runs, queued while this thread

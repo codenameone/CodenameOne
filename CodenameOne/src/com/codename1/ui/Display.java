@@ -6859,6 +6859,19 @@ public final class Display extends CN1Constants {
         return impl.getEnabledAccessibilityServices();
     }
 
+    /// Discards cached platform attestation state, forcing the next attestation to start from a fresh
+    /// hardware key. See `com.codename1.security.DeviceIntegrity#resetAttestation()`.
+    public void resetAttestation() {
+        impl.resetAttestation();
+    }
+
+    /// Returns digests of the certificates the running app is signed with. Low level hook for the
+    /// attestation layer, which reports them to a verifying service; an on-device comparison proves
+    /// nothing on its own. Empty where the platform has no such concept.
+    public String[] getAppSignerDigests() {
+        return impl.getAppSignerDigests();
+    }
+
     /// Marks the current screen secure (Android `FLAG_SECURE`), blocking screenshots/recording/scraping.
     public void setSecureScreen(boolean secure) {
         impl.setSecureScreen(secure);

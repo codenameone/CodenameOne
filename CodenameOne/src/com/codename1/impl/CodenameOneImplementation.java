@@ -6363,6 +6363,28 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// True when this port can report a digest of each certificate's subject public key info,
+    /// enabling public-key pinning through [#getSSLCertificatesEx(Object, String)].
+    ///
+    /// Public-key pins survive certificate renewal on the same key pair; whole-certificate
+    /// fingerprints do not, which is why a renewal can otherwise take a pinning app offline.
+    public boolean canGetPublicKeyDigests() {
+        return false;
+    }
+
+    /// The richer certificate list, grouped per certificate.
+    ///
+    /// Same `algorithm:value` encoding as [#getSSLCertificates(Object, String)], with two
+    /// additions: a `CHAIN:<n>` entry starts each certificate's group (0 is the leaf), and a
+    /// `SPKI-SHA-256:<base64>` entry carries the public-key digest.
+    ///
+    /// Called only when something asked for public-key digests, so a port that does not override
+    /// this simply never sees it. The default delegates to the flat form, which parses correctly
+    /// and just yields no digests.
+    public String[] getSSLCertificatesEx(Object connection, String url) throws IOException {
+        return getSSLCertificates(connection, url);
+    }
+
     /// SSL certificate checks must be performed via a callback from the native side,
     /// rather than explicitly checking as part of NetworkManager's connection
     /// flow.   This is mainly for iOS POST requests.  If we try to get the SSL certs
@@ -11236,6 +11258,29 @@ public abstract class CodenameOneImplementation {
     /// Used to detect malware that abuses Android accessibility services for overlay/remote-control and
     /// text extraction. Returns an empty array on platforms where this concept does not apply (e.g. iOS).
     public String[] getEnabledAccessibilityServices() {
+        return new String[0];
+    }
+
+    /// Discards cached platform attestation state so the next [#requestIntegrityToken(String)] starts
+    /// from a fresh hardware key.
+    ///
+    /// Apple's App Attest model is attest once, then assert many times against the key the server
+    /// recorded. When the server no longer recognises that key -- the app was reinstalled, the device
+    /// was restored from a backup, or the key was invalidated by the OS -- the client has to throw the
+    /// key away and attest again. This is how the attestation layer is told to do that. No-op where
+    /// attestation is unsupported or stateless (Play Integrity holds no client-side key).
+    public void resetAttestation() {
+    }
+
+    /// Returns digests of the certificates the running application is actually signed with, so a build
+    /// can be compared against the identity it was built under and repackaging can be reported.
+    ///
+    /// Deliberately not surfaced on [com.codename1.security.DeviceIntegrity]: an app has no use for its
+    /// own signature, and a comparison performed on the device is defeated by the same patch that did
+    /// the repackaging. The value of this is that it is reported to a verifying service, which checks it
+    /// against what the build server recorded. Returns an empty array where the platform has no such
+    /// concept.
+    public String[] getAppSignerDigests() {
         return new String[0];
     }
 

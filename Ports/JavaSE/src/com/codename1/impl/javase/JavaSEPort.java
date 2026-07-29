@@ -6539,6 +6539,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         simulateMenu.add(biometricMenu);
 
+        final JMenu shieldMenu = installShieldSimulationMenu(simulateMenu, pref);
+
         final JMenu nfcMenu = installNfcSimulationMenu(simulateMenu, pref);
 
         final JMenu foldableMenu = installFoldableSimulationMenu(simulateMenu, pref);
@@ -7056,6 +7058,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         simulateMenu.add(motionSim);
         simulateMenu.add(pushSim);
         simulateMenu.add(biometricMenu);
+        simulateMenu.add(shieldMenu);
         simulateMenu.add(nfcMenu);
         simulateMenu.add(foldableMenu);
         simulateMenu.add(statusBarTapDiag);
@@ -8314,6 +8317,163 @@ public class JavaSEPort extends CodenameOneImplementation {
                 fireSharedContentReceived(content);
             }
         });
+    }
+
+    /**
+     * Builds the {@code Simulate > App Shield} menu.
+     *
+     * <p>Every toggle here exists to make an otherwise untestable branch
+     * reachable on a developer's desktop. "Force Pin Mismatch On Next Request"
+     * is the most valuable of them: a fail-closed pinning branch is otherwise
+     * only exercisable by deliberately mis-pinning a live host.</p>
+     */
+    private JMenu installShieldSimulationMenu(JMenu simulateMenu, final Preferences pref) {
+        JMenu shieldMenu = new JMenu("App Shield");
+        shieldMenu.setToolTipText("Simulate attestation outcomes, compromised-device signals "
+                + "and certificate pin failures.");
+
+        final JCheckBoxMenuItem supported = new JCheckBoxMenuItem("Attestation Supported",
+                pref.getBoolean("ShieldSim.supported", true));
+        JavaSEShield.attestationSupported = supported.isSelected();
+        supported.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JavaSEShield.attestationSupported = supported.isSelected();
+                pref.putBoolean("ShieldSim.supported", supported.isSelected());
+            }
+        });
+        shieldMenu.add(supported);
+
+        JMenu outcomeMenu = new JMenu("Attestation Result");
+        ButtonGroup outcomeGroup = new ButtonGroup();
+        String storedOutcome = pref.get("ShieldSim.outcome",
+                JavaSEShield.AttestOutcome.PASS.name());
+        for (final JavaSEShield.AttestOutcome outcome : JavaSEShield.AttestOutcome.values()) {
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(outcome.name());
+            if (outcome.name().equals(storedOutcome)) {
+                item.setSelected(true);
+                JavaSEShield.attestOutcome = outcome;
+            }
+            outcomeGroup.add(item);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    JavaSEShield.attestOutcome = outcome;
+                    pref.put("ShieldSim.outcome", outcome.name());
+                }
+            });
+            outcomeMenu.add(item);
+        }
+        shieldMenu.add(outcomeMenu);
+
+        shieldMenu.addSeparator();
+
+        // The signals a compromised device would report. Independent toggles
+        // because an app's response to a rooted device and to a hooking
+        // framework are usually different decisions.
+        shieldMenu.add(shieldToggle(pref, "Rooted / Jailbroken", "ShieldSim.rooted",
+                new ShieldToggleSink() {
+                    @Override
+                    public void set(boolean v) {
+                        JavaSEShield.simRooted = v;
+                    }
+                }));
+        shieldMenu.add(shieldToggle(pref, "Hooking Framework (Frida)", "ShieldSim.hooked",
+                new ShieldToggleSink() {
+                    @Override
+                    public void set(boolean v) {
+                        JavaSEShield.simHooked = v;
+                    }
+                }));
+        shieldMenu.add(shieldToggle(pref, "Emulator", "ShieldSim.emulator",
+                new ShieldToggleSink() {
+                    @Override
+                    public void set(boolean v) {
+                        JavaSEShield.simEmulator = v;
+                    }
+                }));
+        shieldMenu.add(shieldToggle(pref, "Debugger Attached", "ShieldSim.debugger",
+                new ShieldToggleSink() {
+                    @Override
+                    public void set(boolean v) {
+                        JavaSEShield.simDebugger = v;
+                    }
+                }));
+        shieldMenu.add(shieldToggle(pref, "Repackaged", "ShieldSim.repackaged",
+                new ShieldToggleSink() {
+                    @Override
+                    public void set(boolean v) {
+                        JavaSEShield.simRepackaged = v;
+                    }
+                }));
+        shieldMenu.add(shieldToggle(pref, "Untrusted Accessibility Service",
+                "ShieldSim.accessibility", new ShieldToggleSink() {
+                    @Override
+                    public void set(boolean v) {
+                        JavaSEShield.simUntrustedAccessibility = v;
+                    }
+                }));
+
+        shieldMenu.addSeparator();
+
+        shieldMenu.add(shieldToggle(pref, "Serve Expired Token", "ShieldSim.expiredToken",
+                new ShieldToggleSink() {
+                    @Override
+                    public void set(boolean v) {
+                        JavaSEShield.serveExpiredToken = v;
+                    }
+                }));
+
+        // The one branch that is otherwise effectively untestable.
+        shieldMenu.add(shieldToggle(pref, "Force Pin Mismatch On Next Request",
+                "ShieldSim.pinMismatch", new ShieldToggleSink() {
+                    @Override
+                    public void set(boolean v) {
+                        JavaSEShield.forcePinMismatch = v;
+                    }
+                }));
+        shieldMenu.add(shieldToggle(pref, "Fail Pin Fetch", "ShieldSim.pinFetchFail",
+                new ShieldToggleSink() {
+                    @Override
+                    public void set(boolean v) {
+                        JavaSEShield.failPinFetch = v;
+                    }
+                }));
+
+        shieldMenu.addSeparator();
+
+        JMenuItem status = new JMenuItem("Show Shield Status...");
+        status.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                JOptionPane.showMessageDialog(canvas, JavaSEShield.describe(),
+                        "App Shield Simulation", JOptionPane.INFORMATION_MESSAGE);
+            }
+        });
+        shieldMenu.add(status);
+
+        simulateMenu.add(shieldMenu);
+        return shieldMenu;
+    }
+
+    /** Lambda stand-in so the toggle wiring is written once rather than nine times. */
+    private interface ShieldToggleSink {
+        void set(boolean value);
+    }
+
+    private JCheckBoxMenuItem shieldToggle(final Preferences pref, String label,
+            final String prefKey, final ShieldToggleSink sink) {
+        final JCheckBoxMenuItem item = new JCheckBoxMenuItem(label,
+                pref.getBoolean(prefKey, false));
+        sink.set(item.isSelected());
+        item.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                sink.set(item.isSelected());
+                pref.putBoolean(prefKey, item.isSelected());
+            }
+        });
+        return item;
     }
 
     private JMenu installNfcSimulationMenu(JMenu simulateMenu, final Preferences pref) {
@@ -14254,9 +14414,47 @@ public class JavaSEPort extends CodenameOneImplementation {
     public boolean canGetSSLCertificates() {
         return true;
     }
-    
-    
-    
+
+    @Override
+    public boolean canGetPublicKeyDigests() {
+        return true;
+    }
+
+    @Override
+    public String[] getSSLCertificatesEx(Object connection, String url) throws IOException {
+        if (connection instanceof HttpsURLConnection) {
+            HttpsURLConnection conn = (HttpsURLConnection) connection;
+            try {
+                conn.connect();
+                java.security.cert.Certificate[] certs = conn.getServerCertificates();
+                java.util.List<String> out = new java.util.ArrayList<String>();
+                for (int i = 0; i < certs.length; i++) {
+                    java.security.cert.Certificate cert = certs[i];
+                    out.add("CHAIN:" + i);
+                    MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+                    sha256.update(cert.getEncoded());
+                    out.add("SHA-256:" + dumpHex(sha256.digest()));
+                    MessageDigest sha1 = MessageDigest.getInstance("SHA1");
+                    sha1.update(cert.getEncoded());
+                    out.add("SHA1:" + dumpHex(sha1.digest()));
+                    // getPublicKey().getEncoded() is already the DER SubjectPublicKeyInfo,
+                    // which is exactly what a public-key pin is computed over.
+                    java.security.PublicKey pk = cert.getPublicKey();
+                    if (pk != null && pk.getEncoded() != null) {
+                        MessageDigest spki = MessageDigest.getInstance("SHA-256");
+                        spki.update(pk.getEncoded());
+                        out.add("SPKI-SHA-256:"
+                                + com.codename1.util.Base64.encodeNoNewline(spki.digest()));
+                    }
+                }
+                return out.toArray(new String[out.size()]);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+        return new String[0];
+    }
+
     /**
      * @inheritDoc
      */
@@ -18795,6 +18993,81 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         return super.isJailbrokenDevice();
+    }
+
+    // --- DeviceIntegrity / App Shield simulation --------------------------
+    //
+    // Without these the simulator reports "no attestation, clean device" for
+    // everything, so the branches an app takes when a device looks compromised
+    // are unreachable until it is on real hardware. Driven by the
+    // Simulate > App Shield menu; see JavaSEShield.
+
+    @Override
+    public boolean isAttestationSupported() {
+        return JavaSEShield.attestationSupported;
+    }
+
+    @Override
+    public com.codename1.util.AsyncResource<String> requestIntegrityToken(String nonce) {
+        final com.codename1.util.AsyncResource<String> result =
+                new com.codename1.util.AsyncResource<String>();
+        if (!JavaSEShield.attestationSupported
+                || JavaSEShield.attestOutcome == JavaSEShield.AttestOutcome.UNSUPPORTED) {
+            result.error(new UnsupportedOperationException(
+                    "Simulated: attestation is not supported on this device"));
+            return result;
+        }
+        switch (JavaSEShield.attestOutcome) {
+            case PASS:
+                // Stamped as simulated so it cannot be mistaken for, or accepted
+                // as, a real attestation by any backend.
+                result.complete("cn1sim:attest:" + (nonce == null ? "" : nonce));
+                break;
+            case FAIL_REJECTED:
+                result.error(new RuntimeException(
+                        "Simulated: the attestation service rejected this device"));
+                break;
+            case FAIL_NO_NETWORK:
+                result.error(new java.io.IOException("Simulated: no network"));
+                break;
+            case FAIL_SERVICE_DOWN:
+                result.error(new java.io.IOException(
+                        "Simulated: the attestation service is unavailable"));
+                break;
+            case FAIL_RATE_LIMITED:
+                result.error(new RuntimeException("Simulated: rate limited, back off"));
+                break;
+            default:
+                result.error(new RuntimeException("Simulated attestation failure"));
+        }
+        return result;
+    }
+
+    @Override
+    public void resetAttestation() {
+        // Nothing is cached in the simulator; the menu is the state.
+    }
+
+    @Override
+    public boolean isDeviceCompromised() {
+        return JavaSEShield.simReasons().length > 0;
+    }
+
+    @Override
+    public String[] getCompromiseReasons() {
+        return JavaSEShield.simReasons();
+    }
+
+    @Override
+    public String[] getEnabledAccessibilityServices() {
+        return JavaSEShield.simAccessibility();
+    }
+
+    @Override
+    public void setSecureScreen(boolean secure) {
+        // No OS-level equivalent on the desktop. Recorded so the menu can show
+        // whether the app asked for it, which is what a developer is checking.
+        JavaSEShield.secureScreen = secure;
     }
 
     @Override

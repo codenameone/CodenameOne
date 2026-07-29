@@ -1009,14 +1009,39 @@ public final class IOSNative {
     native boolean isAppAttestSupported();
 
     /**
-     * Generates/uses an App Attest hardware key and produces an attestation bound
-     * to the SHA-256 of {@code nonce}. Native code calls back into
-     * {@code IOSDeviceIntegrity.nativeAttestSuccess(int, String)} or
-     * {@code IOSDeviceIntegrity.nativeAttestError(int, String)} with the same
-     * requestId. The success token is {@code base64(keyId):base64(attestationObject)}
-     * for the backend to verify with Apple.
+     * Generates a fresh App Attest hardware key. Calls back into
+     * {@code IOSDeviceIntegrity.nativeKeyGenerated(int, String)} with the key
+     * identifier, or {@code nativeAttestError(int, int, String)} on failure.
+     *
+     * <p>Apple rate-limits key generation, so this must happen once per install
+     * and the identifier must be persisted -- not once per request.</p>
      */
-    native void requestAppAttestToken(int requestId, String nonce);
+    native void appAttestGenerateKey(int requestId);
+
+    /**
+     * Attests a previously generated key against a server challenge. Calls back
+     * into {@code IOSDeviceIntegrity.nativeAttestationReady(int, String)} with a
+     * base64 attestation object for the backend to verify with Apple.
+     *
+     * @param clientDataHashB64 base64 of the SHA-256 the attestation binds to,
+     *        computed on the Java side so the attest and assert paths cannot
+     *        disagree about what was hashed
+     */
+    native void appAttestAttestKey(int requestId, String keyId, String clientDataHashB64);
+
+    /**
+     * Produces an assertion over a previously attested key -- the cheap,
+     * unlimited operation that every request after the first should use. Calls
+     * back into {@code IOSDeviceIntegrity.nativeAssertionReady(int, String)}.
+     */
+    native void appAttestGenerateAssertion(int requestId, String keyId, String clientDataHashB64);
+
+    /**
+     * Comma separated jailbreak/hooking signal codes observed on this device, or
+     * an empty string when clean. Unlike the {@code ios.detectJailbreak} launch
+     * gate this never terminates the app.
+     */
+    native String iosJailbreakSignals();
 
     // --- CarPlay (CarPlay.framework) ----------------------------------------
     // All gated natively by CN1_USE_CARPLAY (the build flips it on when the app references

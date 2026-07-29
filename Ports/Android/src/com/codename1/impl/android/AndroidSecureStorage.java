@@ -54,6 +54,7 @@ import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 
 /**
@@ -76,12 +77,29 @@ import javax.crypto.spec.IvParameterSpec;
  *   key and recreate it on first failure to recover.
  *   See <a href="https://issuetracker.google.com/u/0/issues/65578763">Google issue 65578763</a>.
  * </ul>
+ *
+ * <p>The non-prompting tier ({@code set(account, value)} and friends) uses a
+ * <em>separate</em> keystore key ({@code CN1PlainKey}) and preferences file,
+ * created without {@code setUserAuthenticationRequired}, with AES/GCM. Keeping
+ * it separate matters: the biometric key is invalidated whenever the user
+ * re-enrols biometrics, and secrets read on every network call must survive
+ * that.</p>
  */
 public final class AndroidSecureStorage extends SecureStorage {
 
     private static final String KEY_ID = "BiometricsKey";
     private static final String PREFS = "CN1BiometricSecureStorage";
     private static final String ANDROID_KEY_STORE = "AndroidKeyStore";
+
+    /**
+     * Deliberately distinct from {@link #KEY_ID}: the biometric key is created
+     * with {@code setUserAuthenticationRequired(true)} and is invalidated when
+     * the user re-enrols biometrics. The non-prompting tier must survive that,
+     * so it gets its own key and its own preferences file.
+     */
+    private static final String PLAIN_KEY_ID = "CN1PlainKey";
+    private static final String PLAIN_PREFS = "CN1PlainSecureStorage";
+    private static final int GCM_TAG_BITS = 128;
 
     private KeyStore keyStore;
     private KeyGenerator keyGenerator;
@@ -175,6 +193,178 @@ public final class AndroidSecureStorage extends SecureStorage {
         sp.edit().remove("v_" + account).remove("iv_" + account).apply();
         result.complete(Boolean.TRUE);
         return result;
+    }
+
+    // --- Non-prompting tier ------------------------------------------------
+    //
+    // AES/GCM under a dedicated AndroidKeyStore key created *without*
+    // setUserAuthenticationRequired, so reads never raise a biometric prompt.
+    // Deliberately not androidx.security EncryptedSharedPreferences: that
+    // would force a transitive dependency on every Android build and it is
+    // itself deprecated. The value is stored as
+    // base64(iv) + ":" + base64(ciphertext) in a private preferences file.
+
+    @Override
+    public boolean set(String account, String value) {
+        if (account == null || value == null) {
+            return false;
+        }
+        if (Build.VERSION.SDK_INT < 23) {
+            return legacyPlainSet(account, value);
+        }
+        try {
+            SecretKey key = plainKey(true);
+            if (key == null) {
+                return false;
+            }
+            Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+            c.init(Cipher.ENCRYPT_MODE, key);
+            byte[] enc = c.doFinal(value.getBytes("UTF-8"));
+            plainPrefs().edit()
+                    .putString(account, Base64.encodeToString(c.getIV(), Base64.NO_WRAP)
+                            + ":" + Base64.encodeToString(enc, Base64.NO_WRAP))
+                    .apply();
+            return true;
+        } catch (InvalidKeyException e) {
+            // Includes KeyPermanentlyInvalidatedException.
+            resetPlainKey();
+            return false;
+        } catch (Throwable t) {
+            Log.e(t);
+            return false;
+        }
+    }
+
+    @Override
+    public String get(String account) {
+        if (account == null) {
+            return null;
+        }
+        if (Build.VERSION.SDK_INT < 23) {
+            return legacyPlainGet(account);
+        }
+        String stored = plainPrefs().getString(account, null);
+        if (stored == null) {
+            return null;
+        }
+        int sep = stored.indexOf(':');
+        if (sep < 0) {
+            return null;
+        }
+        try {
+            SecretKey key = plainKey(false);
+            if (key == null) {
+                return null;
+            }
+            byte[] iv = Base64.decode(stored.substring(0, sep), Base64.NO_WRAP);
+            byte[] enc = Base64.decode(stored.substring(sep + 1), Base64.NO_WRAP);
+            Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+            c.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_BITS, iv));
+            return new String(c.doFinal(enc), "UTF-8");
+        } catch (InvalidKeyException e) {
+            // The key was invalidated out from under us (device-wide credential
+            // change, or the Samsung 8.0.0 quirk documented on the biometric
+            // tier). Everything encrypted under it is unrecoverable, so drop
+            // the key and the ciphertexts rather than failing forever.
+            resetPlainKey();
+            return null;
+        } catch (UnrecoverableKeyException e) {
+            resetPlainKey();
+            return null;
+        } catch (Throwable t) {
+            Log.e(t);
+            return null;
+        }
+    }
+
+    @Override
+    public boolean remove(String account) {
+        if (account == null) {
+            return false;
+        }
+        plainPrefs().edit().remove(account).apply();
+        return true;
+    }
+
+    private SharedPreferences plainPrefs() {
+        return AndroidNativeUtil.getActivity()
+                .getApplicationContext()
+                .getSharedPreferences(PLAIN_PREFS, Context.MODE_PRIVATE);
+    }
+
+    /**
+     * Loads the non-prompting keystore key, optionally creating it. Returns
+     * null when the key is absent and {@code create} is false, or when
+     * generation fails.
+     */
+    private SecretKey plainKey(boolean create) throws Exception {
+        keyStore().load(null);
+        SecretKey existing = (SecretKey) keyStore.getKey(PLAIN_KEY_ID, null);
+        if (existing != null || !create) {
+            return existing;
+        }
+        KeyGenerator gen = KeyGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEY_STORE);
+        gen.init(new KeyGenParameterSpec.Builder(PLAIN_KEY_ID,
+                KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(256)
+                .setRandomizedEncryptionRequired(true)
+                .build());
+        gen.generateKey();
+        return (SecretKey) keyStore.getKey(PLAIN_KEY_ID, null);
+    }
+
+    private void resetPlainKey() {
+        try {
+            keyStore().deleteEntry(PLAIN_KEY_ID);
+        } catch (KeyStoreException e) {
+            Log.e(e);
+        }
+        plainPrefs().edit().clear().apply();
+    }
+
+    // API 22 and below have no KeyGenParameterSpec. The preferences file is
+    // still app-private, but the value is only obfuscated, not encrypted --
+    // it is extractable from a rooted device or a backup.
+    private boolean legacyPlainSet(String account, String value) {
+        warnLegacyPlainStorage();
+        try {
+            plainPrefs().edit()
+                    .putString(account, Base64.encodeToString(
+                            value.getBytes("UTF-8"), Base64.NO_WRAP))
+                    .apply();
+            return true;
+        } catch (IOException e) {
+            Log.e(e);
+            return false;
+        }
+    }
+
+    private String legacyPlainGet(String account) {
+        warnLegacyPlainStorage();
+        String stored = plainPrefs().getString(account, null);
+        if (stored == null) {
+            return null;
+        }
+        try {
+            return new String(Base64.decode(stored, Base64.NO_WRAP), "UTF-8");
+        } catch (IOException e) {
+            Log.e(e);
+            return null;
+        }
+    }
+
+    private boolean legacyPlainWarned;
+
+    private void warnLegacyPlainStorage() {
+        if (!legacyPlainWarned) {
+            legacyPlainWarned = true;
+            Log.p("SecureStorage: this device predates Android API 23, so the "
+                    + "non-prompting tier stores values obfuscated rather than "
+                    + "encrypted. Do not use it for high-value secrets here.");
+        }
     }
 
     /**

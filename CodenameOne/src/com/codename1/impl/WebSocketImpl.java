@@ -36,6 +36,7 @@ public abstract class WebSocketImpl {
     private final String url;
     private WebSocketEventSink sink;
     private String[] requestedSubprotocols;
+    private final java.util.Hashtable requestHeaders = new java.util.Hashtable();
     // Written by the port's connect/handshake thread, read by the user's
     // connect handler -- volatile to publish the value across threads.
     @SuppressWarnings("PMD.AvoidUsingVolatile")
@@ -69,6 +70,63 @@ public abstract class WebSocketImpl {
     /// Ports read this while building the handshake.
     protected final String[] requestedSubprotocols() {
         return requestedSubprotocols;
+    }
+
+    /// Adds a header to the opening handshake. Called by the public facade
+    /// before `connect(int)`. A null or empty name is ignored; a null value
+    /// removes a previously set header.
+    ///
+    /// Ports that build the handshake themselves emit these; ports built on a
+    /// platform WebSocket that does not expose the handshake ignore them. See
+    /// the facade's `header` method for which those are.
+    public final void setRequestHeader(String name, String value) {
+        if (name == null || name.length() == 0) {
+            return;
+        }
+        if (value == null) {
+            requestHeaders.remove(name);
+        } else {
+            requestHeaders.put(name, value);
+        }
+    }
+
+    /// The extra handshake headers, keyed by name. Never null; ports read this
+    /// while building the handshake. Ports must not emit an entry whose name
+    /// collides with a header the handshake sets itself.
+    protected final java.util.Hashtable requestHeaders() {
+        return requestHeaders;
+    }
+
+    /// Appends the extra handshake headers in `name: value` CRLF form, skipping
+    /// any that would collide with a header the handshake already wrote.
+    ///
+    /// Shared here rather than copied per port so the collision list and the
+    /// header-injection guard stay in one place: a header value carrying CR or
+    /// LF would otherwise let a caller inject arbitrary handshake headers.
+    protected final void appendRequestHeaders(StringBuilder req) {
+        java.util.Enumeration keys = requestHeaders.keys();
+        while (keys.hasMoreElements()) {
+            String name = (String) keys.nextElement();
+            String value = (String) requestHeaders.get(name);
+            if (isReservedHandshakeHeader(name)) {
+                continue;
+            }
+            if (containsCrLf(name) || containsCrLf(value)) {
+                continue;
+            }
+            req.append(name).append(": ").append(value).append("\r\n");
+        }
+    }
+
+    private static boolean isReservedHandshakeHeader(String name) {
+        String n = name.toLowerCase();
+        return n.equals("host") || n.equals("upgrade") || n.equals("connection")
+                || n.equals("sec-websocket-key") || n.equals("sec-websocket-version")
+                || n.equals("sec-websocket-protocol") || n.equals("content-length");
+    }
+
+    private static boolean containsCrLf(String s) {
+        return s.indexOf('\r') >= 0 || s.indexOf('\n') >= 0;
     }
 
     /// Records the subprotocol the server selected. Ports call this once

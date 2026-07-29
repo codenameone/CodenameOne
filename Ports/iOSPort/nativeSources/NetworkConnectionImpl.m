@@ -178,11 +178,19 @@ int connections = 0;
             if (i>0) {
                 [certs appendString:@","];
             }
+            // CHAIN:<n> opens each certificate's group; index 0 is the leaf. The
+            // Java side keeps this and the SPKI entry out of the legacy flat list
+            // so existing checkSSLCertificates overrides see unchanged data.
+            [certs appendFormat:@"CHAIN:%d,", i];
             [certs appendString:@"SHA-256:"];
             [certs appendString:[self getFingerprint256:certRef]];
             [certs appendString:@",SHA1:"];
             [certs appendString:[self getFingerprint:certRef]];
-
+            NSString* spki = [self getPublicKeyDigest:certRef];
+            if (spki != nil) {
+                [certs appendString:@",SPKI-SHA-256:"];
+                [certs appendString:spki];
+            }
         }
     sslCertificates = [[NSString stringWithString:certs] retain];
     if (com_codename1_io_NetworkManager_checkCertificatesNativeCallback___int_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG connectionId)) {
@@ -205,6 +213,110 @@ int connections = 0;
         [fingerprint appendFormat:@"%02x ", sha1Bytes[i]];
     }
     return [fingerprint stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+}
+
+/**
+ * Reads one DER TLV at `off`. Returns NO when the buffer is too short or the
+ * length encoding is one we do not handle (indefinite length, or a length that
+ * would not fit). `headerLen` is the tag plus length bytes, `totalLen` covers
+ * the whole TLV.
+ */
+static BOOL cn1ReadDerTlv(const uint8_t* buf, NSUInteger len, NSUInteger off,
+                          uint8_t* tag, NSUInteger* headerLen, NSUInteger* totalLen) {
+    if (off + 2 > len) {
+        return NO;
+    }
+    *tag = buf[off];
+    NSUInteger n = buf[off + 1];
+    if (n < 0x80) {
+        *headerLen = 2;
+        *totalLen = 2 + n;
+    } else {
+        NSUInteger countBytes = n & 0x7f;
+        // 0x80 is indefinite length, which DER forbids; more than 4 length bytes
+        // would mean a certificate larger than anything we will ever be handed.
+        if (countBytes == 0 || countBytes > 4 || off + 2 + countBytes > len) {
+            return NO;
+        }
+        NSUInteger contentLen = 0;
+        for (NSUInteger i = 0; i < countBytes; i++) {
+            contentLen = (contentLen << 8) | buf[off + 2 + i];
+        }
+        *headerLen = 2 + countBytes;
+        *totalLen = *headerLen + contentLen;
+    }
+    return off + *totalLen <= len;
+}
+
+/**
+ * Base64 SHA-256 over the certificate's SubjectPublicKeyInfo, which is what a
+ * public-key pin is computed over.
+ *
+ * Walks the certificate DER rather than going through SecCertificateCopyKey +
+ * SecKeyCopyExternalRepresentation. That pair hands back the *raw* key, so
+ * reconstructing the SPKI means prepending a hand-maintained ASN.1 header chosen
+ * per key type and size -- a table that silently produces wrong digests for any
+ * key type it does not know about. The DER walk is algorithm-agnostic and
+ * matches `openssl x509 -pubkey | openssl pkey -pubin -outform der` exactly.
+ *
+ * Returns nil if the structure is not what we expect, in which case the caller
+ * simply omits the entry and pinning falls back to whole-certificate digests.
+ */
+- (NSString*) getPublicKeyDigest: (SecCertificateRef) cert {
+    // Plain CoreFoundation rather than a toll-free bridge cast: this file builds
+    // both with and without ARC, and the correct bridging annotation differs
+    // between the two. An explicit CFRelease is unambiguous in either mode.
+    CFDataRef certData = SecCertificateCopyData(cert);
+    if (certData == NULL) {
+        return nil;
+    }
+    const uint8_t* buf = CFDataGetBytePtr(certData);
+    NSUInteger len = (NSUInteger) CFDataGetLength(certData);
+    NSString* result = nil;
+    uint8_t tag;
+    NSUInteger headerLen, totalLen;
+    NSUInteger off;
+    int i;
+
+    // Certificate ::= SEQUENCE { tbsCertificate, signatureAlgorithm, signature }
+    if (!cn1ReadDerTlv(buf, len, 0, &tag, &headerLen, &totalLen) || tag != 0x30) {
+        goto cleanup;
+    }
+    off = headerLen;
+
+    // tbsCertificate ::= SEQUENCE { ... }
+    if (!cn1ReadDerTlv(buf, len, off, &tag, &headerLen, &totalLen) || tag != 0x30) {
+        goto cleanup;
+    }
+    off += headerLen;
+
+    // [0] EXPLICIT Version is optional and absent in a v1 certificate.
+    if (!cn1ReadDerTlv(buf, len, off, &tag, &headerLen, &totalLen)) {
+        goto cleanup;
+    }
+    if (tag == 0xA0) {
+        off += totalLen;
+    }
+
+    // Skip serialNumber, signature, issuer, validity, subject. The next element
+    // is subjectPublicKeyInfo.
+    for (i = 0; i < 5; i++) {
+        if (!cn1ReadDerTlv(buf, len, off, &tag, &headerLen, &totalLen)) {
+            goto cleanup;
+        }
+        off += totalLen;
+    }
+
+    if (cn1ReadDerTlv(buf, len, off, &tag, &headerLen, &totalLen) && tag == 0x30) {
+        uint8_t digest[CC_SHA256_DIGEST_LENGTH];
+        CC_SHA256(buf + off, (CC_LONG) totalLen, digest);
+        NSData* digestData = [NSData dataWithBytes:digest length:CC_SHA256_DIGEST_LENGTH];
+        result = [digestData base64EncodedStringWithOptions:0];
+    }
+
+cleanup:
+    CFRelease(certData);
+    return result;
 }
 
 - (NSString*) getFingerprint256: (SecCertificateRef) cert {
