@@ -189,28 +189,21 @@ public final class HealthWire {
         }
     }
 
-    /// The first `count` measurements of `series`, as a series of its own.
+    /// A series carrying `starts`, `ends` and `values`, with the
+    /// identifier and provenance of `source`.
     ///
     /// For a reader that has to stop inside a record because the caller's
     /// limit falls there. The piece keeps the original's identifier --
-    /// they came from one record and there is nothing else to call it --
-    /// and its stated span ends at the last measurement kept, so it never
-    /// claims to cover time it no longer carries.
-    public static SeriesSample headOfSeries(SeriesSample series, int count) {
-        int n = Math.max(1, Math.min(count, series.size()));
-        long[] starts = new long[n];
-        long[] ends = new long[n];
-        double[] values = new double[n];
-        for (int i = 0; i < n; i++) {
-            starts[i] = series.getSampleStartMillis(i);
-            ends[i] = series.getSampleEndMillis(i);
-            values[i] = series.getSampleValue(i, series.getUnit());
-        }
-        SeriesSample head = SeriesSample.create(series.getType(),
-                series.getStartMillis(), ends[n - 1], starts, ends, values,
-                series.getUnit());
-        carryCommon(series, head);
-        return head;
+    /// the measurements came from one record and there is nothing else to
+    /// call it -- and its stated span is the extent of what it actually
+    /// carries, so it never claims time it no longer covers.
+    public static SeriesSample seriesOfPoints(SeriesSample source,
+            long[] starts, long[] ends, double[] values) {
+        SeriesSample piece = SeriesSample.create(source.getType(),
+                starts[0], ends[ends.length - 1], starts, ends, values,
+                source.getUnit());
+        carryCommon(source, piece);
+        return piece;
     }
 
     /// The shape-specific half of [#copyOf(HealthSample)].

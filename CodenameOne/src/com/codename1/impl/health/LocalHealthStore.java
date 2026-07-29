@@ -204,12 +204,24 @@ public class LocalHealthStore extends HealthStore {
                 truncated = true;
                 break;
             }
-            int weight = weigh(s, flatten);
+            int weight = weigh(s, flatten, range);
+            if (weight == 0) {
+                // A record that overlaps the range while none of its own
+                // measurements do. The shared layer drops every point as
+                // it expands them, so carrying it would spend the page on
+                // a record that contributes nothing -- and if the limit
+                // fell on it, the caller got an empty page marked
+                // truncated.
+                continue;
+            }
             if (counted + weight > limit) {
                 // Only a flattened series can weigh more than one, so
-                // this is the record the limit falls inside.
-                page.add(HealthWire.headOfSeries((SeriesSample) s,
-                        limit - counted));
+                // this is the record the limit falls inside. The points
+                // are chosen from the end the caller asked to read from,
+                // or a descending query would be answered with the oldest
+                // measurements sorted newest-first.
+                page.add(cutSeries((SeriesSample) s, limit - counted, range,
+                        query.isSortDescending()));
                 truncated = true;
                 break;
             }
@@ -223,12 +235,76 @@ public class LocalHealthStore extends HealthStore {
     }
 
     /// How many samples `s` becomes once the shared layer is done with
-    /// it: one, or the size of the series when flattening is on.
-    private static int weigh(HealthSample s, boolean flatten) {
+    /// it.
+    ///
+    /// The measurements inside the requested window, not the size of the
+    /// record: the shared layer drops the rest as it expands them, so
+    /// counting all of them spent the caller's limit on points that were
+    /// never going to be delivered.
+    private static int weigh(HealthSample s, boolean flatten,
+            HealthTimeRange range) {
         if (flatten && s instanceof SeriesSample) {
-            return Math.max(1, ((SeriesSample) s).size());
+            SeriesSample series = (SeriesSample) s;
+            int n = 0;
+            for (int i = 0; i < series.size(); i++) {
+                if (inWindow(range, series, i)) {
+                    n++;
+                }
+            }
+            return n;
         }
         return 1;
+    }
+
+    /// Whether measurement `i` falls inside `range`, by the same rule the
+    /// shared layer applies when it expands the series.
+    private static boolean inWindow(HealthTimeRange range,
+            SeriesSample series, int i) {
+        if (range == null) {
+            return true;
+        }
+        long start = series.getSampleStartMillis(i);
+        long end = series.getSampleEndMillis(i);
+        if (start >= range.getEndMillis()) {
+            return false;
+        }
+        return start == end ? end >= range.getStartMillis()
+                : end > range.getStartMillis();
+    }
+
+    /// The `keep` measurements of `series` the caller would see first.
+    ///
+    /// Only measurements inside the window are eligible -- the rest are
+    /// dropped downstream -- and they are taken from the end the sort
+    /// direction reads from. Taking the array prefix regardless answered a
+    /// descending query with the oldest points, and a window that
+    /// overlapped only the tail of a record with nothing at all.
+    ///
+    /// Series measurements are in chronological order by contract, so the
+    /// newest are the last eligible ones; see
+    /// [com.codename1.health.SeriesSample#create].
+    private static SeriesSample cutSeries(SeriesSample series, int keep,
+            HealthTimeRange range, boolean descending) {
+        int total = series.size();
+        int[] eligible = new int[total];
+        int count = 0;
+        for (int i = 0; i < total; i++) {
+            if (inWindow(range, series, i)) {
+                eligible[count++] = i;
+            }
+        }
+        int take = Math.max(1, Math.min(keep, count));
+        int from = descending ? count - take : 0;
+        long[] starts = new long[take];
+        long[] ends = new long[take];
+        double[] values = new double[take];
+        for (int i = 0; i < take; i++) {
+            int at = eligible[from + i];
+            starts[i] = series.getSampleStartMillis(at);
+            ends[i] = series.getSampleEndMillis(at);
+            values[i] = series.getSampleValue(at, series.getUnit());
+        }
+        return HealthWire.seriesOfPoints(series, starts, ends, values);
     }
 
     private boolean matches(HealthSample s, SampleQuery query,

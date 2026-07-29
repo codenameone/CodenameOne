@@ -398,6 +398,135 @@ class LocalHealthStoreTest extends UITestBase {
                         + rest.size());
     }
 
+    /**
+     * A descending read of an oversized series returns the newest points.
+     *
+     * <p>Cutting the array prefix answered a descending query with the
+     * oldest measurements sorted newest-first, which reads as correct and
+     * is the wrong data.</p>
+     */
+    @Test
+    void aDescendingCutTakesTheNewestPoints() {
+        long base = utc(2026, 1, 1, 9);
+        writeSeries(base, 5);
+
+        SamplePage page = store.readSamplePage(new SampleQuery()
+                .addType(HealthDataType.HEART_RATE)
+                .setSortDescending(true)
+                .setLimit(2)
+                .setTimeRange(HealthTimeRange.between(utc(2026, 1, 1, 0),
+                        utc(2026, 1, 2, 0)))).get();
+
+        // The page is already flattened and ordered by the shared layer,
+        // so what this pins down is which two measurements survived the
+        // cut, not how they were sorted afterwards.
+        assertEquals(2, page.size());
+        assertEquals(base + 4000, page.getSamples().get(0).getStartMillis(),
+                "a descending read must keep the newest measurements");
+        assertEquals(base + 3000, page.getSamples().get(1).getStartMillis());
+    }
+
+    /**
+     * A window that overlaps only part of a record cuts within it.
+     *
+     * <p>The store matches the record because its span overlaps, but the
+     * shared layer drops every measurement outside the window as it
+     * expands. Keeping the prefix therefore returned a page that emptied
+     * itself downstream -- truncated, and with nothing in it.</p>
+     */
+    @Test
+    void aWindowOverTheTailOfARecordStillReturnsPoints() {
+        long base = utc(2026, 1, 1, 9);
+        writeSeries(base, 5);
+
+        List<HealthSample> read = store.readSamples(new SampleQuery()
+                .addType(HealthDataType.HEART_RATE)
+                .setLimit(2)
+                .setTimeRange(HealthTimeRange.between(base + 3000,
+                        utc(2026, 1, 2, 0)))).get();
+
+        assertEquals(2, read.size(),
+                "the window covers two measurements and the limit allows"
+                        + " both, got: " + read.size());
+        assertEquals(base + 3000, read.get(0).getStartMillis());
+    }
+
+    /**
+     * The limit counts the measurements the window will actually deliver.
+     *
+     * <p>Counting every point in the record spent the budget on points
+     * the shared layer drops as it expands: a record with one measurement
+     * inside the window looked bigger than the limit, so the read cut it,
+     * reported truncation that had not happened, and stopped before the
+     * records behind it.</p>
+     */
+    @Test
+    void pointsOutsideTheWindowDoNotSpendTheLimit() {
+        long base = utc(2026, 1, 1, 9);
+        // Five measurements a second apart; the window admits the last.
+        writeSeries(base, 5);
+        // A second record, entirely inside the window.
+        writeSeries(base + 10000, 1);
+
+        // Half past the last two measurements, so the first record
+        // overlaps the window and exactly one of its points is inside it.
+        SamplePage page = store.readSamplePage(new SampleQuery()
+                .addType(HealthDataType.HEART_RATE)
+                .setLimit(3)
+                .setTimeRange(HealthTimeRange.between(base + 3500,
+                        utc(2026, 1, 2, 0)))).get();
+
+        assertEquals(2, page.size(),
+                "one measurement from each record is inside the window and"
+                        + " the limit allows three, got: " + page.size());
+        assertFalse(page.isTruncated(),
+                "nothing was left out, so nothing may be reported as"
+                        + " truncated");
+    }
+
+    /**
+     * A record whose span overlaps the window but whose measurements do
+     * not is skipped rather than carried.
+     */
+    @Test
+    void aRecordWithNoMeasurementInTheWindowIsSkipped() {
+        long base = utc(2026, 1, 1, 9);
+        // Two measurements an hour apart, so the record spans the gap
+        // between them while nothing sits inside it.
+        long[] starts = { base, base + 3600000L };
+        long[] ends = { base, base + 3600000L };
+        double[] values = { 60, 64 };
+        store.write(SeriesSample.create(HealthDataType.HEART_RATE,
+                base, base + 3600000L, starts, ends, values,
+                HealthUnit.COUNT_PER_MINUTE)).get();
+
+        SamplePage page = store.readSamplePage(new SampleQuery()
+                .addType(HealthDataType.HEART_RATE)
+                .setLimit(3)
+                .setTimeRange(HealthTimeRange.between(base + 60000,
+                        base + 120000))).get();
+
+        assertEquals(0, page.size(), "no measurement is inside the window");
+        assertFalse(page.isTruncated(),
+                "an empty page that says it was truncated tells the caller"
+                        + " to page for data that does not exist");
+    }
+
+    /** Writes one heart-rate series of `points` measurements, one a second. */
+    private void writeSeries(long base, int points) {
+        long[] starts = new long[points];
+        long[] ends = new long[points];
+        double[] values = new double[points];
+        for (int i = 0; i < points; i++) {
+            starts[i] = base + i * 1000L;
+            ends[i] = starts[i];
+            values[i] = 60 + i;
+        }
+        store.write(SeriesSample.create(HealthDataType.HEART_RATE,
+                base, base + (points - 1) * 1000L, starts, ends, values,
+                HealthUnit.COUNT_PER_MINUTE)).get();
+    }
+
     @Test
     void anUnflattenedReadCountsRecords() {
         long base = utc(2026, 1, 1, 9);

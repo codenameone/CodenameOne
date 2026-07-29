@@ -68,6 +68,12 @@ public final class SeriesSample extends HealthSample {
     /// Creates a series. The three arrays must be the same length and are
     /// copied defensively.
     ///
+    /// **The measurements must be in chronological order.** Both platforms
+    /// produce them that way, and readers rely on it: a reader asked for
+    /// the newest N points of a long record takes them from the end rather
+    /// than sorting half a million measurements to find out where they
+    /// are.
+    ///
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: if the arrays are null, differ in
