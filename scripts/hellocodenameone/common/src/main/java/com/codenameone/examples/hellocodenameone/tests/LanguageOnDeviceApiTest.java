@@ -133,14 +133,35 @@ public class LanguageOnDeviceApiTest extends BaseTest {
         translator.close();
         smartReply.close();
 
-        assertImmediateFailure(identifier.identify("hello"),
-                "closed language-identification session");
-        assertImmediateFailure(translator.translate(
-                "bonjour", "fr", "en"), "closed translation session");
-        assertImmediateFailure(smartReply.suggest(
-                new SmartReplyMessage[] {
+        assertClosedSessionThrows(new ClosedSessionOperation() {
+            public void run() {
+                identifier.identify("hello");
+            }
+        }, "closed language-identification session");
+        assertClosedSessionThrows(new ClosedSessionOperation() {
+            public void run() {
+                translator.translate("bonjour", "fr", "en");
+            }
+        }, "closed translation session");
+        assertClosedSessionThrows(new ClosedSessionOperation() {
+            public void run() {
+                smartReply.suggest(new SmartReplyMessage[] {
                         new SmartReplyMessage("Hello", "remote", false, 1)
-                }), "closed smart-reply session");
+                });
+            }
+        }, "closed smart-reply session");
+    }
+
+    private void assertClosedSessionThrows(ClosedSessionOperation operation,
+                                           String label) {
+        try {
+            operation.run();
+        } catch (IllegalStateException expected) {
+            // The documented closed-session contract.
+            return;
+        }
+        throw new IllegalStateException(label
+                + " unexpectedly accepted a new request");
     }
 
     private void assertImmediateFailure(AsyncResource<?> resource,
@@ -174,5 +195,9 @@ public class LanguageOnDeviceApiTest extends BaseTest {
             throw new IllegalStateException(label + ": expected "
                     + expected + " got " + actual);
         }
+    }
+
+    private interface ClosedSessionOperation {
+        void run();
     }
 }
