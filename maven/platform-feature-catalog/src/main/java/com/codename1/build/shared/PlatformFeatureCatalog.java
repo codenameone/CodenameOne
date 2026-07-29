@@ -393,6 +393,7 @@ public final class PlatformFeatureCatalog {
         e.add(new Entry("com/codename1/ai/imagegen/StableDiffusion")
                 .iosFrameworks("CoreML", "Vision")
                 .androidGradle("com.microsoft.onnxruntime:onnxruntime-android:1.16.3")
+                .androidMinimumSdk(21)
                 .markBigUpload()
                 .description("On-device Stable Diffusion (local-build only)"));
 

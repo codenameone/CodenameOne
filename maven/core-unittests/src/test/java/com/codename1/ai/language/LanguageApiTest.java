@@ -162,6 +162,47 @@ class LanguageApiTest extends UITestBase {
         assertCancelledSettlementDoesNotPublish(true);
     }
 
+    @Test
+    void throwingCallbackCannotDeferSessionClose() {
+        assertThrowingCallbackStillCloses(false);
+        assertThrowingCallbackStillCloses(true);
+    }
+
+    private void assertThrowingCallbackStillCloses(boolean fail) {
+        RecordingLanguageImpl backend = new RecordingLanguageImpl();
+        backend.deferTranslation = true;
+        implementation.setLanguageImpl(backend);
+        Translator.Session session = Translator.open(
+                new LanguageOptions().backend(
+                        LanguageBackends.mlKitTranslation()));
+        AsyncResource<String> result = session.translate(
+                "bonjour", "fr", "en");
+        if (fail) {
+            result.except(new SuccessCallback<Throwable>() {
+                public void onSucess(Throwable error) {
+                    throw new IllegalStateException("application callback");
+                }
+            });
+        } else {
+            result.ready(new SuccessCallback<String>() {
+                public void onSucess(String value) {
+                    throw new IllegalStateException("application callback");
+                }
+            });
+        }
+        session.close();
+
+        assertThrows(IllegalStateException.class, () -> {
+            if (fail) {
+                backend.pendingTranslation.error(
+                        new IllegalArgumentException("backend failure"));
+            } else {
+                backend.pendingTranslation.complete("hello");
+            }
+        });
+        assertEquals(1, backend.closeCount);
+    }
+
     private void assertCancelledSettlementDoesNotPublish(boolean fail) {
         RecordingLanguageImpl backend = new RecordingLanguageImpl();
         backend.deferTranslation = true;

@@ -173,6 +173,8 @@ class PlatformFeatureCatalogTest {
         acc.consume("com/codename1/ai/imagegen/StableDiffusion");
         assertTrue(acc.anyRequiresBigUpload(),
                 "On-device SD ships a 1-2 GB Core ML model -- cloud builds must abort with a friendly message");
+        assertEquals(21, acc.minimumAndroidSdk(),
+                "ONNX Runtime Android requires API 21");
     }
 
     @Test
