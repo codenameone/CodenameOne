@@ -422,8 +422,25 @@ final class IOSDeviceIntegrity {
         // than natively keeps a single hash implementation across both paths.
         String hash = base64(Hash.sha256(bytes(nonce)));
         // Recorded BEFORE the call, so a crash between here and the result is
-        // distinguishable from never having tried.
-        SecureStorage.getInstance().set(KEY_ATTEST_STARTED, "1");
+        // distinguishable from never having tried -- and the write is checked, because
+        // proceeding without the marker recreates exactly the case it exists to catch:
+        // the app dies after Apple consumes the one-time attestation, the next launch
+        // sees a key with no marker, and submits the spent key again.
+        if (!SecureStorage.getInstance().set(KEY_ATTEST_STARTED, "1")) {
+            bootstrapInFlight = false;
+            failBootstrapWaiters("App Attest could not record that attestation had started");
+            final AsyncResource<String> target = r;
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    if (!target.isDone()) {
+                        target.error(new RuntimeException("App Attest could not record that "
+                                + "attestation had started, so it was not attempted rather "
+                                + "than risk spending the key untracked"));
+                    }
+                }
+            });
+            return;
+        }
         PendingRequest pending = new PendingRequest(r, nonce, PendingRequest.OP_ATTEST, keyId);
         pending.retried = retried;
         int rid = register(pending);

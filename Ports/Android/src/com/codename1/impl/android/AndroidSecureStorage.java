@@ -359,8 +359,14 @@ public final class AndroidSecureStorage extends SecureStorage {
         // one had already encrypted with -- leaving that ciphertext permanently
         // undecryptable. The shared KeyStore is not thread safe either.
         synchronized (PLAIN_KEY_LOCK) {
-            keyStore().load(null);
-            SecretKey existing = (SecretKey) keyStore.getKey(PLAIN_KEY_ID, null);
+            // A KeyStore instance of this tier's own. The biometric tier touches the
+            // shared one without PLAIN_KEY_LOCK, and KeyStore is not thread safe, so
+            // sharing it here would trade a race inside this tier for a race across the
+            // two -- surfacing as intermittent keystore errors that neither tier's code
+            // would explain. Widening this lock into the biometric path would be worse.
+            KeyStore ks = KeyStore.getInstance(ANDROID_KEY_STORE);
+            ks.load(null);
+            SecretKey existing = (SecretKey) ks.getKey(PLAIN_KEY_ID, null);
             if (existing != null || !create) {
                 return existing;
             }
@@ -374,7 +380,7 @@ public final class AndroidSecureStorage extends SecureStorage {
                     .setRandomizedEncryptionRequired(true)
                     .build());
             gen.generateKey();
-            return (SecretKey) keyStore.getKey(PLAIN_KEY_ID, null);
+            return (SecretKey) ks.getKey(PLAIN_KEY_ID, null);
         }
     }
 
@@ -385,8 +391,12 @@ public final class AndroidSecureStorage extends SecureStorage {
         // a value this was about to wipe -- or worse, stored it just after.
         synchronized (PLAIN_KEY_LOCK) {
             try {
-                keyStore().deleteEntry(PLAIN_KEY_ID);
-            } catch (KeyStoreException e) {
+                // Same reasoning as plainKey(): this tier does not touch the shared
+                // KeyStore instance.
+                KeyStore ks = KeyStore.getInstance(ANDROID_KEY_STORE);
+                ks.load(null);
+                ks.deleteEntry(PLAIN_KEY_ID);
+            } catch (Exception e) {
                 Log.e(e);
             }
             SharedPreferences prefs = plainPrefs();
