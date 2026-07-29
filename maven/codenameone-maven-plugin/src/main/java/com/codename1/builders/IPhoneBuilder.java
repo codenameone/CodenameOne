@@ -1042,13 +1042,20 @@ public class IPhoneBuilder extends Executor {
                         }
                         if (method.startsWith("getWorkouts")) {
                             usesHealthWorkout = true;
-                            // Both purpose strings, as the Android hook does. The
-                            // class-reference branch sets these when a workout type
-                            // is named, but an app that calls getWorkouts() and
-                            // passes the facade around as Object never names one --
-                            // and was entitled for HealthKit with neither string,
-                            // so its first authorization request was refused.
-                            usesHealthRead = true;
+                            // The update string, as the Android hook demands the
+                            // write direction. The class-reference branch sets this
+                            // when a workout type is named, but an app that calls
+                            // getWorkouts() and passes the facade around as Object
+                            // never names one -- and was entitled for HealthKit with
+                            // no string at all, so its first authorization request
+                            // was refused.
+                            //
+                            // Not the share string: nothing in the workout package
+                            // reads. The rollup is computed from the samples the app
+                            // fed in, and end() writes them. Asking for a read
+                            // purpose string an app cannot justify is the kind of
+                            // over-declaration App Review pushes back on, and the
+                            // build refused to proceed without it.
                             usesHealthWrite = true;
                         }
                         if (method.startsWith("getSensors")) {

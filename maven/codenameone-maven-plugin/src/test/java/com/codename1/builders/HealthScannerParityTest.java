@@ -92,12 +92,20 @@ public class HealthScannerParityTest {
     }
 
     /**
-     * Obtaining the workout manager needs both purpose strings on iOS and
-     * both direction flags on Android: a workout reads sensor data and
-     * writes a session.
+     * Obtaining the workout manager is a write and not a read, on both
+     * scanners.
+     *
+     * <p>This test asserted the opposite, on the assumption that a
+     * workout reads sensor data. It does not: nothing in
+     * {@code com.codename1.health.workout} calls {@code readSamples} or
+     * {@code aggregate}, the rollup is computed from the samples the app
+     * fed in, and {@code end()} writes them. Demanding the read direction
+     * meant a workout-only app could not build without declaring a
+     * sensitive read permission it never exercises -- which Play policy
+     * asks you not to request and App Review questions on iOS.</p>
      */
     @Test
-    void bothScannersTreatWorkoutsAsReadAndWrite() throws Exception {
+    void bothScannersTreatWorkoutsAsAWriteOnly() throws Exception {
         for (String builder : new String[] {"AndroidGradleBuilder",
                 "IPhoneBuilder"}) {
             String src = source(builder);
@@ -107,12 +115,15 @@ public class HealthScannerParityTest {
             assertTrue(at > 0, builder + " must classify getWorkouts");
             int end = src.indexOf("\n                        }", at);
             if (end < 0) {
-                end = Math.min(src.length(), at + 1200);
+                end = Math.min(src.length(), at + 1600);
             }
             String after = src.substring(at, end);
-            assertTrue(after.contains("usesHealthRead")
-                    && after.contains("usesHealthWrite"),
-                    builder + " must set both directions at getWorkouts");
+            assertTrue(after.contains("usesHealthWrite = true"),
+                    builder + " must set the write direction at"
+                            + " getWorkouts");
+            assertFalse(after.contains("usesHealthRead = true"),
+                    builder + " must not claim a read at getWorkouts; no"
+                            + " workout path reads the store");
         }
     }
 

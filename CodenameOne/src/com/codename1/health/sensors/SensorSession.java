@@ -316,16 +316,36 @@ public class SensorSession {
 
         @Override
         public void run() {
-            // A timer armed before the session ended still fires after
-            // it. The re-arm is guarded, but the tick already in flight
-            // was not, so a dead session issued one last write. The
-            // explicit flush from endSession() does not come through
-            // here, so a short ride still keeps its final partial batch.
-            if (session.isTerminal()) {
+            session.flushIfRunning();
+        }
+    }
+
+    /// True once the session has ended. Guarded by `pendingWrites`, not
+    /// by being volatile, because the point is not visibility but
+    /// atomicity: a timer tick has to decide whether to claim the buffer
+    /// in the same breath as the session decides it has stopped.
+    private boolean flushingStopped;
+
+    /// The timer's flush: claims the buffer only while the session runs.
+    ///
+    /// Checking the state at the top of the tick was not enough. The
+    /// check passed, the session ended, and the write went out anyway --
+    /// one write from a session nobody holds a handle to, every time the
+    /// end landed inside that gap. The check and the claim are one
+    /// critical section now, and ending the session takes the same lock,
+    /// so a batch is either claimed while the session is still running or
+    /// never claimed at all.
+    private void flushIfRunning() {
+        cancelFlush();
+        List<HealthSample> batch;
+        synchronized (pendingWrites) {
+            if (flushingStopped || pendingWrites.isEmpty()) {
                 return;
             }
-            session.flushPendingWrites();
+            batch = new ArrayList<HealthSample>(pendingWrites);
+            pendingWrites.clear();
         }
+        writeBatch(batch);
     }
 
     /// Writes anything still buffered. Called when the session stops so a
@@ -340,10 +360,16 @@ public class SensorSession {
             batch = new ArrayList<HealthSample>(pendingWrites);
             pendingWrites.clear();
         }
-        // The samples stay accounted for until the store confirms them.
-        // Removing them from the buffer and ignoring the result meant a
-        // revoked permission or an unavailable provider silently discarded
-        // a scale or cuff reading the caller explicitly asked to persist.
+        writeBatch(batch);
+    }
+
+    /// Sends a claimed batch to the store.
+    ///
+    /// The samples stay accounted for until the store confirms them.
+    /// Removing them from the buffer and ignoring the result meant a
+    /// revoked permission or an unavailable provider silently discarded a
+    /// scale or cuff reading the caller explicitly asked to persist.
+    private void writeBatch(List<HealthSample> batch) {
         Health.getInstance().getStore().write(batch)
                 .onResult(new WriteBack(this, batch));
     }
@@ -680,6 +706,14 @@ public class SensorSession {
             // includes what was scheduled just before reaching one: the
             // session is gone from the manager's registry, so a timer
             // left armed is one nobody can cancel.
+            //
+            // Under the buffer's lock so a timer tick cannot be midway
+            // through claiming it -- see flushIfRunning. The explicit
+            // flush endSession() performs next does not consult this
+            // flag, so a short ride still keeps its final partial batch.
+            synchronized (pendingWrites) {
+                flushingStopped = true;
+            }
             cancelFlush();
         }
         Object[] snapshot = listenerSnapshot();

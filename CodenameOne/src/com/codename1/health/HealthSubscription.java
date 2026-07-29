@@ -36,9 +36,20 @@ public final class HealthSubscription {
     private final boolean deliverSamples;
     private final boolean includeDeletions;
     private final int maxSamplesPerBatch;
-    private HealthAnchor anchor;
-    private long lastDeliveryMillis;
-    private boolean active = true;
+    /// Volatile, all three: the cursor is written on the EDT -- by a
+    /// delivery, or by a port seeding a starting cursor -- and read by
+    /// `drainChanges()` on whatever thread the app called it from.
+    ///
+    /// A stale read here is not a stale number, it is lost data: the
+    /// Android drain reads this anchor and takes a fresh baseline token
+    /// when it finds null, so a cursor that had been seeded but not yet
+    /// published meant a second token, and every change between the two
+    /// permanently unreported. The synchronization the store does around
+    /// its registry does not help -- the anchor is read before any of it,
+    /// and a later monitor cannot make an earlier read current.
+    private volatile HealthAnchor anchor;
+    private volatile long lastDeliveryMillis;
+    private volatile boolean active = true;
 
     /// Creates a handle. Called by [HealthStore].
     HealthSubscription(HealthStore store, String id,

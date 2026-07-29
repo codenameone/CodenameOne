@@ -1682,13 +1682,21 @@ public class AndroidGradleBuilder extends Executor {
                         // when a real read or write is called.
                         if (method.startsWith("getWorkouts")) {
                             usesHealthWorkout = true;
-                            // A workout reads and writes exercise data, so
-                            // it needs a declared token like any other
-                            // store use -- otherwise the manifest carried
-                            // only ACTIVITY_RECOGNITION and every workout
-                            // call was unauthorized at runtime.
+                            // A recorded workout writes: end() stores the
+                            // child samples it was fed. Without this the
+                            // manifest carried only ACTIVITY_RECOGNITION
+                            // and every one of those writes was
+                            // unauthorized at runtime.
+                            //
+                            // It does not read. Nothing in the workout
+                            // package calls readSamples or aggregate --
+                            // the rollup is computed from the samples the
+                            // app fed in -- so demanding a read token
+                            // forced a workout-only app to request a
+                            // sensitive permission it never uses, which
+                            // Play policy asks you not to do and which the
+                            // build then refused to proceed without.
                             usesHealthData = true;
-                            usesHealthRead = true;
                             usesHealthWrite = true;
                         }
                         if (method.startsWith("getSensors")) {
