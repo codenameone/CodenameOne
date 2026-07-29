@@ -50,10 +50,10 @@ public class FlutterRootLayout extends Layout {
         if (root == null) {
             return new Dimension(0, 0);
         }
-        // Dry pass with loose unbounded constraints; the real pass in
-        // layoutContainer uses different (tight) constraints so the layout
-        // cache never confuses the two.
-        Size sz = root.layout(BoxConstraints.loose(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY));
+        // Dry pass with loose unbounded constraints. It goes through dryLayout, which keeps
+        // its own cache slot: these constraints differ from layoutContainer's tight ones, so
+        // sharing one slot made the two passes evict each other on every box in the tree.
+        Size sz = root.dryLayout(BoxConstraints.loose(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY));
         Style s = parent.getStyle();
         int w = (int) Math.ceil(sz.width()) + s.getHorizontalPadding();
         int h = (int) Math.ceil(sz.height()) + s.getVerticalPadding();

@@ -28,6 +28,9 @@ public abstract class RenderElement extends Element {
     private Component component;
     private Size size = Size.ZERO;
     private BoxConstraints lastConstraints;
+    /// The dry-layout slot, kept apart from the real one so the two cannot evict each other.
+    private Size drySize;
+    private BoxConstraints lastDryConstraints;
     private boolean needsLayout = true;
 
     /** Offset of this box within its parent render element, set by the parent's performLayout. */
@@ -207,9 +210,82 @@ public abstract class RenderElement extends Element {
     /**
      * Runs (or reuses the cached result of) the layout pass for this box.
      */
+    /// Diagnostic counters for {@link BuildOwner#traceFrames(boolean)}: how much of a layout
+    /// pass the constraints-to-size cache actually absorbs. A pass that misses on nearly
+    /// every box is re-laying out the whole tree for one changed leaf.
+    /// True while a dry measurement is running, so nested layout() calls measure dryly too.
+    private static boolean dryPass;
+
+    static long layoutCalls;
+    static long layoutHits;
+    static long layoutMissDirty;
+    static long layoutMissConstraints;
+
+    static void resetLayoutCounters() {
+        layoutCalls = 0;
+        layoutHits = 0;
+        layoutMissDirty = 0;
+        layoutMissConstraints = 0;
+    }
+
+    /**
+     * Measures this box WITHOUT making the result the authoritative layout - Flutter's dry
+     * layout. Codename One asks a container for its preferred size far more often than it
+     * lays it out (scroll extents, focus maths, revalidate), and that question arrives with
+     * different constraints than the real pass. With one cache slot the two alternate and
+     * evict each other on every box in the tree, so a single changed leaf re-measured
+     * everything: on the gallery home that was a 92% miss rate over 7600 layout calls.
+     *
+     * <p>The dry result gets its own slot and never clears {@code needsLayout}, so the real
+     * pass still runs. A dry HIT skips the subtree entirely, which is the whole point.</p>
+     */
+    public final Size dryLayout(BoxConstraints constraints) {
+        layoutCalls++;
+        if (!needsLayout && drySize != null && constraints.equals(lastDryConstraints)) {
+            layoutHits++;
+            return drySize;
+        }
+        if (needsLayout) {
+            layoutMissDirty++;
+        } else {
+            layoutMissConstraints++;
+        }
+        lastDryConstraints = constraints;
+        // Dryness has to propagate. performLayout measures its children through layout(),
+        // so without this flag a dry pass would write dry constraints into every
+        // descendant's REAL slot and the real pass that follows would miss on all of them -
+        // which is most of what made a one-element change re-measure the whole tree.
+        // Layout runs on the EDT, so a plain static is the whole of the bookkeeping.
+        boolean outer = dryPass;
+        dryPass = true;
+        try {
+            drySize = performLayout(constraints);
+        } finally {
+            dryPass = outer;
+        }
+        // performLayout is NOT side-effect free: it writes child offsets, and it just wrote
+        // them for the dry constraints. So the real pass has to recompute them - if it were
+        // allowed to hit its cache it would keep the dry offsets and place children wrongly
+        // (this put the study card's caption at the top of the card instead of the bottom).
+        // Drop only THIS element's real result; ancestors are untouched, so this does not
+        // escalate into the whole-tree invalidation the cache exists to avoid.
+        lastConstraints = null;
+        return drySize;
+    }
+
     public final Size layout(BoxConstraints constraints) {
+        if (dryPass) {
+            return dryLayout(constraints);
+        }
+        layoutCalls++;
         if (!needsLayout && constraints.equals(lastConstraints)) {
+            layoutHits++;
             return size;
+        }
+        if (needsLayout) {
+            layoutMissDirty++;
+        } else {
+            layoutMissConstraints++;
         }
         lastConstraints = constraints;
         size = performLayout(constraints);
@@ -230,7 +306,11 @@ public abstract class RenderElement extends Element {
     public void markNeedsLayout() {
         for (Element a = this; a != null; a = a.parent) {
             if (a instanceof RenderElement) {
-                ((RenderElement) a).needsLayout = true;
+                RenderElement r = (RenderElement) a;
+                r.needsLayout = true;
+                // The dry measurement is just as stale as the real one.
+                r.drySize = null;
+                r.lastDryConstraints = null;
             }
         }
     }
