@@ -191,11 +191,19 @@ final class IOSDeviceIntegrity {
         // would report success while the next request reloads the very key the backend
         // asked us to discard -- and keeps asserting with it. Better to leave the state
         // visibly unchanged so the caller fails and can retry.
-        boolean cleared = store.remove(KEY_ID);
-        cleared &= store.remove(KEY_STATE);
+        boolean idGone = store.remove(KEY_ID);
+        boolean stateGone = store.remove(KEY_STATE);
         store.remove(KEY_RETRY_AFTER);
         store.remove(KEY_PENDING_SINCE);
-        if (!cleared) {
+        if (!idGone || !stateGone) {
+            // The two deletions are not atomic, so a partial failure leaves half the
+            // identity gone. Treating that as "untouched" would let a callback from the
+            // rejected identity still pass its staleness check and act on inconsistent
+            // state, so the generation is advanced first: whatever the keychain did, no
+            // outstanding callback belongs to the current flow any more.
+            generation++;
+            bootstrapInFlight = false;
+            failBootstrapWaiters("App Attest could not fully discard its stored key");
             throw new IllegalStateException("App Attest could not discard its stored key; "
                     + "the keychain refused the deletion");
         }
@@ -486,7 +494,19 @@ final class IOSDeviceIntegrity {
                 // a key no backend has acknowledged -- the first-use rejection and
                 // pointless key reset this state exists to prevent. Roll back to new so
                 // the key is attested again rather than used prematurely.
-                store.set(KEY_STATE, STATE_NEW);
+                if (!store.set(KEY_STATE, STATE_NEW)) {
+                    // The rollback failed too, so the key would sit pending with no
+                    // deadline and be promoted on the next request. Discard the identity
+                    // outright rather than leave a state that reads as ready.
+                    try {
+                        instance.resetLocked();
+                    } catch (IllegalStateException ignored) {
+                        // resetLocked already advanced the generation and failed the
+                        // waiters; nothing further to do but report to this caller.
+                    }
+                    fail(pending, "App Attest could not record its registration deadline");
+                    return;
+                }
                 instance.bootstrapInFlight = false;
                 fail(pending, "App Attest could not record its registration deadline");
                 instance.failBootstrapWaiters(
@@ -660,12 +680,22 @@ final class IOSDeviceIntegrity {
                 if (pending.result.isDone()) {
                     return;
                 }
-                if (instance != null) {
-                    boolean stale;
-                    synchronized (instance.flowLock) {
-                        stale = isStale(pending);
-                    }
-                    if (stale) {
+                if (instance == null) {
+                    pending.result.complete(token);
+                    return;
+                }
+                // The staleness check happens under the lock; the completion itself does
+                // not, and that is deliberate. complete() runs the app's own listeners
+                // synchronously, and holding the attestation lock across arbitrary
+                // application code is how the deadlock earlier in this class happened.
+                //
+                // The residual window is a reset landing between the check and the
+                // handover. What the caller then holds is an assertion for a key the
+                // backend no longer knows, which it rejects; the app resets and retries,
+                // which is the recovery path that already exists. A deadlocked EDT has
+                // no such recovery, so the trade runs this way round.
+                synchronized (instance.flowLock) {
+                    if (isStale(pending)) {
                         pending.result.error(new RuntimeException("App Attest state was "
                                 + "reset while this request was in flight"));
                         return;

@@ -106,8 +106,23 @@ jobs:
       - name: Build codename1-core + the Windows port (JDK 8)
         run: |
           cd maven
-          JAVA_HOME="$JDK_8_HOME" mvn -B -pl windows -am -DskipTests \
-            '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+          # Maven Central intermittently resets the connection or throttles the runner,
+          # and Maven treats that as a permanent resolution failure -- observed killing
+          # this job while resolving a build extension, before any project code compiled.
+          # The backoff grows because a flat retry lands inside the same window a 429 is
+          # still rate limiting in. A genuine build failure fails identically every time.
+          for delay in 30 120 300 0; do
+            if JAVA_HOME="$JDK_8_HOME" mvn -B -pl windows -am -DskipTests \
+                 '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install; then
+              break
+            fi
+            if [ "$delay" = "0" ]; then
+              echo "core + Windows port build failed after all retries"
+              exit 1
+            fi
+            echo "build failed; retrying in ${delay}s in case Maven Central was flaky"
+            sleep "$delay"
+          done
           test -f core/target/classes/com/codename1/ui/Form.class
           test -f windows/target/classes/com/codename1/impl/windows/WindowsImplementation.class
 
