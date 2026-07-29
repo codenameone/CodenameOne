@@ -795,7 +795,14 @@ public class Sheet extends Container {
         if (border instanceof RoundRectBorder) {
             RoundRectBorder b = (RoundRectBorder) border;
 
-            $(contentPane).setPaddingMillimeters(b.getCornerRadius());
+            // A hand written RoundRectBorder reserves twice the radius of its own, so insetting
+            // the content pane by the radius keeps the content clear of the rounded corners. A
+            // border that came out of a stylesheet reserves nothing and the padding of the sheet
+            // is whatever the CSS asked for, so an inset here is padding the author never wrote,
+            // and on an empty content pane it becomes a gap under the title, see issue 5488.
+            if (!b.isCssBoxModel()) {
+                $(contentPane).setPaddingMillimeters(b.getCornerRadius());
+            }
         }
 
         // Deal with iPhoneX notch.
