@@ -80,6 +80,9 @@ public class MCPServer {
     private String serverVersion = "1.0";
     private boolean screenshotEnabled = true;
     private boolean running;
+    /// Bumped by every start(), so a reader thread can tell its own run from a later one that
+    /// happens to have been handed the same transport instance.
+    private int startGeneration;
     private MCPTransport transport;
     private MCPVerbosity verbosity = MCPVerbosity.OFF;
 
@@ -139,6 +142,8 @@ public class MCPServer {
         }
         this.transport = transport;
         running = true;
+        startGeneration++;
+        final int generation = startGeneration;
         // Captured for the thread rather than read back off the field. A later start()
         // replaces the field, and a reader thread that followed it would end up serving a
         // transport the server no longer considers its own -- while the transport it was
@@ -147,7 +152,7 @@ public class MCPServer {
         Thread readerThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                runLoop(mine);
+                runLoop(mine, generation);
             }
         }, "cn1-mcp-server");
         readerThread.start();
@@ -164,27 +169,33 @@ public class MCPServer {
     /// True while `t` is still the transport this server is serving over. False once stop()
     /// has run, or once a restart handed the server a different transport -- in both cases
     /// the thread holding `t` owns it alone and has to close it itself.
-    private synchronized boolean isCurrent(MCPTransport t) {
-        return running && transport == t; // NOPMD identity is the question, not equality
+    private synchronized boolean isCurrent(MCPTransport t, int generation) {
+        // The generation as well as the identity. A caller that stops and restarts with
+        // the SAME transport instance would otherwise leave the old reader thread looking
+        // current, so it could run on beside the replacement and eventually stop the
+        // server and close the transport underneath it.
+        return running && startGeneration == generation
+                && transport == t; // NOPMD identity is the question, not equality
     }
 
     /// Clears the running flag, but only on behalf of the transport that is still current.
     /// A thread unwinding from a superseded transport must not stop a server that has since
     /// been restarted over a new one.
-    private synchronized void stopIfCurrent(MCPTransport t) {
-        if (transport == t) { // NOPMD identity: is this still our transport?
+    private synchronized void stopIfCurrent(MCPTransport t, int generation) {
+        if (startGeneration == generation
+                && transport == t) { // NOPMD identity: is this still our transport?
             running = false;
         }
     }
 
-    private void runLoop(MCPTransport t) {
+    private void runLoop(MCPTransport t, int generation) {
         // Opening is deferred to this thread, so by the time it happens the server may
         // already have been stopped or restarted. Either way stop()'s close() ran against a
         // transport that had not opened yet and therefore released nothing, so opening now
         // would leave a transport registered with nobody left to close it. That registration
         // is process-wide: every later open() is refused on the grounds that an agent is
         // already being served.
-        if (!isCurrent(t)) {
+        if (!isCurrent(t, generation)) {
             return;
         }
         try {
@@ -199,17 +210,17 @@ public class MCPServer {
             } catch (Throwable logErr) {
                 System.err.println("[cn1.mcp] transport open failed: " + ex);
             }
-            stopIfCurrent(t);
+            stopIfCurrent(t, generation);
             t.close();
             return;
         }
-        if (!isCurrent(t)) {
+        if (!isCurrent(t, generation)) {
             // Same window, the far side of it: the server moved on while open() was in
             // flight. Undo the registration this thread just took.
             t.close();
             return;
         }
-        while (isCurrent(t)) {
+        while (isCurrent(t, generation)) {
             String line;
             try {
                 line = t.readMessage();
@@ -231,7 +242,7 @@ public class MCPServer {
                 }
             }
         }
-        stopIfCurrent(t);
+        stopIfCurrent(t, generation);
         t.close();
     }
 

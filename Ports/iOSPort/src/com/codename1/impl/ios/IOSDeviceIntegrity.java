@@ -617,8 +617,14 @@ final class IOSDeviceIntegrity {
             // marker would refuse a future replacement when iOS legitimately invalidates
             // THIS key, and every later assertion would fail until the app reset by hand.
             store.remove(KEY_ATTEST_STARTED);
-            store.remove(KEY_RECOVERY_SPENT);
-            instance.recoverySpentInMemory = false;
+            // The in-memory copy is cleared unconditionally, but the persisted marker is
+            // only forgotten once the keychain confirms the deletion. A stale marker
+            // would refuse the one-shot replacement the next time iOS legitimately
+            // invalidates this key, leaving every assertion failing until the app reset
+            // by hand -- so if the delete fails, the marker stays true here too and the
+            // process keeps behaving as though the recovery were spent, which is the
+            // conservative direction.
+            instance.recoverySpentInMemory = !store.remove(KEY_RECOVERY_SPENT);
             instance.currentBackoff = MIN_BACKOFF_MILLIS;
             instance.bootstrapInFlight = false;
             // Deliberately NOT asserted here, for the reason above. Queued callers
