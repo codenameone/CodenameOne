@@ -550,8 +550,10 @@ class BleSensorReconnectTest extends UITestBase {
             delivered.putMetadata("edited", "yes");
 
             pumpFor(400, store);
-            assertFalse(store.written.isEmpty(), "the batch must be written");
-            assertNull(store.written.get(0).getMetadata().get("edited"),
+            java.util.List<com.codename1.health.HealthSample> stored =
+                    store.snapshot();
+            assertFalse(stored.isEmpty(), "the batch must be written");
+            assertNull(stored.get(0).getMetadata().get("edited"),
                     "the store must hold what the sensor reported");
         } finally {
             implementation.setHealth(null);
@@ -562,11 +564,24 @@ class BleSensorReconnectTest extends UITestBase {
     private static final class RecordingStore
             extends com.codename1.health.HealthStore implements WriteCounter {
 
+        /// Guarded for the same reason as HalfCommittingStore's: the
+        /// write lands on whichever thread the flush runs on, and the
+        /// test thread reads it.
         final java.util.List<com.codename1.health.HealthSample> written =
                 new ArrayList<com.codename1.health.HealthSample>();
 
         public int writeCount() {
-            return written.size();
+            synchronized (written) {
+                return written.size();
+            }
+        }
+
+        /// A snapshot, so a caller can look at it without racing a write.
+        java.util.List<com.codename1.health.HealthSample> snapshot() {
+            synchronized (written) {
+                return new ArrayList<com.codename1.health.HealthSample>(
+                        written);
+            }
         }
 
         @Override
@@ -590,7 +605,9 @@ class BleSensorReconnectTest extends UITestBase {
         protected void doWrite(
                 java.util.List<com.codename1.health.HealthSample> samples,
                 AsyncResource<com.codename1.health.HealthWriteResult> out) {
-            written.addAll(samples);
+            synchronized (written) {
+                written.addAll(samples);
+            }
             out.complete(new com.codename1.health.HealthWriteResult());
         }
     }
@@ -763,6 +780,12 @@ class BleSensorReconnectTest extends UITestBase {
             extends com.codename1.health.HealthStore {
 
         /** Every value handed to doWrite, across every attempt. */
+        /// Appended from whichever thread the write lands on and read
+        /// from the test thread, so every touch is guarded. An unguarded
+        /// ArrayList here threw ConcurrentModificationException out of
+        /// timesWritten() on the CI JDK and never once on this machine --
+        /// the same shape as the counter that leaked between tests
+        /// earlier, and the same reason it hid.
         final java.util.List<Double> written = new ArrayList<Double>();
 
         @Override
@@ -796,7 +819,11 @@ class BleSensorReconnectTest extends UITestBase {
                     (com.codename1.health.QuantitySample) samples.get(0);
             double bpm = q.getQuantity().getValue(
                     com.codename1.health.HealthUnit.COUNT_PER_MINUTE);
-            written.add(Double.valueOf(bpm));
+            int soFar;
+            synchronized (written) {
+                written.add(Double.valueOf(bpm));
+                soFar = written.size();
+            }
             if (bpm >= 71) {
                 // The later sample always fails, so the earlier one is
                 // always a committed prefix of a failed write.
@@ -807,15 +834,17 @@ class BleSensorReconnectTest extends UITestBase {
             }
             com.codename1.health.HealthWriteResult r =
                     new com.codename1.health.HealthWriteResult();
-            r.addSampleId("committed-" + written.size());
+            r.addSampleId("committed-" + soFar);
             out.complete(r);
         }
 
         int timesWritten(double bpm) {
             int n = 0;
-            for (Double d : written) {
-                if (d.doubleValue() == bpm) {
-                    n++;
+            synchronized (written) {
+                for (Double d : written) {
+                    if (d.doubleValue() == bpm) {
+                        n++;
+                    }
                 }
             }
             return n;

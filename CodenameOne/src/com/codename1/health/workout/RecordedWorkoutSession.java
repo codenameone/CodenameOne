@@ -137,8 +137,9 @@ final class RecordedWorkoutSession extends WorkoutSession {
         // it, taking the child samples that were perfectly writable. That
         // is the failure this list exists to avoid, so the same treatment
         // applies: leave it out and say so.
-        boolean workoutWritable = store.isWritable(HealthDataType.WORKOUT)
-                && !workout.isInstantaneous();
+        final boolean workoutWritable =
+                store.isWritable(HealthDataType.WORKOUT)
+                        && !workout.isInstantaneous();
         if (workoutWritable) {
             toWrite.add(workout);
         } else {
@@ -180,18 +181,18 @@ final class RecordedWorkoutSession extends WorkoutSession {
                     out.error(err);
                     return;
                 }
-                if (!value.getSampleIds().isEmpty()
-                        && store.isWritable(HealthDataType.WORKOUT)) {
+                // The captured decision, not the store's general
+                // capability: a workout can be left out of a batch the
+                // store would otherwise accept -- an instantaneous one
+                // is -- and asking the store again stamped the first
+                // child sample's identifier onto a workout that was
+                // never written, and had just been marked as not
+                // persisted. The marker itself is set where that
+                // decision is made, so there is nothing to add here.
+                if (workoutWritable && !value.getSampleIds().isEmpty()) {
                     // The first id belongs to the workout only when the
                     // workout was part of the batch.
                     workout.setId(value.getSampleIds().get(0));
-                } else if (!store.isWritable(HealthDataType.WORKOUT)) {
-                    // Neither mobile platform accepts a workout through
-                    // the sample write path in this release, so the child
-                    // measurements are stored and the session record is
-                    // not. Saying so through the returned sample beats
-                    // resolving as though the workout had been persisted.
-                    workout.putMetadata(WORKOUT_NOT_PERSISTED, "true");
                 }
                 setState(WorkoutSessionState.ENDED);
                 out.complete(workout);

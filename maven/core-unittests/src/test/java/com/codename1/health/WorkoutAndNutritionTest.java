@@ -377,6 +377,58 @@ class WorkoutAndNutritionTest extends UITestBase {
         }
     }
 
+    /**
+     * A workout left out of the batch does not take a child's identifier.
+     *
+     * <p>An instantaneous workout is excluded because WORKOUT is an
+     * interval-only type, while its child samples are written normally.
+     * Asking the store whether it *can* write workouts, rather than
+     * whether this one was in the batch, stamped the first child's
+     * identifier onto a workout that was never persisted -- and that had
+     * just been marked as not persisted.</p>
+     */
+    @Test
+    void anUnwrittenWorkoutKeepsNoIdentifier() {
+        final com.codename1.impl.health.LocalHealthStore store =
+                new com.codename1.impl.health.LocalHealthStore();
+        implementation.setHealth(new Health() {
+            @Override
+            public boolean isSupported() {
+                return true;
+            }
+
+            @Override
+            public HealthStore getStore() {
+                return store;
+            }
+        });
+        try {
+            WorkoutManager m = new WorkoutManager();
+            WorkoutSession s = m.startSession(
+                    new WorkoutConfiguration()).get();
+            s.start();
+            List<HealthSample> batch = new ArrayList<HealthSample>();
+            batch.add(QuantitySample.create(HealthDataType.HEART_RATE,
+                    new HealthQuantity(150, HealthUnit.COUNT_PER_MINUTE),
+                    1000L, 1000L));
+            s.addSamples(batch);
+
+            // Ended in the same millisecond it started, so the workout
+            // itself has no interval to record while its child does.
+            WorkoutSample written = s.end().get();
+
+            assertEquals("true",
+                    written.getMetadata().get(
+                            WorkoutSample.WORKOUT_NOT_PERSISTED),
+                    "an instantaneous workout is not written");
+            assertNull(written.getId(),
+                    "so it must not carry an identifier the store handed"
+                            + " back for something else");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
     @Test
     void workoutSampleTotalsAreNullUntilSet() {
         WorkoutSample w = WorkoutSample.create(WorkoutActivityType.RUNNING,
