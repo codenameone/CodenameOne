@@ -1,63 +1,56 @@
 {
-  "commit": "25d95ae7dc70db866062a334cdca7854e7132008",
-  "generated_at": "2026-07-29T06:50:37Z",
+  "commit": "ad2c1952cc6ce1a3f96a6373801f4012f917b3e6",
+  "generated_at": "2026-07-29T21:50:31Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 291739000
+        "duration_ns": 336771000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 31121000
-      },
-      "hashMapChurn": {
-        "checksum": "49941",
-        "duration_ns": 60408000
+        "duration_ns": 24907000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 119729000
+        "duration_ns": 142454000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 73738000
+        "duration_ns": 71460000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 275011000
-      },
-      "objectAllocation": {
-        "checksum": "2999790376128",
-        "duration_ns": 241824000
+        "duration_ns": 403311000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 117469000
+        "duration_ns": 163319000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 145735000
-      },
-      "stringBuilding": {
-        "checksum": "-609121604069",
-        "duration_ns": 36456000
+        "duration_ns": 194243000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
     "missing": [],
+    "skipped": {
+      "hashMapChurn": "ios-simulator-gc-footprint",
+      "objectAllocation": "ios-simulator-gc-footprint",
+      "stringBuilding": "ios-simulator-gc-footprint"
+    },
     "status": "complete",
     "suite_checksum": 0
   },
   "port": "ios-metal",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30422317150",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30476901663",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 165,
+    "pass": 168,
     "skip": 2
   },
   "tests": {
@@ -392,6 +385,10 @@
       "feature": "text-input",
       "status": "pass"
     },
+    "InferenceOnDeviceApiTest": {
+      "feature": "on-device-inference",
+      "status": "pass"
+    },
     "InscribedTriangleGrid": {
       "feature": "graphics-shapes-strokes",
       "status": "pass"
@@ -402,6 +399,10 @@
     },
     "KotlinUiTest": {
       "feature": "application-bootstrap",
+      "status": "pass"
+    },
+    "LanguageOnDeviceApiTest": {
+      "feature": "on-device-language",
       "status": "pass"
     },
     "LargeStrokeDirtyClipTest": {
@@ -734,6 +735,10 @@
         "encode-unavailable-on-ios:Failed"
       ],
       "status": "skip"
+    },
+    "VisionOnDeviceApiTest": {
+      "feature": "on-device-vision",
+      "status": "pass"
     }
   }
 }
