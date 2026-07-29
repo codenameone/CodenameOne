@@ -364,6 +364,24 @@ final class IOSDeviceIntegrity {
                     // previous attempt died between generating and submitting. Attest
                     // that key rather than burning another.
                     attestKey(r, nonce, keyId);
+                } else if (keyId != null && keyId.length() > 0
+                        && store.get(KEY_RECOVERY_SPENT) != null) {
+                    // The interrupted key belongs to a recovery that has already been
+                    // used once. Discarding it here would generate yet another
+                    // rate-limited key, and would do so on every subsequent request --
+                    // the exact loop the spent marker exists to stop. Report instead.
+                    bootstrapInFlight = false;
+                    final AsyncResource<String> exhausted = r;
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            if (!exhausted.isDone()) {
+                                exhausted.error(new RuntimeException("App Attest could not "
+                                        + "establish a usable key on this device; call "
+                                        + "DeviceIntegrity.resetAttestation() to try again"));
+                            }
+                        }
+                    });
+                    return r;
                 } else if (keyId != null && keyId.length() > 0) {
                     // Attestation WAS started for this key and we never recorded the
                     // outcome, so Apple may already have consumed it. Re-submitting a
@@ -590,6 +608,11 @@ final class IOSDeviceIntegrity {
                         "App Attest could not record its registration deadline");
                 return;
             }
+            // The recovery this key came from, if any, is now complete. Leaving the
+            // marker would refuse a future replacement when iOS legitimately invalidates
+            // THIS key, and every later assertion would fail until the app reset by hand.
+            store.remove(KEY_ATTEST_STARTED);
+            store.remove(KEY_RECOVERY_SPENT);
             instance.currentBackoff = MIN_BACKOFF_MILLIS;
             instance.bootstrapInFlight = false;
             // Deliberately NOT asserted here, for the reason above. Queued callers
