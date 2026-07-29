@@ -3297,6 +3297,10 @@ public class AndroidGradleBuilder extends Executor {
                     // instead (see CN1WearableListenerService).
                     "        <service android:name=\"com.codename1.impl.android.CN1WearableListenerService\" android:exported=\"true\">\n"
                     + "            <intent-filter>\n"
+                    // BIND_LISTENER is how Play services binds the service at all; the specific
+                    // actions below narrow what it delivers. Without it nothing binds and no
+                    // callback ever arrives.
+                    + "                <action android:name=\"com.google.android.gms.wearable.BIND_LISTENER\" />\n"
                     + "                <action android:name=\"com.google.android.gms.wearable.MESSAGE_RECEIVED\" />\n"
                     + "                <action android:name=\"com.google.android.gms.wearable.DATA_CHANGED\" />\n"
                     + "                <action android:name=\"com.google.android.gms.wearable.CAPABILITY_CHANGED\" />\n"

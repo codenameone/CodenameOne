@@ -87,7 +87,13 @@ func cn1LayoutForFamily(_ layouts: [String: Any], family: WidgetFamily) -> [Stri
         case .accessoryCircular:
             keys = ["watchCircular"]
         case .accessoryRectangular:
+            // The same family serves the iPhone lock screen and the watch face, so each surface
+            // has to prefer the layout that was designed for it.
+#if os(watchOS)
             keys = ["watchRectangular", "lockscreen"]
+#else
+            keys = ["lockscreen", "watchRectangular"]
+#endif
         case .accessoryInline:
             keys = ["watchInline"]
         default:

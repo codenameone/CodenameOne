@@ -234,9 +234,30 @@ public class CN1WearableBridge implements WearableBridge {
 
     // --- messages -----------------------------------------------------------
 
-    public void sendMessage(String path, byte[] payload, int replyToken) {
+    public void sendMessage(final String path, final byte[] payload, final int replyToken) {
+        if (cachedNodesStamp == 0) {
+            // Nothing has been discovered yet. Sending now would fan out to an empty list and
+            // report "no nearby device" while a watch is sitting right there, so wait for the
+            // first refresh instead of trusting a cache that has never been filled.
+            nodeClient.getConnectedNodes().addOnCompleteListener(
+                    new com.google.android.gms.tasks.OnCompleteListener<List<Node>>() {
+                        public void onComplete(com.google.android.gms.tasks.Task<List<Node>> task) {
+                            cachedNodes = task.isSuccessful() && task.getResult() != null
+                                    ? task.getResult() : new ArrayList<Node>();
+                            cachedNodesStamp = System.currentTimeMillis();
+                            fanOut(path, payload, replyToken);
+                        }
+                    });
+            return;
+        }
+        fanOut(path, payload, replyToken);
+    }
+
+    private void fanOut(String path, byte[] payload, final int replyToken) {
         List<Node> nodes = connectedNodes();
         boolean sentToAnyone = false;
+        List<com.google.android.gms.tasks.Task<Integer>> tasks =
+                new ArrayList<com.google.android.gms.tasks.Task<Integer>>();
         for (Node n : nodes) {
             if (!n.isNearby()) {
                 continue;
@@ -247,48 +268,78 @@ public class CN1WearableBridge implements WearableBridge {
             // conventionally slash-prefixed, so add one rather than assuming it.
             String wire = (replyToken == 0 ? MESSAGE_PATH : REQUEST_PATH + replyToken)
                     + slashPrefixed(encode(path));
-            com.google.android.gms.tasks.Task<Integer> task =
-                    messageClient.sendMessage(n.getId(), wire, payload);
-            if (replyToken != 0) {
-                // Discovery can hand back a node that disconnects before the send lands. Without
-                // this the caller's reply handler is never completed at all.
-                final int token = replyToken;
-                task.addOnFailureListener(new com.google.android.gms.tasks.OnFailureListener() {
-                    public void onFailure(Exception e) {
-                        WearableConnection.deliverReply(token, null,
-                                "The message could not be delivered: " + e.getMessage());
-                    }
-                });
-            }
+            tasks.add(messageClient.sendMessage(n.getId(), wire, payload));
             sentToAnyone = true;
         }
-        if (!sentToAnyone && replyToken != 0) {
-            WearableConnection.deliverReply(replyToken, null, "No nearby device is running the app");
+        if (!sentToAnyone) {
+            if (replyToken != 0) {
+                WearableConnection.deliverReply(replyToken, null,
+                        "No nearby device is running the app");
+            }
+            return;
+        }
+        if (replyToken != 0) {
+            // Fail only when NO node accepted the request: one watch failing while another
+            // succeeds must not cancel the handler that the successful one is about to answer.
+            com.google.android.gms.tasks.Tasks.whenAllComplete(tasks).addOnCompleteListener(
+                    new com.google.android.gms.tasks.OnCompleteListener<List<com.google.android.gms.tasks.Task<?>>>() {
+                        public void onComplete(
+                                com.google.android.gms.tasks.Task<List<com.google.android.gms.tasks.Task<?>>> all) {
+                            if (all.getResult() == null) {
+                                return;
+                            }
+                            for (com.google.android.gms.tasks.Task<?> t : all.getResult()) {
+                                if (t.isSuccessful()) {
+                                    return;
+                                }
+                            }
+                            WearableConnection.deliverReply(replyToken, null,
+                                    "The message could not be delivered to any paired device");
+                        }
+                    });
         }
     }
 
     public void sendReply(int replyToken, byte[] payload) {
         // Back to the node that asked, not to every watch on the wrist rack: tokens are allocated
         // per node and routinely collide, so broadcasting would answer the wrong request.
-        String node;
+        // Two watches can allocate the same token before either is answered, so the origin is
+        // keyed by node AND token; the local token handed to Java is unique on its own.
+        InboundRequest req;
         synchronized (inboundNodes) {
-            node = inboundNodes.remove(Integer.valueOf(replyToken));
+            req = inboundNodes.remove(Integer.valueOf(replyToken));
         }
-        if (node == null) {
+        if (req == null) {
             return;
         }
-        messageClient.sendMessage(node, REPLY_PATH + replyToken, payload);
+        messageClient.sendMessage(req.nodeId, REPLY_PATH + req.peerToken, payload);
     }
 
     /// Records which node sent a request, so its answer can be routed back to it. Called by
     /// {@link CN1WearableListenerService} as the request arrives.
-    static void rememberRequestOrigin(int replyToken, String nodeId) {
+    static int rememberRequestOrigin(int peerToken, String nodeId) {
         synchronized (inboundNodes) {
-            inboundNodes.put(Integer.valueOf(replyToken), nodeId);
+            int local = nextLocalToken++;
+            inboundNodes.put(Integer.valueOf(local), new InboundRequest(nodeId, peerToken));
+            return local;
         }
     }
 
-    private static final Map<Integer, String> inboundNodes = new HashMap<Integer, String>();
+    /// Who asked, and what token they used. Their token is theirs alone; ours identifies the
+    /// request locally so two nodes cannot collide.
+    private static final class InboundRequest {
+        final String nodeId;
+        final int peerToken;
+
+        InboundRequest(String nodeId, int peerToken) {
+            this.nodeId = nodeId;
+            this.peerToken = peerToken;
+        }
+    }
+
+    private static final Map<Integer, InboundRequest> inboundNodes =
+            new HashMap<Integer, InboundRequest>();
+    private static int nextLocalToken = 1;
 
     private static String slashPrefixed(String path) {
         return path.startsWith("/") ? path : "/" + path;

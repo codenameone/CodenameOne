@@ -332,7 +332,9 @@ public final class WearableConnection {
     /// - `l`: the listener to add
     public static void addMessageListener(WearableMessageListener l) {
         if (l != null && !messageListeners.contains(l)) {
-            messageListeners.add(l);
+            synchronized (pendingMessages) {
+                messageListeners.add(l);
+            }
             activate();
             drainPending(pendingMessages);
         }
@@ -355,7 +357,9 @@ public final class WearableConnection {
     /// - `l`: the listener to add
     public static void addDataListener(WearableDataListener l) {
         if (l != null && !dataListeners.contains(l)) {
-            dataListeners.add(l);
+            synchronized (pendingData) {
+                dataListeners.add(l);
+            }
             activate();
             drainPending(pendingData);
         }
@@ -425,7 +429,7 @@ public final class WearableConnection {
                     }
                 }
             }
-        }, !messageListeners.isEmpty(), pendingMessages);
+        }, messageListeners, pendingMessages);
     }
 
     /// Framework/port entry point: hands the peer's answer to the waiting reply handler. Called by
@@ -477,7 +481,7 @@ public final class WearableConnection {
                     l.dataChanged(m);
                 }
             }
-        }, !dataListeners.isEmpty(), pendingData);
+        }, dataListeners, pendingData);
     }
 
     /// Framework/port entry point: reports that the peer removed a replicated value. Called by the
@@ -496,7 +500,7 @@ public final class WearableConnection {
                     l.dataRemoved(path);
                 }
             }
-        }, !dataListeners.isEmpty(), pendingData);
+        }, dataListeners, pendingData);
     }
 
     /// Framework/port entry point: reports that reachability, pairing or peer-app installation
@@ -520,12 +524,14 @@ public final class WearableConnection {
     /// The platform starts an app to hand it a payload, so the payload routinely arrives before the
     /// app has finished wiring itself up. Parking rather than dropping is what makes it safe to
     /// register listeners in `init()`.
-    private static void deliver(Runnable delivery, boolean hasListener, List<Runnable> queue) {
-        if (!hasListener) {
-            synchronized (queue) {
+    private static void deliver(Runnable delivery, List<?> listeners, List<Runnable> queue) {
+        // The listener check and the enqueue share the queue's monitor with drainPending, so a
+        // delivery can never be parked after the drain that would have replayed it.
+        synchronized (queue) {
+            if (listeners.isEmpty()) {
                 queue.add(delivery);
+                return;
             }
-            return;
         }
         Display.getInstance().callSerially(delivery);
     }

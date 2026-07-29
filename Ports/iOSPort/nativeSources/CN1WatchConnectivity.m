@@ -33,6 +33,41 @@ static NSString *const kBodyKey = @"cn1.body";
 static NSString *const kTokenKey = @"cn1.token";
 static NSString *const kReplyKey = @"cn1.reply";
 
+
+/// Builds the WearableMessage wire form for a received file: a two-entry payload carrying "name"
+/// (string) and "contents" (bytes). Mirrors com.codename1.wearable.WearableMessage#toByteArray, so
+/// the shapes have to stay in step -- see FORMAT_VERSION there.
+static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
+    const uint8_t kFormatVersion = 1;
+    const uint8_t kTypeString = 1;
+    const uint8_t kTypeBytes = 6;
+    NSMutableData *out = [NSMutableData data];
+    [out appendBytes:&kFormatVersion length:1];
+    uint16_t count = CFSwapInt16HostToBig(2);
+    [out appendBytes:&count length:2];
+
+    NSData *nameKey = [@"name" dataUsingEncoding:NSUTF8StringEncoding];
+    NSData *nameVal = [(name == nil ? @"file" : name) dataUsingEncoding:NSUTF8StringEncoding];
+    NSData *bodyKey = [@"contents" dataUsingEncoding:NSUTF8StringEncoding];
+
+    uint32_t len = CFSwapInt32HostToBig((uint32_t) nameKey.length);
+    [out appendBytes:&len length:4];
+    [out appendData:nameKey];
+    [out appendBytes:&kTypeString length:1];
+    len = CFSwapInt32HostToBig((uint32_t) nameVal.length);
+    [out appendBytes:&len length:4];
+    [out appendData:nameVal];
+
+    len = CFSwapInt32HostToBig((uint32_t) bodyKey.length);
+    [out appendBytes:&len length:4];
+    [out appendData:bodyKey];
+    [out appendBytes:&kTypeBytes length:1];
+    len = CFSwapInt32HostToBig((uint32_t) contents.length);
+    [out appendBytes:&len length:4];
+    [out appendData:contents];
+    return out;
+}
+
 @implementation CN1WatchConnectivity {
     // Reply blocks for messages the peer sent us that expect an answer. The Java side answers
     // asynchronously on the EDT, so the block has to outlive the delegate callback.
@@ -312,11 +347,16 @@ static NSString *const kReplyKey = @"cn1.reply";
 }
 
 - (void)session:(WCSession *)session didReceiveFile:(WCSessionFile *)file {
+    // The only delivery path decodes bytes as a WearableMessage, so raw file contents would arrive
+    // as a malformed payload with the name lost. Encode name+contents into one, matching what the
+    // Android bridge publishes for a transfer.
     NSString *path = file.metadata[kPathKey];
     NSData *body = [NSData dataWithContentsOfURL:file.fileURL];
-    if (body != nil) {
-        cn1_wearable_deliverDataChanged(path.UTF8String, body.bytes, (int) body.length);
+    if (body == nil) {
+        return;
     }
+    NSData *wrapped = cn1WearableWrapFile(file.fileURL.lastPathComponent, body);
+    cn1_wearable_deliverDataChanged(path.UTF8String, wrapped.bytes, (int) wrapped.length);
 }
 
 @end

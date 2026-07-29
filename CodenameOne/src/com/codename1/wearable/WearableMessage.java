@@ -314,9 +314,23 @@ public class WearableMessage {
 
     /// Reads a string written by [#writeLongUTF(DataOutputStream,String)].
     private static String readLongUTF(DataInputStream in) throws IOException {
-        byte[] utf8 = new byte[in.readInt()];
+        byte[] utf8 = new byte[readLength(in)];
         in.readFully(utf8);
         return new String(utf8, "UTF-8");
+    }
+
+    /// Reads a length that is about to size an allocation.
+    ///
+    /// A negative or absurd value means the payload is malformed or came from a peer this build
+    /// does not understand. Throwing IOException keeps that inside the decoder's own handler, which
+    /// answers with an empty message -- an unchecked NegativeArraySizeException would escape onto
+    /// the EDT instead.
+    private static int readLength(DataInputStream in) throws IOException {
+        int n = in.readInt();
+        if (n < 0 || n > in.available() + 1) {
+            throw new IOException("Implausible length " + n + " in a wearable payload");
+        }
+        return n;
     }
 
     // --- wire format --------------------------------------------------------
@@ -419,7 +433,7 @@ public class WearableMessage {
                         m.put(key, in.readBoolean());
                         break;
                     case TYPE_BYTES:
-                        byte[] b = new byte[in.readInt()];
+                        byte[] b = new byte[readLength(in)];
                         in.readFully(b);
                         m.put(key, b);
                         break;
@@ -430,7 +444,7 @@ public class WearableMessage {
                 }
             }
         } catch (IOException err) {
-            com.codename1.io.Log.p("Wearable: truncated payload on " + path + ": " + err);
+            com.codename1.io.Log.p("Wearable: unreadable payload on " + path + ": " + err);
         }
         return m;
     }

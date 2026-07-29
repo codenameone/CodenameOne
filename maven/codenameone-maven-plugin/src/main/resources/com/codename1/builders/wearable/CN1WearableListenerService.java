@@ -109,12 +109,13 @@ public class CN1WearableListenerService extends WearableListenerService {
                 return;
             }
             try {
-                int token = Integer.parseInt(rest.substring(0, slash));
-                // Remember who asked so the answer goes back to that watch: tokens are allocated per
-                // node and collide across them, so a broadcast reply would answer the wrong request.
-                CN1WearableBridge.rememberRequestOrigin(token, event.getSourceNodeId());
+                int peerToken = Integer.parseInt(rest.substring(0, slash));
+                // The peer's token is unique only on the peer, so trade it for a locally unique one
+                // keyed to the node that asked; two watches can otherwise pick the same number.
+                int localToken = CN1WearableBridge.rememberRequestOrigin(
+                        peerToken, event.getSourceNodeId());
                 WearableConnection.deliverMessage(
-                        CN1WearableBridge.decode(rest.substring(slash)), event.getData(), token);
+                        CN1WearableBridge.decode(rest.substring(slash)), event.getData(), localToken);
             } catch (NumberFormatException malformed) {
                 // Not ours.
             }
