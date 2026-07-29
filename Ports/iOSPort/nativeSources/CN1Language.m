@@ -23,11 +23,11 @@
 #import "CodenameOne_GLViewController.h"
 #import "xmlvm.h"
 
+#if defined(INCLUDE_CN1_LANGUAGE) && !TARGET_OS_WATCH && !TARGET_OS_TV
 #if !__has_feature(objc_arc)
 #error CN1Language.m requires ARC (-fobjc-arc)
 #endif
 
-#if defined(INCLUDE_CN1_LANGUAGE) && !TARGET_OS_WATCH && !TARGET_OS_TV
 #import <Foundation/Foundation.h>
 #import <NaturalLanguage/NaturalLanguage.h>
 #import "java_lang_String.h"

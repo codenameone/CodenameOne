@@ -170,6 +170,34 @@ class VisionApiTest extends UITestBase {
     }
 
     @Test
+    void cancelledAnalysisSuppressesLateBackendCallbacks() {
+        DeferredVisionImpl backend = new DeferredVisionImpl();
+        implementation.setVisionImpl(backend);
+        TextRecognizer recognizer = new TextRecognizer();
+        AsyncResource<TextRecognitionResult> result = recognizer.process(
+                VisionImage.encoded(new byte[] {1}));
+        final int[] callbackCount = new int[1];
+        result.ready(new SuccessCallback<TextRecognitionResult>() {
+            public void onSucess(TextRecognitionResult value) {
+                callbackCount[0]++;
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            public void onSucess(Throwable error) {
+                callbackCount[0]++;
+            }
+        });
+
+        assertTrue(result.cancel(false));
+        backend.pending.complete(new TextRecognitionResult("late", null));
+        backend.pending.error(new RuntimeException("later error"));
+        flushSerialCalls();
+
+        assertTrue(result.isCancelled());
+        assertEquals(0, callbackCount[0]);
+        recognizer.close();
+    }
+
+    @Test
     void analyzerCreationAndCloseAreSerialized() throws Exception {
         final RecordingVisionImpl backend = new RecordingVisionImpl();
         implementation.setVisionImpl(backend);
@@ -267,6 +295,26 @@ class VisionApiTest extends UITestBase {
 
         public void close() {
             closeCount++;
+        }
+    }
+
+    private static final class DeferredVisionImpl extends VisionImpl {
+        final AsyncResource<TextRecognitionResult> pending =
+                new AsyncResource<TextRecognitionResult>();
+
+        public boolean isSupported(VisionFeature feature, String backendId) {
+            return true;
+        }
+
+        @SuppressWarnings("unchecked")
+        public <T> AsyncResource<T> analyze(VisionFeature feature,
+                                            String backendId,
+                                            VisionImage image,
+                                            VisionOptions options) {
+            return (AsyncResource<T>) pending;
+        }
+
+        public void close() {
         }
     }
 }

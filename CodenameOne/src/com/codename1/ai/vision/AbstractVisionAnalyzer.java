@@ -25,6 +25,7 @@ package com.codename1.ai.vision;
 import com.codename1.impl.VisionImpl;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
 
 abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
     private final VisionFeature feature;
@@ -63,7 +64,9 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
                     feature + " is not supported by " + options.getBackend().getId()));
             return out;
         }
-        return impl.analyze(feature, options.getBackend().getId(), image, options);
+        AsyncResource<T> backend = impl.analyze(feature,
+                options.getBackend().getId(), image, options);
+        return new AnalysisResource<T>(backend);
     }
 
     /// Idempotently releases the retained native backend.
@@ -81,5 +84,39 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
             implementation = Display.getInstance().getVisionBackend();
         }
         return implementation;
+    }
+
+    private static final class AnalysisResource<T>
+            extends AsyncResource<T> {
+        AnalysisResource(AsyncResource<T> backend) {
+            backend.ready(new SuccessCallback<T>() {
+                @Override
+                public void onSucess(T value) {
+                    publish(value);
+                }
+            }).except(new SuccessCallback<Throwable>() {
+                @Override
+                public void onSucess(Throwable error) {
+                    fail(error);
+                }
+            });
+        }
+
+        @Override
+        public synchronized boolean cancel(boolean mayInterruptIfRunning) {
+            return super.cancel(mayInterruptIfRunning);
+        }
+
+        private synchronized void publish(T value) {
+            if (!isCancelled()) {
+                complete(value);
+            }
+        }
+
+        private synchronized void fail(Throwable error) {
+            if (!isCancelled()) {
+                error(error);
+            }
+        }
     }
 }

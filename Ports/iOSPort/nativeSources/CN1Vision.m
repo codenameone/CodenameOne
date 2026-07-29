@@ -23,11 +23,11 @@
 #import "CodenameOne_GLViewController.h"
 #import "xmlvm.h"
 
+#if defined(INCLUDE_CN1_VISION) && !TARGET_OS_WATCH && !TARGET_OS_TV
 #if !__has_feature(objc_arc)
 #error CN1Vision.m requires ARC (-fobjc-arc)
 #endif
 
-#if defined(INCLUDE_CN1_VISION) && !TARGET_OS_WATCH && !TARGET_OS_TV
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <Vision/Vision.h>
