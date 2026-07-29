@@ -223,7 +223,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 Everything you already know about surfaces applies: the same node catalog, the
 same `${key}` state interpolation, the same timeline that lets the OS advance
-content on its own clock with no app wakeups. `SurfaceVector` is especially at
+content on its own clock with no app wake-ups. `SurfaceVector` is especially at
 home here, because most complications are a gauge, a dial or a ring.
 
 [cols="2,2,2"]
@@ -339,7 +339,7 @@ Two things behave differently on a watch and are handled for you:
 * *Round screens.* A circular face reports no display cutout, so a layout drawn
   to the full rectangle would have its corners eaten by the bezel. The safe area
   is inset to the largest rectangle that fits inside the circle -- about 15% a
-  side -- so honouring the form's safe-area insets is enough.
+  side -- so honoring the form's safe-area insets is enough.
 
 TIP: Because a Wear OS app is an ordinary Android app, you can also declare any
 additional manifest features and permissions with the generic
