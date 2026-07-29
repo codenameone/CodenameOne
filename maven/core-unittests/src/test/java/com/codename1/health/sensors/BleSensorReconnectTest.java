@@ -204,6 +204,12 @@ class BleSensorReconnectTest extends UITestBase {
             return getService(HR_SERVICE);
         }
 
+        /// What the transport does when the link comes back: the state
+        /// the reconnect ladder listens for.
+        void reconnected() {
+            fireConnectionStateChanged(ConnectionState.CONNECTED, null);
+        }
+
         void dropLink() {
             fireConnectionStateChanged(ConnectionState.DISCONNECTED,
                     new BluetoothException(BluetoothError.NOT_CONNECTED,
@@ -892,5 +898,45 @@ class BleSensorReconnectTest extends UITestBase {
         flushSerialCalls();
         assertEquals(Integer.valueOf(72), good.getBatteryPercent(),
                 "and an ordinary level is still reported");
+    }
+
+    /**
+     * A terminal session cannot be brought back to life.
+     *
+     * <p>An asynchronous subscribe or reconnect callback can pass its own
+     * terminal check and reach {@code setState} after {@code stop()} has
+     * run on another thread. It used to overwrite STOPPED with
+     * STREAMING -- so a session already removed from the manager and
+     * disconnected reported itself live, and queued notifications passed
+     * the very guard that had just been set against them.</p>
+     *
+     * <p>The interleaving is not reproducible from a test -- it needs a
+     * callback suspended between its own check and this call -- so the
+     * transition itself is driven, which is the thing the guard makes
+     * impossible.</p>
+     */
+    @Test
+    void aTerminalSessionCannotBeRevived() throws Exception {
+        FakePeripheral p = new FakePeripheral();
+        BleSensorSession session = new BleSensorSession("fake",
+                HealthSensorProfile.HEART_RATE,
+                new SensorSessionOptions(), p);
+        started.add(session);
+        session.start(new AsyncResource<SensorSession>());
+        flushSerialCalls();
+
+        session.stop();
+        flushSerialCalls();
+        assertEquals(SensorSessionState.STOPPED, session.getState());
+
+        // What a late callback does when it wins the race.
+        session.setState(SensorSessionState.STREAMING);
+        assertEquals(SensorSessionState.STOPPED, session.getState(),
+                "a stopped session must stay stopped");
+
+        session.setState(SensorSessionState.CONNECTING);
+        assertEquals(SensorSessionState.STOPPED, session.getState(),
+                "and a reconnect must not resurrect it either");
+        assertTrue(session.isTerminal());
     }
 }

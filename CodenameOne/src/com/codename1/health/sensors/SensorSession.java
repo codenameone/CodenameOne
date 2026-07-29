@@ -731,6 +731,18 @@ public class SensorSession {
             if (newState == null || newState == state) {
                 return;
             }
+            if (state == SensorSessionState.STOPPED
+                    || state == SensorSessionState.FAILED) {
+                // Terminal is terminal. An asynchronous subscribe or
+                // reconnect callback can pass its own terminal check and
+                // arrive here after stop() has run on another thread --
+                // and it used to overwrite STOPPED with STREAMING, so a
+                // session already removed from the manager and
+                // disconnected reported itself live, and queued
+                // notifications passed the very guard that had just been
+                // set against them.
+                return;
+            }
             state = newState;
         }
         // Everything below runs outside the lock. The teardown it

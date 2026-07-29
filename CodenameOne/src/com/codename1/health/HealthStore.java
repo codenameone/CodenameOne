@@ -374,6 +374,29 @@ public class HealthStore {
         return out;
     }
 
+    /// A copy of `query` as it stands right now.
+    ///
+    /// Same reason as the [SampleQuery] overload: the aggregate fallback
+    /// holds the query across several reads and a rollup, all of which
+    /// have to see the criteria the caller submitted rather than whatever
+    /// its builder says by the time they run.
+    private static AggregateQuery snapshot(AggregateQuery query) {
+        AggregateQuery copy = new AggregateQuery()
+                .setTimeRange(query.getTimeRange())
+                .setBucket(query.getBucket())
+                .setUnit(query.getUnit());
+        for (HealthDataType type : query.getTypes()) {
+            copy.addType(type);
+        }
+        for (AggregateMetric metric : query.getMetrics()) {
+            copy.addMetric(metric);
+        }
+        for (String source : query.getSources()) {
+            copy.addSource(source);
+        }
+        return copy;
+    }
+
     /// A copy of `query` as it stands right now, page token included.
     ///
     /// Every read takes one before it dispatches. `SampleQuery` is a
@@ -1100,7 +1123,14 @@ public class HealthStore {
             out.error(ex);
             return out;
         }
-        doAggregate(query, bucketBoundaries(query), out);
+        // Snapshotted for the same reason readSamplePage is: the
+        // fallback holds this object across several asynchronous reads
+        // and a final rollup, so a caller reusing its builder could
+        // change the sources, unit or range between the boundaries being
+        // computed and the buckets being filled -- mixing two queries'
+        // criteria into one answer, or emptying it.
+        AggregateQuery pinned = snapshot(query);
+        doAggregate(pinned, bucketBoundaries(pinned), out);
         return out;
     }
 

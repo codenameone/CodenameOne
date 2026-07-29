@@ -516,8 +516,17 @@ class CN1HealthConnectBridge(private val context: Context)
         // Past that the reply keeps its continuation token, so the answer
         // is a bounded prefix that says it is one rather than a wrong
         // answer that claims to be complete.
+        // A scalar read is bounded too. An unlimited query arrives as
+        // Integer.MAX_VALUE, and walking every page of it built the whole
+        // reply in memory before returning -- a long range of a
+        // high-frequency scalar type, blood glucose say, grows without
+        // bound and exhausts the heap rather than handing back the
+        // provider's continuation token. Capped at the same ceiling: what
+        // does not fit stays behind a token the caller can follow, which
+        // is the paging this reply is supposed to support.
         var remaining = if (isSeriesToken(token)) SERIES_SCAN_CEILING
-            else if (limit > 0) limit else Int.MAX_VALUE
+            else if (limit > 0) minOf(limit, SERIES_SCAN_CEILING)
+            else SERIES_SCAN_CEILING
         var emitted = 0
         var pageToken: String? = resumeToken
         // Samples seen per record so far. The caller's limit counts
