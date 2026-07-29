@@ -1029,6 +1029,39 @@ class BleSensorReconnectTest extends UITestBase {
     }
 
     /**
+     * Starting a session that has already stopped touches nothing.
+     *
+     * <p>Winning the transition is not enough on its own: a {@code stop()}
+     * arriving in the gap between it and the transport work ran its whole
+     * teardown -- removing a listener not yet registered, disconnecting a
+     * link not yet opened -- and the start then registered a listener
+     * nobody would remove and connected a session already off the
+     * registry.</p>
+     *
+     * <p>The interleaving needs one thread suspended mid-method, so what
+     * is driven here is the state the losing side finds: a start that
+     * reaches the transport work terminal must not connect.</p>
+     */
+    @Test
+    void startingAnAlreadyStoppedSessionNeverConnects() {
+        FakePeripheral p = new FakePeripheral();
+        BleSensorSession session = new BleSensorSession("fake",
+                HealthSensorProfile.HEART_RATE,
+                new SensorSessionOptions(), p);
+        started.add(session);
+        session.stop();
+        flushSerialCalls();
+        int connectsBefore = p.connects;
+
+        session.start(new AsyncResource<SensorSession>());
+        flushSerialCalls();
+
+        assertEquals(connectsBefore, p.connects,
+                "a stopped session must not open a link");
+        assertEquals(SensorSessionState.STOPPED, session.getState());
+    }
+
+    /**
      * A session keeps the options it was created with.
      *
      * <p>The builder is fluent and a caller can reuse one for a second

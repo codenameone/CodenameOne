@@ -69,17 +69,26 @@ final class BleSensorSession extends SensorSession {
     private final BlePeripheral peripheral;
     private GattCharacteristic measurement;
     /// Read and written from connection callbacks and from stop(), which
-    /// are not the same thread. Guarded by [#reconnectLock], like the
+    /// are not the same thread. Guarded by [#lifecycleLock], like the
     /// count below -- a lock rather than `volatile`, which this codebase
     /// does not use.
     private Reconnector reconnectListener;
 
-    /// Guards the failure count. Volatile is not enough for it: the
-    /// increment and the test against the limit are one decision, and
-    /// two callbacks racing through a volatile `++` can lose a count and
-    /// let the ladder run past the bound it exists to enforce.
-    private final Object reconnectLock = new Object();
-    /// Guarded by [#reconnectLock].
+    /// Guards what the session does to the transport, and the failure
+    /// count.
+    ///
+    /// Volatile would not be enough for the count: the increment and the
+    /// test against the limit are one decision, and two callbacks racing
+    /// through a volatile `++` can lose a count and let the ladder run
+    /// past the bound it exists to enforce.
+    ///
+    /// It also serializes starting against tearing down. Those are the
+    /// two places that register a connection listener and open or close
+    /// the link, and interleaved they left a stopped session holding a
+    /// live connection and a listener nobody would ever remove -- see
+    /// [#start(com.codename1.util.AsyncResource)].
+    private final Object lifecycleLock = new Object();
+    /// Guarded by [#lifecycleLock].
     private int reconnectFailures;
 
     BleSensorSession(String sensorId, HealthSensorProfile profile,
@@ -98,32 +107,38 @@ final class BleSensorSession extends SensorSession {
             // session holding a live link that nothing will close.
             return;
         }
-        boolean needsListener;
-        synchronized (reconnectLock) {
-            needsListener = options().isAutoReconnect()
-                    && reconnectListener == null;
-        }
-        if (needsListener) {
-            // A strap that walks out of range mid-workout otherwise leaves
-            // the session marked STREAMING forever, receiving nothing and
-            // never retrying, which is the opposite of what the default
-            // promises.
-            Reconnector listener = new Reconnector(this);
-            synchronized (reconnectLock) {
+        // Registering the listener and opening the link happen under the
+        // lock teardown takes, and the terminal state is re-read inside
+        // it. Winning the transition above is not enough on its own: a
+        // stop() arriving in the gap ran its whole teardown -- removing a
+        // listener that was not registered yet and disconnecting a link
+        // that had not opened -- and then this registered a listener
+        // nobody would remove and connected a session already off the
+        // registry.
+        synchronized (lifecycleLock) {
+            if (isTerminal()) {
+                return;
+            }
+            if (options().isAutoReconnect() && reconnectListener == null) {
+                // A strap that walks out of range mid-workout otherwise
+                // leaves the session marked STREAMING forever, receiving
+                // nothing and never retrying, which is the opposite of
+                // what the default promises.
+                Reconnector listener = new Reconnector(this);
                 reconnectListener = listener;
+                peripheral.addConnectionListener(listener);
             }
-            peripheral.addConnectionListener(listener);
-        }
-        peripheral.connect().onResult(new AsyncResult<BlePeripheral>() {
-            @Override
-            public void onReady(BlePeripheral value, Throwable err) {
-                if (err != null) {
-                    failStart(out, err);
-                    return;
+            peripheral.connect().onResult(new AsyncResult<BlePeripheral>() {
+                @Override
+                public void onReady(BlePeripheral value, Throwable err) {
+                    if (err != null) {
+                        failStart(out, err);
+                        return;
+                    }
+                    discover(out);
                 }
-                discover(out);
-            }
-        });
+            });
+        }
     }
 
     /// Re-runs discovery and subscription after an unexpected drop.
@@ -360,7 +375,7 @@ final class BleSensorSession extends SensorSession {
                         // it is uninterrupted: a strap that reconnects
                         // cleanly has spent whatever budget it used
                         // getting there.
-                        synchronized (reconnectLock) {
+                        synchronized (lifecycleLock) {
                             reconnectFailures = 0;
                         }
                         if (out != null) {
@@ -434,7 +449,17 @@ final class BleSensorSession extends SensorSession {
             // second time.
             return;
         }
-        Reconnector listener = takeReconnectListener();
+        synchronized (lifecycleLock) {
+            endSessionLocked();
+        }
+    }
+
+    /// The teardown itself, under [#lifecycleLock] -- see [#stop()] for
+    /// why the transport work and the transition are one critical
+    /// section.
+    private void endSessionLocked() {
+        Reconnector listener = reconnectListener;
+        reconnectListener = null;
         if (listener != null) {
             peripheral.removeConnectionListener(listener);
         }
@@ -471,19 +496,9 @@ final class BleSensorSession extends SensorSession {
     /// that has genuinely changed -- a peripheral reflashed with different
     /// services will never expose the measurement characteristic again,
     /// and the session should end rather than reconnect at it all day.
-    /// Clears the reconnect listener and hands it back, so a caller can
-    /// deregister it without holding the lock across a peripheral call.
-    private Reconnector takeReconnectListener() {
-        synchronized (reconnectLock) {
-            Reconnector listener = reconnectListener;
-            reconnectListener = null;
-            return listener;
-        }
-    }
-
     private void failReconnect(HealthException wrapped) {
         boolean giveUp;
-        synchronized (reconnectLock) {
+        synchronized (lifecycleLock) {
             reconnectFailures++;
             giveUp = reconnectFailures >= MAX_RECONNECT_FAILURES;
         }
@@ -531,17 +546,24 @@ final class BleSensorSession extends SensorSession {
             // of how it ended than the one its listeners were given.
             return;
         }
-        Reconnector listener = takeReconnectListener();
-        if (listener != null) {
-            // Removed before the state changes, so the disconnect this
-            // method causes is not mistaken for a dropped link.
-            peripheral.removeConnectionListener(listener);
+        // Under the lock start() holds while it registers and connects,
+        // so the two cannot interleave: either this finds a link to close
+        // and a listener to remove, or start() finds a session already
+        // terminal and touches the transport at all.
+        synchronized (lifecycleLock) {
+            Reconnector listener = reconnectListener;
+            reconnectListener = null;
+            if (listener != null) {
+                // Removed before the state changes, so the disconnect this
+                // method causes is not mistaken for a dropped link.
+                peripheral.removeConnectionListener(listener);
+            }
+            setState(SensorSessionState.STOPPED);
+            // A short ride would otherwise lose whatever had not reached a
+            // batch boundary yet.
+            flushPendingWrites();
+            forgetFromManager();
+            peripheral.disconnect();
         }
-        setState(SensorSessionState.STOPPED);
-        // A short ride would otherwise lose whatever had not reached a
-        // batch boundary yet.
-        flushPendingWrites();
-        forgetFromManager();
-        peripheral.disconnect();
     }
 }
