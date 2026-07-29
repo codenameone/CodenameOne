@@ -478,8 +478,17 @@ class CN1HealthConnectBridge(private val context: Context)
         // asks for Integer.MAX_VALUE -- wants everything it can get and
         // must keep paging with a real token, so it takes the ordinary
         // path.
+        // Never on a continuation. Selection is single-page by
+        // definition -- it scans the range and hands back no token -- so
+        // a request that arrives *with* a token is by construction a
+        // paging read and must stay one. Without this the shared layer's
+        // per-page remainder flipped the mode underneath a large read: a
+        // limit of thirty thousand became ten thousand on the second
+        // page, that is below the ceiling, and the read that had been
+        // paging happily switched to selection and threw for spanning too
+        // much -- the very failure whose advice is to raise the limit.
         val capped = isSeriesToken(token) && limit > 0
-            && limit < SERIES_SCAN_CEILING
+            && limit < SERIES_SCAN_CEILING && resumeToken == null
         val out = if (capped) StringBuilder() else sb
         // A type this bridge cannot read is rejected rather than returned
         // as an empty page: the caller cannot tell an empty page apart from
@@ -1049,7 +1058,7 @@ class CN1HealthConnectBridge(private val context: Context)
         // decodable rather than being rejected as malformed.
         val start = minOf(recordStart.toEpochMilli(), points.minOf { it.first })
         val end = maxOf(recordEnd.toEpochMilli(), points.maxOf { it.first })
-        sb.append('~').append(r.metadata.id).append('\t')
+        sb.append(SERIES_MARKER).append(r.metadata.id).append('\t')
             .append(token).append('\t')
             .append(start).append('\t').append(end).append('\t')
             .append(points.size).append('\t').append(unit).append('\t')
@@ -1111,6 +1120,17 @@ class CN1HealthConnectBridge(private val context: Context)
     private fun toRecord(line: String): Record? {
         if (line.isBlank()) {
             return null
+        }
+        // The whole-series read shape, which the write encoder never
+        // produces: it flattens a series into one scalar line per
+        // measurement. Parsed as a scalar this line would read field 4 --
+        // the point count -- as the measurement, storing a heart rate equal
+        // to the number of readings and discarding all of them, so the
+        // shape is refused instead.
+        if (line[0] == SERIES_MARKER) {
+            throw IllegalArgumentException(
+                "a whole series cannot be written; the points must be sent"
+                    + " as individual measurements")
         }
         val f = line.split('\t')
         if (f.size < 6) {
@@ -1435,6 +1455,16 @@ class CN1HealthConnectBridge(private val context: Context)
      * says so.
      */
     private val SERIES_SCAN_CEILING = 20000
+
+    /**
+     * First character of a line carrying a whole series record, matching
+     * `HealthWire.SERIES_MARKER` on the portable side.
+     *
+     * Read-only: it is emitted when a query turns flattening off, and
+     * refused on the way back in, because a series has no single-value
+     * form to insert.
+     */
+    private val SERIES_MARKER = '~'
 
     /// Whether this type's records hold many samples each.
     ///

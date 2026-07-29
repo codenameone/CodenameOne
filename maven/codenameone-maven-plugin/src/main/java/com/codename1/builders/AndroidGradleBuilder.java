@@ -636,6 +636,26 @@ public class AndroidGradleBuilder extends Executor {
         }
     }
 
+    /// Whether `url` can serve as the health privacy-policy link.
+    ///
+    /// Absolute, https, and with a host. The rationale screen hands the
+    /// value to the platform as a link, so a non-blank string is not
+    /// enough: a scheme-less "example.com/privacy" opens nothing, and
+    /// http:// is blocked outright by the cleartext policy that applies at
+    /// the target API levels health builds require.
+    static boolean isHealthPolicyUrl(String url) {
+        if (url == null || url.length() == 0) {
+            return false;
+        }
+        try {
+            java.net.URI uri = new java.net.URI(url);
+            return "https".equalsIgnoreCase(uri.getScheme())
+                    && uri.getHost() != null && uri.getHost().length() > 0;
+        } catch (java.net.URISyntaxException malformed) {
+            return false;
+        }
+    }
+
     private static String escape(String str, String chars) {
         if(str == null) {
             return null;
@@ -2055,34 +2075,34 @@ public class AndroidGradleBuilder extends Executor {
                 // The scanner cannot infer these: a data type is referenced
                 // as a constant, and field reads are not recorded. Play
                 // also requires declaring exactly the types you use.
-                error("This app uses com.codename1.health but declares no "
-                        + "health data types. Health Connect permissions are "
+                throw new BuildException("This app uses com.codename1.health"
+                        + " but declares no health data types. Health"
+                        + " Connect permissions are "
                         + "per-data-type and cannot be inferred from "
                         + "bytecode, so list them explicitly:\n"
                         + "  android.health.read=steps,heart_rate,sleep\n"
                         + "  android.health.write=steps\n"
                         + "Known tokens: "
-                        + HealthManifestFragments.knownTokens(),
-                        new RuntimeException("android.health.read unset"));
+                        + HealthManifestFragments.knownTokens());
             }
             if (usesHealthRead && readTypes.isEmpty()) {
-                error("This app reads health data but android.health.read is "
-                        + "empty. Health Connect permissions are directional, "
+                throw new BuildException("This app reads health data but"
+                        + " android.health.read is empty. Health Connect"
+                        + " permissions are directional, "
                         + "so a write declaration does not authorize a read:\n"
                         + "  android.health.read=steps,heart_rate\n"
                         + "Known tokens: "
-                        + HealthManifestFragments.knownTokens(),
-                        new RuntimeException("android.health.read unset"));
+                        + HealthManifestFragments.knownTokens());
             }
             if (usesHealthWrite && writeTypes.isEmpty()) {
-                error("This app writes or deletes health data but "
-                        + "android.health.write is empty. Health Connect "
+                throw new BuildException("This app writes or deletes"
+                        + " health data"
+                        + " but android.health.write is empty. Health Connect "
                         + "permissions are directional, so a read declaration "
                         + "does not authorize a write:\n"
                         + "  android.health.write=steps\n"
                         + "Known tokens: "
-                        + HealthManifestFragments.knownTokens(),
-                        new RuntimeException("android.health.write unset"));
+                        + HealthManifestFragments.knownTokens());
             }
             // No workout-token requirement. Android never reads or writes
             // the WORKOUT type in this release -- HealthWire excludes it
@@ -2113,22 +2133,22 @@ public class AndroidGradleBuilder extends Executor {
             unreadable.addAll(
                     HealthManifestFragments.unsupportedTokens(writeTokens));
             if (!unreadable.isEmpty()) {
-                error("Health Connect support for " + unreadable
+                throw new BuildException("Health Connect support for "
+                        + unreadable
                         + " is not implemented in this build, so declaring"
                         + " it would request a permission the app cannot"
                         + " use. Remove it from android.health.read /"
-                        + " android.health.write.",
-                        new RuntimeException("unsupported health token"));
+                        + " android.health.write.");
             }
             java.util.List<String> unknown =
                     HealthManifestFragments.unknownTokens(readTokens);
             unknown.addAll(HealthManifestFragments.unknownTokens(writeTokens));
             if (!unknown.isEmpty()) {
-                error("Unknown health data type(s) " + unknown
+                throw new BuildException("Unknown health data type(s) "
+                        + unknown
                         + " in android.health.read / android.health.write. "
                         + "Known tokens: "
-                        + HealthManifestFragments.knownTokens(),
-                        new RuntimeException("unknown health token"));
+                        + HealthManifestFragments.knownTokens());
             }
             // Only when the app actually requests a Health Connect
             // permission. An availability-only app never presents the
@@ -2155,16 +2175,24 @@ public class AndroidGradleBuilder extends Executor {
             // as satisfied.
             String policyUrl = request.getArg(
                     "android.health.privacyPolicyUrl", "").trim();
-            if (requestsPermissions && policyUrl.length() == 0) {
+            if (requestsPermissions && !isHealthPolicyUrl(policyUrl)) {
                 // Play requires a privacy policy for health permissions and
                 // the rationale screen has to link to it, so a missing URL
                 // means a rejected app rather than a broken build later.
-                error("Google Play requires a privacy policy for apps that "
-                        + "request Health Connect permissions, and the "
+                // The value is parsed rather than merely counted: the
+                // rationale screen turns it into a link, so "example.com" or
+                // an ftp URL passed the requirement and shipped a disclosure
+                // nothing on the device can open.
+                throw new BuildException("Google Play requires a privacy"
+                        + " policy for apps that request Health"
+                        + " Connect permissions, and the "
                         + "permissions-rationale screen must link to it. Set "
-                        + "android.health.privacyPolicyUrl=<https://...>.",
-                        new RuntimeException("privacy policy url unset"));
-            } else {
+                        + "android.health.privacyPolicyUrl to an absolute "
+                        + "https:// URL"
+                        + (policyUrl.length() == 0 ? "; it is unset."
+                                : "; it is \"" + policyUrl + "\"."));
+            }
+            if (isHealthPolicyUrl(policyUrl)) {
                 // Emit the URL as the string resource
                 // HealthPermissionsRationaleActivity looks up. Validating
                 // the hint without emitting it would leave the rationale
@@ -2179,11 +2207,11 @@ public class AndroidGradleBuilder extends Executor {
             if (targetSDKVersionInt < 30) {
                 // <queries> is only emitted from API 30, and without it the
                 // provider is invisible to package visibility.
-                error("Health Connect requires android.targetSDKVersion 30 "
+                throw new BuildException("Health Connect requires"
+                        + " android.targetSDKVersion 30 "
                         + "or higher so the provider <queries> entry is "
                         + "emitted; this app targets "
-                        + targetSDKVersionInt + ".",
-                        new RuntimeException("targetSdk too low"));
+                        + targetSDKVersionInt + ".");
             }
             log("Health Connect fragments version "
                     + HealthManifestFragments.FRAGMENT_VERSION);

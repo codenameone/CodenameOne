@@ -182,6 +182,31 @@ public class HealthBridgeTokenTableTest {
     }
 
     /**
+     * Series selection scans the whole range and returns no token, so it
+     * can only ever be the first page. The shared layer sends what is
+     * still wanted on a continuation, which drops the limit below the
+     * ceiling part way through a large read -- and a read that had been
+     * paging would switch to selection mid-flight and throw for spanning
+     * too much, which is the one failure the caller was told to avoid by
+     * raising the limit.
+     */
+    @Test
+    public void selectionModeIsNeverEnteredOnAContinuation()
+            throws Exception {
+        String src = source();
+        int start = src.indexOf("private suspend fun appendRecords(");
+        assertTrue(start > 0);
+        String body = src.substring(start, src.indexOf("\n    }", start));
+        int capped = body.indexOf("val capped =");
+        assertTrue("the capped-selection mode must be decided in one"
+                + " expression", capped > 0);
+        String decision = body.substring(capped,
+                body.indexOf("\n", body.indexOf("val out =", capped)));
+        assertTrue("and it must exclude continuation reads, got: "
+                + decision, decision.contains("resumeToken == null"));
+    }
+
+    /**
      * Health Connect rejects a page size above 5000 rather than clamping
      * it, so an unbounded read that passed its own default straight
      * through would throw before reading anything.
@@ -216,7 +241,13 @@ public class HealthBridgeTokenTableTest {
         String src = source();
         int start = src.indexOf(fn);
         assertTrue(fn + " must exist in the bridge", start > 0);
-        String body = src.substring(start, src.indexOf("\n    }", start));
+        String body = src.substring(start, src.indexOf("\n    }", start))
+                // Comments first. Every quoted lowercase word in the body
+                // is read as a token, so a comment that quoted one -- or
+                // quoted anything else that looks like one -- silently
+                // added a type to the set the bridge claims to support.
+                .replaceAll("(?s)/\\*.*?\\*/", "")
+                .replaceAll("(?m)^\\s*//.*$", "");
         java.util.Set<String> out = new java.util.TreeSet<String>();
         Matcher m = Pattern.compile("\"([a-z0-9_]+)\"").matcher(body);
         while (m.find()) {

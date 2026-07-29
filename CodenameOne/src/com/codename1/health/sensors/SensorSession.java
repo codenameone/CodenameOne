@@ -478,23 +478,39 @@ public class SensorSession {
                         + " setWriteToStore off for this session, or route"
                         + " the readings to a workout instead.");
             }
-            if (retryable.isEmpty() || session.isTerminal()) {
-                // Nothing is requeued once the session has ended. It
-                // could never be flushed by the session itself -- the
-                // re-arm below is guarded and the timer is cancelled --
-                // so it only sat there waiting for something else to
-                // drain it, and something else did: endSession() flushes
-                // unconditionally and has more than one caller, so the
-                // failed final write refilled the buffer and the next
-                // teardown wrote it again. That is the "issued one more
-                // write" failure, and it survived both the state check
-                // and making the claim atomic because neither of them is
-                // on this path.
+            if (retryable.isEmpty()) {
                 session.fireError(asHealthException(error));
                 return;
             }
+            // Nothing is requeued once the session has ended, and the
+            // decision is taken under the buffer's own lock below.
+            // Anything left in that buffer afterwards could never be
+            // flushed by the session itself -- the re-arm is guarded and
+            // the timer cancelled -- so it sat there waiting for
+            // something else to drain it, and something else did:
+            // endSession() flushes unconditionally and has more than one
+            // caller, so a failed final write refilled the buffer and the
+            // next teardown wrote it again.
+            boolean requeued;
             synchronized (session.pendingWrites) {
-                session.pendingWrites.addAll(0, retryable);
+                // The flag and the buffer under one lock, because
+                // teardown sets that flag and drains the buffer under it
+                // too. Checked separately, this callback could see a live
+                // session, wait while the final flush ran, and then add
+                // its samples behind it -- into a buffer nothing will
+                // ever claim again, since the re-arm below correctly
+                // declines to schedule anything for a dead session.
+                requeued = !session.flushingStopped;
+                if (requeued) {
+                    session.pendingWrites.addAll(0, retryable);
+                }
+            }
+            if (!requeued) {
+                // Teardown won. The samples are reported rather than left
+                // in a buffer nobody will read: this is the only notice
+                // the app gets that they were not stored.
+                session.fireError(asHealthException(error));
+                return;
             }
             // Re-armed explicitly, but only while the session is still
             // running. Rescheduling from a session that has ended --
