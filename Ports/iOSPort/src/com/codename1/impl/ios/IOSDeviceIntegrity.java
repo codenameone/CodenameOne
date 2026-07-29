@@ -559,6 +559,17 @@ final class IOSDeviceIntegrity {
             fail(pending, "App Attest assertion returned no data");
             return;
         }
+        if (instance != null) {
+            synchronized (instance.flowLock) {
+                // A working assertion means Apple is answering again, so the throttle
+                // sequence starts over. Without this the doubling only ever accumulated:
+                // outages separated by months of successful requests would compound
+                // until one transient failure imposed the full hour.
+                instance.currentBackoff = MIN_BACKOFF_MILLIS;
+                instance.retryAfterFallback = 0L;
+                SecureStorage.getInstance().remove(KEY_RETRY_AFTER);
+            }
+        }
         succeed(pending, TOKEN_PREFIX + ":assert:" + base64(bytes(pending.keyId))
                 + ":" + assertionB64
                 + ":" + base64(bytes(pending.clientData)));

@@ -911,10 +911,11 @@ public class ConnectionRequest implements IOProgressListener {
             SSLCertificate[] certs = getSSLCertificates();
             checkSSLCertificates(certs);
             NetworkGuard guard = NetworkManager.getNetworkGuard();
-            if (guard != null) {
+            if (guard != null && guardWantsCertificates) {
                 // Same split as the non-callback path: the hook above sees the flat view
                 // it has always seen, the guard gets the enriched one when the platform
-                // can produce it.
+                // can produce it. And only for URLs the guard asked about -- the request
+                // may have opted into inspection by itself.
                 SSLCertificate[] forGuard = _connection == null
                         ? null : guardSSLCertificates(_connection, url);
                 guard.checkCertificates(this, forGuard == null ? certs : forGuard);
@@ -933,13 +934,21 @@ public class ConnectionRequest implements IOProgressListener {
 
     /// True when the certificate chain for this request should be fetched and vetted, either
     /// because the request opted in itself or because the installed [NetworkGuard] pins this host.
+    /// Whether the guard asked to see this URL's chain, as answered by
+    /// [#shouldInspectCertificates()]. Kept so the guard is only handed a chain for hosts
+    /// it selected: a request can opt into inspection on its own, and a guard that
+    /// declined this URL must not then be asked to judge it.
+    private boolean guardWantsCertificates;
+
     private boolean shouldInspectCertificates() {
+        guardWantsCertificates = false;
         NetworkGuard guard = NetworkManager.getNetworkGuard();
         if (guard == null) {
             return checkSSLCertificates;
         }
         try {
             if (guard.isCertificateCheckRequired(url)) {
+                guardWantsCertificates = true;
                 // Ask the platform for the richer chain details (public key
                 // digests, per-certificate grouping). Off by default so every
                 // existing caller keeps seeing byte-identical data. Asked even
@@ -1078,7 +1087,7 @@ public class ConnectionRequest implements IOProgressListener {
                 // on, and only the guard sees the enriched per-certificate form.
                 checkSSLCertificates(sslCertificates);
                 NetworkGuard certGuard = NetworkManager.getNetworkGuard();
-                if (certGuard != null) {
+                if (certGuard != null && guardWantsCertificates) {
                     SSLCertificate[] forGuard = guardSSLCertificates(connection, url);
                     certGuard.checkCertificates(this,
                             forGuard == null ? sslCertificates : forGuard);
