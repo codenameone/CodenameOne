@@ -1096,8 +1096,10 @@ public final class NetworkManager {
                         break;
                 }
 
-                if (progressListeners != null) {
-                    progressListeners.fireActionEvent(new NetworkEvent(req, NetworkEvent.PROGRESS_TYPE_INITIALIZING));
+                // progressListeners might be made null by a separate thread
+                EventDispatcher initListeners = progressListeners;
+                if (initListeners != null) {
+                    initListeners.fireActionEvent(new NetworkEvent(req, NetworkEvent.PROGRESS_TYPE_INITIALIZING));
                 }
                 if (req.getShowOnInit() != null) {
                     req.getShowOnInit().showModeless();
@@ -1130,8 +1132,15 @@ public final class NetworkManager {
                 if (requestWasCompleted) {
                     req.complete = true;
                 }
-                if (progressListeners != null) {
-                    progressListeners.fireActionEvent(new NetworkEvent(req, NetworkEvent.PROGRESS_TYPE_COMPLETED));
+                // Read once into a local. A listener removed from the EDT --
+                // which is where postResponse() runs, queued while this thread
+                // was still finishing the request -- can null the field between
+                // the check and the dispatch, and the NullPointerException that
+                // followed would escape NetworkThread.run() and kill the only
+                // network worker. Same reasoning as fireProgressEvent.
+                EventDispatcher completionListeners = progressListeners;
+                if (completionListeners != null) {
+                    completionListeners.fireActionEvent(new NetworkEvent(req, NetworkEvent.PROGRESS_TYPE_COMPLETED));
                 }
                 if (req.getDisposeOnCompletion() != null && !req.isRedirecting()) {
                     // there may be a race condition where the dialog hasn't yet appeared but the

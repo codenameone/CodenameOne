@@ -23,13 +23,16 @@
 package com.codename1.mcp;
 
 import com.codename1.ai.Tool;
+import com.codename1.ui.Display;
 
 /// Public entry point for the Codename One MCP headless API. Invoking a starter here is
 /// the enablement; there is no build hint or property to toggle. A single server
 /// instance exists per process.
 ///
-/// This API is supported by the Codename One JavaSE port, which powers the simulator and
-/// the desktop tooling. It is not part of a packaged application build.
+/// The stdio transport is supported by the Codename One JavaSE port, which powers the
+/// simulator and the desktop tooling. The socket transport also serves a build running on
+/// a device, on any port that can bind the loopback interface. It is blocked on a release
+/// build - see [#setAllowOnReleaseBuilds(boolean)].
 ///
 /// #### Typical usage
 ///
@@ -45,8 +48,15 @@ import com.codename1.ai.Tool;
 /// ```
 public final class MCP {
     private static MCPServer server;
+    /// Every access to these goes through the class monitor, because the port that
+    /// registers a transport and the code asking whether one exists are not necessarily
+    /// the same thread. The accessors below are synchronized for that reason, which also
+    /// keeps every read and write of this state on the one lock the rest of the class
+    /// already takes.
     private static StdioTransportFactory stdioTransportFactory;
     private static SocketTransportFactory socketTransportFactory;
+    /// Lifts the release build block; see [#setAllowOnReleaseBuilds(boolean)].
+    private static boolean allowOnReleaseBuilds;
 
     private MCP() {
     }
@@ -69,23 +79,38 @@ public final class MCP {
     }
 
     /// Registers the platform stdio transport factory. Called by the JavaSE port.
-    public static void setStdioTransportFactory(StdioTransportFactory factory) {
+    public static synchronized void setStdioTransportFactory(StdioTransportFactory factory) {
         stdioTransportFactory = factory;
     }
 
     /// Registers the platform socket transport factory. Called by the JavaSE port.
-    public static void setSocketTransportFactory(SocketTransportFactory factory) {
+    public static synchronized void setSocketTransportFactory(SocketTransportFactory factory) {
         socketTransportFactory = factory;
     }
 
+    /// Whether the PORT supplied a transport of its own. Distinct from
+    /// [#isSocketSupported()], which also counts the portable fallback - the fallback
+    /// must not see itself as already installed.
+    static synchronized boolean hasPlatformSocketTransport() {
+        return socketTransportFactory != null;
+    }
+
     /// Whether an stdio transport is available on this platform.
-    public static boolean isStdioSupported() {
+    public static synchronized boolean isStdioSupported() {
         return stdioTransportFactory != null;
     }
 
-    /// Whether a loopback socket transport is available on this platform.
-    public static boolean isSocketSupported() {
-        return socketTransportFactory != null;
+    /// Whether a loopback socket transport is available on this platform - either one the
+    /// port registered itself, or the portable one, which needs
+    /// [com.codename1.io.Socket#isLoopbackServerSocketSupported()].
+    ///
+    /// This is a question about CAPABILITY and deliberately ignores the release build
+    /// gate, so it is not a complete preflight for [#startSocketServer(int)] on its own -
+    /// a platform that can bind may still refuse to serve. Ask
+    /// [#isSocketServerAllowedOnThisBuild()] for the other half.
+    public static synchronized boolean isSocketSupported() {
+        return socketTransportFactory != null
+                || com.codename1.io.Socket.isLoopbackServerSocketSupported();
     }
 
     /// Returns the shared server, creating it on first use.
@@ -114,15 +139,88 @@ public final class MCP {
     }
 
     /// Starts a loopback socket server so an agent can attach to this running process.
-    /// Requires a platform socket transport factory (registered by the JavaSE port).
+    ///
+    /// Uses the transport the port registered, if it has one - the JavaSE port registers a
+    /// java.net implementation. Any other port falls back to the portable transport, which
+    /// binds through [com.codename1.io.Socket], so this works on a device too. It fails,
+    /// on this thread, when the platform cannot bind a loopback server socket at all.
+    ///
+    /// Refuses to bind on a RELEASE build, throwing [IllegalStateException] - see
+    /// [#setAllowOnReleaseBuilds(boolean)] for why, and for the deliberate override.
     public static synchronized MCPServer startSocketServer(int port) {
+        checkAllowedOnThisBuild();
+        // Ports that did not register a transport of their own fall back to the portable
+        // one, which binds loopback through com.codename1.io.Socket - so attaching to a
+        // running app on a device or simulator works, not only on the desktop.
+        MCPLoopbackSocketTransport.registerIfPlatformHasNone();
         if (socketTransportFactory == null) {
             throw new IllegalStateException(
-                    "No socket MCP transport is available on this platform. Run on the JavaSE port.");
+                    "No socket MCP transport is available on this platform: it cannot bind a "
+                            + "loopback server socket.");
         }
         MCPServer s = getServer();
         s.start(socketTransportFactory.createSocketTransport(port));
         return s;
+    }
+
+    /// Permits the socket server to bind on a RELEASE build. Off by default, and turning
+    /// it on should be a deliberate, reviewed decision.
+    ///
+    /// The reason for the default: an attached agent can read the screen and drive the
+    /// user interface, and the loopback interface is shared by everything on the device,
+    /// not private to one application. On a phone that means any OTHER app installed
+    /// alongside yours can connect to the port and drive your application. That is a fine
+    /// trade while developing - it is how an agent attaches to a running app - and a poor
+    /// one in an app a user installs.
+    ///
+    /// A development build is detected as a debuggable Android package or a development
+    /// provisioned iOS build. Any other target is treated as a release build, so a port
+    /// that cannot tell withholds the server rather than exposing it.
+    ///
+    /// The JavaSE port is the exception, and it matters here: it reports a development
+    /// build in every case, because it cannot distinguish the simulator, the designer and
+    /// the desktop tooling from a desktop application packaged for distribution. So this
+    /// gate does NOT protect a shipped desktop build, and a desktop application that wants
+    /// the server withheld from its own release has to decide that for itself. See
+    /// [com.codename1.ui.Display#isDebuggableBuild()].
+    ///
+    /// Set this only for a build that ships to a controlled fleet - a kiosk, a test lab,
+    /// an enterprise deployment - where the device itself is trusted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `allow`: true to permit the socket server on a release build
+    public static synchronized void setAllowOnReleaseBuilds(boolean allow) {
+        allowOnReleaseBuilds = allow;
+    }
+
+    /// Whether the socket server may bind on a release build.
+    public static synchronized boolean isAllowedOnReleaseBuilds() {
+        return allowOnReleaseBuilds;
+    }
+
+    /// Whether the socket server is allowed to run on THIS build, which is the other half
+    /// of the question [#isSocketSupported()] answers: that one asks whether the platform
+    /// can bind a loopback server socket, this one whether it is permitted to serve.
+    /// [#startSocketServer(int)] needs both, and refuses on the first that says no.
+    ///
+    /// True on a development build, or on any build where
+    /// [#setAllowOnReleaseBuilds(boolean)] has been used.
+    public static synchronized boolean isSocketServerAllowedOnThisBuild() {
+        return allowOnReleaseBuilds || Display.getInstance().isDebuggableBuild();
+    }
+
+    /// Throws unless this build may serve MCP over a socket.
+    private static void checkAllowedOnThisBuild() {
+        if (isSocketServerAllowedOnThisBuild()) {
+            return;
+        }
+        throw new IllegalStateException(
+                "The MCP socket server is blocked on a release build. An attached agent can "
+                        + "read the screen and drive the UI, and any other app on the device "
+                        + "can reach the loopback port. Use a development build, or call "
+                        + "MCP.setAllowOnReleaseBuilds(true) if this build ships to a "
+                        + "controlled fleet.");
     }
 
     /// Stops the shared server if it is running.

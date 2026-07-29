@@ -27,6 +27,12 @@ import java.util.List;
 
 /// A connected sequence of line segments drawn on a map. Add one through
 /// [MapSurface#addPolyline(Polyline)].
+///
+/// A polyline joins the vertices you give it with *straight* segments; it
+/// knows nothing about roads. To draw a route that follows the road network,
+/// ask a routing service for the road geometry and draw that -- see
+/// [com.codename1.maps.routing.Routing], or decode a geometry you fetched
+/// yourself with [#fromEncoded(String)].
 public final class Polyline extends MapObject {
 
     private final List points;
@@ -48,6 +54,31 @@ public final class Polyline extends MapObject {
                 points.add(pt);
             }
         }
+    }
+
+    /// Creates a polyline from an *encoded polyline* geometry at
+    /// [PolylineCodec]'s default precision -- the shape virtually every
+    /// directions API returns for a route.
+    public static Polyline fromEncoded(String encoded) {
+        return through(PolylineCodec.decode(encoded));
+    }
+
+    /// Creates a polyline from an *encoded polyline* geometry at an explicit
+    /// decimal precision (5 for the classic format, 6 for `polyline6`).
+    ///
+    /// Throws `IllegalArgumentException` when `precision` falls outside 1 to
+    /// 10; a precision that cannot scale coordinates sensibly would otherwise
+    /// decode into a line drawn in the wrong place. See [PolylineCodec].
+    public static Polyline fromEncoded(String encoded, int precision) {
+        return through(PolylineCodec.decode(encoded, precision));
+    }
+
+    /// Wraps already-decoded vertices, so neither factory has to restate the
+    /// codec's default precision.
+    private static Polyline through(List decoded) {
+        Polyline pl = new Polyline();
+        pl.points.addAll(decoded);
+        return pl;
     }
 
     /// Appends a vertex.

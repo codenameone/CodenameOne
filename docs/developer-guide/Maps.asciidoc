@@ -31,6 +31,35 @@ Marker icons are supplied as `EncodedImage` and anchored in normalized `(u, v)` 
 
 image::img/maps-markers.png[Markers drawn with the default Material map pin,scaledwidth=40%]
 
+=== Routes that follow the road
+
+A polyline joins the coordinates you hand it with *straight* lines -- it knows nothing about roads. Passing two endpoints to `addPolyline` therefore draws a single straight segment across the map, which is seldom what a navigation screen wants. Working out the road geometry between two points is a separate job, done by a routing service, and that's what the `com.codename1.maps.routing` package is for:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MapsJava005Snippet.java[tag=maps-java-005,indent=0]
+----
+
+`Routing.showRoute(...)` fetches the route, draws it and moves the camera to frame it. Like the keyless OpenFreeMap basemap, it works with no API key and no signup: routing runs over OpenStreetMap data through the built-in `OsrmRouteService`.
+
+Routing is asynchronous -- the call returns immediately and the line appears when the service answers. Use `Routing.findRoute(...)` when you want the result itself, for example to style the line or show the distance and the estimated time:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MapsJava006Snippet.java[tag=maps-java-006,indent=0]
+----
+
+A `Route` carries the drawable geometry (`toPolyline()`), the bounds to frame it with, the total distance and duration, and the `RouteLeg`/`RouteStep` breakdown behind a turn-by-turn list. A `RouteRequest` adds waypoints and a `TravelMode` (`DRIVING`, `WALKING`, `CYCLING`).
+
+CAUTION: The default endpoint is OSRM's *public demo server*. It exists for development and demos: no SLA, rate limited, and it hosts the car profile, so walking and cycling requests are routed over driving data there. Before shipping, point the service at your own OSRM instance (or any OSRM-compatible endpoint) -- nothing else in your code changes:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MapsJava007Snippet.java[tag=maps-java-007,indent=0]
+----
+
+To route through a different provider entirely -- Google Directions, Mapbox Directions, GraphHopper, your own server -- implement `RouteService` and install it the same way. Every provider of that kind returns the route as an *encoded polyline*, which `Polyline.fromEncoded(geometry)` turns straight into something drawable (`PolylineCodec` also handles the `polyline6` variant used by Valhalla).
+
 === Tile sources and styles (MapView)
 
 `MapView` pulls its tiles from a pluggable `com.codename1.maps.vector.TileSource`:

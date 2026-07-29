@@ -72,6 +72,45 @@ public final class WebMercator {
         return latRad * 180.0 / PI;
     }
 
+    /// The furthest latitude Web Mercator can represent. The projection runs
+    /// to infinity at the poles, so every slippy map cuts off here, which also
+    /// makes the world exactly square.
+    public static final double MAX_LATITUDE = 85.05112878;
+
+    /// Confines `lat` to the range the projection can actually represent.
+    ///
+    /// Projecting a latitude beyond [#MAX_LATITUDE] produces an enormous or
+    /// infinite y, and arithmetic on those values quietly yields nonsense:
+    /// averaging the projections of -90 and 90 lands on the south pole rather
+    /// than the equator. Clamping first keeps every derived camera finite and
+    /// sensible.
+    public static double clampLatitude(double lat) {
+        if (lat > MAX_LATITUDE) {
+            return MAX_LATITUDE;
+        }
+        if (lat < -MAX_LATITUDE) {
+            return -MAX_LATITUDE;
+        }
+        return lat;
+    }
+
+    /// The latitude that sits visually halfway between `southLat` and
+    /// `northLat` on a Mercator map -- the midpoint of their *projected* y
+    /// coordinates, converted back. Both inputs are clamped to
+    /// [#MAX_LATITUDE] first.
+    ///
+    /// This is not the arithmetic mean, because Mercator stretches distances
+    /// away from the equator. Latitudes 0 and 80 average to 40, but their
+    /// projected midpoint is about 57; centering a camera on 40 pushes the
+    /// northern edge of that band well outside a viewport sized to hold it.
+    /// Anything framing bounds must center this way for the fitted zoom to
+    /// actually contain them.
+    public static double centerLatitude(double southLat, double northLat) {
+        double midY = (latToWorldY(clampLatitude(southLat), 0)
+                + latToWorldY(clampLatitude(northLat), 0)) / 2.0;
+        return worldYToLat(midY, 0);
+    }
+
     /// Hyperbolic sine, absent from the minimal device `Math`.
     public static double sinh(double x) {
         return (MathUtil.exp(x) - MathUtil.exp(-x)) / 2.0;

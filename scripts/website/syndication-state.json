@@ -1257,6 +1257,57 @@
         "source_slug": "text-input-without-native-overlay",
         "scheduled_at": "2026-07-27T09:00:00+00:00"
       }
+    },
+    "accessibility-semantics": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cms3ctzbi00000ai3doecfy30",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a6772805201a5d3e7460dc2",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-27T15:01:12+00:00"
+      },
+      "devto": {
+        "id": 4246482,
+        "url": "https://dev.to/codenameone/accessibility-semantics-the-ui-tree-you-cannot-see-g9m",
+        "syndicated_at": "2026-07-27T15:38:41+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/f324aeae88e9/edit",
+        "syndicated_at": "2026-07-27T17:02:02+00:00"
+      }
+    },
+    "2026-07-28-1200-codenameone-rich-text-without-webview": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/company/5041007/admin/page-posts/published/",
+        "syndicated_at": "2026-07-28T09:01:03+00:00",
+        "account": "codenameone",
+        "source_slug": "rich-text-without-webview",
+        "scheduled_at": "2026-07-28T09:00:00+00:00"
+      }
+    },
+    "codename-one-mcp-server": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cms4s9s1g00010akefydl34ro",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a68c3fc698247b1f9d5ea47",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-28T15:01:09+00:00"
+      },
+      "devto": {
+        "id": 4255423,
+        "url": "https://dev.to/codenameone/your-codename-one-app-can-be-an-mcp-server-21ja",
+        "syndicated_at": "2026-07-28T15:16:20+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/5826cd818bae/edit",
+        "syndicated_at": "2026-07-28T17:01:08+00:00"
+      }
     }
   }
 }

@@ -36,10 +36,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -86,7 +86,7 @@ final class ClassClosureVerifier {
      * @return map of missing class internal name to the internal names of the
      *         classes that reference it, empty when the closure is consistent
      */
-    static Map<String, Set<String>> findMissingProjectReferences(File stagedJar, List<File> projectClassRoots, List<File> providedJars) throws IOException {
+    static Map<String, Set<String>> findMissingProjectReferences(File stagedJar, Collection<File> projectClassRoots, Collection<File> providedJars) throws IOException {
         Set<String> projectPackages = new HashSet<String>();
         for (File root : projectClassRoots) {
             if (root.isDirectory()) {

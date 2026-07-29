@@ -29,6 +29,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /// Class implementing the socket API
 ///
@@ -59,6 +60,22 @@ public final class Socket {
     /// we recommend against using them
     public static boolean isServerSocketSupported() {
         return Util.getImplementation().isServerSocketAvailable();
+    }
+
+    /// Returns true if this port can listen on the LOOPBACK interface only, so the
+    /// channel is reachable from the device itself but not from the network.
+    ///
+    /// This is a strictly narrower capability than [#isServerSocketSupported()], which
+    /// binds the wildcard address and therefore publishes the port on every network
+    /// interface. A port must implement loopback binding explicitly; there is no
+    /// fallback to a wildcard bind, because silently widening the reach of a channel a
+    /// caller asked to keep local would be the wrong failure.
+    ///
+    /// #### Returns
+    ///
+    /// true if [#listenLoopback(int, Class)] is usable on this port
+    public static boolean isLoopbackServerSocketSupported() {
+        return Util.getImplementation().isLoopbackServerSocketAvailable();
     }
 
     /// Connect to a remote host
@@ -166,16 +183,88 @@ public final class Socket {
     /// @deprecated server sockets are only supported on Android and Desktop and as such
     /// we recommend against using them
     public static StopListening listen(final int port, final Class scClass) {
+        return listenImpl(port, scClass, false);
+    }
+
+    /// Listens on the given port on the LOOPBACK interface only, so the channel is
+    /// reachable from this device but not from the network. Otherwise identical to
+    /// [#listen(int, Class)]: `scClass` is instantiated per incoming connection and
+    /// must have a public no-argument constructor.
+    ///
+    /// Use this for anything that is local by nature - a debug or automation channel,
+    /// an on-device tool talking to a companion process. Callers that genuinely want to
+    /// serve the network should use [#listen(int, Class)] and say so.
+    ///
+    /// Fails (never falls back to a wildcard bind) when
+    /// [#isLoopbackServerSocketSupported()] is false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `port`: the device port
+    ///
+    /// - `scClass`: class of callback for each incoming connection
+    ///
+    /// #### Returns
+    ///
+    /// StopListening instance that allows the caller to stop listening
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: if this platform cannot bind a loopback server socket.
+    /// Thrown here rather than on the listener thread so a caller cannot walk away
+    /// believing it is listening when nothing ever bound.
+    public static StopListening listenLoopback(final int port, final Class scClass) {
+        if (!isLoopbackServerSocketSupported()) {
+            throw new IllegalStateException("This platform cannot bind a loopback server "
+                    + "socket; check Socket.isLoopbackServerSocketSupported() first");
+        }
+        return listenImpl(port, scClass, true);
+    }
+
+    private static StopListening listenImpl(final int port, final Class scClass, final boolean loopbackOnly) {
         class Listener implements StopListening, Runnable {
-            private boolean stopped;
+            /// Written by stop() on the caller's thread and read by the accept loop on
+            /// another, so it needs a memory barrier rather than a plain field. Without
+            /// one the loop can miss the write, and since closing the listening socket
+            /// makes the port's cache hand out a FRESH socket on the next call, the
+            /// listener would quietly resurrect itself instead of stopping.
+            private final AtomicBoolean stopped = new AtomicBoolean();
+
+            /// The backoff after a failed accept. It starts short, doubles while the
+            /// failure persists and is capped, so a port that can never be bound settles
+            /// into one attempt every few seconds instead of two a second forever. Reset
+            /// as soon as an accept succeeds, so a listener that saw one bad moment is not
+            /// left sluggish. Slept in slices so a stop is still noticed promptly.
+            private static final int BACKOFF_MIN_MS = 50;
+            private static final int BACKOFF_MAX_MS = 5000;
+            private static final int BACKOFF_SLICE_MS = 50;
+            private int backoffMs = BACKOFF_MIN_MS;
 
             @Override
             public void run() {
                 try {
-                    while (!stopped) {
-                        final Object connection = Util.getImplementation().listenSocket(port);
+                    while (!stopped.get()) {
+                        final Object connection = loopbackOnly
+                                ? Util.getImplementation().listenSocketLoopback(port)
+                                : Util.getImplementation().listenSocket(port);
+                        if (stopped.get()) {
+                            // stop() was called while this thread sat inside accept. The
+                            // connection that unblocked it belongs to a listener the caller
+                            // has already abandoned, so hand it back rather than serving it.
+                            if (connection != null) {
+                                Util.getImplementation().disconnectSocket(connection);
+                            }
+                            break;
+                        }
+                        if (connection == null && stopped.get()) {
+                            // Closing the listening socket is how a stop is delivered, and
+                            // it surfaces here as a failed accept. Reporting that through
+                            // connectionError would announce a fault that never happened.
+                            break;
+                        }
                         final SocketConnection sc = (SocketConnection) scClass.newInstance();
                         if (connection != null) {
+                            backoffMs = BACKOFF_MIN_MS;   // healthy again
                             sc.setConnected(true);
                             Display.getInstance().startThread(new Runnable() {
                                 @Override
@@ -188,6 +277,28 @@ public final class Socket {
                             }, "Connection " + port).start();
                         } else {
                             sc.connectionError(Util.getImplementation().getSocketErrorCode(connection), Util.getImplementation().getSocketErrorMessage(connection));
+                            // A listener whose accept fails immediately and keeps failing --
+                            // a port that cannot be bound, say -- would otherwise spin at
+                            // full speed, burning a core and filling the log. Pause so a
+                            // persistent failure is slow and visible instead of hot. Only
+                            // the failure path waits; a served connection never gets here.
+                            //
+                            // Slept in slices, re-testing the flag between them, so a stop
+                            // arriving during the pause is acted on within a slice rather
+                            // than after the whole backoff.
+                            int waited = 0;
+                            while (waited < backoffMs && !stopped.get()) {
+                                int slice = Math.min(BACKOFF_SLICE_MS, backoffMs - waited);
+                                try {
+                                    Thread.sleep(slice);
+                                } catch (InterruptedException interrupted) {
+                                    break;   // the loop re-tests stopped straight away
+                                }
+                                waited += slice;
+                            }
+                            if (backoffMs < BACKOFF_MAX_MS) {
+                                backoffMs = Math.min(backoffMs * 2, BACKOFF_MAX_MS);
+                            }
                         }
                     }
                 } catch (InstantiationException err) {
@@ -204,7 +315,13 @@ public final class Socket {
 
             @Override
             public void stop() {
-                stopped = true;
+                stopped.set(true);
+                // Closing the listening socket is what brings the thread back out of
+                // accept. Without it the flag is only noticed the next time a client
+                // connects, so the thread lingers, and a listener restarted on the same
+                // port shares the cached socket -- letting this abandoned thread win the
+                // race for the first connection and drop it.
+                Util.getImplementation().stopListeningSocket(port, loopbackOnly);
             }
 
         }

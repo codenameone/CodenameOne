@@ -207,6 +207,66 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     }
 
     /**
+     * Local JavaScript builds run ParparVM's translator on this machine, so
+     * they keep the classes a server build would have re-supplied.
+     */
+    static boolean isLocalJavascriptBuild(String buildTarget) {
+        return buildTarget != null && buildTarget.contains("javascript") && isLocalBuildTarget(buildTarget);
+    }
+
+    // A null build target never reaches these from the mojo -- the parameter is
+    // required -- but they are static and package private, so treat an absent
+    // target as "not local": the conservative answer, since it keeps the server
+    // supplied artifacts out of the staged jar rather than throwing.
+
+    /**
+     * Whether the build itself re-supplies the artifact's classes after they
+     * are left out of the staged jar: codenameone-core and java-runtime come
+     * from the build server (or, for a local JavaScript build, stay in the jar
+     * so ParparVM's translator can see them), and kotlin-stdlib comes from the
+     * build server too. This is deliberately narrower than
+     * {@link #isStrippedFromStagedJar}: a reference into anything else that is
+     * left out really is a reference to a class nobody will supply.
+     */
+    static boolean isSuppliedByBuildServer(String groupId, String artifactId, String buildTarget) {
+        if (GROUP_ID.equals(groupId) && contains(artifactId, BUNDLE_ARTIFACT_ID_BLACKLIST)) {
+            return !isLocalJavascriptBuild(buildTarget);
+        }
+        return !isLocalBuildTarget(buildTarget)
+                && "org.jetbrains.kotlin".equals(groupId)
+                && "kotlin-stdlib".equals(artifactId);
+    }
+
+    /**
+     * Whether the given artifact is left out of the jar-with-dependencies that
+     * is staged for the build, either because the build re-supplies it or
+     * because its scope says it is not part of the application. Shared by the
+     * jar assembly and the class closure check so the two can never disagree
+     * about what is in the jar.
+     */
+    static boolean isStrippedFromStagedJar(String groupId, String artifactId, String scope, String buildTarget) {
+        if (GROUP_ID.equals(groupId) && contains(artifactId, BUNDLE_ARTIFACT_ID_BLACKLIST)) {
+            // For local JavaScript builds we need codenameone-core and java-runtime classes
+            // in the staged jar - the build server normally re-supplies those, but ParparVM's
+            // ByteCodeTranslator runs locally here and resolves everything from the staged class
+            // directory.
+            return !isLocalJavascriptBuild(buildTarget);
+        }
+        if (isSuppliedByBuildServer(groupId, artifactId, buildTarget)) {
+            // When sending to the build server, we'll strip the kotlin-stdlib and the server will
+            // provide it. For local builds, it's easier to just include it.
+            return true;
+        }
+        // An artifact with no scope was never scoped out of the application, so
+        // keep its classes rather than dropping them from the jar.
+        return scope != null && !"compile".equals(scope);
+    }
+
+    private boolean isStrippedFromStagedJar(Artifact artifact) {
+        return isStrippedFromStagedJar(artifact.getGroupId(), artifact.getArtifactId(), artifact.getScope(), buildTarget);
+    }
+
+    /**
      * Fails the build when the staged jar-with-dependencies contains an
      * application class that references another application class which is not
      * in the jar. Stale build output causes exactly this -- e.g. an IDE deletes
@@ -241,19 +301,48 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
             }
         }
-        // Classes stripped from the upload that the build server re-supplies:
-        // references into them are not missing.
-        List<File> providedJars = new ArrayList<File>();
+        // Classes left out of the staged jar that the build re-supplies: references
+        // into them are not missing. Anything else that was left out -- a `provided`
+        // scope third party dependency, say -- stays reportable, because nothing
+        // puts those classes back before the translators run.
+        boolean localJavascriptBuild = isLocalJavascriptBuild(buildTarget);
+        Set<File> providedJars = new LinkedHashSet<File>();
         for (Artifact artifact : project.getArtifacts()) {
-            boolean providedByServer = GROUP_ID.equals(artifact.getGroupId())
-                    && contains(artifact.getArtifactId(), BUNDLE_ARTIFACT_ID_BLACKLIST);
-            providedByServer = providedByServer || ("org.jetbrains.kotlin".equals(artifact.getGroupId())
-                    && "kotlin-stdlib".equals(artifact.getArtifactId()));
-            if (providedByServer) {
+            if (isSuppliedByBuildServer(artifact.getGroupId(), artifact.getArtifactId(), buildTarget)) {
                 File jar = getJar(artifact);
                 if (jar != null && jar.isFile()) {
                     providedJars.add(jar);
                 }
+            }
+        }
+        if (!localJavascriptBuild) {
+            // codenameone-core and java-runtime are `provided` scope in the app's common
+            // module and `provided` is not transitive, so a platform module (ios, android,
+            // ...) that only depends on common does not see them among its own artifacts.
+            // They still have to count as provided: without them every reference into a
+            // package the app shares with the framework -- a patched framework class, or a
+            // helper deliberately placed in a com.codename1 package to reach package
+            // private API -- makes the whole framework package look like it is missing
+            // from the build. Resolve them from the plugin's own dependencies instead.
+            boolean coreResolved = false;
+            for (String bundled : BUNDLE_ARTIFACT_ID_BLACKLIST) {
+                File jar = getJar(GROUP_ID, bundled);
+                if (jar != null && jar.isFile()) {
+                    providedJars.add(jar);
+                    if ("codenameone-core".equals(bundled)) {
+                        coreResolved = true;
+                    }
+                }
+            }
+            if (!coreResolved) {
+                // Every application class references the framework, so without its class
+                // list the check cannot tell a stale class from a framework class and would
+                // report false positives. Skipping is the only safe answer, but say so
+                // loudly: a stale class will now reach the build unreported.
+                getLog().warn("Skipping the application class closure check for build target " + buildTarget
+                        + " because " + GROUP_ID + ":codenameone-core could not be resolved."
+                        + " Stale application classes will not be detected before the build runs.");
+                return;
             }
         }
         Map<String, Set<String>> missing;
@@ -524,7 +613,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     public static final String BUILD_TARGET_MAC_NATIVE = Executor.BUILD_TARGET_MAC_NATIVE;
     public static final String BUILD_TARGET_LINUX_NATIVE = Executor.BUILD_TARGET_LINUX_NATIVE;
 
-    private boolean isLocalBuildTarget(String buildTarget) {
+    private static boolean isLocalBuildTarget(String buildTarget) {
+        if (buildTarget == null) {
+            return false;
+        }
         // windows-device (BUILD_TARGET_WINDOWS_NATIVE) is a *cloud* build: it sends
         // a "win32" build to the server (see the windows-device target in
         // buildxml-template.xml), mirroring linux-device. Only the explicit
@@ -652,34 +744,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             // in the staged jar — the build server normally re-supplies those, but ParparVM's
             // ByteCodeTranslator runs locally here and resolves everything from the staged class
             // directory.
-            boolean localJsBuild = buildTarget.contains("javascript") && isLocalBuildTarget(buildTarget);
+            boolean localJsBuild = isLocalJavascriptBuild(buildTarget);
             for (Artifact artifact : project.getArtifacts()) {
-                boolean addToBlacklist = false;
-                if (artifact.getGroupId().equals("com.codenameone") && contains(artifact.getArtifactId(), BUNDLE_ARTIFACT_ID_BLACKLIST)) {
-                    if (!localJsBuild) {
-                        addToBlacklist = true;
-                    }
-                }
-                if (!addToBlacklist && !isLocalBuildTarget(buildTarget)) {
-                    // When sending to the build server, we'll strip the kotlin-stdlib and the server will provide it
-                    // for local builds, it's easier to just include it.
-                    if (artifact.getGroupId().equals("org.jetbrains.kotlin") && artifact.getArtifactId().equals("kotlin-stdlib")) {
-                        addToBlacklist = true;
-                        serverMustProvideKotlinVersion = artifact.getVersion();
-                        getLog().debug("Adding kotlin-stdlib to blacklist.  Server will provide this:" + artifact);
-                    }
-                }
-                if (!addToBlacklist && !"compile".equals(artifact.getScope())) {
-                    // Local JS builds need codenameone-core / java-runtime even though they are
-                    // marked `provided` in the user's POM — the build server normally re-supplies
-                    // them, but locally we have to bundle them so ParparVM's translator can see
-                    // every referenced class.
-                    boolean keepForLocalJs = localJsBuild
-                            && "com.codenameone".equals(artifact.getGroupId())
-                            && contains(artifact.getArtifactId(), BUNDLE_ARTIFACT_ID_BLACKLIST);
-                    if (!keepForLocalJs) {
-                        addToBlacklist = true;
-                    }
+                boolean addToBlacklist = isStrippedFromStagedJar(artifact);
+                if (addToBlacklist && !isLocalBuildTarget(buildTarget)
+                        && "org.jetbrains.kotlin".equals(artifact.getGroupId())
+                        && "kotlin-stdlib".equals(artifact.getArtifactId())) {
+                    serverMustProvideKotlinVersion = artifact.getVersion();
+                    getLog().debug("Adding kotlin-stdlib to blacklist.  Server will provide this:" + artifact);
                 }
                 if (addToBlacklist) {
                     File jar = getJar(artifact);

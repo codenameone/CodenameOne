@@ -4082,6 +4082,35 @@ public final class Display extends CN1Constants {
     /// `simulator-hooks.properties` format and the positional `itemN` / `labelN`
     /// conventions.
     ///
+    /// #### JavaScript port
+    ///
+    /// Browsers only let a page open a new window/tab from inside a live user
+    /// gesture, and Codename One dispatches events on its own EDT so by the time
+    /// your listener calls this method the browser no longer considers a gesture
+    /// to be in progress. The JavaScript port therefore resolves the
+    /// `javascript.execute.target` property to decide what to do:
+    ///
+    /// - `auto` (the default) opens a new tab when the page still has user
+    ///   activation and otherwise navigates the page the app is running in. No
+    ///   confirmation prompt is ever shown, but note that navigating the current
+    ///   page unloads the app.
+    /// - `_blank` only ever opens a new tab. When the browser would block it the
+    ///   port shows a confirmation `Sheet` whose OK button supplies the missing
+    ///   gesture. This was the behavior before the property existed.
+    /// - `_self` always navigates the page the app is running in.
+    ///
+    /// Set it before the call, for example in your `init` method:
+    ///
+    /// ```java
+    /// Display.getInstance().setProperty("javascript.execute.target", "_self");
+    /// ```
+    ///
+    /// The property applies to any URL carrying a URI scheme the browser can
+    /// hand off, custom deep links like the `imdb:///find` example above
+    /// included. It is ignored on every other platform, and on all targets a
+    /// `javascript:` URL, a `data:` URL, a `file:` URL or a path into local
+    /// storage keeps its existing meaning.
+    ///
     /// #### Parameters
     ///
     /// - `url`: the url to execute
@@ -6701,6 +6730,37 @@ public final class Display extends CN1Constants {
     /// true if we are running in the simulator, false otherwise
     public boolean isSimulator() {
         return impl.isSimulator();
+    }
+
+    /// Whether this build is a development build rather than a release build headed for
+    /// an app store. This is broader than [#isSimulator()], which reports the JavaSE
+    /// simulator and designer specifically and is false on a device however the build was
+    /// signed. Use it to gate a facility that belongs in a build you are working on but
+    /// not in one a user installs.
+    ///
+    /// What each port reports:
+    ///
+    /// - Android: true when the package carries the debuggable flag, which a debug build
+    /// sets and a release build clears.
+    ///
+    /// - iOS: true when the provisioning profile grants get-task-allow, the entitlement
+    /// that permits a debugger to attach. Development and ad-hoc profiles carry it; App
+    /// Store and enterprise profiles do not.
+    ///
+    /// - JavaSE: ALWAYS true. That port runs the simulator, the designer and the desktop
+    /// tooling, and it cannot distinguish those from a desktop application packaged for
+    /// distribution, so a packaged desktop app also reports true. Do not rely on this
+    /// method alone to withhold something from a shipped DESKTOP build; combine it with
+    /// your own signal there.
+    ///
+    /// - Any other port: false, because it cannot tell. The answer errs towards treating a
+    /// build as a release and withholding the facility.
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a development build
+    public boolean isDebuggableBuild() {
+        return impl.isDebuggableBuild();
     }
 
     /// Creates an audio media that can be played in the background.

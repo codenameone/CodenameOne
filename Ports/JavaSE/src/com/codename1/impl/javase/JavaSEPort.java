@@ -9723,6 +9723,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         // differentiate simulator from JavaSE port and detect designer
         return designMode || getSkin() != null || widthLabel != null;
     }
+
+    /// Always true, and deliberately so, but it is the weakest answer of any port.
+    ///
+    /// This port is the development environment - the simulator, the designer and the
+    /// desktop tooling all run on it, and that tooling already exposes itself to agents
+    /// from here. A desktop application packaged for distribution ALSO runs on it, and
+    /// nothing in the process distinguishes the two: there is no debuggable flag and no
+    /// provisioning profile to read, as there is on Android and iOS. Reporting a release
+    /// build here would take the MCP menu away from every desktop tool, which is a shipped
+    /// feature, so the port answers true and a packaged desktop app is not gated by it.
+    ///
+    /// A desktop application that needs to withhold something from its own release build
+    /// has to supply that signal itself.
+    @Override
+    public boolean isDebuggableBuild() {
+        return true;
+    }
     
     /**
      * @inheritDoc
@@ -17138,23 +17155,50 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     class ServerSockets {
         Map<Integer,ServerSocket> socks = new HashMap<Integer,ServerSocket>();
-        
+        Map<Integer,ServerSocket> loopbackSocks = new HashMap<Integer,ServerSocket>();
+
         public synchronized ServerSocket get(int port) throws IOException {
-            if (socks.containsKey(port)) {
-                ServerSocket sock = socks.get(port);
-                if (sock.isClosed()) {
-                    sock = new ServerSocket(port);
-                    socks.put(port, sock);
+            return get(port, false);
+        }
+
+        /// When loopbackOnly is set the socket binds 127.0.0.1 instead of the wildcard, so
+        /// the channel is not published on every network interface. The two are cached in
+        /// SEPARATE maps: a port already bound wildcard must never be handed back to a
+        /// caller that asked for loopback. Distinguishing them by sign within one map
+        /// would collide on port 0, the ephemeral-port request, where -0 == 0.
+        ///
+        /// The IPv4 loopback is named explicitly rather than taken from
+        /// InetAddress.getLoopbackAddress(), which answers ::1 when the runtime prefers
+        /// IPv6. A client that then connects to 127.0.0.1 - which is what agents and
+        /// port-forwarding tools do, and what the iOS port binds - would find nothing
+        /// listening, with the server reporting that it had started.
+        public synchronized ServerSocket get(int port, boolean loopbackOnly) throws IOException {
+            Map<Integer,ServerSocket> cache = loopbackOnly ? loopbackSocks : socks;
+            Integer key = Integer.valueOf(port);
+            ServerSocket sock = cache.get(key);
+            if (sock == null || sock.isClosed()) {
+                sock = loopbackOnly
+                        ? new ServerSocket(port, 50, InetAddress.getByName("127.0.0.1"))
+                        : new ServerSocket(port);
+                cache.put(key, sock);
+            }
+            return sock;
+        }
+
+        /// Closes and forgets the socket, so a thread blocked in accept returns and a
+        /// later listener on this port binds a fresh one rather than sharing this.
+        public synchronized void close(int port, boolean loopbackOnly) {
+            Map<Integer,ServerSocket> cache = loopbackOnly ? loopbackSocks : socks;
+            ServerSocket sock = cache.remove(Integer.valueOf(port));
+            if (sock != null) {
+                try {
+                    sock.close();
+                } catch (IOException ignored) {
+                    // best effort: the point is to unblock accept, and a socket that
+                    // cannot be closed is already unusable
                 }
-                return sock;
-            } else {
-                ServerSocket sock = new ServerSocket(port);
-                socks.put(port, sock);
-                return sock;
             }
         }
-        
-        
     }
     
     class SocketImpl {
@@ -17285,13 +17329,24 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public Object listen(int param) {
+            return listen(param, false);
+        }
+
+        public Object listen(int param, boolean loopbackOnly) {
+            ServerSocket serverSocketInstance = null;
             try {
-                ServerSocket serverSocketInstance = getServerSockets().get(param);
+                serverSocketInstance = getServerSockets().get(param, loopbackOnly);
                 socketInstance = serverSocketInstance.accept();
                 return this;
             } catch(Exception err) {
                 errorMessage = err.toString();
-                err.printStackTrace();
+                // A closed socket here is the deliberate stop path: stopping a listener
+                // closes it precisely to bring this accept back. Printing a stack trace
+                // for that would put an alarming fake failure in the log every time a
+                // listener is stopped.
+                if(serverSocketInstance == null || !serverSocketInstance.isClosed()) {
+                    err.printStackTrace();
+                }
                 return null;
             }
         }
@@ -17319,7 +17374,22 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Object listenSocket(int port) {
         return new SocketImpl().listen(port);
     }
-    
+
+    @Override
+    public boolean isLoopbackServerSocketAvailable() {
+        return true;
+    }
+
+    @Override
+    public Object listenSocketLoopback(int port) {
+        return new SocketImpl().listen(port, true);
+    }
+
+    @Override
+    public void stopListeningSocket(int port, boolean loopbackOnly) {
+        getServerSockets().close(port, loopbackOnly);
+    }
+
     @Override
     public String getHostOrIP() {
         try {

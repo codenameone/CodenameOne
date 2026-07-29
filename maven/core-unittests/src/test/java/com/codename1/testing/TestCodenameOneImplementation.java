@@ -1283,6 +1283,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         nativePickerTypeSupported = null;
         socketAvailable = true;
         serverSocketAvailable = false;
+        loopbackSupportedOnlyOnFirstQuery = false;
+        stoppedListeners.clear();
+        loopbackQueried = false;
+        debuggableBuild = true;
         appHomePath = "file://app/";
         hostOrIp = null;
         resetGalleryTracking();
@@ -2807,6 +2811,69 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         } catch (InterruptedException e) {
             return null;
         }
+    }
+
+    private final java.util.List<String> stoppedListeners =
+            java.util.Collections.synchronizedList(new java.util.ArrayList<String>());
+
+    /// Records that a listener was asked to stop, as "port:loopbackOnly". Real ports close
+    /// the listening socket here; there is no socket to close in these tests, so what is
+    /// observable is that the call was made at all, and for the right listener.
+    @Override
+    public void stopListeningSocket(int port, boolean loopbackOnly) {
+        stoppedListeners.add(port + ":" + loopbackOnly);
+    }
+
+    /// A snapshot, not the live list. Handing back the real one lets a test mutate what a
+    /// later assertion reads, and iterating a synchronized list safely needs external
+    /// locking that a test would have to remember.
+    public java.util.List<String> getStoppedListeners() {
+        synchronized (stoppedListeners) {
+            return java.util.Collections.unmodifiableList(
+                    new java.util.ArrayList<String>(stoppedListeners));
+        }
+    }
+
+    private boolean loopbackSupportedOnlyOnFirstQuery;
+    private boolean loopbackQueried;
+
+    /// Reports loopback support to the first caller and withholds it from every caller
+    /// after that, which models the capability changing between a check and the use that
+    /// follows it. Lets a test drive the failure path of a caller that checks first.
+    public void setLoopbackSupportedOnlyOnFirstQuery(boolean onlyFirst) {
+        this.loopbackSupportedOnlyOnFirstQuery = onlyFirst;
+        this.loopbackQueried = false;
+    }
+
+    @Override
+    public boolean isLoopbackServerSocketAvailable() {
+        if (loopbackSupportedOnlyOnFirstQuery) {
+            boolean first = !loopbackQueried;
+            loopbackQueried = true;
+            return first;
+        }
+        return serverSocketAvailable;
+    }
+
+    private boolean debuggableBuild = true;
+
+    /// Lets a test choose which side of the release build gate it is on.
+    public void setDebuggableBuild(boolean debuggableBuild) {
+        this.debuggableBuild = debuggableBuild;
+    }
+
+    @Override
+    public boolean isDebuggableBuild() {
+        return debuggableBuild;
+    }
+
+    /// There is no real network in these tests, so a loopback accept is the same
+    /// simulated queue as a wildcard one. The distinction under test is the API contract
+    /// (callers asking for loopback get a socket, and a port that cannot bind loopback
+    /// refuses), not the kernel-level bind.
+    @Override
+    public Object listenSocketLoopback(int port) {
+        return listenSocket(port);
     }
 
     @Override

@@ -9935,6 +9935,69 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Not supported");
     }
 
+    /// Whether this port can bind a server socket to the LOOPBACK interface only.
+    ///
+    /// Deliberately separate from [#isServerSocketAvailable()] and defaulting to false:
+    /// a port must implement loopback binding explicitly. Answering this with the
+    /// wildcard-binding implementation would publish on every network interface a
+    /// channel the caller asked to keep local.
+    ///
+    /// #### Returns
+    ///
+    /// true if [#listenSocketLoopback(int)] is implemented here
+    public boolean isLoopbackServerSocketAvailable() {
+        return false;
+    }
+
+    /// Closes the listening socket for the given port so a thread parked in accept comes
+    /// back, which is what makes stopping a listener actually stop it. Setting a flag
+    /// alone leaves that thread blocked until some client happens to connect, and that
+    /// late connection is then served or dropped by a listener the caller has abandoned.
+    ///
+    /// A port that does not implement this keeps the older behaviour, where stopping takes
+    /// effect on the next accept.
+    ///
+    /// #### Parameters
+    ///
+    /// - `port`: the port that was being listened on
+    ///
+    /// - `loopbackOnly`: true if the listener was created by [#listenSocketLoopback(int)]
+    public void stopListeningSocket(int port, boolean loopbackOnly) {
+    }
+
+    /// Whether this build is a development build rather than a release build headed for
+    /// an app store: a debuggable Android package, a development provisioned iOS build,
+    /// or a JavaSE process, which covers the simulator, the designer, the desktop tooling
+    /// and a packaged desktop application alike - see [#isDebuggableBuild()] on the JavaSE
+    /// port for why it cannot tell them apart.
+    ///
+    /// Facilities that are appropriate while developing but not in a shipped app can gate
+    /// themselves on this. A port that cannot tell should leave the default in place:
+    /// answering "release" is the safe direction, because it withholds a development
+    /// facility rather than exposing one in production.
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a development build
+    public boolean isDebuggableBuild() {
+        return false;
+    }
+
+    /// Listens on the given port, bound to the loopback interface only, and blocks until
+    /// a connection arrives - the accept semantics of [#listenSocket(int)], with a
+    /// narrower bind.
+    ///
+    /// #### Parameters
+    ///
+    /// - `port`: the port to listen on
+    ///
+    /// #### Returns
+    ///
+    /// connected socket instance, or null when the accept failed
+    public Object listenSocketLoopback(int port) {
+        throw new RuntimeException("Loopback server sockets are not supported on this platform");
+    }
+
     /// Returns the device host or ip address if available
     ///
     /// #### Returns
