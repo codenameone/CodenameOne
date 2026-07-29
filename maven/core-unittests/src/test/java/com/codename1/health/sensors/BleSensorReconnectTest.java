@@ -112,6 +112,7 @@ class BleSensorReconnectTest extends UITestBase {
         BleSensorSession session = new BleSensorSession("fake",
                 HealthSensorProfile.HEART_RATE, new SensorSessionOptions(),
                 p);
+            started.add(session);
         AsyncResource<SensorSession> out =
                 new AsyncResource<SensorSession>();
         session.start(out);
@@ -136,6 +137,7 @@ class BleSensorReconnectTest extends UITestBase {
         BleSensorSession session = new BleSensorSession("fake",
                 HealthSensorProfile.HEART_RATE, new SensorSessionOptions(),
                 p);
+            started.add(session);
         AsyncResource<SensorSession> out =
                 new AsyncResource<SensorSession>();
         session.start(out);
@@ -329,6 +331,7 @@ class BleSensorReconnectTest extends UITestBase {
                     .setStoreBatchMillis(10);
             BleSensorSession session = new BleSensorSession("fake",
                     HealthSensorProfile.HEART_RATE, options, p);
+            started.add(session);
             AsyncResource<SensorSession> out =
                     new AsyncResource<SensorSession>();
             session.start(out);
@@ -359,7 +362,7 @@ class BleSensorReconnectTest extends UITestBase {
             // The batch has to have been attempted at least once, or
             // the retry this guards against never had anything to retry
             // and the test would pass for no reason.
-            int beforeFailure = pumpFor(200);
+            int beforeFailure = pumpFor(200, store);
             assertTrue(beforeFailure > 0,
                     "the session should have tried to write its batch");
 
@@ -368,8 +371,8 @@ class BleSensorReconnectTest extends UITestBase {
             pumpUntil(session, SensorSessionState.FAILED);
             assertTrue(session.isTerminal());
 
-            int afterFailure = pumpFor(300);
-            assertEquals(afterFailure, pumpFor(300),
+            int afterFailure = pumpFor(300, store);
+            assertEquals(afterFailure, pumpFor(300, store),
                     "a session that has ended must issue no further"
                             + " writes; it issued more");
         } finally {
@@ -378,23 +381,33 @@ class BleSensorReconnectTest extends UITestBase {
     }
 
     /** Pumps the EDT for a while and reports the store's write count. */
-    private int pumpFor(long millis) throws Exception {
+    private int pumpFor(long millis, WriteCounter store) throws Exception {
         long until = System.currentTimeMillis() + millis;
         while (System.currentTimeMillis() < until) {
             flushSerialCalls();
             Thread.sleep(10);
         }
-        return CountingStore.writes;
+        return store.writeCount();
+    }
+
+    /** Anything that counts the writes it was handed. */
+    private interface WriteCounter {
+        int writeCount();
     }
 
     /** A store that refuses every write and counts the attempts. */
     private static final class CountingStore
-            extends com.codename1.health.HealthStore {
+            extends com.codename1.health.HealthStore implements WriteCounter {
 
-        static int writes;
+        /// Per instance, not static. A shared counter let a session
+        /// leaked by one test move another test's numbers with nothing
+        /// pointing at the leak -- which is what made
+        /// aFailedSessionStopsRetryingItsWrites fail in CI while passing
+        /// on its own.
+        int writes;
 
-        CountingStore() {
-            writes = 0;
+        public int writeCount() {
+            return writes;
         }
 
         @Override
@@ -460,6 +473,7 @@ class BleSensorReconnectTest extends UITestBase {
                     HealthSensorProfile.HEART_RATE,
                     new SensorSessionOptions().setWriteToStore(true)
                             .setStoreBatchMillis(10), p);
+            started.add(session);
             final int[] errors = new int[1];
             AsyncResource<SensorSession> out =
                     new AsyncResource<SensorSession>();
@@ -493,6 +507,30 @@ class BleSensorReconnectTest extends UITestBase {
         } finally {
             implementation.setHealth(null);
         }
+    }
+
+    /// Sessions any test started, stopped before the next test runs.
+    ///
+    /// A session left streaming keeps its flush timer, and the timer
+    /// resolves the store through Health.getInstance() at flush time --
+    /// so a session leaked by one test writes into the *next* test's
+    /// store and moves its counts. That is what broke
+    /// aFailedSessionStopsRetryingItsWrites in CI while it passed alone:
+    /// the write it saw after the session ended was not its own session's.
+    private final List<SensorSession> started =
+            new ArrayList<SensorSession>();
+
+    @org.junit.jupiter.api.AfterEach
+    void stopStartedSessions() {
+        for (SensorSession s : started) {
+            try {
+                s.stop();
+            } catch (Throwable ignored) {
+                // A test may already have torn it down.
+            }
+        }
+        started.clear();
+        flushSerialCalls();
     }
 
     /** Pumps the EDT for a while so timers can fire. */
@@ -663,6 +701,7 @@ class BleSensorReconnectTest extends UITestBase {
                     // relying on them landing inside a few milliseconds.
                     new SensorSessionOptions().setWriteToStore(true)
                             .setStoreBatchMillis(400), p);
+            started.add(session);
             AsyncResource<SensorSession> out =
                     new AsyncResource<SensorSession>();
             session.start(out);
@@ -713,6 +752,7 @@ class BleSensorReconnectTest extends UITestBase {
                     HealthSensorProfile.HEART_RATE,
                     new SensorSessionOptions().setWriteToStore(true)
                             .setStoreBatchMillis(600), p);
+            started.add(session);
             AsyncResource<SensorSession> out =
                     new AsyncResource<SensorSession>();
             session.start(out);
@@ -730,6 +770,65 @@ class BleSensorReconnectTest extends UITestBase {
             assertEquals(0, store.written.size(),
                     "a session that failed before its flush window"
                             + " elapsed must never issue that write");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
+    /**
+     * Tearing a session down twice does not write twice.
+     *
+     * <p>{@code endSession()} and {@code stop()} both flush, and a failed
+     * flush used to requeue what it could not write -- even from a
+     * session that had already ended, which could never flush it again.
+     * So the buffer refilled and the next teardown sent it. That is one
+     * more write from a dead session, and it survived both the terminal
+     * state check and making the buffer claim atomic, because neither of
+     * them is on this path.</p>
+     *
+     * <p>Deterministic where the reconnect test was not: the second
+     * teardown is this test calling {@code stop()}, not a timer.</p>
+     */
+    @Test
+    void tearingDownTwiceDoesNotWriteTwice() throws Exception {
+        CountingStore store = new CountingStore();
+        implementation.setHealth(new com.codename1.health.Health() {
+            @Override
+            public boolean isSupported() {
+                return true;
+            }
+
+            @Override
+            public com.codename1.health.HealthStore getStore() {
+                return store;
+            }
+        });
+        try {
+            FakePeripheral p = new FakePeripheral();
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE,
+                    new SensorSessionOptions().setWriteToStore(true)
+                            .setStoreBatchMillis(10), p);
+            started.add(session);
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+            p.notifyHeartRate(72);
+            flushSerialCalls();
+
+            p.failDiscoveries = 99;
+            p.dropLink();
+            pumpUntil(session, SensorSessionState.FAILED);
+            int settled = pumpFor(400, store);
+
+            // The second teardown, by hand.
+            session.stop();
+            assertEquals(SensorSessionState.FAILED, session.getState(),
+                    "stopping a failed session must not rewrite how it"
+                            + " ended");
+            assertEquals(settled, pumpFor(400, store),
+                    "a second teardown must not issue another write");
         } finally {
             implementation.setHealth(null);
         }

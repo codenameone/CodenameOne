@@ -641,4 +641,68 @@ class HealthSubscriptionCursorTest extends UITestBase {
                 "with the delivered batch's cursor persisted");
         store.unsubscribe(id);
     }
+
+    /**
+     * A second thread waits for restoration rather than walking into a
+     * half-filled registry.
+     *
+     * <p>The restored flag used to be published before the work was
+     * done, so a concurrent caller saw "restored" against a registry
+     * still being filled. It could unsubscribe an id restoration had read
+     * but not yet inserted -- deleting the persisted cursor -- and the
+     * restoring thread would then put that subscription back and call
+     * {@code doSubscribe} for it: a cancelled subscription resurrected,
+     * watching data the app had told it to stop watching.</p>
+     */
+    @Test
+    void aConcurrentCallerWaitsForRestorationToFinish() throws Exception {
+        String id = "restore-race-" + System.nanoTime();
+        FakeHealthStore first = newStore();
+        first.subscribe(new SubscriptionRequest(id)
+                .addType(HealthDataType.STEPS), new Collector(1));
+
+        // A fresh store restores that persisted subscription on first
+        // touch, and is held inside doSubscribe until this test lets go.
+        final FakeHealthStore restoring = new FakeHealthStore();
+        final CountDownLatch held = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        restoring.duringSubscribe = new Runnable() {
+            public void run() {
+                held.countDown();
+                try {
+                    release.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        };
+        Thread restorer = new Thread(new Runnable() {
+            public void run() {
+                restoring.getSubscriptions();
+            }
+        });
+        restorer.start();
+        assertTrue(held.await(5, TimeUnit.SECONDS),
+                "restoration must reach doSubscribe");
+
+        final CountDownLatch second = new CountDownLatch(1);
+        Thread other = new Thread(new Runnable() {
+            public void run() {
+                restoring.getSubscriptions();
+                second.countDown();
+            }
+        });
+        other.start();
+        assertFalse(second.await(400, TimeUnit.MILLISECONDS),
+                "a second caller must not proceed against a registry that"
+                        + " is still being restored");
+
+        release.countDown();
+        assertTrue(second.await(5, TimeUnit.SECONDS),
+                "and it must proceed once restoration is done");
+        restorer.join(5000);
+        other.join(5000);
+        restoring.unsubscribe(id);
+        first.unsubscribe(id);
+    }
 }

@@ -1810,12 +1810,43 @@ public class HealthStore {
     /// `doSubscribe`, so it cannot run until the port is fully built.
     private void ensureSubscriptionsRestored() {
         synchronized (subscriptions) {
+            if (restoringThread == Thread.currentThread()) {
+                // Restoration itself calls doSubscribe, and a port is
+                // free to look at the registry from there. The thread
+                // doing the work passes straight through rather than
+                // waiting for itself.
+                return;
+            }
+            while (restoringThread != null) {
+                // The flag used to be published before the work was done,
+                // so a second thread walked on into a half-filled
+                // registry: it could unsubscribe an id restoration had
+                // read but not yet inserted, deleting the preferences
+                // while the restoring thread went on to put that very
+                // subscription back and call doSubscribe for it. A
+                // cancelled subscription resurrected, watching data the
+                // app had told it to stop watching.
+                try {
+                    subscriptions.wait();
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
             if (subscriptionsRestored) {
                 return;
             }
-            subscriptionsRestored = true;
+            restoringThread = Thread.currentThread();
         }
-        restoreSubscriptions();
+        try {
+            restoreSubscriptions();
+        } finally {
+            synchronized (subscriptions) {
+                subscriptionsRestored = true;
+                restoringThread = null;
+                subscriptions.notifyAll();
+            }
+        }
     }
 
     /// Cancels a subscription and discards its persisted cursor.
@@ -2186,6 +2217,9 @@ public class HealthStore {
 
     /// Guards the one-shot restore in [#ensureSubscriptionsRestored].
     private boolean subscriptionsRestored;
+    /// The thread currently restoring, so others wait for it and it does
+    /// not wait for itself. Guarded by `subscriptions`.
+    private Thread restoringThread;
     /// Whether a drain has started and not yet resolved. Guarded by
     /// `subscriptions`.
     private boolean drainInFlight;

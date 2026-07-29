@@ -54,6 +54,16 @@ public class FakeHealthStore extends HealthStore {
             new ArrayList<HealthChangeBatch>();
     /** When set, the port drain fails after firing its batches. */
     public HealthException failDrainAfterFiring;
+    /** Run inside doSubscribe, so a test can hold restoration open. */
+    public Runnable duringSubscribe;
+
+    @Override
+    protected void doSubscribe(SubscriptionRequest request,
+            HealthSubscription subscription) {
+        if (duringSubscribe != null) {
+            duringSubscribe.run();
+        }
+    }
 
     public int maxWriteBatch = 1000;
     public boolean supported = true;

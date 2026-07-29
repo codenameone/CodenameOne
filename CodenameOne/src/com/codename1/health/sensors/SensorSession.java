@@ -83,9 +83,15 @@ public class SensorSession {
     /// why it appeared on a CI machine and not on a developer's.
     private volatile SensorSessionState state =
             SensorSessionState.CONNECTING;
-    private boolean streamed;
-    private Integer batteryPercent;
-    private int bodySensorLocation = -1;
+    /// Volatile, all three: they are set as notifications decode -- on
+    /// whichever thread the transport delivers on -- and read by the app
+    /// through the getters, and `streamed` also decides whether a
+    /// reconnect is worth attempting. Same reason as [#state], found by
+    /// going through the package for the rest of this shape rather than
+    /// waiting for each one to be reported.
+    private volatile boolean streamed;
+    private volatile Integer batteryPercent;
+    private volatile int bodySensorLocation = -1;
 
     /// Ports and [HealthSensors] construct sessions.
     protected SensorSession(String sensorId, HealthSensorProfile profile,
@@ -465,7 +471,18 @@ public class SensorSession {
                         + " setWriteToStore off for this session, or route"
                         + " the readings to a workout instead.");
             }
-            if (retryable.isEmpty()) {
+            if (retryable.isEmpty() || session.isTerminal()) {
+                // Nothing is requeued once the session has ended. It
+                // could never be flushed by the session itself -- the
+                // re-arm below is guarded and the timer is cancelled --
+                // so it only sat there waiting for something else to
+                // drain it, and something else did: endSession() flushes
+                // unconditionally and has more than one caller, so the
+                // failed final write refilled the buffer and the next
+                // teardown wrote it again. That is the "issued one more
+                // write" failure, and it survived both the state check
+                // and making the claim atomic because neither of them is
+                // on this path.
                 session.fireError(asHealthException(error));
                 return;
             }

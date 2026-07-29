@@ -68,7 +68,16 @@ final class BleSensorSession extends SensorSession {
 
     private final BlePeripheral peripheral;
     private GattCharacteristic measurement;
-    private Reconnector reconnectListener;
+    /// Volatile: read and written from connection callbacks and from
+    /// stop(), which are not the same thread.
+    private volatile Reconnector reconnectListener;
+
+    /// Guards the failure count. Volatile is not enough for it: the
+    /// increment and the test against the limit are one decision, and
+    /// two callbacks racing through a volatile `++` can lose a count and
+    /// let the ladder run past the bound it exists to enforce.
+    private final Object reconnectLock = new Object();
+    /// Guarded by [#reconnectLock].
     private int reconnectFailures;
 
     BleSensorSession(String sensorId, HealthSensorProfile profile,
@@ -286,7 +295,9 @@ final class BleSensorSession extends SensorSession {
                         // it is uninterrupted: a strap that reconnects
                         // cleanly has spent whatever budget it used
                         // getting there.
-                        reconnectFailures = 0;
+                        synchronized (reconnectLock) {
+                            reconnectFailures = 0;
+                        }
                         if (out != null) {
                             out.complete(BleSensorSession.this);
                         }
@@ -353,6 +364,14 @@ final class BleSensorSession extends SensorSession {
     /// was finished, with nothing but an explicit `stop()` to reclaim
     /// them.
     private void endSession() {
+        if (isTerminal()) {
+            // Two paths reach here -- a discovery or subscribe failure,
+            // and the reconnect ladder giving up -- and a session tears
+            // down once. The second pass used to flush again, which is
+            // how a buffer refilled by a failed final write went out a
+            // second time.
+            return;
+        }
         if (reconnectListener != null) {
             peripheral.removeConnectionListener(reconnectListener);
             reconnectListener = null;
@@ -383,8 +402,12 @@ final class BleSensorSession extends SensorSession {
     /// services will never expose the measurement characteristic again,
     /// and the session should end rather than reconnect at it all day.
     private void failReconnect(HealthException wrapped) {
-        reconnectFailures++;
-        if (reconnectFailures >= MAX_RECONNECT_FAILURES) {
+        boolean giveUp;
+        synchronized (reconnectLock) {
+            reconnectFailures++;
+            giveUp = reconnectFailures >= MAX_RECONNECT_FAILURES;
+        }
+        if (giveUp) {
             endSession();
             fireError(wrapped);
             return;
@@ -420,7 +443,12 @@ final class BleSensorSession extends SensorSession {
 
     @Override
     public void stop() {
-        if (getState() == SensorSessionState.STOPPED) {
+        if (isTerminal()) {
+            // Either terminal state, not STOPPED alone. A session the
+            // reconnect ladder had already retired as FAILED went through
+            // the whole teardown a second time -- flushing again, and
+            // reporting itself as STOPPED, which is a different account
+            // of how it ended than the one its listeners were given.
             return;
         }
         if (reconnectListener != null) {

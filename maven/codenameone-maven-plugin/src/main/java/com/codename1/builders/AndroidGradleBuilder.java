@@ -1594,7 +1594,13 @@ public class AndroidGradleBuilder extends Executor {
                         }
                         if (cls.indexOf("com/codename1/health/workout/") == 0) {
                             usesHealthWorkout = true;
-                            usesHealthRead = true;
+                            // Write only, as the getWorkouts() hook is.
+                            // Naming WorkoutConfiguration or WorkoutSession
+                            // says no more about reading than calling
+                            // getWorkouts() does, and nothing in the package
+                            // reads -- so this branch went on demanding
+                            // android.health.read of an app that had
+                            // correctly declared only a write.
                             usesHealthWrite = true;
                         }
                     }

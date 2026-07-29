@@ -128,6 +128,40 @@ public class HealthScannerParityTest {
     }
 
     /**
+     * And the same for naming a workout type, which is the other half of
+     * the classification and drifted from the first.
+     *
+     * <p>Correcting {@code getWorkouts()} alone left this branch marking
+     * the whole {@code com.codename1.health.workout} package as a read,
+     * so an app that referenced {@code WorkoutConfiguration} -- which any
+     * workout app does -- still could not build with only
+     * {@code android.health.write}. Both branches are checked here now,
+     * because one of them being right is what made the other look
+     * right.</p>
+     */
+    @Test
+    void namingAWorkoutTypeIsAWriteOnly() throws Exception {
+        for (String builder : new String[] {"AndroidGradleBuilder",
+                "IPhoneBuilder"}) {
+            String src = source(builder);
+            int at = src.indexOf("\"com/codename1/health/workout/\") == 0");
+            assertTrue(at > 0,
+                    builder + " must classify the workout package");
+            int end = src.indexOf("\n                        }", at);
+            if (end < 0) {
+                end = Math.min(src.length(), at + 1600);
+            }
+            String after = src.substring(at, end);
+            assertTrue(after.contains("usesHealthWrite = true"),
+                    builder + " must set the write direction for the"
+                            + " workout package");
+            assertFalse(after.contains("usesHealthRead = true"),
+                    builder + " must not claim a read for the workout"
+                            + " package; no workout path reads the store");
+        }
+    }
+
+    /**
      * Naming a store type is not using it, so the class-name branch must
      * not set {@code usesHealthData} -- that flag is what demands
      * {@code android.health.read}/{@code write} hints and fails the build

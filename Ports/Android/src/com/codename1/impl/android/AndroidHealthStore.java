@@ -536,7 +536,12 @@ class AndroidHealthStore extends HealthStore {
     /// One field rather than state threaded through the recursion because
     /// the shared layer runs one drain at a time -- a second call while
     /// one is in flight is coalesced onto it rather than started.
-    private Throwable drainFailure;
+    ///
+    /// Volatile because the two ends are on different threads: it is set
+    /// from the bridge's callback and read on the EDT, after the hop
+    /// SkipOne makes. One drain at a time makes the field safe to share;
+    /// it does not publish the write.
+    private volatile Throwable drainFailure;
 
     /// Remembers a failure so the drain can report it once it has given
     /// the healthy subscriptions their turn. The first one wins: it is

@@ -937,13 +937,17 @@ public class IPhoneBuilder extends Executor {
                         }
                         if (cls.indexOf("com/codename1/health/workout/") == 0) {
                             usesHealthWorkout = true;
-                        // A workout reads sensor data and writes the
-                        // session, so it needs both purpose strings.
-                        // usesHealthWorkout alone drove nothing, and a
-                        // workout-only app shipped without them and was
-                        // refused when it asked HealthKit for access.
-                        usesHealthRead = true;
-                        usesHealthWrite = true;
+                            // The update string, matching the getWorkouts()
+                            // hook. usesHealthWorkout alone drove nothing,
+                            // and a workout-only app shipped without any
+                            // purpose string and was refused when it asked
+                            // HealthKit for access.
+                            //
+                            // Not the share string: naming
+                            // WorkoutConfiguration says no more about
+                            // reading than calling getWorkouts() does, and
+                            // nothing in the package reads.
+                            usesHealthWrite = true;
                         }
                     }
                     // Low-level camera API (com.codename1.camera.*). Gated on

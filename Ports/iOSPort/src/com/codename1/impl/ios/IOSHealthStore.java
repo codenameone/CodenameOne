@@ -301,7 +301,12 @@ class IOSHealthStore extends HealthStore {
     /// Reset per subscription in [#drainFrom], and safe as a field for
     /// the same reason [#drainFailure] is: the shared layer runs one
     /// drain at a time and this drain reads its subscriptions in turn.
-    private boolean resyncRequired;
+    ///
+    /// Volatile because a read's post-processing runs on the shared
+    /// health worker, so the thread that sets this is not always the one
+    /// that reads it. One drain at a time makes the field safe to share;
+    /// it does not publish the write.
+    private volatile boolean resyncRequired;
 
     void noteResyncRequired() {
         resyncRequired = true;
@@ -312,7 +317,9 @@ class IOSHealthStore extends HealthStore {
     /// One field rather than state threaded through the recursion because
     /// the shared layer runs one drain at a time -- a second call while
     /// one is in flight is coalesced onto it rather than started.
-    private Throwable drainFailure;
+    ///
+    /// Volatile for the same reason as [#resyncRequired].
+    private volatile Throwable drainFailure;
 
     /// Remembers a failure so the drain can report it once it has given
     /// the healthy subscriptions their turn. The first one wins: it is
