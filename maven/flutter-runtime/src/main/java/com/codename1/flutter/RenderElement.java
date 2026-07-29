@@ -221,11 +221,65 @@ public abstract class RenderElement extends Element {
     static long layoutMissDirty;
     static long layoutMissConstraints;
 
+    /// Self time inside performLayout per element class, so a slow pass names the widget
+    /// responsible instead of just being slow. Self time, not total: a parent's entry would
+    /// otherwise swallow its whole subtree and every pass would blame the root.
+    static final java.util.Map<String, long[]> layoutSelfNanos = new java.util.HashMap<String, long[]>();
+    private static long childNanos;
+
     static void resetLayoutCounters() {
         layoutCalls = 0;
         layoutHits = 0;
         layoutMissDirty = 0;
         layoutMissConstraints = 0;
+        layoutSelfNanos.clear();
+        childNanos = 0;
+    }
+
+    /// The costliest element classes by self time, worst first.
+    static String hotLayoutClasses(int top) {
+        java.util.List<java.util.Map.Entry<String, long[]>> all =
+                new java.util.ArrayList<java.util.Map.Entry<String, long[]>>(layoutSelfNanos.entrySet());
+        java.util.Collections.sort(all, new java.util.Comparator<java.util.Map.Entry<String, long[]>>() {
+            @Override
+            public int compare(java.util.Map.Entry<String, long[]> a, java.util.Map.Entry<String, long[]> b) {
+                return Long.compare(b.getValue()[0], a.getValue()[0]);
+            }
+        });
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < Math.min(top, all.size()); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append("{\"class\":\"").append(all.get(i).getKey())
+                    .append("\",\"ms\":").append(all.get(i).getValue()[0] / 1000000)
+                    .append(",\"calls\":").append(all.get(i).getValue()[1]).append('}');
+        }
+        return sb.append(']').toString();
+    }
+
+    /// Runs performLayout while attributing only its OWN time to this element's class.
+    private Size timedPerformLayout(BoxConstraints constraints) {
+        long start = System.nanoTime();
+        long childrenBefore = childNanos;
+        childNanos = 0;
+        Size result;
+        try {
+            result = performLayout(constraints);
+        } finally {
+            long elapsed = System.nanoTime() - start;
+            long self = elapsed - childNanos;
+            String key = getClass().getSimpleName();
+            long[] slot = layoutSelfNanos.get(key);
+            if (slot == null) {
+                slot = new long[2];
+                layoutSelfNanos.put(key, slot);
+            }
+            slot[0] += self;
+            slot[1]++;
+            childNanos = childrenBefore + elapsed;
+        }
+        return result;
     }
 
     /**
@@ -259,7 +313,7 @@ public abstract class RenderElement extends Element {
         boolean outer = dryPass;
         dryPass = true;
         try {
-            drySize = performLayout(constraints);
+            drySize = timedPerformLayout(constraints);
         } finally {
             dryPass = outer;
         }
@@ -288,7 +342,7 @@ public abstract class RenderElement extends Element {
             layoutMissConstraints++;
         }
         lastConstraints = constraints;
-        size = performLayout(constraints);
+        size = timedPerformLayout(constraints);
         needsLayout = false;
         return size;
     }

@@ -98,7 +98,8 @@ public class BuildOwner {
                 + ",\"layoutCalls\":" + RenderElement.layoutCalls
                 + ",\"layoutHits\":" + RenderElement.layoutHits
                 + ",\"missDirty\":" + RenderElement.layoutMissDirty
-                + ",\"missConstraints\":" + RenderElement.layoutMissConstraints + "}";
+                + ",\"missConstraints\":" + RenderElement.layoutMissConstraints
+                + ",\"hot\":" + RenderElement.hotLayoutClasses(6) + "}";
     }
 
     void flushBuild() {

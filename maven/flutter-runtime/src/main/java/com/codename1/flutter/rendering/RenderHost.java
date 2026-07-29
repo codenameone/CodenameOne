@@ -254,9 +254,25 @@ public class RenderHost {
         }
     }
 
+    /**
+     * Lays out THIS host's subtree after a build changed it.
+     *
+     * <p>Deliberately not {@code revalidate()}. In Codename One a finished layout is
+     * finished; revalidate goes to the Form root and lays the whole hierarchy out again,
+     * which for a Flutter build flush is the wrong scope by a wide margin - a setState on
+     * one leaf would re-lay out the toolbar, the side menu and every other container on the
+     * form. Marking this container's own subtree and calling {@code layoutContainer()} does
+     * only the work that a change inside this host can possibly have affected.</p>
+     *
+     * <p>The Flutter pass this triggers is tight against the host's own bounds, so the host
+     * does not change size and its parent has nothing to redo.</p>
+     */
     public void revalidate() {
-        if (container != null) {
-            container.revalidateWithAnimationSafety();
+        if (container == null) {
+            return;
         }
+        container.setShouldCalcPreferredSize(true);
+        container.layoutContainer();
+        container.repaint();
     }
 }
