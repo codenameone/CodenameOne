@@ -972,6 +972,12 @@ public class ConnectionRequest implements IOProgressListener {
         // certificate on a retried request, or rejecting a redirect to a
         // differently pinned host.
         sslCertificates = null;
+        // Same reasoning for the guard's view of the response. A ConnectionRequest can
+        // be reused, and a retained 401 plus its rejection header would be replayed to
+        // afterResponse() by an attempt that failed before reaching a response or was
+        // served from the cache -- invalidating a token that was never refused.
+        guardHeaders = null;
+        guardResponseCaptured = false;
         if (cacheMode == CachingMode.OFFLINE || cacheMode == CachingMode.OFFLINE_FIRST) {
             InputStream is = null; //NOPMD CloseResource
             try {
@@ -1351,9 +1357,15 @@ public class ConnectionRequest implements IOProgressListener {
     /// is still open because it is closed before `afterResponse` runs.
     private String[] guardHeaders;
 
+    /// Whether the current attempt got far enough to have a response of its own. Guards the
+    /// reuse case: without it a retained response code from an earlier attempt is reported
+    /// as though it belonged to this one.
+    private boolean guardResponseCaptured;
+
     private void captureGuardHeaders(Object connection) {
         NetworkGuard guard = NetworkManager.getNetworkGuard();
         guardHeaders = null;
+        guardResponseCaptured = true;
         if (guard == null) {
             return;
         }
@@ -1375,6 +1387,12 @@ public class ConnectionRequest implements IOProgressListener {
 
     String[] getGuardHeaders() {
         return guardHeaders;
+    }
+
+    /// True when this attempt actually observed a response, so its code and headers describe
+    /// this request rather than a previous use of the same object.
+    boolean hasGuardResponse() {
+        return guardResponseCaptured;
     }
 
     /// Allows reading the headers from the connection by calling the getHeader() method when a response that isn't 200 OK is sent.

@@ -264,7 +264,16 @@ public final class AndroidSecureStorage extends SecureStorage {
         }
         int sep = stored.indexOf(':');
         if (sep < 0) {
-            return null;
+            // No IV separator, so this was written by legacyPlainSet on API 22 or below
+            // and the device has since been upgraded to 23+. Reporting it missing would
+            // silently discard a cached credential across an OS upgrade the user did not
+            // choose to lose anything by. Decode it and re-store it encrypted, so this
+            // only happens once.
+            String legacy = decodeLegacyPlain(stored);
+            if (legacy != null) {
+                set(account, legacy);
+            }
+            return legacy;
         }
         try {
             SecretKey key = plainKey(false);
@@ -387,6 +396,16 @@ public final class AndroidSecureStorage extends SecureStorage {
         } catch (IOException e) {
             Log.e(e);
             return false;
+        }
+    }
+
+    /** The obfuscated-only form written on API 22 and below, or null if unreadable. */
+    private String decodeLegacyPlain(String stored) {
+        try {
+            return new String(Base64.decode(stored, Base64.NO_WRAP), "UTF-8");
+        } catch (Throwable t) {
+            Log.e(t);
+            return null;
         }
     }
 

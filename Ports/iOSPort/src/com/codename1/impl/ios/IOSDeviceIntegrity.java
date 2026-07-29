@@ -170,17 +170,23 @@ final class IOSDeviceIntegrity {
         // mark only that callback stale and leave the resurrected key behind for the
         // next bootstrap to find.
         synchronized (flowLock) {
-            SecureStorage store = SecureStorage.getInstance();
-            store.remove(KEY_ID);
-            store.remove(KEY_STATE);
-            store.remove(KEY_RETRY_AFTER);
-            store.remove(KEY_PENDING_SINCE);
-            currentBackoff = MIN_BACKOFF_MILLIS;
-            bootstrapInFlight = false;
-            // Any callback still outstanding now belongs to an abandoned flow.
-            generation++;
-            failBootstrapWaiters("App Attest state was reset while a bootstrap was in flight");
+            resetLocked();
         }
+    }
+
+    /// The reset itself, for callers that must not release the lock between discarding
+    /// the old identity and starting the replacement. Caller holds `flowLock`.
+    private void resetLocked() {
+        SecureStorage store = SecureStorage.getInstance();
+        store.remove(KEY_ID);
+        store.remove(KEY_STATE);
+        store.remove(KEY_RETRY_AFTER);
+        store.remove(KEY_PENDING_SINCE);
+        currentBackoff = MIN_BACKOFF_MILLIS;
+        bootstrapInFlight = false;
+        // Any callback still outstanding now belongs to an abandoned flow.
+        generation++;
+        failBootstrapWaiters("App Attest state was reset while a bootstrap was in flight");
     }
 
     /**
@@ -514,17 +520,22 @@ final class IOSDeviceIntegrity {
             return;
         }
         if (errorCode == DC_ERROR_INVALID_KEY && instance != null && !pending.retried) {
-            // The key is gone or was never valid. Wipe it and try once from
-            // scratch; a second failure is reported rather than looped.
-            instance.resetAttestation();
+            // The key is gone or was never valid. Wipe it and try once from scratch; a
+            // second failure is reported rather than looped.
+            //
+            // Discarding the identity and claiming the replacement bootstrap happen in
+            // ONE lock acquisition. Calling resetAttestation() and then reacquiring left
+            // a gap in which a concurrent requestToken() saw no key and no bootstrap
+            // running, started its own generation, and then this path started another --
+            // two rate-limited hardware keys racing to become the persisted identity.
             synchronized (instance.flowLock) {
+                instance.resetLocked();
                 PendingRequest retry = new PendingRequest(pending.result, pending.nonce,
                         PendingRequest.OP_GENERATE_KEY, null);
                 retry.retried = true;
-                // resetAttestation() clears the flag, so set it again before
-                // starting the replacement: otherwise a request arriving before
-                // the recovery callback sees no key and no bootstrap running,
-                // generates a second rate-limited key and races this one.
+                // resetLocked() clears the flag, so set it again before starting the
+                // replacement -- still under the same lock, so nothing observes the
+                // cleared state.
                 instance.bootstrapInFlight = true;
                 int rid = register(retry);
                 instance.nativeInstance.appAttestGenerateKey(rid);

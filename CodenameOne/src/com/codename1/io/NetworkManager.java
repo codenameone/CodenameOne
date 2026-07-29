@@ -1173,7 +1173,7 @@ public final class NetworkManager {
                     req.complete = true;
                 }
                 NetworkGuard guard = getNetworkGuard();
-                if (guard != null) {
+                if (guard != null && req.hasGuardResponse()) {
                     try {
                         guard.afterResponse(req, req.getResponseCode(), req.getGuardHeaders());
                     } catch (Throwable t) {
