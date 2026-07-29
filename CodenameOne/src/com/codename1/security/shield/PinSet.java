@@ -160,8 +160,8 @@ public final class PinSet {
             return false;
         }
         Vector pins = pinsFor(host);
-        for (int i = 0; i < chainSpkiDigests.length; i++) {
-            if (chainSpkiDigests[i] != null && pins.contains(chainSpkiDigests[i])) {
+        for (String digest : chainSpkiDigests) {
+            if (digest != null && pins.contains(digest)) {
                 return true;
             }
         }
@@ -173,6 +173,7 @@ public final class PinSet {
         return hostToPins.isEmpty();
     }
 
+    @Override
     public String toString() {
         return "PinSet[version=" + version + ", hosts=" + hostToPins.size()
                 + ", stale=" + isStale() + ", expired=" + isExpired() + "]";

@@ -39,12 +39,14 @@ import java.io.IOException;
 /// could only weaken this one.
 final class ShieldNetworkGuard implements NetworkGuard {
 
+    @Override
     public void beforeRequest(ConnectionRequest request) throws IOException {
         // Also clears the header when the host is not protected, which is what
         // stops a token following a cross-host redirect.
         AppShield.attach(request);
     }
 
+    @Override
     public boolean isCertificateCheckRequired(String url) {
         String host = AppShield.hostOf(url);
         if (host == null || !AppShield.policyFor(host).isEnforcePins()) {
@@ -56,6 +58,7 @@ final class ShieldNetworkGuard implements NetworkGuard {
         return AppShield.getPinSet().isEnforcedFor(host);
     }
 
+    @Override
     public void checkCertificates(ConnectionRequest request,
             ConnectionRequest.SSLCertificate[] certificates) throws IOException {
         String host = AppShield.hostOf(request.getUrl());
@@ -86,10 +89,12 @@ final class ShieldNetworkGuard implements NetworkGuard {
         }
     }
 
+    @Override
     public String[] interestingResponseHeaders() {
         return new String[] {AppShield.REJECT_HEADER};
     }
 
+    @Override
     public void afterResponse(ConnectionRequest request, int responseCode, String[] headers) {
         if (responseCode != 401 && responseCode != 403) {
             return;

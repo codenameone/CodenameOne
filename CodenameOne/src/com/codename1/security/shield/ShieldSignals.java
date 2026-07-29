@@ -145,9 +145,10 @@ public final class ShieldSignals {
             this.signal = signal;
         }
 
+        @Override
         public void run() {
-            for (int i = 0; i < targets.length; i++) {
-                targets[i].signalRaised(signal);
+            for (ShieldListener target : targets) {
+                target.signalRaised(signal);
             }
         }
     }

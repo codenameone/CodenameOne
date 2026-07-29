@@ -74,6 +74,7 @@ public final class HostPolicy {
         return !attachToken && !enforcePins;
     }
 
+    @Override
     public String toString() {
         return "HostPolicy[token=" + attachToken + ", pins=" + enforcePins
                 + ", onFailure=" + failureMode + "]";

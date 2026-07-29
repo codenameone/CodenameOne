@@ -42,14 +42,17 @@ final class DefaultEngineContext implements EngineContext {
     private DefaultEngineContext() {
     }
 
+    @Override
     public SecureStorage getSecureStorage() {
         return SecureStorage.getInstance();
     }
 
+    @Override
     public AsyncResource<String> requestPlatformAttestation(String nonce) {
         return DeviceIntegrity.requestIntegrityToken(nonce);
     }
 
+    @Override
     public boolean isPlatformAttestationSupported() {
         try {
             return DeviceIntegrity.isAttestationSupported();
@@ -58,6 +61,7 @@ final class DefaultEngineContext implements EngineContext {
         }
     }
 
+    @Override
     public void resetPlatformAttestation() {
         try {
             DeviceIntegrity.resetAttestation();
@@ -66,6 +70,7 @@ final class DefaultEngineContext implements EngineContext {
         }
     }
 
+    @Override
     public void confirmPlatformAttestation() {
         try {
             DeviceIntegrity.confirmAttestation();
@@ -74,6 +79,7 @@ final class DefaultEngineContext implements EngineContext {
         }
     }
 
+    @Override
     public String[] getPlatformCompromiseReasons() {
         try {
             String[] r = DeviceIntegrity.getCompromiseReasons();
@@ -83,6 +89,7 @@ final class DefaultEngineContext implements EngineContext {
         }
     }
 
+    @Override
     public String[] getEnabledAccessibilityServices() {
         try {
             String[] r = DeviceIntegrity.getEnabledAccessibilityServices();
@@ -92,6 +99,7 @@ final class DefaultEngineContext implements EngineContext {
         }
     }
 
+    @Override
     public String[] getAppSignerDigests() {
         try {
             String[] r = Display.getInstance().getAppSignerDigests();
@@ -101,6 +109,7 @@ final class DefaultEngineContext implements EngineContext {
         }
     }
 
+    @Override
     public String getProperty(String key, String defaultValue) {
         try {
             return Display.getInstance().getProperty(key, defaultValue);
@@ -109,10 +118,12 @@ final class DefaultEngineContext implements EngineContext {
         }
     }
 
+    @Override
     public void log(String message) {
         Log.p(message);
     }
 
+    @Override
     public void publishSignal(ShieldSignal signal) {
         ShieldSignals.add(signal);
     }

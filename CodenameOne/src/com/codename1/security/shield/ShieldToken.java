@@ -129,6 +129,7 @@ public final class ShieldToken {
     }
 
     /// Never renders the token value -- these strings end up in logs.
+    @Override
     public String toString() {
         return "ShieldToken[status=" + status.getId()
                 + ", fetchedAt=" + fetchedAt

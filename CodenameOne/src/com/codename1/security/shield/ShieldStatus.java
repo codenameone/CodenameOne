@@ -105,18 +105,20 @@ public final class ShieldStatus {
         if (id == null) {
             return NOT_INITIALIZED;
         }
-        for (int i = 0; i < KNOWN.length; i++) {
-            if (KNOWN[i].id.equals(id)) {
-                return KNOWN[i];
+        for (ShieldStatus known : KNOWN) {
+            if (known.id.equals(id)) {
+                return known;
             }
         }
         return new ShieldStatus(id, false);
     }
 
+    @Override
     public String toString() {
         return id;
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -127,6 +129,7 @@ public final class ShieldStatus {
         return id.equals(((ShieldStatus) o).id);
     }
 
+    @Override
     public int hashCode() {
         return id.hashCode();
     }

@@ -199,6 +199,7 @@ public final class AppShield {
             return result;
         }
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            @Override
             public void run() {
                 try {
                     ShieldToken token = ShieldEngineRegistry.getEngine().fetchToken(bindingData);
@@ -416,8 +417,8 @@ public final class AppShield {
             fromEngine = new ShieldSignal[0];
         }
         if (fromEngine != null) {
-            for (int i = 0; i < fromEngine.length; i++) {
-                ShieldSignals.add(fromEngine[i]);
+            for (ShieldSignal s : fromEngine) {
+                ShieldSignals.add(s);
             }
         }
         return ShieldSignals.snapshot();
@@ -488,9 +489,10 @@ public final class AppShield {
             this.status = status;
         }
 
+        @Override
         public void run() {
-            for (int i = 0; i < targets.length; i++) {
-                targets[i].statusChanged(status);
+            for (ShieldListener target : targets) {
+                target.statusChanged(status);
             }
         }
     }

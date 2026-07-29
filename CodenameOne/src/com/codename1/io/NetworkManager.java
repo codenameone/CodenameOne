@@ -207,7 +207,11 @@ public final class NetworkManager {
         return INSTANCE;
     }
 
-    private static volatile NetworkGuard networkGuard;
+    /// Read through [#getNetworkGuard()], which synchronizes on the same monitor the two
+    /// writers below take. Not `volatile`: the core is built for Java 5 semantics and the
+    /// repo's PMD gate forbids the modifier outright, so the lock is what publishes the
+    /// write to the network thread.
+    private static NetworkGuard networkGuard;
     private static boolean networkGuardSealed;
 
     /// Installs the app-wide [NetworkGuard].
@@ -231,7 +235,7 @@ public final class NetworkManager {
     }
 
     /// The installed guard, or null when none was installed.
-    public static NetworkGuard getNetworkGuard() {
+    public static synchronized NetworkGuard getNetworkGuard() {
         return networkGuard;
     }
 
@@ -1168,7 +1172,7 @@ public final class NetworkManager {
                 if (requestWasCompleted) {
                     req.complete = true;
                 }
-                NetworkGuard guard = networkGuard;
+                NetworkGuard guard = getNetworkGuard();
                 if (guard != null) {
                     try {
                         guard.afterResponse(req, req.getResponseCode(), req.getGuardHeaders());

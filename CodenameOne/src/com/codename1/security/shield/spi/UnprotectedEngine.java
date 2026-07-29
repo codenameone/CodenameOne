@@ -54,14 +54,17 @@ final class UnprotectedEngine implements ShieldEngine {
     private UnprotectedEngine() {
     }
 
+    @Override
     public String getName() {
         return "unprotected";
     }
 
+    @Override
     public boolean isAvailable() {
         return false;
     }
 
+    @Override
     public void initialize(EngineContext ctx, ShieldConfig config) {
         if (ctx != null) {
             ctx.log("AppShield: no attestation engine registered; running unprotected. "
@@ -69,23 +72,28 @@ final class UnprotectedEngine implements ShieldEngine {
         }
     }
 
+    @Override
     public ShieldToken fetchToken(String bindingData) throws ShieldException {
         throw new ShieldException(ShieldStatus.UNPROTECTED,
                 "This build has no attestation engine, so no token can be issued.");
     }
 
+    @Override
     public ShieldToken getCachedToken() {
         return null;
     }
 
+    @Override
     public boolean verifyPins(String host, String[] spkiDigests, String[] certDigests) {
         return true;
     }
 
+    @Override
     public PinSet getPinSet() {
         return PinSet.EMPTY;
     }
 
+    @Override
     public ShieldSignal[] collectSignals() {
         String[] reasons;
         try {
@@ -99,8 +107,8 @@ final class UnprotectedEngine implements ShieldEngine {
             return new ShieldSignal[0];
         }
         Vector out = new Vector();
-        for (int i = 0; i < reasons.length; i++) {
-            ShieldSignal s = toSignal(reasons[i]);
+        for (String reason : reasons) {
+            ShieldSignal s = toSignal(reason);
             if (s != null) {
                 out.addElement(s);
             }
@@ -131,9 +139,11 @@ final class UnprotectedEngine implements ShieldEngine {
         return new ShieldSignal(reason, 50, null);
     }
 
+    @Override
     public void invalidate() {
     }
 
+    @Override
     public void shutdown() {
     }
 }

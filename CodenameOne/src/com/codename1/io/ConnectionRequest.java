@@ -1243,7 +1243,11 @@ public class ConnectionRequest implements IOProgressListener {
             if (pinFailure != null) {
                 IOException cause = pinFailure;
                 pinFailure = null;
-                throw cause;
+                // Not a new exception: this is the original pin failure, recorded by the
+                // certificate callback because that callback can only answer with a
+                // boolean. Rethrowing it here is what preserves its stack trace, rather
+                // than losing it behind the generic connection error.
+                throw cause; //NOPMD rethrow of the recorded cause, see above
             }
             throw ioe;
         } finally {
@@ -1698,11 +1702,10 @@ public class ConnectionRequest implements IOProgressListener {
             // the network path, i.e. as an unrelated connection failure.
             return new SSLCertificate[0];
         }
-        java.util.Vector out = new java.util.Vector();
+        Vector out = new Vector();
         SSLCertificate current = null;
         int index = 0;
-        for (int i = 0; i < entries.length; i++) {
-            String entry = entries[i];
+        for (String entry : entries) {
             if (entry == null) {
                 continue;
             }

@@ -120,9 +120,9 @@ public abstract class WebSocketImpl {
 
     private static boolean isReservedHandshakeHeader(String name) {
         String n = name.toLowerCase();
-        return n.equals("host") || n.equals("upgrade") || n.equals("connection")
-                || n.equals("sec-websocket-key") || n.equals("sec-websocket-version")
-                || n.equals("sec-websocket-protocol") || n.equals("content-length");
+        return "host".equals(n) || "upgrade".equals(n) || "connection".equals(n)
+                || "sec-websocket-key".equals(n) || "sec-websocket-version".equals(n)
+                || "sec-websocket-protocol".equals(n) || "content-length".equals(n);
     }
 
     private static boolean containsCrLf(String s) {

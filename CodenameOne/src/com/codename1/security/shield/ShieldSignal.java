@@ -79,6 +79,7 @@ public final class ShieldSignal {
         return timestamp;
     }
 
+    @Override
     public String toString() {
         return id + "(" + severity + (detail == null ? "" : ", " + detail) + ")";
     }
