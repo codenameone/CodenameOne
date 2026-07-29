@@ -6757,7 +6757,7 @@ JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_THREAD_S
 // See the contract in cn1_globals.h. throwException() longjmps when a handler is
 // found and returns when none is; the statement-form check macros have nothing to
 // bail with, so returning here would fall through into the out-of-bounds access.
-void cn1ThrowArrayIndexOrDie(CODENAME_ONE_THREAD_STATE, int index) {
+CN1_NORETURN void cn1ThrowArrayIndexOrDie(CODENAME_ONE_THREAD_STATE, int index) {
     throwArrayIndexOutOfBoundsException(threadStateData, index);
     // Unreachable while any handler is installed -- every Java thread root has one
     // (Thread.runImpl). Reached only from a native callback that entered Java
@@ -6769,7 +6769,7 @@ void cn1ThrowArrayIndexOrDie(CODENAME_ONE_THREAD_STATE, int index) {
 
 // Null counterpart of cn1ThrowArrayIndexOrDie -- same reasoning: falling through
 // would dereference the null array the check just rejected.
-void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE) {
+CN1_NORETURN void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE) {
     throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData));
     fprintf(stderr, "FATAL: null array access with no exception handler installed\n");
     fflush(stderr);
