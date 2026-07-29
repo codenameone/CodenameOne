@@ -317,7 +317,7 @@ class CN1HealthConnectBridge(private val context: Context)
                 val block = StringBuilder()
                 val r = appendRecords(block, token, filter,
                     perTypeBudget, origins, ascending, inTokens[token],
-                    flatten)
+                    flatten, start.toEpochMilli() until end.toEpochMilli())
                 perType.add(block.toString())
                 anyTruncated = anyTruncated || r.truncated
                 // Exhausted types are recorded with an empty token, not
@@ -455,7 +455,8 @@ class CN1HealthConnectBridge(private val context: Context)
                                       origins: Set<DataOrigin>,
                                       ascending: Boolean,
                                       resumeToken: String?,
-                                      flatten: Boolean): Read {
+                                      flatten: Boolean,
+                                      window: LongRange?): Read {
         // A capped series read writes into its own buffer and hands back
         // only the requested number of lines.
         //
@@ -591,7 +592,8 @@ class CN1HealthConnectBridge(private val context: Context)
             var lines = 0
             var points = 0
             for (record in page.records) {
-                val w = appendOne(out, record, token, flatten, ascending)
+                val w = appendOne(out, record, token, flatten, ascending,
+                    window)
                 lines += w.lines
                 points += w.points
             }
@@ -714,7 +716,8 @@ class CN1HealthConnectBridge(private val context: Context)
      */
     private fun appendOne(sb: StringBuilder, record: Record,
                           token: String, flatten: Boolean,
-                          ascending: Boolean = true): Written {
+                          ascending: Boolean = true,
+                          window: LongRange? = null): Written {
         // Only when flattening is off, because this *writes*. Hoisting
         // the call out of the condition to read its count emitted the
         // whole-record line and then fell through to the per-sample
@@ -805,28 +808,38 @@ class CN1HealthConnectBridge(private val context: Context)
             // portable layer flattens by default, so emit one line per
             // sample rather than per record.
             is HeartRateRecord -> ordered(record.samples, ascending).forEach {
-                sample(sb, record, token, it.time.toEpochMilli(),
-                    it.beatsPerMinute.toDouble(), "count/min")
+                if (inWindow(window, it.time.toEpochMilli())) {
+                    sample(sb, record, token, it.time.toEpochMilli(),
+                        it.beatsPerMinute.toDouble(), "count/min")
+                }
             }
 
             is PowerRecord -> ordered(record.samples, ascending).forEach {
-                sample(sb, record, token, it.time.toEpochMilli(),
-                    it.power.inWatts, "W")
+                if (inWindow(window, it.time.toEpochMilli())) {
+                    sample(sb, record, token, it.time.toEpochMilli(),
+                        it.power.inWatts, "W")
+                }
             }
 
             is SpeedRecord -> ordered(record.samples, ascending).forEach {
-                sample(sb, record, token, it.time.toEpochMilli(),
-                    it.speed.inMetersPerSecond, "m/s")
+                if (inWindow(window, it.time.toEpochMilli())) {
+                    sample(sb, record, token, it.time.toEpochMilli(),
+                        it.speed.inMetersPerSecond, "m/s")
+                }
             }
 
             is CyclingPedalingCadenceRecord -> ordered(record.samples, ascending).forEach {
-                sample(sb, record, token, it.time.toEpochMilli(),
-                    it.revolutionsPerMinute, "count/min")
+                if (inWindow(window, it.time.toEpochMilli())) {
+                    sample(sb, record, token, it.time.toEpochMilli(),
+                        it.revolutionsPerMinute, "count/min")
+                }
             }
 
             is StepsCadenceRecord -> ordered(record.samples, ascending).forEach {
-                sample(sb, record, token, it.time.toEpochMilli(),
-                    it.rate, "count/min")
+                if (inWindow(window, it.time.toEpochMilli())) {
+                    sample(sb, record, token, it.time.toEpochMilli(),
+                        it.rate, "count/min")
+                }
             }
 
             else -> return Written(0, 0)
@@ -973,6 +986,25 @@ class CN1HealthConnectBridge(private val context: Context)
 
             else -> -1
         }
+    }
+
+    /**
+     * Whether a flattened measurement falls inside the requested window.
+     *
+     * Health Connect selects whole *records* that overlap the range, so a
+     * record straddling either edge carries measurements outside it. Left
+     * in, those are returned as samples the caller never asked for -- and
+     * on a capped read they are worse than noise, because the selection
+     * happens here: an out-of-range point can take the place of a valid
+     * one and then be nothing anyone wanted.
+     *
+     * Half-open, matching the range the query was built from.
+     *
+     * The unflattened path needs none of this: it emits the record whole
+     * and the shared layer filters the points as it expands them.
+     */
+    private fun inWindow(window: LongRange?, at: Long): Boolean {
+        return window == null || at in window
     }
 
     /** Returns how many points were serialized, which may be zero. */
