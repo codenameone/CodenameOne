@@ -308,6 +308,10 @@ class CN1HealthConnectBridge(private val context: Context)
             // simply wrong.
             val perTypeBudget = budget
             val perType = ArrayList<String>()
+            // True when a type's reply left something behind that its
+            // token cannot fetch -- a capped series read, which selects
+            // from what it scanned and cannot be resumed.
+            var anyTruncated = false
             for (i in 0 until types.length()) {
                 val token = types.getString(i)
                 val block = StringBuilder()
@@ -315,11 +319,12 @@ class CN1HealthConnectBridge(private val context: Context)
                     perTypeBudget, origins, ascending, inTokens[token],
                     flatten)
                 perType.add(block.toString())
+                anyTruncated = anyTruncated || r.truncated
                 // Exhausted types are recorded with an empty token, not
                 // omitted. Omitting them made the next page see no token
                 // for that type and read it from the beginning again,
                 // duplicating records while the other types advanced.
-                outTokens[token] = r.second ?: ""
+                outTokens[token] = r.token ?: ""
             }
             // Nothing left anywhere means no trailer token at all.
             if (outTokens.values.all { it.isEmpty() }) {
@@ -365,7 +370,7 @@ class CN1HealthConnectBridge(private val context: Context)
             // which is what the flattened output should have been all
             // along.
             val merged = mergeByTime(perType, ascending)
-            val truncated = false
+            val truncated = anyTruncated
             sb.append(merged)
             // Trailer: what is left on the platform side. Reporting nothing
             // made every page look complete, so the caller's paging loop
@@ -450,7 +455,26 @@ class CN1HealthConnectBridge(private val context: Context)
                                       origins: Set<DataOrigin>,
                                       ascending: Boolean,
                                       resumeToken: String?,
-                                      flatten: Boolean): Pair<Int, String?> {
+                                      flatten: Boolean): Read {
+        // A capped series read writes into its own buffer and hands back
+        // only the requested number of lines.
+        //
+        // The scan has to cover the range -- the newest sample can be in
+        // a record that starts long before the ones already read -- but
+        // what it scans is candidates, not the answer. Emitting all of
+        // them returned twenty thousand samples to a caller who asked for
+        // one, which is the heap guard the limit exists to be. So the
+        // candidates are gathered here, the top N by time are selected,
+        // and the rest are dropped.
+        //
+        // Such a reply carries no continuation token, and says it is
+        // truncated. It cannot be resumed: the scan passed over records
+        // the token would have to return to. That is the same answer the
+        // multi-type path already gives, for the same reason -- the limit
+        // wins, and the reply admits what it is rather than claiming to
+        // be complete.
+        val capped = isSeriesToken(token) && limit > 0
+        val out = if (capped) StringBuilder() else sb
         // A type this bridge cannot read is rejected rather than returned
         // as an empty page: the caller cannot tell an empty page apart from
         // "you have no data", which is the one answer a health API must
@@ -460,10 +484,10 @@ class CN1HealthConnectBridge(private val context: Context)
                 "Health Connect reads are not implemented for '" + token
                     + "' in this build")
         if (limit <= 0) {
-            return Pair(0, null)
+            return Read(0, null, false)
         }
         if (resumeToken != null && resumeToken.isEmpty()) {
-            return Pair(0, null)
+            return Read(0, null, false)
         }
         // Health Connect rejects a pageSize above MAX_PAGE_SIZE outright, so
         // a caller wanting more records than one page holds is served by
@@ -527,21 +551,74 @@ class CN1HealthConnectBridge(private val context: Context)
             // could never be read again. Overshooting the caller's limit
             // is recoverable; skipping records is not.
             var lines = 0
+            var points = 0
             for (record in page.records) {
-                lines += appendOne(sb, record, token, flatten, ascending)
+                val w = appendOne(out, record, token, flatten, ascending)
+                lines += w.lines
+                points += w.points
             }
             if (page.records.isNotEmpty()) {
                 samplesPerRecord = maxOf(1, lines / page.records.size)
             }
-            remaining -= lines
+            // The ceiling counts points and the caller's limit counts
+            // lines. For a flattened read they are the same number; for
+            // an unflattened one a single line carries a whole record's
+            // measurements, so counting lines against the ceiling let it
+            // admit twenty thousand records holding millions of points.
+            remaining -= if (isSeriesToken(token)) points else lines
             emitted += lines
             pageToken = page.pageToken
             if (pageToken == null || page.records.isEmpty()) {
                 break
             }
         }
-        return Pair(emitted, pageToken)
+        if (!capped) {
+            return Read(emitted, pageToken, false)
+        }
+        val kept = topByTime(out.toString(), limit, ascending)
+        sb.append(kept.first)
+        // No token: the scan walked past records a continuation would
+        // have to come back to. Truncated whenever anything was dropped
+        // or the platform still had more.
+        return Read(kept.second, null,
+            kept.second < emitted || pageToken != null)
     }
+
+    /**
+     * Keeps the `limit` lines closest to the end the caller asked for.
+     *
+     * Returns the kept text and how many lines it holds.
+     */
+    private fun topByTime(block: String, limit: Int,
+                          ascending: Boolean): Pair<String, Int> {
+        val lines = ArrayList<String>()
+        for (line in block.split('\n')) {
+            if (line.isNotBlank()) {
+                lines.add(line)
+            }
+        }
+        val byTime = lines.sortedBy {
+            val f = it.split('\t')
+            if (f.size > 2) f[2].toLongOrNull() ?: 0L else 0L
+        }
+        // Ascending keeps the oldest, descending the newest; the block is
+        // then written back in the order the caller asked for.
+        val chosen = if (ascending) byTime.take(limit)
+            else byTime.takeLast(limit).asReversed()
+        val sb = StringBuilder()
+        for (line in chosen) {
+            sb.append(line).append('\n')
+        }
+        return Pair(sb.toString(), chosen.size)
+    }
+
+    /**
+     * One type's contribution to a read: the lines emitted, the token to
+     * resume with, and whether the platform still had more that this
+     * reply does not carry.
+     */
+    private class Read(val emitted: Int, val token: String?,
+                       val truncated: Boolean)
 
     /**
      * Emits one record in the shared line format, tagged with `token`.
@@ -558,9 +635,14 @@ class CN1HealthConnectBridge(private val context: Context)
      */
     private fun appendOne(sb: StringBuilder, record: Record,
                           token: String, flatten: Boolean,
-                          ascending: Boolean = true): Int {
-        if (!flatten && appendWholeSeries(sb, record, token, ascending)) {
-            return 1
+                          ascending: Boolean = true): Written {
+        val wholeSeries = appendWholeSeries(sb, record, token, ascending)
+        if (!flatten && wholeSeries >= 0) {
+            // One line, and as many points as it actually serialized.
+            // The two are counted separately because the caller's limit
+            // is in lines while the memory ceiling is in points -- and a
+            // single unflattened record can carry thousands.
+            return Written(1, wholeSeries)
         }
         when (record) {
             is StepsRecord -> interval(sb, record, token,
@@ -658,9 +740,10 @@ class CN1HealthConnectBridge(private val context: Context)
                     it.rate, "count/min")
             }
 
-            else -> return 0
+            else -> return Written(0, 0)
         }
-        // One line per scalar record; a series contributes one per sample.
+        // One line per scalar record; a flattened series contributes one
+        // per sample, so here the two counts coincide.
         //
         // A series record is never split. Health Connect's page token
         // resumes after a whole record, so emitting a prefix would strand
@@ -668,7 +751,7 @@ class CN1HealthConnectBridge(private val context: Context)
         // therefore overshoot the limit by less than one record, which the
         // shared layer trims for the caller while the token still resumes
         // at the right place.
-        return when (record) {
+        val n = when (record) {
             is HeartRateRecord -> record.samples.size
             is PowerRecord -> record.samples.size
             is SpeedRecord -> record.samples.size
@@ -676,7 +759,17 @@ class CN1HealthConnectBridge(private val context: Context)
             is StepsCadenceRecord -> record.samples.size
             else -> 1
         }
+        return Written(n, n)
     }
+
+    /**
+     * What one record contributed: lines, which the caller's limit counts,
+     * and points, which the memory ceiling counts.
+     *
+     * They differ only for an unflattened series, where one line carries
+     * a whole record's measurements.
+     */
+    private class Written(val lines: Int, val points: Int)
 
     // The record timestamps are passed in rather than read off a shared
     // supertype: androidx.health.connect marks IntervalRecord and
@@ -748,10 +841,17 @@ class CN1HealthConnectBridge(private val context: Context)
     private fun <T> ordered(samples: List<T>, ascending: Boolean): List<T> =
         if (ascending) samples else samples.asReversed()
 
+    /// Returns the number of points serialized, or -1 when `record` is
+    /// not a series shape and the caller should fall through.
+    ///
+    /// A count rather than a flag because one of these lines carries a
+    /// whole record's measurements: counting it as one against a memory
+    /// ceiling let twenty thousand records through, and each of them can
+    /// hold thousands of points.
     private fun appendWholeSeries(sb: StringBuilder, record: Record,
                                   token: String,
-                                  ascending: Boolean): Boolean {
-        when (record) {
+                                  ascending: Boolean): Int {
+        return when (record) {
             is HeartRateRecord -> series(sb, record, token, "count/min",
                 record.startTime, record.endTime,
                 ordered(record.samples, ascending).map {
@@ -782,19 +882,19 @@ class CN1HealthConnectBridge(private val context: Context)
                     Pair(it.time.toEpochMilli(), it.rate)
                 })
 
-            else -> return false
+            else -> -1
         }
-        return true
     }
 
+    /** Returns how many points were serialized, which may be zero. */
     private fun series(sb: StringBuilder, r: Record, token: String,
                        unit: String, recordStart: Instant, recordEnd: Instant,
-                       points: List<Pair<Long, Double>>) {
+                       points: List<Pair<Long, Double>>): Int {
         // An empty series would decode to a record with no measurements,
         // which is indistinguishable from a decode failure. There is
         // nothing to report, so nothing is written.
         if (points.isEmpty()) {
-            return
+            return 0
         }
         // The record's own interval, not the extent of its measurements.
         // Disabling flattening is a request for record identity, and a
@@ -826,6 +926,7 @@ class CN1HealthConnectBridge(private val context: Context)
                 .append(p.second)
         }
         sb.append('\n')
+        return points.size
     }
 
     private fun recordingMethodName(r: Record): String {
@@ -1124,7 +1225,8 @@ class CN1HealthConnectBridge(private val context: Context)
         // Always flattened. A subscription has no query on it to carry the
         // option, and the change page is a notification of what moved
         // rather than a shaped read.
-        if (token == null || appendOne(body, record, token, true) == 0) {
+        if (token == null
+            || appendOne(body, record, token, true).lines == 0) {
             sb.append(op).append("\t").append(record.metadata.id)
                 .append('\t').append(token ?: "").append('\n')
             return

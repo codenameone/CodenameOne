@@ -1913,17 +1913,32 @@ public class HealthStore {
         }
         ensureSubscriptionsRestored();
         HealthSubscription sub;
+        boolean stillGone;
         synchronized (subscriptions) {
             sub = subscriptions.remove(subscriptionId);
             liveListeners.remove(subscriptionId);
+            // The removal and the persisted cleanup are one transaction,
+            // the mirror of what register() does. Released between them,
+            // a registration of the same id that arrived in the gap had
+            // its request deleted from PREF_SUBS by this older
+            // unsubscribe: the replacement stayed live in memory and was
+            // gone at the next launch.
+            forgetSubscriptionLocked(subscriptionId);
+            Preferences.delete(PREF_ANCHOR + subscriptionId);
+            Preferences.delete(PREF_LISTENER + subscriptionId);
+            // Whether the id is still unregistered as this leaves. If
+            // something re-registered it, the platform state now belongs
+            // to that registration and tearing it down would break a
+            // subscription nobody cancelled.
+            stillGone = !subscriptions.containsKey(subscriptionId);
         }
         if (sub != null) {
             sub.markInactive();
         }
-        forgetSubscription(subscriptionId);
-        Preferences.delete(PREF_ANCHOR + subscriptionId);
-        Preferences.delete(PREF_LISTENER + subscriptionId);
-        if (isSupported()) {
+        if (isSupported() && stillGone) {
+            // Outside the lock: this calls into the port, and holding the
+            // registry monitor across a platform call orders it against
+            // every lock a port happens to take.
             doUnsubscribe(subscriptionId);
         }
     }
@@ -2553,14 +2568,9 @@ public class HealthStore {
         Preferences.set(PREF_SUBS, sb.toString());
     }
 
-    /// Drops `subscriptionId` from the persisted list, under the registry
-    /// lock for the same reason as [#rememberSubscription].
-    private void forgetSubscription(String subscriptionId) {
-        synchronized (subscriptions) {
-            forgetSubscriptionLocked(subscriptionId);
-        }
-    }
-
+    /// Drops `subscriptionId` from the persisted list. **The caller must
+    /// hold the registry lock**, for the same reason as
+    /// [#rememberSubscriptionLocked].
     private void forgetSubscriptionLocked(String subscriptionId) {
         List<String> kept = readStoredEntries(subscriptionId);
         StringBuilder sb = new StringBuilder();

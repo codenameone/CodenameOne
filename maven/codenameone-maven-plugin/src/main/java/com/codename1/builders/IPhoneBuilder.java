@@ -2769,12 +2769,28 @@ public class IPhoneBuilder extends Executor {
                 // app asking for background delivery produced an
                 // entitlement set that could not be signed against a
                 // profile and would not have worked if it had been.
+                // The long-form keys count too. A sub-entitlement can be
+                // asked for either through the ios.health.* alias or
+                // written out in the ios.entitlements.* namespace, and
+                // the generic renderer emits whatever is in that
+                // namespace -- so an availability-only app that spelled
+                // it out in full got its sub-capability emitted while
+                // this gate, reading only the aliases, left
+                // com.apple.developer.healthkit off. That is the same
+                // unsignable entitlement set the aliases were fixed to
+                // avoid, reachable by the other spelling.
                 boolean entitleHealthKit = usesHealthRead || usesHealthWrite
                         || usesHealthWorkout
                         || "true".equalsIgnoreCase(request.getArg(
                                 "ios.health.backgroundDelivery", "false"))
                         || "true".equalsIgnoreCase(request.getArg(
-                                "ios.health.recalibrateEstimates", "false"));
+                                "ios.health.recalibrateEstimates", "false"))
+                        || request.getArg("ios.entitlements.com.apple"
+                                + ".developer.healthkit.background-delivery",
+                                null) != null
+                        || request.getArg("ios.entitlements.com.apple"
+                                + ".developer.healthkit.recalibrate-estimates",
+                                null) != null;
                 if (entitleHealthKit && request.getArg(
                         "ios.entitlements.com.apple.developer.healthkit",
                         null) == null) {
