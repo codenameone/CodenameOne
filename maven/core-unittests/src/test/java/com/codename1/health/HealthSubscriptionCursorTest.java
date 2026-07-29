@@ -755,4 +755,42 @@ class HealthSubscriptionCursorTest extends UITestBase {
             store.unsubscribe(base + "-" + i);
         }
     }
+
+    /**
+     * A listener that unsubscribes from inside the delivery does not get
+     * its cursor written back.
+     *
+     * <p>The registration check ran before the listener and not after,
+     * so a listener calling {@code unsubscribe()} from inside
+     * {@code healthDataChanged} had this batch's anchor persisted once it
+     * returned -- recreating the cursor that call had just discarded, for
+     * the next registration under the same id to load and resume from.</p>
+     */
+    @Test
+    void aListenerThatUnsubscribesLeavesNoCursorBehind() throws Exception {
+        final FakeHealthStore store = newStore();
+        final String id = "self-cancel-" + System.nanoTime();
+        final CountDownLatch delivered = new CountDownLatch(1);
+        HealthSubscription sub = store.subscribe(
+                new SubscriptionRequest(id).addType(HealthDataType.STEPS),
+                new HealthChangeListener() {
+                    public void healthDataChanged(HealthChangeBatch b) {
+                        store.unsubscribe(id);
+                        delivered.countDown();
+                    }
+                });
+
+        store.batchesToFire.add(new HealthChangeBatch(id, sub.getTypes(),
+                samples(2), null, false, HealthAnchor.of("after-cancel"),
+                0L, false));
+        store.drainChanges();
+        assertTrue(delivered.await(5, TimeUnit.SECONDS),
+                "the batch must reach the listener");
+        flushSerialCalls();
+
+        assertNull(com.codename1.io.Preferences.get(
+                "cn1$health$anchor$" + id, null),
+                "unsubscribe discarded the cursor; the delivery that was"
+                        + " already running must not write it back");
+    }
 }

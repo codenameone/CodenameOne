@@ -233,4 +233,35 @@ public class HealthScannerParityTest {
         assertTrue(src.contains("ios.health.backgroundDelivery"),
                 "the explicit hint still turns it on");
     }
+
+    /**
+     * A HealthKit sub-capability is read by its value, not by being
+     * present, and a contradictory base entitlement stops the build.
+     *
+     * <p>Both halves were wrong in the same expression. The long-form
+     * {@code ios.entitlements.*} keys were tested with {@code != null}
+     * while the short {@code ios.health.*} aliases beside them tested for
+     * {@code true} -- so declining a sub-capability read as asking for
+     * it. And a detected use combined with an explicit
+     * {@code healthkit=false} injected nothing, signing the app with the
+     * capability disabled: the build looked healthy and every
+     * authorization request failed at runtime.</p>
+     */
+    @Test
+    public void theHealthKitGateReadsEntitlementValuesAndRefusesConflict()
+            throws Exception {
+        String src = source("IPhoneBuilder");
+        int at = src.indexOf("boolean entitleHealthKit");
+        assertTrue(at > 0, "the base entitlement gate must exist");
+        String gate = src.substring(at,
+                Math.min(src.length(), at + 1400));
+        assertFalse(gate.contains("healthkit.background-delivery\",\n"
+                        + "                                null) != null"),
+                "a sub-capability must be read by value, not presence");
+        int conflict = src.indexOf("healthKitEntitlement != null");
+        assertTrue(conflict > at,
+                "a detected use with the entitlement explicitly disabled"
+                        + " must be refused rather than silently honoured"
+                        + " or silently overridden");
+    }
 }

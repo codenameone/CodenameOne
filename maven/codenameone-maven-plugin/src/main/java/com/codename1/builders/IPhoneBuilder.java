@@ -2793,9 +2793,36 @@ public class IPhoneBuilder extends Executor {
                                 "ios.entitlements.com.apple.developer"
                                         + ".healthkit.recalibrate-estimates",
                                 "false"));
-                if (entitleHealthKit && request.getArg(
+                String healthKitEntitlement = request.getArg(
                         "ios.entitlements.com.apple.developer.healthkit",
-                        null) == null) {
+                        null);
+                if (entitleHealthKit && healthKitEntitlement != null
+                        && !"true".equalsIgnoreCase(healthKitEntitlement)) {
+                    // Refused rather than overridden. The app calls the
+                    // health store and the hint says not to entitle it,
+                    // and neither reading wins on its own: silently
+                    // forcing the entitlement on contradicts an explicit
+                    // instruction, while honouring it signs the app with
+                    // <false/> and every authorization request fails at
+                    // runtime with the build having looked perfectly
+                    // healthy. A missing HealthKit capability is a
+                    // developer bug this feature already fails the build
+                    // over -- see the usage strings -- so it fails here
+                    // too, saying which two things disagree.
+                    error("This app uses com.codename1.health but sets "
+                            + "ios.entitlements.com.apple.developer"
+                            + ".healthkit=" + healthKitEntitlement
+                            + ". HealthKit cannot be used without that "
+                            + "entitlement: the app would be signed "
+                            + "without the capability and every "
+                            + "authorization request would fail at "
+                            + "runtime. Remove the hint to have it added "
+                            + "for you, set it to true, or stop calling "
+                            + "the health store.",
+                            new RuntimeException(
+                                "healthkit entitlement disabled"));
+                }
+                if (entitleHealthKit && healthKitEntitlement == null) {
                     request.putArgument(
                         "ios.entitlements.com.apple.developer.healthkit",
                         "true");
@@ -4015,7 +4042,16 @@ public class IPhoneBuilder extends Executor {
                 || "com/codename1/health/HealthDataType".equals(cls)
                 || "com/codename1/health/HealthSource".equals(cls)
                 || "com/codename1/health/RecordingMethod".equals(cls)
-                || "com/codename1/health/BloodPressureSample".equals(cls);
+                || "com/codename1/health/BloodPressureSample".equals(cls)
+                // The error types travel the same way. A sensor callback
+                // is handed a HealthException, and asking it what went
+                // wrong names HealthError -- so a sensor-only app that
+                // handled its errors was read as touching the store, and
+                // got the Health Connect bridge bundled and its
+                // minSdkVersion raised to 26, cutting off the API 21-25
+                // devices the BLE-only flow is documented to support.
+                || "com/codename1/health/HealthException".equals(cls)
+                || "com/codename1/health/HealthError".equals(cls);
     }
 
     public File getXcodeProjectDir() {

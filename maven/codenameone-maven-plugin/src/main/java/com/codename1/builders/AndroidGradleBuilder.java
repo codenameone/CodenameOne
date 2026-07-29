@@ -6663,7 +6663,16 @@ public class AndroidGradleBuilder extends Executor {
                 || "com/codename1/health/HealthDataType".equals(cls)
                 || "com/codename1/health/HealthSource".equals(cls)
                 || "com/codename1/health/RecordingMethod".equals(cls)
-                || "com/codename1/health/BloodPressureSample".equals(cls);
+                || "com/codename1/health/BloodPressureSample".equals(cls)
+                // The error types travel the same way. A sensor callback
+                // is handed a HealthException, and asking it what went
+                // wrong names HealthError -- so a sensor-only app that
+                // handled its errors was read as touching the store, and
+                // got the Health Connect bridge bundled and its
+                // minSdkVersion raised to 26, cutting off the API 21-25
+                // devices the BLE-only flow is documented to support.
+                || "com/codename1/health/HealthException".equals(cls)
+                || "com/codename1/health/HealthError".equals(cls);
     }
 
     static int compareVersions(String v1, String v2) {

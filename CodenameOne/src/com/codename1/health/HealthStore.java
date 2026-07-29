@@ -1926,14 +1926,27 @@ public class HealthStore {
             forgetSubscriptionLocked(subscriptionId);
             Preferences.delete(PREF_ANCHOR + subscriptionId);
             Preferences.delete(PREF_LISTENER + subscriptionId);
-            // Whether the id is still unregistered as this leaves. If
-            // something re-registered it, the platform state now belongs
-            // to that registration and tearing it down would break a
-            // subscription nobody cancelled.
-            stillGone = !subscriptions.containsKey(subscriptionId);
         }
         if (sub != null) {
             sub.markInactive();
+        }
+        synchronized (subscriptions) {
+            // Read after the lock was released and taken again, which is
+            // the only reading that means anything: computed inside the
+            // block above it was trivially true, since nothing could have
+            // registered between the removal and the test. A registration
+            // that arrives in the gap owns the platform state from that
+            // moment, and tearing it down would break a subscription
+            // nobody cancelled -- on Android it drops the new handle from
+            // baselinesInFlight, and the next drain takes a second
+            // baseline token.
+            //
+            // The gap cannot be closed entirely without holding the
+            // registry monitor across a call into the port, which orders
+            // it against whatever locks a port takes. It is narrowed to
+            // this test rather than left at the width of the whole
+            // teardown.
+            stillGone = !subscriptions.containsKey(subscriptionId);
         }
         if (isSupported() && stillGone) {
             // Outside the lock: this calls into the port, and holding the
@@ -2215,6 +2228,16 @@ public class HealthStore {
                     Display.getInstance().callSerially(
                             makeDeliveryRunnable(store, listener, chunks,
                                     index + 1, subscription));
+                }
+                if (!store.isStillRegistered(subscription)) {
+                    // Checked again after the listener returned, not only
+                    // before it ran. A listener is free to call
+                    // unsubscribe() -- or re-register its id -- from
+                    // inside healthDataChanged, and persisting this
+                    // batch's cursor afterwards recreated the very cursor
+                    // unsubscribe() had just discarded, for the next
+                    // registration under that id to load and resume from.
+                    return false;
                 }
                 if (batch.isResyncRequired()) {
                     // The cursor the platform rejected is dropped here,

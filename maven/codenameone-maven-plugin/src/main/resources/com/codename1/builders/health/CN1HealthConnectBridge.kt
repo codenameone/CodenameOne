@@ -522,13 +522,23 @@ class CN1HealthConnectBridge(private val context: Context)
         // guessed: it starts at one sample per record, which is exactly
         // right for every scalar type, and the first page of a series type
         // corrects it for every page after.
-        var samplesPerRecord = 1
+        // Series density is unknown until a page has been read, so the
+        // first one is deliberately a small probe: an over-large first
+        // page is memory spent that no later estimate can give back.
+        var samplesPerRecord = if (isSeriesToken(token))
+            SERIES_SCAN_CEILING / SERIES_PROBE_RECORDS else 1
         while (remaining > 0) {
-            // Series records are fetched a fixed number at a time rather
-            // than by dividing a sample budget: the budget above is a
-            // ceiling, not a target, and dividing by it would ask for one
-            // enormous page.
-            val wantRecords = if (isSeriesToken(token)) SERIES_PAGE_RECORDS
+            // A series page is sized from measured density, not from a
+            // constant. Asking for a fixed 64 records materialized the
+            // whole page before the ceiling was consulted, so 64 dense
+            // records -- ten thousand points each is an ordinary day of
+            // heart rate -- serialized far past the bound the ceiling
+            // exists to be. The first page is a small probe precisely
+            // because nothing is known about density yet; every page
+            // after it is sized by what that measured.
+            val wantRecords = if (isSeriesToken(token))
+                minOf(SERIES_PAGE_RECORDS,
+                    maxOf(1, remaining / samplesPerRecord))
                 else maxOf(1, remaining / samplesPerRecord)
             val page = requireClient().readRecords(
                 ReadRecordsRequest(type, timeRangeFilter = filter,
@@ -555,6 +565,15 @@ class CN1HealthConnectBridge(private val context: Context)
                 val w = appendOne(out, record, token, flatten, ascending)
                 lines += w.lines
                 points += w.points
+                // A capped read stops the moment the ceiling is reached,
+                // mid-page if need be. It can afford to: it selects from
+                // what it scanned and hands back no token, so abandoning
+                // the rest of a page strands nothing. An uncapped read
+                // cannot -- its token resumes past the whole page -- and
+                // is held to the ceiling by the page sizing above.
+                if (capped && points >= remaining) {
+                    break
+                }
             }
             if (page.records.isNotEmpty()) {
                 samplesPerRecord = maxOf(1, lines / page.records.size)
@@ -571,7 +590,18 @@ class CN1HealthConnectBridge(private val context: Context)
                 break
             }
         }
-        if (!capped) {
+        if (!capped || pageToken != null) {
+            // Selecting is only sound over a scan that finished. Stopping
+            // at the ceiling with records still unread means the newest
+            // sample may be among them, so there is nothing to select
+            // from -- the read falls back to the ordinary paging answer,
+            // which hands back everything it did read together with a
+            // token that reaches the rest. An earlier version returned
+            // the selection and dropped the token, which both threw away
+            // the continuation and claimed a prefix was the whole range.
+            if (capped) {
+                sb.append(out)
+            }
             return Read(emitted, pageToken)
         }
         val kept = topByTime(out.toString(), limit, ascending)
@@ -1262,8 +1292,18 @@ class CN1HealthConnectBridge(private val context: Context)
      */
     private val MAX_PAGE_SIZE = 5000
 
-    /** How many series records one round trip asks for. */
+    /** The most series records one round trip will ask for. */
     private val SERIES_PAGE_RECORDS = 64
+
+    /**
+     * How many series records the first page asks for, before anything
+     * is known about how many points they hold.
+     *
+     * Every record fetched is serialized before the ceiling is next
+     * consulted, so this is the one page whose size cannot be derived
+     * from measurement -- and the one that has to be small.
+     */
+    private val SERIES_PROBE_RECORDS = 4
 
     /**
      * The most samples a single series read will gather before it stops
