@@ -22,7 +22,6 @@
  */
 package com.codename1.impl.ios;
 
-import com.codename1.io.Log;
 import com.codename1.security.Hash;
 import com.codename1.security.SecureStorage;
 import com.codename1.ui.Display;
@@ -437,6 +436,14 @@ final class IOSDeviceIntegrity {
         if (pending == null) {
             return;
         }
+        if (isStale(pending)) {
+            // A reset landed while this assertion was in flight -- typically because a
+            // concurrent request learned the backend does not recognise the key. Handing
+            // back an assertion for the key that was just discarded would send the
+            // server the very thing it already rejected.
+            fail(pending, "App Attest state was reset while this request was in flight");
+            return;
+        }
         if (assertionB64 == null) {
             fail(pending, "App Attest assertion returned no data");
             return;
@@ -564,8 +571,12 @@ final class IOSDeviceIntegrity {
         try {
             return s.getBytes("UTF-8");
         } catch (java.io.UnsupportedEncodingException e) {
-            Log.e(e);
-            return s.getBytes();
+            // Every JVM is required to support UTF-8, so this cannot happen. Falling
+            // back to the platform default would be worse than failing: these bytes are
+            // hashed and the server recomputes the same hash over UTF-8, so a silent
+            // re-encode would produce an attestation that never verifies and no
+            // indication of why.
+            throw new IllegalStateException("UTF-8 is unavailable on this VM", e);
         }
     }
 

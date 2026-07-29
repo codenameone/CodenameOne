@@ -225,13 +225,20 @@ if [ ! -d "$CN1_BINARIES/.git" ]; then
   git clone --depth=1 --filter=blob:none https://github.com/codenameone/cn1-binaries "$CN1_BINARIES"
 fi
 
+# Both builds below run with -T 1C, so several modules install into the local
+# repository at once and contend for its lock. Maven's default wait is 30 seconds,
+# and on a cold cache under a loaded runner that is not always enough -- the build
+# then dies with "Could not acquire lock(s)" having compiled nothing wrong. Waiting
+# longer costs nothing when there is no contention.
+MVN_LOCK_ARGS="-Daether.syncContext.named.time=300 -Daether.syncContext.named.timeUnit=SECONDS"
+
 log "Building Codename One core modules"
-"$MAVEN_HOME/bin/mvn" -f maven/pom.xml -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -DskipTests -Djava.awt.headless=true -Dcn1.binaries="$CN1_BINARIES" -Dcodename1.platform=javase -P local-dev-javase,compile-android,!download-cn1-binaries install "$@"
+"$MAVEN_HOME/bin/mvn" -f maven/pom.xml $MVN_LOCK_ARGS -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -DskipTests -Djava.awt.headless=true -Dcn1.binaries="$CN1_BINARIES" -Dcodename1.platform=javase -P local-dev-javase,compile-android,!download-cn1-binaries install "$@"
 
 log "Building Codename One Maven plugin"
 "$MAVEN_HOME/bin/mvn" -f maven/pom.xml \
   -pl codenameone-maven-plugin -am \
-  -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+  $MVN_LOCK_ARGS -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
   -DskipTests -Djava.awt.headless=true \
   -Dcn1.binaries="$CN1_BINARIES" \
   -P !download-cn1-binaries \

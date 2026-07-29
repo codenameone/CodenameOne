@@ -147,7 +147,16 @@ public final class AppShield {
     /// True when a real attestation engine is present and available. False in an open-source or
     /// unentitled build, and in the simulator unless simulation is switched on.
     public static boolean isProtected() {
-        return ShieldEngineRegistry.getEngine().isAvailable();
+        // Guarded because the engine is pluggable and this is consulted on the failure
+        // path: a partially initialized engine whose isAvailable() throws would turn a
+        // fail-open host into a blocked request, which is the exact inversion the
+        // degradation contract promises will not happen. Unanswerable means unprotected.
+        try {
+            return ShieldEngineRegistry.getEngine().isAvailable();
+        } catch (Throwable t) {
+            Log.e(t);
+            return false;
+        }
     }
 
     /// The active engine's name, for diagnostics and support logs.
