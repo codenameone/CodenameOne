@@ -140,10 +140,23 @@ public class CN1WearableListenerService extends WearableListenerService {
                     path.substring(CN1WearableBridge.pathPrefix().length()));
             if (event.getType() == DataEvent.TYPE_DELETED) {
                 WearableConnection.deliverDataRemoved(appPath);
-            } else {
-                WearableConnection.deliverDataChanged(appPath, event.getDataItem().getData());
+                continue;
             }
+            // A file transfer arrives as a DataMap carrying an Asset rather than an inline payload.
+            // Turn it back into the WearableMessage the receiver expects; this callback already
+            // runs off the main thread, so resolving the asset here is fine.
+            byte[] payload = CN1WearableBridge.decodeTransfer(this, event.getDataItem());
+            WearableConnection.deliverDataChanged(appPath,
+                    payload != null ? payload : event.getDataItem().getData());
         }
+    }
+
+    @Override
+    public void onCapabilityChanged(com.google.android.gms.wearable.CapabilityInfo info) {
+        // The companion was installed or removed while the device stayed connected. Nothing else
+        // would notice: the capability cache would keep answering with the previous result.
+        CN1WearableBridge.capabilityChanged(info);
+        WearableConnection.notifyStateChanged();
     }
 
     @Override

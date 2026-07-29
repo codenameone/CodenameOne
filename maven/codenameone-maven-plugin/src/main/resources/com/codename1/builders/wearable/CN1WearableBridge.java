@@ -35,9 +35,13 @@ import com.google.android.gms.wearable.CapabilityInfo;
 import com.google.android.gms.wearable.DataClient;
 import com.google.android.gms.wearable.DataItem;
 import com.google.android.gms.wearable.DataItemBuffer;
+import com.google.android.gms.wearable.DataMap;
+import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.MessageClient;
 import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.NodeClient;
+import com.google.android.gms.wearable.Asset;
+import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 
@@ -104,6 +108,7 @@ public class CN1WearableBridge implements WearableBridge {
         this.dataClient = Wearable.getDataClient(this.context);
         this.nodeClient = Wearable.getNodeClient(this.context);
         this.capabilityClient = Wearable.getCapabilityClient(this.context);
+        current = this;
     }
 
     // --- state --------------------------------------------------------------
@@ -146,6 +151,9 @@ public class CN1WearableBridge implements WearableBridge {
             refreshBondedAsync();
             return cachedBonded;
         }
+        if (bondedStamp != 0 && System.currentTimeMillis() - bondedStamp <= NODE_CACHE_MILLIS) {
+            return cachedBonded;
+        }
         List<String> out = new ArrayList<String>();
         try {
             CapabilityInfo info = Tasks.await(
@@ -158,11 +166,32 @@ public class CN1WearableBridge implements WearableBridge {
             // No capability info: fall back to "nothing known".
         }
         cachedBonded = out;
+        bondedStamp = System.currentTimeMillis();
         return out;
     }
 
     private volatile List<String> cachedBonded = new ArrayList<String>();
     private volatile boolean refreshingBonded;
+    private volatile long bondedStamp;
+
+    /// Accepts a capability set pushed by Play services, so the cache tracks an install or
+    /// uninstall that happens while the device stays connected.
+    static void capabilityChanged(CapabilityInfo info) {
+        CN1WearableBridge b = current;
+        if (b == null || info == null) {
+            return;
+        }
+        List<String> out = new ArrayList<String>();
+        for (Node n : info.getNodes()) {
+            out.add(n.getId());
+        }
+        b.cachedBonded = out;
+        b.bondedStamp = System.currentTimeMillis();
+    }
+
+    /// The live bridge, so the listener service can push state into it. The service and the bridge
+    /// are created independently by Android, which is why this is not a constructor argument.
+    private static volatile CN1WearableBridge current;
 
     private void refreshBondedAsync() {
         if (refreshingBonded) {
@@ -179,6 +208,7 @@ public class CN1WearableBridge implements WearableBridge {
                             }
                         }
                         cachedBonded = out;
+                        bondedStamp = System.currentTimeMillis();
                         refreshingBonded = false;
                         WearableConnection.notifyStateChanged();
                     }
@@ -304,6 +334,10 @@ public class CN1WearableBridge implements WearableBridge {
             return;
         }
         if (replyToken != 0) {
+            // A send can succeed and still never be answered -- an older peer that does not know
+            // the path, or a cold start Android refused to allow. Without this the pending entry
+            // lives forever and neither handler method is ever called.
+            scheduleReplyTimeout(replyToken);
             // Fail only when NO node accepted the request: one watch failing while another
             // succeeds must not cancel the handler that the successful one is about to answer.
             com.google.android.gms.tasks.Tasks.whenAllComplete(tasks).addOnCompleteListener(
@@ -366,6 +400,23 @@ public class CN1WearableBridge implements WearableBridge {
             new HashMap<Integer, InboundRequest>();
     private static int nextLocalToken = 1;
 
+    /** How long an accepted request may go unanswered before the handler is failed. */
+    private static final int REPLY_TIMEOUT_MILLIS = 30000;
+
+    /**
+     * Fails a pending request that is never answered. {@code deliverReply} removes the token on the
+     * first call, so a real answer arriving first makes this a no-op.
+     */
+    private void scheduleReplyTimeout(final int replyToken) {
+        new java.util.Timer(true).schedule(new java.util.TimerTask() {
+            public void run() {
+                WearableConnection.deliverReply(replyToken, null,
+                        "The peer did not answer within " + (REPLY_TIMEOUT_MILLIS / 1000)
+                                + " seconds");
+            }
+        }, REPLY_TIMEOUT_MILLIS);
+    }
+
     private static String slashPrefixed(String path) {
         return path.startsWith("/") ? path : "/" + path;
     }
@@ -427,14 +478,50 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     public void transferFile(String path, String name, byte[] contents) {
-        // A DataItem already syncs in the background and survives both apps being killed, which is
-        // the guarantee a file transfer makes. The bytes are the file's own, not a WearableMessage,
-        // so wrap them in one -- the receiver decodes every DataItem as a payload and would
-        // otherwise read a PNG as a malformed message.
-        WearableMessage wrapper = new WearableMessage(path)
-                .put("name", name == null ? "file" : name)
-                .put("contents", contents == null ? new byte[0] : contents);
-        putData(path + "/" + (name == null ? "file" : name), wrapper.toByteArray());
+        // A DataItem's inline payload is capped at about 100KB, which a real file routinely
+        // exceeds; an Asset is the Data Layer's own answer for bulk and is streamed in the
+        // background. The DataItem carries the name and the Asset, so the receiver still gets a
+        // WearableMessage rather than raw bytes.
+        String fileName = name == null ? "file" : name;
+        byte[] body = contents == null ? new byte[0] : contents;
+        PutDataMapRequest req = PutDataMapRequest.create(dataPath(path + "/" + fileName));
+        req.getDataMap().putString("name", fileName);
+        req.getDataMap().putAsset("asset", Asset.createFromBytes(body));
+        dataClient.putDataItem(req.asPutDataRequest().setUrgent());
+    }
+
+    /**
+     * Rebuilds the {@code WearableMessage} form of a file transfer, or null when the item is an
+     * ordinary published value rather than a transfer.
+     *
+     * @param context any context
+     * @param item the received data item
+     * @return the encoded payload, or null
+     */
+    static byte[] decodeTransfer(Context context, DataItem item) {
+        try {
+            DataMap map = DataMapItem.fromDataItem(item).getDataMap();
+            Asset asset = map.getAsset("asset");
+            if (asset == null) {
+                return null;
+            }
+            java.io.InputStream in = Tasks.await(
+                    Wearable.getDataClient(context.getApplicationContext()).getFdForAsset(asset),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS).getInputStream();
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+            in.close();
+            return new WearableMessage(item.getUri().getPath())
+                    .put("name", map.getString("name", "file"))
+                    .put("contents", out.toByteArray())
+                    .toByteArray();
+        } catch (Throwable notATransfer) {
+            return null;
+        }
     }
 
     // --- paths --------------------------------------------------------------

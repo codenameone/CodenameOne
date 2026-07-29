@@ -23,6 +23,7 @@
 package com.codename1.impl.javase;
 
 import com.codename1.wearable.WearableConnection;
+import com.codename1.wearable.WearableMessage;
 import com.codename1.wearable.spi.WearableBridge;
 
 import java.io.DataInputStream;
@@ -61,6 +62,9 @@ class JavaSEWearableBridge implements WearableBridge {
     private static final int FRAME_MESSAGE = 1;
     private static final int FRAME_REPLY = 2;
     private static final int FRAME_HELLO = 3;
+    /// Ceiling on a single frame. Generous for any real payload, small enough that a corrupt length
+    /// cannot exhaust the heap.
+    private static final int MAX_FRAME_BYTES = 64 * 1024 * 1024;
 
     private final File dataDir;
     private final File portFile;
@@ -223,8 +227,14 @@ class JavaSEWearableBridge implements WearableBridge {
 
     public void transferFile(String path, String name, byte[] contents) {
         // The desktop has no background-transfer scheduler worth simulating, and a transfer that
-        // arrives eventually is indistinguishable from a data write that arrives eventually.
-        putData(path + "/" + (name == null ? "file" : name), contents);
+        // arrives eventually is indistinguishable from a data write that arrives eventually. The
+        // bytes still have to be encoded as a payload, though: the receiving side decodes every
+        // value as one, and raw file bytes would arrive as a malformed message with no name.
+        String fileName = name == null ? "file" : name;
+        WearableMessage wrapper = new WearableMessage(path)
+                .put("name", fileName)
+                .put("contents", contents == null ? new byte[0] : contents);
+        putData(path + "/" + fileName, wrapper.toByteArray());
     }
 
     // --- rendezvous ---------------------------------------------------------
@@ -301,7 +311,14 @@ class JavaSEWearableBridge implements WearableBridge {
                 int kind = in.readByte();
                 String path = in.readUTF();
                 int token = in.readInt();
-                byte[] payload = new byte[in.readInt()];
+                int length = in.readInt();
+                if (length < 0 || length > MAX_FRAME_BYTES) {
+                    // A corrupt or mismatched peer stream. Allocating on this would throw
+                    // NegativeArraySizeException or OutOfMemoryError, neither of which the
+                    // accept/connect loop catches -- it would take the link's thread with it.
+                    throw new IOException("Implausible frame length " + length);
+                }
+                byte[] payload = new byte[length];
                 in.readFully(payload);
                 switch (kind) {
                     case FRAME_MESSAGE:

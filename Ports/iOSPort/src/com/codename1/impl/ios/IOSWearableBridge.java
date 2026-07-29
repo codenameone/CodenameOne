@@ -107,6 +107,9 @@ final class IOSWearableBridge implements WearableBridge {
     }
 
     public void transferFile(String path, String name, byte[] contents) {
+        // WCSession moves the file itself, so the bytes go across untouched; the native receive
+        // side re-encodes them as a WearableMessage carrying name and contents, which is what the
+        // delivery path decodes. Sending is therefore raw by design, not by omission.
         nativeInstance.wearableTransferFile(path, name, contents);
     }
 }
