@@ -1245,15 +1245,21 @@ public abstract class Executor {
             while ((entry = zis.getNextEntry()) != null) {
                 String entryName = entry.getName();
 
+                // Validate the original ZIP name before any archive-specific
+                // branch can route it into a generated tar and continue.
+                resolveArchiveEntry(resDir, entryName);
+
                 if(!"html.tar".equals(entryName)&& (entryName.startsWith("html") || entryName.startsWith("/html"))) {
                     if(entry.isDirectory()) {
                         continue;
                     }
-
+                    entryName = entryName.substring(5);
+                    // The stripped name becomes a member of another archive,
+                    // so validate it independently against that archive's root.
+                    resolveArchiveEntry(resDir, entryName);
                     if(tos == null) {
                         tos = new TarOutputStream(new FileOutputStream(new File(resDir, "html.tar")));
                     }
-                    entryName = entryName.substring(5);
                     TarEntry tEntry = new TarEntry(new File(entryName), entryName);
                     tEntry.setSize(entry.getSize());
                     debug("Packaging entry " + entryName + " size: " + entry.getSize());
@@ -1270,10 +1276,11 @@ public abstract class Executor {
                         continue;
                     }
                     int podSpecsPrefix = entryName.startsWith("podspecs/") ? "podspecs/".length() : "/podspecs/".length();
+                    entryName = entryName.substring(podSpecsPrefix);
+                    resolveArchiveEntry(resDir, entryName);
                     if(podspecTos == null) {
                         podspecTos = new TarOutputStream(new FileOutputStream(new File(resDir, "podspecs.tar")));
                     }
-                    entryName = entryName.substring(podSpecsPrefix);
                     TarEntry tEntry = new TarEntry(new File(entryName), entryName);
                     tEntry.setSize(entry.getSize());
                     debug("Packaging entry " + entryName + " size: " + entry.getSize());
@@ -1292,10 +1299,11 @@ public abstract class Executor {
                         continue;
                     }
                     int libPrefix = entryName.startsWith("javase.lib/") ? "javase.lib/".length() : "/javase.lib/".length();
+                    entryName = entryName.substring(libPrefix);
+                    resolveArchiveEntry(resDir, entryName);
                     if(libTos == null) {
                         libTos = new TarOutputStream(new FileOutputStream(new File(resDir, "javase.lib.tar")));
                     }
-                    entryName = entryName.substring(libPrefix);
                     TarEntry tEntry = new TarEntry(new File(entryName), entryName);
                     tEntry.setSize(entry.getSize());
                     debug("Packaging entry " + entryName + " size: " + entry.getSize());

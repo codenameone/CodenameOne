@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ExecutorArchiveExtractionTest {
@@ -97,6 +98,21 @@ class ExecutorArchiveExtractionTest {
                         StandardCharsets.UTF_8));
     }
 
+    @Test
+    void rejectsTraversalBeforeArchiveSpecificRouting() throws Exception {
+        assertSpecialEntryRejected("html/../../payload", "html.tar");
+        assertSpecialEntryRejected("javase.lib/../../payload",
+                "javase.lib.tar");
+    }
+
+    @Test
+    void rejectsTraversalInStrippedTarMemberName() throws Exception {
+        assertSpecialEntryRejected("html/../payload", "html.tar");
+        assertSpecialEntryRejected("podspecs/../payload", "podspecs.tar");
+        assertSpecialEntryRejected("javase.lib/../payload",
+                "javase.lib.tar");
+    }
+
     private static byte[] zipEntry(String name, String contents)
             throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -106,5 +122,24 @@ class ExecutorArchiveExtractionTest {
         zip.closeEntry();
         zip.close();
         return bytes.toByteArray();
+    }
+
+    private void assertSpecialEntryRejected(String entryName,
+            String generatedArchive) throws Exception {
+        File root = temporaryDirectory.resolve("special-"
+                + Math.abs(entryName.hashCode())).toFile();
+        File classes = new File(root, "classes");
+        File resources = new File(root, "resources");
+        File sources = new File(root, "sources");
+        classes.mkdirs();
+        resources.mkdirs();
+        sources.mkdirs();
+
+        new IPhoneBuilder().unzip(
+                new ByteArrayInputStream(zipEntry(entryName, "payload")),
+                classes, resources, sources);
+
+        assertFalse(new File(resources, generatedArchive).exists(),
+                "Unsafe entry must not create " + generatedArchive);
     }
 }
