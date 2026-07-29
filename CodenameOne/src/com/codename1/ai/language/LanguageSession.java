@@ -27,11 +27,9 @@ import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
 
-/**
- * Shared lifecycle implementation for the public feature-specific language
- * sessions. This package-private type keeps native backends alive across
- * repeated operations and defers release while an operation is pending.
- */
+/// Shared lifecycle implementation for the public feature-specific language
+/// sessions. This package-private type keeps native backends alive across
+/// repeated operations and defers release while an operation is pending.
 final class LanguageSession implements AutoCloseable {
     interface Operation<T> {
         AsyncResource<T> run(LanguageImpl implementation,
