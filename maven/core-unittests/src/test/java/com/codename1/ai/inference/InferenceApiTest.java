@@ -201,6 +201,63 @@ class InferenceApiTest extends UITestBase {
     }
 
     @Test
+    void modelCacheIsolatesCoalescedSubscriberCallbacks() {
+        assertModelCacheSubscriberIsolation(false);
+        assertModelCacheSubscriberIsolation(true);
+    }
+
+    private void assertModelCacheSubscriberIsolation(boolean fail) {
+        String suffix = fail ? "failure" : "success";
+        String fileName = "model-cache-subscriber-" + suffix + ".tflite";
+        ModelCache.FetchRegistration first = ModelCache.registerFetch(
+                fileName, "https://one.example/model.tflite", null);
+        ModelCache.FetchRegistration second = ModelCache.registerFetch(
+                fileName, "https://one.example/model.tflite", null);
+        AtomicReference<Object> secondNotification =
+                new AtomicReference<Object>();
+        if (fail) {
+            first.resource.except(new SuccessCallback<Throwable>() {
+                @Override
+                public void onSucess(Throwable value) {
+                    throw new IllegalStateException(
+                            "first subscriber callback failed");
+                }
+            });
+            second.resource.except(new SuccessCallback<Throwable>() {
+                @Override
+                public void onSucess(Throwable value) {
+                    secondNotification.set(value);
+                }
+            });
+            first.completion.fail(new IllegalStateException(
+                    "download failed"));
+        } else {
+            first.resource.ready(new SuccessCallback<ModelSource>() {
+                @Override
+                public void onSucess(ModelSource value) {
+                    throw new IllegalStateException(
+                            "first subscriber callback failed");
+                }
+            });
+            second.resource.ready(new SuccessCallback<ModelSource>() {
+                @Override
+                public void onSucess(ModelSource value) {
+                    secondNotification.set(value);
+                }
+            });
+            first.completion.complete(
+                    ModelSource.file("test-model.tflite"));
+        }
+        flushSerialCalls();
+
+        assertTrue(first.resource.isDone());
+        assertTrue(second.resource.isDone(),
+                "a throwing subscriber must not block later subscribers");
+        assertNotNull(secondNotification.get(),
+                "the later subscriber must still receive its notification");
+    }
+
+    @Test
     void modelCacheNamesDoNotAliasSanitizedKeys() {
         assertNotEquals(ModelCache.safeName("model/v1"),
                 ModelCache.safeName("model?v1"));

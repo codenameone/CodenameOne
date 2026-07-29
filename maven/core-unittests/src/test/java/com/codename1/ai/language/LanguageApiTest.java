@@ -156,6 +156,25 @@ class LanguageApiTest extends UITestBase {
     }
 
     @Test
+    void synchronousBackendFailureClosesEphemeralBackend() {
+        RecordingLanguageImpl backend = new RecordingLanguageImpl();
+        backend.throwTranslation = true;
+        implementation.setLanguageImpl(backend);
+
+        AsyncResource<String> result = Translator.translate(
+                "bonjour", "fr", "en",
+                new LanguageOptions().backend(
+                        LanguageBackends.mlKitTranslation()));
+
+        assertTrue(result.isDone());
+        AsyncResource.AsyncExecutionException error = assertThrows(
+                AsyncResource.AsyncExecutionException.class, result::get);
+        assertEquals("native initialization failed",
+                error.getCause().getMessage());
+        assertEquals(1, backend.closeCount);
+    }
+
+    @Test
     void cancelledOperationSuppressesLateBackendCallbacksAndCloses()
             throws Exception {
         assertCancelledSettlementDoesNotPublish(false);
@@ -246,6 +265,7 @@ class LanguageApiTest extends UITestBase {
         int translationCalls;
         int closeCount;
         boolean deferTranslation;
+        boolean throwTranslation;
         AsyncResource<String> pendingTranslation;
 
         public boolean isSupported(String value, String backendId) {
@@ -272,6 +292,10 @@ class LanguageApiTest extends UITestBase {
                 String backendId, LanguageOptions value) {
             feature = "translation";
             translationCalls++;
+            if (throwTranslation) {
+                throw new IllegalStateException(
+                        "native initialization failed");
+            }
             AsyncResource<String> result = new AsyncResource<String>();
             if (deferTranslation) {
                 pendingTranslation = result;

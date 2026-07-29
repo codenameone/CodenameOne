@@ -24,6 +24,7 @@ package com.codename1.ai.inference;
 
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
 import com.codename1.security.Hash;
@@ -341,12 +342,20 @@ public final class ModelCache {
         operation.ready(new SuccessCallback<T>() {
             @Override
             public void onSucess(T value) {
-                subscriber.publish(value);
+                try {
+                    subscriber.publish(value);
+                } catch (Throwable callbackFailure) {
+                    Log.e(callbackFailure);
+                }
             }
         }).except(new SuccessCallback<Throwable>() {
             @Override
             public void onSucess(Throwable error) {
-                subscriber.fail(error);
+                try {
+                    subscriber.fail(error);
+                } catch (Throwable callbackFailure) {
+                    Log.e(callbackFailure);
+                }
             }
         });
         return subscriber;

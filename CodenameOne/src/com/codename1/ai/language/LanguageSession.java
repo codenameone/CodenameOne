@@ -87,7 +87,9 @@ final class LanguageSession implements AutoCloseable {
 
     <T> AsyncResource<T> execute(Operation<T> operation,
                                  final boolean closeWhenFinished) {
-        final AsyncResource<T> backendResult;
+        AsyncResource<T> startedResult = null;
+        RuntimeException synchronousFailure = null;
+        Error synchronousError = null;
         synchronized (this) {
             if (closed) {
                 throw new IllegalStateException(
@@ -95,21 +97,35 @@ final class LanguageSession implements AutoCloseable {
             }
             activeOperations++;
             try {
-                backendResult = operation.run(implementation, options);
-                if (backendResult == null) {
+                startedResult = operation.run(implementation, options);
+                if (startedResult == null) {
                     throw new IllegalStateException(
                             "Language backend returned no asynchronous result");
                 }
             } catch (RuntimeException error) {
                 activeOperations--;
-                throw error;
+                synchronousFailure = error;
             } catch (Error error) {
                 activeOperations--;
-                throw error;
+                synchronousError = error;
             }
         }
         final OperationResource<T> result =
                 new OperationResource<T>(this, closeWhenFinished);
+        if (synchronousFailure != null) {
+            if (closeWhenFinished) {
+                close();
+            }
+            result.fail(synchronousFailure);
+            return result;
+        }
+        if (synchronousError != null) {
+            if (closeWhenFinished) {
+                close();
+            }
+            throw synchronousError;
+        }
+        final AsyncResource<T> backendResult = startedResult;
         final Completion completion = new Completion();
         backendResult.ready(new SuccessCallback<T>() {
             @Override
