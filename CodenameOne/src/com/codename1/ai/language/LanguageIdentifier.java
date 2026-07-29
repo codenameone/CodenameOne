@@ -64,7 +64,7 @@ public final class LanguageIdentifier {
     /// @return asynchronous ranked candidates; may be empty for undetermined text
     public static AsyncResource<LanguageCandidate[]> identify(
             String text, LanguageOptions options) {
-        final Session session;
+        final Session session; //NOPMD CloseResource - async result owns closure
         try {
             session = open(options);
         } catch (RuntimeException error) {
@@ -103,6 +103,7 @@ public final class LanguageIdentifier {
                 final String text, boolean closeWhenFinished) {
             return session.execute(
                     new LanguageSession.Operation<LanguageCandidate[]>() {
+                        @Override
                         public AsyncResource<LanguageCandidate[]> run(
                                 LanguageImpl implementation,
                                 LanguageOptions options) {
@@ -115,6 +116,7 @@ public final class LanguageIdentifier {
 
         /// Closes the session. This method is idempotent; native release is
         /// deferred until pending identifications finish.
+        @Override
         public void close() {
             session.close();
         }

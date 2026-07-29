@@ -75,7 +75,7 @@ public final class Translator {
     public static AsyncResource<String> translate(String text, String sourceLanguage,
                                                    String targetLanguage,
                                                    LanguageOptions options) {
-        final Session session;
+        final Session session; //NOPMD CloseResource - async result owns closure
         try {
             session = open(options);
         } catch (RuntimeException error) {
@@ -118,6 +118,7 @@ public final class Translator {
                                                 final String targetLanguage,
                                                 boolean closeWhenFinished) {
             return session.execute(new LanguageSession.Operation<String>() {
+                @Override
                 public AsyncResource<String> run(
                         LanguageImpl implementation,
                         LanguageOptions options) {
@@ -131,6 +132,7 @@ public final class Translator {
 
         /// Closes the session. This method is idempotent; native release is
         /// deferred until pending translations finish.
+        @Override
         public void close() {
             session.close();
         }

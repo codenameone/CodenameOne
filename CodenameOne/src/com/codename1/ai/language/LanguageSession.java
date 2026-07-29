@@ -112,6 +112,7 @@ final class LanguageSession implements AutoCloseable {
                 new OperationResource<T>(this, closeWhenFinished);
         final Completion completion = new Completion();
         backendResult.ready(new SuccessCallback<T>() {
+            @Override
             public void onSucess(T value) {
                 if (completion.finish()) {
                     if (closeWhenFinished) {
@@ -122,6 +123,7 @@ final class LanguageSession implements AutoCloseable {
                 }
             }
         }).except(new SuccessCallback<Throwable>() {
+            @Override
             public void onSucess(Throwable error) {
                 if (completion.finish()) {
                     if (closeWhenFinished) {
@@ -149,6 +151,7 @@ final class LanguageSession implements AutoCloseable {
         }
     }
 
+    @Override
     public void close() {
         LanguageImpl toClose = null;
         synchronized (this) {
@@ -178,6 +181,7 @@ final class LanguageSession implements AutoCloseable {
             this.closeWhenFinished = closeWhenFinished;
         }
 
+        @Override
         public synchronized boolean cancel(boolean mayInterruptIfRunning) {
             boolean cancelled = super.cancel(mayInterruptIfRunning);
             if (cancelled && closeWhenFinished) {

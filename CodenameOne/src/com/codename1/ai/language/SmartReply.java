@@ -69,7 +69,7 @@ public final class SmartReply {
     /// @return asynchronous suggestions, possibly an empty array
     public static AsyncResource<String[]> suggest(SmartReplyMessage[] conversation,
                                                    LanguageOptions options) {
-        final Session session;
+        final Session session; //NOPMD CloseResource - async result owns closure
         try {
             session = open(options);
         } catch (RuntimeException error) {
@@ -123,6 +123,7 @@ public final class SmartReply {
             final SmartReplyMessage[] snapshot =
                     copyConversation(conversation);
             return session.execute(new LanguageSession.Operation<String[]>() {
+                @Override
                 public AsyncResource<String[]> run(
                         LanguageImpl implementation,
                         LanguageOptions options) {
@@ -134,6 +135,7 @@ public final class SmartReply {
 
         /// Closes the session. This method is idempotent; native release is
         /// deferred until pending suggestions finish.
+        @Override
         public void close() {
             session.close();
         }
