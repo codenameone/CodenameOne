@@ -57,7 +57,7 @@ class HealthManifestFragmentsTest {
     @Test
     void readTokensBecomeReadPermissions() {
         String out = HealthManifestFragments.injectPermissions("",
-                list("steps", "heart_rate"), list(), false, false, false, 34);
+                list("steps", "heart_rate"), list(), false, false, 34);
         assertTrue(out.contains("android.permission.health.READ_STEPS"));
         assertTrue(out.contains("android.permission.health.READ_HEART_RATE"));
         assertFalse(out.contains("WRITE_STEPS"));
@@ -66,7 +66,7 @@ class HealthManifestFragmentsTest {
     @Test
     void writeTokensBecomeWritePermissions() {
         String out = HealthManifestFragments.injectPermissions("",
-                list(), list("steps"), false, false, false, 34);
+                list(), list("steps"), false, false, 34);
         assertTrue(out.contains("android.permission.health.WRITE_STEPS"));
         assertFalse(out.contains("READ_STEPS"));
     }
@@ -79,7 +79,7 @@ class HealthManifestFragmentsTest {
     void heartRatePrefixDoesNotSuppressHeartRateVariability() {
         String out = HealthManifestFragments.injectPermissions("",
                 list("heart_rate", "heart_rate_variability_sdnn"),
-                list(), false, false, false, 34);
+                list(), false, false, 34);
         assertTrue(out.contains(
                 "\"android.permission.health.READ_HEART_RATE\""));
         assertTrue(out.contains(
@@ -90,7 +90,7 @@ class HealthManifestFragmentsTest {
     @Test
     void exercisePrefixDoesNotSuppressLongerPermissions() {
         String out = HealthManifestFragments.injectPermissions("",
-                list("workout"), list(), false, false, false, 34);
+                list("workout"), list(), false, false, 34);
         assertTrue(out.contains("\"android.permission.health.READ_EXERCISE\""));
     }
 
@@ -101,7 +101,7 @@ class HealthManifestFragmentsTest {
     @Test
     void backgroundAndHistoryPermissionsCoexist() {
         String out = HealthManifestFragments.injectPermissions("",
-                list("steps"), list(), true, true, false, 34);
+                list("steps"), list(), true, true, 34);
         assertTrue(out.contains(
                 "READ_HEALTH_DATA_IN_BACKGROUND"));
         assertTrue(out.contains("READ_HEALTH_DATA_HISTORY"));
@@ -116,7 +116,7 @@ class HealthManifestFragmentsTest {
         String existing = "    <uses-permission android:name="
                 + "\"android.permission.health.READ_STEPS\" />\n";
         String out = HealthManifestFragments.injectPermissions(existing,
-                list("steps"), list(), false, false, false, 34);
+                list("steps"), list(), false, false, 34);
         assertEquals(1, count(out,
                 "\"android.permission.health.READ_STEPS\""));
     }
@@ -130,17 +130,29 @@ class HealthManifestFragmentsTest {
         String out = HealthManifestFragments.injectPermissions("",
                 list("distance_walking_running", "distance_cycling",
                         "distance_swimming"),
-                list(), false, false, false, 34);
+                list(), false, false, 34);
         assertEquals(1, count(out,
                 "\"android.permission.health.READ_DISTANCE\""));
     }
 
+    /**
+     * A workout asks for no permission of its own.
+     *
+     * <p>This asserted that ACTIVITY_RECOGNITION was emitted, on the
+     * stated grounds that a recorded workout reads step and exercise
+     * detection. It does not: the only session this release implements
+     * rolls up samples the app hands it, and both sensor-collection
+     * capability queries answer false everywhere. So the assertion was
+     * defending a sensitive permission that no workout-only app could
+     * ever exercise, and the Play disclosure that comes with it.</p>
+     */
     @Test
-    void workoutSessionsAddForegroundServiceAndActivityRecognition() {
+    void aWorkoutAsksForNoPermissionOfItsOwn() {
         String out = HealthManifestFragments.injectPermissions("",
-                list("workout"), list(), false, false, true, 34);
-        assertTrue(out.contains("android.permission.ACTIVITY_RECOGNITION"));
-        // No foreground-service permissions: this release ships no
+                list("workout"), list(), false, false, 34);
+        assertFalse(out.contains("android.permission.ACTIVITY_RECOGNITION"),
+                "nothing in a recorded workout reads activity recognition");
+        // No foreground-service permissions either: this release ships no
         // foreground service, and requesting permissions the app cannot
         // use invites a Play review question with no good answer.
         assertFalse(out.contains("android.permission.FOREGROUND_SERVICE"));
@@ -151,7 +163,7 @@ class HealthManifestFragmentsTest {
     @Test
     void foregroundServicePermissionsAreNeverRequested() {
         String out = HealthManifestFragments.injectPermissions("",
-                list("workout"), list(), false, false, true, 33);
+                list("workout"), list(), false, false, 33);
         assertFalse(out.contains("android.permission.FOREGROUND_SERVICE"));
         assertFalse(out.contains(
                 "android.permission.FOREGROUND_SERVICE_HEALTH"));
@@ -174,7 +186,7 @@ class HealthManifestFragmentsTest {
     @Test
     void rationaleActivityIsAlwaysDeclared() {
         String out = HealthManifestFragments.injectApplicationEntries("",
-                false, 34);
+                34);
         assertTrue(out.contains(
                 HealthManifestFragments.RATIONALE_ACTIVITY));
         assertTrue(out.contains(
@@ -184,10 +196,9 @@ class HealthManifestFragmentsTest {
     @Test
     void permissionUsageAliasIsApi34Only() {
         String modern = HealthManifestFragments.injectApplicationEntries("",
-                false, 34);
+                34);
         assertTrue(modern.contains("ViewPermissionUsageActivity"));
-        String older = HealthManifestFragments.injectApplicationEntries("",
-                false, 33);
+        String older = HealthManifestFragments.injectApplicationEntries("", 33);
         assertFalse(older.contains("ViewPermissionUsageActivity"));
     }
 
@@ -201,10 +212,9 @@ class HealthManifestFragmentsTest {
      */
     @Test
     void noWorkoutServiceIsDeclared() {
-        assertFalse(HealthManifestFragments.injectApplicationEntries("",
-                false, 34).contains("HealthWorkoutService"));
+        assertFalse(HealthManifestFragments.injectApplicationEntries("", 34).contains("HealthWorkoutService"));
         String withWorkouts = HealthManifestFragments
-                .injectApplicationEntries("", true, 34);
+                .injectApplicationEntries("", 34);
         assertFalse(withWorkouts.contains("HealthWorkoutService"));
         assertFalse(withWorkouts.contains("foregroundServiceType"));
     }
@@ -218,9 +228,9 @@ class HealthManifestFragmentsTest {
     @Test
     void applicationEntriesAreNotDuplicated() {
         String once = HealthManifestFragments.injectApplicationEntries("",
-                true, 34);
+                34);
         String twice = HealthManifestFragments.injectApplicationEntries(once,
-                true, 34);
+                34);
         assertEquals(once, twice, "a second pass must add nothing");
         assertEquals(1, count(twice, "<activity android:name="));
         assertEquals(0, count(twice, "<service android:name="),

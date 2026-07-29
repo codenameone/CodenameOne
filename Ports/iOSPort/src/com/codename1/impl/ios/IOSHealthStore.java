@@ -290,7 +290,9 @@ class IOSHealthStore extends HealthStore {
     /// answer false so an app can tell how much this is worth.
     protected void doDrainChanges(List<HealthSubscription> subscriptions,
             AsyncResource<Integer> out) {
-        drainFailure = null;
+        synchronized (drainLock) {
+            drainFailure = null;
+        }
         drainFrom(new ArrayList<HealthSubscription>(subscriptions), 0, 0,
                 out);
     }
@@ -302,14 +304,18 @@ class IOSHealthStore extends HealthStore {
     /// the same reason [#drainFailure] is: the shared layer runs one
     /// drain at a time and this drain reads its subscriptions in turn.
     ///
-    /// Volatile because a read's post-processing runs on the shared
-    /// health worker, so the thread that sets this is not always the one
-    /// that reads it. One drain at a time makes the field safe to share;
-    /// it does not publish the write.
-    private volatile boolean resyncRequired;
+    /// Guarded by [#drainLock] because a read's post-processing runs on
+    /// the shared health worker, so the thread that sets this is not
+    /// always the one that reads it. One drain at a time makes the field
+    /// safe to share; it does not publish the write.
+    private final Object drainLock = new Object();
+    /// Guarded by [#drainLock].
+    private boolean resyncRequired;
 
     void noteResyncRequired() {
-        resyncRequired = true;
+        synchronized (drainLock) {
+            resyncRequired = true;
+        }
     }
 
     /// The first failure this drain hit, or null.
@@ -318,15 +324,17 @@ class IOSHealthStore extends HealthStore {
     /// the shared layer runs one drain at a time -- a second call while
     /// one is in flight is coalesced onto it rather than started.
     ///
-    /// Volatile for the same reason as [#resyncRequired].
-    private volatile Throwable drainFailure;
+    /// Guarded by [#drainLock], for the same reason as [#resyncRequired].
+    private Throwable drainFailure;
 
     /// Remembers a failure so the drain can report it once it has given
     /// the healthy subscriptions their turn. The first one wins: it is
     /// the one with a cause the caller can still act on.
     void noteDrainFailure(Throwable error) {
-        if (drainFailure == null) {
-            drainFailure = error;
+        synchronized (drainLock) {
+            if (drainFailure == null) {
+                drainFailure = error;
+            }
         }
     }
 
@@ -334,7 +342,12 @@ class IOSHealthStore extends HealthStore {
             final int index, final int delivered,
             final AsyncResource<Integer> out) {
         if (index >= subs.size()) {
-            if (drainFailure != null) {
+            Throwable failed;
+            synchronized (drainLock) {
+                failed = drainFailure;
+                drainFailure = null;
+            }
+            if (failed != null) {
                 // Surfaced, not swallowed. A subscription skipped for
                 // HKErrorDatabaseInaccessible -- the device locked, before
                 // its first unlock, which is exactly when a background
@@ -342,8 +355,6 @@ class IOSHealthStore extends HealthStore {
                 // nothing to report. The caller could not tell that from
                 // genuinely no changes, so the one error the API documents
                 // as retryable was the one error nobody ever retried.
-                Throwable failed = drainFailure;
-                drainFailure = null;
                 out.error(failed);
                 return;
             }
@@ -377,7 +388,9 @@ class IOSHealthStore extends HealthStore {
             drainFrom(subs, index + 1, delivered + sent, out);
             return;
         }
-        resyncRequired = false;
+        synchronized (drainLock) {
+            resyncRequired = false;
+        }
         readTypes(subs, index, delivered, out, types, 0,
                 new ArrayList<HealthSample>(), since, now, now);
     }
@@ -420,7 +433,11 @@ class IOSHealthStore extends HealthStore {
                     // ordinary drain as already out of time.
                     HealthAnchor.of(String.valueOf(safeUntil)), Long.MAX_VALUE,
                     safeUntil < now));;
-            if (resyncRequired) {
+            boolean resync;
+            synchronized (drainLock) {
+                resync = resyncRequired;
+            }
+            if (resync) {
                 // A second, empty batch rather than a flag on the first.
                 // getAdded() is documented as empty when a resynchronisation
                 // is required, and the samples above were genuinely read

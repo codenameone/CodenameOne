@@ -2193,12 +2193,12 @@ public class AndroidGradleBuilder extends Executor {
                             "android.health.background", "false")),
                     "true".equalsIgnoreCase(request.getArg(
                             "android.health.history", "false")),
-                    usesHealthWorkout, targetSDKVersionInt);
+                    targetSDKVersionInt);
             healthQueriesFragment =
                     HealthManifestFragments.injectQueries("");
             healthApplicationFragment =
                     HealthManifestFragments.injectApplicationEntries("",
-                            usesHealthWorkout, targetSDKVersionInt);
+                            targetSDKVersionInt);
 
             // Health Connect ships as an AndroidX library with a Kotlin
             // coroutine API; the port itself never references it (see

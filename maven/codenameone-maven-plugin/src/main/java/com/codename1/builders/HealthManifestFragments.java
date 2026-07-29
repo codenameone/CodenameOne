@@ -72,7 +72,7 @@ final class HealthManifestFragments {
      * builder so a BuildDaemon running an older copy of this class is
      * apparent from the build log.
      */
-    static final String FRAGMENT_VERSION = "health-1";
+    static final String FRAGMENT_VERSION = "health-2";
 
     /** The Health Connect provider package. */
     static final String PROVIDER_PACKAGE =
@@ -413,12 +413,11 @@ final class HealthManifestFragments {
      * @param writeTokens       {@code android.health.write} tokens
      * @param backgroundRead    {@code android.health.background} hint
      * @param history           {@code android.health.history} hint
-     * @param workoutSessions   workout API usage detected
      * @param targetSdkVersion  the app's target SDK
      */
     static String injectPermissions(String xPermissions,
             List<String> readTokens, List<String> writeTokens,
-            boolean backgroundRead, boolean history, boolean workoutSessions,
+            boolean backgroundRead, boolean history,
             int targetSdkVersion) {
         StringBuilder sb = new StringBuilder(
                 xPermissions == null ? "" : xPermissions);
@@ -439,20 +438,22 @@ final class HealthManifestFragments {
             addPermission(sb, emitted,
                     "android.permission.health.READ_HEALTH_DATA_HISTORY");
         }
-        if (workoutSessions) {
-            // ACTIVITY_RECOGNITION gates step and exercise detection from
-            // API 29, which a recorded workout genuinely reads.
-            //
-            // The foreground-service permissions are deliberately NOT
-            // requested. They only matter alongside a foreground service,
-            // and this release ships none -- the manifest used to declare
-            // com.codename1.health.HealthWorkoutService, a class that does
-            // not exist, so the promised keepalive was never there. Asking
-            // for permissions the app cannot use invites a Play review
-            // question with no answer.
-            addPermission(sb, emitted,
-                    "android.permission.ACTIVITY_RECOGNITION");
-        }
+        // Nothing is emitted for workouts.
+        //
+        // ACTIVITY_RECOGNITION used to be, on the stated grounds that a
+        // recorded workout reads step and exercise detection. It does
+        // not: the only session this release implements rolls up samples
+        // the app hands it through addSamples(), and both
+        // sensor-collection capability queries answer false everywhere.
+        // So a workout-only app declared a sensitive permission nothing
+        // in it could exercise, and invited the Play disclosure that
+        // comes with it.
+        //
+        // The foreground-service permissions are omitted for the same
+        // kind of reason. They only matter alongside a foreground
+        // service, and this release ships none -- the manifest used to
+        // declare com.codename1.health.HealthWorkoutService, a class that
+        // does not exist, so the promised keepalive was never there.
         return sb.toString();
     }
 
@@ -501,7 +502,7 @@ final class HealthManifestFragments {
      * appears.</p>
      */
     static String injectApplicationEntries(String xApplication,
-            boolean workoutSessions, int targetSdkVersion) {
+            int targetSdkVersion) {
         StringBuilder sb = new StringBuilder(
                 xApplication == null ? "" : xApplication);
         if (sb.indexOf(RATIONALE_ACTIVITY) < 0) {

@@ -526,7 +526,9 @@ class AndroidHealthStore extends HealthStore {
         if (failIfNoBridge(out)) {
             return;
         }
-        drainFailure = null;
+        synchronized (drainLock) {
+            drainFailure = null;
+        }
         drainFrom(new ArrayList<HealthSubscription>(subscriptions), 0, 0,
                 out);
     }
@@ -537,33 +539,40 @@ class AndroidHealthStore extends HealthStore {
     /// the shared layer runs one drain at a time -- a second call while
     /// one is in flight is coalesced onto it rather than started.
     ///
-    /// Volatile because the two ends are on different threads: it is set
-    /// from the bridge's callback and read on the EDT, after the hop
-    /// SkipOne makes. One drain at a time makes the field safe to share;
-    /// it does not publish the write.
-    private volatile Throwable drainFailure;
+    /// Guarded by [#drainLock] because the two ends are on different
+    /// threads: it is set from the bridge's callback and read on the EDT,
+    /// after the hop SkipOne makes. One drain at a time makes the field
+    /// safe to share; it does not publish the write.
+    private final Object drainLock = new Object();
+    /// Guarded by [#drainLock].
+    private Throwable drainFailure;
 
     /// Remembers a failure so the drain can report it once it has given
     /// the healthy subscriptions their turn. The first one wins: it is
     /// the one with a cause the caller can still act on.
     private void noteDrainFailure(Throwable error) {
-        if (drainFailure == null) {
-            drainFailure = error;
+        synchronized (drainLock) {
+            if (drainFailure == null) {
+                drainFailure = error;
+            }
         }
     }
 
     private void drainFrom(List<HealthSubscription> subs, int index,
             int delivered, AsyncResource<Integer> out) {
         if (index >= subs.size()) {
-            if (drainFailure != null) {
+            Throwable failed;
+            synchronized (drainLock) {
+                failed = drainFailure;
+                drainFailure = null;
+            }
+            if (failed != null) {
                 // Surfaced, not swallowed. A subscription skipped because
                 // Health Connect refused the read otherwise resolved as a
                 // clean drain with nothing to report, which a caller
                 // cannot tell from genuinely no changes -- so nothing ever
                 // retried, and the skipped window was only picked up if
                 // the app happened to drain again for its own reasons.
-                Throwable failed = drainFailure;
-                drainFailure = null;
                 out.error(failed);
                 return;
             }

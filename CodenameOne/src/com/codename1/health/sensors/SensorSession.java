@@ -75,23 +75,24 @@ public class SensorSession {
     private final CumulativeCounterTracker crankTracker =
             new CumulativeCounterTracker(0x10000L, 1024);
 
-    /// Volatile because it is written on the EDT and read from the
-    /// flush timer's thread and from store callbacks. Without it those
-    /// threads could go on seeing a running session after it had ended,
-    /// re-arm the flush, and issue a write from a session nobody holds --
-    /// which is exactly the "issued one more write" failure, and exactly
-    /// why it appeared on a CI machine and not on a developer's.
-    private volatile SensorSessionState state =
-            SensorSessionState.CONNECTING;
-    /// Volatile, all three: they are set as notifications decode -- on
-    /// whichever thread the transport delivers on -- and read by the app
-    /// through the getters, and `streamed` also decides whether a
-    /// reconnect is worth attempting. Same reason as [#state], found by
-    /// going through the package for the rest of this shape rather than
-    /// waiting for each one to be reported.
-    private volatile boolean streamed;
-    private volatile Integer batteryPercent;
-    private volatile int bodySensorLocation = -1;
+    /// Guards the cross-thread session fields. They are written on the
+    /// EDT and read from the flush timer's thread and from store
+    /// callbacks; without publication those threads could go on seeing a
+    /// running session after it had ended.
+    ///
+    /// A lock rather than `volatile`, which this codebase does not use.
+    private final Object stateLock = new Object();
+    /// Guarded by [#stateLock].
+    private SensorSessionState state = SensorSessionState.CONNECTING;
+    /// All three set as notifications decode -- on whichever thread the
+    /// transport delivers on -- and read by the app through the getters;
+    /// `streamed` also decides whether a reconnect is worth attempting.
+    /// Guarded by [#stateLock], found by going through the package for
+    /// the rest of this shape rather than waiting for each to be
+    /// reported.
+    private boolean streamed;
+    private Integer batteryPercent;
+    private int bodySensorLocation = -1;
 
     /// Ports and [HealthSensors] construct sessions.
     protected SensorSession(String sensorId, HealthSensorProfile profile,
@@ -119,7 +120,9 @@ public class SensorSession {
 
     /// The current lifecycle state.
     public final SensorSessionState getState() {
-        return state;
+        synchronized (stateLock) {
+            return state;
+        }
     }
 
     /// Registers a listener for measurements and state changes.
@@ -167,13 +170,17 @@ public class SensorSession {
     /// The device's battery level as a percentage, or `null` when it does
     /// not report one.
     public final Integer getBatteryPercent() {
-        return batteryPercent;
+        synchronized (stateLock) {
+            return batteryPercent;
+        }
     }
 
     /// Where a heart-rate sensor is worn, as a [BodySensorLocation]
     /// constant, or `-1` when unreported.
     public final int getBodySensorLocation() {
-        return bodySensorLocation;
+        synchronized (stateLock) {
+            return bodySensorLocation;
+        }
     }
 
     /// Resets a heart-rate strap's accumulated energy-expended counter, by
@@ -684,12 +691,16 @@ public class SensorSession {
 
     /// Records the device's battery level. Called by the transport.
     protected final void setBatteryPercent(Integer percent) {
-        this.batteryPercent = percent;
+        synchronized (stateLock) {
+            this.batteryPercent = percent;
+        }
     }
 
     /// Records where a heart-rate sensor is worn. Called by the transport.
     protected final void setBodySensorLocation(int location) {
-        this.bodySensorLocation = location;
+        synchronized (stateLock) {
+            this.bodySensorLocation = location;
+        }
     }
 
     /// Forgets the cumulative-counter baselines, so the next notification
@@ -707,17 +718,25 @@ public class SensorSession {
     /// reconnecting from that resurrects a session the caller was already
     /// told had failed.
     protected final boolean hasStreamed() {
-        return streamed;
+        synchronized (stateLock) {
+            return streamed;
+        }
     }
 
     protected final void setState(SensorSessionState newState) {
-        if (newState == SensorSessionState.STREAMING) {
-            streamed = true;
+        synchronized (stateLock) {
+            if (newState == SensorSessionState.STREAMING) {
+                streamed = true;
+            }
+            if (newState == null || newState == state) {
+                return;
+            }
+            state = newState;
         }
-        if (newState == null || newState == state) {
-            return;
-        }
-        state = newState;
+        // Everything below runs outside the lock. The teardown it
+        // triggers takes the buffer's monitor and the listener snapshot,
+        // and holding this one across them would order the two locks
+        // against every other path that touches both.
         if (isTerminal()) {
             // Nothing may be scheduled from a terminal state, and that
             // includes what was scheduled just before reaching one: the

@@ -68,9 +68,11 @@ final class BleSensorSession extends SensorSession {
 
     private final BlePeripheral peripheral;
     private GattCharacteristic measurement;
-    /// Volatile: read and written from connection callbacks and from
-    /// stop(), which are not the same thread.
-    private volatile Reconnector reconnectListener;
+    /// Read and written from connection callbacks and from stop(), which
+    /// are not the same thread. Guarded by [#reconnectLock], like the
+    /// count below -- a lock rather than `volatile`, which this codebase
+    /// does not use.
+    private Reconnector reconnectListener;
 
     /// Guards the failure count. Volatile is not enough for it: the
     /// increment and the test against the limit are one decision, and
@@ -90,13 +92,21 @@ final class BleSensorSession extends SensorSession {
     /// measurements can start arriving.
     void start(final AsyncResource<SensorSession> out) {
         setState(SensorSessionState.CONNECTING);
-        if (getOptions().isAutoReconnect() && reconnectListener == null) {
+        boolean needsListener;
+        synchronized (reconnectLock) {
+            needsListener = getOptions().isAutoReconnect()
+                    && reconnectListener == null;
+        }
+        if (needsListener) {
             // A strap that walks out of range mid-workout otherwise leaves
             // the session marked STREAMING forever, receiving nothing and
             // never retrying, which is the opposite of what the default
             // promises.
-            reconnectListener = new Reconnector(this);
-            peripheral.addConnectionListener(reconnectListener);
+            Reconnector listener = new Reconnector(this);
+            synchronized (reconnectLock) {
+                reconnectListener = listener;
+            }
+            peripheral.addConnectionListener(listener);
         }
         peripheral.connect().onResult(new AsyncResult<BlePeripheral>() {
             @Override
@@ -372,9 +382,9 @@ final class BleSensorSession extends SensorSession {
             // second time.
             return;
         }
-        if (reconnectListener != null) {
-            peripheral.removeConnectionListener(reconnectListener);
-            reconnectListener = null;
+        Reconnector listener = takeReconnectListener();
+        if (listener != null) {
+            peripheral.removeConnectionListener(listener);
         }
         setState(SensorSessionState.FAILED);
         forgetFromManager();
@@ -401,6 +411,16 @@ final class BleSensorSession extends SensorSession {
     /// that has genuinely changed -- a peripheral reflashed with different
     /// services will never expose the measurement characteristic again,
     /// and the session should end rather than reconnect at it all day.
+    /// Clears the reconnect listener and hands it back, so a caller can
+    /// deregister it without holding the lock across a peripheral call.
+    private Reconnector takeReconnectListener() {
+        synchronized (reconnectLock) {
+            Reconnector listener = reconnectListener;
+            reconnectListener = null;
+            return listener;
+        }
+    }
+
     private void failReconnect(HealthException wrapped) {
         boolean giveUp;
         synchronized (reconnectLock) {
@@ -451,11 +471,11 @@ final class BleSensorSession extends SensorSession {
             // of how it ended than the one its listeners were given.
             return;
         }
-        if (reconnectListener != null) {
+        Reconnector listener = takeReconnectListener();
+        if (listener != null) {
             // Removed before the state changes, so the disconnect this
             // method causes is not mistaken for a dropped link.
-            peripheral.removeConnectionListener(reconnectListener);
-            reconnectListener = null;
+            peripheral.removeConnectionListener(listener);
         }
         setState(SensorSessionState.STOPPED);
         // A short ride would otherwise lose whatever had not reached a

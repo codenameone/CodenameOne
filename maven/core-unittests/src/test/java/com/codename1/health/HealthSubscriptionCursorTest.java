@@ -705,4 +705,54 @@ class HealthSubscriptionCursorTest extends UITestBase {
         restoring.unsubscribe(id);
         first.unsubscribe(id);
     }
+
+    /**
+     * Two threads subscribing at once both survive a restart.
+     *
+     * <p>The persisted list is one preference, and remembering a
+     * subscription is a read-modify-write over it. Outside a lock, two
+     * threads read the same old value and the second write dropped the
+     * first: both subscriptions were live in memory, and only one came
+     * back after the next launch. The one that vanished simply stopped
+     * being drained, at a restart nowhere near the call that lost it.</p>
+     */
+    @Test
+    void concurrentSubscribesBothSurviveARestart() throws Exception {
+        final FakeHealthStore store = newStore();
+        final String base = "concurrent-" + System.nanoTime();
+        final int threads = 8;
+        final CountDownLatch go = new CountDownLatch(1);
+        final CountDownLatch done = new CountDownLatch(threads);
+        for (int i = 0; i < threads; i++) {
+            final String id = base + "-" + i;
+            new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        go.await(5, TimeUnit.SECONDS);
+                        store.subscribe(new SubscriptionRequest(id)
+                                .addType(HealthDataType.STEPS),
+                                new Collector(1));
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        done.countDown();
+                    }
+                }
+            }).start();
+        }
+        go.countDown();
+        assertTrue(done.await(10, TimeUnit.SECONDS));
+
+        // What a relaunch would see.
+        String stored = com.codename1.io.Preferences.get(
+                "cn1$health$subs", "");
+        for (int i = 0; i < threads; i++) {
+            assertTrue(stored.indexOf(base + "-" + i) >= 0,
+                    base + "-" + i + " must survive into the persisted"
+                            + " list; a concurrent subscribe overwrote it");
+        }
+        for (int i = 0; i < threads; i++) {
+            store.unsubscribe(base + "-" + i);
+        }
+    }
 }

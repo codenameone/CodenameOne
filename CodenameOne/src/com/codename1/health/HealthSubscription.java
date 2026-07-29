@@ -36,9 +36,10 @@ public final class HealthSubscription {
     private final boolean deliverSamples;
     private final boolean includeDeletions;
     private final int maxSamplesPerBatch;
-    /// Volatile, all three: the cursor is written on the EDT -- by a
-    /// delivery, or by a port seeding a starting cursor -- and read by
-    /// `drainChanges()` on whatever thread the app called it from.
+    /// Guards the three mutable fields below, which cross threads: the
+    /// cursor is written on the EDT -- by a delivery, or by a port
+    /// seeding a starting cursor -- and read by `drainChanges()` on
+    /// whatever thread the app called it from.
     ///
     /// A stale read here is not a stale number, it is lost data: the
     /// Android drain reads this anchor and takes a fresh baseline token
@@ -47,9 +48,15 @@ public final class HealthSubscription {
     /// permanently unreported. The synchronization the store does around
     /// its registry does not help -- the anchor is read before any of it,
     /// and a later monitor cannot make an earlier read current.
-    private volatile HealthAnchor anchor;
-    private volatile long lastDeliveryMillis;
-    private volatile boolean active = true;
+    ///
+    /// A lock rather than `volatile`, which this codebase does not use.
+    private final Object lock = new Object();
+    /// Guarded by [#lock].
+    private HealthAnchor anchor;
+    /// Guarded by [#lock].
+    private long lastDeliveryMillis;
+    /// Guarded by [#lock].
+    private boolean active = true;
 
     /// Creates a handle. Called by [HealthStore].
     HealthSubscription(HealthStore store, String id,
@@ -83,7 +90,9 @@ public final class HealthSubscription {
     /// start a fresh baseline -- losing everything that accumulated while
     /// the process was dead -- and iOS would resume with no window at all.
     void seedAnchor(HealthAnchor restored) {
-        this.anchor = restored;
+        synchronized (lock) {
+            this.anchor = restored;
+        }
     }
 
     /// Whether batches carry sample payloads, from the request.
@@ -113,7 +122,9 @@ public final class HealthSubscription {
 
     /// `true` until [#stop()] is called.
     public boolean isActive() {
-        return active;
+        synchronized (lock) {
+            return active;
+        }
     }
 
     /// Whether the operating system wakes the app when new data arrives.
@@ -137,12 +148,16 @@ public final class HealthSubscription {
     /// The cursor reached by the most recent delivery, or null before the
     /// first one.
     public HealthAnchor getAnchor() {
-        return anchor;
+        synchronized (lock) {
+            return anchor;
+        }
     }
 
     /// When the last batch was delivered, epoch millis, or 0 if never.
     public long getLastDeliveryMillis() {
-        return lastDeliveryMillis;
+        synchronized (lock) {
+            return lastDeliveryMillis;
+        }
     }
 
     /// Cancels the subscription and discards its persisted cursor.
@@ -152,29 +167,41 @@ public final class HealthSubscription {
     /// because the cursor is gone. To pause without losing your place,
     /// simply stop calling [HealthStore#drainChanges()].
     public void stop() {
-        if (active) {
+        boolean wasActive;
+        synchronized (lock) {
+            wasActive = active;
             active = false;
+        }
+        if (wasActive) {
+            // Outside the lock. unsubscribe() takes the store's registry
+            // monitor and then reaches back here through markInactive();
+            // holding this one across the call would take the two in the
+            // opposite order from every other path, which is a deadlock.
             store.unsubscribe(id);
         }
     }
 
     /// Records progress. Called by [HealthStore] after a delivery.
     void noteDelivery(HealthAnchor anchor, long whenMillis) {
-        this.anchor = anchor;
-        this.lastDeliveryMillis = whenMillis;
+        synchronized (lock) {
+            this.anchor = anchor;
+            this.lastDeliveryMillis = whenMillis;
+        }
     }
 
     /// Marks this handle inactive without re-entering
     /// [HealthStore#unsubscribe(String)]. Called by the store when it
     /// tears the subscription down itself.
     void markInactive() {
-        active = false;
+        synchronized (lock) {
+            active = false;
+        }
     }
 
     @Override
     public String toString() {
         return "HealthSubscription[" + id + " " + types.size() + " types"
                 + (pushDelivery ? ", push" : ", poll")
-                + (active ? "" : ", stopped") + "]";
+                + (isActive() ? "" : ", stopped") + "]";
     }
 }

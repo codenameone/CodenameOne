@@ -2465,7 +2465,23 @@ public class HealthStore {
         }
     }
 
+    /// Adds `request` to the persisted list.
+    ///
+    /// Under the registry lock, because this is a read-modify-write over
+    /// one preference: two threads subscribing under different ids read
+    /// the same old value and the second write dropped the first. Both
+    /// subscriptions were live in memory and only one survived the next
+    /// launch, so a subscription the app had registered simply stopped
+    /// being drained -- after a restart, which is nowhere near the call
+    /// that lost it. The same lock as the map, so the two cannot disagree
+    /// about what is registered.
     private void rememberSubscription(SubscriptionRequest request) {
+        synchronized (subscriptions) {
+            rememberSubscriptionLocked(request);
+        }
+    }
+
+    private void rememberSubscriptionLocked(SubscriptionRequest request) {
         StringBuilder sb = new StringBuilder();
         List<String> kept = readStoredEntries(request.getId());
         for (String keptItem : kept) {
@@ -2487,7 +2503,15 @@ public class HealthStore {
         Preferences.set(PREF_SUBS, sb.toString());
     }
 
+    /// Drops `subscriptionId` from the persisted list, under the registry
+    /// lock for the same reason as [#rememberSubscription].
     private void forgetSubscription(String subscriptionId) {
+        synchronized (subscriptions) {
+            forgetSubscriptionLocked(subscriptionId);
+        }
+    }
+
+    private void forgetSubscriptionLocked(String subscriptionId) {
         List<String> kept = readStoredEntries(subscriptionId);
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < kept.size(); i++) {
