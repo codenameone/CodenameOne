@@ -446,18 +446,17 @@ public class LocalHealthStore extends HealthStore {
                     added.add(stored);
                     result.addSampleId(id);
                 }
-            }
-            if (!persist()) {
-                // Rolled back rather than kept. `Storage.writeObject` reports
-                // a full or unwritable store by returning false, and a caller
-                // told the write succeeded would have a record that exists
-                // only until the process exits -- on the very ports whose
-                // whole claim is durability. Undoing it keeps memory and disk
-                // saying the same thing.
-                synchronized (samples) {
+                if (!persist()) {
+                    // Rolled back rather than kept. `Storage.writeObject`
+                    // reports a full or unwritable store by returning
+                    // false, and a caller told the write succeeded would
+                    // have a record that exists only until the process
+                    // exits -- on the very ports whose whole claim is
+                    // durability. Undoing it keeps memory and disk saying
+                    // the same thing.
                     samples.removeAll(added);
+                    failed = true;
                 }
-                failed = true;
             }
         }
         if (failed) {
@@ -517,12 +516,10 @@ public class LocalHealthStore extends HealthStore {
                         }
                     }
                 }
-            }
-            if (removed > 0 && !persist()) {
-                synchronized (samples) {
+                if (removed > 0 && !persist()) {
                     samples.addAll(dropped);
+                    failed = true;
                 }
-                failed = true;
             }
         }
         if (failed) {

@@ -24,6 +24,7 @@ package com.codename1.health;
 
 import com.codename1.health.nutrition.Nutrient;
 import com.codename1.health.nutrition.NutritionSample;
+import com.codename1.impl.health.LocalHealthStore;
 import com.codename1.impl.health.StoredHealthStore;
 import com.codename1.util.AsyncResource;
 import com.codename1.io.Storage;
@@ -75,6 +76,50 @@ class LocalHealthPersistenceTest extends UITestBase {
         return second.readSamples(new SampleQuery().addType(type)
                 .setTimeRange(HealthTimeRange.between(T0 - MINUTE,
                         T0 + 100 * MINUTE))).get();
+    }
+
+    /**
+     * A write that fails to persist is never visible to a reader.
+     *
+     * <p>The samples went into the live list, persistence ran, and only
+     * then were they removed -- so a read taking the list in between saw
+     * records that were about to be rolled back and reported as an
+     * error. Health data that never existed is the worst thing this
+     * store can hand out.</p>
+     *
+     * <p>This asserts the end state, which is all a sequential test can
+     * reach: the window itself needs a reader running while persistence
+     * is in flight. What closes it is that the insert, the persist and
+     * the rollback are now one critical section on the list readers
+     * take.</p>
+     */
+    @Test
+    void aWriteThatCannotPersistIsNeverVisible() throws Exception {
+        final boolean[] refuse = new boolean[] { true };
+        LocalHealthStore store = new LocalHealthStore() {
+            @Override
+            protected boolean persist() {
+                return !refuse[0];
+            }
+        };
+        QuantitySample s = QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(500, HealthUnit.COUNT), 1000L, 2000L);
+        assertNotNull(errorOf(store.write(s)),
+                "a store that cannot persist must fail the write");
+
+        assertEquals(0, store.readSamples(new SampleQuery()
+                .addType(HealthDataType.STEPS)
+                .setTimeRange(HealthTimeRange.between(0L, 100000L)))
+                .get().size(),
+                "and nothing it rolled back may be readable");
+
+        refuse[0] = false;
+        assertNull(errorOf(store.write(s)));
+        assertEquals(1, store.readSamples(new SampleQuery()
+                .addType(HealthDataType.STEPS)
+                .setTimeRange(HealthTimeRange.between(0L, 100000L)))
+                .get().size(),
+                "a write that does persist is still readable");
     }
 
     @Test

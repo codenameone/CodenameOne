@@ -1127,6 +1127,29 @@ class CN1HealthConnectBridge(private val context: Context)
         }
     }
 
+    /**
+     * The instant an instantaneous record is stored at, or a refusal.
+     *
+     * Health Connect keeps a weight, a height or a resting heart rate at
+     * one point in time -- there is no field for a span. Taking `start`
+     * and ignoring `end` reported a lossy write as a successful one: the
+     * sample read back as instantaneous, which changes which ranges it
+     * overlaps and what a duration-weighted average makes of it, so the
+     * same data behaved differently here than on iOS or in the local
+     * store. Refusing is the honest answer, and the caller can write the
+     * instant it meant.
+     */
+    private fun instantOf(token: String, start: Instant,
+                          end: Instant): Instant {
+        if (start != end) {
+            throw IllegalArgumentException(
+                "Health Connect stores '" + token + "' at a single instant"
+                    + " and this sample spans " + start + " to " + end
+                    + "; write it as an instantaneous sample instead")
+        }
+        return start
+    }
+
     private fun toRecord(line: String): Record? {
         if (line.isBlank()) {
             return null
@@ -1194,46 +1217,46 @@ class CN1HealthConnectBridge(private val context: Context)
                 startZoneOffset = zone, endZoneOffset = endZone,
                 volume = Volume.liters(value), metadata = meta)
 
-            "body_mass" -> WeightRecord(time = start, zoneOffset = zone,
+            "body_mass" -> WeightRecord(time = instantOf(token, start, end), zoneOffset = zone,
                 weight = Mass.kilograms(value), metadata = meta)
 
-            "lean_body_mass" -> LeanBodyMassRecord(time = start,
+            "lean_body_mass" -> LeanBodyMassRecord(time = instantOf(token, start, end),
                 zoneOffset = zone, mass = Mass.kilograms(value),
                 metadata = meta)
 
-            "bone_mass" -> BoneMassRecord(time = start, zoneOffset = zone,
+            "bone_mass" -> BoneMassRecord(time = instantOf(token, start, end), zoneOffset = zone,
                 mass = Mass.kilograms(value), metadata = meta)
 
-            "body_fat_percentage" -> BodyFatRecord(time = start,
+            "body_fat_percentage" -> BodyFatRecord(time = instantOf(token, start, end),
                 zoneOffset = zone, percentage = Percentage(value),
                 metadata = meta)
 
-            "height" -> HeightRecord(time = start, zoneOffset = zone,
+            "height" -> HeightRecord(time = instantOf(token, start, end), zoneOffset = zone,
                 height = Length.meters(value), metadata = meta)
 
-            "resting_heart_rate" -> RestingHeartRateRecord(time = start,
+            "resting_heart_rate" -> RestingHeartRateRecord(time = instantOf(token, start, end),
                 zoneOffset = zone, beatsPerMinute = wholeCount(token, value),
                 metadata = meta)
 
-            "oxygen_saturation" -> OxygenSaturationRecord(time = start,
+            "oxygen_saturation" -> OxygenSaturationRecord(time = instantOf(token, start, end),
                 zoneOffset = zone, percentage = Percentage(value),
                 metadata = meta)
 
-            "respiratory_rate" -> RespiratoryRateRecord(time = start,
+            "respiratory_rate" -> RespiratoryRateRecord(time = instantOf(token, start, end),
                 zoneOffset = zone, rate = value, metadata = meta)
 
-            "body_temperature" -> BodyTemperatureRecord(time = start,
+            "body_temperature" -> BodyTemperatureRecord(time = instantOf(token, start, end),
                 zoneOffset = zone, temperature = Temperature.celsius(value),
                 metadata = meta)
 
             "basal_body_temperature" -> BasalBodyTemperatureRecord(
-                time = start, zoneOffset = zone,
+                time = instantOf(token, start, end), zoneOffset = zone,
                 temperature = Temperature.celsius(value), metadata = meta)
 
-            "vo2_max" -> Vo2MaxRecord(time = start, zoneOffset = zone,
+            "vo2_max" -> Vo2MaxRecord(time = instantOf(token, start, end), zoneOffset = zone,
                 vo2MillilitersPerMinuteKilogram = value, metadata = meta)
 
-            "blood_glucose" -> BloodGlucoseRecord(time = start,
+            "blood_glucose" -> BloodGlucoseRecord(time = instantOf(token, start, end),
                 zoneOffset = zone,
                 level = BloodGlucose.millimolesPerLiter(value), metadata = meta)
 
@@ -1254,7 +1277,7 @@ class CN1HealthConnectBridge(private val context: Context)
                     // record crossing the transition with the start
                     // side's offset at its end.
                     endZoneOffset = rules.getOffset(hrEnd),
-                    samples = listOf(HeartRateRecord.Sample(time = start,
+                    samples = listOf(HeartRateRecord.Sample(time = instantOf(token, start, end),
                         beatsPerMinute = wholeCount(token, value))),
                     metadata = meta)
             }

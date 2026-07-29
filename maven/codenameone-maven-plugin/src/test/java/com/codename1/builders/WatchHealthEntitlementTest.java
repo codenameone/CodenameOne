@@ -133,11 +133,26 @@ public class WatchHealthEntitlementTest {
                 "and background delivery has the same two spellings");
     }
 
-    /** Workout processing implies background delivery, as before. */
+    /**
+     * Workout processing does not ask for background delivery.
+     *
+     * <p>A workout keeps running through
+     * {@code WKBackgroundModes=workout-processing} in the watch
+     * Info.plist. The HealthKit sub-entitlement covers HealthKit
+     * *delivering updates* to a suspended app, which a workout app need
+     * not ask for -- and claiming it put a capability in the signature
+     * that a profile carrying only base HealthKit does not have, so
+     * entitlement validation refused the build over something nothing
+     * used.</p>
+     */
     @Test
-    void workoutProcessingStillImpliesBackgroundDelivery() {
+    void workoutProcessingDoesNotImplyBackgroundDelivery() {
+        assertFalse(WatchNativeBuilder.watchEntitlementsPlist(
+                entitlementRequest(null, null), "true").contains(BACKGROUND),
+                "a workout does not need HealthKit background delivery");
         assertTrue(WatchNativeBuilder.watchEntitlementsPlist(
-                entitlementRequest(null, null), "true").contains(BACKGROUND));
+                entitlementRequest("true", null), "true").contains(BACKGROUND),
+                "and the explicit hint still grants it");
     }
 
     /** Sharing the phone's main class means sharing its health usage. */

@@ -207,6 +207,37 @@ public class HealthBridgeTokenTableTest {
     }
 
     /**
+     * An instantaneous record type refuses an interval rather than
+     * dropping its end.
+     *
+     * <p>Health Connect keeps a weight or a height at one point in time,
+     * and taking the start while ignoring the end reported a lossy write
+     * as a successful one -- the sample read back instantaneous, which
+     * changes which ranges it overlaps and what a duration-weighted
+     * average makes of it, so the same data behaved differently here
+     * than on iOS or in the local store.</p>
+     */
+    @Test
+    public void anInstantRecordRefusesAnInterval() throws Exception {
+        String src = source();
+        int start = src.indexOf("private fun toRecord(");
+        assertTrue("the write parser must exist", start > 0);
+        String body = src.substring(start,
+                src.indexOf("\n    }", src.indexOf("resting_heart_rate",
+                        start)));
+        assertTrue("no instantaneous branch may take the start and drop"
+                + " the end: " + body,
+                body.indexOf("time = start") < 0);
+        assertTrue("they go through the check that refuses a span",
+                body.indexOf("instantOf(token, start, end)") > 0);
+        assertTrue("and the refusal names the token so the caller knows"
+                + " which sample it was",
+                src.indexOf("Health Connect stores '\" + token + \"'") > 0
+                        || src.contains("stores '\" + token + \"' at a"
+                                + " single instant"));
+    }
+
+    /**
      * A whole-series line keeps its measurements chronological.
      *
      * <p>The direction the caller asked for orders the records; inside

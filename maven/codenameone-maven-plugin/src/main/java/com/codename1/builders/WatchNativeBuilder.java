@@ -622,9 +622,16 @@ class WatchNativeBuilder {
           .append("<plist version=\"1.0\">\n<dict>\n")
           .append("    <key>com.apple.developer.healthkit</key>\n")
           .append("    <true/>\n");
+        // Background delivery only, not workout processing. A workout
+        // keeps running through WKBackgroundModes=workout-processing in
+        // the watch Info.plist; this entitlement covers HealthKit
+        // *delivering updates* while the app is suspended, which a
+        // workout app need not ask for. Granting it anyway put a
+        // capability in the signature that a provisioning profile
+        // carrying only base HealthKit does not have, and entitlement
+        // validation refuses the build for something nothing uses.
         if (healthCapability(request, "ios.health.backgroundDelivery",
-                "background-delivery")
-                || "true".equalsIgnoreCase(workoutProcessingHint)) {
+                "background-delivery")) {
             sb.append("    <key>com.apple.developer.healthkit")
               .append(".background-delivery</key>\n    <true/>\n");
         }
