@@ -135,6 +135,11 @@ public class IPhoneBuilder extends Executor {
     private boolean surfacesLiveActivities;
     private final List<IOSWidgetExtensionBuilder.Kind> surfacesKinds =
             new ArrayList<IOSWidgetExtensionBuilder.Kind>();
+    // Set when the app references com.codename1.wearable.* (the phone-to-watch link). Gates the
+    // CN1_USE_WATCHCONNECTIVITY native define and WatchConnectivity.framework linkage on both the
+    // phone target and the watch target -- WCSession is symmetric, so both halves of a pair need
+    // it. Apps that never touch the API see no change.
+    private boolean usesWearable;
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
@@ -886,6 +891,12 @@ public class IPhoneBuilder extends Executor {
                     // apps that publish external surfaces.
                     if (!usesSurfaces && cls.indexOf("com/codename1/surfaces/") == 0) {
                         usesSurfaces = true;
+                    }
+                    // Phone-to-watch link (com.codename1.wearable.*). Gated on actual usage
+                    // so WatchConnectivity.framework and the CN1_USE_WATCHCONNECTIVITY
+                    // natives are only added for apps that talk to their watch app.
+                    if (!usesWearable && cls.indexOf("com/codename1/wearable/") == 0) {
+                        usesWearable = true;
                     }
                     // OidcClient + SystemBrowser rely on
                     // ASWebAuthenticationSession (AuthenticationServices.framework,
@@ -2110,6 +2121,15 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_WIDGETS", "#define CN1_USE_WIDGETS");
             }
 
+            // com.codename1.wearable usage compiles the WatchConnectivity glue (gated by
+            // CN1_USE_WATCHCONNECTIVITY so other builds carry no WCSession symbols). The define
+            // lives in the shared CodenameOne_GLViewController.h so it reaches every wearable
+            // translation unit, and unlike the widgets define it deliberately survives on the watch
+            // slice: both halves of a pair run the same symmetric code.
+            if (usesWearable) {
+                replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_WATCHCONNECTIVITY", "#define CN1_USE_WATCHCONNECTIVITY");
+            }
+
             String glAppDelegeateBody = request.getArg("ios.glAppDelegateBody", null);
             if (glAppDelegeateBody != null && glAppDelegeateBody.length() > 0) {
                 replaceInFile(glAppDelegate, "//GL_APP_DELEGATE_BODY", glAppDelegeateBody);
@@ -2495,6 +2515,19 @@ public class IPhoneBuilder extends Executor {
             // Apple per app category, so we only inject the ones the project opts into via the
             // ios.carplay.<category> build hints; the binary references CarPlay symbols (gated by
             // CN1_USE_CARPLAY) which is why the framework is linked here in lockstep with the scan.
+            // The phone-to-watch link references WCSession (gated by CN1_USE_WATCHCONNECTIVITY), so
+            // link WatchConnectivity.framework in lockstep with the scan. It exists on both iOS and
+            // watchOS, which is why it is a plain link rather than one of the watch slice's
+            // weak-linked frameworks.
+            if (usesWearable) {
+                String wearableLib = "WatchConnectivity.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = wearableLib;
+                } else if (!addLibs.toLowerCase().contains("watchconnectivity.framework")) {
+                    addLibs = addLibs + ";" + wearableLib;
+                }
+            }
+
             if (usesCar) {
                 String carPlayLibs = "CarPlay.framework;MediaPlayer.framework";
                 if (addLibs == null || addLibs.length() == 0) {

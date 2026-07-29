@@ -148,6 +148,17 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 #undef CN1_USE_WIDGETS
 #endif
 
+// CN1_USE_WATCHCONNECTIVITY gates the phone-to-watch link (CN1WatchConnectivity.{h,m} + the
+// IOSNative wearable* trampolines) backing com.codename1.wearable. IPhoneBuilder uncomments this
+// only when the classpath scanner saw com.codename1.wearable.*, so apps that never talk to a watch
+// ship without any WatchConnectivity symbols and link no framework. Unlike the defines above this
+// one deliberately SURVIVES on watchOS: WCSession is symmetric, and the watch half of a pair needs
+// exactly the same code as the phone half. It does not exist on tvOS or Mac Catalyst.
+//#define CN1_USE_WATCHCONNECTIVITY
+#if TARGET_OS_TV || TARGET_OS_MACCATALYST
+#undef CN1_USE_WATCHCONNECTIVITY
+#endif
+
 // CN1_INCLUDE_OIDC gates the com.codename1.io.oidc native bridge
 // (AuthenticationServices.framework import, ASWebAuthenticationSession code
 // in CN1OidcBrowser.m). IPhoneBuilder uncomments this only when the
