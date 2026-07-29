@@ -496,7 +496,13 @@ class WatchNativeBuilder {
                 // per-SDK so the simulator build doesn't try arm64_32 (whose
                 // Swift stdlib slice doesn't exist -> 'Unable to find module Swift').
                 .append("  bs['ARCHS[sdk=watchos*]'] = 'arm64_32'\n")
-                .append("  bs['ARCHS[sdk=watchsimulator*]'] = '$(ARCHS_STANDARD)'\n")
+                // arm64 rather than ARCHS_STANDARD: the standard set still includes x86_64 for
+                // the watch simulator, and the shared sources include ARM-only code -- IOSSimd.m
+                // pulls <arm_neon.h> unconditionally, which an x86_64 slice cannot satisfy. The
+                // device arch (arm64_32) is ARM too, so pinning arm64 keeps the simulator honest
+                // about what it is simulating.
+                .append("  bs['ARCHS[sdk=watchsimulator*]'] = 'arm64'\n")
+                .append("  bs['ONLY_ACTIVE_ARCH'] = 'YES'\n")
                 .append("  bs['WATCHOS_DEPLOYMENT_TARGET'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(MIN_DEPLOYMENT_TARGET)).append("'\n")
                 .append("  bs['TARGETED_DEVICE_FAMILY'] = '4'\n")
