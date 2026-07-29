@@ -220,22 +220,29 @@ public final class AndroidSecureStorage extends SecureStorage {
             return legacyPlainSet(account, value);
         }
         try {
-            SecretKey key = plainKey(true);
-            if (key == null) {
-                return false;
+            // The whole use-and-persist runs under the same lock a reset takes.
+            // Releasing it after the lookup let a concurrent resetPlainKey() delete the
+            // alias and clear the preferences between here and the write, so this
+            // reported success while storing ciphertext under a key that no longer
+            // exists -- unreadable forever, and silently so.
+            synchronized (PLAIN_KEY_LOCK) {
+                SecretKey key = plainKey(true);
+                if (key == null) {
+                    return false;
+                }
+                Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+                c.init(Cipher.ENCRYPT_MODE, key);
+                byte[] enc = c.doFinal(value.getBytes("UTF-8"));
+                SharedPreferences prefs = plainPrefs();
+                if (prefs == null) {
+                    return false;
+                }
+                prefs.edit()
+                        .putString(account, Base64.encodeToString(c.getIV(), Base64.NO_WRAP)
+                                + ":" + Base64.encodeToString(enc, Base64.NO_WRAP))
+                        .apply();
+                return true;
             }
-            Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-            c.init(Cipher.ENCRYPT_MODE, key);
-            byte[] enc = c.doFinal(value.getBytes("UTF-8"));
-            SharedPreferences prefs = plainPrefs();
-            if (prefs == null) {
-                return false;
-            }
-            prefs.edit()
-                    .putString(account, Base64.encodeToString(c.getIV(), Base64.NO_WRAP)
-                            + ":" + Base64.encodeToString(enc, Base64.NO_WRAP))
-                    .apply();
-            return true;
         } catch (InvalidKeyException e) {
             // Includes KeyPermanentlyInvalidatedException.
             resetPlainKey();
@@ -276,15 +283,19 @@ public final class AndroidSecureStorage extends SecureStorage {
             return legacy;
         }
         try {
-            SecretKey key = plainKey(false);
-            if (key == null) {
-                return null;
+            // Same reasoning as set(): a reset landing mid-read would otherwise
+            // invalidate the key between the lookup and the decrypt.
+            synchronized (PLAIN_KEY_LOCK) {
+                SecretKey key = plainKey(false);
+                if (key == null) {
+                    return null;
+                }
+                byte[] iv = Base64.decode(stored.substring(0, sep), Base64.NO_WRAP);
+                byte[] enc = Base64.decode(stored.substring(sep + 1), Base64.NO_WRAP);
+                Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+                c.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_BITS, iv));
+                return new String(c.doFinal(enc), "UTF-8");
             }
-            byte[] iv = Base64.decode(stored.substring(0, sep), Base64.NO_WRAP);
-            byte[] enc = Base64.decode(stored.substring(sep + 1), Base64.NO_WRAP);
-            Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-            c.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_BITS, iv));
-            return new String(c.doFinal(enc), "UTF-8");
         } catch (InvalidKeyException e) {
             // The key was invalidated out from under us (device-wide credential
             // change, or the Samsung 8.0.0 quirk documented on the biometric
@@ -365,16 +376,20 @@ public final class AndroidSecureStorage extends SecureStorage {
     }
 
     private void resetPlainKey() {
+        // Deleting the key and dropping the ciphertexts it protected are one step, under
+        // the same lock readers and writers hold. Clearing outside it left a window
+        // where a writer had already encrypted under the old key and was about to store
+        // a value this was about to wipe -- or worse, stored it just after.
         synchronized (PLAIN_KEY_LOCK) {
             try {
                 keyStore().deleteEntry(PLAIN_KEY_ID);
             } catch (KeyStoreException e) {
                 Log.e(e);
             }
-        }
-        SharedPreferences prefs = plainPrefs();
-        if (prefs != null) {
-            prefs.edit().clear().apply();
+            SharedPreferences prefs = plainPrefs();
+            if (prefs != null) {
+                prefs.edit().clear().apply();
+            }
         }
     }
 

@@ -65,7 +65,16 @@ final class ShieldNetworkGuard implements NetworkGuard {
         if (host == null || !AppShield.policyFor(host).isEnforcePins()) {
             return;
         }
-        String[] spki = new String[certificates == null ? 0 : certificates.length];
+        if (certificates == null || certificates.length == 0) {
+            // The iOS contract explicitly allows an empty array when the chain is not
+            // available from the TLS cache. That is "we did not see a certificate", not
+            // "we saw a wrong one" -- and reporting a mismatch would fail a perfectly
+            // good cached connection with a PIN_MISMATCH naming a certificate nobody
+            // observed. Pinning fails open on unavailability everywhere else in this
+            // design; this is the same rule.
+            return;
+        }
+        String[] spki = new String[certificates.length];
         String[] certs = new String[spki.length];
         for (int i = 0; i < spki.length; i++) {
             spki[i] = certificates[i].getPublicKeyDigest();
