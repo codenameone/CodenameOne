@@ -478,6 +478,7 @@ public final class IOSNative {
     native String getUDID();
     native String getOSVersion();
     native String getDeviceName();
+    native boolean isSimulator();
     // The hardware/marketing model identifier (e.g. "iPhone15,2"). Unlike
     // getDeviceName() -- which returns the user-assigned device name and is
     // therefore personally identifying -- this is safe to use for analytics
@@ -537,6 +538,29 @@ public final class IOSNative {
     native void cn1CameraPause(long sessionPeer);
     native void cn1CameraResume(long sessionPeer);
     native void cn1CameraClose(long sessionPeer);
+
+    // On-device image analysis backed by Apple Vision/Core Image.
+    native boolean cn1VisionIsSupported(int feature, boolean mlKit);
+    native String cn1VisionAnalyze(byte[] imageData, int feature, boolean mlKit,
+                                   int rotationDegrees, int width, int height,
+                                   int frameFormat);
+    native boolean cn1LanguageIsSupported(int feature, boolean mlKit);
+    native String cn1LanguageIdentify(String text, float minimumConfidence,
+                                      boolean mlKit);
+    native String cn1LanguageTranslate(String text, String sourceLanguage,
+                                       String targetLanguage);
+    native String cn1LanguageSmartReply(String conversationJson);
+    native boolean cn1InferenceIsSupported();
+    native String cn1InferenceOpen(byte[] model, int threads, int accelerator,
+                                   boolean allowFallback);
+    native String cn1InferenceOpenFile(String path, int threads, int accelerator,
+                                      boolean allowFallback);
+    native String cn1InferenceMetadata(int handle, boolean outputs);
+    native String cn1InferenceCopyInput(int handle, int index, byte[] data);
+    native String cn1InferenceInvoke(int handle);
+    native long cn1InferenceOutputData(int handle, int index);
+    native String cn1InferenceResize(int handle, int index, int[] shape);
+    native void cn1InferenceClose(int handle);
 
     // Augmented reality API (com.codename1.ar). Backed by CN1AR.m which wraps
     // an ARKit ARSession composited through an ARSCNView. The IOSARImpl class

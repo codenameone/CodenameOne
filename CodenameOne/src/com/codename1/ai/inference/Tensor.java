@@ -1,0 +1,196 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.inference;
+
+/// Immutable named tensor passed to or returned from an inference session.
+/// The primitive data array and shape are copied on construction and by their
+/// public getters, so callers can safely reuse or mutate their source arrays.
+public final class Tensor {
+    private final String name;
+    private final TensorType type;
+    private final int[] shape;
+    private final Object data;
+
+    /// Creates a tensor and validates that its type, shape, and primitive array
+    /// agree. Dynamic dimensions may be negative and skip the element-count
+    /// check; fixed shapes are overflow-checked.
+    ///
+    /// @param name model tensor name, or {@code null} for positional matching
+    /// @param type element type
+    /// @param shape tensor dimensions; an empty shape represents a scalar
+    /// @param data matching primitive array
+    public Tensor(String name, TensorType type, int[] shape, Object data) {
+        if (type == null || data == null) {
+            throw new NullPointerException("type and data are required");
+        }
+        validateData(type, data);
+        int count = elementCount(shape);
+        if (count >= 0 && count != dataLength(data)) {
+            throw new IllegalArgumentException("Tensor shape does not match data length");
+        }
+        this.name = name;
+        this.type = type;
+        this.shape = copy(shape);
+        this.data = copyData(data);
+    }
+
+    /// @return a FLOAT32 tensor with defensively copied data
+    public static Tensor floats(String name, int[] shape, float[] data) {
+        return new Tensor(name, TensorType.FLOAT32, shape, data);
+    }
+
+    /// @return an INT32 tensor with defensively copied data
+    public static Tensor ints(String name, int[] shape, int[] data) {
+        return new Tensor(name, TensorType.INT32, shape, data);
+    }
+
+    /// Creates a byte-array tensor for UINT8, INT8, or BOOL data.
+    /// @return a tensor with defensively copied data
+    public static Tensor bytes(String name, TensorType type, int[] shape, byte[] data) {
+        return new Tensor(name, type, shape, data);
+    }
+
+    /// @return the model tensor name, or {@code null} for an unnamed tensor
+    public String getName() {
+        return name;
+    }
+
+    /// @return the element type
+    public TensorType getType() {
+        return type;
+    }
+
+    /// @return a defensive copy of tensor dimensions
+    public int[] getShape() {
+        return copy(shape);
+    }
+
+    /// @return a defensive copy of the matching primitive data array
+    public Object getData() {
+        return copyData(data);
+    }
+
+    /// Returns the tensor's immutable backing primitive array to a port
+    /// implementation, avoiding an additional full-tensor copy at the native
+    /// boundary. Application code must use {@link #getData()}.
+    ///
+    /// @return the backing {@code float[]}, {@code int[]}, {@code long[]}, or
+    ///         {@code byte[]} matching {@link #getType()}
+    /// @hidden
+    public Object getDataUnsafe() {
+        return data;
+    }
+
+    private static void validateData(TensorType type, Object data) {
+        boolean valid;
+        switch (type) {
+            case FLOAT32:
+                valid = data instanceof float[];
+                break;
+            case INT32:
+                valid = data instanceof int[];
+                break;
+            case INT64:
+                valid = data instanceof long[];
+                break;
+            case UINT8:
+            case INT8:
+            case BOOL:
+                valid = data instanceof byte[];
+                break;
+            default:
+                valid = false;
+        }
+        if (!valid) {
+            throw new IllegalArgumentException("Data array does not match " + type);
+        }
+    }
+
+    private static int elementCount(int[] shape) {
+        if (shape == null || shape.length == 0) {
+            return 1;
+        }
+        long out = 1;
+        for (int dimension : shape) {
+            if (dimension < 0) {
+                return -1;
+            }
+            out *= dimension;
+            if (out > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException(
+                        "Tensor shape contains more than 2147483647 elements");
+            }
+        }
+        return (int) out;
+    }
+
+    private static int dataLength(Object value) {
+        if (value instanceof float[]) {
+            return ((float[]) value).length;
+        }
+        if (value instanceof int[]) {
+            return ((int[]) value).length;
+        }
+        if (value instanceof long[]) {
+            return ((long[]) value).length;
+        }
+        if (value instanceof byte[]) {
+            return ((byte[]) value).length;
+        }
+        throw new IllegalArgumentException("Unsupported tensor data array");
+    }
+
+    private static int[] copy(int[] value) {
+        if (value == null) {
+            return new int[0];
+        }
+        int[] out = new int[value.length];
+        System.arraycopy(value, 0, out, 0, value.length);
+        return out;
+    }
+
+    private static Object copyData(Object value) {
+        int length = dataLength(value);
+        if (value instanceof float[]) {
+            float[] out = new float[length];
+            System.arraycopy(value, 0, out, 0, length);
+            return out;
+        }
+        if (value instanceof int[]) {
+            int[] out = new int[length];
+            System.arraycopy(value, 0, out, 0, length);
+            return out;
+        }
+        if (value instanceof long[]) {
+            long[] out = new long[length];
+            System.arraycopy(value, 0, out, 0, length);
+            return out;
+        }
+        if (value instanceof byte[]) {
+            byte[] out = new byte[length];
+            System.arraycopy(value, 0, out, 0, length);
+            return out;
+        }
+        throw new IllegalArgumentException("Unsupported tensor data array");
+    }
+}

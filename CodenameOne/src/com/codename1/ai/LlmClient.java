@@ -80,28 +80,44 @@ public abstract class LlmClient {
     /// OpenAI / OpenAI-compatible (Together, Groq, Fireworks, vLLM,
     /// Ollama, etc.). Uses the public endpoint by default; override
     /// with [#setBaseUrl(String)].
+    /// @param apiKey provider API key
+    /// @return configured client
     public static LlmClient openai(String apiKey) {
         return SimulatorRedirect.maybeWrap(new OpenAiClient(apiKey, DEFAULT_OPENAI_URL));
     }
 
+    /// Creates a client for Anthropic's Messages API.
+    /// @param apiKey Anthropic API key
+    /// @return configured client
     public static LlmClient anthropic(String apiKey) {
         return SimulatorRedirect.maybeWrap(new AnthropicClient(apiKey, DEFAULT_ANTHROPIC_URL));
     }
 
+    /// Creates a client for Gemini's OpenAI-compatible endpoint.
+    /// @param apiKey Google AI API key
+    /// @return configured client
     public static LlmClient gemini(String apiKey) {
         return SimulatorRedirect.maybeWrap(new GeminiClient(apiKey, DEFAULT_GEMINI_URL));
     }
 
     /// Default Ollama install: `http://localhost:11434/v1`, model
     /// `llama3.2`.
+    /// @return local Ollama client
     public static LlmClient ollama() {
         return ollama("llama3.2");
     }
 
+    /// Creates a client for the default local Ollama endpoint.
+    /// @param defaultModel model used when requests omit one
+    /// @return local Ollama client
     public static LlmClient ollama(String defaultModel) {
         return ollama(DEFAULT_OLLAMA_URL, defaultModel);
     }
 
+    /// Creates an Ollama client for a custom endpoint.
+    /// @param baseUrl OpenAI-compatible endpoint root
+    /// @param defaultModel model used when requests omit one
+    /// @return configured Ollama client
     public static LlmClient ollama(String baseUrl, String defaultModel) {
         OpenAiClient c = new OpenAiClient("ollama", baseUrl);
         c.setDefaultModel(defaultModel);
@@ -111,6 +127,10 @@ public abstract class LlmClient {
     /// Generic OpenAI-compatible endpoint (llama.cpp server, vLLM,
     /// LM Studio, a custom proxy). `apiKey` may be empty for local
     /// services that don't authenticate.
+    /// @param baseUrl OpenAI-compatible endpoint root
+    /// @param apiKey API key, or empty for an unauthenticated service
+    /// @param defaultModel model used when requests omit one
+    /// @return configured compatible client
     public static LlmClient localOpenAiCompatible(String baseUrl, String apiKey, String defaultModel) {
         OpenAiClient c = new OpenAiClient(apiKey == null ? "" : apiKey, baseUrl);
         c.setDefaultModel(defaultModel);
@@ -120,33 +140,48 @@ public abstract class LlmClient {
     /// Non-streaming chat. Equivalent to `chatStream` with a no-op
     /// listener but optimized -- the provider skips the SSE response
     /// and returns a single JSON object.
+    /// @param req immutable chat request
+    /// @return asynchronous normalized provider response
     public abstract AsyncResource<ChatResponse> chat(ChatRequest req);
 
     /// Streaming chat. `listener` fires for every content delta /
     /// tool-call fragment on the EDT. The returned `AsyncResource`
     /// completes with the aggregated final response once the stream
     /// ends; cancel it to close the underlying socket.
+    /// @param req immutable chat request
+    /// @param listener incremental callbacks delivered on the EDT
+    /// @return asynchronous aggregated response
     public abstract AsyncResource<ChatResponse> chatStream(ChatRequest req, StreamingListener listener);
 
+    /// Creates embeddings for one or more strings.
+    /// @param req immutable embedding request
+    /// @return asynchronous normalized embedding response
     public abstract AsyncResource<EmbeddingResponse> embed(EmbeddingRequest req);
 
     /// One of `"openai"`, `"anthropic"`, `"gemini"`, `"ollama"`,
     /// `"local"`. Used by `ChatView` and tests to vary behaviour by
     /// provider.
+    /// @return stable provider family id
     public abstract String getProvider();
 
+    /// @return current provider endpoint root
     public String getBaseUrl() {
         return baseUrl;
     }
 
+    /// Overrides the provider endpoint for proxies or compatible services.
+    /// @param baseUrl endpoint root used by subsequent calls
     public void setBaseUrl(String baseUrl) {
         this.baseUrl = baseUrl;
     }
 
+    /// @return network timeout in milliseconds
     public int getHttpTimeoutMs() {
         return httpTimeoutMs;
     }
 
+    /// Sets the network timeout for subsequent calls.
+    /// @param httpTimeoutMs timeout in milliseconds
     public void setHttpTimeoutMs(int httpTimeoutMs) {
         this.httpTimeoutMs = httpTimeoutMs;
     }

@@ -124,6 +124,15 @@ When adding a conformance test:
 . Run the validator before pushing. The `Validate port status contract` workflow
   enforces the same rules in CI.
 
+The on-device AI rows are permanent assertion tests rather than screenshots.
+They validate immutable image, camera-frame, tensor, model-source, and options
+contracts on every translated runtime; query every native analyzer or service;
+and verify deterministic failed-resource behavior when a port has no backend.
+They do not open camera hardware, download language models, or bundle a test
+inference model. Registering each concrete entry point in the shared application
+also exercises the builders' granular native source and dependency selection on
+every source-build job.
+
 CN1SS normalizes each run to `pass`, `fail`, `skip`, or `not-run` per test. A
 public feature checkbox is checked only when every mapped test passes. Skips,
 incomplete runs, stale reports, and failures remain distinct states; none is

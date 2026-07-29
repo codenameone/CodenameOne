@@ -246,6 +246,13 @@ view.setInputListener(userText -> {
 
 ### The AI cn1libs
 
+> **Editor's note (July 2026):** This section describes the APIs as they
+> shipped when this post was published. Vision, language services, and LiteRT
+> inference have since moved into core with builder-selected native
+> dependencies; Whisper and Stable Diffusion remain cn1libs. See
+> [AI, Chat UI, and Speech](https://www.codenameone.com/developer-guide/#_ai_chat_ui_and_speech)
+> for the current APIs and migration guidance.
+
 The core LLM stack is paired with a set of opt-in cn1libs that wrap specific on-device capabilities: Google ML Kit features, the TensorFlow Lite runtime, a local Whisper transcription engine, and an on-device Stable Diffusion model. Thirteen new cn1libs ship this release.
 
 These cn1libs are not yet listed in the Codename One Preferences cn1lib picker, so for the moment they are added by hand. Drop the matching dependency block into your project's `common/pom.xml` and rebuild. The build-time scanner does the rest: the iOS pod or Swift Package, the Android Gradle dependency, the plist usage strings (`NSCameraUsageDescription` for the vision libraries, `NSSpeechRecognitionUsageDescription` for Whisper, etc.), and the Android permissions (`android.permission.RECORD_AUDIO` for audio capture) are all injected automatically the first time the scanner sees the matching class on the classpath.

@@ -22,7 +22,7 @@
  */
 package com.codename1.builders;
 
-
+import com.codename1.build.shared.PlatformFeatureCatalog;
 
 import static com.codename1.maven.PathUtil.path;
 
@@ -533,6 +533,11 @@ public class AndroidGradleBuilder extends Executor {
     private boolean migrateToAndroidX;
     private boolean shouldIncludeGoogleImpl;
     private boolean arSupport;
+    private boolean visionSupport;
+    private boolean inferenceSupport;
+    private boolean languageSupport;
+    private final Set<String> includedAiAdapterSources =
+            new HashSet<String>();
 
     static {
         isMac = System.getProperty("os.name").toLowerCase().contains("mac");
@@ -1402,13 +1407,20 @@ public class AndroidGradleBuilder extends Executor {
             wakeLock = true;
         }
         mediaPlaybackPermission = false;
+        visionSupport = false;
+        inferenceSupport = false;
+        languageSupport = false;
+        includedAiAdapterSources.clear();
 
         // Accumulator for AI/ML class hits. After the scan we apply
-        // every matched AiDependencyTable.Entry -- appending Gradle
+        // every matched PlatformFeatureCatalog.Entry -- appending Gradle
         // deps to additionalDependencies (later) and permissions/
         // features to xPermissions right now.
-        final AiDependencyTable.Accumulator aiAcc = new AiDependencyTable.Accumulator();
+        final PlatformFeatureCatalog.Accumulator aiAcc = new PlatformFeatureCatalog.Accumulator();
 
+        // scanClassesForPermissions invokes callbacks serially on this build
+        // thread. The mutable feature flags and source set are intentionally
+        // unsynchronized; parallelizing the scanner requires revisiting them.
         try {
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
                 @Override
@@ -1437,6 +1449,21 @@ public class AndroidGradleBuilder extends Executor {
                 @Override
                 public void usesClass(String cls) {
                     aiAcc.consume(cls);
+                    String aiAdapter = androidAiAdapterSource(cls);
+                    if (aiAdapter != null) {
+                        includedAiAdapterSources.add(aiAdapter);
+                    }
+                    if (aiAdapter != null
+                            && cls.indexOf("com/codename1/ai/vision/") == 0) {
+                        visionSupport = true;
+                    }
+                    if ("com/codename1/ai/inference/InferenceSession".equals(cls)) {
+                        inferenceSupport = true;
+                    }
+                    if (aiAdapter != null
+                            && cls.indexOf("com/codename1/ai/language/") == 0) {
+                        languageSupport = true;
+                    }
                     if (cls.indexOf("com/codename1/ar/") == 0) {
                         // Keeps the ARCore-backed impl sources (deleted for
                         // non-AR apps below) and bumps minSdk to the ARCore
@@ -1679,31 +1706,35 @@ public class AndroidGradleBuilder extends Executor {
 
                 @Override
                 public void usesClassMethod(String cls, String method) {
+                    // The catalog first: it decides frameworks, gradle
+                    // dependencies and plist entries for every feature,
+                    // health included, and is indifferent to what follows.
+                    aiAcc.consumeMethod(cls, method);
+                    // A store method reached through a passed-in HealthStore
+                    // never names Health at all, so the facade hook below
+                    // cannot see it -- and without this the build skipped the
+                    // type validation and shipped a manifest with no per-type
+                    // permissions, leaving those calls unauthorized.
+                    if (cls.indexOf("com/codename1/health/HealthStore") == 0) {
+                        usesHealth = true;
+                        usesHealthStore = true;
+                        usesHealthWrite |=
+                                HealthManifestFragments.isWriteCall(method);
+                        usesHealthRead |=
+                                HealthManifestFragments.isReadCall(method);
+                        // Data access, not merely touching the store. The
+                        // capability probes -- isSupported, isTypeSupported,
+                        // isWritable, getSupportedTypes -- read no records and
+                        // need no permission, so demanding declared types for
+                        // them made a build that only asks "is this available"
+                        // request permissions it never uses.
+                        usesHealthData |= usesHealthRead || usesHealthWrite;
+                    }
                     // Health.getStore()/getWorkouts() mean a real platform
                     // store; Health.getSensors() means BLE only. The class
                     // reference alone cannot tell them apart, so the facade
                     // is decided here.
-                    // A store method reached through a passed-in HealthStore
-                // never names Health at all, so the facade hook below
-                // cannot see it -- and without this the build skipped the
-                // type validation and shipped a manifest with no per-type
-                // permissions, leaving those calls unauthorized.
-                if (cls.indexOf("com/codename1/health/HealthStore") == 0) {
-                    usesHealth = true;
-                    usesHealthStore = true;
-                    usesHealthWrite |=
-                            HealthManifestFragments.isWriteCall(method);
-                    usesHealthRead |=
-                            HealthManifestFragments.isReadCall(method);
-                    // Data access, not merely touching the store. The
-                    // capability probes -- isSupported, isTypeSupported,
-                    // isWritable, getSupportedTypes -- read no records and
-                    // need no permission, so demanding declared types for
-                    // them made a build that only asks "is this available"
-                    // request permissions it never uses.
-                    usesHealthData |= usesHealthRead || usesHealthWrite;
-                }
-                if ("com/codename1/health/Health".equals(cls)) {
+                    if ("com/codename1/health/Health".equals(cls)) {
                         usesHealth = true;
                         if (method.startsWith("getStore")
                                 || method.startsWith("getWorkouts")
@@ -1914,7 +1945,7 @@ public class AndroidGradleBuilder extends Executor {
         // additionalDependencies is written to build.gradle below.
         StringBuilder aiExtraGradleDependencies = new StringBuilder();
         String aiApplicationMetaData = "";
-        for (AiDependencyTable.Entry entry : aiAcc.hits()) {
+        for (PlatformFeatureCatalog.Entry entry : aiAcc.hits()) {
             for (String perm : entry.androidPermissions()) {
                 String addString = "    <uses-permission android:name=\"" + perm + "\" />\n";
                 xPermissions += permissionAdd(request, perm, addString);
@@ -1950,6 +1981,9 @@ public class AndroidGradleBuilder extends Executor {
             for (String gav : entry.androidGradleDeps()) {
                 aiExtraGradleDependencies.append("    implementation '").append(gav).append("'\n");
             }
+        }
+        if (aiAcc.minimumAndroidSdk() > 0) {
+            minSDK = maxInt(Integer.toString(aiAcc.minimumAndroidSdk()), minSDK);
         }
         if (aiAcc.anyRequiresBigUpload()) {
             request.putArgument("cn1.ai.requiresBigUpload", "true");
@@ -3104,6 +3138,8 @@ public class AndroidGradleBuilder extends Executor {
             }
             arPackage.delete();
         }
+
+        pruneOptionalAiSources(srcDir);
 
         final String moPubAdUnitId = request.getArg("android.mopubId", null);
         if (moPubAdUnitId != null && moPubAdUnitId.length() > 0) {
@@ -5294,6 +5330,11 @@ public class AndroidGradleBuilder extends Executor {
 
         String keepFirebase = "-keep class com.google.android.gms.** { *; }\n\n" +
                 "-keep class com.google.firebase.** { *; }\n\n";
+        String keepAi = visionSupport || languageSupport || inferenceSupport
+                ? "-keep class com.codename1.impl.android.ai.** { *; }\n\n"
+                : "";
+        String keepInferenceRuntime =
+                androidInferenceProguardRules(inferenceSupport);
         // workaround broken optimizer in proguard
         String proguardConfigOverride = "-dontusemixedcaseclassnames\n"
                 + "-dontskipnonpubliclibraryclasses\n"
@@ -5304,6 +5345,8 @@ public class AndroidGradleBuilder extends Executor {
                 + "\n"
                 + "-dontwarn com.google.android.gms.**\n"
                 + keepFirebase
+                + keepAi
+                + keepInferenceRuntime
                 + "-keep class com.codename1.impl.android.AndroidBrowserComponentCallback {\n"
                 + "*;\n"
                 + "}\n\n"
@@ -5951,6 +5994,90 @@ public class AndroidGradleBuilder extends Executor {
         return true;
     }
 
+    private void pruneOptionalAiSources(File srcDir) {
+        File aiDir = new File(srcDir,
+                "com/codename1/impl/android/ai");
+        String[] vision = {
+            "AndroidTextRecognitionAdapter.java",
+            "AndroidBarcodeScanningAdapter.java",
+            "AndroidFaceDetectionAdapter.java",
+            "AndroidImageLabelingAdapter.java",
+            "AndroidPoseDetectionAdapter.java",
+            "AndroidSelfieSegmentationAdapter.java"
+        };
+        String[] language = {
+            "AndroidLanguageIdAdapter.java",
+            "AndroidTranslationAdapter.java",
+            "AndroidSmartReplyAdapter.java"
+        };
+        pruneAiGroup(aiDir, visionSupport,
+                new String[] {"AndroidVisionImpl.java",
+                    "AndroidVisionAdapter.java"}, vision);
+        pruneAiGroup(aiDir, languageSupport,
+                new String[] {"AndroidLanguageImpl.java",
+                    "AndroidLanguageAdapter.java"}, language);
+        if (!inferenceSupport) {
+            new File(aiDir, "AndroidInferenceImpl.java").delete();
+        }
+    }
+
+    private void pruneAiGroup(File aiDir, boolean groupIncluded,
+                              String[] sharedSources, String[] adapters) {
+        if (!groupIncluded) {
+            for (int i = 0; i < sharedSources.length; i++) {
+                new File(aiDir, sharedSources[i]).delete();
+            }
+        }
+        for (int i = 0; i < adapters.length; i++) {
+            if (!groupIncluded
+                    || !includedAiAdapterSources.contains(adapters[i])) {
+                new File(aiDir, adapters[i]).delete();
+            }
+        }
+    }
+
+    static String androidAiAdapterSource(String cls) {
+        if ("com/codename1/ai/vision/TextRecognizer".equals(cls)) {
+            return "AndroidTextRecognitionAdapter.java";
+        }
+        if ("com/codename1/ai/vision/BarcodeScanner".equals(cls)) {
+            return "AndroidBarcodeScanningAdapter.java";
+        }
+        if ("com/codename1/ai/vision/FaceDetector".equals(cls)) {
+            return "AndroidFaceDetectionAdapter.java";
+        }
+        if ("com/codename1/ai/vision/ImageLabeler".equals(cls)) {
+            return "AndroidImageLabelingAdapter.java";
+        }
+        if ("com/codename1/ai/vision/PoseDetector".equals(cls)) {
+            return "AndroidPoseDetectionAdapter.java";
+        }
+        if ("com/codename1/ai/vision/SelfieSegmenter".equals(cls)) {
+            return "AndroidSelfieSegmentationAdapter.java";
+        }
+        if ("com/codename1/ai/language/LanguageIdentifier".equals(cls)) {
+            return "AndroidLanguageIdAdapter.java";
+        }
+        if ("com/codename1/ai/language/Translator".equals(cls)) {
+            return "AndroidTranslationAdapter.java";
+        }
+        if ("com/codename1/ai/language/SmartReply".equals(cls)) {
+            return "AndroidSmartReplyAdapter.java";
+        }
+        // DocumentScanner is Apple-only. Returning null intentionally prunes
+        // the Android vision backend for an app that references only it; the
+        // public API then reports UNSUPPORTED without a native dependency.
+        return null;
+    }
+
+    static String androidInferenceProguardRules(boolean inferenceIncluded) {
+        return inferenceIncluded
+                ? "-keepclassmembers class org.tensorflow.lite.TensorImpl {\n"
+                + "    void refreshShape();\n"
+                + "}\n\n"
+                : "";
+    }
+
     static String xmlize(String s) {
         s = s.replace("&", "&amp;");
         s = s.replace("<", "&lt;");
@@ -6216,7 +6343,7 @@ public class AndroidGradleBuilder extends Executor {
             while ((entry = zis.getNextEntry()) != null) {
                 debug("Extracting: " + entry);
                 if (entry.isDirectory()) {
-                    File d = new File(dir, entry.getName());
+                    File d = resolveArchiveEntry(dir, entry.getName());
                     d.mkdirs();
                     if (!addedSDKDir && sdkPath != null) {
                         if (is_windows) {
@@ -6241,7 +6368,7 @@ public class AndroidGradleBuilder extends Executor {
                     String sdkPathProperties = "sdk.dir=" + sdkPath + "\n";
                     // write the files to the disk
                     File destFile;
-                    destFile = new File(dir, entry.getName());
+                    destFile = resolveArchiveEntry(dir, entry.getName());
                     destFile.getParentFile().mkdirs();
                     FileOutputStream fos = new FileOutputStream(destFile);
                     fos.write(sdkPathProperties.getBytes(StandardCharsets.UTF_8));
@@ -6253,7 +6380,7 @@ public class AndroidGradleBuilder extends Executor {
                 byte[] data = new byte[8192];
                 // write the files to the disk
                 File destFile;
-                destFile = new File(dir, entry.getName());
+                destFile = resolveArchiveEntry(dir, entry.getName());
                 destFile.getParentFile().mkdirs();
                 FileOutputStream fos = new FileOutputStream(destFile);
                 dest = new BufferedOutputStream(fos, data.length);
@@ -6354,18 +6481,18 @@ public class AndroidGradleBuilder extends Executor {
 
     }
 
-    protected File placeXMLFile(ZipEntry entry, File xmlDir, File resDir) {
+    protected File placeXMLFile(ZipEntry entry, File xmlDir, File resDir) throws IOException {
         String name = entry.getName();
         if (name.endsWith("colors.xml")) {
             File parent = resDir.getParentFile();
             resDir = new File(parent, "res");
             File valsDir = new File(resDir, "values");
-            return new File(valsDir, entry.getName());
+            return resolveArchiveEntry(valsDir, entry.getName());
         } else if (name.endsWith("layout.xml")) {
             File parent = resDir.getParentFile();
             resDir = new File(parent, "res");
             File layDir = new File(resDir, "layout");
-            return new File(layDir, entry.getName());
+            return resolveArchiveEntry(layDir, entry.getName());
         } else {
             return super.placeXMLFile(entry, xmlDir, resDir);
         }
@@ -6474,11 +6601,11 @@ public class AndroidGradleBuilder extends Executor {
 
                 if (entry.isDirectory()) {
                     if (!entryName.startsWith("raw")) {
-                        File dir = new File(classesDir, entryName);
+                        File dir = resolveArchiveEntry(classesDir, entryName);
                         dir.mkdirs();
-                        dir = new File(resDir, entryName);
+                        dir = resolveArchiveEntry(resDir, entryName);
                         dir.mkdirs();
-                        dir = new File(sourceDir, entryName);
+                        dir = resolveArchiveEntry(sourceDir, entryName);
                         dir.mkdirs();
                     }
                     continue;
@@ -6490,24 +6617,26 @@ public class AndroidGradleBuilder extends Executor {
                 // write the files to the disk
                 File destFile;
                 if (entryName.endsWith(".class")) {
-                    destFile = new File(classesDir, entryName);
+                    destFile = resolveArchiveEntry(classesDir, entryName);
                 } else {
                     if (entryName.endsWith(".java") || entryName.endsWith(".kt") || entryName.endsWith(".swift") || entryName.endsWith(".m") || entryName.endsWith(".h")) {
-                        destFile = new File(sourceDir, entryName);
+                        destFile = resolveArchiveEntry(sourceDir, entryName);
                     } else {
                         if (entryName.endsWith(".jar") || entryName.endsWith(".a") || entryName.endsWith(".dylib") || entryName.endsWith(".andlib") || entryName.endsWith(".aar")) {
-                            destFile = new File(libsDir, entryName);
+                            destFile = resolveArchiveEntry(libsDir, entryName);
                         } else {
                             if (useXMLDir() && entryName.endsWith(".xml")) {
                                 destFile = placeXMLFile(entry, xmlDir, resDir);
                             } else if (entryName.startsWith("raw")) {
-                                destFile = new File(xmlDir.getParentFile(), entryName.toLowerCase());
+                                destFile = resolveArchiveEntry(xmlDir.getParentFile(),
+                                        entryName.toLowerCase());
                             } else if (entryName.contains("notification_sound")) {
-                                destFile = new File(xmlDir.getParentFile(), "raw/" + entryName.toLowerCase());
+                                destFile = resolveArchiveEntry(xmlDir.getParentFile(),
+                                        "raw/" + entryName.toLowerCase());
                             } else if ("google-services.json".equals(entryName)) {
-                                destFile = new File(libsDir.getParentFile(), entryName);
+                                destFile = resolveArchiveEntry(libsDir.getParentFile(), entryName);
                             } else {
-                                destFile = new File(resDir, entryName);
+                                destFile = resolveArchiveEntry(resDir, entryName);
                             }
                         }
                     }

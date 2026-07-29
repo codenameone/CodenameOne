@@ -276,6 +276,14 @@ Supported need formats are `from:`, `exact:`, `branch:`, `revision:`, and `range
 
 `ios.dependencyManager=auto` preserves backward compatibility. Existing projects with `ios.pods` continue to use CocoaPods. Projects with `ios.spm.*` use SPM. If both hint families are present, both are applied.
 
+Explicit dependency-manager modes are validated rather than dropping
+dependencies. `ios.dependencyManager=spm` fails when the project or a built-in
+API requires a CocoaPod; use `auto` or `both`. Likewise,
+`ios.dependencyManager=none` fails while pod or SPM hints are present; remove
+the dependency hints only if suppression is intentional, or switch to
+`auto`. This is a migration-visible change for older projects that used
+`spm` or `none` to ignore declared native dependencies.
+
 === Including dynamic frameworks
 
 If you need to use a dynamic framework (for example: SomeThirdPartySDK.framework), and it isn't available through CocoaPods, then you can add it to your project by zipping up the framework and copying it to your native/ios directory.

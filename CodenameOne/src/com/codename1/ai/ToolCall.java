@@ -38,20 +38,27 @@ public final class ToolCall {
     private final String name;
     private final String argumentsJson;
 
+    /// Creates a normalized model tool call.
+    /// @param id provider id used to associate the result
+    /// @param name requested tool name
+    /// @param argumentsJson model-generated JSON arguments; {@code null} becomes {@code {}}
     public ToolCall(String id, String name, String argumentsJson) {
         this.id = id;
         this.name = name;
         this.argumentsJson = argumentsJson == null ? "{}" : argumentsJson;
     }
 
+    /// @return provider id used to associate the eventual tool result
     public String getId() {
         return id;
     }
 
+    /// @return requested tool name
     public String getName() {
         return name;
     }
 
+    /// @return model-generated arguments encoded as JSON
     public String getArgumentsJson() {
         return argumentsJson;
     }
@@ -65,6 +72,9 @@ public final class ToolCall {
     /// Throws `IllegalArgumentException` when no tool in `tools`
     /// has a matching name, or `IllegalStateException` when the
     /// matching tool has no handler registered.
+    /// @param tools definitions offered with the request
+    /// @return handler result encoded as JSON
+    /// @throws Exception when lookup or application execution fails
     public String execute(List<Tool> tools) throws Exception {
         Tool match = findTool(tools);
         if (match == null) {
@@ -79,6 +89,8 @@ public final class ToolCall {
     /// Looks up the matching [Tool] without invoking it. Useful when
     /// the caller wants to dispatch by hand but still benefit from
     /// the name-matching plumbing.
+    /// @param tools candidate definitions, or {@code null}
+    /// @return matching definition, or {@code null}
     public Tool findTool(List<Tool> tools) {
         if (tools == null) {
             return null;

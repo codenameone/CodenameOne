@@ -1,8 +1,33 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.builders;
 
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -144,6 +169,92 @@ class IPhoneBuilderDependencyConfigTest {
     @Test
     void rejectsUnknownDependencyManagerHint() {
         assertThrows(BuildException.class, () -> IOSDependencyManager.fromHint("gradle"));
+    }
+
+    @Test
+    void appendsEachRequiredAiFrameworkIndependently() throws Exception {
+        Method method = IPhoneBuilder.class.getDeclaredMethod(
+                "appendFrameworks", String.class, String[].class);
+        method.setAccessible(true);
+        String value = (String) method.invoke(null, "Vision.framework",
+                new String[] {"Vision.framework", "CoreImage.framework",
+                        "CoreVideo.framework"});
+        assertEquals("Vision.framework;CoreImage.framework;CoreVideo.framework",
+                value);
+
+        value = (String) method.invoke(null,
+                "CoreML.framework;Accelerate.framework",
+                new String[] {"CoreML.framework", "Metal.framework",
+                        "Accelerate.framework"});
+        assertEquals("CoreML.framework;Accelerate.framework;Metal.framework",
+                value);
+
+        value = (String) method.invoke(null, "Vision.framework",
+                new String[] {"NaturalLanguage.framework"});
+        assertEquals("Vision.framework;NaturalLanguage.framework", value);
+
+        value = (String) method.invoke(null, "ThirdPartyVision.framework",
+                new String[] {"Vision.framework"});
+        assertEquals("ThirdPartyVision.framework;Vision.framework", value);
+    }
+
+    @Test
+    void catalogPodsDoNotOverrideUserVersionSpecs() {
+        String pods = IPhoneBuilder.appendPodSpecIfAbsent(
+                "GoogleMLKit/TextRecognition ~> 7.0,OtherPod",
+                "GoogleMLKit/TextRecognition");
+        assertEquals("GoogleMLKit/TextRecognition ~> 7.0,OtherPod", pods);
+
+        assertEquals("GoogleMLKit/TextRecognition ~> 7.0,OtherPod",
+                IPhoneBuilder.deduplicatePodSpecs(
+                        pods + ",GoogleMLKit/TextRecognition;OtherPod"));
+    }
+
+    @Test
+    void dependencyFloorRaisesExplicitDeploymentTarget() throws Exception {
+        IPhoneBuilder builder = new IPhoneBuilder();
+        Method addTarget = IPhoneBuilder.class.getDeclaredMethod(
+                "addMinDeploymentTarget", String.class);
+        addTarget.setAccessible(true);
+        addTarget.invoke(builder, "15.5");
+
+        Method getTarget = IPhoneBuilder.class.getDeclaredMethod(
+                "getDeploymentTarget", BuildRequest.class);
+        getTarget.setAccessible(true);
+        String target = (String) getTarget.invoke(builder,
+                requestWithArgs("ios.deployment_target", "14.0"));
+
+        assertEquals("15.5", target);
+    }
+
+    @Test
+    void catalogPrivacyDefaultsReachGeneratedPlistMap() throws Exception {
+        Method apply = IPhoneBuilder.class.getDeclaredMethod(
+                "applyCatalogPlistEntry", BuildRequest.class,
+                String[].class);
+        apply.setAccessible(true);
+        Field privacy = IPhoneBuilder.class.getDeclaredField(
+                "privacyUsageDescriptions");
+        privacy.setAccessible(true);
+
+        IPhoneBuilder defaultBuilder = new IPhoneBuilder();
+        BuildRequest defaultRequest = new BuildRequest();
+        apply.invoke(defaultBuilder, defaultRequest,
+                new String[] {"NSCameraUsageDescription", "Camera default"});
+        assertEquals("Camera default", defaultRequest.getArg(
+                "ios.NSCameraUsageDescription", null));
+        Map<?, ?> defaultMap = (Map<?, ?>) privacy.get(defaultBuilder);
+        assertEquals("Camera default",
+                defaultMap.get("NSCameraUsageDescription"));
+
+        IPhoneBuilder explicitBuilder = new IPhoneBuilder();
+        BuildRequest explicitRequest = requestWithArgs(
+                "ios.NSCameraUsageDescription", "Developer value");
+        apply.invoke(explicitBuilder, explicitRequest,
+                new String[] {"NSCameraUsageDescription", "Camera default"});
+        Map<?, ?> explicitMap = (Map<?, ?>) privacy.get(explicitBuilder);
+        assertEquals("Developer value",
+                explicitMap.get("NSCameraUsageDescription"));
     }
 
     private BuildRequest requestWithArgs(String... kvPairs) {

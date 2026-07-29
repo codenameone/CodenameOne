@@ -45,6 +45,8 @@ public final class ConversationStore {
 
     private final String storageKey;
 
+    /// Creates a store using one app-private {@link Storage} key.
+    /// @param storageKey non-empty key dedicated to this conversation
     public ConversationStore(String storageKey) {
         if (storageKey == null || storageKey.length() == 0) {
             throw new IllegalArgumentException("storageKey is required");
@@ -52,6 +54,9 @@ public final class ConversationStore {
         this.storageKey = storageKey;
     }
 
+    /// Replaces the persisted history.
+    /// @param messages chronological history; {@code null} stores an empty list
+    /// @throws IOException when JSON encoding or storage fails
     public void save(List<ChatMessage> messages) throws IOException {
         List<Object> serialized = new ArrayList<Object>(messages == null ? 0 : messages.size());
         if (messages != null) {
@@ -90,6 +95,10 @@ public final class ConversationStore {
         Storage.getInstance().writeObject(storageKey, payload);
     }
 
+    /// Loads persisted history. Missing or incompatible data is treated as an
+    /// empty conversation so upgrades do not prevent application startup.
+    /// @return mutable chronological message list
+    /// @throws IOException when stored JSON cannot be decoded
     public List<ChatMessage> load() throws IOException {
         Object raw = Storage.getInstance().readObject(storageKey);
         if (raw == null) {
@@ -130,10 +139,12 @@ public final class ConversationStore {
         return out;
     }
 
+    /// Deletes the persisted conversation.
     public void clear() {
         Storage.getInstance().deleteStorageFile(storageKey);
     }
 
+    /// @return app-private storage key used by this store
     public String getStorageKey() {
         return storageKey;
     }

@@ -24,14 +24,13 @@ package com.codename1.camera;
 
 /// Pixel format requested for `CameraFrame` data delivered to a `FrameListener`.
 ///
-/// `JPEG` is the default and the right choice for feeding frames into the
-/// `com.codename1.ai.*` modules, all of which accept JPEG `byte[]` directly.
-/// Raw formats (`NV21`, `RGBA8888`) are useful when an application performs
-/// its own pixel processing and wants to avoid the JPEG encode/decode round-trip.
+/// `JPEG` is the default and is useful when an application needs a portable
+/// encoded image. Built-in vision analyzers also accept raw `NV21` and
+/// `RGBA8888` frames directly; select a raw format for live analysis to avoid
+/// a JPEG encode/decode round-trip.
 public enum FrameFormat {
     /// JPEG-encoded bytes available via `CameraFrame#getJpegBytes()`.
-    /// Always available regardless of the requested format; this is the
-    /// universal format for AI/vision module integration.
+    /// Always available regardless of the requested format.
     JPEG,
 
     /// YUV 4:2:0 NV21 layout available via `CameraFrame#getRawBytes()`.

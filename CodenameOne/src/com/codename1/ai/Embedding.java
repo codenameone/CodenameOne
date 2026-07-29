@@ -22,26 +22,44 @@
  */
 package com.codename1.ai;
 
-/// A single embedding vector. `index` matches the position of the
-/// corresponding input string in the original request.
+/// One vector returned by an embedding provider. The vector is defensively
+/// copied on construction and access so callers cannot mutate stored results.
+/// {@link #getIndex()} identifies the corresponding input position in a
+/// batched {@link EmbeddingRequest}.
 public final class Embedding {
     private final float[] vector;
     private final int index;
 
+    /// Creates an embedding result.
+    /// @param vector numeric embedding coordinates, defensively copied; a
+    ///  {@code null} value creates an empty vector
+    /// @param index zero-based position of the corresponding request input
     public Embedding(float[] vector, int index) {
-        this.vector = vector == null ? new float[0] : vector;
+        this.vector = copy(vector);
         this.index = index;
     }
 
+    /// @return a defensive copy of the embedding coordinates
     public float[] getVector() {
-        return vector;
+        return copy(vector);
     }
 
+    /// @return zero-based position of this item in the request
     public int getIndex() {
         return index;
     }
 
+    /// @return number of coordinates in the embedding
     public int getDimensions() {
         return vector.length;
+    }
+
+    private static float[] copy(float[] value) {
+        if (value == null) {
+            return new float[0];
+        }
+        float[] result = new float[value.length];
+        System.arraycopy(value, 0, result, 0, value.length);
+        return result;
     }
 }

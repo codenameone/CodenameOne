@@ -52,15 +52,18 @@ public final class CameraFrame {
     }
 
     /// JPEG-encoded bytes for this frame. Always non-null regardless of the
-    /// requested `FrameFormat`; the framework encodes raw frames into JPEG
-    /// on demand for AI module consumption.
+    /// requested `FrameFormat`; use this when encoded image data is needed.
+    /// `VisionImage#fromCameraFrame(CameraFrame)` instead selects the raw
+    /// buffer for NV21 and RGBA8888 frames.
     public byte[] getJpegBytes() {
         return jpegBytes;
     }
 
     /// Raw pixel bytes in the format requested via
-    /// `CameraSessionOptions#frameFormat(FrameFormat)`. `null` when the
-    /// requested format was `FrameFormat#JPEG`.
+    /// `CameraSessionOptions#frameFormat(FrameFormat)`. This is `null` for
+    /// JPEG requests and may also be `null` when the current port cannot
+    /// expose the requested raw format. In that case
+    /// {@link #getJpegBytes()} remains available as a fallback.
     public byte[] getRawBytes() {
         return rawBytes;
     }
@@ -87,8 +90,11 @@ public final class CameraFrame {
         return timestampNanos;
     }
 
-    /// Pixel format actually used for `#getRawBytes()`. JPEG bytes returned by
-    /// `#getJpegBytes()` are always JPEG-encoded regardless of this value.
+    /// Pixel format requested for this frame. A non-JPEG value describes
+    /// {@link #getRawBytes()} when that buffer is available; ports that cannot
+    /// expose raw pixels may return {@code null} there while still reporting
+    /// the requested format. JPEG bytes returned by {@link #getJpegBytes()}
+    /// are always JPEG-encoded regardless of this value.
     public FrameFormat getFormat() {
         return format;
     }

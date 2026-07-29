@@ -42,27 +42,35 @@ public final class EmbeddingRequest {
         this.dimensions = b.dimensions;
     }
 
+    /// @return a new empty embedding request builder
     public static Builder builder() {
         return new Builder();
     }
 
-    /// Convenience for the single-input case.
+    /// Creates a single-input request.
+    /// @param model provider model id, or {@code null} for the client default
+    /// @param text text to embed
+    /// @return immutable embedding request
     public static EmbeddingRequest of(String model, String text) {
         return builder().model(model).inputs(Arrays.asList(text)).build();
     }
 
+    /// @return requested model id, or {@code null} for the client default
     public String getModel() {
         return model;
     }
 
+    /// @return immutable input strings in request order
     public List<String> getInputs() {
         return inputs;
     }
 
+    /// @return requested output dimensions, or {@code null} for model default
     public Integer getDimensions() {
         return dimensions;
     }
 
+    /// Mutable builder for an immutable {@link EmbeddingRequest}.
     public static final class Builder {
         private String model;
         private List<String> inputs = new ArrayList<String>();
@@ -71,27 +79,38 @@ public final class EmbeddingRequest {
         Builder() {
         }
 
+        /// @param m provider model id, or {@code null} for client default
+        /// @return this builder
         public Builder model(String m) {
             this.model = m;
             return this;
         }
 
+        /// Replaces all input strings.
+        /// @param in strings to embed; {@code null} clears the list
+        /// @return this builder
         public Builder inputs(List<String> in) {
             this.inputs = in == null ? new ArrayList<String>()
                     : new ArrayList<String>(in);
             return this;
         }
 
+        /// @param s input string to append
+        /// @return this builder
         public Builder addInput(String s) {
             this.inputs.add(s);
             return this;
         }
 
+        /// @param d requested vector dimensions, or {@code null} for model default
+        /// @return this builder
         public Builder dimensions(Integer d) {
             this.dimensions = d;
             return this;
         }
 
+        /// @return validated immutable request
+        /// @throws IllegalStateException when no input strings were supplied
         public EmbeddingRequest build() {
             if (inputs.isEmpty()) {
                 throw new IllegalStateException("at least one input is required");

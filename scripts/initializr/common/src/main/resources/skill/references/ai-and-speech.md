@@ -1,6 +1,6 @@
 # AI, Chat UI, and Speech Reference
 
-Codename One ships a portable LLM client, a streaming chat component, speech recognition, text-to-speech, and ML Kit cn1lib bridges. All of it sits in the cross-platform `common/` module — the same call site runs on iOS, Android, JavaSE, and (where the backend supports it) JavaScript.
+Codename One ships a portable LLM client, a streaming chat component, speech recognition, text-to-speech, and built-in on-device vision, language, and LiteRT inference APIs.
 
 **Read this reference when** the user asks to integrate an LLM, build a chat UI, voice input, voice output, image generation, embeddings, on-device barcode/face/document scanning, or wants to store an API key.
 
@@ -13,11 +13,11 @@ Codename One ships a portable LLM client, a streaming chat component, speech rec
 | Speech-to-text | `com.codename1.media.SpeechRecognizer` | core (built-in) |
 | Text-to-speech | `com.codename1.media.TextToSpeech` | core (built-in) |
 | Silent secret storage (LLM API keys, etc.) | Single-arg overloads on `com.codename1.security.SecureStorage` | core (built-in) |
-| Barcode scanning | `com.codename1.ai.mlkit.barcode.BarcodeScanner` | cn1lib `cn1-ai-mlkit-barcode` |
-| Document scanning | `com.codename1.ai.mlkit.docscan.DocumentScanner` | cn1lib `cn1-ai-mlkit-docscan` |
-| Face detection | `com.codename1.ai.mlkit.face.FaceDetector` | cn1lib `cn1-ai-mlkit-face` |
+| Vision analysis | `com.codename1.ai.vision.*` | core (built-in) |
+| LiteRT inference | `com.codename1.ai.inference.*` | core (built-in) |
+| Language services | `com.codename1.ai.language.*` | core (built-in) |
 
-The build-time scanner in the Codename One Maven plugin (`AiDependencyTable`) picks up references to any `com.codename1.ai.*` or `com.codename1.media.{Speech,Tts}*` class and automatically wires Pods (iOS), Swift Packages (iOS SPM), Gradle dependencies (Android), `Info.plist` usage strings, and Android permissions. You don't edit `codenameone_settings.properties` build hints for these classes.
+The build-time scanner uses `PlatformFeatureCatalog` to add the required Apple frameworks, CocoaPods, Android dependencies, and permissions. Applications don't add AI cn1libs or build hints.
 
 ## LlmClient — chat, embeddings, image generation
 
@@ -307,61 +307,68 @@ LlmClient client = LlmClient.openai(key);
 
 Base class returns `null` / `false` on platforms without an implementation, so you can wire this in without a platform check.
 
-## ML Kit cn1libs
-
-Three cn1libs, each backed by ML Kit on iOS and Android. Drop the `<type>pom</type>` dependency in `common/pom.xml` and the build-time scanner takes care of Pods, Gradle deps, permissions, and usage strings.
-
-```xml
-<dependency>
-    <groupId>com.codenameone</groupId>
-    <artifactId>cn1-ai-mlkit-barcode-lib</artifactId>
-    <version>${cn1.version}</version>
-    <type>pom</type>
-</dependency>
-```
-
-### Barcode scanner
+## Built-in on-device ML
 
 ```java
-import com.codename1.ai.mlkit.barcode.BarcodeScanner;
+new TextRecognizer()
+    .process(VisionImage.encoded(jpegBytes))
+    .ready(result -> Log.p(result.getText()));
 
-Capture.capturePhoto(evt -> {
-    String path = (String) evt.getSource();
-    byte[] bytes = readAllBytes(path);
-    BarcodeScanner.scan(bytes).ready(values -> {
-        for (String v : values) Log.p("Detected: " + v);
-    });
-});
+InferenceSession.open(
+    ModelSource.resource("/model.tflite"),
+    new InferenceOptions())
+    .ready(session -> session.run(new Tensor[] {input}));
+
+LanguageOptions translationOptions = new LanguageOptions()
+    .backend(LanguageBackends.mlKitTranslation());
+Translator.translate("Bonjour", "fr", "en", translationOptions)
+    .ready(result -> Log.p(result));
 ```
 
-Decodes QR, EAN, Code 128, and the other ML Kit-supported formats.
+`VisionImage` accepts JPEG, PNG, NV21, and RGBA8888. Use
+`VisionPipeline` to connect a reusable analyzer to camera frames; it
+copies callback-owned data and drops stale pending frames under load.
+Use `ModelCache.fetch(httpsUrl, cacheKey, sha256)` for models too large
+to bundle. The initial model URL must remain HTTPS. Observable redirects
+are rejected if they downgrade to HTTP; iOS requires the digest because
+its network stack follows redirects below the portable callback.
+Identical concurrent fetches coalesce instead of sharing a temporary
+file unsafely. iOS and Mac native default to Apple Vision; iOS also
+supports explicit ML Kit selection. Android uses ML Kit.
 
-### Document scanner
+The Apple barcode backend uses Vision request revision 1 in the iOS
+simulator because newer simulator runtimes can return no observations
+for valid QR images. Devices use the latest OS revision. Validate newer
+Apple symbologies on a device, or select the ML Kit barcode backend.
 
-```java
-import com.codename1.ai.mlkit.docscan.DocumentScanner;
+Dependency selection is per entry point. Referencing `TextRecognizer`
+retains only the Android text adapter/artifact; it does not pull
+barcode, face, labeling, pose, or segmentation. `LanguageIdentifier`,
+`Translator`, and `SmartReply` likewise select independent artifacts.
+On iOS, an ML Kit vision pod is selected only when both its analyzer
+and its matching feature-specific selector are referenced. For example,
+`VisionBackends.mlKitBarcodeScanning()` selects only the barcode pod.
+LiteRT is selected only by
+`InferenceSession`. NPU acceleration is best effort when fallback is
+enabled. Android and iOS reject `Accelerator.NPU` together with
+`allowFallback(false)`: NNAPI cannot prove full-graph delegation, while
+the Core ML delegate may also schedule work on CPU or GPU.
 
-DocumentScanner.scanToFile(jpegBytes).ready(filePath -> {
-    // filePath points to the cropped, corrected document image
-});
-```
+Language identification defaults to Apple Natural Language on iOS and ML
+Kit on Android. iOS translation and Smart Reply require their
+`mlKitTranslation()` and `mlKitSmartReply()` selectors; referencing the API
+class alone does not disable the arm64 simulator. The static methods own a
+one-shot backend. For repeated operations, reuse and close the feature session
+returned by `LanguageIdentifier.open()`, `Translator.open()`, or
+`SmartReply.open()`. Call `isSupported()` before exposing a feature. Vision has native backends
+on Android, iOS, and Mac native. Language services and LiteRT inference
+have native backends on Android and iOS. JavaSE, JavaScript, native
+Windows/Linux, watchOS, and tvOS return unsupported; Mac native returns
+unsupported for language and LiteRT. An opt-in runtime can add another
+backend, and the built-in fallback never uploads input to a cloud service.
 
-iOS uses `VisionKit`. Android uses the Google Play Services document scanner — on devices without Play Services, the call resolves through `AsyncResource.except(...)`.
-
-### Face detector
-
-```java
-import com.codename1.ai.mlkit.face.FaceDetector;
-
-FaceDetector.detect(jpegBytes).ready(rects -> {
-    for (int i = 0; i < rects.length; i += 4) {
-        int x = rects[i], y = rects[i + 1], w = rects[i + 2], h = rects[i + 3];
-        // draw rectangle, crop, etc.
-    }
-});
-```
-
-Returns a packed `int[]` — four ints per face.
+Do not add the retired `cn1-ai-mlkit-*` or `cn1-ai-tflite` dependencies.
+There are no compatibility aliases for `com.codename1.ai.mlkit.*`.
 
 ## Common patterns
 
@@ -419,5 +426,5 @@ view.setOnVoice(e -> SpeechRecognizer.recognize(
 - **Don't store an API key in source.** Use `SecureStorage.get("openai.key")` (single-arg overload) or pull it from a server-side proxy. Hard-coded keys leak through reverse-engineered binaries.
 - **Don't call `chatStream` from a tight UI loop.** A streaming call holds an HTTP connection until the response completes; one per user turn is correct, one per keystroke is a bug.
 - **Don't mutate `ChatView` on a non-EDT thread without going through the documented mutators.** `addMessage`, `appendToLastMessage`, and `setTypingIndicatorVisible` are thread-safe; arbitrary `view.add(...)` calls are not.
-- **Don't assume the document scanner works on every Android device.** It requires Google Play Services. Wrap the call and fall back to `Capture.capturePhoto(...)` if the scanner returns an error.
+- **Don't assume `DocumentScanner` is available on Android.** The built-in API corrects an existing image, while Google's Android scanner is an interactive camera flow. Check `isSupported()` and use your capture flow when it is false.
 - **Don't ship a project that bundles `cn1-ai-stablediffusion` to the cloud build server without checking.** The cn1lib carries multi-GB native blobs; the build will reject the upload with a `cn1.ai.requiresBigUpload` hint. Build locally for those projects.

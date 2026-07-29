@@ -187,17 +187,6 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
           all_libs=(
-            cn1-ai-mlkit-text
-            cn1-ai-mlkit-barcode
-            cn1-ai-mlkit-face
-            cn1-ai-mlkit-labeling
-            cn1-ai-mlkit-translate
-            cn1-ai-mlkit-smartreply
-            cn1-ai-mlkit-langid
-            cn1-ai-mlkit-pose
-            cn1-ai-mlkit-segmentation
-            cn1-ai-mlkit-docscan
-            cn1-ai-tflite
             cn1-ai-whisper
             cn1-ai-stablediffusion
             cn1-admob
@@ -206,17 +195,6 @@ jobs:
             cn1-ads-mock
           )
           ai_libs=(
-            cn1-ai-mlkit-text
-            cn1-ai-mlkit-barcode
-            cn1-ai-mlkit-face
-            cn1-ai-mlkit-labeling
-            cn1-ai-mlkit-translate
-            cn1-ai-mlkit-smartreply
-            cn1-ai-mlkit-langid
-            cn1-ai-mlkit-pose
-            cn1-ai-mlkit-segmentation
-            cn1-ai-mlkit-docscan
-            cn1-ai-tflite
             cn1-ai-whisper
             cn1-ai-stablediffusion
           )

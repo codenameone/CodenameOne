@@ -1,9 +1,39 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 #include "xmlvm.h"
 #include <stdint.h>
 #include <string.h>
 #include <math.h>
-#include <arm_neon.h>
 
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+#define CN1_IOS_NEON 1
+#include <arm_neon.h>
+#else
+#define CN1_IOS_NEON 0
+#endif
+
+#if CN1_IOS_NEON
 static JAVA_ARRAY_BYTE cn1_saturating_byte(int value) {
     if (value > 127) {
         return 127;
@@ -37,6 +67,7 @@ static uint8x16_t cn1_load_ints_to_u8x16(JAVA_ARRAY_INT* s, int offset) {
     int8x16_t out = vcombine_s8(vmovn_s16(lo16), vmovn_s16(hi16));
     return vreinterpretq_u8_s8(out);
 }
+#endif
 
 JAVA_OBJECT com_codename1_impl_ios_IOSSimd_allocByteNative___int_R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT size) {
     return allocArrayAligned(threadStateData, size, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1, 16);
@@ -50,6 +81,11 @@ JAVA_OBJECT com_codename1_impl_ios_IOSSimd_allocFloatNative___int_R_float_1ARRAY
     return allocArrayAligned(threadStateData, size, &class_array1__JAVA_FLOAT, sizeof(JAVA_ARRAY_FLOAT), 1, 16);
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSSimd_isNativeSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return CN1_IOS_NEON ? JAVA_TRUE : JAVA_FALSE;
+}
+
+#if CN1_IOS_NEON
 JAVA_VOID com_codename1_impl_ios_IOSSimd_lookupBytes___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT table, JAVA_OBJECT indices, JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
     JAVA_ARRAY_BYTE* t = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)table)->data;
     JAVA_ARRAY_BYTE* idx = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)indices)->data;
@@ -1777,3 +1813,117 @@ JAVA_VOID com_codename1_impl_ios_IOSSimd_replaceTopByteFromUnsignedBytes___int_1
         d[dstOffset + i] = (JAVA_INT)((r[rgbSrcOffset + i] & 0x00ffffff) | ((a[alphaSrcOffset + i] & 0xff) << 24));
     }
 }
+#else
+/*
+ * Google ML Kit still requires an x86_64 simulator build on Apple Silicon.
+ * IOSSimd is NEON-specific, so expose the generic Simd implementations under
+ * the native iOS symbol names on non-NEON architectures. Mach-O indirect
+ * symbols preserve the exact generated native ABI without duplicating the
+ * scalar implementations or adding a second native source file.
+ */
+#define CN1_IOS_SIMD_ALIAS(name) \
+    __asm__(".globl _com_codename1_impl_ios_IOSSimd_" #name "\n" \
+            ".set _com_codename1_impl_ios_IOSSimd_" #name \
+            ", _com_codename1_util_Simd_" #name);
+
+CN1_IOS_SIMD_ALIAS(lookupBytes___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(lookupBytes___byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(add___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(sub___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(mul___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(min___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(max___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(abs___byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(clamp___byte_1ARRAY_byte_1ARRAY_byte_byte_int_int)
+CN1_IOS_SIMD_ALIAS(add___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(sub___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(mul___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(min___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(max___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(abs___int_1ARRAY_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(clamp___int_1ARRAY_int_1ARRAY_int_int_int_int)
+CN1_IOS_SIMD_ALIAS(sum___int_1ARRAY_int_int_R_int)
+CN1_IOS_SIMD_ALIAS(dot___int_1ARRAY_int_1ARRAY_int_int_R_int)
+CN1_IOS_SIMD_ALIAS(add___float_1ARRAY_float_1ARRAY_float_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(sub___float_1ARRAY_float_1ARRAY_float_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(mul___float_1ARRAY_float_1ARRAY_float_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(min___float_1ARRAY_float_1ARRAY_float_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(max___float_1ARRAY_float_1ARRAY_float_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(abs___float_1ARRAY_float_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(clamp___float_1ARRAY_float_1ARRAY_float_float_int_int)
+CN1_IOS_SIMD_ALIAS(sum___float_1ARRAY_int_int_R_float)
+CN1_IOS_SIMD_ALIAS(dot___float_1ARRAY_float_1ARRAY_int_int_R_float)
+CN1_IOS_SIMD_ALIAS(and___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(and___byte_1ARRAY_int_byte_1ARRAY_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(or___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(or___byte_1ARRAY_int_byte_1ARRAY_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(xor___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(not___byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(cmpEq___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(cmpEq___byte_1ARRAY_byte_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(cmpLt___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(cmpLt___byte_1ARRAY_byte_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(cmpGt___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(cmpRange___byte_1ARRAY_byte_byte_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(select___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(unpackUnsignedByteToInt___byte_1ARRAY_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(packIntToByteSaturating___int_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(packIntToByteTruncate___int_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(packIntToByteTruncate___int_1ARRAY_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(packIntToByteTruncateInterleaved4___int_1ARRAY_int_int_int_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(packBytesInterleaved3___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(packBytesInterleaved3___byte_1ARRAY_int_int_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(packBytesInterleaved4___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(packBytesInterleaved4___byte_1ARRAY_int_int_int_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(permuteBytes___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(and___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(and___int_1ARRAY_int_int_1ARRAY_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(or___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(or___int_1ARRAY_int_int_1ARRAY_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(xor___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(not___int_1ARRAY_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(shl___int_1ARRAY_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(shl___int_1ARRAY_int_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(shrLogical___int_1ARRAY_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(shrLogical___int_1ARRAY_int_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(shrArithmetic___int_1ARRAY_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(cmpEq___int_1ARRAY_int_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(cmpLt___int_1ARRAY_int_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(cmpGt___int_1ARRAY_int_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(select___byte_1ARRAY_int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(shl___byte_1ARRAY_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(shl___byte_1ARRAY_int_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(shrLogical___byte_1ARRAY_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(shrLogical___byte_1ARRAY_int_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(addWrapping___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(addWrapping___byte_1ARRAY_byte_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(subWrapping___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(subWrapping___byte_1ARRAY_byte_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(unpackUnsignedByteToInt___byte_1ARRAY_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(unpackUnsignedByteToIntInterleaved3___byte_1ARRAY_int_int_1ARRAY_int_int_int_int)
+CN1_IOS_SIMD_ALIAS(unpackBytesInterleaved3___byte_1ARRAY_int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int)
+CN1_IOS_SIMD_ALIAS(unpackBytesInterleaved3___byte_1ARRAY_int_byte_1ARRAY_int_int_int_int)
+CN1_IOS_SIMD_ALIAS(unpackBytesInterleaved4___byte_1ARRAY_int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int)
+CN1_IOS_SIMD_ALIAS(unpackBytesInterleaved4___byte_1ARRAY_int_byte_1ARRAY_int_int_int_int_int)
+CN1_IOS_SIMD_ALIAS(unpackLookupBytesInterleaved4___byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_R_int)
+CN1_IOS_SIMD_ALIAS(unpackLookupBytesInterleaved4___byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_int_int_int_int_int_R_int)
+CN1_IOS_SIMD_ALIAS(add___int_1ARRAY_int_int_1ARRAY_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(cmpEq___int_1ARRAY_int_int_1ARRAY_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(cmpLt___int_1ARRAY_int_int_1ARRAY_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(select___byte_1ARRAY_int_int_1ARRAY_int_int_1ARRAY_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(and___int_1ARRAY_int_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(or___int_1ARRAY_int_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(xor___int_1ARRAY_int_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(cmpEq___int_1ARRAY_int_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(cmpLt___int_1ARRAY_int_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(cmpGt___int_1ARRAY_int_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(not___byte_1ARRAY_int_byte_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(select___byte_1ARRAY_int_int_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(select___byte_1ARRAY_int_int_1ARRAY_int_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(select___byte_1ARRAY_int_int_int_1ARRAY_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(blendByMaskTestNonzero___int_1ARRAY_int_int_int_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(blendByMaskTestNonzeroSubstituteOnKeepEq___int_1ARRAY_int_int_int_int_int_int_int_1ARRAY_int_int)
+CN1_IOS_SIMD_ALIAS(replaceTopByteFromUnsignedBytes___int_1ARRAY_int_byte_1ARRAY_int_int_1ARRAY_int_int)
+
+#undef CN1_IOS_SIMD_ALIAS
+#endif
