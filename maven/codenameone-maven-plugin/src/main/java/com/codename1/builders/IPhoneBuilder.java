@@ -2785,12 +2785,14 @@ public class IPhoneBuilder extends Executor {
                                 "ios.health.backgroundDelivery", "false"))
                         || "true".equalsIgnoreCase(request.getArg(
                                 "ios.health.recalibrateEstimates", "false"))
-                        || request.getArg("ios.entitlements.com.apple"
-                                + ".developer.healthkit.background-delivery",
-                                null) != null
-                        || request.getArg("ios.entitlements.com.apple"
-                                + ".developer.healthkit.recalibrate-estimates",
-                                null) != null;
+                        || "true".equalsIgnoreCase(request.getArg(
+                                "ios.entitlements.com.apple.developer"
+                                        + ".healthkit.background-delivery",
+                                "false"))
+                        || "true".equalsIgnoreCase(request.getArg(
+                                "ios.entitlements.com.apple.developer"
+                                        + ".healthkit.recalibrate-estimates",
+                                "false"));
                 if (entitleHealthKit && request.getArg(
                         "ios.entitlements.com.apple.developer.healthkit",
                         null) == null) {

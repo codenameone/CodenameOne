@@ -308,10 +308,6 @@ class CN1HealthConnectBridge(private val context: Context)
             // simply wrong.
             val perTypeBudget = budget
             val perType = ArrayList<String>()
-            // True when a type's reply left something behind that its
-            // token cannot fetch -- a capped series read, which selects
-            // from what it scanned and cannot be resumed.
-            var anyTruncated = false
             for (i in 0 until types.length()) {
                 val token = types.getString(i)
                 val block = StringBuilder()
@@ -319,7 +315,6 @@ class CN1HealthConnectBridge(private val context: Context)
                     perTypeBudget, origins, ascending, inTokens[token],
                     flatten)
                 perType.add(block.toString())
-                anyTruncated = anyTruncated || r.truncated
                 // Exhausted types are recorded with an empty token, not
                 // omitted. Omitting them made the next page see no token
                 // for that type and read it from the beginning again,
@@ -370,13 +365,12 @@ class CN1HealthConnectBridge(private val context: Context)
             // which is what the flattened output should have been all
             // along.
             val merged = mergeByTime(perType, ascending)
-            val truncated = anyTruncated
             sb.append(merged)
             // Trailer: what is left on the platform side. Reporting nothing
             // made every page look complete, so the caller's paging loop
             // stopped at the first limit and lost the rest.
             sb.append('#').append(encodeTokens(outTokens)).append('\t')
-                .append(if (outTokens.isEmpty() && !truncated) "0" else "1")
+                .append(if (outTokens.isEmpty()) "0" else "1")
                 .append('\n')
             sb.toString()
         }
@@ -467,13 +461,18 @@ class CN1HealthConnectBridge(private val context: Context)
         // candidates are gathered here, the top N by time are selected,
         // and the rest are dropped.
         //
-        // Such a reply carries no continuation token, and says it is
-        // truncated. It cannot be resumed: the scan passed over records
-        // the token would have to return to. That is the same answer the
-        // multi-type path already gives, for the same reason -- the limit
-        // wins, and the reply admits what it is rather than claiming to
-        // be complete.
+        // Such a reply carries no continuation token and no has-more:
+        // the scan passed over records a token would have to return to,
+        // so there is nothing to resume from. The caller asked for N and
+        // gets N, which is the answer to the question it put; the
+        // multi-type path is single-page for the same reason.
+        // Only a limit smaller than the scan itself caps anything. A
+        // read asking for the ceiling or more -- the aggregate fallback
+        // asks for Integer.MAX_VALUE -- wants everything it can get and
+        // must keep paging with a real token, so it takes the ordinary
+        // path.
         val capped = isSeriesToken(token) && limit > 0
+            && limit < SERIES_SCAN_CEILING
         val out = if (capped) StringBuilder() else sb
         // A type this bridge cannot read is rejected rather than returned
         // as an empty page: the caller cannot tell an empty page apart from
@@ -484,10 +483,10 @@ class CN1HealthConnectBridge(private val context: Context)
                 "Health Connect reads are not implemented for '" + token
                     + "' in this build")
         if (limit <= 0) {
-            return Read(0, null, false)
+            return Read(0, null)
         }
         if (resumeToken != null && resumeToken.isEmpty()) {
-            return Read(0, null, false)
+            return Read(0, null)
         }
         // Health Connect rejects a pageSize above MAX_PAGE_SIZE outright, so
         // a caller wanting more records than one page holds is served by
@@ -573,15 +572,23 @@ class CN1HealthConnectBridge(private val context: Context)
             }
         }
         if (!capped) {
-            return Read(emitted, pageToken, false)
+            return Read(emitted, pageToken)
         }
         val kept = topByTime(out.toString(), limit, ascending)
         sb.append(kept.first)
-        // No token: the scan walked past records a continuation would
-        // have to come back to. Truncated whenever anything was dropped
-        // or the platform still had more.
-        return Read(kept.second, null,
-            kept.second < emitted || pageToken != null)
+        // No token, and no has-more either.
+        //
+        // The scan walked past records a continuation would have to come
+        // back to, so there is nothing to resume from -- and advertising
+        // a next page without one is worse than admitting there is none:
+        // the caller submits an empty token, which reads as a fresh
+        // query, and the first page repeats for ever. This file already
+        // had that bug once through empty tokens, and flagging a capped
+        // reply as truncated recreated it.
+        //
+        // The caller asked for N and has N, which is the honest answer
+        // to the question it put.
+        return Read(kept.second, null)
     }
 
     /**
@@ -613,12 +620,10 @@ class CN1HealthConnectBridge(private val context: Context)
     }
 
     /**
-     * One type's contribution to a read: the lines emitted, the token to
-     * resume with, and whether the platform still had more that this
-     * reply does not carry.
+     * One type's contribution to a read: the lines emitted and the token
+     * to resume with, if there is one.
      */
-    private class Read(val emitted: Int, val token: String?,
-                       val truncated: Boolean)
+    private class Read(val emitted: Int, val token: String?)
 
     /**
      * Emits one record in the shared line format, tagged with `token`.
