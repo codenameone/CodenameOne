@@ -468,6 +468,58 @@ class WorkoutAndNutritionTest extends UITestBase {
         }
     }
 
+    /**
+     * Two starts at once produce one workout, not two.
+     *
+     * <p>The check and the assignment were separate, so both callers
+     * found nothing running and both were handed a session they could
+     * start. The second assignment only hid the first from
+     * {@code getActiveSession()} -- both went on collecting, and both
+     * persisted a workout at the end.</p>
+     */
+    @Test
+    void concurrentStartsYieldOneSession() throws Exception {
+        final WorkoutManager m = new WorkoutManager();
+        final int callers = 8;
+        final java.util.concurrent.CountDownLatch ready =
+                new java.util.concurrent.CountDownLatch(callers);
+        final java.util.concurrent.CountDownLatch go =
+                new java.util.concurrent.CountDownLatch(1);
+        final java.util.List<WorkoutSession> handed =
+                java.util.Collections.synchronizedList(
+                        new ArrayList<WorkoutSession>());
+        final java.util.concurrent.CountDownLatch done =
+                new java.util.concurrent.CountDownLatch(callers);
+        for (int i = 0; i < callers; i++) {
+            new Thread(new Runnable() {
+                public void run() {
+                    ready.countDown();
+                    try {
+                        go.await();
+                        AsyncResource<WorkoutSession> r =
+                                m.startSession(new WorkoutConfiguration());
+                        if (errorOf(r) == null) {
+                            handed.add(r.get());
+                        }
+                    } catch (Exception e) {
+                        // Counted by absence: a caller that threw simply
+                        // contributes no session.
+                    } finally {
+                        done.countDown();
+                    }
+                }
+            }).start();
+        }
+        assertTrue(ready.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        go.countDown();
+        assertTrue(done.await(10, java.util.concurrent.TimeUnit.SECONDS),
+                "every caller must finish");
+
+        assertEquals(1, handed.size(),
+                "only one caller may be handed a session, got: "
+                        + handed.size());
+    }
+
     @Test
     void workoutSampleTotalsAreNullUntilSet() {
         WorkoutSample w = WorkoutSample.create(WorkoutActivityType.RUNNING,

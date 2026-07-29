@@ -190,6 +190,10 @@ class BleSensorReconnectTest extends UITestBase {
         /// characteristic is disarmed only when its last one goes.
         int armCount;
         int disarmCount;
+        /// Holds the next connect in flight, so the session sits in
+        /// CONNECTING the way it does between a drop and the link
+        /// coming back.
+        boolean holdConnect;
         /// Holds the first subscribe in flight so a stop can land while
         /// the caller is still waiting on the start.
         boolean holdSubscribe;
@@ -238,6 +242,11 @@ class BleSensorReconnectTest extends UITestBase {
         protected void doConnect(ConnectionOptions options,
                 AsyncResource<BlePeripheral> out) {
             connects++;
+            if (holdConnect) {
+                // Left in flight: the session stays in CONNECTING, which
+                // is where a reconnect sits until the link comes back.
+                return;
+            }
             if (failConnects > 0) {
                 failConnects--;
                 out.error(new BluetoothException(
@@ -730,7 +739,17 @@ class BleSensorReconnectTest extends UITestBase {
 
     /** A store that supports the type for reading but never for writing. */
     private static final class RefusingStore
-            extends com.codename1.health.HealthStore {
+            extends com.codename1.health.HealthStore implements WriteCounter {
+
+        /// Guarded: the write lands on whichever thread the flush runs
+        /// on and the test thread reads it.
+        private int refusals;
+
+        public int writeCount() {
+            synchronized (this) {
+                return refusals;
+            }
+        }
 
         @Override
         public boolean isSupported() {
@@ -753,6 +772,9 @@ class BleSensorReconnectTest extends UITestBase {
         protected void doWrite(
                 java.util.List<com.codename1.health.HealthSample> samples,
                 AsyncResource<com.codename1.health.HealthWriteResult> out) {
+            synchronized (this) {
+                refusals++;
+            }
             out.error(new com.codename1.health.HealthException(
                     com.codename1.health.HealthError.TYPE_NOT_SUPPORTED,
                     "not writable here"));
@@ -1310,6 +1332,99 @@ class BleSensorReconnectTest extends UITestBase {
         assertEquals(1, p.disarmCount,
                 "stopping must remove the listener, which is what disarms"
                         + " the characteristic");
+    }
+
+    /**
+     * A retry timer is never installed after teardown.
+     *
+     * <p>The re-arm decision and the installation were separate steps, so
+     * a failed write that decided to retry could install its timer after
+     * teardown had cancelled them all. The {@code TimerTask} then held
+     * the ended session, its listeners and the peripheral until the batch
+     * delay elapsed -- a minute by default, and on the desktop a
+     * non-daemon thread keeping the JVM up for it.</p>
+     *
+     * <p>Driven through the state teardown leaves behind rather than
+     * through the race: a re-arm attempted after the session has ended
+     * must install nothing.</p>
+     */
+    @Test
+    void noFlushTimerSurvivesTeardown() throws Exception {
+        RefusingStore store = new RefusingStore();
+        implementation.setHealth(new com.codename1.health.Health() {
+            @Override
+            public boolean isSupported() {
+                return true;
+            }
+
+            @Override
+            public com.codename1.health.HealthStore getStore() {
+                return store;
+            }
+        });
+        try {
+            FakePeripheral p = new FakePeripheral();
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE,
+                    new SensorSessionOptions().setWriteToStore(true)
+                            .setStoreBatchMillis(20), p);
+            started.add(session);
+            session.start(new AsyncResource<SensorSession>());
+            flushSerialCalls();
+            p.notifyHeartRate(70);
+            flushSerialCalls();
+
+            session.stop();
+            flushSerialCalls();
+            int afterStop = store.writeCount();
+
+            // Long enough for any timer armed around the teardown to have
+            // fired: nothing more may reach the store.
+            assertEquals(afterStop, pumpFor(500, store),
+                    "a session that has ended must arm no further flush");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
+    /**
+     * A packet queued before a drop is not delivered as a new reading.
+     *
+     * <p>The transport keeps its listener map across a disconnect, so a
+     * notification queued before the link went down can still be
+     * dispatched after it -- and the connection event moves the session
+     * to CONNECTING before that packet runs. Accepting it stamps a stale
+     * reading with the current time and hands it to the app, the workout
+     * and the store as though the strap had just measured it.</p>
+     */
+    @Test
+    void aPacketArrivingDuringAReconnectIsNotAccepted() {
+        FakePeripheral p = new FakePeripheral();
+        BleSensorSession session = start(p);
+        p.notifyHeartRate(70);
+        flushSerialCalls();
+        assertNotNull(session.getLatest(
+                com.codename1.health.HealthDataType.HEART_RATE));
+
+        // Down, and not yet back: discovery is held off so the session
+        // stays in CONNECTING.
+        p.holdConnect = true;
+        p.dropLink();
+        flushSerialCalls();
+        assertEquals(SensorSessionState.CONNECTING, session.getState());
+
+        p.notifyHeartRate(199);
+        flushSerialCalls();
+
+        com.codename1.health.QuantitySample latest =
+                (com.codename1.health.QuantitySample) session.getLatest(
+                        com.codename1.health.HealthDataType.HEART_RATE);
+        assertEquals(70,
+                latest.getValue(
+                        com.codename1.health.HealthUnit.COUNT_PER_MINUTE),
+                1e-9,
+                "a packet from before the drop must not become the"
+                        + " session's latest reading");
     }
 
     /**

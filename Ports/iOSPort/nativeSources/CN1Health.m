@@ -208,6 +208,25 @@ static NSString *cn1hkUnitSymbol(NSString *portableId) {
     return @"count";
 }
 
+// A text field that cannot break the line-and-tab framing.
+//
+// Device and source names come from whatever wrote the sample -- another
+// app, or a peripheral naming itself -- so they are not ours to trust. A
+// tab shifts every column after it, and a newline is worse: the decoder
+// splits on newlines and would read the remainder as another sample,
+// which is a fabricated reading in the caller's results. Both become
+// spaces, which costs nothing anyone can see.
+static NSString *cn1hkText(NSString *value) {
+    if (value == nil) {
+        return @"";
+    }
+    NSString *out = [value stringByReplacingOccurrencesOfString:@"\t"
+                                                     withString:@" "];
+    out = [out stringByReplacingOccurrencesOfString:@"\n" withString:@" "];
+    out = [out stringByReplacingOccurrencesOfString:@"\r" withString:@" "];
+    return out;
+}
+
 static void cn1hkReportError(JAVA_INT requestId, int code, NSString *msg) {
     com_codename1_impl_ios_IOSHealth_nativeHkRequestError___int_int_java_lang_String(
         getThreadLocalData(), requestId, code,
@@ -384,10 +403,9 @@ static void cn1hkRunSampleQuery(JAVA_INT rid, NSString *portableId,
                 (long long)([[sample endDate] timeIntervalSince1970]
                             * 1000.0),
                 value, symbol,
-                src ? [src bundleIdentifier] : @"",
-                src && [src name] ? [src name] : @"",
-                [sample device] && [[sample device] name]
-                    ? [[sample device] name] : @"",
+                cn1hkText(src ? [src bundleIdentifier] : @""),
+                cn1hkText(src ? [src name] : @""),
+                cn1hkText([sample device] ? [[sample device] name] : @""),
                 (entered && [entered boolValue]) ? @"MANUAL_ENTRY" : @""];
         }
         com_codename1_impl_ios_IOSHealth_nativeHkSamples___int_java_lang_String(

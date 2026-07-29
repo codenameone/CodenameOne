@@ -74,6 +74,10 @@ public class WorkoutManager {
 
     private WorkoutSession activeSession;
 
+    /// Guards [#activeSession] so the one-at-a-time rule is a rule
+    /// rather than a race.
+    private final Object sessionLock = new Object();
+
     /// Whether the operating system provides a real workout session that
     /// keeps the app alive and owns the recording.
     ///
@@ -109,24 +113,37 @@ public class WorkoutManager {
             WorkoutConfiguration configuration) {
         AsyncResource<WorkoutSession> out =
                 new AsyncResource<WorkoutSession>();
-        WorkoutSession existing = activeSession;
-        if (existing != null && isRunning(existing)) {
-            out.error(new HealthException(HealthError.SESSION_STATE,
-                    "a workout is already in progress; end or discard it"
-                            + " before starting another"));
-            return out;
+        WorkoutSession session;
+        // The check, the creation and the assignment as one step. Read
+        // and then written, two callers both found nothing running and
+        // both were handed a session they could start: the second
+        // assignment only hid the first from getActiveSession(), while
+        // both went on collecting and both persisted a workout at the
+        // end -- which is the opposite of what the one-at-a-time rule
+        // exists to promise.
+        synchronized (sessionLock) {
+            WorkoutSession existing = activeSession;
+            if (existing != null && isRunning(existing)) {
+                out.error(new HealthException(HealthError.SESSION_STATE,
+                        "a workout is already in progress; end or discard"
+                                + " it before starting another"));
+                return out;
+            }
+            session = createSession(
+                    configuration == null ? new WorkoutConfiguration()
+                            : configuration);
+            activeSession = session;
         }
-        WorkoutSession session = createSession(
-                configuration == null ? new WorkoutConfiguration()
-                        : configuration);
-        activeSession = session;
         out.complete(session);
         return out;
     }
 
     /// The session currently running or paused, or null.
     public final WorkoutSession getActiveSession() {
-        WorkoutSession s = activeSession;
+        WorkoutSession s;
+        synchronized (sessionLock) {
+            s = activeSession;
+        }
         return s != null && isRunning(s) ? s : null;
     }
 

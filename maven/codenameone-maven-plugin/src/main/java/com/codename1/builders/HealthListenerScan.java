@@ -66,6 +66,16 @@ class HealthListenerScan {
     private final Set<String> publicTypes = new HashSet<>();
     /** Types that can be built with {@code new X()}. */
     private final Set<String> constructible = new HashSet<>();
+
+    /// Classes that are concrete -- neither abstract nor an interface --
+    /// whatever their constructors look like.
+    ///
+    /// A concrete listener with no public no-argument constructor is a
+    /// class an app can register and nothing can restore, which is a
+    /// silent loss of background delivery. An abstract one is not: it
+    /// exists to be subclassed, and the subclass is what gets registered.
+    /// Both are "not constructible", so the two are tracked apart.
+    private final Set<String> concrete = new HashSet<>();
     /** What encloses each nested type, from its InnerClasses attribute. */
     private final Map<String, String> enclosing = new HashMap<>();
 
@@ -103,6 +113,10 @@ class HealthListenerScan {
     }
 
     /** Records that a type is public. */
+    void declaresConcreteType(String cls) {
+        concrete.add(cls);
+    }
+
     void declaresPublicType(String cls) {
         if (cls != null) {
             publicTypes.add(cls);
@@ -171,7 +185,15 @@ class HealthListenerScan {
             }
         }
         for (String declarer : declarers) {
-            if (!covered.contains(declarer)) {
+            // A concrete declarer speaks for itself. A subclass covers the
+            // interface for its own registration, not for the declarer's:
+            // the factory has no entry for a class it cannot build, so an
+            // app registering the declarer loses its background delivery
+            // with nothing said. An abstract declarer is a different
+            // matter and is covered by any constructible descendant.
+            boolean unbuildableConcrete = concrete.contains(declarer)
+                    && !constructible.contains(declarer);
+            if (unbuildableConcrete || !covered.contains(declarer)) {
                 out.add(declarer.replace('/', '.') + " implements"
                         + " HealthBackgroundListener but cannot be"
                         + " constructed by the generated bindings. A"

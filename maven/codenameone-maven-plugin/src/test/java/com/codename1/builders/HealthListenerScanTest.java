@@ -24,6 +24,7 @@ package com.codename1.builders;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -52,6 +53,38 @@ class HealthListenerScanTest {
         Map<String, String> out = s.resolve();
         assertEquals(1, out.size());
         assertEquals("app.Watcher", out.get("app.Watcher"));
+    }
+
+    /**
+     * A concrete listener nothing can build is reported even when a
+     * subclass can be.
+     *
+     * <p>The subclass covers the interface for its own registration, not
+     * for the declarer's. The factory has no entry for a class it cannot
+     * build, so an app that registers the declarer -- a perfectly
+     * ordinary thing to do with a concrete class -- loses its background
+     * delivery, and the build said nothing because something else in the
+     * hierarchy was buildable.</p>
+     */
+    @Test
+    void aConcreteDeclarerWithNoUsableConstructorIsStillReported() {
+        HealthListenerScan s = scan();
+        s.implementsInterface("app/Needy", HealthListenerScan.LISTENER);
+        s.declaresPublicType("app/Needy");
+        s.declaresConcreteType("app/Needy");
+        // Concrete, but its only constructor takes an argument.
+        s.declaresType("app/Needy", "java/lang/Object", false);
+        s.declaresPublicType("app/Handy");
+        s.declaresConcreteType("app/Handy");
+        s.declaresType("app/Handy", "app/Needy", true);
+
+        assertEquals(1, s.resolve().size(),
+                "only the buildable one gets a binding");
+        List<String> warnings = s.warnings();
+        assertEquals(1, warnings.size(),
+                "and the one that cannot be built must be named: "
+                        + warnings);
+        assertTrue(warnings.get(0).contains("app.Needy"), warnings.get(0));
     }
 
     /**

@@ -460,6 +460,22 @@ public abstract class Executor {
         /** Reports that {@code cls} is public. */
         public default void declaresPublicType(String cls) {
         }
+        /**
+         * Reports that {@code cls} is a concrete class -- neither
+         * abstract nor an interface -- whatever its constructors look
+         * like.
+         *
+         * <p>{@link #declaresType(String, String, boolean)} answers
+         * whether the generated bindings can build it, which folds two
+         * different situations into one false: an abstract base, which is
+         * meant to have a concrete subclass do the work, and a concrete
+         * class with no public no-argument constructor, which nothing can
+         * restore even though an app can register it. The second is a
+         * silent failure and the first is not, so the two have to be
+         * distinguishable.</p>
+         */
+        public default void declaresConcreteType(String cls) {
+        }
 
         /**
          * Reports a call whose last argument was pushed as a literal
@@ -593,6 +609,9 @@ public abstract class Executor {
                             if (scannedName != null) {
                                 if (scannedPublic) {
                                     scanner.declaresPublicType(scannedName);
+                                }
+                                if (scannedConcrete) {
+                                    scanner.declaresConcreteType(scannedName);
                                 }
                                 scanner.declaresType(scannedName,
                                         scannedSuper, scannedConcrete
