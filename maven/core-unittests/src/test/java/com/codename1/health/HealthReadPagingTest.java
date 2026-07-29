@@ -178,4 +178,50 @@ class HealthReadPagingTest extends UITestBase {
         assertEquals(1,
                 failed.getPartialResult().getSampleIds().size());
     }
+
+    /**
+     * A blood-pressure reading is converted into the unit the query
+     * asked for.
+     *
+     * <p>It is not a {@code QuantitySample} -- it carries two quantities
+     * rather than one -- so it fell straight through the normalizer and
+     * came back in whatever unit it was stored in. {@code readSamples}
+     * documents its results as normalized, and validation accepts a
+     * pressure unit on the query because {@code BLOOD_PRESSURE} is a
+     * pressure type, so a caller asking for mmHg against a store holding
+     * kPa was answered in kPa with nothing to say so.</p>
+     */
+    @Test
+    void aBloodPressureReadingIsNormalizedToTheQueryUnit() throws Exception {
+        FakeHealthStore store = new FakeHealthStore();
+        BloodPressureSample stored = BloodPressureSample.create(
+                new HealthQuantity(16.0, HealthUnit.KILOPASCAL),
+                new HealthQuantity(10.6666, HealthUnit.KILOPASCAL),
+                1000L);
+        stored.setBodyPosition(BloodPressureSample.POSITION_SITTING);
+        stored.putMetadata("cuff", "left");
+        List<HealthSample> page = new ArrayList<HealthSample>();
+        page.add(stored);
+        store.pages.add(new SamplePage(page, null, false));
+
+        List<HealthSample> read = store.readSamples(new SampleQuery()
+                .addType(HealthDataType.BLOOD_PRESSURE)
+                .setUnit(HealthUnit.MILLIMETER_OF_MERCURY)
+                .setTimeRange(HealthTimeRange.between(0L, 10000L))).get();
+
+        assertEquals(1, read.size());
+        BloodPressureSample bp = (BloodPressureSample) read.get(0);
+        assertEquals(120.0,
+                bp.getSystolic().getValue(HealthUnit.MILLIMETER_OF_MERCURY),
+                0.01, "16 kPa is 120 mmHg");
+        assertSame(HealthUnit.MILLIMETER_OF_MERCURY,
+                bp.getSystolic().getUnit(),
+                "and it must be carried in the unit that was asked for");
+        assertSame(HealthUnit.MILLIMETER_OF_MERCURY,
+                bp.getDiastolic().getUnit());
+        assertEquals(BloodPressureSample.POSITION_SITTING,
+                bp.getBodyPosition(),
+                "converting must not drop the rest of the reading");
+        assertEquals("left", bp.getMetadata().get("cuff"));
+    }
 }

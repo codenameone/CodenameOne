@@ -683,4 +683,55 @@ class BleSensorReconnectTest extends UITestBase {
             implementation.setHealth(null);
         }
     }
+
+    /**
+     * A flush armed before the session ended does not run after it.
+     *
+     * <p>The re-arm was guarded but the tick already scheduled was not,
+     * so a dead session issued one last write from a timer nobody could
+     * cancel. Held deterministically: the batch window is long enough
+     * that the session is unambiguously terminal well before the tick
+     * would have fired.</p>
+     */
+    @Test
+    void aFlushArmedBeforeTheEndDoesNotRunAfterIt() throws Exception {
+        final HalfCommittingStore store = new HalfCommittingStore();
+        implementation.setHealth(new com.codename1.health.Health() {
+            @Override
+            public boolean isSupported() {
+                return true;
+            }
+
+            @Override
+            public com.codename1.health.HealthStore getStore() {
+                return store;
+            }
+        });
+        try {
+            FakePeripheral p = new FakePeripheral();
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE,
+                    new SensorSessionOptions().setWriteToStore(true)
+                            .setStoreBatchMillis(600), p);
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+
+            // Arms the flush, then fails the session long before it fires.
+            p.notifyHeartRate(70);
+            flushSerialCalls();
+            p.failDiscoveries = 99;
+            p.dropLink();
+            pumpUntil(session, SensorSessionState.FAILED);
+            assertTrue(session.isTerminal());
+
+            pump(1500);
+            assertEquals(0, store.written.size(),
+                    "a session that failed before its flush window"
+                            + " elapsed must never issue that write");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
 }

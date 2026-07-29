@@ -75,7 +75,14 @@ public class SensorSession {
     private final CumulativeCounterTracker crankTracker =
             new CumulativeCounterTracker(0x10000L, 1024);
 
-    private SensorSessionState state = SensorSessionState.CONNECTING;
+    /// Volatile because it is written on the EDT and read from the
+    /// flush timer's thread and from store callbacks. Without it those
+    /// threads could go on seeing a running session after it had ended,
+    /// re-arm the flush, and issue a write from a session nobody holds --
+    /// which is exactly the "issued one more write" failure, and exactly
+    /// why it appeared on a CI machine and not on a developer's.
+    private volatile SensorSessionState state =
+            SensorSessionState.CONNECTING;
     private boolean streamed;
     private Integer batteryPercent;
     private int bodySensorLocation = -1;
@@ -309,6 +316,14 @@ public class SensorSession {
 
         @Override
         public void run() {
+            // A timer armed before the session ended still fires after
+            // it. The re-arm is guarded, but the tick already in flight
+            // was not, so a dead session issued one last write. The
+            // explicit flush from endSession() does not come through
+            // here, so a short ride still keeps its final partial batch.
+            if (session.isTerminal()) {
+                return;
+            }
             session.flushPendingWrites();
         }
     }
@@ -660,6 +675,13 @@ public class SensorSession {
             return;
         }
         state = newState;
+        if (isTerminal()) {
+            // Nothing may be scheduled from a terminal state, and that
+            // includes what was scheduled just before reaching one: the
+            // session is gone from the manager's registry, so a timer
+            // left armed is one nobody can cancel.
+            cancelFlush();
+        }
         Object[] snapshot = listenerSnapshot();
         if (snapshot != null) {
             Display.getInstance().callSerially(

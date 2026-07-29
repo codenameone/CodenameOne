@@ -835,11 +835,55 @@ public class HealthStore {
                 : end > range.getStartMillis();
     }
 
+    /// Converts the two pressures a blood-pressure reading carries.
+    ///
+    /// It is not a QuantitySample -- it holds two quantities rather than
+    /// one -- so it fell straight through the normalizer and came back in
+    /// whatever unit it was stored in. `readSamples` documents its
+    /// results as normalized, and validation accepts a pressure unit on
+    /// the query because BLOOD_PRESSURE is a pressure type, so a caller
+    /// asking for mmHg against a store holding kPa was answered in kPa
+    /// with nothing to say so. The same reading then measured differently
+    /// depending on which unit it happened to be written in.
+    ///
+    /// The pulse is left alone: it is a frequency, and the query's unit
+    /// is a pressure. Converting it would need a second unit the query
+    /// has no way to express.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
+    private HealthSample normalizeBloodPressure(BloodPressureSample bp,
+            SampleQuery query) throws HealthException {
+        HealthUnit target = query.getUnit();
+        if (target == null) {
+            target = bp.getType().getCanonicalUnit();
+        }
+        if (target == null
+                || (bp.getSystolic().getUnit() == target
+                    && bp.getDiastolic().getUnit() == target)) {
+            return bp;
+        }
+        BloodPressureSample converted = BloodPressureSample.create(
+                bp.getSystolic().in(target), bp.getDiastolic().in(target),
+                bp.getStartMillis());
+        converted.setPulse(bp.getPulse());
+        converted.setBodyPosition(bp.getBodyPosition());
+        converted.setMeasurementLocation(bp.getMeasurementLocation());
+        converted.setId(bp.getId());
+        converted.setSource(bp.getSource());
+        converted.setRecordingMethod(bp.getRecordingMethod());
+        for (Map.Entry<String, String> e : bp.getMetadata().entrySet()) {
+            converted.putMetadata(e.getKey(), e.getValue());
+        }
+        return converted;
+    }
+
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
     private HealthSample normalize(HealthSample s, SampleQuery query)
             throws HealthException {
         if (s instanceof SeriesSample) {
             return normalizeSeries((SeriesSample) s, query);
+        }
+        if (s instanceof BloodPressureSample) {
+            return normalizeBloodPressure((BloodPressureSample) s, query);
         }
         if (!(s instanceof QuantitySample)) {
             return s;
