@@ -250,6 +250,13 @@ public final class AndroidSecureStorage extends SecureStorage {
             // Includes KeyPermanentlyInvalidatedException.
             resetPlainKey();
             return false;
+        } catch (UnrecoverableKeyException e) {
+            // Handled like an invalid key rather than falling into the generic catch:
+            // leaving the unusable alias installed made every later write return false
+            // for good, and only a read happened to clear it -- so an app that only ever
+            // writes could never store anything again.
+            resetPlainKey();
+            return false;
         } catch (Throwable t) {
             Log.e(t);
             return false;

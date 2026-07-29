@@ -951,7 +951,10 @@ public class ConnectionRequest implements IOProgressListener {
         }
         try {
             SSLCertificate[] certs = getSSLCertificates();
-            checkSSLCertificates(certs);
+            if (checkSSLCertificates) {
+                // Same gate as the non-callback path.
+                checkSSLCertificates(certs);
+            }
             NetworkGuard guard = NetworkManager.getNetworkGuard();
             if (guard != null && guardWantsCertificates) {
                 // Same split as the non-callback path: the hook above sees the flat view
@@ -1132,10 +1135,17 @@ public class ConnectionRequest implements IOProgressListener {
                     // empty POST bodies.
                     !Util.getImplementation().checkSSLCertificatesRequiresCallbackFromNative()) {
                 sslCertificates = getSSLCertificatesImpl(connection, url);
-                // The request's own hook runs first and on the legacy flat view, so an
-                // app that already pins by overriding it keeps working; the guard layers
-                // on, and only the guard sees the enriched per-certificate form.
-                checkSSLCertificates(sslCertificates);
+                // Only when the request asked for it. shouldInspectCertificates() is now
+                // also true when the guard pins the host, and running the hook on that
+                // basis would let a subclass that deliberately disabled it reject or
+                // mutate requests purely because App Shield covers the host. The hook's
+                // contract is that it runs when the request opted in.
+                if (checkSSLCertificates) {
+                    // The legacy flat view, so an app that already pins by overriding it
+                    // keeps working; only the guard sees the enriched per-certificate
+                    // form.
+                    checkSSLCertificates(sslCertificates);
+                }
                 NetworkGuard certGuard = NetworkManager.getNetworkGuard();
                 if (certGuard != null && guardWantsCertificates) {
                     SSLCertificate[] forGuard = guardSSLCertificates(connection, url);
