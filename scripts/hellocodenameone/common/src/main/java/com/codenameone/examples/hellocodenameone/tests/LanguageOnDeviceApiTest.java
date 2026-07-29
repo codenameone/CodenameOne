@@ -54,8 +54,8 @@ public class LanguageOnDeviceApiTest extends BaseTest {
     public boolean runTest() {
         try {
             checkValuesAndOptions();
-            checkCapabilities();
-            checkReusableSessionLifecycle();
+            boolean[] capabilities = checkCapabilities();
+            checkReusableSessionLifecycle(capabilities);
             done();
             return true;
         } catch (Throwable t) {
@@ -94,7 +94,7 @@ public class LanguageOnDeviceApiTest extends BaseTest {
                 "smart-reply timestamp");
     }
 
-    private void checkCapabilities() {
+    private boolean[] checkCapabilities() {
         boolean languageId = LanguageIdentifier.isSupported();
         boolean translation = Translator.isSupported();
         boolean smartReply = SmartReply.isSupported();
@@ -116,33 +116,51 @@ public class LanguageOnDeviceApiTest extends BaseTest {
                             new SmartReplyMessage("Hello", "remote", false, 1)
                     }, null), "smart reply");
         }
+        return new boolean[] {languageId, translation, smartReply};
     }
 
-    private void checkReusableSessionLifecycle() {
+    private void checkReusableSessionLifecycle(boolean[] capabilities) {
+        if (capabilities[0]) {
+            checkLanguageIdentifierSessionLifecycle();
+        }
+        if (capabilities[1]) {
+            checkTranslatorSessionLifecycle();
+        }
+        if (capabilities[2]) {
+            checkSmartReplySessionLifecycle();
+        }
+    }
+
+    private void checkLanguageIdentifierSessionLifecycle() {
         LanguageIdentifier.Session identifier =
                 LanguageIdentifier.open(new LanguageOptions());
-        Translator.Session translator =
-                Translator.open(new LanguageOptions());
-        SmartReply.Session smartReply =
-                SmartReply.open(new LanguageOptions());
         identifier.close();
-        translator.close();
-        smartReply.close();
         // Closing is intentionally idempotent so owners can use one cleanup path.
         identifier.close();
-        translator.close();
-        smartReply.close();
-
         assertClosedSessionThrows(new ClosedSessionOperation() {
             public void run() {
                 identifier.identify("hello");
             }
         }, "closed language-identification session");
+    }
+
+    private void checkTranslatorSessionLifecycle() {
+        Translator.Session translator =
+                Translator.open(new LanguageOptions());
+        translator.close();
+        translator.close();
         assertClosedSessionThrows(new ClosedSessionOperation() {
             public void run() {
                 translator.translate("bonjour", "fr", "en");
             }
         }, "closed translation session");
+    }
+
+    private void checkSmartReplySessionLifecycle() {
+        SmartReply.Session smartReply =
+                SmartReply.open(new LanguageOptions());
+        smartReply.close();
+        smartReply.close();
         assertClosedSessionThrows(new ClosedSessionOperation() {
             public void run() {
                 smartReply.suggest(new SmartReplyMessage[] {
