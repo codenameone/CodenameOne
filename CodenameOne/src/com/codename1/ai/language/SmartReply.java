@@ -24,7 +24,6 @@ package com.codename1.ai.language;
 
 import com.codename1.impl.LanguageImpl;
 import com.codename1.util.AsyncResource;
-import com.codename1.util.SuccessCallback;
 
 /// Produces short reply suggestions for a chronological conversation without
 /// uploading its messages. ML Kit may return no suggestions when the language
@@ -62,6 +61,8 @@ public final class SmartReply {
 
     /// The conversation array and option values are copied before backend work
     /// begins. {@link SmartReplyMessage} values are immutable.
+    /// Cancelling the returned resource suppresses late result callbacks; the
+    /// temporary backend is released after its pending native work settles.
     ///
     /// @param conversation chronological messages, oldest first
     /// @param options backend options, or {@code null}
@@ -76,22 +77,7 @@ public final class SmartReply {
             out.error(error);
             return out;
         }
-        AsyncResource<String[]> result = session.suggest(conversation);
-        closeWhenFinished(result, session);
-        return result;
-    }
-
-    private static <T> void closeWhenFinished(AsyncResource<T> result,
-                                               final Session session) {
-        result.ready(new SuccessCallback<T>() {
-            public void onSucess(T value) {
-                session.close();
-            }
-        }).except(new SuccessCallback<Throwable>() {
-            public void onSucess(Throwable error) {
-                session.close();
-            }
-        });
+        return session.suggest(conversation, true);
     }
 
     private static SmartReplyMessage[] copyConversation(
@@ -119,6 +105,8 @@ public final class SmartReply {
         }
 
         /// Generates reply suggestions without recreating the native backend.
+        /// Cancelling the returned resource suppresses late callbacks without
+        /// closing this reusable session.
         ///
         /// @param conversation chronological messages, oldest first;
         ///        {@code null} is treated as an empty conversation
@@ -126,6 +114,12 @@ public final class SmartReply {
         /// @throws IllegalStateException if this session is closed
         public AsyncResource<String[]> suggest(
                 final SmartReplyMessage[] conversation) {
+            return suggest(conversation, false);
+        }
+
+        private AsyncResource<String[]> suggest(
+                final SmartReplyMessage[] conversation,
+                boolean closeWhenFinished) {
             final SmartReplyMessage[] snapshot =
                     copyConversation(conversation);
             return session.execute(new LanguageSession.Operation<String[]>() {
@@ -135,7 +129,7 @@ public final class SmartReply {
                     return implementation.suggestReplies(snapshot,
                             options.getBackend().getId(), options);
                 }
-            });
+            }, closeWhenFinished);
         }
 
         /// Closes the session. This method is idempotent; native release is

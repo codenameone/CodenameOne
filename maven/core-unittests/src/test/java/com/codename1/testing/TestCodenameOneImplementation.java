@@ -937,6 +937,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     private com.codename1.impl.VisionImpl visionImpl;
+    private Runnable visionImplCreationHook;
     private com.codename1.impl.InferenceImpl inferenceImpl;
     private com.codename1.impl.LanguageImpl languageImpl;
 
@@ -944,8 +945,22 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         this.visionImpl = visionImpl;
     }
 
+    /**
+     * Installs a test hook invoked immediately before the vision backend is
+     * returned from {@link #createVisionImpl()}. Tests can use this to hold
+     * backend creation at a deterministic concurrency boundary.
+     *
+     * @param hook hook to invoke, or {@code null} to clear it
+     */
+    public void setVisionImplCreationHook(Runnable hook) {
+        visionImplCreationHook = hook;
+    }
+
     @Override
     public com.codename1.impl.VisionImpl createVisionImpl() {
+        if (visionImplCreationHook != null) {
+            visionImplCreationHook.run();
+        }
         return visionImpl;
     }
 
@@ -1338,6 +1353,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         largerTextScale = 1f;
         cameraImpl = null;
         arImpl = null;
+        visionImplCreationHook = null;
         motionSensorManager = null;
         platformName = "test";
     }

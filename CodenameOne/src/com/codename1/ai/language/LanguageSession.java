@@ -82,6 +82,11 @@ final class LanguageSession implements AutoCloseable {
     }
 
     <T> AsyncResource<T> execute(Operation<T> operation) {
+        return execute(operation, false);
+    }
+
+    <T> AsyncResource<T> execute(Operation<T> operation,
+                                 final boolean closeWhenFinished) {
         final AsyncResource<T> backendResult;
         synchronized (this) {
             if (closed) {
@@ -103,20 +108,27 @@ final class LanguageSession implements AutoCloseable {
                 throw error;
             }
         }
-        final AsyncResource<T> result = new AsyncResource<T>();
+        final OperationResource<T> result =
+                new OperationResource<T>(this, closeWhenFinished);
         final Completion completion = new Completion();
         backendResult.ready(new SuccessCallback<T>() {
             public void onSucess(T value) {
                 if (completion.finish()) {
-                    result.complete(value);
+                    if (closeWhenFinished) {
+                        close();
+                    }
                     operationFinished();
+                    result.publish(value);
                 }
             }
         }).except(new SuccessCallback<Throwable>() {
             public void onSucess(Throwable error) {
                 if (completion.finish()) {
-                    result.error(error);
+                    if (closeWhenFinished) {
+                        close();
+                    }
                     operationFinished();
+                    result.fail(error);
                 }
             }
         });
@@ -152,6 +164,38 @@ final class LanguageSession implements AutoCloseable {
         }
         if (toClose != null) {
             toClose.close();
+        }
+    }
+
+    private static final class OperationResource<T>
+            extends AsyncResource<T> {
+        private final LanguageSession owner;
+        private final boolean closeWhenFinished;
+
+        OperationResource(LanguageSession owner,
+                          boolean closeWhenFinished) {
+            this.owner = owner;
+            this.closeWhenFinished = closeWhenFinished;
+        }
+
+        public synchronized boolean cancel(boolean mayInterruptIfRunning) {
+            boolean cancelled = super.cancel(mayInterruptIfRunning);
+            if (cancelled && closeWhenFinished) {
+                owner.close();
+            }
+            return cancelled;
+        }
+
+        synchronized void publish(T value) {
+            if (!isCancelled()) {
+                complete(value);
+            }
+        }
+
+        synchronized void fail(Throwable error) {
+            if (!isCancelled()) {
+                error(error);
+            }
         }
     }
 

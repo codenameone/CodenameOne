@@ -40,7 +40,7 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
 
     /// @return whether this analyzer's feature/backend is available and open
     @Override
-    public final boolean isSupported() {
+    public final synchronized boolean isSupported() {
         VisionImpl impl = implementation();
         return impl != null && impl.isSupported(feature, options.getBackend().getId());
     }
@@ -49,7 +49,7 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
     /// @param image immutable encoded or raw input
     /// @return asynchronous typed result
     @Override
-    public final AsyncResource<T> process(VisionImage image) {
+    public final synchronized AsyncResource<T> process(VisionImage image) {
         if (image == null) {
             throw new NullPointerException("image");
         }
@@ -68,7 +68,7 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
 
     /// Idempotently releases the retained native backend.
     @Override
-    public final void close() {
+    public final synchronized void close() {
         closed = true;
         if (implementation != null) {
             implementation.close();

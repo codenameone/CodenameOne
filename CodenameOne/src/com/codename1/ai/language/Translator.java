@@ -24,7 +24,6 @@ package com.codename1.ai.language;
 
 import com.codename1.impl.LanguageImpl;
 import com.codename1.util.AsyncResource;
-import com.codename1.util.SuccessCallback;
 
 /// Translates text on device with lazily installed language-pair models.
 /// The first request for a pair may take longer while ML Kit downloads the
@@ -65,6 +64,8 @@ public final class Translator {
     /// region, such as {@code en-US}, and select the corresponding supported
     /// base-language model ({@code en} in this example). The asynchronous
     /// resource fails when either tag does not identify a supported model.
+    /// Cancelling the returned resource suppresses late result callbacks; the
+    /// temporary backend is released after its pending native work settles.
     ///
     /// @param text source text; {@code null} is treated as empty
     /// @param sourceLanguage BCP-47 source language tag
@@ -82,23 +83,7 @@ public final class Translator {
             out.error(error);
             return out;
         }
-        AsyncResource<String> result = session.translate(text,
-                sourceLanguage, targetLanguage);
-        closeWhenFinished(result, session);
-        return result;
-    }
-
-    private static <T> void closeWhenFinished(AsyncResource<T> result,
-                                               final Session session) {
-        result.ready(new SuccessCallback<T>() {
-            public void onSucess(T value) {
-                session.close();
-            }
-        }).except(new SuccessCallback<Throwable>() {
-            public void onSucess(Throwable error) {
-                session.close();
-            }
-        });
+        return session.translate(text, sourceLanguage, targetLanguage, true);
     }
 
     /// Reusable owner of a native translation backend.
@@ -114,6 +99,8 @@ public final class Translator {
         }
 
         /// Translates text without recreating the native backend.
+        /// Cancelling the returned resource suppresses late callbacks without
+        /// closing this reusable session.
         ///
         /// @param text source text; {@code null} is treated as empty
         /// @param sourceLanguage supported BCP-47 source language tag
@@ -123,6 +110,13 @@ public final class Translator {
         public AsyncResource<String> translate(final String text,
                                                final String sourceLanguage,
                                                final String targetLanguage) {
+            return translate(text, sourceLanguage, targetLanguage, false);
+        }
+
+        private AsyncResource<String> translate(final String text,
+                                                final String sourceLanguage,
+                                                final String targetLanguage,
+                                                boolean closeWhenFinished) {
             return session.execute(new LanguageSession.Operation<String>() {
                 public AsyncResource<String> run(
                         LanguageImpl implementation,
@@ -132,7 +126,7 @@ public final class Translator {
                             targetLanguage, options.getBackend().getId(),
                             options);
                 }
-            });
+            }, closeWhenFinished);
         }
 
         /// Closes the session. This method is idempotent; native release is

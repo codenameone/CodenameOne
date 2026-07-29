@@ -27,6 +27,9 @@ import com.codename1.util.AsyncResource;
 /// Reusable, closable on-device analyzer for still images or camera frames.
 /// Implementations may retain native detectors and models between calls, so
 /// create one analyzer per stream/workflow and close it when finished.
+/// Backend creation, request scheduling, capability checks, and close are
+/// serialized so a concurrent close cannot leave a newly created backend
+/// attached after the analyzer has closed.
 public interface VisionAnalyzer<T> extends AutoCloseable {
     /// Tests the exact feature/backend pair configured for this analyzer.
     /// @return {@code true} when the current target supports it

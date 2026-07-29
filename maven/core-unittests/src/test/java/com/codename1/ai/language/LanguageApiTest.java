@@ -29,7 +29,10 @@ package com.codename1.ai.language;
 import com.codename1.impl.LanguageImpl;
 import com.codename1.junit.UITestBase;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.Test;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -152,6 +155,48 @@ class LanguageApiTest extends UITestBase {
         assertEquals(1, backend.closeCount);
     }
 
+    @Test
+    void cancelledOperationSuppressesLateBackendCallbacksAndCloses()
+            throws Exception {
+        assertCancelledSettlementDoesNotPublish(false);
+        assertCancelledSettlementDoesNotPublish(true);
+    }
+
+    private void assertCancelledSettlementDoesNotPublish(boolean fail) {
+        RecordingLanguageImpl backend = new RecordingLanguageImpl();
+        backend.deferTranslation = true;
+        implementation.setLanguageImpl(backend);
+        final AtomicInteger successes = new AtomicInteger();
+        final AtomicInteger failures = new AtomicInteger();
+
+        AsyncResource<String> result = Translator.translate(
+                "bonjour", "fr", "en",
+                new LanguageOptions().backend(
+                        LanguageBackends.mlKitTranslation()));
+        result.ready(new SuccessCallback<String>() {
+            public void onSucess(String value) {
+                successes.incrementAndGet();
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            public void onSucess(Throwable error) {
+                failures.incrementAndGet();
+            }
+        });
+
+        assertTrue(result.cancel(false));
+        if (fail) {
+            backend.pendingTranslation.error(
+                    new IllegalStateException("late failure"));
+        } else {
+            backend.pendingTranslation.complete("late success");
+        }
+
+        assertTrue(result.isCancelled());
+        assertEquals(0, successes.get());
+        assertEquals(0, failures.get());
+        assertEquals(1, backend.closeCount);
+    }
+
     private static final class RecordingLanguageImpl extends LanguageImpl {
         String feature;
         String backend;
@@ -159,6 +204,8 @@ class LanguageApiTest extends UITestBase {
         SmartReplyMessage[] conversation;
         int translationCalls;
         int closeCount;
+        boolean deferTranslation;
+        AsyncResource<String> pendingTranslation;
 
         public boolean isSupported(String value, String backendId) {
             feature = value;
@@ -185,7 +232,11 @@ class LanguageApiTest extends UITestBase {
             feature = "translation";
             translationCalls++;
             AsyncResource<String> result = new AsyncResource<String>();
-            result.complete("hello");
+            if (deferTranslation) {
+                pendingTranslation = result;
+            } else {
+                result.complete("hello");
+            }
             return result;
         }
 

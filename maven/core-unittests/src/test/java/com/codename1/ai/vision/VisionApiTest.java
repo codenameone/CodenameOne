@@ -32,6 +32,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -165,6 +167,68 @@ class VisionApiTest extends UITestBase {
                 new TextRecognizer().process(VisionImage.encoded(new byte[] {1}));
         assertTrue(result.isDone());
         assertThrows(AsyncResource.AsyncExecutionException.class, result::get);
+    }
+
+    @Test
+    void analyzerCreationAndCloseAreSerialized() throws Exception {
+        final RecordingVisionImpl backend = new RecordingVisionImpl();
+        implementation.setVisionImpl(backend);
+        final CountDownLatch creationEntered = new CountDownLatch(1);
+        final CountDownLatch allowCreation = new CountDownLatch(1);
+        implementation.setVisionImplCreationHook(new Runnable() {
+            public void run() {
+                creationEntered.countDown();
+                try {
+                    allowCreation.await();
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(error);
+                }
+            }
+        });
+        final TextRecognizer recognizer = new TextRecognizer();
+        final AtomicReference<Throwable> failure =
+                new AtomicReference<Throwable>();
+        Thread processor = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    recognizer.process(
+                            VisionImage.encoded(new byte[] {1}));
+                } catch (Throwable error) {
+                    failure.set(error);
+                }
+            }
+        }, "vision-process");
+        Thread closer = new Thread(new Runnable() {
+            public void run() {
+                recognizer.close();
+            }
+        }, "vision-close");
+
+        processor.start();
+        assertTrue(creationEntered.await(2, TimeUnit.SECONDS));
+        closer.start();
+        try {
+            long deadline = System.currentTimeMillis() + 2000;
+            while (closer.getState() != Thread.State.BLOCKED
+                    && closer.isAlive()
+                    && System.currentTimeMillis() < deadline) {
+                Thread.yield();
+            }
+            assertEquals(Thread.State.BLOCKED, closer.getState());
+        } finally {
+            allowCreation.countDown();
+        }
+        processor.join(2000);
+        closer.join(2000);
+
+        assertFalse(processor.isAlive());
+        assertFalse(closer.isAlive());
+        assertNull(failure.get());
+        assertEquals(1, backend.closeCount);
+        assertThrows(IllegalStateException.class,
+                () -> recognizer.process(
+                        VisionImage.encoded(new byte[] {1})));
     }
 
     private <T> T await(AsyncResource<T> resource) {
