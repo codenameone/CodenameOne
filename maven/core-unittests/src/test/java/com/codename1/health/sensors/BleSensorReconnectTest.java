@@ -185,6 +185,11 @@ class BleSensorReconnectTest extends UITestBase {
         /// What the Body Sensor Location characteristic answers, or null
         /// for a peripheral that does not expose one.
         Byte bodyLocation;
+        /// CCCD writes on the measurement characteristic, which is how
+        /// a listener that was never removed becomes visible: the
+        /// characteristic is disarmed only when its last one goes.
+        int armCount;
+        int disarmCount;
         /// Holds the first subscribe in flight so a stop can land while
         /// the caller is still waiting on the start.
         boolean holdSubscribe;
@@ -317,6 +322,13 @@ class BleSensorReconnectTest extends UITestBase {
         protected void doSetNotifications(GattCharacteristic c,
                 boolean enable, boolean indication,
                 AsyncResource<Boolean> out) {
+            if (HR_MEASUREMENT.equals(c.getUuid())) {
+                if (enable) {
+                    armCount++;
+                } else {
+                    disarmCount++;
+                }
+            }
             if (holdSubscribe && enable) {
                 // Left in flight, as a real strap can be: the session is
                 // then stopped underneath it and this completes late.
@@ -1269,6 +1281,35 @@ class BleSensorReconnectTest extends UITestBase {
         assertTrue(err instanceof HealthException, String.valueOf(err));
         assertEquals(HealthError.SESSION_STATE,
                 ((HealthException) err).getError());
+    }
+
+    /**
+     * A stopped session unsubscribes its measurement listener.
+     *
+     * <p>{@code BlePeripheral} keeps its subscription map across a
+     * disconnect -- only the armed set is cleared -- and the listener is
+     * an inner class holding the session, its app listeners, its workout
+     * and the GATT tree it was discovered from, so a finished session
+     * pinned all of it for as long as the port cached the peripheral.</p>
+     *
+     * <p>Observed through the CCCD, which is the visible half: the
+     * characteristic is disarmed only when its last listener goes, so a
+     * session that left one behind also left the strap notifying into
+     * nothing.</p>
+     */
+    @Test
+    void aStoppedSessionUnsubscribesItsMeasurementListener() {
+        FakePeripheral p = new FakePeripheral();
+        BleSensorSession session = start(p);
+        assertEquals(1, p.armCount, "the session arms the characteristic");
+        assertEquals(0, p.disarmCount);
+
+        session.stop();
+        flushSerialCalls();
+
+        assertEquals(1, p.disarmCount,
+                "stopping must remove the listener, which is what disarms"
+                        + " the characteristic");
     }
 
     /**

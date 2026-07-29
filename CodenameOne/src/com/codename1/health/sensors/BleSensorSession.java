@@ -74,6 +74,22 @@ final class BleSensorSession extends SensorSession {
     /// does not use.
     private Reconnector reconnectListener;
 
+    /// The measurement listener currently registered, and the
+    /// characteristic it is registered on. Guarded by [#lifecycleLock].
+    ///
+    /// Both, because a reconnect rediscovers the database and hands back
+    /// a different [GattCharacteristic] instance for the same UUID:
+    /// unsubscribing the old listener against the new characteristic
+    /// removes nothing. BlePeripheral keeps its subscription map across a
+    /// disconnect -- only the armed set is cleared -- and each listener
+    /// holds this session, its app listeners, its workout and the GATT
+    /// tree it was discovered from, so a session that ended or a
+    /// reconnect that replaced one leaked all of it for as long as the
+    /// port cached the peripheral, which is for ever.
+    private GattNotificationListener measurementListener;
+    /// Guarded by [#lifecycleLock]; see [#measurementListener].
+    private GattCharacteristic measurementListenerOn;
+
     /// Guards what the session does to the transport, and the failure
     /// count.
     ///
@@ -359,7 +375,17 @@ final class BleSensorSession extends SensorSession {
                         onMeasurement(value, System.currentTimeMillis());
                     }
                 };
-        peripheral.subscribe(measurement, listener)
+        final GattCharacteristic on = measurement;
+        // The previous one goes first. A reconnect subscribes again, and
+        // leaving the old listener registered means two of them decoding
+        // every notification into the same session -- and the older one
+        // pinning the GATT tree it came from.
+        releaseMeasurementListener();
+        synchronized (lifecycleLock) {
+            measurementListener = listener;
+            measurementListenerOn = on;
+        }
+        peripheral.subscribe(on, listener)
                 .onResult(new AsyncResult<Boolean>() {
                     @Override
                     public void onReady(Boolean value, Throwable err) {
@@ -372,7 +398,7 @@ final class BleSensorSession extends SensorSession {
                         // yet reporting itself live and delivering
                         // notifications. Stopped is terminal.
                         if (isTerminal()) {
-                            failLateSubscribe(out, listener);
+                            failLateSubscribe(out, on, listener);
                             return;
                         }
                         if (err != null) {
@@ -386,7 +412,7 @@ final class BleSensorSession extends SensorSession {
                         // caller was handed a stopped session as a
                         // successful start.
                         if (!setState(SensorSessionState.STREAMING)) {
-                            failLateSubscribe(out, listener);
+                            failLateSubscribe(out, on, listener);
                             return;
                         }
                         // A run of failures only retires the session when
@@ -435,17 +461,69 @@ final class BleSensorSession extends SensorSession {
     /// never arrive -- and the reconnect path passes null, because nobody
     /// is waiting on those.
     private void failLateSubscribe(AsyncResource<SensorSession> out,
-            GattNotificationListener listener) {
-        unsubscribeLate(listener);
+            GattCharacteristic on, GattNotificationListener listener) {
+        unsubscribeLate(on, listener);
         failStopped(out);
     }
 
-    private void unsubscribeLate(GattNotificationListener listener) {
+    /// Removes a listener whose subscribe landed after the session ended.
+    ///
+    /// Against the characteristic it was registered on, not the session's
+    /// current one: a reconnect replaces that instance, and unsubscribing
+    /// from the new one removes nothing while the old registration keeps
+    /// this session alive.
+    private void unsubscribeLate(GattCharacteristic on,
+            GattNotificationListener listener) {
+        forget(on, listener);
         try {
-            peripheral.unsubscribe(measurement, listener);
+            peripheral.unsubscribe(on, listener);
         } catch (Throwable t) {
             com.codename1.io.Log.p("[health] late unsubscribe after stop: "
                     + t);
+        }
+    }
+
+    /// Drops the remembered pair if it is still the one given.
+    ///
+    /// Identity on purpose: the question is whether this is the same
+    /// registration, and a reconnect can produce an equal-looking
+    /// characteristic for the same UUID that is a different object with
+    /// a different listener on it.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
+    private void forget(GattCharacteristic on,
+            GattNotificationListener listener) {
+        synchronized (lifecycleLock) {
+            if (measurementListener == listener
+                    && measurementListenerOn == on) {
+                measurementListener = null;
+                measurementListenerOn = null;
+            }
+        }
+    }
+
+    /// Unsubscribes the measurement listener this session registered, if
+    /// it still has one.
+    ///
+    /// Called when a reconnect is about to register another and when the
+    /// session ends, because BlePeripheral holds its subscription map
+    /// across a disconnect and each listener holds this session.
+    private void releaseMeasurementListener() {
+        GattNotificationListener previous;
+        GattCharacteristic on;
+        synchronized (lifecycleLock) {
+            previous = measurementListener;
+            on = measurementListenerOn;
+            measurementListener = null;
+            measurementListenerOn = null;
+        }
+        if (previous == null || on == null) {
+            return;
+        }
+        try {
+            peripheral.unsubscribe(on, previous);
+        } catch (Throwable t) {
+            com.codename1.io.Log.p("[health] could not unsubscribe the"
+                    + " measurement listener: " + t);
         }
     }
 
@@ -510,6 +588,7 @@ final class BleSensorSession extends SensorSession {
         if (listener != null) {
             peripheral.removeConnectionListener(listener);
         }
+        releaseMeasurementListener();
         setState(SensorSessionState.FAILED);
         // The buffered readings go to the store, exactly as stop() does
         // with them. A session that gave up reconnecting still holds
@@ -605,6 +684,7 @@ final class BleSensorSession extends SensorSession {
                 // method causes is not mistaken for a dropped link.
                 peripheral.removeConnectionListener(listener);
             }
+            releaseMeasurementListener();
             setState(SensorSessionState.STOPPED);
             // A short ride would otherwise lose whatever had not reached a
             // batch boundary yet.
