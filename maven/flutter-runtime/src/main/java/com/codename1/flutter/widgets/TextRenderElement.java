@@ -61,6 +61,11 @@ public class TextRenderElement extends RenderElement {
 
     private void applyStyle(Label l) {
         TextStyle ts = text().getStyle();
+        if (l instanceof WrappedLabel) {
+            double sp = ts == null || ts.getLetterSpacing() == null
+                    ? 0 : Dp.px(ts.getLetterSpacing().doubleValue());
+            ((WrappedLabel) l).spacingPx = sp;
+        }
         if (ts != null) {
             Font base = l.getUnselectedStyle().getFont();
             if (base == null) {
@@ -111,16 +116,17 @@ public class TextRenderElement extends RenderElement {
         if (f == null) {
             return constraints.smallest();
         }
+        final double spacing = l.spacingPx;
         List<String> lines = wrap(data(), new Funcs.Func1<String, Double>() {
             @Override
             public Double call(String s) {
-                return (double) f.stringWidth(s);
+                return spacedWidth(f, s, spacing);
             }
         }, constraints.maxWidth());
         l.lines = lines;
         double w = 0;
         for (String line : lines) {
-            w = Math.max(w, f.stringWidth(line));
+            w = Math.max(w, spacedWidth(f, line, spacing));
         }
         double h = (double) f.getHeight() * Math.max(1, lines.size());
         return constraints.constrain(new Size(w, h));
@@ -129,6 +135,27 @@ public class TextRenderElement extends RenderElement {
     private static Font font(Label l) {
         Font f = l.getUnselectedStyle().getFont();
         return f != null ? f : Font.getDefaultFont();
+    }
+
+    /**
+     * The width of {@code s} once Flutter's letterSpacing is added BETWEEN its glyphs -
+     * n-1 gaps for n characters, with no trailing space after the last, which is what
+     * Flutter does. Codename One draws a whole string in one call and has no tracking of
+     * its own, so both the measurement and the painting have to account for it here.
+     */
+    static double spacedWidth(Font f, String s, double spacing) {
+        if (s == null || s.length() == 0) {
+            return 0;
+        }
+        return spacedWidth(f.stringWidth(s), s.length(), spacing);
+    }
+
+    /** The tracking arithmetic on its own, so it can be pinned without a Font. */
+    public static double spacedWidth(double baseWidth, int charCount, double spacing) {
+        if (charCount <= 0) {
+            return 0;
+        }
+        return spacing == 0 ? baseWidth : baseWidth + spacing * (charCount - 1);
     }
 
     // ------------------------------------------------------------------
@@ -201,6 +228,8 @@ public class TextRenderElement extends RenderElement {
     static class WrappedLabel extends Label {
 
         List<String> lines;
+        /** Flutter's TextStyle.letterSpacing, in device pixels. */
+        double spacingPx;
 
         WrappedLabel(String text) {
             super(text, "FlutterText");
@@ -208,7 +237,8 @@ public class TextRenderElement extends RenderElement {
 
         @Override
         public void paint(Graphics g) {
-            if (lines == null || lines.size() <= 1) {
+            boolean multiLine = lines != null && lines.size() > 1;
+            if (!multiLine && spacingPx == 0) {
                 super.paint(g);
                 return;
             }
@@ -220,20 +250,40 @@ public class TextRenderElement extends RenderElement {
             if (f == null) {
                 return;
             }
+            int prevColor = g.getColor();
+            Font prevFont = g.getFont();
             g.setColor(s.getFgColor());
             g.setFont(f);
             int lh = f.getHeight();
             int y = getY();
             int align = s.getAlignment();
-            for (String line : lines) {
+            List<String> toPaint = multiLine ? lines
+                    : java.util.Collections.singletonList(getText() == null ? "" : getText());
+            for (String line : toPaint) {
+                int lineW = (int) Math.ceil(spacedWidth(f, line, spacingPx));
                 int x = getX();
                 if (align == Component.CENTER) {
-                    x += (getWidth() - f.stringWidth(line)) / 2;
+                    x += (getWidth() - lineW) / 2;
                 } else if (align == Component.RIGHT) {
-                    x += getWidth() - f.stringWidth(line);
+                    x += getWidth() - lineW;
                 }
-                g.drawString(line, x, y);
+                if (spacingPx == 0) {
+                    g.drawString(line, x, y);
+                } else {
+                    // One glyph at a time: the only way to add tracking, since Codename One
+                    // draws a whole string in a single advance.
+                    double cursor = x;
+                    for (int i = 0; i < line.length(); i++) {
+                        String ch = line.substring(i, i + 1);
+                        g.drawString(ch, (int) Math.round(cursor), y);
+                        cursor += f.stringWidth(ch) + spacingPx;
+                    }
+                }
                 y += lh;
+            }
+            g.setColor(prevColor);
+            if (prevFont != null) {
+                g.setFont(prevFont);
             }
         }
     }

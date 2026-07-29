@@ -36,6 +36,10 @@ public class TextStyle {
         this.letterSpacing = v;
     }
 
+    public Double getLetterSpacing() {
+        return letterSpacing;
+    }
+
     public void height(double v) {
         this.height = v;
     }

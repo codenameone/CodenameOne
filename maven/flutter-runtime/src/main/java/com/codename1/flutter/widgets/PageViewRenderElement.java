@@ -62,6 +62,116 @@ public class PageViewRenderElement extends ScrollRenderElement {
         return f > 0 && f <= 1 ? f : 1.0;
     }
 
+    // ------------------------------------------------------------------
+    // Page snapping
+    // ------------------------------------------------------------------
+
+    /** How long the settle animation runs, matching Flutter's page settle feel. */
+    private static final int SNAP_MS = 240;
+
+    @Override
+    protected com.codename1.ui.Container createPane(com.codename1.ui.layouts.Layout layout) {
+        return new SnappingPane(layout);
+    }
+
+    /**
+     * A scroll pane that comes to rest ON a page.
+     *
+     * <p>Codename One scrolls freely and keeps its own momentum after the finger lifts, so
+     * a released drag otherwise stops wherever the momentum ran out - which is why the
+     * carousel used to sit between two cards. We cannot snap in {@code pointerReleased}
+     * because the momentum has not run yet; instead we wait for the scroll position to stop
+     * changing and settle from there.</p>
+     */
+    private final class SnappingPane extends com.codename1.ui.Container {
+
+        private boolean settling;
+
+        SnappingPane(com.codename1.ui.layouts.Layout layout) {
+            super(layout);
+        }
+
+        @Override
+        public void pointerReleased(int x, int y) {
+            super.pointerReleased(x, y);
+            awaitMomentum(Integer.MIN_VALUE);
+        }
+
+        /** Polls until CN1's momentum stops moving the pane, then settles onto a page. */
+        private void awaitMomentum(final int previous) {
+            final int current = horizontal() ? getScrollX() : getScrollY();
+            if (current == previous) {
+                snap();
+                return;
+            }
+            com.codename1.ui.CN.setTimeout(50, new Runnable() {
+                @Override
+                public void run() {
+                    awaitMomentum(current);
+                }
+            });
+        }
+
+        private void snap() {
+            double extent = pageExtent();
+            if (settling || extent <= 0) {
+                return;
+            }
+            int from = horizontal() ? getScrollX() : getScrollY();
+            int target = (int) Math.round(Math.round(from / extent) * extent);
+            if (target == from) {
+                return;
+            }
+            settling = true;
+            animateScroll(from, target);
+        }
+
+        private void animateScroll(int from, final int target) {
+            final com.codename1.ui.Form form = getComponentForm();
+            if (form == null) {
+                setScroll(target);
+                settling = false;
+                return;
+            }
+            final com.codename1.ui.animations.Motion motion =
+                    com.codename1.ui.animations.Motion.createEaseInOutMotion(from, target, SNAP_MS);
+            motion.start();
+            form.registerAnimated(new com.codename1.ui.animations.Animation() {
+                @Override
+                public boolean animate() {
+                    setScroll(motion.getValue());
+                    if (motion.isFinished()) {
+                        setScroll(target);
+                        settling = false;
+                        com.codename1.ui.Form f = getComponentForm();
+                        if (f != null) {
+                            f.deregisterAnimated(this);
+                        }
+                    }
+                    return true;
+                }
+
+                @Override
+                public void paint(com.codename1.ui.Graphics g) {
+                }
+            });
+        }
+
+        private void setScroll(int v) {
+            if (horizontal()) {
+                setScrollX(v);
+            } else {
+                setScrollY(v);
+            }
+            repaint();
+        }
+    }
+
+    /** One page's extent along the scroll axis, in device pixels. */
+    double pageExtent() {
+        return (horizontal() ? viewportW : viewportH) * viewportFraction();
+    }
+
     @Override
     protected Widget buildContent() {
         PageView w = pageView();

@@ -91,7 +91,7 @@ public abstract class ScrollRenderElement extends RenderElement {
             // headless unit tests: no CN1 components can exist
             return null;
         }
-        Container pane = new Container(horizontal()
+        Container pane = createPane(horizontal()
                 ? new com.codename1.flutter.rendering.HorizontalScrollRootLayout(innerHost())
                 : new ScrollRootLayout(innerHost()));
         pane.setUIID("FlutterScroll");
@@ -109,6 +109,11 @@ public abstract class ScrollRenderElement extends RenderElement {
         }
         innerHost().container(pane);
         return pane;
+    }
+
+    /** The scrolling pane itself, so a subclass can add behaviour such as page snapping. */
+    protected Container createPane(com.codename1.ui.layouts.Layout layout) {
+        return new Container(layout);
     }
 
     @Override
