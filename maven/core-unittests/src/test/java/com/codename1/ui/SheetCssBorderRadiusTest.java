@@ -202,6 +202,23 @@ class SheetCssBorderRadiusTest extends UITestBase {
                 "padding set after the inset wins over the snapshot");
     }
 
+    @FormTest
+    void disablingTheContentPaneBetweenShowsStillTakesTheInsetOff() {
+        // The style a component presents follows its state, so the pane being disabled by the time
+        // the sheet is restyled must not strand the inset in the unselected style it went into.
+        Sheet sheet = showSheet(RoundRectBorder.create().cornerRadius(4f));
+        assertEquals(Display.getInstance().convertToPixels(4f),
+                sheet.getContentPane().getUnselectedStyle().getPaddingTop(),
+                "the inset goes into the unselected style while the pane is enabled");
+
+        sheet.getContentPane().setEnabled(false);
+        sheet.getAllStyles().setBorder(cssBorder());
+        show(sheet);
+
+        assertEquals(0, sheet.getContentPane().getUnselectedStyle().getPaddingTop(),
+                "the inset comes off the style it went into, not the style presented now");
+    }
+
     private RoundRectBorder cssBorder() {
         // What the CSS compiler emits for border-radius: 4mm 4mm 0mm 0mm
         return RoundRectBorder.create()

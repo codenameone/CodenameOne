@@ -39,6 +39,8 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.AsyncResource;
 
+import java.util.ArrayList;
+
 import static com.codename1.ui.ComponentSelector.$;
 
 /// A light-weight dialog that slides up from the bottom of the screen on mobile devices.
@@ -120,6 +122,9 @@ public class Sheet extends Container {
     private static final int W = 3;
     private static final int C = 4;
     private static final int DEFAULT_TRANSITION_DURATION = 300;
+    /// The styles a component presents: unselected, selected, pressed and disabled. Caps how many
+    /// content pane insets are kept, see `#recordContentPaneInset`.
+    private static final int CONTENT_PANE_STYLES = 4;
     private final Sheet parentSheet;
     private final Label title = new Label();
     private Component titleComponent = title;
@@ -351,10 +356,11 @@ public class Sheet extends Container {
     /// Original padding values to prevent accumulation when showing the sheet multiple times.
     /// These are set the first time the sheet is shown and used as the base for safe area calculations.
     private int[] originalPadding = null;
-    /// The padding a hand written `RoundRectBorder` replaced on the content pane, null while no
-    /// inset is applied. Restyling the sheet with a border that asks for no inset puts this back
-    /// rather than leaving the inset of the previous border behind.
-    private ContentPaneInset contentPaneInset;
+    /// The padding a hand written `RoundRectBorder` replaced on the content pane, one entry per
+    /// style it was applied to, null while no inset is applied. Restyling the sheet with a border
+    /// that asks for no inset puts these back rather than leaving the inset of the previous border
+    /// behind.
+    private ArrayList<ContentPaneInset> contentPaneInsets;
     private Form form;
     private final Rectangle sheetBounds = new Rectangle();
     private boolean trackSheetBounds;
@@ -802,17 +808,19 @@ public class Sheet extends Container {
         // CSS asked for, so an inset here is padding the author never wrote, and on an empty
         // content pane it becomes a gap under the title, see issue 5488.
         if (border instanceof RoundRectBorder && !((RoundRectBorder) border).isCssBoxModel()) {
-            // The inset pads the current style of the content pane, so that is the style the
-            // padding is taken from and the one it is later put back into
+            // The inset pads the current style of the content pane, which is not always the same
+            // style: it follows the state of the pane, so a sheet shown while the pane is disabled
+            // pads the disabled style. Each style that gets insetted is recorded separately
             Style contentStyle = contentPane.getStyle();
-            if (contentPaneInset == null || !contentPaneInset.isIntact(contentStyle)) {
-                // Nothing was inset yet, or what was inset is gone: a theme refresh replaced
-                // the style, or the padding was changed since. Either way the padding in front of
-                // us now is the one to preserve
-                contentPaneInset = new ContentPaneInset(contentStyle);
+            ContentPaneInset inset = contentPaneInsetFor(contentStyle);
+            if (inset == null || !inset.isIntact()) {
+                // Nothing was inset in this style yet, or what was inset is gone because the
+                // padding was changed since. Either way the padding in front of us now is the one
+                // to preserve
+                inset = recordContentPaneInset(contentStyle);
             }
             $(contentPane).setPaddingMillimeters(((RoundRectBorder) border).getCornerRadius());
-            contentPaneInset.recordApplied(contentStyle);
+            inset.recordApplied();
         } else {
             // Restyling the sheet with a border that wants no inset has to take the inset of the
             // previous border back off, otherwise the gap survives the restyle
@@ -945,16 +953,55 @@ public class Sheet extends Container {
         }
     }
 
-    /// Puts back the padding the corner radius of a hand written border replaced, when that inset
-    /// is still there to take off. Nothing happens when no inset was applied, when the style it was
-    /// applied to has since been replaced, by a theme refresh for instance, or when the padding has
-    /// been changed since, so a content pane padded by the developer is left as they left it.
+    /// Puts back the padding the corner radius of a hand written border replaced, in every style it
+    /// was applied to rather than only the style the content pane presents right now, which depends
+    /// on the state of the pane and may well be a different one by the time the sheet is restyled.
+    /// A style whose padding has been changed since is left alone, so a content pane padded by the
+    /// developer stays as they left it.
     private void restoreContentPanePadding() {
-        if (contentPaneInset == null) {
+        if (contentPaneInsets == null) {
             return;
         }
-        contentPaneInset.restore(contentPane.getStyle());
-        contentPaneInset = null;
+        for (int iter = 0; iter < contentPaneInsets.size(); iter++) {
+            contentPaneInsets.get(iter).restore();
+        }
+        contentPaneInsets = null;
+    }
+
+    /// The inset recorded for the given style of the content pane, null when that style was never
+    /// insetted.
+    private ContentPaneInset contentPaneInsetFor(Style style) {
+        if (contentPaneInsets == null) {
+            return null;
+        }
+        for (int iter = 0; iter < contentPaneInsets.size(); iter++) {
+            ContentPaneInset inset = contentPaneInsets.get(iter);
+            if (inset.style == style) { //NOPMD CompareObjectsWithEquals
+                return inset;
+            }
+        }
+        return null;
+    }
+
+    /// Starts recording an inset for the given style of the content pane, replacing whatever was
+    /// recorded for it before.
+    private ContentPaneInset recordContentPaneInset(Style style) {
+        if (contentPaneInsets == null) {
+            contentPaneInsets = new ArrayList<ContentPaneInset>();
+        }
+        for (int iter = contentPaneInsets.size() - 1; iter >= 0; iter--) {
+            if (contentPaneInsets.get(iter).style == style) { //NOPMD CompareObjectsWithEquals
+                contentPaneInsets.remove(iter);
+            }
+        }
+        while (contentPaneInsets.size() >= CONTENT_PANE_STYLES) {
+            // A component presents four styles at most, so an older entry than that belongs to a
+            // style that has since been replaced and is no longer attached to the content pane
+            contentPaneInsets.remove(0);
+        }
+        ContentPaneInset inset = new ContentPaneInset(style);
+        contentPaneInsets.add(inset);
+        return inset;
     }
 
     /// Gets the position where the Sheet is to be displayed.
@@ -1471,15 +1518,16 @@ public class Sheet extends Container {
 
     }
 
-    /// The padding of the content pane as it was before the corner radius of a hand written
-    /// `RoundRectBorder` replaced it, kept alongside the style that was padded and the padding the
-    /// inset wrote there. Restoring writes the old padding back only into a style that still holds
-    /// exactly what the inset left, so a theme refresh that swaps the style, or a developer padding
-    /// the content pane between two shows, drops the snapshot rather than overwriting their work.
+    /// The padding of one style of the content pane as it was before the corner radius of a hand
+    /// written `RoundRectBorder` replaced it, kept alongside that style and the padding the inset
+    /// wrote into it. Restoring writes the old padding back only while the style still holds
+    /// exactly what the inset left, so padding changed since is not overwritten.
     ///
-    /// The inset is applied through the component selector, which pads the current style of the
-    /// content pane rather than all of its styles, so only that one style is ever recorded. The
-    /// selected, pressed and disabled styles are not part of the inset and have nothing to restore.
+    /// The inset is applied through the component selector, which pads the style the content pane
+    /// presents at the time rather than all of its styles. Which style that is follows the state of
+    /// the pane, so an inset applied while it was enabled has to be taken off the unselected style
+    /// even if the pane is disabled by the time the sheet is restyled. Hence the style is held
+    /// here, and the sheet keeps one of these per style it insetted.
     private static class ContentPaneInset {
         private final Style style;
         private final float[] padding;
@@ -1494,27 +1542,26 @@ public class Sheet extends Container {
         }
 
         /// Records what the inset left in the style, which is what `#isIntact` looks for later.
-        void recordApplied(Style inset) {
-            appliedPadding = paddingOf(inset);
-            appliedUnits = unitsOf(inset);
+        void recordApplied() {
+            appliedPadding = paddingOf(style);
+            appliedUnits = unitsOf(style);
         }
 
-        /// True when the given style is the one that was inset and still holds that inset.
-        boolean isIntact(Style current) {
-            return current == style //NOPMD CompareObjectsWithEquals
-                    && appliedPadding != null
-                    && same(paddingOf(current), appliedPadding)
-                    && same(unitsOf(current), appliedUnits);
+        /// True when the style still holds the inset that was applied to it.
+        boolean isIntact() {
+            return appliedPadding != null
+                    && same(paddingOf(style), appliedPadding)
+                    && same(unitsOf(style), appliedUnits);
         }
 
         /// Puts the padding back if the inset it replaced is still in place, otherwise leaves the
         /// style alone.
-        void restore(Style current) {
-            if (!isIntact(current)) {
+        void restore() {
+            if (!isIntact()) {
                 return;
             }
-            current.setPaddingUnit(units);
-            current.setPadding(padding[0], padding[1], padding[2], padding[3]);
+            style.setPaddingUnit(units);
+            style.setPadding(padding[0], padding[1], padding[2], padding[3]);
         }
 
         private static float[] paddingOf(Style s) {
