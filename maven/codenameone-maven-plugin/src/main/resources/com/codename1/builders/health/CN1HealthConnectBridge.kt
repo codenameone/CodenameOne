@@ -743,8 +743,12 @@ class CN1HealthConnectBridge(private val context: Context)
         // samples both -- the same measurements twice, with the count
         // reporting only half of them.
         if (!flatten) {
-            val wholeSeries = appendWholeSeries(sb, record, token,
-                ascending)
+            // No sort direction: the record's own measurements stay
+            // chronological whichever way the records are ordered, or
+            // the portable decoder refuses the line and drops the whole
+            // record. The caller's direction is applied to the records
+            // around it, not inside one.
+            val wholeSeries = appendWholeSeries(sb, record, token)
             if (wholeSeries >= 0) {
                 // One line, and as many points as it actually
                 // serialized. The two are counted separately because the
@@ -970,6 +974,13 @@ class CN1HealthConnectBridge(private val context: Context)
      * with each record's points in ascending order -- and a small portable
      * limit then kept the oldest readings when the caller had asked for
      * the newest.
+     *
+     * Flattened reads only. A whole-series line has to stay
+     * chronological: `SeriesSample` requires it -- a reader takes the
+     * newest measurements from the end of the arrays rather than sorting
+     * them -- so a reversed one is refused on decode and the decoder
+     * drops the record, which lost every multi-point record from a
+     * descending unflattened read.
      */
     private fun <T> ordered(samples: List<T>, ascending: Boolean): List<T> =
         if (ascending) samples else samples.asReversed()
@@ -982,36 +993,35 @@ class CN1HealthConnectBridge(private val context: Context)
     /// ceiling let twenty thousand records through, and each of them can
     /// hold thousands of points.
     private fun appendWholeSeries(sb: StringBuilder, record: Record,
-                                  token: String,
-                                  ascending: Boolean): Int {
+                                  token: String): Int {
         return when (record) {
             is HeartRateRecord -> series(sb, record, token, "count/min",
                 record.startTime, record.endTime,
-                ordered(record.samples, ascending).map {
+                record.samples.map {
                     Pair(it.time.toEpochMilli(), it.beatsPerMinute.toDouble())
                 })
 
             is PowerRecord -> series(sb, record, token, "W",
                 record.startTime, record.endTime,
-                ordered(record.samples, ascending).map {
+                record.samples.map {
                     Pair(it.time.toEpochMilli(), it.power.inWatts)
                 })
 
             is SpeedRecord -> series(sb, record, token, "m/s",
                 record.startTime, record.endTime,
-                ordered(record.samples, ascending).map {
+                record.samples.map {
                     Pair(it.time.toEpochMilli(), it.speed.inMetersPerSecond)
                 })
 
             is CyclingPedalingCadenceRecord -> series(sb, record, token,
                 "count/min", record.startTime, record.endTime,
-                ordered(record.samples, ascending).map {
+                record.samples.map {
                     Pair(it.time.toEpochMilli(), it.revolutionsPerMinute)
                 })
 
             is StepsCadenceRecord -> series(sb, record, token, "count/min",
                 record.startTime, record.endTime,
-                ordered(record.samples, ascending).map {
+                record.samples.map {
                     Pair(it.time.toEpochMilli(), it.rate)
                 })
 

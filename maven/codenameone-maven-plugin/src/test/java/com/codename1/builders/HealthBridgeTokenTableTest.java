@@ -207,6 +207,31 @@ public class HealthBridgeTokenTableTest {
     }
 
     /**
+     * A whole-series line keeps its measurements chronological.
+     *
+     * <p>The direction the caller asked for orders the records; inside
+     * one, {@code SeriesSample} requires chronological order -- a reader
+     * takes the newest measurements from the end of the arrays rather
+     * than sorting half a million of them -- so a reversed line is
+     * refused on decode and the decoder drops the record. A descending
+     * unflattened read therefore lost every multi-point heart-rate,
+     * power, speed or cadence record.</p>
+     */
+    @Test
+    public void anUnflattenedSeriesIsEmittedInTimeOrder() throws Exception {
+        String src = source();
+        int start = src.indexOf("private fun appendWholeSeries(");
+        assertTrue("the whole-series emitter must exist", start > 0);
+        String body = src.substring(start, src.indexOf("\n    }", start));
+        assertTrue("the whole-series emitter must not reorder the"
+                + " measurements: " + body,
+                body.indexOf("ordered(") < 0);
+        assertTrue("and it takes no sort direction, so a later edit"
+                + " cannot reintroduce one by accident",
+                body.indexOf("ascending") < 0);
+    }
+
+    /**
      * Health Connect rejects a page size above 5000 rather than clamping
      * it, so an unbounded read that passed its own default straight
      * through would throw before reading anything.
