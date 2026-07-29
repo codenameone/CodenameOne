@@ -25,9 +25,11 @@ package com.codename1.builders;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -221,5 +223,60 @@ class ScannerBooleanArgumentTest {
         assertEquals("[setWriteToStore=null]", scan(dir).toString(),
                 "a constant that reaches the call through a branch must"
                         + " not be read as the argument");
+    }
+
+    /**
+     * A method reference is reported too, as an unknown argument.
+     *
+     * <p>{@code options::setWriteToStore} supplies its argument wherever
+     * the reference is later called, which this instruction cannot see.
+     * Reporting nothing was worse than reporting unknown: a consumer that
+     * decides on the argument never heard about the call at all, and the
+     * app was built with no health stack for a setter it does enable.</p>
+     */
+    @Test
+    void aMethodReferenceIsReportedWithAnUnknownArgument(@TempDir File dir)
+            throws Exception {
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "app/Ref", null,
+                "java/lang/Object", null);
+        MethodVisitor m = w.visitMethod(Opcodes.ACC_PUBLIC
+                | Opcodes.ACC_STATIC, "run", "(L" + TARGET + ";)V", null,
+                null);
+        m.visitCode();
+        m.visitVarInsn(Opcodes.ALOAD, 0);
+        Handle metafactory = new Handle(Opcodes.H_INVOKESTATIC,
+                "java/lang/invoke/LambdaMetafactory", "metafactory",
+                "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;"
+                        + "Ljava/lang/invoke/MethodType;"
+                        + "Ljava/lang/invoke/MethodType;"
+                        + "Ljava/lang/invoke/MethodHandle;"
+                        + "Ljava/lang/invoke/MethodType;)"
+                        + "Ljava/lang/invoke/CallSite;", false);
+        Handle target = new Handle(Opcodes.H_INVOKEVIRTUAL, TARGET,
+                "setWriteToStore", "(Z)L" + TARGET + ";", false);
+        m.visitInvokeDynamicInsn("accept",
+                "(L" + TARGET + ";)Ljava/lang/Object;", metafactory,
+                Type.getType("(Ljava/lang/Object;)Ljava/lang/Object;"),
+                target,
+                Type.getType("(Ljava/lang/Object;)Ljava/lang/Object;"));
+        m.visitInsn(Opcodes.POP);
+        m.visitInsn(Opcodes.RETURN);
+        m.visitMaxs(3, 1);
+        m.visitEnd();
+        w.visitEnd();
+
+        File pkg = new File(dir, "app");
+        assertTrue(pkg.isDirectory() || pkg.mkdirs());
+        OutputStream out = new FileOutputStream(new File(pkg, "Ref.class"));
+        try {
+            out.write(w.toByteArray());
+        } finally {
+            out.close();
+        }
+
+        assertEquals("[setWriteToStore=null]", scan(dir).toString(),
+                "a method reference must reach the argument-aware"
+                        + " callback, or the call is invisible to it");
     }
 }

@@ -780,6 +780,20 @@ public abstract class Executor {
                                                         h.getName())) {
                                             scanner.usesClassMethod(
                                                     h.getOwner(), h.getName());
+                                            // Unknown, never absent. The
+                                            // arguments of a method
+                                            // reference are supplied
+                                            // wherever it is later called,
+                                            // which this insn cannot see --
+                                            // and a consumer that decides
+                                            // on the argument alone would
+                                            // never hear about the call at
+                                            // all, so options::setWriteTo
+                                            // Store silently built an app
+                                            // with no health stack.
+                                            scanner.usesClassMethodWithBooleanArgument(
+                                                    h.getOwner(), h.getName(),
+                                                    null);
                                         }
                                     }
                                 }

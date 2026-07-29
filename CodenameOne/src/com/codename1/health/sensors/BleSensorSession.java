@@ -282,8 +282,17 @@ final class BleSensorSession extends SensorSession {
                         new AsyncResult<byte[]>() {
                             @Override
                             public void onReady(byte[] value, Throwable err) {
+                                // Reserved values are not a placement.
+                                // The profile defines 0 to 6 and reserves
+                                // the rest, and a peripheral answering 42
+                                // was handed to the app as a location it
+                                // could only render as "Unknown" -- which
+                                // says the sensor is worn somewhere
+                                // unnamed, not that it did not say.
                                 if (err == null && value != null
-                                        && value.length > 0) {
+                                        && value.length > 0
+                                        && BodySensorLocation.isDefined(
+                                                value[0] & 0xFF)) {
                                     setBodySensorLocation(value[0] & 0xFF);
                                 }
                             }
@@ -337,7 +346,16 @@ final class BleSensorSession extends SensorSession {
                             failStart(out, err);
                             return;
                         }
-                        setState(SensorSessionState.STREAMING);
+                        // The transition is the check. The read above is
+                        // one step and the move is another, and stop()
+                        // runs between them -- so a subscription the
+                        // session no longer wants was left armed and the
+                        // caller was handed a stopped session as a
+                        // successful start.
+                        if (!setState(SensorSessionState.STREAMING)) {
+                            unsubscribeLate(listener);
+                            return;
+                        }
                         // A run of failures only retires the session when
                         // it is uninterrupted: a strap that reconnects
                         // cleanly has spent whatever budget it used

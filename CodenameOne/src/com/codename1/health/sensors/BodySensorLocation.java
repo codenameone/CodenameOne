@@ -49,6 +49,17 @@ public final class BodySensorLocation {
     private BodySensorLocation() {
     }
 
+    /// Whether `location` is one of the placements this profile defines.
+    ///
+    /// Everything from 7 up is reserved, and a peripheral that answers
+    /// with one is not describing a placement at all. Passed through, it
+    /// reached the app as a real location that [#describe(int)] could
+    /// only call "Unknown" -- which reads as a sensor worn somewhere
+    /// unnamed rather than as no answer.
+    public static boolean isDefined(int location) {
+        return location >= OTHER && location <= FOOT;
+    }
+
     /// A human-readable name for a location constant.
     public static String describe(int location) {
         switch (location) {
