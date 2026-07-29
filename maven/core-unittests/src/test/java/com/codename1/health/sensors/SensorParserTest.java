@@ -40,6 +40,35 @@ class SensorParserTest {
      * while back-pedalling or coasting downhill; reading it unsigned turns
      * a brief -5 W into 65531 W and poisons the ride's average and maximum.
      */
+    /**
+     * A reserved Temperature Type is not a measurement site.
+     *
+     * <p>The profile defines 1 to 9 and reserves the rest, and
+     * {@code getSite()} promises a {@code SITE_} constant -- so a
+     * thermometer answering 42 handed the app a value nothing in the
+     * profile means, which a caller switching on the site would act
+     * on.</p>
+     */
+    @Test
+    void aReservedTemperatureSiteReadsAsUnknown() {
+        // flags: temperature type present, celsius, no timestamp.
+        byte[] payload = new byte[] {
+            0x04, 0x2C, 0x01, 0x00, (byte) 0xFE, 42
+        };
+        TemperatureMeasurement m = TemperatureMeasurement.parse(payload);
+        assertNotNull(m, "the reading itself is still valid");
+        assertEquals(TemperatureMeasurement.SITE_UNKNOWN, m.getSite(),
+                "a reserved site must not be reported as a placement");
+
+        byte[] defined = new byte[] {
+            0x04, 0x2C, 0x01, 0x00, (byte) 0xFE,
+            (byte) TemperatureMeasurement.SITE_MOUTH
+        };
+        assertEquals(TemperatureMeasurement.SITE_MOUTH,
+                TemperatureMeasurement.parse(defined).getSite(),
+                "and a defined one is still reported");
+    }
+
     @Test
     void cyclingPowerIsSignedAndCanBeNegative() {
         // flags 0x0000, power 0xFFFB = -5

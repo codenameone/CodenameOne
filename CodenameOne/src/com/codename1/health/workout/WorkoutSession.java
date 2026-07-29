@@ -378,8 +378,21 @@ public abstract class WorkoutSession {
                 return out;
             }
         }
+        // Folded first, announced once. A heart-rate trace can carry
+        // tens of thousands of points, and one EDT runnable per
+        // measurement floods the queue with callbacks that each report
+        // the same final figure by the time they run -- while every one
+        // of them holds the listener and the session until it does.
+        List<HealthDataType> touched = new ArrayList<HealthDataType>();
         for (int i = 0; i < flat.size(); i++) {
-            applyRollUp(flat.get(i), values[i]);
+            QuantitySample q = flat.get(i);
+            applyRollUp(q, values[i]);
+            if (!touched.contains(q.getType())) {
+                touched.add(q.getType());
+            }
+        }
+        for (HealthDataType type : touched) {
+            fireStatisticsUpdated(type);
         }
         if (kept.isEmpty()) {
             out.complete(Boolean.TRUE);
@@ -524,7 +537,6 @@ public abstract class WorkoutSession {
                     break;
             }
         }
-        fireStatisticsUpdated(type);
     }
 
     /// When each type's LATEST value was measured, so a sample arriving

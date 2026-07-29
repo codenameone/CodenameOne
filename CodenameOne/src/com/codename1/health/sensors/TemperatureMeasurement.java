@@ -93,7 +93,14 @@ public final class TemperatureMeasurement {
         }
         int site = SITE_UNKNOWN;
         if ((flags & FLAG_TYPE) != 0) {
-            site = r.uint8();
+            int reported = r.uint8();
+            // The profile defines 1 to 9 and reserves the rest. Stored
+            // unchanged, a thermometer answering 42 reached the app as a
+            // measurement site, and getSite() promises a SITE_ constant
+            // -- so a caller switching on it would take a branch nothing
+            // in the profile means. Unknown is what we actually know.
+            site = reported >= SITE_ARMPIT && reported <= SITE_TYMPANUM
+                    ? reported : SITE_UNKNOWN;
         }
 
         if (!r.isValid() || Double.isNaN(celsius)) {

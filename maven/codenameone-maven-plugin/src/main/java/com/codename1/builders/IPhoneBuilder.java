@@ -842,6 +842,11 @@ public class IPhoneBuilder extends Executor {
                 }
 
                 @Override
+                public void declaresConcreteType(String cls) {
+                    healthScan.declaresConcreteType(cls);
+                }
+
+                @Override
                 public void declaresType(String cls, String superName,
                         boolean isConcrete) {
                     healthScan.declaresType(cls, superName, isConcrete);

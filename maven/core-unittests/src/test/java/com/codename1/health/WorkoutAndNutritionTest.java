@@ -28,6 +28,7 @@ import com.codename1.health.workout.WorkoutConfiguration;
 import com.codename1.health.workout.WorkoutEvent;
 import com.codename1.health.workout.WorkoutManager;
 import com.codename1.health.workout.WorkoutSession;
+import com.codename1.health.workout.WorkoutSessionListener;
 import com.codename1.health.workout.WorkoutSessionState;
 import com.codename1.junit.UITestBase;
 import com.codename1.util.AsyncResource;
@@ -518,6 +519,63 @@ class WorkoutAndNutritionTest extends UITestBase {
         assertEquals(1, handed.size(),
                 "only one caller may be handed a session, got: "
                         + handed.size());
+    }
+
+    /**
+     * A batch announces its statistics once per type, not once per
+     * measurement.
+     *
+     * <p>A heart-rate trace can carry tens of thousands of points, and
+     * one EDT runnable per measurement floods the queue with callbacks
+     * that each report the same final figure by the time they run --
+     * while every one of them holds the listener and the session until
+     * it does.</p>
+     */
+    @Test
+    void aBatchAnnouncesItsStatisticsOncePerType() {
+        WorkoutManager m = new WorkoutManager();
+        WorkoutSession s = m.startSession(new WorkoutConfiguration()).get();
+        s.start();
+        final int[] updates = new int[1];
+        s.addListener(new WorkoutSessionListener() {
+            public void workoutStateChanged(WorkoutSession session,
+                    WorkoutSessionState state) {
+            }
+
+            public void workoutStatisticsUpdated(WorkoutSession session,
+                    HealthDataType type) {
+                updates[0]++;
+            }
+
+            public void workoutEvent(WorkoutSession session,
+                    WorkoutEvent event) {
+            }
+
+            public void workoutFailed(WorkoutSession session,
+                    HealthException error) {
+            }
+        });
+
+        long base = 1000L;
+        int points = 40;
+        long[] starts = new long[points];
+        long[] ends = new long[points];
+        double[] values = new double[points];
+        for (int i = 0; i < points; i++) {
+            starts[i] = base + i * 1000L;
+            ends[i] = starts[i];
+            values[i] = 60 + i;
+        }
+        List<HealthSample> batch = new ArrayList<HealthSample>();
+        batch.add(SeriesSample.create(HealthDataType.HEART_RATE, base,
+                base + (points - 1) * 1000L, starts, ends, values,
+                HealthUnit.COUNT_PER_MINUTE));
+        s.addSamples(batch);
+        flushSerialCalls();
+
+        assertEquals(1, updates[0],
+                "forty measurements of one type is one notification, got: "
+                        + updates[0]);
     }
 
     @Test
