@@ -351,6 +351,13 @@ public class Sheet extends Container {
     /// Original padding values to prevent accumulation when showing the sheet multiple times.
     /// These are set the first time the sheet is shown and used as the base for safe area calculations.
     private int[] originalPadding = null;
+    /// Padding of the content pane as it was before a hand written `RoundRectBorder` inset it by its
+    /// corner radius, in top, bottom, left, right order and in the units of `#contentPaneInsetUnits`.
+    /// Null while no inset is applied, so restyling the sheet with a border that asks for no inset
+    /// puts the padding back instead of leaving the inset of the previous border behind.
+    private float[] contentPaneInset = null;
+    /// Padding units of the content pane as they were before the inset, null for pixels.
+    private byte[] contentPaneInsetUnits = null;
     private Form form;
     private final Rectangle sheetBounds = new Rectangle();
     private boolean trackSheetBounds;
@@ -792,17 +799,18 @@ public class Sheet extends Container {
         titleParentStyle.setMarginLeft(titleMargin);
         titleParentStyle.setMarginRight(titleMargin);
         Border border = s.getBorder();
-        if (border instanceof RoundRectBorder) {
-            RoundRectBorder b = (RoundRectBorder) border;
-
-            // A hand written RoundRectBorder reserves twice the radius of its own, so insetting
-            // the content pane by the radius keeps the content clear of the rounded corners. A
-            // border that came out of a stylesheet reserves nothing and the padding of the sheet
-            // is whatever the CSS asked for, so an inset here is padding the author never wrote,
-            // and on an empty content pane it becomes a gap under the title, see issue 5488.
-            if (!b.isCssBoxModel()) {
-                $(contentPane).setPaddingMillimeters(b.getCornerRadius());
-            }
+        // A hand written RoundRectBorder reserves twice the radius of its own, so insetting the
+        // content pane by the radius keeps the content clear of the rounded corners. A border that
+        // came out of a stylesheet reserves nothing and the padding of the sheet is whatever the
+        // CSS asked for, so an inset here is padding the author never wrote, and on an empty
+        // content pane it becomes a gap under the title, see issue 5488.
+        if (border instanceof RoundRectBorder && !((RoundRectBorder) border).isCssBoxModel()) {
+            rememberContentPanePadding();
+            $(contentPane).setPaddingMillimeters(((RoundRectBorder) border).getCornerRadius());
+        } else {
+            // Restyling the sheet with a border that wants no inset has to take the inset of the
+            // previous border back off, otherwise the gap survives the restyle
+            restoreContentPanePadding();
         }
 
         // Deal with iPhoneX notch.
@@ -929,6 +937,37 @@ public class Sheet extends Container {
             this.setY(getHiddenY(cnt));
             cnt.animateLayout(duration);
         }
+    }
+
+    /// Stores the padding of the content pane as it is before the corner radius of a hand written
+    /// border insets it. Only the first inset is recorded, so showing the sheet again does not
+    /// record the inset as if it were the padding of the developer.
+    private void rememberContentPanePadding() {
+        if (contentPaneInset != null) {
+            return;
+        }
+        Style cps = contentPane.getStyle();
+        contentPaneInset = new float[]{
+                cps.getPaddingFloatValue(false, Component.TOP),
+                cps.getPaddingFloatValue(false, Component.BOTTOM),
+                cps.getPaddingFloatValue(false, Component.LEFT),
+                cps.getPaddingFloatValue(false, Component.RIGHT)
+        };
+        byte[] units = cps.getPaddingUnit();
+        contentPaneInsetUnits = units == null ? null : new byte[]{units[0], units[1], units[2], units[3]};
+    }
+
+    /// Puts back the padding `#rememberContentPanePadding` stored, doing nothing when no inset was
+    /// ever applied so a content pane the developer padded is left alone.
+    private void restoreContentPanePadding() {
+        if (contentPaneInset == null) {
+            return;
+        }
+        Style cps = contentPane.getAllStyles();
+        cps.setPaddingUnit(contentPaneInsetUnits);
+        cps.setPadding(contentPaneInset[0], contentPaneInset[1], contentPaneInset[2], contentPaneInset[3]);
+        contentPaneInset = null;
+        contentPaneInsetUnits = null;
     }
 
     /// Gets the position where the Sheet is to be displayed.

@@ -27,9 +27,9 @@ import com.codename1.junit.UITestBase;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.RoundRectBorder;
+import com.codename1.ui.plaf.Style;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// How a `border-radius` coming out of a stylesheet may pad a `Sheet`.
 ///
@@ -97,6 +97,52 @@ class SheetCssBorderRadiusTest extends UITestBase {
                 "a hand written radius keeps insetting the content pane");
         assertEquals(radius, sheet.getContentPane().getStyle().getPaddingLeftNoRTL(),
                 "a hand written radius keeps insetting the content pane");
+    }
+
+    @FormTest
+    void restylingToACssBorderTakesTheLegacyInsetBackOff() {
+        // The inset of a hand written border is written into the style of the content pane, so a
+        // sheet restyled with a CSS sized border has to have it removed rather than merely not
+        // reapplied, otherwise the gap outlives the restyle.
+        Sheet sheet = showSheet(RoundRectBorder.create().cornerRadius(4f));
+        assertEquals(Display.getInstance().convertToPixels(4f),
+                sheet.getContentPane().getStyle().getPaddingTop(),
+                "the hand written border insets the content pane on the first show");
+
+        sheet.getAllStyles().setBorder(cssBorder());
+        show(sheet);
+
+        assertEquals(0, sheet.getContentPane().getStyle().getPaddingTop(),
+                "the inset of the previous border may not survive the restyle");
+        assertEquals(0, sheet.getContentPane().getStyle().getPaddingLeftNoRTL(),
+                "the inset of the previous border may not survive the restyle");
+    }
+
+    @FormTest
+    void restylingRestoresThePaddingTheDeveloperSet() {
+        // Restoring must not zero the content pane, it puts back whatever was there before the
+        // border inset it, in the units it was written in.
+        Sheet sheet = new Sheet(null, "Title");
+        sheet.getContentPane().getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
+        sheet.getContentPane().getAllStyles().setPadding(1f, 1f, 2f, 2f);
+        sheet.getAllStyles().setBorder(RoundRectBorder.create().cornerRadius(4f));
+        zeroBox(sheet);
+        sheet.getContentPane().add(new Label("Test label 1"));
+        show(sheet);
+        assertEquals(Display.getInstance().convertToPixels(4f),
+                sheet.getContentPane().getStyle().getPaddingTop(),
+                "the hand written border insets the content pane on the first show");
+
+        sheet.getAllStyles().setBorder(cssBorder());
+        show(sheet);
+
+        Style contentStyle = sheet.getContentPane().getStyle();
+        assertEquals(Display.getInstance().convertToPixels(1f), contentStyle.getPaddingTop(),
+                "the padding of the developer comes back, in millimetres");
+        assertEquals(Display.getInstance().convertToPixels(2f), contentStyle.getPaddingLeftNoRTL(),
+                "the padding of the developer comes back, in millimetres");
+        assertEquals(Style.UNIT_TYPE_DIPS, contentStyle.getPaddingUnit()[Component.TOP],
+                "the padding unit of the developer comes back too");
     }
 
     private RoundRectBorder cssBorder() {
