@@ -372,18 +372,35 @@ final class IOSDeviceIntegrity {
         if (pending == null || instance == null) {
             return;
         }
-        if (isStale(pending)) {
-            fail(pending, "App Attest state was reset while this request was in flight");
-            return;
-        }
         if (keyId == null || keyId.length() == 0) {
             fail(pending, "App Attest key generation returned no identifier");
             return;
         }
-        SecureStorage store = SecureStorage.getInstance();
-        store.set(KEY_ID, keyId);
-        store.set(KEY_STATE, STATE_NEW);
+        // The staleness check and the writes it guards happen under the same lock a
+        // reset takes. Split apart, a reset landing between them would delete the key
+        // and bump the generation, and these writes would then put the deleted key
+        // back -- registered under the new generation, so every later staleness check
+        // would accept the bootstrap that was supposed to have been abandoned.
+        // fail() only schedules onto the EDT, so it is safe to call while holding this.
         synchronized (instance.flowLock) {
+            if (isStale(pending)) {
+                fail(pending, "App Attest state was reset while this request was in flight");
+                return;
+            }
+            SecureStorage store = SecureStorage.getInstance();
+            if (!store.set(KEY_ID, keyId) || !store.set(KEY_STATE, STATE_NEW)) {
+                // The keychain refused the write. Attesting anyway would burn a
+                // rate-limited attestation on a key the next request cannot find, so it
+                // would generate another, and another. Give up on this attempt instead
+                // and leave nothing half-written behind.
+                store.remove(KEY_ID);
+                store.remove(KEY_STATE);
+                instance.bootstrapInFlight = false;
+                fail(pending, "App Attest could not store its key identifier");
+                instance.failBootstrapWaiters(
+                        "App Attest could not store its key identifier");
+                return;
+            }
             // Carry the marker forward: without it a recovery attempt whose
             // replacement key also reports invalidKey would recover again, and
             // again, instead of surfacing the failure.
@@ -397,12 +414,11 @@ final class IOSDeviceIntegrity {
         if (pending == null) {
             return;
         }
-        if (isStale(pending)) {
-            fail(pending, "App Attest state was reset while this request was in flight");
-            return;
-        }
         if (attestationB64 == null) {
             fail(pending, "App Attest attestation returned no data");
+            return;
+        }
+        if (instance == null) {
             return;
         }
         // Apple accepted the attestation, but only the backend can confirm it
@@ -412,19 +428,32 @@ final class IOSDeviceIntegrity {
         // caller arriving right after this callback would sail past the queue and
         // assert against a key the server has never seen. If the backend later
         // rejects it, the app calls DeviceIntegrity.resetAttestation() instead.
-        SecureStorage store = SecureStorage.getInstance();
-        store.set(KEY_STATE, STATE_PENDING);
-        store.set(KEY_PENDING_SINCE, Long.toString(System.currentTimeMillis()));
-        if (instance != null) {
-            synchronized (instance.flowLock) {
-                instance.currentBackoff = MIN_BACKOFF_MILLIS;
-                instance.bootstrapInFlight = false;
-                // Deliberately NOT asserted here, for the reason above. Queued
-                // callers are told to retry; by then the key is registered and
-                // their request costs one cheap assertion.
-                instance.failBootstrapWaiters("App Attest is completing first-run "
-                        + "registration for this device; retry shortly");
+        // Same lock as the reset, for the same reason as nativeKeyGenerated: the
+        // staleness check and the state it writes have to move together.
+        synchronized (instance.flowLock) {
+            if (isStale(pending)) {
+                fail(pending, "App Attest state was reset while this request was in flight");
+                return;
             }
+            SecureStorage store = SecureStorage.getInstance();
+            if (!store.set(KEY_STATE, STATE_PENDING)) {
+                // The key is attested with Apple but we cannot record that. Reporting
+                // success would leave the next request attesting the same key again,
+                // against Apple's rate limit, forever.
+                instance.bootstrapInFlight = false;
+                fail(pending, "App Attest could not record its attestation state");
+                instance.failBootstrapWaiters(
+                        "App Attest could not record its attestation state");
+                return;
+            }
+            store.set(KEY_PENDING_SINCE, Long.toString(System.currentTimeMillis()));
+            instance.currentBackoff = MIN_BACKOFF_MILLIS;
+            instance.bootstrapInFlight = false;
+            // Deliberately NOT asserted here, for the reason above. Queued callers
+            // are told to retry; by then the key is registered and their request
+            // costs one cheap assertion.
+            instance.failBootstrapWaiters("App Attest is completing first-run "
+                    + "registration for this device; retry shortly");
         }
         succeed(pending, TOKEN_PREFIX + ":attest:" + base64(bytes(pending.keyId))
                 + ":" + attestationB64);
@@ -436,13 +465,18 @@ final class IOSDeviceIntegrity {
         if (pending == null) {
             return;
         }
-        if (isStale(pending)) {
-            // A reset landed while this assertion was in flight -- typically because a
-            // concurrent request learned the backend does not recognise the key. Handing
-            // back an assertion for the key that was just discarded would send the
-            // server the very thing it already rejected.
-            fail(pending, "App Attest state was reset while this request was in flight");
-            return;
+        if (instance != null) {
+            synchronized (instance.flowLock) {
+                if (isStale(pending)) {
+                    // A reset landed while this assertion was in flight -- typically
+                    // because a concurrent request learned the backend does not
+                    // recognise the key. Handing back an assertion for the key that was
+                    // just discarded would send the server what it already rejected.
+                    fail(pending,
+                            "App Attest state was reset while this request was in flight");
+                    return;
+                }
+            }
         }
         if (assertionB64 == null) {
             fail(pending, "App Attest assertion returned no data");

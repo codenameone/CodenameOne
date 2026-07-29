@@ -166,11 +166,12 @@ int connections = 0;
     SecTrustRef trustRef = [[challenge protectionSpace] serverTrust];
     SecTrustEvaluate(trustRef, NULL);
     NSMutableString* certs = [NSMutableString string];
-    if (insecure) {
-        [[challenge sender] useCredential:[NSURLCredential credentialForTrust:[[challenge protectionSpace] serverTrust]] forAuthenticationChallenge:challenge];
-        return;
-    }
-    //[connection cancel];
+    // The chain is collected and offered to Java even for an insecure request. An
+    // insecure request asks us to accept a certificate the OS would reject -- a
+    // self-signed development server -- and that is a decision about OS trust
+    // evaluation, not a decision to stop looking. Returning here meant a host with
+    // enforced pins accepted any certificate at all as long as the request happened
+    // to be insecure, which is the opposite of what pinning is for.
     
     CFIndex count = SecTrustGetCertificateCount(trustRef);
     for (int i=0; i<count; i++) {
@@ -193,11 +194,19 @@ int connections = 0;
             }
         }
     sslCertificates = [[NSString stringWithString:certs] retain];
-    if (com_codename1_io_NetworkManager_checkCertificatesNativeCallback___int_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG connectionId)) {
-        [challenge.sender performDefaultHandlingForAuthenticationChallenge:challenge];
-    } else {
+    if (!com_codename1_io_NetworkManager_checkCertificatesNativeCallback___int_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG connectionId)) {
+        // Java rejected the chain -- a per-request check or a guard pin mismatch.
+        // That veto applies to insecure requests too.
         [challenge.sender cancelAuthenticationChallenge:challenge];
+        return;
     }
+    if (insecure) {
+        // Accepted despite whatever the OS thinks of the chain, which is what the
+        // caller asked for by setting it insecure.
+        [[challenge sender] useCredential:[NSURLCredential credentialForTrust:trustRef] forAuthenticationChallenge:challenge];
+        return;
+    }
+    [challenge.sender performDefaultHandlingForAuthenticationChallenge:challenge];
 }
 
 -(void)setConnectionId:(JAVA_INT)connId {

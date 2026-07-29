@@ -99,6 +99,13 @@ public final class AndroidSecureStorage extends SecureStorage {
      */
     private static final String PLAIN_KEY_ID = "CN1PlainKey";
     private static final String PLAIN_PREFS = "CN1PlainSecureStorage";
+
+    /**
+     * Serializes load-check-generate on the non-prompting key, and the shared
+     * AndroidKeyStore handle with it. Static because the keystore alias is
+     * process-wide, so two instances would race just as two threads would.
+     */
+    private static final Object PLAIN_KEY_LOCK = new Object();
     private static final int GCM_TAG_BITS = 128;
 
     private KeyStore keyStore;
@@ -220,7 +227,11 @@ public final class AndroidSecureStorage extends SecureStorage {
             Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
             c.init(Cipher.ENCRYPT_MODE, key);
             byte[] enc = c.doFinal(value.getBytes("UTF-8"));
-            plainPrefs().edit()
+            SharedPreferences prefs = plainPrefs();
+            if (prefs == null) {
+                return false;
+            }
+            prefs.edit()
                     .putString(account, Base64.encodeToString(c.getIV(), Base64.NO_WRAP)
                             + ":" + Base64.encodeToString(enc, Base64.NO_WRAP))
                     .apply();
@@ -243,7 +254,11 @@ public final class AndroidSecureStorage extends SecureStorage {
         if (Build.VERSION.SDK_INT < 23) {
             return legacyPlainGet(account);
         }
-        String stored = plainPrefs().getString(account, null);
+        SharedPreferences prefs = plainPrefs();
+        if (prefs == null) {
+            return null;
+        }
+        String stored = prefs.getString(account, null);
         if (stored == null) {
             return null;
         }
@@ -282,13 +297,30 @@ public final class AndroidSecureStorage extends SecureStorage {
         if (account == null) {
             return false;
         }
-        plainPrefs().edit().remove(account).apply();
+        SharedPreferences prefs = plainPrefs();
+        if (prefs == null) {
+            return false;
+        }
+        prefs.edit().remove(account).apply();
         return true;
     }
 
+    /**
+     * The preferences file, resolved from the application context rather than an
+     * Activity.
+     *
+     * <p>A port initialized from a background service has no Activity but does
+     * have a context, and this tier exists precisely so a background caller can
+     * read a cached secret without prompting. Requiring an Activity would make
+     * {@code get()} throw there -- outside its try/catch, so the caller crashes
+     * rather than reading the value it asked for.</p>
+     */
     private SharedPreferences plainPrefs() {
-        return AndroidNativeUtil.getActivity()
-                .getApplicationContext()
+        Context ctx = AndroidNativeUtil.getContext();
+        if (ctx == null) {
+            return null;
+        }
+        return ctx.getApplicationContext()
                 .getSharedPreferences(PLAIN_PREFS, Context.MODE_PRIVATE);
     }
 
@@ -298,31 +330,43 @@ public final class AndroidSecureStorage extends SecureStorage {
      * generation fails.
      */
     private SecretKey plainKey(boolean create) throws Exception {
-        keyStore().load(null);
-        SecretKey existing = (SecretKey) keyStore.getKey(PLAIN_KEY_ID, null);
-        if (existing != null || !create) {
-            return existing;
+        // The whole load-check-generate sequence is serialized, not just the
+        // generation. Two first writers that each saw the alias absent would each
+        // generate under it, and the second generation replaces the key the first
+        // one had already encrypted with -- leaving that ciphertext permanently
+        // undecryptable. The shared KeyStore is not thread safe either.
+        synchronized (PLAIN_KEY_LOCK) {
+            keyStore().load(null);
+            SecretKey existing = (SecretKey) keyStore.getKey(PLAIN_KEY_ID, null);
+            if (existing != null || !create) {
+                return existing;
+            }
+            KeyGenerator gen = KeyGenerator.getInstance(
+                    KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEY_STORE);
+            gen.init(new KeyGenParameterSpec.Builder(PLAIN_KEY_ID,
+                    KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setKeySize(256)
+                    .setRandomizedEncryptionRequired(true)
+                    .build());
+            gen.generateKey();
+            return (SecretKey) keyStore.getKey(PLAIN_KEY_ID, null);
         }
-        KeyGenerator gen = KeyGenerator.getInstance(
-                KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEY_STORE);
-        gen.init(new KeyGenParameterSpec.Builder(PLAIN_KEY_ID,
-                KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setKeySize(256)
-                .setRandomizedEncryptionRequired(true)
-                .build());
-        gen.generateKey();
-        return (SecretKey) keyStore.getKey(PLAIN_KEY_ID, null);
     }
 
     private void resetPlainKey() {
-        try {
-            keyStore().deleteEntry(PLAIN_KEY_ID);
-        } catch (KeyStoreException e) {
-            Log.e(e);
+        synchronized (PLAIN_KEY_LOCK) {
+            try {
+                keyStore().deleteEntry(PLAIN_KEY_ID);
+            } catch (KeyStoreException e) {
+                Log.e(e);
+            }
         }
-        plainPrefs().edit().clear().apply();
+        SharedPreferences prefs = plainPrefs();
+        if (prefs != null) {
+            prefs.edit().clear().apply();
+        }
     }
 
     // API 22 and below have no KeyGenParameterSpec. The preferences file is
@@ -331,7 +375,11 @@ public final class AndroidSecureStorage extends SecureStorage {
     private boolean legacyPlainSet(String account, String value) {
         warnLegacyPlainStorage();
         try {
-            plainPrefs().edit()
+            SharedPreferences prefs = plainPrefs();
+            if (prefs == null) {
+                return false;
+            }
+            prefs.edit()
                     .putString(account, Base64.encodeToString(
                             value.getBytes("UTF-8"), Base64.NO_WRAP))
                     .apply();
@@ -344,7 +392,11 @@ public final class AndroidSecureStorage extends SecureStorage {
 
     private String legacyPlainGet(String account) {
         warnLegacyPlainStorage();
-        String stored = plainPrefs().getString(account, null);
+        SharedPreferences prefs = plainPrefs();
+        if (prefs == null) {
+            return null;
+        }
+        String stored = prefs.getString(account, null);
         if (stored == null) {
             return null;
         }
