@@ -6000,6 +6000,18 @@ public abstract class CodenameOneImplementation {
         return b != null && b.isConnected();
     }
 
+    /// Returns the platform bridge that carries the `com.codename1.wearable` phone-to-watch API over
+    /// the native transport (Apple's `WCSession` / Google's Wearable Data Layer), or null when this
+    /// device has no wearable counterpart (the base implementation). When null, the
+    /// `com.codename1.wearable` API degrades to a harmless no-op.
+    ///
+    /// #### Returns
+    ///
+    /// the wearable bridge, or null when unsupported
+    public com.codename1.wearable.spi.WearableBridge getWearableBridge() {
+        return null;
+    }
+
     /// Returns the platform bridge used by the `com.codename1.surfaces` API to render external
     /// surfaces (home-screen widgets and live activities). Ports supporting surfaces override
     /// this; the base implementation returns null which renders the whole API an inert no-op.
