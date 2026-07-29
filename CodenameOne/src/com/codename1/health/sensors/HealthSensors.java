@@ -109,8 +109,17 @@ public class HealthSensors {
         }
         SensorScanSettings s = settings == null
                 ? new SensorScanSettings() : settings;
-        final List<HealthSensorProfile> wanted = s.getProfiles().isEmpty()
-                ? HealthSensorProfile.values() : s.getProfiles();
+        // A copy, taken once. getProfiles() answers with an unmodifiable
+        // view of the caller's own list, so keeping it left this scan
+        // reading a list the caller could still change -- and the listener
+        // walks it on the platform's callback thread, where a concurrent
+        // addProfile() throws ConcurrentModificationException and the
+        // discovery it was decoding is lost.
+        final List<HealthSensorProfile> wanted =
+                new ArrayList<HealthSensorProfile>(
+                        s.getProfiles().isEmpty()
+                                ? HealthSensorProfile.values()
+                                : s.getProfiles());
 
         ScanSettings bleSettings = new ScanSettings();
         if (s.isLowPower()) {

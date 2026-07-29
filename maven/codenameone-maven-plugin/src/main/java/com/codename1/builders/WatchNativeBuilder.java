@@ -566,6 +566,24 @@ class WatchNativeBuilder {
                         .getBytes(StandardCharsets.UTF_8));
     }
 
+    /// Whether a HealthKit capability is asked for, in either spelling.
+    ///
+    /// The short hint promotes into the `ios.entitlements.*` namespace for
+    /// the phone, and a project can equally set the canonical key itself
+    /// -- the phone honours both. Reading only the short one signed the
+    /// watch without a capability the build had granted, and the watch is
+    /// the target where the workout code that needs it actually runs.
+    ///
+    /// Order-independent by construction, which matters because the
+    /// promotion and this file are written by different passes.
+    private static boolean healthCapability(BuildRequest request,
+            String shortHint, String canonicalKey) {
+        return "true".equalsIgnoreCase(request.getArg(shortHint, "false"))
+                || "true".equalsIgnoreCase(request.getArg(
+                        "ios.entitlements.com.apple.developer.healthkit."
+                                + canonicalKey, "false"));
+    }
+
     /// The watch target's entitlements, as the plist text that is signed.
     ///
     /// Separated from writing it so the capability set can be asserted
@@ -581,8 +599,8 @@ class WatchNativeBuilder {
           .append("<plist version=\"1.0\">\n<dict>\n")
           .append("    <key>com.apple.developer.healthkit</key>\n")
           .append("    <true/>\n");
-        if ("true".equalsIgnoreCase(request.getArg(
-                "ios.health.backgroundDelivery", "false"))
+        if (healthCapability(request, "ios.health.backgroundDelivery",
+                "background-delivery")
                 || "true".equalsIgnoreCase(workoutProcessingHint)) {
             sb.append("    <key>com.apple.developer.healthkit")
               .append(".background-delivery</key>\n    <true/>\n");
@@ -592,8 +610,8 @@ class WatchNativeBuilder {
         // capability the phone was granted does not reach it. The estimate
         // recalibration a workout performs runs in shared code, on the
         // target where it is most likely to run at all.
-        if ("true".equalsIgnoreCase(request.getArg(
-                "ios.health.recalibrateEstimates", "false"))) {
+        if (healthCapability(request, "ios.health.recalibrateEstimates",
+                "recalibrate-estimates")) {
             sb.append("    <key>com.apple.developer.healthkit")
               .append(".recalibrate-estimates</key>\n    <true/>\n");
         }

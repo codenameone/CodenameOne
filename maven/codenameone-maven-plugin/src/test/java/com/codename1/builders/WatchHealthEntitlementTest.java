@@ -106,6 +106,33 @@ public class WatchHealthEntitlementTest {
         assertFalse(plist.contains(BACKGROUND), plist);
     }
 
+    /**
+     * The canonical entitlement key counts as well as the short hint.
+     *
+     * <p>The short hint promotes into the {@code ios.entitlements.*}
+     * namespace for the phone, and a project can set the canonical key
+     * directly instead -- the phone honours both, so a watch reading only
+     * the short one signed without a capability the build had granted.</p>
+     */
+    @Test
+    void theCanonicalEntitlementKeyReachesTheWatch() {
+        BuildRequest r = new BuildRequest();
+        r.setMainClass("com.acme.MyApp");
+        r.putArgument("ios.entitlements.com.apple.developer.healthkit"
+                + ".recalibrate-estimates", "true");
+        assertTrue(WatchNativeBuilder.watchEntitlementsPlist(r, null)
+                .contains(RECALIBRATE),
+                "the canonical spelling must be honoured here too");
+
+        BuildRequest bg = new BuildRequest();
+        bg.setMainClass("com.acme.MyApp");
+        bg.putArgument("ios.entitlements.com.apple.developer.healthkit"
+                + ".background-delivery", "true");
+        assertTrue(WatchNativeBuilder.watchEntitlementsPlist(bg, null)
+                .contains(BACKGROUND),
+                "and background delivery has the same two spellings");
+    }
+
     /** Workout processing implies background delivery, as before. */
     @Test
     void workoutProcessingStillImpliesBackgroundDelivery() {
