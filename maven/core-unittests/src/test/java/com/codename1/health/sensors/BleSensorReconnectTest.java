@@ -65,6 +65,10 @@ class BleSensorReconnectTest extends UITestBase {
     private static final BluetoothUuid BATTERY_LEVEL =
             BluetoothUuid.fromShort(0x2A19);
 
+    /** Body Sensor Location, on the heart-rate service. */
+    private static final BluetoothUuid BODY_SENSOR_LOCATION =
+            BluetoothUuid.fromShort(0x2A38);
+
     /**
      * A transient discovery failure on the way back must not end the
      * session: the reconnect listener never retries from FAILED, so one
@@ -176,6 +180,9 @@ class BleSensorReconnectTest extends UITestBase {
         /// What the Battery Level characteristic answers, or null for no
         /// battery service at all.
         Byte batteryLevel;
+        /// What the Body Sensor Location characteristic answers, or null
+        /// for a peripheral that does not expose one.
+        Byte bodyLocation;
         private int discoveries;
         private int connects;
 
@@ -250,6 +257,11 @@ class BleSensorReconnectTest extends UITestBase {
                     GattCharacteristic.PROPERTY_NOTIFY, 0));
             List<GattService> services = new ArrayList<GattService>();
             services.add(hr);
+            if (bodyLocation != null) {
+                hr.addCharacteristic(new GattCharacteristic(hr,
+                        BODY_SENSOR_LOCATION,
+                        GattCharacteristic.PROPERTY_READ, 0));
+            }
             if (batteryLevel != null) {
                 GattService battery = new GattService(this,
                         BATTERY_SERVICE, true, 0);
@@ -266,6 +278,11 @@ class BleSensorReconnectTest extends UITestBase {
             if (batteryLevel != null
                     && BATTERY_LEVEL.equals(c.getUuid())) {
                 out.complete(new byte[] { batteryLevel.byteValue() });
+                return;
+            }
+            if (bodyLocation != null
+                    && BODY_SENSOR_LOCATION.equals(c.getUuid())) {
+                out.complete(new byte[] { bodyLocation.byteValue() });
                 return;
             }
             out.complete(new byte[] { 0 });
@@ -976,6 +993,39 @@ class BleSensorReconnectTest extends UITestBase {
                 "a refused reconnect must not connect the peripheral");
         assertEquals(SensorSessionState.STOPPED, session.getState(),
                 "and it must leave the session stopped");
+    }
+
+    /**
+     * A reserved Body Sensor Location is not a placement.
+     *
+     * <p>The profile defines 0 to 6 and reserves everything above.
+     * Published unchanged, a peripheral answering 42 reached the app as a
+     * location it could only render as "Unknown" -- which says the sensor
+     * is worn somewhere unnamed, not that it never said.</p>
+     */
+    @Test
+    void aReservedBodyLocationLeavesThePlacementUnknown() throws Exception {
+        FakePeripheral p = new FakePeripheral();
+        p.bodyLocation = (byte) 42;
+        BleSensorSession session = new BleSensorSession("fake",
+                HealthSensorProfile.HEART_RATE,
+                new SensorSessionOptions(), p);
+        started.add(session);
+        session.start(new AsyncResource<SensorSession>());
+        flushSerialCalls();
+        assertEquals(-1, session.getBodySensorLocation(),
+                "a reserved value must leave the placement unreported");
+
+        FakePeripheral ok = new FakePeripheral();
+        ok.bodyLocation = (byte) BodySensorLocation.CHEST;
+        BleSensorSession good = new BleSensorSession("fake2",
+                HealthSensorProfile.HEART_RATE,
+                new SensorSessionOptions(), ok);
+        started.add(good);
+        good.start(new AsyncResource<SensorSession>());
+        flushSerialCalls();
+        assertEquals(BodySensorLocation.CHEST, good.getBodySensorLocation(),
+                "and a defined one is still reported");
     }
 
     /**
