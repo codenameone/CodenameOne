@@ -69,15 +69,62 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
     protected void paintWithEffect(com.codename1.ui.Graphics g,
             com.codename1.ui.Container pane, Runnable paintChildren) {
         styleOnce(pane);
-        // Clip.antiAlias would cut the subtree to the rounded shape; not done yet, so a
-        // child that fills the surface still paints square corners over the rounded
-        // background. Reported rather than left as a silent visual difference.
-        if (cornerRadiusLp() > 0
-                && material().getClipBehavior() != com.codename1.flutter.Clip.none) {
-            com.codename1.flutter.FlutterErrorReport.unimplemented("Material",
-                    "clipBehavior is ignored; a child filling the surface paints over its rounded corners");
+        int radius = (int) Math.round(com.codename1.flutter.rendering.Dp.px(cornerRadiusLp()));
+        if (radius <= 0 || material().getClipBehavior() == com.codename1.flutter.Clip.none) {
+            paintChildren.run();
+            return;
         }
-        paintChildren.run();
+        if (!g.isShapeClipSupported()) {
+            com.codename1.flutter.FlutterErrorReport.unimplemented("Material",
+                    "this port cannot clip to a shape, so the corners paint square");
+            paintChildren.run();
+            return;
+        }
+        int x = pane.getX();
+        int y = pane.getY();
+        int w = pane.getWidth();
+        int h = pane.getHeight();
+        // setClip(Shape) REPLACES the clip rather than intersecting it, and the study card
+        // lives in a horizontally scrolling carousel that is already clipping us - so
+        // replacing outright would let a half-scrolled card paint outside its viewport.
+        //
+        // Which of the two forms below applies matters, and was established by trying it:
+        // GeneralPath.intersection() does NOT survive the case where the path is entirely
+        // inside the rectangle - going through it unconditionally cut the icons out of every
+        // category row. So intersect only when we genuinely overflow the clip, and use the
+        // plain rounded rect when we do not, which is the common case and the correct one.
+        int cx = g.getClipX();
+        int cy = g.getClipY();
+        int cw = g.getClipWidth();
+        int ch = g.getClipHeight();
+        com.codename1.ui.geom.GeneralPath rounded =
+                roundedRect(x, y, w, h, Math.min(radius, Math.min(w, h) / 2));
+        boolean insideClip = x >= cx && y >= cy && x + w <= cx + cw && y + h <= cy + ch;
+        try {
+            g.setClip(insideClip
+                    ? (com.codename1.ui.geom.Shape) rounded
+                    : rounded.intersection(new com.codename1.ui.geom.Rectangle(cx, cy, cw, ch)));
+            paintChildren.run();
+        } finally {
+            g.setClip(cx, cy, cw, ch);
+        }
+    }
+
+    /// A rounded rectangle in the coordinate space a component paints in - parent-relative,
+    /// because the Graphics has already accumulated its ancestors' translation.
+    private static com.codename1.ui.geom.GeneralPath roundedRect(int x, int y, int w, int h, int r) {
+        com.codename1.ui.geom.GeneralPath p = new com.codename1.ui.geom.GeneralPath();
+        p.moveTo(x + r, y);
+        p.lineTo(x + w - r, y);
+        p.quadTo(x + w, y, x + w, y + r);
+        p.lineTo(x + w, y + h - r);
+        p.quadTo(x + w, y + h, x + w - r, y + h);
+        p.lineTo(x + r, y + h);
+        p.quadTo(x, y + h, x, y + h - r);
+        p.lineTo(x, y + r);
+        p.quadTo(x, y, x + r, y);
+        p.closePath();
+        return p;
     }
 
     /// Applies the surface style when it first paints or after its configuration
