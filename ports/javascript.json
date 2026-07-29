@@ -1,63 +1,64 @@
 {
-  "commit": "f9810b02066e5384533b61ce9511996165eb2db0",
-  "generated_at": "2026-07-29T13:22:45Z",
+  "commit": "ad2c1952cc6ce1a3f96a6373801f4012f917b3e6",
+  "generated_at": "2026-07-29T18:24:39Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 1514299999
+        "duration_ns": 1493100000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 851600000
+        "duration_ns": 837600000
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 14357699999
+        "duration_ns": 14647999999
       },
       "intArithmetic": {
         "checksum": "1313580095284",
-        "duration_ns": 747100001
+        "duration_ns": 739500000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 4096400000
+        "duration_ns": 4037300000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 585399999
+        "duration_ns": 585900000
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 2777100000
+        "duration_ns": 2716000000
       },
       "quicksort": {
         "checksum": "786886890168670967",
-        "duration_ns": 617400000
+        "duration_ns": 611700000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 1138900000
+        "duration_ns": 1132400000
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 1168300001
+        "duration_ns": 1181500000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
     "missing": [],
+    "skipped": {},
     "status": "complete",
     "suite_checksum": 0
   },
   "port": "javascript",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30452918695",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30476901394",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 167,
+    "pass": 170,
     "skip": 0
   },
   "tests": {
@@ -389,6 +390,10 @@
       "feature": "text-input",
       "status": "pass"
     },
+    "InferenceOnDeviceApiTest": {
+      "feature": "on-device-inference",
+      "status": "pass"
+    },
     "InscribedTriangleGrid": {
       "feature": "graphics-shapes-strokes",
       "status": "pass"
@@ -399,6 +404,10 @@
     },
     "KotlinUiTest": {
       "feature": "application-bootstrap",
+      "status": "pass"
+    },
+    "LanguageOnDeviceApiTest": {
+      "feature": "on-device-language",
       "status": "pass"
     },
     "LargeStrokeDirtyClipTest": {
@@ -727,6 +736,10 @@
     },
     "VideoIORoundTripTest": {
       "feature": "video-round-trip",
+      "status": "pass"
+    },
+    "VisionOnDeviceApiTest": {
+      "feature": "on-device-vision",
       "status": "pass"
     }
   }
