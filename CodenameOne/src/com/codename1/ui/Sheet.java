@@ -122,9 +122,6 @@ public class Sheet extends Container {
     private static final int W = 3;
     private static final int C = 4;
     private static final int DEFAULT_TRANSITION_DURATION = 300;
-    /// The styles a component presents: unselected, selected, pressed and disabled. Caps how many
-    /// content pane insets are kept, see `#recordContentPaneInset`.
-    private static final int CONTENT_PANE_STYLES = 4;
     private final Sheet parentSheet;
     private final Label title = new Label();
     private Component titleComponent = title;
@@ -983,21 +980,24 @@ public class Sheet extends Container {
         return null;
     }
 
-    /// Starts recording an inset for the given style of the content pane, replacing whatever was
-    /// recorded for it before.
+    /// Starts recording an inset for the given style of the content pane, dropping the entry
+    /// recorded for that style before along with any entry there is nothing left to restore for.
+    ///
+    /// Entries are not otherwise evicted. Dropping the oldest once a few have accumulated would be
+    /// wrong, because age does not say whether a style is still attached to the content pane, and
+    /// the alternative of asking the pane for its four styles would create the selected, pressed
+    /// and disabled ones on a pane that never had them, which registers elevation and surface
+    /// state. So an entry for a style that has been replaced is simply carried until the next
+    /// restore, where putting padding back into a detached style costs nothing.
     private ContentPaneInset recordContentPaneInset(Style style) {
         if (contentPaneInsets == null) {
             contentPaneInsets = new ArrayList<ContentPaneInset>();
         }
         for (int iter = contentPaneInsets.size() - 1; iter >= 0; iter--) {
-            if (contentPaneInsets.get(iter).style == style) { //NOPMD CompareObjectsWithEquals
+            ContentPaneInset recorded = contentPaneInsets.get(iter);
+            if (recorded.style == style || !recorded.isIntact()) { //NOPMD CompareObjectsWithEquals
                 contentPaneInsets.remove(iter);
             }
-        }
-        while (contentPaneInsets.size() >= CONTENT_PANE_STYLES) {
-            // A component presents four styles at most, so an older entry than that belongs to a
-            // style that has since been replaced and is no longer attached to the content pane
-            contentPaneInsets.remove(0);
         }
         ContentPaneInset inset = new ContentPaneInset(style);
         contentPaneInsets.add(inset);

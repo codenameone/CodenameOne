@@ -219,6 +219,30 @@ class SheetCssBorderRadiusTest extends UITestBase {
                 "the inset comes off the style it went into, not the style presented now");
     }
 
+    @FormTest
+    void everyStyleThatWasInsetIsRestoredHoweverManyThereAre() {
+        // Insets pile up one per style, and none of them may be evicted to make room: a style being
+        // the oldest recorded does not say it is gone, so evicting it would strand its inset.
+        Sheet sheet = showSheet(RoundRectBorder.create().cornerRadius(4f));
+        Style first = sheet.getContentPane().getStyle();
+        assertEquals(Display.getInstance().convertToPixels(4f), first.getPaddingTop(),
+                "the first style is inset by the hand written border");
+
+        for (int iter = 0; iter < 4; iter++) {
+            Style fresh = new Style(first);
+            fresh.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+            fresh.setPadding(0, 0, 0, 0);
+            sheet.getContentPane().setUnselectedStyle(fresh);
+            show(sheet);
+        }
+
+        sheet.getAllStyles().setBorder(cssBorder());
+        show(sheet);
+
+        assertEquals(0, first.getPaddingTop(),
+                "the style inset first is restored however many were recorded after it");
+    }
+
     private RoundRectBorder cssBorder() {
         // What the CSS compiler emits for border-radius: 4mm 4mm 0mm 0mm
         return RoundRectBorder.create()
