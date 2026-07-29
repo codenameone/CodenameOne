@@ -7392,8 +7392,6 @@ public abstract class CodenameOneImplementation {
     /// Factory for the low-level `com.codename1.camera.Camera` API. Each call
     /// returns a fresh per-session backend, or `null` on platforms that do not
     /// implement the new API. Subclasses override to wire in their port.
-    ///
-    /// @hidden
     public CameraImpl createCameraImpl() {
         return null;
     }
@@ -7401,9 +7399,22 @@ public abstract class CodenameOneImplementation {
     /// Factory for the `com.codename1.ar.AR` augmented reality API. Each call
     /// returns a fresh per-session backend, or `null` on platforms without AR
     /// support. Subclasses override to wire in their port.
-    ///
-    /// @hidden
     public ARImpl createARImpl() {
+        return null;
+    }
+
+    /// Factory for the built-in on-device vision API.
+    public VisionImpl createVisionImpl() {
+        return null;
+    }
+
+    /// Factory for the built-in LiteRT inference API.
+    public InferenceImpl createInferenceImpl() {
+        return null;
+    }
+
+    /// Factory for built-in on-device language services.
+    public LanguageImpl createLanguageImpl() {
         return null;
     }
 

@@ -35,6 +35,7 @@ package com.codename1.ai;
 public interface StreamingListener {
     /// A chunk of assistant text. Append it to whatever text buffer
     /// you're rendering.
+    /// @param textDelta next ordered text fragment
     void onContentDelta(String textDelta);
 
     /// A tool-call fragment. `index` lets you correlate fragments
@@ -44,16 +45,22 @@ public interface StreamingListener {
     /// JSON; concatenate fragments for the same `index` to reassemble.
     /// `id` is the provider's tool-call id, present on the first
     /// fragment.
+    /// @param index zero-based tool call within the response
+    /// @param id provider tool-call id, normally present on the first fragment
+    /// @param name requested tool name, normally present on the first fragment
+    /// @param argumentsFragment next JSON argument fragment
     void onToolCallDelta(int index, String id, String name, String argumentsFragment);
 
     /// Token-accounting update. Most providers send this once at the
     /// end; some send incremental counts.
+    /// @param usage latest provider token counts
     void onUsage(Usage usage);
 
     /// Mid-stream error (e.g. connection reset). The `AsyncResource`
     /// returned by `chatStream` will also complete with this same
     /// exception, so listeners can typically ignore this and react to
     /// the resource. Implemented for parity with other SDKs.
+    /// @param t stream failure also delivered by the returned resource
     void onError(Throwable t);
 
     /// No-op default implementation. Subclass and override only what

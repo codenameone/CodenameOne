@@ -65,10 +65,19 @@ public final class Tool {
     private final String parametersJsonSchema;
     private final ToolHandler handler;
 
+    /// Creates a description-only tool for manual dispatch.
+    /// @param name provider-visible function name
+    /// @param description guidance that helps the model choose the tool
+    /// @param parametersJsonSchema JSON Schema for accepted arguments
     public Tool(String name, String description, String parametersJsonSchema) {
         this(name, description, parametersJsonSchema, null);
     }
 
+    /// Creates a tool definition with an application executor.
+    /// @param name provider-visible function name
+    /// @param description guidance that helps the model choose the tool
+    /// @param parametersJsonSchema JSON Schema for accepted arguments
+    /// @param handler executor called by {@link #invoke(String)}, or {@code null}
     public Tool(String name, String description, String parametersJsonSchema,
                 ToolHandler handler) {
         if (name == null || name.length() == 0) {
@@ -82,26 +91,33 @@ public final class Tool {
         this.handler = handler;
     }
 
+    /// @return provider-visible function name
     public String getName() {
         return name;
     }
 
+    /// @return description used by the model to decide when to call the tool
     public String getDescription() {
         return description;
     }
 
+    /// @return JSON Schema describing accepted function arguments
     public String getParametersJsonSchema() {
         return parametersJsonSchema;
     }
 
     /// The optional executor wired up by the constructor. Returns
     /// `null` for description-only tools.
+    /// @return registered executor, or {@code null}
     public ToolHandler getHandler() {
         return handler;
     }
 
     /// Invokes the handler with the given arguments JSON. Throws
     /// `IllegalStateException` when no handler was registered.
+    /// @param argumentsJson model-generated arguments
+    /// @return handler result encoded as JSON
+    /// @throws Exception when the handler rejects or cannot execute the call
     public String invoke(String argumentsJson) throws Exception {
         if (handler == null) {
             throw new IllegalStateException(

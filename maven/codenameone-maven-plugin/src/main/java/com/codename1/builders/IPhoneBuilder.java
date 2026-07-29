@@ -22,6 +22,7 @@
  */
 package com.codename1.builders;
 
+import com.codename1.build.shared.PlatformFeatureCatalog;
 import com.codename1.util.IOSWalletExtensionBuilder;
 import com.codename1.util.IOSWidgetExtensionBuilder;
 import org.w3c.dom.Document;
@@ -117,6 +118,9 @@ public class IPhoneBuilder extends Executor {
     private boolean usesBluetoothPeripheral;
     private boolean usesCn1Camera;
     private boolean usesCn1Ar;
+    private boolean usesCn1Vision;
+    private boolean usesCn1Language;
+    private boolean usesCn1Inference;
     // Set when the app references com.codename1.car.* (Apple CarPlay support). Gates the
     // CN1_USE_CARPLAY native define, CarPlay.framework linkage, the carplay entitlement and the
     // CarPlay scene in the Info.plist scene manifest. Apps that never touch the API see no change.
@@ -334,7 +338,71 @@ public class IPhoneBuilder extends Executor {
         }
         return str + append;
     }
-    
+
+    private static String appendFrameworks(String libraries,
+                                           String... frameworks) {
+        String out = libraries == null ? "" : libraries;
+        for (String framework : frameworks) {
+            boolean present = false;
+            for (String item : out.split(";")) {
+                if (framework.equalsIgnoreCase(item.trim())) {
+                    present = true;
+                    break;
+                }
+            }
+            if (!present) {
+                out = out.length() == 0 ? framework : out + ";" + framework;
+            }
+        }
+        return out;
+    }
+
+    static String appendPodSpecIfAbsent(String pods, String candidate) {
+        String out = pods == null ? "" : pods;
+        String candidateName = podName(candidate);
+        for (String existing : out.split("[,;]")) {
+            if (candidateName.equalsIgnoreCase(podName(existing))) {
+                return out;
+            }
+        }
+        return out.length() == 0 ? candidate : out + "," + candidate;
+    }
+
+    static String deduplicatePodSpecs(String pods) {
+        String out = "";
+        if (pods == null) {
+            return out;
+        }
+        for (String podSpec : pods.split("[,;]")) {
+            podSpec = podSpec.trim();
+            if (podSpec.length() > 0) {
+                out = appendPodSpecIfAbsent(out, podSpec);
+            }
+        }
+        return out;
+    }
+
+    private static String podName(String podSpec) {
+        String value = podSpec == null ? "" : podSpec.trim();
+        int separator = value.indexOf(' ');
+        return separator < 0 ? value : value.substring(0, separator).trim();
+    }
+
+    private void applyCatalogPlistEntry(BuildRequest request,
+                                        String[] plistEntry) {
+        String privacyKey = plistEntry[0];
+        String requestKey = "ios." + privacyKey;
+        String value = request.getArg(requestKey, null);
+        if (value == null) {
+            value = plistEntry[1];
+            request.putArgument(requestKey, value);
+        }
+        if (value != null
+                && !privacyUsageDescriptions.containsKey(privacyKey)) {
+            privacyUsageDescriptions.put(privacyKey, value);
+        }
+    }
+
     private int getDeploymentTargetInt(BuildRequest request) {
         String target = getDeploymentTarget(request);
         if (target.indexOf(".") > 0) {
@@ -347,6 +415,11 @@ public class IPhoneBuilder extends Executor {
 
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
+        // Builder instances are normally single-use, but keep scan-derived
+        // native feature state deterministic if an instance is reused.
+        usesCn1Vision = false;
+        usesCn1Language = false;
+        usesCn1Inference = false;
         Stopwatch stopwatch = new Stopwatch();
         addMinDeploymentTarget(DEFAULT_MIN_DEPLOYMENT_VERSION);
         if (request.getArg("ios.deployment_target", null) == null) {
@@ -791,10 +864,11 @@ public class IPhoneBuilder extends Executor {
         }
         
         // Accumulator for AI/ML class hits. After the scan we apply
-        // every matched AiDependencyTable.Entry -- appending pods,
+        // every matched PlatformFeatureCatalog.Entry -- appending pods,
         // SPM specs, plist defaults and Android perms -- so the user
         // doesn't have to declare them by hand.
-        final AiDependencyTable.Accumulator aiAcc = new AiDependencyTable.Accumulator();
+        final PlatformFeatureCatalog.Accumulator aiAcc = new PlatformFeatureCatalog.Accumulator();
+        boolean excludeArm64Simulator = false;
 
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
@@ -874,6 +948,16 @@ public class IPhoneBuilder extends Executor {
                     if (!usesCn1Ar && cls.indexOf("com/codename1/ar/") == 0) {
                         usesCn1Ar = true;
                     }
+                    if (!usesCn1Vision && isVisionAnalyzerClass(cls)) {
+                        usesCn1Vision = true;
+                    }
+                    if (!usesCn1Language && isLanguageFeatureClass(cls)) {
+                        usesCn1Language = true;
+                    }
+                    if (!usesCn1Inference
+                            && "com/codename1/ai/inference/InferenceSession".equals(cls)) {
+                        usesCn1Inference = true;
+                    }
                     // Apple CarPlay (com.codename1.car.*). Gated on actual usage so the
                     // CarPlay scene/entitlement/framework are only added for apps that
                     // build an in-car experience.
@@ -927,6 +1011,7 @@ public class IPhoneBuilder extends Executor {
 
                 @Override
                 public void usesClassMethod(String cls, String method) {
+                    aiAcc.consumeMethod(cls, method);
                     if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0
                             || (cls.indexOf("com/codename1/calendar/CalendarManager") == 0
                             && (method.indexOf("getLocalSource") >= 0
@@ -1010,7 +1095,8 @@ public class IPhoneBuilder extends Executor {
         // iosPods string and SPM entries through the request build
         // hints, so the IOSDependencyManager.resolve() call below can
         // pick them up consistently with manually-declared deps.
-        if (!aiAcc.hits().isEmpty()) {
+        Set<PlatformFeatureCatalog.Entry> platformFeatureHits = aiAcc.hits();
+        if (!platformFeatureHits.isEmpty()) {
             // Prefer SPM when the project already uses SPM and the
             // entry exposes an SPM spec; otherwise pods. A handful
             // of ML Kit libs are pods-only -- those force pods on
@@ -1018,10 +1104,34 @@ public class IPhoneBuilder extends Executor {
             // upgrade the effective mode to BOTH below).
             boolean projectPrefersSpm = dependencyConfig.usesSwiftPackages() && !dependencyConfig.usesCocoaPods();
             StringBuilder spmPackages = new StringBuilder(request.getArg("ios.spm.packages", ""));
-            for (AiDependencyTable.Entry entry : aiAcc.hits()) {
+            for (PlatformFeatureCatalog.Entry entry : platformFeatureHits) {
+                // Third-party AI packages may omit Catalyst or arm64
+                // simulator slices. Keep framework-only Apple Vision enabled
+                // for macNative and record the simulator constraint for the
+                // generated Xcode and Pods projects.
+                boolean includeApplePackageDependencies =
+                        !macNativeBuilder.isEnabled()
+                        || entry.iosDependenciesSupportMacCatalyst();
+                if (includeApplePackageDependencies
+                        && entry.iosMinimumDeploymentTarget() != null) {
+                    addMinDeploymentTarget(
+                            entry.iosMinimumDeploymentTarget());
+                }
+                if (includeApplePackageDependencies
+                        && !entry.iosDependenciesSupportArm64Simulator()
+                        && (!entry.iosPods().isEmpty()
+                        || !entry.iosSpmSpecs().isEmpty())) {
+                    excludeArm64Simulator = true;
+                    log("Catalog-selected iOS dependency \""
+                            + entry.description()
+                            + "\" has no arm64 simulator slice. The generated "
+                            + "project will use the x86_64 simulator architecture.");
+                }
                 boolean handledViaSpm = false;
-                if (projectPrefersSpm && !entry.iosSpmSpecs().isEmpty()) {
-                    for (AiDependencyTable.IosSpm spm : entry.iosSpmSpecs()) {
+                if (includeApplePackageDependencies
+                        && projectPrefersSpm
+                        && !entry.iosSpmSpecs().isEmpty()) {
+                    for (PlatformFeatureCatalog.IosSpm spm : entry.iosSpmSpecs()) {
                         if (spmPackages.length() > 0) spmPackages.append(';');
                         spmPackages.append(spm.identity).append('|')
                                 .append(spm.url).append('|')
@@ -1040,19 +1150,18 @@ public class IPhoneBuilder extends Executor {
                     }
                     handledViaSpm = true;
                 }
-                if (!handledViaSpm) {
+                if (includeApplePackageDependencies && !handledViaSpm) {
                     for (String pod : entry.iosPods()) {
-                        if (iosPods.length() > 0) iosPods += ",";
-                        iosPods += pod;
+                        // User-declared specs are already first in iosPods, so
+                        // they win when the catalog requests the same pod.
+                        iosPods = appendPodSpecIfAbsent(iosPods, pod);
                     }
                 }
                 for (String[] plistEntry : entry.iosPlistEntries()) {
-                    String key = "ios." + plistEntry[0];
-                    if (request.getArg(key, null) == null) {
-                        request.putArgument(key, plistEntry[1]);
-                    }
+                    applyCatalogPlistEntry(request, plistEntry);
                 }
             }
+            iosPods = deduplicatePodSpecs(iosPods);
             if (spmPackages.length() > 0) {
                 request.putArgument("ios.spm.packages", spmPackages.toString());
             }
@@ -2401,7 +2510,7 @@ public class IPhoneBuilder extends Executor {
             // First-class Bluetooth: weak-link CoreBluetooth and compile in
             // the CN1Bluetooth natives only when the app references
             // com.codename1.bluetooth.*. The NSBluetooth* privacy strings
-            // are defaulted (only-if-unset) by the AiDependencyTable entry
+            // are defaulted (only-if-unset) by the PlatformFeatureCatalog entry
             // through the standard plist application above. Background
             // operation is opt-in through the ios.bluetooth.background hint
             // ("central", "peripheral" or "central,peripheral"), merged into
@@ -2452,7 +2561,7 @@ public class IPhoneBuilder extends Executor {
             // INCLUDE_CAMERA_USAGE (the old modal Capture API): the new
             // AVFoundation natives are only built when the app actually
             // references com.codename1.camera.*, matching the AVFoundation
-            // framework injection driven by the same scan via AiDependencyTable.
+            // framework injection driven by the same scan via PlatformFeatureCatalog.
             if (usesCn1Camera) {
                 try {
                     replaceInFile(new File(buildinRes,
@@ -2468,7 +2577,8 @@ public class IPhoneBuilder extends Executor {
             // Augmented reality: uncomment INCLUDE_CN1_AR so the CN1AR
             // natives (ARKit + ARSCNView) compile in, and link ARKit /
             // SceneKit explicitly -- neither is default-linked and the
-            // AiDependencyTable iosFrameworks field is documentation-only.
+            // Catalog frameworks are linked below. This explicit AR block also
+            // controls the native compile define and remains for compatibility.
             // Apps that never reference com.codename1.ar leave the define
             // commented out so no ARKit symbol is referenced, which keeps
             // Apple's API-usage scan quiet and tvOS/watchOS slices clean.
@@ -2488,6 +2598,53 @@ public class IPhoneBuilder extends Executor {
                 } else if (!addLibs.toLowerCase().contains("arkit.framework")) {
                     addLibs = addLibs + ";" + arLibs;
                 }
+            }
+
+            for (String framework : aiAcc.iosFrameworks()) {
+                addLibs = appendFrameworks(addLibs,
+                        framework + ".framework");
+            }
+
+            if (usesCn1Vision) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_VISION",
+                            "#define INCLUDE_CN1_VISION");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_VISION", ex);
+                }
+                addLibs = appendFrameworks(addLibs, "Vision.framework",
+                        "CoreImage.framework", "CoreVideo.framework");
+            }
+
+            if (usesCn1Language) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_LANGUAGE",
+                            "#define INCLUDE_CN1_LANGUAGE");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_LANGUAGE", ex);
+                }
+                addLibs = appendFrameworks(addLibs,
+                        "NaturalLanguage.framework");
+            }
+
+            if (usesCn1Inference) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_INFERENCE",
+                            "#define INCLUDE_CN1_INFERENCE");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_INFERENCE", ex);
+                }
+                addLibs = appendFrameworks(addLibs, "CoreML.framework",
+                        "Metal.framework", "Accelerate.framework");
             }
 
             // CarPlay: link CarPlay.framework (+ MediaPlayer for the now-playing template) and
@@ -3042,6 +3199,9 @@ public class IPhoneBuilder extends Executor {
                         targetStr = "8.0";
                     }
                     addMinDeploymentTarget(targetStr);
+                    String simulatorArchitectureSettings = excludeArm64Simulator
+                            ? "      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'\n"
+                            : "";
                     deploymentTargetStr = "begin\n"
                             + "  xcproj.targets.find{|e|e.name=='" + request.getMainClass() + "'}.build_configurations.each{|config| \n"
                             + "    config.build_settings['PRODUCT_BUNDLE_IDENTIFIER']='"+request.getPackageName()+"'\n"
@@ -3058,6 +3218,7 @@ public class IPhoneBuilder extends Executor {
                             + "    next if target.respond_to?(:product_type) && target.product_type == 'com.apple.product-type.app-extension'\n"
                             + "    target.build_configurations.each do |config|\n"
                             + "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '" + getDeploymentTarget(request) + "'\n"
+                            + simulatorArchitectureSettings
                             + "    end\n"
                             + "  end\n"
                             + "  xcproj.save\n"
@@ -3208,6 +3369,20 @@ public class IPhoneBuilder extends Executor {
 
                     }
 
+                    String arcPhaseFixScript =
+                            usesCn1Vision || usesCn1Language || usesCn1Inference
+                            ? "    arc_sources = ['CN1Vision.m', 'CN1Language.m', 'CN1Inference.m']\n"
+                            + "    main_target.source_build_phase.files.each do |bf|\n"
+                            + "      ref = bf.file_ref\n"
+                            + "      name = ref && File.basename(ref.path || ref.name || '')\n"
+                            + "      next unless arc_sources.include?(name)\n"
+                            + "      settings = bf.settings || {}\n"
+                            + "      flags = settings['COMPILER_FLAGS'].to_s.split\n"
+                            + "      flags << '-fobjc-arc' unless flags.include?('-fobjc-arc')\n"
+                            + "      settings['COMPILER_FLAGS'] = flags.join(' ')\n"
+                            + "      bf.settings = settings\n"
+                            + "    end\n"
+                            : "";
                     String createSchemesScript = "#!/usr/bin/env ruby\n" +
                             "require 'xcodeproj'\n" +
                             "require 'pathname'\n" +
@@ -3318,6 +3493,7 @@ public class IPhoneBuilder extends Executor {
                             + "      end\n"
                             + "      raise \"Swift files/resources still present in Copy Bundle Resources: #{names.join(', ')}\"\n"
                             + "    end\n"
+                            + arcPhaseFixScript
                             + "  end\n"
                             + "rescue => e\n"
                             + "  puts \"Error while correcting Swift build phases: #{$!}\"\n"
@@ -3353,7 +3529,7 @@ public class IPhoneBuilder extends Executor {
                         return false;
                     }
                     String podFileContents = "target '" + request.getMainClass() + "' do\n";
-                    String[] pods = iosPods.split("[,;]");
+                    String[] pods = deduplicatePodSpecs(iosPods).split("[,;]");
                     for (String podLib : pods) {
                         podLib = podLib.trim();
                         if (podLib.isEmpty()) {
@@ -3408,6 +3584,14 @@ public class IPhoneBuilder extends Executor {
 
                     if (useMetal) {
                         buildSettings += "      config.build_settings['CLANG_ENABLE_MODULES'] = \"YES\"\n";
+                    }
+                    if (excludeArm64Simulator) {
+                        // Google ML Kit's binary frameworks contain device
+                        // arm64 and simulator x86_64 slices. Apply the same
+                        // exclusion to every pod target so CocoaPods doesn't
+                        // drop its conflicting per-pod setting while merging
+                        // the aggregate xcconfig.
+                        buildSettings += "      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = \"arm64\"\n";
                     }
 
 
@@ -5480,6 +5664,22 @@ public class IPhoneBuilder extends Executor {
         
         }
         return out.toString();
+    }
+
+    private static boolean isVisionAnalyzerClass(String cls) {
+        return "com/codename1/ai/vision/TextRecognizer".equals(cls)
+                || "com/codename1/ai/vision/BarcodeScanner".equals(cls)
+                || "com/codename1/ai/vision/FaceDetector".equals(cls)
+                || "com/codename1/ai/vision/ImageLabeler".equals(cls)
+                || "com/codename1/ai/vision/PoseDetector".equals(cls)
+                || "com/codename1/ai/vision/SelfieSegmenter".equals(cls)
+                || "com/codename1/ai/vision/DocumentScanner".equals(cls);
+    }
+
+    private static boolean isLanguageFeatureClass(String cls) {
+        return "com/codename1/ai/language/LanguageIdentifier".equals(cls)
+                || "com/codename1/ai/language/Translator".equals(cls)
+                || "com/codename1/ai/language/SmartReply".equals(cls);
     }
 
 }

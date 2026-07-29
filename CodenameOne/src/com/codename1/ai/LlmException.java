@@ -100,19 +100,39 @@ public class LlmException extends IOException {
     private final ErrorType type;
     private final int retryAfterSeconds;
 
+    /// Creates an unclassified provider failure.
+    /// @param message user-readable failure description
     public LlmException(String message) {
         this(message, -1, null, null, null, ErrorType.UNKNOWN, -1);
     }
 
+    /// Creates an unclassified failure with its underlying cause.
+    /// @param message user-readable failure description
+    /// @param cause network, parsing, or provider cause
     public LlmException(String message, Throwable cause) {
         this(message, -1, null, null, cause, ErrorType.UNKNOWN, -1);
     }
 
+    /// Creates a classified provider failure without retry timing.
+    /// @param message user-readable failure description
+    /// @param httpStatus HTTP status, or {@code -1} without a response
+    /// @param providerErrorCode provider-specific machine code
+    /// @param rawBody raw response body retained for diagnostics
+    /// @param cause originating error, or {@code null}
+    /// @param type portable failure classification
     public LlmException(String message, int httpStatus, String providerErrorCode,
                         String rawBody, Throwable cause, ErrorType type) {
         this(message, httpStatus, providerErrorCode, rawBody, cause, type, -1);
     }
 
+    /// Creates a fully classified provider failure.
+    /// @param message user-readable failure description
+    /// @param httpStatus HTTP status, or {@code -1} without a response
+    /// @param providerErrorCode provider-specific machine code
+    /// @param rawBody raw response body retained for diagnostics
+    /// @param cause originating error, or {@code null}
+    /// @param type portable failure classification
+    /// @param retryAfterSeconds server-requested delay, or {@code -1}
     public LlmException(String message, int httpStatus, String providerErrorCode,
                         String rawBody, Throwable cause, ErrorType type,
                         int retryAfterSeconds) {
@@ -134,14 +154,17 @@ public class LlmException extends IOException {
         return type;
     }
 
+    /// @return HTTP status, or {@code -1} when no response was received
     public int getHttpStatus() {
         return httpStatus;
     }
 
+    /// @return provider-specific error code, or {@code null}
     public String getProviderErrorCode() {
         return providerErrorCode;
     }
 
+    /// @return raw response body for diagnostics, or {@code null}
     public String getRawBody() {
         return rawBody;
     }

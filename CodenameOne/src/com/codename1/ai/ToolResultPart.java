@@ -25,6 +25,8 @@ package com.codename1.ai;
 /// The result of a tool invocation, sent back to the model so it can
 /// continue reasoning. Pairs with the originating [ToolCall] via the
 /// `toolCallId`. The carrying [ChatMessage] should use [Role#TOOL].
+/// Result content sent back to a model after executing a requested tool call.
+/// The result is JSON text so providers receive the original structured value.
 public final class ToolResultPart extends MessagePart {
     private final String toolCallId;
     private final String resultJson;
@@ -32,15 +34,20 @@ public final class ToolResultPart extends MessagePart {
     /// `resultJson` is the literal JSON string the tool produced. If
     /// the tool result isn't valid JSON, wrap it like
     /// `"{\"text\":\"...\"}"` -- the providers expect JSON-shaped values.
+    /// Creates a tool result part.
+    /// @param toolCallId id of the {@link ToolCall} being answered
+    /// @param resultJson JSON value returned by the application tool
     public ToolResultPart(String toolCallId, String resultJson) {
         this.toolCallId = toolCallId;
         this.resultJson = resultJson == null ? "" : resultJson;
     }
 
+    /// @return provider tool-call id this result answers
     public String getToolCallId() {
         return toolCallId;
     }
 
+    /// @return application result encoded as JSON
     public String getResultJson() {
         return resultJson;
     }

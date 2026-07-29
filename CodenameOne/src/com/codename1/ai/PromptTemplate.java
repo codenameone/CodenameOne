@@ -45,15 +45,25 @@ public final class PromptTemplate {
         this.template = template;
     }
 
+    /// Starts a template instance.
+    /// @param template text containing optional {@code {name}} placeholders
+    /// @return mutable template values bound to the supplied text
     public static PromptTemplate of(String template) {
         return new PromptTemplate(template);
     }
 
+    /// Binds one placeholder. A {@code null} value renders as an empty string.
+    /// @param key placeholder name without braces
+    /// @param value replacement value
+    /// @return this template
     public PromptTemplate put(String key, String value) {
         values.put(key, value == null ? "" : value);
         return this;
     }
 
+    /// Adds all supplied placeholder values.
+    /// @param map replacements keyed by placeholder name; {@code null} is ignored
+    /// @return this template
     public PromptTemplate putAll(Map<String, String> map) {
         if (map != null) {
             values.putAll(map);
@@ -64,6 +74,7 @@ public final class PromptTemplate {
     /// Renders the final string. Unknown placeholders are left
     /// intact (`{like_this}`) so they're easy to spot in test
     /// output -- silently dropping them tends to hide bugs.
+    /// @return rendered prompt text
     public String build() {
         StringBuilder out = new StringBuilder(template.length() + 32);
         int i = 0;
@@ -88,11 +99,13 @@ public final class PromptTemplate {
     }
 
     /// Convenience: render and wrap as a [ChatMessage] with USER role.
+    /// @return rendered user message
     public ChatMessage asUser() {
         return ChatMessage.user(build());
     }
 
     /// Convenience: render and wrap as a [ChatMessage] with SYSTEM role.
+    /// @return rendered system message
     public ChatMessage asSystem() {
         return ChatMessage.system(build());
     }

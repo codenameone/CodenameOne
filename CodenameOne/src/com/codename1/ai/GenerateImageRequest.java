@@ -23,6 +23,9 @@
 package com.codename1.ai;
 
 /// Request payload for [ImageGenerator#generate(GenerateImageRequest)].
+/// Mutable image-generation request shared by the supported providers.
+/// Provider-specific values that are unsupported may be ignored or rejected
+/// by the selected {@link ImageGenerator}.
 public final class GenerateImageRequest {
     private final String prompt;
     private String model;
@@ -32,6 +35,8 @@ public final class GenerateImageRequest {
     private int count = 1;
     private Long seed;
 
+    /// Creates a request with required prompt text.
+    /// @param prompt description of the image to generate
     public GenerateImageRequest(String prompt) {
         if (prompt == null || prompt.length() == 0) {
             throw new IllegalArgumentException("prompt is required");
@@ -39,19 +44,24 @@ public final class GenerateImageRequest {
         this.prompt = prompt;
     }
 
+    /// @return image description sent to the provider
     public String getPrompt() {
         return prompt;
     }
 
+    /// @return requested model id, or {@code null} for generator default
     public String getModel() {
         return model;
     }
 
+    /// @param model provider model id, or {@code null} for generator default
+    /// @return this request
     public GenerateImageRequest setModel(String model) {
         this.model = model;
         return this;
     }
 
+    /// @return requested dimensions such as {@code 1024x1024}
     public String getSize() {
         return size;
     }
@@ -63,24 +73,31 @@ public final class GenerateImageRequest {
         return this;
     }
 
+    /// @return provider style value, or {@code null} when unspecified
     public String getStyle() {
         return style;
     }
 
+    /// @param style provider-specific rendering style, or {@code null}
+    /// @return this request
     public GenerateImageRequest setStyle(String style) {
         this.style = style;
         return this;
     }
 
+    /// @return provider quality tier, or {@code null} when unspecified
     public String getQuality() {
         return quality;
     }
 
+    /// @param quality provider-specific quality tier, or {@code null}
+    /// @return this request
     public GenerateImageRequest setQuality(String quality) {
         this.quality = quality;
         return this;
     }
 
+    /// @return requested image count
     public int getCount() {
         return count;
     }
@@ -92,10 +109,13 @@ public final class GenerateImageRequest {
         return this;
     }
 
+    /// @return deterministic seed, or {@code null} when unspecified
     public Long getSeed() {
         return seed;
     }
 
+    /// @param seed deterministic seed where supported, or {@code null}
+    /// @return this request
     public GenerateImageRequest setSeed(Long seed) {
         this.seed = seed;
         return this;

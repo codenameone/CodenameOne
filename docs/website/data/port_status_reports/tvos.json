@@ -7,8 +7,8 @@
   "suite_finished": true,
   "summary": {
     "fail": 0,
-    "not-run": 0,
-    "pass": 162,
+    "not-run": 5,
+    "pass": 163,
     "skip": 2
   },
   "tests": {
@@ -684,6 +684,18 @@
     },
     "ClipboardRoundTripTest": {
       "feature": "clipboard",
+      "status": "not-run"
+    },
+    "InferenceOnDeviceApiTest": {
+      "feature": "on-device-inference",
+      "status": "not-run"
+    },
+    "LanguageOnDeviceApiTest": {
+      "feature": "on-device-language",
+      "status": "not-run"
+    },
+    "VisionOnDeviceApiTest": {
+      "feature": "on-device-vision",
       "status": "not-run"
     }
   },

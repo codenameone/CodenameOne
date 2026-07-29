@@ -31,6 +31,8 @@ import java.util.List;
 public interface SafetyFilter {
     /// Returns `null` to allow the call, or a human-readable reason
     /// string to block it.
+    /// @param messages immutable request conversation
+    /// @return {@code null} to allow submission, otherwise the rejection reason
     String check(List<ChatMessage> messages);
 
     /// A built-in filter that allows everything. Useful as a default

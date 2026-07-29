@@ -1,23 +1,23 @@
-name: AI cn1lib iOS xcodebuild check
+name: Large AI cn1lib iOS xcodebuild check
 
-# Per cn1lib: synthesise a tiny Xcode project that links the bundled
-# `nativeios/*.m` against the real `GoogleMLKit/*` (or TFLite / whisper)
-# pod, run `pod install`, then `xcodebuild build`. Catches API drift,
-# missing imports, and missing pod hints early -- on the same macOS
-# runners we already use for build-ios.
+# The lightweight vision, language, and LiteRT bridges now live in core and
+# are exercised by the normal port/build tests. Keep this isolated native
+# check for the two deliberately large cn1libs.
 
 on:
   workflow_dispatch:
   pull_request:
     branches: [master]
     paths:
-      - 'maven/cn1-ai-**'
+      - 'maven/cn1-ai-whisper/**'
+      - 'maven/cn1-ai-stablediffusion/**'
       - 'scripts/gen-ai-cn1libs.py'
       - '.github/workflows/ai-cn1lib-native-check.yml'
   push:
     branches: [master]
     paths:
-      - 'maven/cn1-ai-**'
+      - 'maven/cn1-ai-whisper/**'
+      - 'maven/cn1-ai-stablediffusion/**'
       - 'scripts/gen-ai-cn1libs.py'
 
 jobs:
@@ -32,17 +32,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { lib: cn1-ai-mlkit-text,         pod: 'GoogleMLKit/TextRecognition'    }
-          - { lib: cn1-ai-mlkit-barcode,      pod: 'GoogleMLKit/BarcodeScanning'    }
-          - { lib: cn1-ai-mlkit-face,         pod: 'GoogleMLKit/FaceDetection'      }
-          - { lib: cn1-ai-mlkit-labeling,     pod: 'GoogleMLKit/ImageLabeling'      }
-          - { lib: cn1-ai-mlkit-translate,    pod: 'GoogleMLKit/Translate'          }
-          - { lib: cn1-ai-mlkit-smartreply,   pod: 'GoogleMLKit/SmartReply'         }
-          - { lib: cn1-ai-mlkit-langid,       pod: 'GoogleMLKit/LanguageID'         }
-          - { lib: cn1-ai-mlkit-pose,         pod: 'GoogleMLKit/PoseDetection'      }
-          - { lib: cn1-ai-mlkit-segmentation, pod: 'GoogleMLKit/SegmentationSelfie' }
-          - { lib: cn1-ai-mlkit-docscan,      pod: ''                               }   # VisionKit/CoreImage only
-          - { lib: cn1-ai-tflite,             pod: 'TensorFlowLiteObjC'             }
           - { lib: cn1-ai-whisper,            pod: ''                               }   # links static libwhisper.a
           - { lib: cn1-ai-stablediffusion,    pod: ''                               }   # links Swift runner
     steps:

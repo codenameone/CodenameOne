@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.settings.extensions;
 
 import com.codename1.io.ConnectionRequest;
@@ -20,14 +42,6 @@ public final class MavenCentralSearch {
         ArrayList<ExtensionDescriptor> out = new ArrayList<ExtensionDescriptor>();
         out.add(maven("Google Maps", "Native Google Maps integration for Codename One apps.",
                 "com.codenameone", "googlemaps-lib", "1.0.1", "pom"));
-        out.add(maven("ML Kit Barcode", "Decode QR, EAN, Code 128, and other ML Kit barcode formats.",
-                "com.codenameone", "cn1-ai-mlkit-barcode-lib", "LATEST", "pom"));
-        out.add(maven("ML Kit Document Scanner", "Capture and crop document photos with native VisionKit and Google Play Services support.",
-                "com.codenameone", "cn1-ai-mlkit-docscan-lib", "LATEST", "pom"));
-        out.add(maven("ML Kit Face Detection", "Detect faces and bounding rectangles using ML Kit-backed native providers.",
-                "com.codenameone", "cn1-ai-mlkit-face-lib", "LATEST", "pom"));
-        out.add(maven("TensorFlow Lite", "TensorFlow Lite inference bridge packaged as a Codename One cn1lib.",
-                "com.codenameone", "cn1-ai-tflite-lib", "LATEST", "pom"));
         out.add(maven("Whisper", "Speech-to-text support through the Codename One AI Whisper cn1lib.",
                 "com.codenameone", "cn1-ai-whisper-lib", "LATEST", "pom"));
         out.add(legacy("Bouncy Castle SDK", "Legacy cn1lib catalog entry for Bouncy Castle cryptography support."));
