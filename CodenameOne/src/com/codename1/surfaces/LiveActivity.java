@@ -64,6 +64,17 @@ public final class LiveActivity {
     /// Starts a live activity. On unsupported platforms (or when the platform refuses, e.g. the
     /// user disabled live activities) this returns an inert handle rather than throwing.
     ///
+    /// #### Threading
+    ///
+    /// Callable from any thread, and a background thread is the right one. Starting an activity
+    /// serializes the descriptor, writes its PNG blobs where the platform renderer can reach them
+    /// and makes a synchronous native request (`Activity.request` is an XPC round trip on iOS).
+    /// The simulator makes all of that free, so an app that starts activities on the EDT looks
+    /// fine there and stalls on hardware; [Surfaces#setDiagnosticsEnabled(Boolean)] describes the
+    /// checks that catch it. Note also that the returned handle is the only way to update or end
+    /// this activity: check [#isActive()] rather than tracking a flag of your own, or a start that
+    /// the platform refused leaves you starting a second activity on top of a live one.
+    ///
     /// #### Parameters
     ///
     /// - `descriptor`: the activity layout and regions
@@ -74,6 +85,7 @@ public final class LiveActivity {
     /// a handle to the running activity; check [#isActive()] to know whether it is live
     public static LiveActivity start(LiveActivityDescriptor descriptor,
             Map<String, Object> initialState) {
+        SurfaceDiagnostics.offEdtPreferred("LiveActivity.start");
         SurfaceBridge b = Surfaces.bridgeInternal();
         if (b == null || !b.isLiveActivitySupported()) {
             return new LiveActivity(null);
@@ -108,8 +120,11 @@ public final class LiveActivity {
     /// - `state`: the new state map
     public void update(Map<String, Object> state) {
         if (!active) {
+            SurfaceDiagnostics.inertActivity("LiveActivity.update");
             return;
         }
+        SurfaceDiagnostics.offEdtPreferred("LiveActivity.update");
+        SurfaceDiagnostics.noteRepublish("activity:" + id, "live activity \"" + id + "\"");
         SurfaceBridge b = Surfaces.bridgeInternal();
         if (b != null) {
             b.updateLiveActivity(id, SurfaceSerializer.serializeState(state));
@@ -135,8 +150,10 @@ public final class LiveActivity {
     ///   platform linger on the final state
     public void end(Map<String, Object> finalState, boolean dismissImmediately) {
         if (!active) {
+            SurfaceDiagnostics.inertActivity("LiveActivity.end");
             return;
         }
+        SurfaceDiagnostics.offEdtPreferred("LiveActivity.end");
         active = false;
         SurfaceBridge b = Surfaces.bridgeInternal();
         if (b != null) {

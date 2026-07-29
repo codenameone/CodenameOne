@@ -677,6 +677,126 @@ class SurfaceTest {
         });
     }
 
+    // --- simulator diagnostics ------------------------------------------------
+    //
+    // These guard the mistakes that work in the simulator and stall (or silently do nothing) on a
+    // device. They are inert without a platform, so every test here turns them on explicitly and
+    // Surfaces.reset() in tearDown puts them back.
+
+    @Test
+    void diagnosticsAreInertWithoutAPlatform() {
+        assertFalse(Surfaces.isDiagnosticsEnabled());
+        // no kind registered, and still no complaint: nothing to diagnose off-simulator
+        Surfaces.setBridge(new FakeBridge());
+        Surfaces.publish("never_registered", new WidgetTimeline()
+                .setContent(new SurfaceText("x")));
+    }
+
+    @Test
+    void publishingAnUnregisteredKindFailsFast() {
+        Surfaces.setDiagnosticsEnabled(Boolean.TRUE);
+        Surfaces.setBridge(new FakeBridge());
+        Surfaces.registerWidgetKind(new WidgetKind("registered_one"));
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        Surfaces.publish("typo_in_the_id", new WidgetTimeline()
+                                .setContent(new SurfaceText("x")));
+                    }
+                });
+        assertTrue(e.getMessage().contains("typo_in_the_id"), e.getMessage());
+        assertTrue(e.getMessage().contains("registerWidgetKind"), e.getMessage());
+        // the message names what IS registered, so the typo is obvious
+        assertTrue(e.getMessage().contains("registered_one"), e.getMessage());
+    }
+
+    @Test
+    void publishingARegisteredKindIsUnaffected() {
+        Surfaces.setDiagnosticsEnabled(Boolean.TRUE);
+        FakeBridge bridge = new FakeBridge();
+        Surfaces.setBridge(bridge);
+        Surfaces.registerWidgetKind(new WidgetKind("delivery_status"));
+        Surfaces.publish("delivery_status", new WidgetTimeline()
+                .setContent(new SurfaceText("${statusLabel}")));
+        assertEquals("delivery_status", bridge.publishedKind);
+    }
+
+    @Test
+    void rasterizingAnImageOnTheEdtFailsFast() {
+        // Driven through the diagnostic rather than through SurfaceSerializer because building a
+        // non-EncodedImage com.codename1.ui.Image needs a platform Display, which this suite has
+        // no business requiring. SurfaceSerializer.encode() calls exactly this for any image that
+        // is not already encoded.
+        Surfaces.setDiagnosticsEnabled(Boolean.TRUE);
+        SurfaceDiagnostics.setEdtForTests(Boolean.TRUE);
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        SurfaceDiagnostics.beforeRasterizingImageEncode();
+                    }
+                });
+        assertTrue(e.getMessage().contains("EncodedImage"), e.getMessage());
+        assertTrue(e.getMessage().contains("EDT"), e.getMessage());
+    }
+
+    @Test
+    void rasterizingAnImageOffTheEdtIsAllowed() {
+        Surfaces.setDiagnosticsEnabled(Boolean.TRUE);
+        SurfaceDiagnostics.setEdtForTests(Boolean.FALSE);
+        SurfaceDiagnostics.beforeRasterizingImageEncode();
+    }
+
+    @Test
+    void encodedImagePayloadsSkipTheRasterizingPathEntirely() {
+        // registerImageBytes is the same entry point EncodedImage takes in encode(): bytes in,
+        // bytes out, so it stays legal on the EDT where a rasterizing encode does not.
+        Surfaces.setDiagnosticsEnabled(Boolean.TRUE);
+        SurfaceDiagnostics.setEdtForTests(Boolean.TRUE);
+        Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
+        String name = SurfaceSerializer.registerImageBytes(pngBytes(7), images);
+        assertNotNull(name);
+        assertEquals(1, images.size());
+    }
+
+    @Test
+    void inertLiveActivityCallsStayNoOpsWhileDiagnosed() {
+        Surfaces.setDiagnosticsEnabled(Boolean.TRUE);
+        FakeBridge bridge = new FakeBridge();
+        bridge.activitiesSupported = false;
+        Surfaces.setBridge(bridge);
+        LiveActivity inert = LiveActivity.start(
+                new LiveActivityDescriptor("delivery").setContent(new SurfaceText("x")), null);
+        assertFalse(inert.isActive());
+        // documented no-ops: the diagnostic explains them, it must not change them
+        inert.update(new HashMap<String, Object>());
+        inert.end(null);
+        assertTrue(bridge.updates.isEmpty());
+        assertNull(bridge.endedId);
+    }
+
+    @Test
+    void republishingPastTheRateLimitWarnsWithoutFailing() {
+        Surfaces.setDiagnosticsEnabled(Boolean.TRUE);
+        FakeBridge bridge = new FakeBridge();
+        Surfaces.setBridge(bridge);
+        Surfaces.registerWidgetKind(new WidgetKind("chatty"));
+        for (int i = 0; i < 30; i++) {
+            Surfaces.publish("chatty", new WidgetTimeline().setContent(new SurfaceText("x")));
+        }
+        assertEquals("chatty", bridge.publishedKind);
+    }
+
+    @Test
+    void diagnosticsCanBeForcedOff() {
+        Surfaces.setDiagnosticsEnabled(Boolean.FALSE);
+        assertFalse(Surfaces.isDiagnosticsEnabled());
+        SurfaceDiagnostics.setEdtForTests(Boolean.TRUE);
+        Surfaces.setBridge(new FakeBridge());
+        SurfaceDiagnostics.beforeRasterizingImageEncode();
+        Surfaces.publish("never_registered", new WidgetTimeline()
+                .setContent(new SurfaceText("x")));
+    }
+
     @Test
     void kindSerializationIncludesSizesAndDefaults() throws Exception {
         WidgetKind k = new WidgetKind("scores");
