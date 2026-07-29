@@ -19051,7 +19051,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
-    public void confirmAttestation() {
+    public void confirmAttestation(String keyId) {
         // No client-side key here either, so there is nothing to acknowledge.
     }
 

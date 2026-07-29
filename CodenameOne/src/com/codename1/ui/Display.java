@@ -6867,8 +6867,8 @@ public final class Display extends CN1Constants {
 
     /// Acknowledges that a backend recorded the attested key. See
     /// `com.codename1.security.DeviceIntegrity#confirmAttestation()`.
-    public void confirmAttestation() {
-        impl.confirmAttestation();
+    public void confirmAttestation(String keyId) {
+        impl.confirmAttestation(keyId);
     }
 
     /// Returns digests of the certificates the running app is signed with. Low level hook for the

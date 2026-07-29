@@ -71,9 +71,9 @@ final class DefaultEngineContext implements EngineContext {
     }
 
     @Override
-    public void confirmPlatformAttestation() {
+    public void confirmPlatformAttestation(String keyId) {
         try {
-            DeviceIntegrity.confirmAttestation();
+            DeviceIntegrity.confirmAttestation(keyId);
         } catch (Throwable t) {
             Log.e(t);
         }

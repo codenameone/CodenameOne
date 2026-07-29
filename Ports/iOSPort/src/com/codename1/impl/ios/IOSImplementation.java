@@ -4581,8 +4581,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public void confirmAttestation() {
-        deviceIntegrity().confirmAttestation();
+    public void confirmAttestation(String keyId) {
+        deviceIntegrity().confirmAttestation(keyId);
     }
 
     /**

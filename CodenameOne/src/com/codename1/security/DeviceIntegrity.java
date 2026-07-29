@@ -137,11 +137,17 @@ public final class DeviceIntegrity {
     /// good and burn one of Apple's rate limited attestations replacing it. So requests made between
     /// the attestation and this acknowledgement are refused with a retry hint rather than asserted.
     ///
-    /// Call it once, after the response accepting the attestation token. Not calling it is safe but
-    /// slower: the client assumes registration succeeded after a short grace period. No-op on Android
-    /// and where attestation is unsupported.
-    public static void confirmAttestation() {
-        Display.getInstance().confirmAttestation();
+    /// Call it once, after the response accepting the attestation token, passing the key that
+    /// response acknowledged. Not calling it is safe but slower: the client assumes registration
+    /// succeeded after a short grace period. No-op on Android and where attestation is
+    /// unsupported.
+    /// @param keyId the key identifier your backend recorded -- the middle field of the
+    ///        `cn1aa1:attest:<keyId>:<attestation>` token it accepted, base64-decoded.
+    ///        Naming it matters: a response for an earlier attestation can arrive after
+    ///        the key has already been replaced, and acknowledging that would mark a key
+    ///        attested which the backend has never seen.
+    public static void confirmAttestation(String keyId) {
+        Display.getInstance().confirmAttestation(keyId);
     }
 
     /// Non-exiting RASP check. Returns true when the device shows signs of being rooted, jailbroken,

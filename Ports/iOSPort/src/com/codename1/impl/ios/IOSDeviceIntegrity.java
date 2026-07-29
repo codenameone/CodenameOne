@@ -237,7 +237,10 @@ final class IOSDeviceIntegrity {
      * invalid key, and resets a key that was in fact perfectly good. The whole
      * point of attest-once is not to burn keys that way.</p>
      */
-    void confirmAttestation() {
+    void confirmAttestation(String keyId) {
+        if (keyId == null || keyId.length() == 0) {
+            return;
+        }
         synchronized (flowLock) {
             // Re-read inside the lock. Checking first and transitioning afterwards let a
             // reset and a replacement key land in between, so this would stamp
@@ -245,6 +248,14 @@ final class IOSDeviceIntegrity {
             // next request would assert against it.
             SecureStorage store = SecureStorage.getInstance();
             if (!STATE_PENDING.equals(store.get(KEY_STATE))) {
+                return;
+            }
+            // And it must acknowledge THIS key. A response for an earlier attestation
+            // can arrive after a reset has already replaced the identity, and promoting
+            // on that would mark a key attested that the backend has never seen -- so
+            // the next assertion is rejected and costs another reset, which is the loop
+            // this state exists to break.
+            if (!keyId.equals(store.get(KEY_ID))) {
                 return;
             }
             store.set(KEY_STATE, STATE_ATTESTED);

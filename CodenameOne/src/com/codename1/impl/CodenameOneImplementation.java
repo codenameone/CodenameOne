@@ -11276,7 +11276,7 @@ public abstract class CodenameOneImplementation {
     /// take the cheap assertion path. See
     /// [com.codename1.security.DeviceIntegrity#confirmAttestation()]. No-op where attestation holds no
     /// client-side key.
-    public void confirmAttestation() {
+    public void confirmAttestation(String keyId) {
     }
 
     /// Returns digests of the certificates the running application is actually signed with, so a build
