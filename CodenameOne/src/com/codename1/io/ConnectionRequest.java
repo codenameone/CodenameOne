@@ -657,9 +657,51 @@ public class ConnectionRequest implements IOProgressListener {
     /// headers: anything scoped to the original host has to be removable before
     /// the retry, or it follows the redirect to wherever it points.
     public void removeRequestHeader(String key) {
-        if (userHeaders != null && key != null) {
-            userHeaders.remove(key);
+        if (userHeaders == null || key == null) {
+            return;
         }
+        userHeaders.remove(key);
+        // And any other spelling of it. HTTP header names are case-insensitive, so a
+        // token added as "X-CN1-Attest" and removed as "x-cn1-attest" would survive an
+        // exact-key removal -- and initConnection emits everything left, which on a
+        // redirect from a protected host to an unprotected one means handing the bearer
+        // token to the redirect target. That is the case this method exists to prevent.
+        Vector matches = null;
+        Enumeration keys = userHeaders.keys();
+        while (keys.hasMoreElements()) {
+            String existing = (String) keys.nextElement();
+            if (existing != null && existing.length() == key.length()
+                    && equalsIgnoreAsciiCase(existing, key)) {
+                if (matches == null) {
+                    matches = new Vector();
+                }
+                matches.addElement(existing);
+            }
+        }
+        if (matches != null) {
+            for (int i = 0; i < matches.size(); i++) {
+                userHeaders.remove(matches.elementAt(i));
+            }
+        }
+    }
+
+    /// ASCII-only case-insensitive comparison, so the result never depends on the device locale --
+    /// under the Turkish locale an uppercase `I` does not fold to `i`.
+    private static boolean equalsIgnoreAsciiCase(String a, String b) {
+        for (int i = 0; i < a.length(); i++) {
+            char x = a.charAt(i);
+            char y = b.charAt(i);
+            if (x >= 'A' && x <= 'Z') {
+                x = (char) (x + 32);
+            }
+            if (y >= 'A' && y <= 'Z') {
+                y = (char) (y + 32);
+            }
+            if (x != y) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Adds the given header to the request that will be sent unless the header

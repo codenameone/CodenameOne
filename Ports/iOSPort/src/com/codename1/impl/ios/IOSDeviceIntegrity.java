@@ -91,6 +91,15 @@ final class IOSDeviceIntegrity {
     private static final String KEY_RETRY_AFTER = "cn1.appattest.retryAfter";
 
     private static final String KEY_PENDING_SINCE = "cn1.appattest.pendingSince";
+    /**
+     * Set immediately before {@code attestKey}, cleared once the result is recorded.
+     *
+     * <p>Attestation is one-time and rate limited, so a key that has already been
+     * submitted must not be submitted again. Finding this marker on a later launch means
+     * the app died between Apple accepting the attestation and us persisting that fact
+     * -- and the key may well be spent, so the only safe move is a fresh one.</p>
+     */
+    private static final String KEY_ATTEST_STARTED = "cn1.appattest.attestStarted";
 
     private static final String STATE_NEW = "new";
     private static final String STATE_ATTESTED = "attested";
@@ -205,6 +214,7 @@ final class IOSDeviceIntegrity {
         boolean stateGone = store.remove(KEY_STATE);
         store.remove(KEY_RETRY_AFTER);
         store.remove(KEY_PENDING_SINCE);
+        store.remove(KEY_ATTEST_STARTED);
         if (!idGone || !stateGone) {
             // The two deletions are not atomic, so a partial failure leaves half the
             // identity gone. Treating that as "untouched" would let a callback from the
@@ -338,11 +348,25 @@ final class IOSDeviceIntegrity {
                     return r;
                 }
                 bootstrapInFlight = true;
-                if (keyId != null && keyId.length() > 0) {
-                    // A key exists but was never attested -- a previous attempt
-                    // died between the two steps. Attest that key rather than
-                    // generating another.
+                if (keyId != null && keyId.length() > 0
+                        && store.get(KEY_ATTEST_STARTED) == null) {
+                    // A key exists but attestation was never started for it -- the
+                    // previous attempt died between generating and submitting. Attest
+                    // that key rather than burning another.
                     attestKey(r, nonce, keyId);
+                } else if (keyId != null && keyId.length() > 0) {
+                    // Attestation WAS started for this key and we never recorded the
+                    // outcome, so Apple may already have consumed it. Re-submitting a
+                    // spent key is rejected and the failure repeats on every request
+                    // until something resets, so discard it and start clean. One
+                    // rate-limited key is spent either way; this way the device recovers.
+                    store.remove(KEY_ID);
+                    store.remove(KEY_STATE);
+                    store.remove(KEY_ATTEST_STARTED);
+                    PendingRequest fresh = new PendingRequest(r, nonce,
+                            PendingRequest.OP_GENERATE_KEY, null);
+                    int rid = register(fresh);
+                    nativeInstance.appAttestGenerateKey(rid);
                 } else {
                     int rid = register(pending);
                     nativeInstance.appAttestGenerateKey(rid);
@@ -387,6 +411,9 @@ final class IOSDeviceIntegrity {
         // The attestation binds to SHA-256 of the raw nonce. Hashing here rather
         // than natively keeps a single hash implementation across both paths.
         String hash = base64(Hash.sha256(bytes(nonce)));
+        // Recorded BEFORE the call, so a crash between here and the result is
+        // distinguishable from never having tried.
+        SecureStorage.getInstance().set(KEY_ATTEST_STARTED, "1");
         PendingRequest pending = new PendingRequest(r, nonce, PendingRequest.OP_ATTEST, keyId);
         pending.retried = retried;
         int rid = register(pending);
@@ -458,6 +485,7 @@ final class IOSDeviceIntegrity {
                 // and leave nothing half-written behind.
                 store.remove(KEY_ID);
                 store.remove(KEY_STATE);
+                store.remove(KEY_ATTEST_STARTED);
                 instance.bootstrapInFlight = false;
                 fail(pending, "App Attest could not store its key identifier");
                 instance.failBootstrapWaiters(
