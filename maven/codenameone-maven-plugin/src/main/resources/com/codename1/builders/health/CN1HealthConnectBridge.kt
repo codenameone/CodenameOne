@@ -488,8 +488,28 @@ class CN1HealthConnectBridge(private val context: Context)
         // spent that the estimate below can only avoid on page two. One
         // extra round trip on a large series read is the cheaper mistake.
         var samplesPerRecord = if (isSeriesToken(token)) limit else 1
+        var firstPage = true
         while (remaining > 0) {
-            val wantRecords = maxOf(1, remaining / samplesPerRecord)
+            // The first page of a series read asks for several records
+            // however small the limit is. Series records overlap -- a
+            // phone and a watch both recording heart rate -- so the
+            // newest sample is not necessarily in the record with the
+            // newest start, and a limit of one collapsed this to a single
+            // record. The merge then had nothing to compare it against,
+            // and the token moved past the record that actually held the
+            // latest sample.
+            //
+            // A floor rather than an exact answer, and it is worth being
+            // clear that it is one: a sample lies inside its record's
+            // span, and records arrive ordered by start, so knowing that
+            // no unread record can beat the best sample so far needs
+            // their end times -- which are only known once fetched.
+            // MIN_SERIES_RECORDS covers the overlap a person actually
+            // wears; nothing bounds it in principle.
+            val floor = if (isSeriesToken(token) && firstPage)
+                MIN_SERIES_RECORDS else 1
+            firstPage = false
+            val wantRecords = maxOf(floor, remaining / samplesPerRecord)
             val page = requireClient().readRecords(
                 ReadRecordsRequest(type, timeRangeFilter = filter,
                     // Source filtering happens here rather than after the
@@ -1137,6 +1157,21 @@ class CN1HealthConnectBridge(private val context: Context)
      * larger value is not clamped by the library, it is rejected.
      */
     private val MAX_PAGE_SIZE = 5000
+
+    /**
+     * How many series records the first page reads however small the
+     * caller's limit is, so that overlapping records can be compared.
+     *
+     * Series records overlap whenever more than one device is recording,
+     * and the newest sample need not be in the record with the newest
+     * start -- so a limit of one, which otherwise asks for exactly one
+     * record, would let the merge pick from a single record and the token
+     * move past the one that held the later sample. Eight covers a phone,
+     * a watch and a strap or two with room to spare; a read whose limit
+     * is genuinely larger is unaffected, since it asks for more than this
+     * anyway.
+     */
+    private val MIN_SERIES_RECORDS = 8
 
     /// Whether this type's records hold many samples each.
     ///
