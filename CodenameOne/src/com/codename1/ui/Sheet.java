@@ -990,6 +990,13 @@ public class Sheet extends Container {
     /// and disabled ones on a pane that never had them, which registers elevation and surface
     /// state. So an entry for a style that has been replaced is simply carried until the next
     /// restore, where putting padding back into a detached style costs nothing.
+    ///
+    /// One entry is added per style the content pane presents while a hand written border is in
+    /// effect, so the count is bounded by how often something replaces those styles, a theme
+    /// refresh in practice, between one show of this sheet and the show that takes the inset off.
+    /// Holding the styles weakly instead would let the list shrink on its own, but the portable
+    /// weak reference of the platform is allowed to report that it holds nothing, and treating that
+    /// as a style that went away would silently skip a restore that is still owed.
     private ContentPaneInset recordContentPaneInset(Style style) {
         if (contentPaneInsets == null) {
             contentPaneInsets = new ArrayList<ContentPaneInset>();
