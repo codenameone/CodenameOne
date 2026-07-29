@@ -293,6 +293,31 @@ class IOSHealthStore extends HealthStore {
     /// deletions and stop re-reading samples already seen at the same
     /// time. Until it lands, an app that must be complete rather than
     /// merely current has to re-read its range periodically; the
+    /// Seeds the cursor at registration, so the first drain reads the
+    /// window since `subscribe()` rather than opening one.
+    ///
+    /// The cursor here is a timestamp, so unlike Health Connect there is
+    /// nothing to ask the platform for and nothing to wait on. Without
+    /// this the handle had no anchor until the first drain, which took
+    /// `now` as its baseline and reported an empty batch -- so everything
+    /// the user recorded between registering and that first drain was
+    /// skipped, permanently and silently. Health Connect's side of this
+    /// takes a baseline token in `doSubscribe` for exactly the same
+    /// reason.
+    ///
+    /// A restored subscription already carries its cursor and
+    /// `seedAnchor` declines to move it, which is what keeps a relaunch
+    /// resuming where the last drain left off.
+    @Override
+    protected void doSubscribe(com.codename1.health.SubscriptionRequest request,
+            HealthSubscription subscription) {
+        if (subscription == null) {
+            return;
+        }
+        seedAnchor(subscription, HealthAnchor.of(
+                String.valueOf(System.currentTimeMillis())));
+    }
+
     /// developer guide says so where subscriptions are introduced.
     ///
     /// This is
