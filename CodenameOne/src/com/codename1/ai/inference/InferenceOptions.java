@@ -31,7 +31,9 @@ package com.codename1.ai.inference;
 /// runtime can mix NPU and CPU operations without reporting full delegation,
 /// and the iOS Core ML delegate can schedule work across the Neural Engine,
 /// GPU, and CPU. Both mobile backends therefore reject
-/// {@link Accelerator#NPU} when fallback is disabled.
+/// {@link Accelerator#NPU} when fallback is disabled. iOS also rejects strict
+/// {@link Accelerator#CORE_ML} sessions because the delegate does not report
+/// whether unsupported model operations remained on LiteRT's CPU path.
 public final class InferenceOptions {
     /// Execution targets understood by the portable inference API.
     public enum Accelerator {
@@ -65,9 +67,10 @@ public final class InferenceOptions {
     /// to CPU execution.
     ///
     /// On Android and iOS, setting this to {@code false} with
-    /// {@link Accelerator#NPU} rejects session creation. Neither LiteRT's
-    /// NNAPI delegate nor its Core ML delegate can prove that every operation
-    /// ran on the requested NPU instead of CPU or GPU.
+    /// {@link Accelerator#NPU} rejects session creation. On iOS it also
+    /// rejects {@link Accelerator#CORE_ML}. Neither LiteRT's NNAPI delegate
+    /// nor its Core ML delegate can prove that every operation ran on the
+    /// requested accelerator instead of CPU or another processor.
     ///
     /// @param value {@code true} to permit CPU fallback
     /// @return this options object

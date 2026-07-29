@@ -381,6 +381,9 @@ and the Core ML delegate can schedule work across the Neural Engine, GPU,
 and CPU. Neither reports that the entire graph ran on the requested NPU.
 With fallback enabled, NPU selection is a best-effort accelerator
 preference.
+On iOS, strict `Accelerator.CORE_ML` sessions are also rejected because
+the delegate doesn't report whether unsupported model operations remained
+on LiteRT's CPU path.
 The JavaSE simulator and targets without
 a native LiteRT runtime, including Mac native, return `false` from
 `InferenceSession.isSupported()`.
