@@ -28,8 +28,17 @@ import com.codename1.flutter.Widget;
 public class _DemoPageState extends State<DemoPage> {
 
     private final DartList<String> _items = DartList.<String>of("Alpha", "Beta", "Gamma");
+    DartList<String> get$_items() {
+        return _items;
+    }
 
     private long _taps = 0L;
+    long get$_taps() {
+        return _taps;
+    }
+    void set$_taps(long v) {
+        this._taps = v;
+    }
 
     @Override
     public Widget build(BuildContext context) {
@@ -77,13 +86,13 @@ public class _DemoPageState extends State<DemoPage> {
         return $t0;
     }
 
-    private void _addItem() {
+    void _addItem() {
         this.setState(() -> {
             this._items.add("Item " + DartRuntime.str(this._items.length() + 1L));
         });
     }
 
-    private void _clear() {
+    void _clear() {
         this.setState(() -> {
             this._items.clear();
             this._taps = 0L;

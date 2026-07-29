@@ -20,8 +20,14 @@ import com.codename1.flutter.Widget;
 public class _MyHomePageState extends State<MyHomePage> {
 
     private long _counter = 0L;
+    long get$_counter() {
+        return _counter;
+    }
+    void set$_counter(long v) {
+        this._counter = v;
+    }
 
-    private void _incrementCounter() {
+    void _incrementCounter() {
         this.setState(() -> {
             this._counter++;
         });

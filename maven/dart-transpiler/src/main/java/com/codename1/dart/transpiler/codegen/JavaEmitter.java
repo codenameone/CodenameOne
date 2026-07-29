@@ -5753,6 +5753,88 @@ public final class JavaEmitter {
         return false;
     }
 
+    /**
+     * Whether {@code value} already inherits exactly the instantiation {@code target} names, in
+     * which case Java accepts the assignment as-is and an erasing cast would be pure noise.
+     */
+    private boolean inheritsSameInstantiation(TypeRef value, TypeRef target) {
+        TypeRef inherited = supertypeInstantiation(value.name, value.args, target.name);
+        return inherited != null
+                && copyNonNull(inherited).toString().equals(copyNonNull(target).toString());
+    }
+
+    /**
+     * The instantiation of {@code sup} that {@code sub<args>} already inherits, or null when the
+     * superclass chain does not reach {@code sup}. From {@code class _MyHomePageState extends
+     * State<MyHomePage>} the instantiation of {@code State} seen from {@code _MyHomePageState} is
+     * {@code State<MyHomePage>} — which is why assigning one to the other needs no cast.
+     *
+     * <p>Walks the same chain as {@link #isSubtypeName}, but substitutes each class's type
+     * parameters with the arguments carried down from the previous link.</p>
+     */
+    private TypeRef supertypeInstantiation(String sub, List<TypeRef> args, String sup) {
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        String cur = sub;
+        List<TypeRef> curArgs = args;
+        while (cur != null && seen.add(cur)) {
+            if (cur.equals(sup)) {
+                TypeRef t = new TypeRef(cur);
+                if (curArgs != null) {
+                    t.args.addAll(curArgs);
+                }
+                return t;
+            }
+            ClassDecl decl = program.classes.get(cur);
+            List<String> params;
+            TypeRef next;
+            if (decl != null) {
+                params = decl.typeParams;
+                next = decl.superclass;
+            } else {
+                Ast.ClassDecl sc = stubs.classes.get(cur);
+                if (sc == null) {
+                    return null;
+                }
+                params = sc.typeParams;
+                next = sc.superclass;
+            }
+            if (next == null) {
+                return null;
+            }
+            curArgs = substituteTypeParams(next.args, params, curArgs);
+            cur = next.name;
+        }
+        return null;
+    }
+
+    /** {@code types} with each occurrence of {@code params[i]} replaced by {@code args[i]}. */
+    private List<TypeRef> substituteTypeParams(List<TypeRef> types, List<String> params, List<TypeRef> args) {
+        List<TypeRef> out = new ArrayList<TypeRef>();
+        for (TypeRef t : types) {
+            out.add(substituteTypeParam(t, params, args));
+        }
+        return out;
+    }
+
+    private TypeRef substituteTypeParam(TypeRef t, List<String> params, List<TypeRef> args) {
+        if (t == null) {
+            return null;
+        }
+        if (params != null && args != null) {
+            int i = params.indexOf(t.name);
+            if (i >= 0 && i < args.size()) {
+                return args.get(i);
+            }
+        }
+        if (t.args.isEmpty()) {
+            return t;
+        }
+        TypeRef copy = new TypeRef(t.name);
+        copy.nullable = t.nullable;
+        copy.args.addAll(substituteTypeParams(t.args, params, args));
+        return copy;
+    }
+
     /** The top-level function named {@code n} declared in library {@code lib}, or null. */
     private FunctionDecl functionInLibrary(Library lib, String n) {
         if (lib == null) {
@@ -6320,7 +6402,8 @@ public final class JavaEmitter {
                 && !target.name.equals(o.type.name)
                 && !target.args.isEmpty()
                 && isFullyConcrete(target)
-                && isSubtypeName(o.type.name, target.name)) {
+                && isSubtypeName(o.type.name, target.name)
+                && !inheritsSameInstantiation(o.type, target)) {
             return "(" + javaType(copyNonNull(target), false, ctx) + ") (Object) " + paren(o.code);
         }
         // Covariant generic assignment: Dart lists/maps/futures are covariant in their type
