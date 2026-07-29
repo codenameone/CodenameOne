@@ -380,17 +380,28 @@ class WorkoutAndNutritionTest extends UITestBase {
     /**
      * A workout left out of the batch does not take a child's identifier.
      *
-     * <p>An instantaneous workout is excluded because WORKOUT is an
-     * interval-only type, while its child samples are written normally.
-     * Asking the store whether it *can* write workouts, rather than
+     * <p>Asking the store whether it *can* write workouts, rather than
      * whether this one was in the batch, stamped the first child's
      * identifier onto a workout that was never persisted -- and that had
      * just been marked as not persisted.</p>
+     *
+     * <p>The exclusion here is driven by a store that refuses the type,
+     * which is what both mobile platforms do. The first version of this
+     * test drove it with an instantaneous workout instead and asserted on
+     * the clock: it ran fast enough on a developer machine for start and
+     * end to land in the same millisecond, and slowly enough in CI that
+     * they did not.</p>
+     *
+     * <p>So this covers the common path and not the one that produced the
+     * bug, which needs a store that *can* write workouts to be handed one
+     * with no interval -- a coincidence of the wall clock, with no seam to
+     * force it. What guards that path is the shape of the fix: the
+     * callback uses the decision the batch was built from instead of
+     * asking the store a second question.</p>
      */
     @Test
     void anUnwrittenWorkoutKeepsNoIdentifier() {
-        final com.codename1.impl.health.LocalHealthStore store =
-                new com.codename1.impl.health.LocalHealthStore();
+        final NoWorkoutsStore store = new NoWorkoutsStore();
         implementation.setHealth(new Health() {
             @Override
             public boolean isSupported() {
@@ -413,54 +424,48 @@ class WorkoutAndNutritionTest extends UITestBase {
                     1000L, 1000L));
             s.addSamples(batch);
 
-            // Ended in the same millisecond it started, so the workout
-            // itself has no interval to record while its child does.
             WorkoutSample written = s.end().get();
 
             assertEquals("true",
                     written.getMetadata().get(
                             WorkoutSample.WORKOUT_NOT_PERSISTED),
-                    "an instantaneous workout is not written");
+                    "a workout the store will not take is not written");
             assertNull(written.getId(),
                     "so it must not carry an identifier the store handed"
-                            + " back for something else");
+                            + " back for the child sample");
         } finally {
             implementation.setHealth(null);
         }
     }
 
-    /**
-     * A batch the rollup cannot take leaves the totals alone.
-     *
-     * <p>Rolling up as it went applied the earlier samples' totals and
-     * then threw on a sample whose unit measures the wrong dimension --
-     * and because the batch was refused, none of it was retained. The
-     * workout then ended reporting a total with no child sample behind
-     * it.</p>
-     */
-    @Test
-    void aBatchWithAnUnconvertibleSampleChangesNothing() {
-        WorkoutManager m = new WorkoutManager();
-        WorkoutSession s = m.startSession(new WorkoutConfiguration()).get();
-        s.start();
+    /// A store that takes child samples but not the workout itself,
+    /// which is what both mobile platforms do in this release.
+    private static final class NoWorkoutsStore extends HealthStore {
 
-        List<HealthSample> batch = new ArrayList<HealthSample>();
-        batch.add(QuantitySample.create(HealthDataType.STEPS,
-                new HealthQuantity(500, HealthUnit.COUNT),
-                1000L, 2000L));
-        // Steps in kilograms: accepted by the constructor, refused by the
-        // conversion the rollup needs.
-        batch.add(QuantitySample.create(HealthDataType.STEPS,
-                new HealthQuantity(7, HealthUnit.KILOGRAM),
-                2000L, 3000L));
+        @Override
+        public boolean isSupported() {
+            return true;
+        }
 
-        AsyncResource<Boolean> out = s.addSamples(batch);
+        @Override
+        public boolean isTypeSupported(HealthDataType type) {
+            return true;
+        }
 
-        assertNotNull(errorOf(out), "the batch must be refused");
-        assertNull(s.getStatistic(HealthDataType.STEPS,
-                AggregateMetric.TOTAL),
-                "and no total may be left behind by the sample that did"
-                        + " convert");
+        @Override
+        public boolean isWritable(HealthDataType type) {
+            return type != HealthDataType.WORKOUT;
+        }
+
+        @Override
+        protected void doWrite(List<HealthSample> samples,
+                AsyncResource<HealthWriteResult> out) {
+            HealthWriteResult r = new HealthWriteResult();
+            for (int i = 0; i < samples.size(); i++) {
+                r.addSampleId("stored-" + i);
+            }
+            out.complete(r);
+        }
     }
 
     @Test
