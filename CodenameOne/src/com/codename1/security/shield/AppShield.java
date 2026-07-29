@@ -201,6 +201,11 @@ public final class AppShield {
         }
         String host = hostOf(request.getUrl());
         HostPolicy policy = policyFor(host);
+        // Always clear first. A redirect reuses this request object with its
+        // headers intact, so a protected endpoint with an open redirect would
+        // otherwise hand a replayable token to whatever host it points at.
+        // Re-adding below is conditional on the *current* host's policy.
+        request.removeRequestHeader(getConfig().getTokenHeader());
         if (!policy.isAttachToken()) {
             return;
         }

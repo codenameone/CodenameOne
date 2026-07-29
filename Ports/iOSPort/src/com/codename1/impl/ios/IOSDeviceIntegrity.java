@@ -183,7 +183,14 @@ final class IOSDeviceIntegrity {
             }
             SecureStorage store = SecureStorage.getInstance();
             String keyId = store.get(KEY_ID);
-            if (keyId == null || keyId.length() == 0) {
+            boolean attested = STATE_ATTESTED.equals(store.get(KEY_STATE));
+            if (keyId == null || keyId.length() == 0 || !attested) {
+                // Checked before branching on the key state, not after: between
+                // key generation persisting the id and its attestation
+                // completing, the key exists but is not yet attested, and a
+                // caller arriving in that window would otherwise attest the same
+                // key a second time. Attestation is rate limited, so that costs
+                // real budget and races its own result.
                 PendingRequest pending =
                         new PendingRequest(r, nonce, PendingRequest.OP_GENERATE_KEY, null);
                 if (bootstrapInFlight) {
@@ -197,15 +204,18 @@ final class IOSDeviceIntegrity {
                     return r;
                 }
                 bootstrapInFlight = true;
-                int rid = register(pending);
-                nativeInstance.appAttestGenerateKey(rid);
+                if (keyId != null && keyId.length() > 0) {
+                    // A key exists but was never attested -- a previous attempt
+                    // died between the two steps. Attest that key rather than
+                    // generating another.
+                    attestKey(r, nonce, keyId);
+                } else {
+                    int rid = register(pending);
+                    nativeInstance.appAttestGenerateKey(rid);
+                }
                 return r;
             }
-            if (STATE_ATTESTED.equals(store.get(KEY_STATE))) {
-                assertWithKey(r, nonce, keyId);
-            } else {
-                attestKey(r, nonce, keyId);
-            }
+            assertWithKey(r, nonce, keyId);
         }
         return r;
     }

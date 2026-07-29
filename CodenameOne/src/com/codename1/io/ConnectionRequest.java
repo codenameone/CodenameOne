@@ -651,6 +651,17 @@ public class ConnectionRequest implements IOProgressListener {
         }
     }
 
+    /// Removes a header previously added with [#addRequestHeader(String, String)].
+    ///
+    /// Needed because a redirect reuses the same request object with the same
+    /// headers: anything scoped to the original host has to be removable before
+    /// the retry, or it follows the redirect to wherever it points.
+    public void removeRequestHeader(String key) {
+        if (userHeaders != null && key != null) {
+            userHeaders.remove(key);
+        }
+    }
+
     /// Adds the given header to the request that will be sent unless the header
     /// is already set to something else
     ///

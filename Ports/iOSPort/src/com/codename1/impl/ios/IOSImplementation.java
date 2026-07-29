@@ -12561,15 +12561,23 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isJailbrokenDevice() {
-        if (getCompromiseReasons().length > 0) {
-            return true;
+        return getCompromiseReasons().length > 0;
+    }
+
+    /**
+     * The legacy probe. Only ever returns true when the app also declares cydia
+     * in ios.applicationQueriesSchemes -- on iOS 9 and up canOpenURL returns
+     * false for undeclared schemes regardless of what is installed. That is why
+     * it cannot be the primary signal, but apps that do declare it would
+     * regress if it were dropped.
+     */
+    private boolean cydiaProbe() {
+        try {
+            Boolean b = canExecute("cydia://package/com.example.package");
+            return b != null && b.booleanValue();
+        } catch (Throwable t) {
+            return false;
         }
-        // Kept as a last resort, but note it only ever returns true when the app
-        // also declares cydia in ios.applicationQueriesSchemes -- on iOS 9 and up
-        // canOpenURL returns false for undeclared schemes regardless of what is
-        // installed. That is why it cannot be the primary signal.
-        Boolean b = canExecute("cydia://package/com.example.package");
-        return b != null && b.booleanValue();
     }
 
     /**
@@ -12580,11 +12588,17 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public String[] getCompromiseReasons() {
         String[] signals = deviceIntegrity().jailbreakSignals();
-        if (signals.length == 0) {
-            return signals;
-        }
         java.util.ArrayList<String> out = new java.util.ArrayList<String>();
         boolean jailbreakReported = false;
+        if (signals.length == 0) {
+            // The native probes found nothing, but an app that declares the
+            // cydia scheme can still detect one this way. Dropping it here would
+            // regress isDeviceCompromised() for exactly those apps.
+            if (cydiaProbe()) {
+                out.add("jailbreak");
+            }
+            return out.toArray(new String[out.size()]);
+        }
         for (int i = 0; i < signals.length; i++) {
             String s = signals[i];
             if ("hookLib".equals(s) || "dyldInsert".equals(s)) {
