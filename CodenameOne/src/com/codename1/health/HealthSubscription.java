@@ -177,7 +177,10 @@ public final class HealthSubscription {
             // monitor and then reaches back here through markInactive();
             // holding this one across the call would take the two in the
             // opposite order from every other path, which is a deadlock.
-            store.unsubscribe(id);
+            // This handle, not merely this id: stopped after the id had
+            // been re-registered, cancelling by id alone removed and tore
+            // down the replacement instead of the handle being stopped.
+            store.unsubscribe(id, this);
         }
     }
 

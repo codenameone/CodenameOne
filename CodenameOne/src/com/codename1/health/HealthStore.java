@@ -1804,19 +1804,37 @@ public class HealthStore {
                 request.getId(), request.getTypes(), isPushDelivery(),
                 request.isDeliverSamples(), request.isIncludeDeletions(),
                 request.getMaxSamplesPerBatch());
-        HealthAnchor stored = loadAnchor(request.getId());
-        // The new handle carries the persisted cursor.
-        //
-        // The anchor used to reach doSubscribe() alone, which neither
-        // mobile store overrides, while both drains read sub.getAnchor().
-        // So re-registering an id -- replacing a listener, or restoring a
-        // subscription at launch -- started the next drain from a fresh
-        // baseline and silently discarded everything accumulated since the
-        // last one.
-        if (stored != null) {
-            sub.noteDelivery(stored, 0L);
-        }
+        HealthAnchor stored;
         synchronized (subscriptions) {
+            // The cursor is read inside the transaction that publishes
+            // the handle. Read before it, a cancellation arriving in the
+            // gap deleted the anchor and this registration then published
+            // a handle already carrying it -- so restarting under an id
+            // resumed from the cursor stop() had promised to discard.
+            stored = loadAnchor(request.getId());
+            // Only when the types are the same. A Health Connect change
+            // token is issued for a *type set*: re-registering an id with
+            // different types and keeping the old token means doSubscribe
+            // sees a non-null anchor, takes no new baseline, and the
+            // subscription goes on reporting changes for the types it
+            // used to watch while every change to the new ones is missed
+            // silently. Dropping it costs one empty baseline drain;
+            // keeping it costs the data.
+            if (stored != null && !sameTypes(request)) {
+                stored = null;
+                storeAnchor(request.getId(), null);
+            }
+            // The new handle carries the persisted cursor.
+            //
+            // The anchor used to reach doSubscribe() alone, which neither
+            // mobile store overrides, while both drains read
+            // sub.getAnchor(). So re-registering an id -- replacing a
+            // listener, or restoring a subscription at launch -- started
+            // the next drain from a fresh baseline and silently discarded
+            // everything accumulated since the last one.
+            if (stored != null) {
+                sub.noteDelivery(stored, 0L);
+            }
             HealthSubscription existing = subscriptions.get(request.getId());
             if (existing != null) {
                 existing.markInactive();
@@ -1919,12 +1937,28 @@ public class HealthStore {
     /// Cancels a subscription and discards its persisted cursor.
     /// Idempotent.
     public final void unsubscribe(String subscriptionId) {
+        unsubscribe(subscriptionId, null);
+    }
+
+    /// Cancels `subscriptionId`, but only when the registered handle is
+    /// `expected` -- or unconditionally when that is null, which is what
+    /// the public call means.
+    ///
+    /// [HealthSubscription#stop()] passes its own handle. Cancelling by
+    /// id alone let a stale handle, stopped after its id had been
+    /// re-registered, remove and tear down its successor instead of
+    /// itself.
+    void unsubscribe(String subscriptionId, HealthSubscription expected) {
         if (subscriptionId == null) {
             return;
         }
         ensureSubscriptionsRestored();
         HealthSubscription sub;
         synchronized (subscriptions) {
+            if (expected != null
+                    && subscriptions.get(subscriptionId) != expected) { //NOPMD CompareObjectsWithEquals
+                return;
+            }
             sub = subscriptions.remove(subscriptionId);
             liveListeners.remove(subscriptionId);
             // The removal and the persisted cleanup are one transaction,
@@ -2435,6 +2469,34 @@ public class HealthStore {
             subscription.noteDelivery(subscription.getAnchor(),
                     System.currentTimeMillis());
         }
+    }
+
+    /// Whether the persisted subscription for `request`'s id watches
+    /// exactly the types it asks for. **Caller holds the registry lock.**
+    ///
+    /// Order is not significant -- a subscription is a set of types --
+    /// so this compares membership both ways rather than sequence.
+    private boolean sameTypes(SubscriptionRequest request) {
+        String stored = Preferences.get(PREF_SUBS, "");
+        if (stored.length() == 0) {
+            return false;
+        }
+        List<String> entries = com.codename1.util.StringUtil
+                .tokenize(stored, '\n');
+        SubscriptionRequest previous = null;
+        for (String entry : entries) {
+            SubscriptionRequest parsed = parseSubscription(entry);
+            if (parsed != null
+                    && parsed.getId().equals(request.getId())) {
+                previous = parsed;
+            }
+        }
+        if (previous == null) {
+            return false;
+        }
+        List<HealthDataType> was = previous.getTypes();
+        List<HealthDataType> now = request.getTypes();
+        return was.size() == now.size() && was.containsAll(now);
     }
 
     /// Persists a cursor. Called by [#fireChanges(HealthChangeBatch)]

@@ -824,4 +824,81 @@ class HealthSubscriptionCursorTest extends UITestBase {
                         + " binding as part of the same registration");
         store.unsubscribe(id);
     }
+
+    /**
+     * Re-registering an id with different types drops the old cursor.
+     *
+     * <p>A Health Connect change token is issued for a type set. Keeping
+     * it across a change of types meant {@code doSubscribe} saw a
+     * non-null anchor, took no new baseline, and the subscription went on
+     * reporting changes for the types it used to watch while every change
+     * to the new ones was missed -- silently, since the drain looked
+     * perfectly healthy.</p>
+     */
+    @Test
+    void changingTheTypesOfASubscriptionDropsItsCursor() {
+        FakeHealthStore store = newStore();
+        String id = "retyped-" + System.nanoTime();
+        HealthSubscription first = store.subscribe(
+                new SubscriptionRequest(id).addType(HealthDataType.STEPS),
+                new Collector(1));
+        assertTrue(store.seedForTest(first, HealthAnchor.of("steps-token")));
+        assertEquals("steps-token", com.codename1.io.Preferences.get(
+                "cn1$health$anchor$" + id, null));
+
+        HealthSubscription sameTypes = store.subscribe(
+                new SubscriptionRequest(id).addType(HealthDataType.STEPS),
+                new Collector(1));
+        assertNotNull(sameTypes.getAnchor(),
+                "an unchanged type set keeps its place");
+
+        HealthSubscription retyped = store.subscribe(
+                new SubscriptionRequest(id).addType(HealthDataType.STEPS)
+                        .addType(HealthDataType.HEART_RATE),
+                new Collector(1));
+        assertNull(retyped.getAnchor(),
+                "a token issued for the old types cannot serve the new"
+                        + " ones");
+        assertNull(com.codename1.io.Preferences.get(
+                "cn1$health$anchor$" + id, null),
+                "and the persisted copy goes with it");
+        store.unsubscribe(id);
+    }
+
+    /**
+     * A stale handle cannot cancel its successor.
+     *
+     * <p>{@code stop()} cancelled by id, so a handle stopped after its id
+     * had been re-registered removed and tore down the replacement
+     * instead of itself. The race it needs -- {@code stop()} reading its
+     * active flag, the replacement registering, and only then the
+     * cancellation running -- is not reproducible from a test, so this
+     * drives the mechanism that closes it: a cancellation that names a
+     * handle must do nothing when that handle is not the registered
+     * one.</p>
+     */
+    @Test
+    void aCancellationNamingAStaleHandleDoesNothing() {
+        FakeHealthStore store = newStore();
+        String id = "successor-" + System.nanoTime();
+        HealthSubscription old = store.subscribe(
+                new SubscriptionRequest(id).addType(HealthDataType.STEPS),
+                new Collector(1));
+        HealthSubscription replacement = store.subscribe(
+                new SubscriptionRequest(id).addType(HealthDataType.STEPS),
+                new Collector(1));
+        assertNotSame(old, replacement);
+
+        store.unsubscribe(id, old);
+
+        assertEquals(1, store.getSubscriptions().size(),
+                "cancelling the old handle must not remove the new one");
+        assertSame(replacement, store.getSubscriptions().get(0));
+        assertTrue(replacement.isActive());
+
+        // Naming the current handle still cancels, and so does the
+        // public by-id call the app makes.
+        store.unsubscribe(id, replacement);
+        assertTrue(store.getSubscriptions().isEmpty());
+    }
 }
