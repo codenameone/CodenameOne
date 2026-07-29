@@ -524,60 +524,51 @@ final class IOSDeviceIntegrity {
             return;
         }
         if (instance != null) {
-            boolean stale;
+            // The staleness check and every mutation this callback performs sit inside
+            // ONE acquisition. Checking under the lock and then releasing it let a reset
+            // bump the generation and start a replacement in between, and this callback
+            // would then discard that replacement -- or, for a non-invalid-key error,
+            // clear the in-flight flag and waiters belonging to it.
             synchronized (instance.flowLock) {
-                stale = isStale(pending);
-            }
-            if (stale) {
-                // Belongs to a flow that was already abandoned. Acting on it would reset
-                // the identity a newer bootstrap just established and burn another
-                // rate-limited key replacing it -- and for a non-invalid-key error it
-                // would clear bootstrapInFlight for a generation it knows nothing about,
-                // letting a concurrent request start a second key alongside the first.
-                fail(pending, "App Attest state was reset while this request was in flight");
-                return;
-            }
-        }
-        if (errorCode == DC_ERROR_INVALID_KEY && instance != null && !pending.retried) {
-            // The key is gone or was never valid. Wipe it and try once from scratch; a
-            // second failure is reported rather than looped.
-            //
-            // Discarding the identity and claiming the replacement bootstrap happen in
-            // ONE lock acquisition. Calling resetAttestation() and then reacquiring left
-            // a gap in which a concurrent requestToken() saw no key and no bootstrap
-            // running, started its own generation, and then this path started another --
-            // two rate-limited hardware keys racing to become the persisted identity.
-            synchronized (instance.flowLock) {
-                instance.resetLocked();
-                PendingRequest retry = new PendingRequest(pending.result, pending.nonce,
-                        PendingRequest.OP_GENERATE_KEY, null);
-                retry.retried = true;
-                // resetLocked() clears the flag, so set it again before starting the
-                // replacement -- still under the same lock, so nothing observes the
-                // cleared state.
-                instance.bootstrapInFlight = true;
-                int rid = register(retry);
-                instance.nativeInstance.appAttestGenerateKey(rid);
-            }
-            return;
-        }
-        if (errorCode == DC_ERROR_SERVER_UNAVAILABLE && instance != null) {
-            // Never retry a throttle in a loop -- that is what gets an app's
-            // whole attestation budget suspended.
-            synchronized (instance.flowLock) {
-                long backoff = instance.currentBackoff;
-                SecureStorage.getInstance().set(KEY_RETRY_AFTER,
-                        Long.toString(System.currentTimeMillis() + backoff));
-                instance.currentBackoff = Math.min(backoff * 2, MAX_BACKOFF_MILLIS);
+                if (isStale(pending)) {
+                    fail(pending,
+                            "App Attest state was reset while this request was in flight");
+                    return;
+                }
+                if (errorCode == DC_ERROR_INVALID_KEY && !pending.retried) {
+                    // The key is gone or was never valid. Wipe it and try once from
+                    // scratch; a second failure is reported rather than looped.
+                    instance.resetLocked();
+                    PendingRequest retry = new PendingRequest(pending.result, pending.nonce,
+                            PendingRequest.OP_GENERATE_KEY, null);
+                    retry.retried = true;
+                    // resetLocked() clears the flag, so set it again before starting the
+                    // replacement -- still under the same lock, so nothing observes the
+                    // cleared state.
+                    instance.bootstrapInFlight = true;
+                    int rid = register(retry);
+                    instance.nativeInstance.appAttestGenerateKey(rid);
+                    return;
+                }
+                if (errorCode == DC_ERROR_SERVER_UNAVAILABLE) {
+                    // Never retry a throttle in a loop -- that is what gets an app's
+                    // whole attestation budget suspended.
+                    long backoff = instance.currentBackoff;
+                    SecureStorage.getInstance().set(KEY_RETRY_AFTER,
+                            Long.toString(System.currentTimeMillis() + backoff));
+                    instance.currentBackoff = Math.min(backoff * 2, MAX_BACKOFF_MILLIS);
+                }
+                if (pending.op != PendingRequest.OP_ASSERT) {
+                    // Still the same acquisition: releasing here and reacquiring would
+                    // reopen the window on this mutation alone, clearing the in-flight
+                    // flag of whatever bootstrap had started meanwhile.
+                    instance.bootstrapInFlight = false;
+                    instance.failBootstrapWaiters(
+                            msg == null ? "App Attest failed (code " + errorCode + ")" : msg);
+                }
             }
         }
         String message = msg == null ? "App Attest failed (code " + errorCode + ")" : msg;
-        if (instance != null && pending.op != PendingRequest.OP_ASSERT) {
-            synchronized (instance.flowLock) {
-                instance.bootstrapInFlight = false;
-                instance.failBootstrapWaiters(message);
-            }
-        }
         fail(pending, message);
     }
 
@@ -627,12 +618,33 @@ final class IOSDeviceIntegrity {
         }
     }
 
+    /**
+     * Completes a caller with a token, unless a reset overtook it.
+     *
+     * <p>Completion is scheduled onto the EDT, so between the callback deciding the
+     * token is good and the caller receiving it, another request can reset attestation
+     * -- and the caller would then be handed an assertion for the key that was just
+     * discarded, which is exactly what the staleness checks exist to suppress. The
+     * generation is therefore checked again at the moment of publication.</p>
+     */
     private static void succeed(final PendingRequest pending, final String token) {
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                if (!pending.result.isDone()) {
-                    pending.result.complete(token);
+                if (pending.result.isDone()) {
+                    return;
                 }
+                if (instance != null) {
+                    boolean stale;
+                    synchronized (instance.flowLock) {
+                        stale = isStale(pending);
+                    }
+                    if (stale) {
+                        pending.result.error(new RuntimeException("App Attest state was "
+                                + "reset while this request was in flight"));
+                        return;
+                    }
+                }
+                pending.result.complete(token);
             }
         });
     }

@@ -258,8 +258,16 @@ public final class AppShield {
             // The token is a bearer credential. Sending it in plaintext -- after a
             // downgrade redirect, or a mistyped scheme -- hands it to anyone on the
             // path, and pinning cannot help because there is no certificate to pin.
+            //
+            // Routed through the failure mode rather than simply returning: a
+            // fail-closed host promises to refuse requests that carry no valid token,
+            // and silently sending the body over plaintext instead is the one outcome
+            // that policy exists to rule out.
             Log.p("AppShield: refusing to attach a token to a plaintext URL for "
                     + host + ". Use https for protected hosts.");
+            failOrContinue(policy, new ShieldException(ShieldStatus.REJECTED,
+                    "AppShield: " + host + " is a protected host but the request is "
+                    + "plaintext, so no token can be attached safely. Use https."));
             return;
         }
         try {

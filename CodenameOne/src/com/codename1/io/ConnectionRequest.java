@@ -912,7 +912,12 @@ public class ConnectionRequest implements IOProgressListener {
             checkSSLCertificates(certs);
             NetworkGuard guard = NetworkManager.getNetworkGuard();
             if (guard != null) {
-                guard.checkCertificates(this, certs);
+                // Same split as the non-callback path: the hook above sees the flat view
+                // it has always seen, the guard gets the enriched one when the platform
+                // can produce it.
+                SSLCertificate[] forGuard = _connection == null
+                        ? null : guardSSLCertificates(_connection, url);
+                guard.checkCertificates(this, forGuard == null ? certs : forGuard);
             }
             return !shouldStop();
         } catch (IOException ex) {
@@ -1068,12 +1073,15 @@ public class ConnectionRequest implements IOProgressListener {
                     // empty POST bodies.
                     !Util.getImplementation().checkSSLCertificatesRequiresCallbackFromNative()) {
                 sslCertificates = getSSLCertificatesImpl(connection, url);
-                // The request's own hook runs first and unchanged, so an app that
-                // already pins by overriding it keeps working; the guard layers on.
+                // The request's own hook runs first and on the legacy flat view, so an
+                // app that already pins by overriding it keeps working; the guard layers
+                // on, and only the guard sees the enriched per-certificate form.
                 checkSSLCertificates(sslCertificates);
                 NetworkGuard certGuard = NetworkManager.getNetworkGuard();
                 if (certGuard != null) {
-                    certGuard.checkCertificates(this, sslCertificates);
+                    SSLCertificate[] forGuard = guardSSLCertificates(connection, url);
+                    certGuard.checkCertificates(this,
+                            forGuard == null ? sslCertificates : forGuard);
                 }
                 if (shouldStop()) {
                     return true;
@@ -1762,11 +1770,25 @@ public class ConnectionRequest implements IOProgressListener {
         return arr;
     }
 
+    /// The enriched per-certificate view, or null when this platform or request cannot produce
+    /// one. Only the [NetworkGuard] sees this; see [#getSSLCertificatesImpl] for why.
+    private SSLCertificate[] guardSSLCertificates(Object connection, String url)
+            throws IOException {
+        CodenameOneImplementation impl = Util.getImplementation();
+        if (!collectPublicKeyDigests || !impl.canGetPublicKeyDigests()) {
+            return null;
+        }
+        return parseGroupedCertificates(impl.getSSLCertificatesEx(connection, url));
+    }
+
+    /// The flat, one-entry-per-fingerprint view every existing caller has always seen.
+    ///
+    /// Deliberately not the grouped form even when the guard asked for it: grouping yields one
+    /// object per certificate and keeps only the first fingerprint, so a hook that pins a SHA-1
+    /// value -- or simply counts entries -- would start rejecting a chain it has always accepted.
+    /// The enriched view exists for the guard and goes only to the guard.
     private SSLCertificate[] getSSLCertificatesImpl(Object connection, String url) throws IOException {
         CodenameOneImplementation impl = Util.getImplementation();
-        if (collectPublicKeyDigests && impl.canGetPublicKeyDigests()) {
-            return parseGroupedCertificates(impl.getSSLCertificatesEx(connection, url));
-        }
         String[] sslCerts = impl.getSSLCertificates(connection, url);
         SSLCertificate[] out = new SSLCertificate[sslCerts.length];
         int i = 0;
