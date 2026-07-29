@@ -578,6 +578,7 @@ public abstract class Executor {
                         private String scannedSuper;
                         private boolean scannedPublic;
                         private boolean scannedConcrete;
+                        private boolean scannedNonAbstract;
                         private boolean scannedHasPublicNoArgCtor;
 
                         @Override
@@ -590,8 +591,17 @@ public abstract class Executor {
                             // to be public and buildable; the constructor
                             // is checked in visitMethod.
                             scannedPublic = (accessFlags & 0x0001) != 0;
-                            scannedConcrete = (accessFlags & 0x0200) == 0
-                                    && (accessFlags & 0x0400) == 0
+                            // Two different questions. Concrete is
+                            // about the class itself -- neither abstract
+                            // nor an interface -- and stays true for a
+                            // package-private one, which an app can
+                            // still register and which the factory still
+                            // cannot name. Constructible additionally
+                            // requires the accessibility the generated
+                            // binding needs.
+                            scannedNonAbstract = (accessFlags & 0x0200) == 0
+                                    && (accessFlags & 0x0400) == 0;
+                            scannedConcrete = scannedNonAbstract
                                     && scannedPublic;
                             scannedHasPublicNoArgCtor = false;
                             scanner.usesClass(superName);
@@ -610,7 +620,7 @@ public abstract class Executor {
                                 if (scannedPublic) {
                                     scanner.declaresPublicType(scannedName);
                                 }
-                                if (scannedConcrete) {
+                                if (scannedNonAbstract) {
                                     scanner.declaresConcreteType(scannedName);
                                 }
                                 scanner.declaresType(scannedName,

@@ -177,6 +177,28 @@ class HealthListenerScan {
                         + " the listener to its own file");
             }
         }
+        // Every concrete listener that cannot be built, not only the
+        // ones that declare the interface themselves. A concrete subclass
+        // of an abstract base is just as registerable and just as absent
+        // from the factory, and it was silent because something else in
+        // the hierarchy was buildable.
+        List<String> unbuildable = new ArrayList<>(concrete);
+        java.util.Collections.sort(unbuildable);
+        for (String cls : unbuildable) {
+            if (constructible.contains(cls)
+                    || findListenerAncestor(cls) == null) {
+                continue;
+            }
+            out.add(cls.replace('/', '.') + " implements"
+                    + " HealthBackgroundListener but cannot be constructed"
+                    + " by the generated bindings. A background listener"
+                    + " must be a public top-level or static nested class"
+                    + " with a public no-argument constructor; registering"
+                    + " this one would leave nothing to restore it after"
+                    + " the process dies.");
+        }
+        // And an abstract declarer with no constructible implementor at
+        // all. Concrete ones are covered above, so nothing is said twice.
         Set<String> covered = new HashSet<>();
         for (String cls : constructible) {
             String hit = findListenerAncestor(cls);
@@ -185,22 +207,13 @@ class HealthListenerScan {
             }
         }
         for (String declarer : declarers) {
-            // A concrete declarer speaks for itself. A subclass covers the
-            // interface for its own registration, not for the declarer's:
-            // the factory has no entry for a class it cannot build, so an
-            // app registering the declarer loses its background delivery
-            // with nothing said. An abstract declarer is a different
-            // matter and is covered by any constructible descendant.
-            boolean unbuildableConcrete = concrete.contains(declarer)
-                    && !constructible.contains(declarer);
-            if (unbuildableConcrete || !covered.contains(declarer)) {
+            if (!covered.contains(declarer)
+                    && !concrete.contains(declarer)) {
                 out.add(declarer.replace('/', '.') + " implements"
-                        + " HealthBackgroundListener but cannot be"
-                        + " constructed by the generated bindings. A"
-                        + " background listener must be a top-level or"
-                        + " static nested class with a public no-argument"
-                        + " constructor; an abstract base needs a concrete"
-                        + " subclass, which this app does not appear to"
+                        + " HealthBackgroundListener but nothing can be"
+                        + " constructed from it: an abstract base needs a"
+                        + " concrete subclass with a public no-argument"
+                        + " constructor, which this app does not appear to"
                         + " have.");
             }
         }

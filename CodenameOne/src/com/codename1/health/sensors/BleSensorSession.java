@@ -234,6 +234,16 @@ final class BleSensorSession extends SensorSession {
 
         @Override
         public void connectionStateChanged(ConnectionEvent event) {
+            if (event.getState() == ConnectionState.DISCONNECTED) {
+                // The subscription dies with the link. Clearing it here
+                // rather than at the next subscribe is what makes a
+                // packet queued before the drop identifiable as stale:
+                // until this ran, the old listener was still the
+                // session's current registration and its late delivery
+                // was published as a fresh reading. It also stops the
+                // listener outliving the connection it belonged to.
+                session.releaseMeasurementListener();
+            }
             // Only a session that actually got streaming reconnects. A
             // failed initial connect publishes DISCONNECTED too, and
             // retrying from there resurrected a session the caller had
@@ -372,6 +382,23 @@ final class BleSensorSession extends SensorSession {
                         if (isTerminal()) {
                             return;
                         }
+                        // And only from the subscription the session is
+                        // actually on. The transport keeps its listener
+                        // map across a disconnect, so a packet queued
+                        // before the link dropped can be dispatched after
+                        // it and was published as a fresh reading, timed
+                        // by its arrival.
+                        //
+                        // By registration rather than by state: the pair
+                        // is recorded before the CCCD write completes, so
+                        // a reading that beats the subscribe callback is
+                        // still this connection's and is accepted --
+                        // which is the only reading a weight scale or a
+                        // blood-pressure cuff will send, on a reconnect
+                        // as much as on the first connect.
+                        if (!isCurrentSubscription(characteristic, this)) {
+                            return;
+                        }
                         onMeasurement(value, System.currentTimeMillis());
                     }
                 };
@@ -480,6 +507,22 @@ final class BleSensorSession extends SensorSession {
         } catch (Throwable t) {
             com.codename1.io.Log.p("[health] late unsubscribe after stop: "
                     + t);
+        }
+    }
+
+    /// Whether `listener` on `c` is the subscription this session is
+    /// currently reading from.
+    ///
+    /// Identity on both: a reconnect rediscovers the database, so the
+    /// same UUID comes back as a different [GattCharacteristic], and the
+    /// listener registered against the old one belongs to a connection
+    /// that is over.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
+    private boolean isCurrentSubscription(GattCharacteristic c,
+            GattNotificationListener listener) {
+        synchronized (lifecycleLock) {
+            return measurementListener == listener
+                    && measurementListenerOn == c;
         }
     }
 

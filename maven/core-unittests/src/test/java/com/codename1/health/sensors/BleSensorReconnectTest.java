@@ -1428,6 +1428,44 @@ class BleSensorReconnectTest extends UITestBase {
     }
 
     /**
+     * A reading from the new subscription is accepted even before the
+     * subscribe completes.
+     *
+     * <p>The pair is recorded before the CCCD write completes, so a
+     * reading that beats the callback still belongs to this connection.
+     * Rejecting on state instead would drop it -- and for a weight scale
+     * or a blood-pressure cuff that is the only reading the reconnect
+     * will ever produce.</p>
+     */
+    @Test
+    void aReadingFromTheNewSubscriptionArrivesEvenBeforeItCompletes() {
+        FakePeripheral p = new FakePeripheral();
+        BleSensorSession session = start(p);
+        p.notifyHeartRate(70);
+        flushSerialCalls();
+
+        // Down and back, but with the subscribe held: the session is in
+        // CONNECTING, on the new connection's characteristic.
+        p.holdSubscribe = true;
+        p.dropLink();
+        flushSerialCalls();
+        assertEquals(SensorSessionState.CONNECTING, session.getState());
+
+        p.notifyHeartRate(88);
+        flushSerialCalls();
+
+        com.codename1.health.QuantitySample latest =
+                (com.codename1.health.QuantitySample) session.getLatest(
+                        com.codename1.health.HealthDataType.HEART_RATE);
+        assertEquals(88,
+                latest.getValue(
+                        com.codename1.health.HealthUnit.COUNT_PER_MINUTE),
+                1e-9,
+                "a reading on the new subscription is this connection's,"
+                        + " whatever the state says");
+    }
+
+    /**
      * A session keeps the options it was created with.
      *
      * <p>The builder is fluent and a caller can reuse one for a second

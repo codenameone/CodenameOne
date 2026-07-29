@@ -286,7 +286,7 @@ public class SensorSession {
         // flushingStopped, so the sample is never persisted and nothing
         // says so.
         synchronized (stateLock) {
-            if (isTerminal() || reconnecting()) {
+            if (isTerminal()) {
                 return;
             }
             for (HealthSample s : samples) {
@@ -601,24 +601,6 @@ public class SensorSession {
                     : new HealthException(HealthError.UNKNOWN,
                             "could not persist sensor samples", error);
         }
-    }
-
-    /// Whether the link has dropped and not yet come back.
-    ///
-    /// A notification queued before the drop can still be dispatched
-    /// after it -- the transport keeps its listener map across a
-    /// disconnect -- and the connection event moves the session to
-    /// CONNECTING before that packet runs. Accepting it stamps a stale
-    /// reading with the current time and sends it to the app, the workout
-    /// and the store as though the strap had just measured it.
-    ///
-    /// A session that has not streamed yet is a different case and is
-    /// still accepted: a weight scale or a blood-pressure cuff sends one
-    /// reading and stops, and it can arrive between the CCCD being armed
-    /// and the subscribe completing. Dropping that would lose the only
-    /// measurement the device will ever send.
-    private boolean reconnecting() {
-        return getState() == SensorSessionState.CONNECTING && hasStreamed();
     }
 
     /// Whether this session has ended, however it ended.

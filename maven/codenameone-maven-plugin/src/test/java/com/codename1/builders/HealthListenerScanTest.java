@@ -88,6 +88,63 @@ class HealthListenerScanTest {
     }
 
     /**
+     * An unbuildable concrete *descendant* is reported too.
+     *
+     * <p>An abstract base with one good subclass and one that has no
+     * usable constructor: the good one covers the base, so the bad one
+     * was silent -- and it is just as registerable and just as absent
+     * from the factory.</p>
+     */
+    @Test
+    void anUnbuildableConcreteSubclassIsReported() {
+        HealthListenerScan s = scan();
+        s.implementsInterface("app/Base", HealthListenerScan.LISTENER);
+        s.declaresPublicType("app/Base");
+        s.declaresType("app/Base", "java/lang/Object", false);
+
+        s.declaresPublicType("app/Good");
+        s.declaresConcreteType("app/Good");
+        s.declaresType("app/Good", "app/Base", true);
+
+        // Concrete, public, and its only constructor takes an argument.
+        s.declaresPublicType("app/Bad");
+        s.declaresConcreteType("app/Bad");
+        s.declaresType("app/Bad", "app/Base", false);
+
+        assertEquals(1, s.resolve().size(),
+                "only the buildable subclass gets a binding");
+        List<String> warnings = s.warnings();
+        assertEquals(1, warnings.size(),
+                "the subclass nothing can build must be named: "
+                        + warnings);
+        assertTrue(warnings.get(0).contains("app.Bad"), warnings.get(0));
+    }
+
+    /**
+     * A package-private concrete listener is reported as well.
+     *
+     * <p>Concreteness is about the class, accessibility is about whether
+     * the binding can name it: folding them together let a non-public
+     * declarer look like an abstract base and be treated as covered by a
+     * subclass.</p>
+     */
+    @Test
+    void aNonPublicConcreteListenerIsReported() {
+        HealthListenerScan s = scan();
+        s.implementsInterface("app/Hidden", HealthListenerScan.LISTENER);
+        // Concrete but not public, so never constructible.
+        s.declaresConcreteType("app/Hidden");
+        s.declaresType("app/Hidden", "java/lang/Object", false);
+        s.declaresPublicType("app/Visible");
+        s.declaresConcreteType("app/Visible");
+        s.declaresType("app/Visible", "app/Hidden", true);
+
+        List<String> warnings = s.warnings();
+        assertEquals(1, warnings.size(), warnings.toString());
+        assertTrue(warnings.get(0).contains("app.Hidden"), warnings.get(0));
+    }
+
+    /**
      * The interface declared on an abstract base: the base cannot be
      * built, and the concrete subclass never names the interface.
      */
