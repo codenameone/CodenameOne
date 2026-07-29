@@ -489,7 +489,7 @@ public class CodenameOneSettings extends Lifecycle {
 
     private void renderBasic() {
         page.add(pageTitle("Basic", "Core application settings - title, version, package and icon."));
-        Container grid = new Container(new GridLayout(3, 2));
+        Container grid = new Container(new GridLayout(4, 2));
         grid.setUIID(uiid("SettingsFieldGrid"));
         grid.add(textFieldGroup("Title", "codename1.displayName", false));
         grid.add(textFieldGroup("Description", "codename1.description", false));
@@ -497,6 +497,12 @@ public class CodenameOneSettings extends Lifecycle {
         grid.add(textFieldGroup("Vendor", "codename1.vendor", false));
         grid.add(textFieldGroup("Package Name", "codename1.packageName", false));
         grid.add(textFieldGroup("Main Class", "codename1.mainName", false));
+        // Secondary entry points. Declaring a watch lifecycle class is the whole
+        // opt-in for the Apple Watch and Wear OS apps -- there are no wearable
+        // build hints. Both take a fully-qualified class name, unlike the phone
+        // main class which is a simple name resolved against the package.
+        grid.add(textFieldGroup("Watch Main Class", "codename1.watchMain", false));
+        grid.add(textFieldGroup("TV Main Class", "codename1.tvMain", false));
         page.add(grid);
         page.add(iconDrop());
         page.add(divider());

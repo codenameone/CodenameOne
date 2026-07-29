@@ -44,10 +44,16 @@ A CN1 project declares the watch entry point next to the phone main in
 codename1.mainName=com.example.MyApp        # phone lifecycle ("main" class)
 codename1.watchMain=com.example.MyWatchApp  # watch lifecycle (Apple Watch + Wear)
 ```
-`codename1.watchMain` flows through `CN1BuildMojo` as the `watchMain` build arg.
-`WatchNativeBuilder.parseHints` auto-enables the watch slice whenever `watchMain`
-is present (no separate `watchNative.enabled` needed), so the regular iPhone
-build emits the packaged double app.
+Declaring `codename1.watchMain` is the *entire* opt-in — there are no wearable
+build hints. It reaches `WatchNativeBuilder.parseHints` as the `watchMain` build
+argument by two routes: `CN1BuildMojo.putSecondaryEntryPointArguments` on local
+builds, and, for cloud builds, `createAntProject` mirroring it into
+`codename1.arg.watchMain` in the uploaded settings file (the server only lifts
+`codename1.arg.*` keys, so without that mirror a cloud build produced no watch
+app at all). Everything else — bundle id, deployment target, team id, display
+name — is derived. The one other recognized setting is
+`codename1.watchStandalone=true`, which ships the watch app on its own instead of
+embedding it in the phone app.
 
 **Important - current bootstrap reality (do NOT assume watchMain tree-shaking):**
 The watch target compiles the SAME single ParparVM translation as the phone and
@@ -73,9 +79,11 @@ Core-Graphics-backend issue, not absent code.
 - a Swift bridging header.
 
 Because the watch app is SwiftUI-`@main`-rooted, the shared ParparVM `int main()`
-(the phone entry) must be excluded from the watch target via
-`watchNative.phoneMainSource=<translated phone-main .m filename>` (added to the
-watch target's `EXCLUDED_SOURCE_FILE_NAMES`).
+(the phone entry) must not produce a second `main` symbol in the watch target.
+`applyXcodeSettings` neutralises it with a per-file `-Dmain=...` rename on the
+translated phone Stub, which keeps the app's translated classes available to the
+watch. (An earlier draft of this document described a `watchNative.phoneMainSource`
+hint that excluded the file outright; that hint never existed.)
 
 ## Complete interactive app on the simulator — VERIFIED (2026-06-17)
 

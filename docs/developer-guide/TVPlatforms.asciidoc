@@ -87,8 +87,9 @@ feature, makes `android.hardware.touchscreen` optional, and generates the
 
 === Building for Apple TV (tvOS)
 
-Enable the tvOS application target with the `tvNative.*` build hints (analogous
-to the `watchNative.*` hints used for Apple Watch):
+Enable the tvOS application target with the `tvNative.*` build hints (the Apple
+Watch build is enabled by declaring a `codename1.watchMain` instead -- see the
+wearables chapter):
 
 [source,properties]
 ----

@@ -30,40 +30,45 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Helper extracted from {@link IPhoneBuilder} that owns the Apple Watch
- * (watchOS) native build path. Activated by the build hint {@code
- * watchNative.enabled=true}.
+ * (watchOS) native build path. Activated by the project declaring a watch
+ * lifecycle class, {@code codename1.watchMain}; there are no other watch build
+ * hints, everything else is derived.
  *
  * <p>Unlike {@link MacNativeBuilder} (which Mac-Catalyst-slices the SAME iOS app
  * target), a watchOS app is a distinct product: it has its own bundle, its own
  * {@code WKApplication} Info.plist, and the {@code arm64_32} architecture. So
  * this builder <b>adds a second Xcode target</b> to the generated project,
- * compiles the shared ParparVM-generated sources (minus the GL/Metal-only files)
- * for watchOS, and - in the default {@code companion} distribution - embeds the
- * watch app inside the iOS {@code .app} via an "Embed Watch Content" copy-files
- * phase. The watch UI is rendered by the Core Graphics backend
- * ({@code CN1CGGraphics} + {@code CN1WatchRenderingView}) driven by
+ * compiles the ParparVM-generated sources (minus the GL/Metal-only files) for
+ * watchOS, and embeds the watch app inside the iOS {@code .app} via an "Embed
+ * Watch Content" copy-files phase so the pair installs together. A project that
+ * sets {@code codename1.watchStandalone=true} ships a watch-only product with no
+ * paired phone app instead. The watch UI is rendered by the Core Graphics
+ * backend ({@code CN1CGGraphics} + {@code CN1WatchRenderingView}) driven by
  * {@code CN1WatchHost}.
  *
  * <p>The underlying mechanism is a Ruby {@code xcodeproj} script (same toolchain
  * macNative relies on). Like {@link MacNativeBuilder} this is a delegate owned
  * by {@link IPhoneBuilder}, invoked at hint-parse time and at the
- * post-project-generate patching point. Every change is additive: with the hint
- * off, the iOS build is byte-for-byte unchanged.
+ * post-project-generate patching point. Every change is additive: without a
+ * {@code watchMain} the iOS build is byte-for-byte unchanged.
  */
 class WatchNativeBuilder {
     private final IPhoneBuilder owner;
 
-    // Parsed hints.
+    // watchOS floor: single-target WKApplication apps, WidgetKit complications,
+    // and the SwiftUI onChange(of:) two-parameter API the generated
+    // CN1WatchRootView uses.
+    private static final String MIN_DEPLOYMENT_TARGET = "10.0";
+
+    // Derived build state.
     private boolean enabled;
-    private String distribution;       // companion | standalone
+    private boolean standalone;        // codename1.watchStandalone
     private String bundleId;
-    private String minDeploymentTarget; // WATCHOS_DEPLOYMENT_TARGET
     private String teamId;
     private String displayName;
-    // Fully-qualified watch lifecycle entry class (codename1.watchMain). May
-    // equal the phone main class; a distinct value lets the watch slice tree-
-    // shake from its own root. Empty when neither watchMain nor an explicit
-    // watchNative.mainClass hint is set (then we fall back to the phone main).
+    // Fully-qualified watch lifecycle entry class (codename1.watchMain). Its
+    // presence is what turns the watch build on, and it is the root the watch
+    // slice is translated from. Empty when the project declares no watch app.
     private String watchMain;
 
     // GL/Metal-only source files with no watchOS substitute. Excluded from the
@@ -124,50 +129,34 @@ class WatchNativeBuilder {
     }
 
     /**
-     * Parse the {@code watchNative.*} hint family. Caller flips Metal on (the
-     * watch slice cannot use GL ES; the iOS slice still wants Metal) and raises
-     * the watch deployment floor.
+     * Resolve the watch build from the project's entry points. The watch app is
+     * built whenever the project declares a watch lifecycle class
+     * ({@code codenameone_settings.properties -> codename1.watchMain}, arriving
+     * here as the {@code watchMain} argument); everything else is derived. The
+     * only other recognized setting is {@code codename1.watchStandalone}, which
+     * says the watch app ships on its own rather than inside the phone app --
+     * the one thing that cannot be inferred from the project.
+     *
+     * <p>Caller flips Metal on (the watch slice cannot use GL ES; the iOS slice
+     * still wants Metal) and raises the watch deployment floor.
      */
     void parseHints(BuildRequest request) {
-        // The watch slice auto-enables when the project declares a watchMain
-        // entry point (codenameone_settings.properties -> codename1.watchMain),
-        // so the double app is produced seamlessly as part of the regular iPhone
-        // build. watchNative.enabled=true forces it on even without a distinct
-        // watchMain (the watch then shares the phone main class).
-        watchMain = request.getArg("watchMain",
-                request.getArg("watchNative.mainClass", "")).trim();
-        enabled = "true".equals(request.getArg("watchNative.enabled", "false"))
-                || watchMain.length() > 0;
+        watchMain = request.getArg("watchMain", "").trim();
+        enabled = watchMain.length() > 0;
         if (!enabled) {
             return;
         }
-        if (watchMain.length() == 0) {
-            // No distinct watch entry: reuse the phone main class as the watch
-            // lifecycle root.
-            watchMain = request.getMainClass();
-        }
-        distribution = request.getArg("watchNative.distribution", "companion");
-        bundleId = request.getArg("watchNative.bundleId",
-                request.getPackageName() + ".watchkitapp");
-        // watchOS 10 is the floor: single-target WKApplication apps, WidgetKit
-        // complications, and the SwiftUI onChange(of:) two-parameter API the
-        // generated CN1WatchRootView uses. Lower only if the project explicitly
-        // asks (and adjusts the generated shell accordingly).
-        minDeploymentTarget = request.getArg("watchNative.minDeploymentTarget", "10.0");
-        teamId = request.getArg("watchNative.teamId",
-                request.getArg("ios.release.teamId",
-                        request.getArg("ios.teamId",
-                                request.getArg("ios.debug.teamId", ""))));
-        displayName = request.getArg("watchNative.displayName",
-                request.getDisplayName() != null ? request.getDisplayName() : request.getMainClass());
+        standalone = "true".equals(request.getArg("watchStandalone", "false"));
+        bundleId = request.getPackageName() + ".watchkitapp";
+        teamId = request.getArg("ios.release.teamId",
+                request.getArg("ios.teamId",
+                        request.getArg("ios.debug.teamId", "")));
+        displayName = request.getDisplayName() != null
+                ? request.getDisplayName() : request.getMainClass();
     }
 
     boolean isStandalone() {
-        return "standalone".equalsIgnoreCase(distribution);
-    }
-
-    String getMinDeploymentTarget() {
-        return minDeploymentTarget;
+        return standalone;
     }
 
     /** Fully-qualified watch lifecycle entry class. */
@@ -445,7 +434,7 @@ class WatchNativeBuilder {
         String watchTargetName = mainClass + "Watch";
         String projectFile = new File(tmpFile, "dist/" + mainClass + ".xcodeproj").getAbsolutePath();
         String infoPlistPath = mainClass + "-src/" + mainClass + "-Watch-Info.plist";
-        String resolvedTeamId = owner.sanitizeTeamId(teamId, "watchNative.teamId");
+        String resolvedTeamId = owner.sanitizeTeamId(teamId, "ios.teamId");
 
         StringBuilder excluded = new StringBuilder();
         for (String f : EXCLUDED_WATCH_SOURCES) {
@@ -473,7 +462,7 @@ class WatchNativeBuilder {
                 .append("watch_target = xcproj.targets.find { |t| t.name == watch_name }\n")
                 .append("if watch_target.nil?\n")
                 .append("  watch_target = xcproj.new_target(:application, watch_name, :watchos, '")
-                .append(IPhoneBuilder.escapeRubyStr(minDeploymentTarget)).append("')\n")
+                .append(IPhoneBuilder.escapeRubyStr(MIN_DEPLOYMENT_TARGET)).append("')\n")
                 .append("end\n")
                 // Compile the shared ParparVM sources for the watch, minus the
                 // GL/Metal-only files. Reuse the app target's compile sources so
@@ -509,7 +498,7 @@ class WatchNativeBuilder {
                 .append("  bs['ARCHS[sdk=watchos*]'] = 'arm64_32'\n")
                 .append("  bs['ARCHS[sdk=watchsimulator*]'] = '$(ARCHS_STANDARD)'\n")
                 .append("  bs['WATCHOS_DEPLOYMENT_TARGET'] = '")
-                .append(IPhoneBuilder.escapeRubyStr(minDeploymentTarget)).append("'\n")
+                .append(IPhoneBuilder.escapeRubyStr(MIN_DEPLOYMENT_TARGET)).append("'\n")
                 .append("  bs['TARGETED_DEVICE_FAMILY'] = '4'\n")
                 .append("  bs['PRODUCT_BUNDLE_IDENTIFIER'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(bundleId)).append("'\n")
@@ -599,13 +588,12 @@ class WatchNativeBuilder {
                 .append("  end\n")
                 .append("end\n");
 
-        // Companion embedding is opt-in (watchNative.embedCompanion=true) and OFF
-        // by default. Embedding adds the watch target as a build dependency of the
-        // iOS app, which makes building the iOS app also build the watch target.
-        // Remove any dependency/copy phase that Xcode or an older generator run
-        // left behind unless the project explicitly asks for companion packaging.
-        boolean embedCompanion = "true".equals(request.getArg("watchNative.embedCompanion", "false"));
-        if (!embedCompanion || isStandalone()) {
+        // A companion watch app is embedded in the iOS app so the pair installs
+        // together -- that is the whole point of declaring a watchMain next to a
+        // phone main, so it is not opt-in. A standalone watch app ships on its
+        // own instead, so strip any dependency/copy phase Xcode or an earlier
+        // generator run left behind.
+        if (isStandalone()) {
             s.append("app_target.dependencies.to_a.each do |dep|\n")
                     .append("  proxy = dep.respond_to?(:target_proxy) ? dep.target_proxy : nil\n")
                     .append("  remote = proxy && proxy.respond_to?(:remote_global_id) ? xcproj.objects_by_uuid[proxy.remote_global_id] : nil\n")
@@ -659,7 +647,7 @@ class WatchNativeBuilder {
             }
             owner.log("[watchNative] Added watchOS target " + watchTargetName
                     + " (" + (isStandalone() ? "standalone" : "companion") + ", "
-                    + "watchOS " + minDeploymentTarget + ", arm64_32)");
+                    + "watchOS " + MIN_DEPLOYMENT_TARGET + ", arm64_32)");
         } catch (BuildException ex) {
             throw ex;
         } catch (Exception ex) {

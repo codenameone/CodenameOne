@@ -60,9 +60,9 @@ public class IPhoneBuilder extends Executor {
     // that is an implementation detail -- never surfaced in hint names.
     private final MacNativeBuilder macNativeBuilder = new MacNativeBuilder(this);
 
-    // watchNative.* delegate: adds an Apple Watch (watchOS) target rendered via
-    // the Core Graphics backend. Like macNativeBuilder this is inert unless the
-    // watchNative.enabled hint is set, keeping the iOS build unchanged.
+    // Watch delegate: adds an Apple Watch (watchOS) target rendered via the Core
+    // Graphics backend. Like macNativeBuilder this is inert unless the project
+    // declares a codename1.watchMain, keeping the iOS build unchanged.
     private final WatchNativeBuilder watchNativeBuilder = new WatchNativeBuilder(this);
 
     // tvNative.* delegate: adds an Apple TV (tvOS) target. tvOS is handled like

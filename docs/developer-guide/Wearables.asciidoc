@@ -77,70 +77,50 @@ image::img/wearables/apple-watch-simulator.png[Codename One running on the Apple
 
 ==== Enabling the watchOS Build
 
-Set the build hint:
+Declare the watch lifecycle class next to your phone main class in
+`codenameone_settings.properties`:
 
 [source,properties]
 ----
 include::../demos/common/src/main/snippets/developer-guide/wearables.properties[tag=wearables-properties-001,indent=0]
 ----
 
-Alternatively, declare a watch entry point and the watch slice is produced
-automatically as part of the regular iOS build:
+That's the whole opt-in. There are no wearable build hints: the watch bundle
+identifier, deployment target, signing team and display name are all derived from
+the settings your project already has. The watch app is built as part of the
+regular iOS build and embedded in the phone app, so the pair installs together.
+
+Note the asymmetry: `codename1.mainName` is a simple class name resolved against
+`codename1.packageName`, while `codename1.watchMain` is fully qualified.
+
+==== Standalone Watch Apps
+
+By default the watch app is a companion: it ships inside the phone app. If the
+watch app is the product and there is no phone app to pair with, declare it
+standalone:
 
 [source,properties]
 ----
 include::../demos/common/src/main/snippets/developer-guide/wearables.properties[tag=wearables-properties-002,indent=0]
 ----
 
-If you don't declare a distinct `watchMain`, the watch app reuses your phone
-main class as its lifecycle entry point.
+A standalone build produces a watch-only product on Apple, and on Android turns
+the single APK into the Wear OS app.
 
-NOTE: `codename1.watchMain` (and `watchNative.enabled`) affect only the Apple
-Watch (watchOS) build. They have no effect on Android: a Wear OS build is never
-produced implicitly -- you enable it explicitly with `android.wear=true` (see
-<<wear-os-android>>). A project can target both wearables at once by setting a
-`watchMain` (or `watchNative.enabled=true`) and `android.wear=true` together.
-
-==== watchOS Build Hints
+==== Wearable Settings
 
 [cols="2,1,4"]
 |===
-|Build hint |Default |Description
+|Setting |Default |Description
 
-|`watchNative.enabled`
-|`false`
-|Force the watch target on even without a distinct `watchMain`.
-
-|`codename1.watchMain` (a.k.a. `watchMain`)
+|`codename1.watchMain`
 |_(none)_
-|Fully-qualified watch lifecycle entry class. Setting it also turns on the watch
-build.
+|Fully-qualified watch lifecycle entry class. Declaring it builds the watch app
+on both Apple Watch and Wear OS.
 
-|`watchNative.distribution`
-|`companion`
-|`companion` embeds the watch app in the iOS app; `standalone` builds a
-watch-only app with no paired phone app.
-
-|`watchNative.bundleId`
-|`<package>.watchkitapp`
-|Bundle identifier of the watch app.
-
-|`watchNative.minDeploymentTarget`
-|`10.0`
-|`WATCHOS_DEPLOYMENT_TARGET` for the watch target.
-
-|`watchNative.displayName`
-|_(app display name)_
-|The watch app name shown on the watch.
-
-|`watchNative.teamId`
-|_(falls back to the iOS team id)_
-|Apple Developer Team ID used to sign the watch target.
-
-|`watchNative.embedCompanion`
+|`codename1.watchStandalone`
 |`false`
-|Embed the watch app into the iOS app as a build dependency. Off by default so
-the iOS build is unaffected; enable it for a packaged companion submission.
+|The watch app ships on its own rather than inside the phone app.
 |===
 
 ==== Supported and Unsupported APIs on watchOS
@@ -165,69 +145,43 @@ so keep watch screens light.
 
 ==== Building and Debugging
 
-A `companion` build produces an iOS `.ipa` that carries the embedded watch app;
-a `standalone` build produces a watch-only product. The generated project is a
-standard Xcode project, so you can open it and debug/profile the watch target
-with the native Xcode tools as usual. Cloud builds support the watch target
-through the same iOS build -- set the hints above and build for iOS.
+A companion build produces an iOS `.ipa` that carries the embedded watch app; a
+standalone build produces a watch-only product. The generated project is a
+standard Xcode project, so you can open it and debug or profile the watch target
+with the native Xcode tools as usual. Cloud builds produce the watch app through
+the same iOS build -- declare the watch main class and build for iOS.
 
 === Android (Wear OS)
 [[wear-os-android]]
 
 A Wear OS app is a regular Android app. The Codename One Android port renders the
 UI with the same pipeline it uses on phones, so no special rendering backend is
-required -- you only need to mark the build as a watch app.
+required. The same `codename1.watchMain` that builds the Apple Watch app builds
+the Wear OS app, so a project targets both wearables from one declaration.
 
-==== Enabling the Wear OS Build
-
-[source,properties]
-----
-include::../demos/common/src/main/snippets/developer-guide/wearables.properties[tag=wearables-properties-003,indent=0]
-----
-
-This injects the watch hardware feature into the manifest:
+A standalone Wear app declares the watch hardware feature in the manifest:
 
 [source,xml]
 ----
 include::../demos/common/src/main/snippets/developer-guide/wearables.xml[tag=wearables-xml-001,indent=0]
 ----
 
-By default it also declares the app *standalone*, so it installs and runs
-directly on the watch without a paired phone app:
+It also marks itself standalone, so it installs and runs directly on the watch
+without a paired phone app:
 
 [source,xml]
 ----
 include::../demos/common/src/main/snippets/developer-guide/wearables.xml[tag=wearables-xml-002,indent=0]
 ----
 
-Setting `android.wear=true` also raises the minimum SDK to API 23 (the Wear OS
-2.0 standalone baseline) if your project requests a lower level.
-
-==== Wear OS Build Hints
-
-[cols="2,1,4"]
-|===
-|Build hint |Default |Description
-
-|`android.wear`
-|`false`
-|Mark the build as a Wear OS app (manifest feature + standalone meta-data +
-minimum SDK floor).
-
-|`android.wear.standalone`
-|`true`
-|Declare the app standalone. Set to `false` for a watch app that requires a
-companion phone app.
-
-|`android.playService.wearable`
-|`false`
-|Add the `play-services-wearable` dependency (only needed if you use the
-Wearable Data Layer / message APIs directly).
-|===
+A standalone Wear build also raises the minimum SDK to API 23, the Wear OS 2.0
+standalone baseline, if your project requests a lower level.
 
 TIP: Because a Wear OS app is an ordinary Android app, you can also declare any
 additional manifest features and permissions with the generic
-`android.uses_feature.<name>` and `android.uses_permission.<name>` hints.
+`android.uses_feature.<name>` and `android.uses_permission.<name>` hints. The
+`android.playService.wearable` hint adds the `play-services-wearable` dependency
+if you want to call the Wearable Data Layer APIs directly.
 
 === Summary
 
@@ -236,21 +190,21 @@ additional manifest features and permissions with the generic
 | |Apple Watch (watchOS) |Wear OS (Android)
 
 |Enable
-|`watchNative.enabled=true` or `codename1.watchMain`
-|`android.wear=true`
+|`codename1.watchMain`
+|`codename1.watchMain`
 
 |Rendering
 |Dedicated Core Graphics backend + separate watch target
 |Standard Android rendering pipeline
 
 |Distribution
-|Companion (embedded in iOS app) or standalone
-|Standalone (default) or companion
+|Companion (embedded in the phone app) or standalone
+|Companion or standalone
 
 |Runtime detection
 |`CN.isWatch()`
 |`CN.isWatch()`
 |===
 
-The wearable build is additive on both platforms: with the hints off, your phone
-builds are unchanged.
+The wearable build is additive on both platforms: without a watch main class,
+your phone builds are unchanged.
