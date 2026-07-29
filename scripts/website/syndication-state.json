@@ -1308,6 +1308,15 @@
         "url": "https://medium.com/p/5826cd818bae/edit",
         "syndicated_at": "2026-07-28T17:01:08+00:00"
       }
+    },
+    "2026-07-29-1200-shai-compact-strings-parparvm": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-07-29T09:01:06+00:00",
+        "account": "shai",
+        "source_slug": "compact-strings-parparvm",
+        "scheduled_at": "2026-07-29T09:00:00+00:00"
+      }
     }
   }
 }
