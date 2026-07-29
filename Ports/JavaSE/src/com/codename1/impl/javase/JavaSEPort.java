@@ -8452,7 +8452,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         shieldMenu.add(status);
 
-        simulateMenu.add(shieldMenu);
+        // Returned rather than added here, matching installNfcSimulationMenu and
+        // installFoldableSimulationMenu. The caller does the adding, in the
+        // removeAll-then-rebuild block that assembles the final menu order.
         return shieldMenu;
     }
 
