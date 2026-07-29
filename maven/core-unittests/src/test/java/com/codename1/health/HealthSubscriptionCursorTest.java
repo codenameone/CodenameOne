@@ -793,4 +793,35 @@ class HealthSubscriptionCursorTest extends UITestBase {
                 "unsubscribe discarded the cursor; the delivery that was"
                         + " already running must not write it back");
     }
+
+    /**
+     * Replacing a background subscription with an in-memory one publishes
+     * the handle and the binding together.
+     *
+     * <p>The binding used to be written by the caller after
+     * {@code register()} returned, so a drain arriving in between
+     * delivered the new subscription to the class it had just replaced,
+     * and two registrations of one id could write their bindings in
+     * either order.</p>
+     */
+    @Test
+    void aRegistrationPublishesItsListenerBindingWithItself() {
+        FakeHealthStore store = newStore();
+        String id = "binding-" + System.nanoTime();
+        SubscriptionRequest req = new SubscriptionRequest(id)
+                .addType(HealthDataType.STEPS);
+
+        store.subscribe(req, TestBackgroundListener.class);
+        assertEquals(TestBackgroundListener.class.getName(),
+                com.codename1.io.Preferences.get(
+                        "cn1$health$listener$" + id, null),
+                "the class binding is persisted by the registration");
+
+        store.subscribe(req, new Collector(1));
+        assertNull(com.codename1.io.Preferences.get(
+                "cn1$health$listener$" + id, null),
+                "and replacing it with an in-memory listener clears the"
+                        + " binding as part of the same registration");
+        store.unsubscribe(id);
+    }
 }

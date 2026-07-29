@@ -47,7 +47,6 @@ import com.codename1.util.AsyncResource;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -686,15 +685,14 @@ class AndroidHealthStore extends HealthStore {
     /// look at the entry again, so it would sit in the map for the life
     /// of the process.
     @Override
-    protected void doUnsubscribe(String subscriptionId) {
+    protected void doUnsubscribe(HealthSubscription subscription) {
         synchronized (baselinesInFlight) {
-            Iterator<HealthSubscription> it =
-                    baselinesInFlight.keySet().iterator();
-            while (it.hasNext()) {
-                if (it.next().getId().equals(subscriptionId)) {
-                    it.remove();
-                }
-            }
+            // Keyed on the handle, so only the generation that was
+            // cancelled is forgotten. Removing every entry with a
+            // matching id dropped a *replacement* whose baseline was
+            // still in flight, and its first drain then took a second
+            // token and lost the window between them.
+            baselinesInFlight.remove(subscription);
         }
     }
 

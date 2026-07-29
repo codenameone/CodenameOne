@@ -1744,10 +1744,7 @@ public class HealthStore {
             throw new IllegalArgumentException(backgroundListenerClass.getName()
                     + " does not implement HealthBackgroundListener");
         }
-        HealthSubscription sub = register(request, null);
-        Preferences.set(PREF_LISTENER + request.getId(),
-                backgroundListenerClass.getName());
-        return sub;
+        return register(request, null, backgroundListenerClass.getName());
     }
 
     /// Subscribes with an in-memory listener, dropped when the process
@@ -1759,11 +1756,22 @@ public class HealthStore {
             throw new IllegalArgumentException(
                     "subscribe needs a listener");
         }
-        return register(request, listener);
+        return register(request, listener, null);
     }
 
+    /// Registers, publishing the handle, its persisted request and its
+    /// listener binding as one transaction.
+    ///
+    /// `backgroundListenerClass` is the class name to persist, or null
+    /// for an in-memory listener, whose binding is deleted instead. It
+    /// used to be written by the caller after this returned: a drain
+    /// arriving in between delivered the new subscription to the class it
+    /// had just replaced, and two registrations of one id could write
+    /// their bindings in either order, so the wrong one survived a
+    /// restart.
     private HealthSubscription register(SubscriptionRequest request,
-            HealthChangeListener listener) {
+            HealthChangeListener listener,
+            String backgroundListenerClass) {
         ensureSubscriptionsRestored();
         if (request == null) {
             throw new IllegalArgumentException(
@@ -1819,6 +1827,18 @@ public class HealthStore {
             } else {
                 liveListeners.put(request.getId(), listener);
             }
+            if (backgroundListenerClass != null) {
+                Preferences.set(PREF_LISTENER + request.getId(),
+                        backgroundListenerClass);
+            } else {
+                // An id previously bound to a background listener class
+                // keeps that binding in Preferences, and restoration
+                // after a relaunch resolves it. Replacing such a
+                // subscription with an in-memory listener would then
+                // deliver its changes to the very class the app had just
+                // replaced.
+                Preferences.delete(PREF_LISTENER + request.getId());
+            }
             // Persisted inside the same critical section that published
             // the handle. Between the two, another thread could
             // unsubscribe this id or replace it -- and this registration,
@@ -1828,15 +1848,6 @@ public class HealthStore {
             // replaced one's old types and options, came back at the next
             // launch.
             rememberSubscriptionLocked(request);
-        }
-        if (listener != null) {
-            // An id previously bound to a background listener class keeps
-            // that binding in Preferences, and restoration after a
-            // relaunch resolves it. Replacing such a subscription with an
-            // in-memory listener would then deliver its changes to the
-            // very class the app had just replaced. The Class overload
-            // writes the binding back immediately after this returns.
-            Preferences.delete(PREF_LISTENER + request.getId());
         }
         if (isSupported()) {
             doSubscribe(request, sub);
@@ -1913,7 +1924,6 @@ public class HealthStore {
         }
         ensureSubscriptionsRestored();
         HealthSubscription sub;
-        boolean stillGone;
         synchronized (subscriptions) {
             sub = subscriptions.remove(subscriptionId);
             liveListeners.remove(subscriptionId);
@@ -1930,29 +1940,21 @@ public class HealthStore {
         if (sub != null) {
             sub.markInactive();
         }
-        synchronized (subscriptions) {
-            // Read after the lock was released and taken again, which is
-            // the only reading that means anything: computed inside the
-            // block above it was trivially true, since nothing could have
-            // registered between the removal and the test. A registration
-            // that arrives in the gap owns the platform state from that
-            // moment, and tearing it down would break a subscription
-            // nobody cancelled -- on Android it drops the new handle from
-            // baselinesInFlight, and the next drain takes a second
-            // baseline token.
+        if (isSupported() && sub != null) {
+            // Outside the lock: this calls into the port, and holding
+            // the registry monitor across a platform call orders it
+            // against every lock a port happens to take.
             //
-            // The gap cannot be closed entirely without holding the
-            // registry monitor across a call into the port, which orders
-            // it against whatever locks a port takes. It is narrowed to
-            // this test rather than left at the width of the whole
-            // teardown.
-            stillGone = !subscriptions.containsKey(subscriptionId);
-        }
-        if (isSupported() && stillGone) {
-            // Outside the lock: this calls into the port, and holding the
-            // registry monitor across a platform call orders it against
-            // every lock a port happens to take.
-            doUnsubscribe(subscriptionId);
+            // The handle rather than the id, so the port tears down the
+            // generation that was cancelled. Checking beforehand that
+            // nothing had re-registered the id was not enough: a
+            // registration landing between that test and this call owned
+            // the platform state, and the teardown dismantled it -- on
+            // Android by dropping the new handle from baselinesInFlight,
+            // after which its first drain took a second baseline token
+            // and lost the window between them. A test cannot close that
+            // gap; naming the generation removes it.
+            doUnsubscribe(sub);
         }
     }
 
@@ -2839,8 +2841,14 @@ public class HealthStore {
             HealthSubscription subscription) {
     }
 
-    /// Tears down a platform observer.
-    protected void doUnsubscribe(String subscriptionId) {
+    /// Tears down the platform observer belonging to `subscription`.
+    ///
+    /// The handle, not the id: another registration under the same id can
+    /// land between the removal and this call, and a teardown that works
+    /// by id alone then dismantles the replacement's platform state. A
+    /// port must key its own bookkeeping on this instance so it tears
+    /// down the generation that was actually cancelled.
+    protected void doUnsubscribe(HealthSubscription subscription) {
     }
 
     /// Polls for pending changes and delivers them through

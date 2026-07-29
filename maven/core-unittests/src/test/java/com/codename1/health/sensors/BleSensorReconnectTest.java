@@ -59,6 +59,12 @@ class BleSensorReconnectTest extends UITestBase {
     private static final BluetoothUuid HR_MEASUREMENT =
             BluetoothUuid.fromShort(0x2A37);
 
+    /** Battery service and its level characteristic. */
+    private static final BluetoothUuid BATTERY_SERVICE =
+            BluetoothUuid.fromShort(0x180F);
+    private static final BluetoothUuid BATTERY_LEVEL =
+            BluetoothUuid.fromShort(0x2A19);
+
     /**
      * A transient discovery failure on the way back must not end the
      * session: the reconnect listener never retries from FAILED, so one
@@ -167,6 +173,9 @@ class BleSensorReconnectTest extends UITestBase {
 
         private int failDiscoveries;
         private int failConnects;
+        /// What the Battery Level characteristic answers, or null for no
+        /// battery service at all.
+        Byte batteryLevel;
         private int discoveries;
         private int connects;
 
@@ -235,12 +244,24 @@ class BleSensorReconnectTest extends UITestBase {
                     GattCharacteristic.PROPERTY_NOTIFY, 0));
             List<GattService> services = new ArrayList<GattService>();
             services.add(hr);
+            if (batteryLevel != null) {
+                GattService battery = new GattService(this,
+                        BATTERY_SERVICE, true, 0);
+                battery.addCharacteristic(new GattCharacteristic(battery,
+                        BATTERY_LEVEL, GattCharacteristic.PROPERTY_READ, 0));
+                services.add(battery);
+            }
             out.complete(services);
         }
 
         @Override
         protected void doReadCharacteristic(GattCharacteristic c,
                 AsyncResource<byte[]> out) {
+            if (batteryLevel != null
+                    && BATTERY_LEVEL.equals(c.getUuid())) {
+                out.complete(new byte[] { batteryLevel.byteValue() });
+                return;
+            }
             out.complete(new byte[] { 0 });
         }
 
@@ -836,5 +857,40 @@ class BleSensorReconnectTest extends UITestBase {
         } finally {
             implementation.setHealth(null);
         }
+    }
+
+    /**
+     * A reserved battery level is not reported as a percentage.
+     *
+     * <p>The Battery Level characteristic reserves everything above 100,
+     * and a peripheral answering {@code 0xFF} for "unknown" was handed to
+     * the app as a 255% battery.</p>
+     */
+    @Test
+    void aReservedBatteryLevelLeavesTheBatteryUnknown() throws Exception {
+        FakePeripheral p = new FakePeripheral();
+        p.batteryLevel = (byte) 0xFF;
+        BleSensorSession session = new BleSensorSession("fake",
+                HealthSensorProfile.HEART_RATE,
+                new SensorSessionOptions(), p);
+        started.add(session);
+        AsyncResource<SensorSession> out =
+                new AsyncResource<SensorSession>();
+        session.start(out);
+        flushSerialCalls();
+
+        assertNull(session.getBatteryPercent(),
+                "255 is reserved, not a percentage");
+
+        FakePeripheral ok = new FakePeripheral();
+        ok.batteryLevel = (byte) 72;
+        BleSensorSession good = new BleSensorSession("fake2",
+                HealthSensorProfile.HEART_RATE,
+                new SensorSessionOptions(), ok);
+        started.add(good);
+        good.start(new AsyncResource<SensorSession>());
+        flushSerialCalls();
+        assertEquals(Integer.valueOf(72), good.getBatteryPercent(),
+                "and an ordinary level is still reported");
     }
 }

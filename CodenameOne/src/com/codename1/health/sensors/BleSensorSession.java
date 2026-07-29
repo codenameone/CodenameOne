@@ -235,8 +235,20 @@ final class BleSensorSession extends SensorSession {
                             public void onReady(byte[] value, Throwable err) {
                                 if (err == null && value != null
                                         && value.length > 0) {
-                                    setBatteryPercent(
-                                            Integer.valueOf(value[0] & 0xFF));
+                                    // 0 to 100, and nothing else. The
+                                    // Battery Level characteristic
+                                    // reserves everything above 100, and
+                                    // a peripheral that answers 0xFF for
+                                    // "unknown" was reported to the app
+                                    // as a 255% battery. Left unset
+                                    // instead, which getBatteryPercent
+                                    // already documents as null when the
+                                    // device does not report one.
+                                    int percent = value[0] & 0xFF;
+                                    if (percent <= 100) {
+                                        setBatteryPercent(
+                                                Integer.valueOf(percent));
+                                    }
                                 }
                             }
                         });
@@ -315,9 +327,16 @@ final class BleSensorSession extends SensorSession {
                 });
     }
 
-    /// Whether this session has been stopped for good.
+    /// Whether this session has ended, however it ended.
+    ///
+    /// Both terminal states, not STOPPED alone. The reconnect ladder
+    /// retires a session as FAILED, and an indication the transport had
+    /// already queued then passed a stopped-only check: it reached the
+    /// listeners after the session was over, and with write-through on it
+    /// landed in a buffer whose final flush had already run and whose
+    /// timer is disarmed -- so it could never be persisted either.
     private boolean isStopped() {
-        return getState() == SensorSessionState.STOPPED;
+        return isTerminal();
     }
 
     /// Tears down a subscription that completed after the session stopped.

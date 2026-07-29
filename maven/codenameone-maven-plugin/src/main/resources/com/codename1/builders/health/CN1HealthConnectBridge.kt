@@ -527,6 +527,21 @@ class CN1HealthConnectBridge(private val context: Context)
         // page is memory spent that no later estimate can give back.
         var samplesPerRecord = if (isSeriesToken(token))
             SERIES_SCAN_CEILING / SERIES_PROBE_RECORDS else 1
+        // How many records a series page may ask for, grown gradually.
+        //
+        // The measured density bounds the *next* page only if the next
+        // page is like the last one, and it need not be: four sparse
+        // records say nothing about the sixty-four dense ones behind
+        // them, so an estimate alone let one page serialize hundreds of
+        // thousands of points. Growing by a fixed factor caps what a
+        // density jump can cost at one page of this size, and the size
+        // only rises while the records actually are light.
+        //
+        // No estimate can bound a *single* record -- Health Connect does
+        // not say how many points one holds until it is fetched -- so the
+        // guarantee is one page's worth of overshoot, with the page kept
+        // small, rather than a hard ceiling on materialization.
+        var seriesPage = SERIES_PROBE_RECORDS
         while (remaining > 0) {
             // A series page is sized from measured density, not from a
             // constant. Asking for a fixed 64 records materialized the
@@ -537,8 +552,7 @@ class CN1HealthConnectBridge(private val context: Context)
             // because nothing is known about density yet; every page
             // after it is sized by what that measured.
             val wantRecords = if (isSeriesToken(token))
-                minOf(SERIES_PAGE_RECORDS,
-                    maxOf(1, remaining / samplesPerRecord))
+                minOf(seriesPage, maxOf(1, remaining / samplesPerRecord))
                 else maxOf(1, remaining / samplesPerRecord)
             val page = requireClient().readRecords(
                 ReadRecordsRequest(type, timeRangeFilter = filter,
@@ -593,24 +607,37 @@ class CN1HealthConnectBridge(private val context: Context)
             // admit twenty thousand records holding millions of points.
             remaining -= if (isSeriesToken(token)) points else lines
             emitted += lines
+            seriesPage = minOf(SERIES_PAGE_RECORDS,
+                seriesPage * SERIES_PAGE_GROWTH)
             pageToken = page.pageToken
             if (pageToken == null || page.records.isEmpty()) {
                 break
             }
         }
-        if (!capped || pageToken != null) {
-            // Selecting is only sound over a scan that finished. Stopping
-            // at the ceiling with records still unread means the newest
-            // sample may be among them, so there is nothing to select
-            // from -- the read falls back to the ordinary paging answer,
-            // which hands back everything it did read together with a
-            // token that reaches the rest. An earlier version returned
-            // the selection and dropped the token, which both threw away
-            // the continuation and claimed a prefix was the whole range.
-            if (capped) {
-                sb.append(out)
-            }
+        if (!capped) {
             return Read(emitted, pageToken)
+        }
+        if (pageToken != null) {
+            // A capped scan that could not finish cannot answer at all.
+            //
+            // Selecting is only sound over the whole range: stopped at
+            // the ceiling, the newest sample may be among the records not
+            // yet read. And handing back the candidate buffer instead is
+            // no answer either -- the shared layer does not trim a page
+            // carrying a token, so a limit of one would return twenty
+            // thousand samples and the cap that exists to bound the heap
+            // would be gone. Both of those have been tried here.
+            //
+            // So it fails, and says what to do: a smaller range needs no
+            // scan this large, and a limit at or above the ceiling asks
+            // for paging instead of selection and is served normally.
+            throw IllegalStateException("A limited read of '" + token
+                + "' spans more than " + SERIES_SCAN_CEILING
+                + " measurements. Selecting the " + limit
+                + " you asked for would mean reading past that bound, so"
+                + " this cannot be answered exactly: narrow the time"
+                + " range, or raise the limit to " + SERIES_SCAN_CEILING
+                + " or more to page through the range instead.")
         }
         val kept = topByTime(out.toString(), limit, ascending)
         sb.append(kept.first)
@@ -1312,6 +1339,16 @@ class CN1HealthConnectBridge(private val context: Context)
 
     /** The most series records one round trip will ask for. */
     private val SERIES_PAGE_RECORDS = 64
+
+    /**
+     * How fast a series page may grow towards that maximum.
+     *
+     * A page is sized from the density the *previous* one measured, and
+     * density can jump -- sparse records say nothing about the dense ones
+     * behind them. Growing gradually caps what such a jump costs at one
+     * page of the current size instead of one page of the maximum.
+     */
+    private val SERIES_PAGE_GROWTH = 2
 
     /**
      * How many series records the first page asks for, before anything
