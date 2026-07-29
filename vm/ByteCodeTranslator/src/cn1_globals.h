@@ -1736,6 +1736,15 @@ extern JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_T
 // a scanning loop rather than hoisting them into registers once.
 extern CN1_NORETURN void cn1ThrowArrayIndexOrDie(CODENAME_ONE_THREAD_STATE, int index);
 
+// Same contract for the null case. cn1_array_access_validate() -- the reduced
+// expression path -- has always thrown NullPointerException on a null array in
+// every configuration; the statement-form macros below only did so when
+// CN1_INCLUDE_NPE_CHECKS was on, i.e. never in a shipping build, where a null
+// array segfaulted instead. There is no SIGSEGV-to-NPE handler to fall back on
+// (the only sigaction the runtime installs is the GC stop signal), so this was a
+// genuine gap and not a hardware-assisted shortcut.
+extern CN1_NORETURN void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE);
+
 // Array bounds checks are ALWAYS compiled in, in every configuration.
 //
 // They used to sit inside #ifdef CN1_INCLUDE_NPE_CHECKS, which is commented out
@@ -1754,38 +1763,34 @@ extern CN1_NORETURN void cn1ThrowArrayIndexOrDie(CODENAME_ONE_THREAD_STATE, int 
 // removed earlier and for free by the bounds-check-elimination pass
 // (BytecodeMethod.analyzeBoundsChecks), and a method may opt out deliberately via
 // the DisableNullAndArrayBoundsChecks annotation.
-#define CN1_ARRAY_BOUNDS_GUARD(array, bounds) \
+// One guard, used by every configuration: null then bounds, matching the order
+// and the semantics cn1_array_access_validate() has always had. The bounds test
+// is a single unsigned compare, so it covers index < 0 and index >= length.
+#define CN1_ARRAY_ACCESS_GUARD(array, bounds) \
+    if(__builtin_expect((array) == JAVA_NULL, 0)) { cn1ThrowNullPointerOrDie(threadStateData); } \
     if(__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)(array))->length), 0)) { cn1ThrowArrayIndexOrDie(threadStateData, bounds); }
 
-#define CN1_ARRAY_BOUNDS_GUARD_EXPR(array, bounds) \
-    (__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)(array))->length), 0) ? throwArrayIndexOutOfBoundsException_R_boolean(threadStateData, bounds) : JAVA_TRUE)
+#define CN1_ARRAY_ACCESS_GUARD_EXPR(array, bounds) \
+    (__builtin_expect((array) == JAVA_NULL, 0) ? throwException_R_boolean(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) \
+     : __builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)(array))->length), 0) ? throwArrayIndexOutOfBoundsException_R_boolean(threadStateData, bounds) : JAVA_TRUE)
+
+// DIVERGING form for FRAMELESS methods only: the failure path throws and RETURNS
+// from the (frame-free) method instead of falling through, so it needs the
+// returning throw helpers rather than the ...OrDie() pair.
+#define CN1_ARRAY_CHECK_DIVERGE(array, bounds, retval) \
+    if(__builtin_expect((array) == JAVA_NULL, 0)) { THROW_NULL_POINTER_EXCEPTION(); return retval; } \
+    if(__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)(array))->length), 0)) { THROW_ARRAY_INDEX_EXCEPTION(bounds); return retval; }
+
+#define CHECK_ARRAY_ACCESS(array_pos, bounds) CN1_ARRAY_ACCESS_GUARD(SP[- array_pos].data.o, bounds)
+#define CHECK_ARRAY_ACCESS_EXPR(array, bounds) CN1_ARRAY_ACCESS_GUARD_EXPR(array, bounds)
+#define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds) CN1_ARRAY_ACCESS_GUARD(array, bounds)
 
 #ifdef CN1_INCLUDE_NPE_CHECKS
     #define CHECK_NPE_TOP_OF_STACK() if(SP[-1].data.o == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); }
     #define CHECK_NPE_AT_STACK(pos) if(SP[-pos].data.o == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); }
-
-    #define CHECK_ARRAY_ACCESS(array_pos, bounds) if(SP[- array_pos].data.o == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); } \
-        CN1_ARRAY_BOUNDS_GUARD(SP[- array_pos].data.o, bounds)
-    #define CHECK_ARRAY_ACCESS_EXPR(array, bounds) ((array == JAVA_NULL) ? throwException_R_boolean(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : CN1_ARRAY_BOUNDS_GUARD_EXPR(array, bounds))
-    #define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds) if(array == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); } \
-        CN1_ARRAY_BOUNDS_GUARD(array, bounds)
-    // DIVERGING check for FRAMELESS methods only: the failure path throws and
-    // RETURNS from the (frame-free) method instead of falling through. That
-    // keeps the throwException CALL out of every loop cycle, so clang can
-    // hoist the array header loads (data/length) that the merging accessors
-    // (cn1_array_element_*) force it to reload each iteration. Mirrors the
-    // CN1_FRAMELESS_SOE_GUARD throw-and-return pattern.
-    #define CN1_ARRAY_CHECK_DIVERGE(array, bounds, retval) \
-        if(__builtin_expect(array == JAVA_NULL, 0)) { THROW_NULL_POINTER_EXCEPTION(); return retval; } \
-        if(__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)array)->length), 0)) { THROW_ARRAY_INDEX_EXCEPTION(bounds); return retval; }
 #else
     #define CHECK_NPE_TOP_OF_STACK()
     #define CHECK_NPE_AT_STACK(pos)
-    #define CHECK_ARRAY_ACCESS(array_pos, bounds) CN1_ARRAY_BOUNDS_GUARD(SP[- array_pos].data.o, bounds)
-    #define CHECK_ARRAY_ACCESS_EXPR(array, bounds) CN1_ARRAY_BOUNDS_GUARD_EXPR(array, bounds)
-    #define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds) CN1_ARRAY_BOUNDS_GUARD(array, bounds)
-    #define CN1_ARRAY_CHECK_DIVERGE(array, bounds, retval) \
-        if(__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)array)->length), 0)) { THROW_ARRAY_INDEX_EXCEPTION(bounds); return retval; }
 #endif
 
 #define CHECK_ARRAY_BOUNDS_AT_STACK(pos, bounds) CN1_ARRAY_BOUNDS_GUARD(PEEK_OBJ(pos), bounds)

@@ -6767,6 +6767,15 @@ void cn1ThrowArrayIndexOrDie(CODENAME_ONE_THREAD_STATE, int index) {
     abort();
 }
 
+// Null counterpart of cn1ThrowArrayIndexOrDie -- same reasoning: falling through
+// would dereference the null array the check just rejected.
+void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE) {
+    throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData));
+    fprintf(stderr, "FATAL: null array access with no exception handler installed\n");
+    fflush(stderr);
+    abort();
+}
+
 void** interfaceVtableGlobal = 0;
 
 void** initVtableForInterface() {
