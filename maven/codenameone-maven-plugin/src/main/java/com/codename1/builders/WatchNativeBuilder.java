@@ -618,6 +618,19 @@ class WatchNativeBuilder {
             // $(CONTENTS_FOLDER_PATH)/Watch and add a build dependency so the
             // pair archives together.
             s.append("app_target.add_dependency(watch_target)\n")
+                    // Mac Catalyst builds this same app target for macOS, and macOS refuses to
+                    // carry embedded watchOS content ("contains embedded content built for the
+                    // watchOS platform, which is not allowed"). A platformFilter of ios keeps the
+                    // dependency and the copy out of the Catalyst variant while leaving the iPhone
+                    // build with its embedded watch app.
+                    .append("app_target.dependencies.to_a.each do |dep|\n")
+                    .append("  proxy = dep.respond_to?(:target_proxy) ? dep.target_proxy : nil\n")
+                    .append("  remote = proxy && proxy.respond_to?(:remote_global_id) ? xcproj.objects_by_uuid[proxy.remote_global_id] : nil\n")
+                    .append("  dep_target = dep.respond_to?(:target) ? dep.target : nil\n")
+                    .append("  dep_target = remote if dep_target.nil?\n")
+                    .append("  next unless dep_target && dep_target.respond_to?(:name) && dep_target.name == watch_name\n")
+                    .append("  dep.platform_filter = 'ios' if dep.respond_to?(:platform_filter=)\n")
+                    .append("end\n")
                     .append("embed = app_target.build_phases.find { |p| p.respond_to?(:symbol_dst_subfolder_spec) && p.display_name == 'Embed Watch Content' }\n")
                     .append("if embed.nil?\n")
                     .append("  embed = app_target.new_copy_files_build_phase('Embed Watch Content')\n")
@@ -628,6 +641,9 @@ class WatchNativeBuilder {
                     .append("unless embed.files_references.include?(product)\n")
                     .append("  bf = embed.add_file_reference(product)\n")
                     .append("  bf.settings = { 'ATTRIBUTES' => ['RemoveHeadersOnCopy'] }\n")
+                    .append("end\n")
+                    .append("embed.files.to_a.each do |bf|\n")
+                    .append("  bf.platform_filter = 'ios' if bf.respond_to?(:platform_filter=)\n")
                     .append("end\n");
         }
 
