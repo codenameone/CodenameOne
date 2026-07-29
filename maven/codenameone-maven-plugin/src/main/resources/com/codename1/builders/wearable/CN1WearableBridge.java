@@ -378,21 +378,36 @@ public class CN1WearableBridge implements WearableBridge {
     /// {@link CN1WearableListenerService} as the request arrives.
     static int rememberRequestOrigin(int peerToken, String nodeId) {
         synchronized (inboundNodes) {
+            // An app that never answers a path would otherwise grow this map for its whole life.
+            // The sender gives up after its own timeout, so an entry older than that can go.
+            long cutoff = System.currentTimeMillis() - INBOUND_TTL_MILLIS;
+            java.util.Iterator<Map.Entry<Integer, InboundRequest>> it =
+                    inboundNodes.entrySet().iterator();
+            while (it.hasNext()) {
+                if (it.next().getValue().created < cutoff) {
+                    it.remove();
+                }
+            }
             int local = nextLocalToken++;
             inboundNodes.put(Integer.valueOf(local), new InboundRequest(nodeId, peerToken));
             return local;
         }
     }
 
+    /** How long an unanswered inbound request is remembered; outlives the sender's own timeout. */
+    private static final long INBOUND_TTL_MILLIS = 60000;
+
     /// Who asked, and what token they used. Their token is theirs alone; ours identifies the
     /// request locally so two nodes cannot collide.
     private static final class InboundRequest {
         final String nodeId;
         final int peerToken;
+        final long created;
 
         InboundRequest(String nodeId, int peerToken) {
             this.nodeId = nodeId;
             this.peerToken = peerToken;
+            this.created = System.currentTimeMillis();
         }
     }
 
@@ -486,6 +501,9 @@ public class CN1WearableBridge implements WearableBridge {
         byte[] body = contents == null ? new byte[0] : contents;
         PutDataMapRequest req = PutDataMapRequest.create(dataPath(path + "/" + fileName));
         req.getDataMap().putString("name", fileName);
+        // The DataItem path is namespaced and filename-suffixed, so the caller's own path has to
+        // travel with the payload -- a listener routes on the path it was given, not on ours.
+        req.getDataMap().putString("cn1.path", path);
         req.getDataMap().putAsset("asset", Asset.createFromBytes(body));
         dataClient.putDataItem(req.asPutDataRequest().setUrgent());
     }
@@ -498,13 +516,19 @@ public class CN1WearableBridge implements WearableBridge {
      * @param item the received data item
      * @return the encoded payload, or null
      */
-    static byte[] decodeTransfer(Context context, DataItem item) {
+    static Transfer decodeTransfer(Context context, DataItem item) {
+        DataMap map;
+        Asset asset;
         try {
-            DataMap map = DataMapItem.fromDataItem(item).getDataMap();
-            Asset asset = map.getAsset("asset");
-            if (asset == null) {
-                return null;
-            }
+            map = DataMapItem.fromDataItem(item).getDataMap();
+            asset = map.getAsset("asset");
+        } catch (Throwable notADataMap) {
+            return Transfer.NOT_A_TRANSFER;
+        }
+        if (asset == null) {
+            return Transfer.NOT_A_TRANSFER;
+        }
+        try {
             java.io.InputStream in = Tasks.await(
                     Wearable.getDataClient(context.getApplicationContext()).getFdForAsset(asset),
                     TIMEOUT_SECONDS, TimeUnit.SECONDS).getInputStream();
@@ -515,12 +539,38 @@ public class CN1WearableBridge implements WearableBridge {
                 out.write(buf, 0, n);
             }
             in.close();
-            return new WearableMessage(item.getUri().getPath())
+            // On the caller's own path, not the namespaced DataItem one.
+            String logical = map.getString("cn1.path", item.getUri().getPath());
+            return Transfer.of(new WearableMessage(logical)
                     .put("name", map.getString("name", "file"))
                     .put("contents", out.toByteArray())
-                    .toByteArray();
-        } catch (Throwable notATransfer) {
-            return null;
+                    .toByteArray());
+        } catch (Throwable assetUnreadable) {
+            // A transient download failure. Forwarding DataItem.getData() here would hand the
+            // listener DataMap metadata dressed up as a payload, so say nothing instead: the item
+            // stays published and the next sync delivers it.
+            return Transfer.UNREADABLE;
+        }
+    }
+
+    /**
+     * The outcome of inspecting a received DataItem: an ordinary published value, a decoded file
+     * transfer, or a transfer whose asset could not be read this time.
+     */
+    static final class Transfer {
+        static final Transfer NOT_A_TRANSFER = new Transfer(null, false);
+        static final Transfer UNREADABLE = new Transfer(null, true);
+
+        final byte[] payload;
+        final boolean isTransfer;
+
+        private Transfer(byte[] payload, boolean isTransfer) {
+            this.payload = payload;
+            this.isTransfer = isTransfer;
+        }
+
+        static Transfer of(byte[] payload) {
+            return new Transfer(payload, true);
         }
     }
 

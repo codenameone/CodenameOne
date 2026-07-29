@@ -145,9 +145,17 @@ public class CN1WearableListenerService extends WearableListenerService {
             // A file transfer arrives as a DataMap carrying an Asset rather than an inline payload.
             // Turn it back into the WearableMessage the receiver expects; this callback already
             // runs off the main thread, so resolving the asset here is fine.
-            byte[] payload = CN1WearableBridge.decodeTransfer(this, event.getDataItem());
-            WearableConnection.deliverDataChanged(appPath,
-                    payload != null ? payload : event.getDataItem().getData());
+            CN1WearableBridge.Transfer transfer =
+                    CN1WearableBridge.decodeTransfer(this, event.getDataItem());
+            if (transfer.isTransfer) {
+                if (transfer.payload != null) {
+                    WearableConnection.deliverDataChanged(appPath, transfer.payload);
+                }
+                // An unreadable asset delivers nothing: the item stays published and the next sync
+                // brings it, which beats handing the listener DataMap bytes as a payload.
+                continue;
+            }
+            WearableConnection.deliverDataChanged(appPath, event.getDataItem().getData());
         }
     }
 
