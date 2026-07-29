@@ -1122,6 +1122,36 @@ class BleSensorReconnectTest extends UITestBase {
     }
 
     /**
+     * A start on an already stopped session fails its caller.
+     *
+     * <p>The transition is refused, which is right, but returning quietly
+     * left the {@code connect()} resource pending forever -- the same
+     * defect as the late-subscribe path, one step earlier.</p>
+     */
+    @Test
+    void aRefusedStartFailsTheCaller() {
+        FakePeripheral p = new FakePeripheral();
+        BleSensorSession session = new BleSensorSession("fake",
+                HealthSensorProfile.HEART_RATE,
+                new SensorSessionOptions(), p);
+        started.add(session);
+        session.stop();
+        flushSerialCalls();
+
+        AsyncResource<SensorSession> out =
+                new AsyncResource<SensorSession>();
+        session.start(out);
+        flushSerialCalls();
+
+        assertTrue(out.isDone(),
+                "a refused start must settle the caller's resource");
+        Throwable err = errorOf(out);
+        assertTrue(err instanceof HealthException, String.valueOf(err));
+        assertEquals(HealthError.SESSION_STATE,
+                ((HealthException) err).getError());
+    }
+
+    /**
      * A session keeps the options it was created with.
      *
      * <p>The builder is fluent and a caller can reuse one for a second

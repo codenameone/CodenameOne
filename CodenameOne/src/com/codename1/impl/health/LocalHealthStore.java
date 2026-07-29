@@ -183,10 +183,17 @@ public class LocalHealthStore extends HealthStore {
         // simulator, where the heap is not generous.
         //
         // Whole records only, matching the trim the shared layer performs
-        // after flattening: the measurements of one series share an
-        // identifier, and this store hands back no continuation token, so
-        // anything cut from the middle of a record is gone for good. The
-        // last record is therefore kept entire and may overshoot.
+        // after flattening, and the cut may fall inside a record.
+        //
+        // Keeping a record whole would have made the cap meaningless in
+        // the one case it matters most: a single half-million-point
+        // series is half a million QuantitySamples on the platforms with
+        // the least heap, whatever the caller asked for. It is safe to
+        // cut here in a way it is not on the mobile ports -- there a
+        // token moves past the record and nothing brings the rest back,
+        // while this store answers a query over its own contents, so a
+        // narrower time range returns the remaining points exactly. The
+        // page says it was truncated either way.
         boolean flatten = query.isFlattenSeries();
         int limit = query.getLimit();
         boolean truncated = false;
@@ -197,8 +204,17 @@ public class LocalHealthStore extends HealthStore {
                 truncated = true;
                 break;
             }
+            int weight = weigh(s, flatten);
+            if (counted + weight > limit) {
+                // Only a flattened series can weigh more than one, so
+                // this is the record the limit falls inside.
+                page.add(HealthWire.headOfSeries((SeriesSample) s,
+                        limit - counted));
+                truncated = true;
+                break;
+            }
             page.add(s);
-            counted += weigh(s, flatten);
+            counted += weight;
         }
         matched = page;
         // Everything is in memory, so a single page always satisfies the

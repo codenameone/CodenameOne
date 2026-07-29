@@ -168,22 +168,49 @@ public final class HealthWire {
         if (copy == null) {
             return null;
         }
-        copy.setId(sample.getId());
-        copy.setSource(sample.getSource());
-        copy.setRecordingMethod(sample.getRecordingMethod());
+        carryCommon(sample, copy);
+        return copy;
+    }
+
+    /// Copies the state every shape carries from `from` onto `to`.
+    private static void carryCommon(HealthSample from, HealthSample to) {
+        to.setId(from.getId());
+        to.setSource(from.getSource());
+        to.setRecordingMethod(from.getRecordingMethod());
         // Title and notes live on SessionSample, above the shapes that
         // carry them, so every per-shape branch missed them and a titled
         // workout or sleep session lost both the moment it was written.
-        if (sample instanceof SessionSample && copy instanceof SessionSample) {
-            SessionSample from = (SessionSample) sample;
-            SessionSample to = (SessionSample) copy;
-            to.setTitle(from.getTitle());
-            to.setNotes(from.getNotes());
+        if (from instanceof SessionSample && to instanceof SessionSample) {
+            ((SessionSample) to).setTitle(((SessionSample) from).getTitle());
+            ((SessionSample) to).setNotes(((SessionSample) from).getNotes());
         }
-        for (Map.Entry<String, String> e : sample.getMetadata().entrySet()) {
-            copy.putMetadata(e.getKey(), e.getValue());
+        for (Map.Entry<String, String> e : from.getMetadata().entrySet()) {
+            to.putMetadata(e.getKey(), e.getValue());
         }
-        return copy;
+    }
+
+    /// The first `count` measurements of `series`, as a series of its own.
+    ///
+    /// For a reader that has to stop inside a record because the caller's
+    /// limit falls there. The piece keeps the original's identifier --
+    /// they came from one record and there is nothing else to call it --
+    /// and its stated span ends at the last measurement kept, so it never
+    /// claims to cover time it no longer carries.
+    public static SeriesSample headOfSeries(SeriesSample series, int count) {
+        int n = Math.max(1, Math.min(count, series.size()));
+        long[] starts = new long[n];
+        long[] ends = new long[n];
+        double[] values = new double[n];
+        for (int i = 0; i < n; i++) {
+            starts[i] = series.getSampleStartMillis(i);
+            ends[i] = series.getSampleEndMillis(i);
+            values[i] = series.getSampleValue(i, series.getUnit());
+        }
+        SeriesSample head = SeriesSample.create(series.getType(),
+                series.getStartMillis(), ends[n - 1], starts, ends, values,
+                series.getUnit());
+        carryCommon(series, head);
+        return head;
     }
 
     /// The shape-specific half of [#copyOf(HealthSample)].

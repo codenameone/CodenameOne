@@ -338,21 +338,66 @@ class LocalHealthStoreTest extends UITestBase {
                 .setLimit(4)
                 .setTimeRange(HealthTimeRange.between(utc(2026, 1, 1, 0),
                         utc(2026, 1, 2, 0)))).get();
-        // Whole records only, so the second one overshoots four rather
-        // than being cut: its measurements share an identifier and this
-        // store hands back no token to resume past them.
-        assertEquals(6, page.size(),
+        assertEquals(4, page.size(),
                 "twelve measurements were stored and the limit was four,"
                         + " so a page of them all means the limit counted"
                         + " containers");
         assertTrue(page.isTruncated(),
-                "and the records left out must be reported as truncated");
+                "and what was left out must be reported as truncated");
     }
 
     /**
      * Turning flattening off means the records are what the caller
      * counts, so the limit counts records again.
      */
+    /**
+     * The cap holds inside a single record too.
+     *
+     * <p>Keeping a record whole made the cap meaningless in the case it
+     * matters most: one half-million-point series is half a million
+     * QuantitySamples on the platforms with the least heap, whatever the
+     * caller asked for. Cutting is safe here in a way it is not on the
+     * mobile ports -- this store answers a query over its own contents,
+     * so a narrower range returns the rest exactly.</p>
+     */
+    @Test
+    void aSingleOversizedSeriesIsCutAtTheLimit() {
+        long base = utc(2026, 1, 1, 9);
+        long[] starts = new long[5];
+        long[] ends = new long[5];
+        double[] values = new double[5];
+        for (int i = 0; i < 5; i++) {
+            starts[i] = base + i * 1000L;
+            ends[i] = starts[i];
+            values[i] = 60 + i;
+        }
+        store.write(SeriesSample.create(HealthDataType.HEART_RATE,
+                base, base + 4000, starts, ends, values,
+                HealthUnit.COUNT_PER_MINUTE)).get();
+
+        SamplePage page = store.readSamplePage(new SampleQuery()
+                .addType(HealthDataType.HEART_RATE)
+                .setLimit(3)
+                .setTimeRange(HealthTimeRange.between(utc(2026, 1, 1, 0),
+                        utc(2026, 1, 2, 0)))).get();
+
+        assertEquals(3, page.size(),
+                "the limit must hold inside the record, got: "
+                        + page.size());
+        assertTrue(page.isTruncated(),
+                "and the caller must be told there is more");
+
+        // The rest is still reachable, which is what makes the cut safe.
+        SamplePage rest = store.readSamplePage(new SampleQuery()
+                .addType(HealthDataType.HEART_RATE)
+                .setLimit(10)
+                .setTimeRange(HealthTimeRange.between(base + 3000,
+                        utc(2026, 1, 2, 0)))).get();
+        assertTrue(rest.size() >= 2,
+                "a narrower range must return the remaining points, got: "
+                        + rest.size());
+    }
+
     @Test
     void anUnflattenedReadCountsRecords() {
         long base = utc(2026, 1, 1, 9);

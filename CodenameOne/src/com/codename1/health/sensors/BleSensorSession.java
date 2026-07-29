@@ -105,6 +105,7 @@ final class BleSensorSession extends SensorSession {
             // session is already disconnected and off the registry, so
             // connecting the peripheral now would leave a stopped
             // session holding a live link that nothing will close.
+            failStopped(out);
             return;
         }
         // Registering the listener and opening the link happen under the
@@ -117,6 +118,7 @@ final class BleSensorSession extends SensorSession {
         // registry.
         synchronized (lifecycleLock) {
             if (isTerminal()) {
+                failStopped(out);
                 return;
             }
             if (options().isAutoReconnect() && reconnectListener == null) {
@@ -409,6 +411,21 @@ final class BleSensorSession extends SensorSession {
     /// then, in which case this fails harmlessly. Leaving it is the worse
     /// option -- a live characteristic notification on a session the app
     /// has finished with.
+    /// Fails a start that lost to teardown.
+    ///
+    /// Every path that gives up because the session ended settles the
+    /// caller's resource. Returning quietly left an app that stopped a
+    /// session while its start was in flight waiting on a `connect()`
+    /// that could never complete -- indistinguishable, from where it
+    /// stands, from a strap that is merely slow.
+    private void failStopped(AsyncResource<SensorSession> out) {
+        if (out != null) {
+            out.error(new HealthException(HealthError.SESSION_STATE,
+                    "the " + getProfile().getName() + " session was"
+                            + " stopped before it started streaming"));
+        }
+    }
+
     /// Tears down a subscription whose session ended while it was in
     /// flight, and settles whoever was waiting on the start.
     ///
@@ -420,11 +437,7 @@ final class BleSensorSession extends SensorSession {
     private void failLateSubscribe(AsyncResource<SensorSession> out,
             GattNotificationListener listener) {
         unsubscribeLate(listener);
-        if (out != null) {
-            out.error(new HealthException(HealthError.SESSION_STATE,
-                    "the " + getProfile().getName() + " session was"
-                            + " stopped before it started streaming"));
-        }
+        failStopped(out);
     }
 
     private void unsubscribeLate(GattNotificationListener listener) {
