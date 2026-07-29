@@ -163,12 +163,18 @@ final class IOSDeviceIntegrity {
      * restore to a new device, or an OS-side invalidation.
      */
     void resetAttestation() {
-        SecureStorage store = SecureStorage.getInstance();
-        store.remove(KEY_ID);
-        store.remove(KEY_STATE);
-        store.remove(KEY_RETRY_AFTER);
-        store.remove(KEY_PENDING_SINCE);
+        // The lock is taken BEFORE the removals, so deleting the state and invalidating
+        // the generation are one step. Removing first left a window in which a callback
+        // could take the lock, pass its staleness check -- the generation had not been
+        // bumped yet -- and write the discarded key straight back. The reset would then
+        // mark only that callback stale and leave the resurrected key behind for the
+        // next bootstrap to find.
         synchronized (flowLock) {
+            SecureStorage store = SecureStorage.getInstance();
+            store.remove(KEY_ID);
+            store.remove(KEY_STATE);
+            store.remove(KEY_RETRY_AFTER);
+            store.remove(KEY_PENDING_SINCE);
             currentBackoff = MIN_BACKOFF_MILLIS;
             bootstrapInFlight = false;
             // Any callback still outstanding now belongs to an abandoned flow.
@@ -446,7 +452,20 @@ final class IOSDeviceIntegrity {
                         "App Attest could not record its attestation state");
                 return;
             }
-            store.set(KEY_PENDING_SINCE, Long.toString(System.currentTimeMillis()));
+            if (!store.set(KEY_PENDING_SINCE, Long.toString(System.currentTimeMillis()))) {
+                // Part of the same state transition, not a nicety: with no timestamp,
+                // registrationGraceRemaining() reads the window as already expired, so
+                // the very next request promotes the key to attested and asserts against
+                // a key no backend has acknowledged -- the first-use rejection and
+                // pointless key reset this state exists to prevent. Roll back to new so
+                // the key is attested again rather than used prematurely.
+                store.set(KEY_STATE, STATE_NEW);
+                instance.bootstrapInFlight = false;
+                fail(pending, "App Attest could not record its registration deadline");
+                instance.failBootstrapWaiters(
+                        "App Attest could not record its registration deadline");
+                return;
+            }
             instance.currentBackoff = MIN_BACKOFF_MILLIS;
             instance.bootstrapInFlight = false;
             // Deliberately NOT asserted here, for the reason above. Queued callers

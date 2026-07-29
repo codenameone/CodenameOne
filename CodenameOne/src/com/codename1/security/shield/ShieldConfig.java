@@ -100,7 +100,7 @@ public final class ShieldConfig {
     /// subdomains. Hosts not registered here are never touched.
     public ShieldConfig protect(String hostPattern, HostPolicy policy) {
         if (hostPattern != null && hostPattern.length() > 0) {
-            hostPolicies.put(hostPattern.toLowerCase(),
+            hostPolicies.put(ShieldHosts.normalize(hostPattern),
                     policy == null ? implicitPolicy() : policy);
         }
         return this;
@@ -152,7 +152,7 @@ public final class ShieldConfig {
         if (host == null) {
             return HostPolicy.UNPROTECTED;
         }
-        String h = host.toLowerCase();
+        String h = ShieldHosts.normalize(host);
         Object exact = hostPolicies.get(h);
         if (exact != null) {
             return (HostPolicy) exact;

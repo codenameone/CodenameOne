@@ -289,7 +289,7 @@ public final class AppShield {
     /// True for an absolute https URL. Anything else -- http, or a relative URL we cannot
     /// classify -- is not somewhere a bearer token belongs.
     static boolean isSecure(String url) {
-        return url != null && url.toLowerCase().startsWith("https://");
+        return ShieldHosts.startsWithIgnoreCase(url, "https://");
     }
 
     private static void failOrContinue(HostPolicy policy, ShieldException e) throws ShieldException {
@@ -353,7 +353,7 @@ public final class AppShield {
             // Same rule as ShieldConfig.protect: an omitted policy has to pick up
             // the configured default failure mode, or setting a fail-closed
             // default silently does nothing on this path too.
-            runtimeHosts.put(host.toLowerCase(),
+            runtimeHosts.put(ShieldHosts.normalize(host),
                     policy == null ? implicitPolicy() : policy);
         }
     }
@@ -378,7 +378,7 @@ public final class AppShield {
         if (host == null) {
             return HostPolicy.UNPROTECTED;
         }
-        Object runtime = runtimeHosts.get(host.toLowerCase());
+        Object runtime = runtimeHosts.get(ShieldHosts.normalize(host));
         if (runtime != null) {
             return (HostPolicy) runtime;
         }
@@ -526,7 +526,7 @@ public final class AppShield {
         if (colon >= 0 && authority.indexOf(']') < colon) {
             authority = authority.substring(0, colon);
         }
-        return authority.length() == 0 ? null : authority.toLowerCase();
+        return authority.length() == 0 ? null : ShieldHosts.normalize(authority);
     }
 
     private static com.codename1.security.shield.spi.EngineContext contextForEngine() {

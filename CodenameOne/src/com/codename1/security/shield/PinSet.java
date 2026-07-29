@@ -107,7 +107,7 @@ public final class PinSet {
         if (host == null) {
             return null;
         }
-        String h = host.toLowerCase();
+        String h = ShieldHosts.normalize(host);
         Object exact = hostToPins.get(h);
         if (exact != null) {
             return copyOf((Vector) exact);
