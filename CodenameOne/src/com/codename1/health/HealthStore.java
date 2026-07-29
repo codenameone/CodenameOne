@@ -24,6 +24,7 @@ package com.codename1.health;
 
 import com.codename1.io.Preferences;
 import com.codename1.ui.Display;
+import com.codename1.impl.health.HealthWire;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
 import com.codename1.util.EasyThread;
@@ -1529,10 +1530,19 @@ public class HealthStore {
                     "write needs at least one sample");
             return out;
         }
+        // Copied as well as validated. Only the first chunk is dispatched
+        // here -- the rest go out as each platform callback returns -- so
+        // a caller that edited a sample after write() returned changed the
+        // provenance, the value or the unit of a chunk that had not left
+        // yet, and the store recorded the edit rather than the request.
+        // A shape with no copy is passed through: the mobile ports refuse
+        // those anyway, and the local store takes its own copy.
         List<HealthSample> prepared = new ArrayList<HealthSample>();
         try {
             for (HealthSample sample : samples) {
-                prepared.add(validateForWrite(sample));
+                HealthSample checked = validateForWrite(sample);
+                HealthSample copy = HealthWire.copyOf(checked);
+                prepared.add(copy == null ? checked : copy);
             }
         } catch (HealthException ex) {
             out.error(ex);

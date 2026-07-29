@@ -35,16 +35,7 @@ import com.codename1.health.HealthSample;
 import com.codename1.health.HealthStore;
 import com.codename1.health.HealthTimeRange;
 import com.codename1.health.HealthWriteResult;
-import com.codename1.health.BloodPressureSample;
-import com.codename1.health.CategorySample;
-import com.codename1.health.HealthQuantity;
-import com.codename1.health.QuantitySample;
 import com.codename1.health.SeriesSample;
-import com.codename1.health.SessionSample;
-import com.codename1.health.SleepSample;
-import com.codename1.health.WorkoutSample;
-import com.codename1.health.nutrition.Nutrient;
-import com.codename1.health.nutrition.NutritionSample;
 import com.codename1.health.SampleQuery;
 import com.codename1.health.SamplePage;
 import com.codename1.util.AsyncResource;
@@ -53,7 +44,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 
 /// A health store held in the app's own process, for ports with no
 /// platform health provider -- the desktop ports, the JavaScript port, and
@@ -277,12 +267,8 @@ public class LocalHealthStore extends HealthStore {
     }
 
     /// Copies a stored sample so callers cannot mutate the store.
-    ///
-    /// Quantity samples are the only shape this store holds; anything else
-    /// is returned as-is, which is still an improvement on handing back
-    /// the stored instance for the common case.
     private static HealthSample snapshot(HealthSample s) {
-        HealthSample copy = copyShape(s);
+        HealthSample copy = HealthWire.copyOf(s);
         if (copy == null) {
             // A shape this build cannot copy. Sharing the caller's object
             // is worse than refusing the write: it would let a later edit
@@ -292,108 +278,7 @@ public class LocalHealthStore extends HealthStore {
                     + " cannot be stored locally: this build has no copy"
                     + " for that sample shape");
         }
-        copy.setId(s.getId());
-        copy.setSource(s.getSource());
-        copy.setRecordingMethod(s.getRecordingMethod());
-        // Title and notes live on SessionSample, above the shapes that
-        // carry them, so every per-shape branch missed them and a titled
-        // workout or sleep session lost both the moment it was written.
-        if (s instanceof SessionSample && copy instanceof SessionSample) {
-            SessionSample from = (SessionSample) s;
-            SessionSample to = (SessionSample) copy;
-            to.setTitle(from.getTitle());
-            to.setNotes(from.getNotes());
-        }
-        for (Map.Entry<String, String> e : s.getMetadata().entrySet()) {
-            copy.putMetadata(e.getKey(), e.getValue());
-        }
         return copy;
-    }
-
-    /// A copy of `s` carrying its shape-specific state, or null when the
-    /// shape is unknown to this build.
-    ///
-    /// Every shape, not only [QuantitySample]. The common setters --
-    /// identifier, source, metadata -- exist on all of them, and a series,
-    /// a workout or a nutrition entry has mutable state of its own on top.
-    /// Returning the caller's object left the store aliased to it, so
-    /// editing a sample after writing it silently changed what was stored,
-    /// and editing one that came back from a read did the same. Losing the
-    /// identifier that way breaks deletion by id.
-    private static HealthSample copyShape(HealthSample s) {
-        if (s instanceof QuantitySample) {
-            QuantitySample q = (QuantitySample) s;
-            return q.isInstantaneous()
-                    ? QuantitySample.create(q.getType(), q.getQuantity(),
-                            q.getStartMillis())
-                    : QuantitySample.create(q.getType(), q.getQuantity(),
-                            q.getStartMillis(), q.getEndMillis());
-        }
-        if (s instanceof SeriesSample) {
-            SeriesSample series = (SeriesSample) s;
-            int n = series.size();
-            long[] starts = new long[n];
-            long[] ends = new long[n];
-            double[] values = new double[n];
-            for (int i = 0; i < n; i++) {
-                starts[i] = series.getSampleStartMillis(i);
-                ends[i] = series.getSampleEndMillis(i);
-                values[i] = series.getSampleValue(i, series.getUnit());
-            }
-            return SeriesSample.create(series.getType(),
-                    series.getStartMillis(), series.getEndMillis(), starts,
-                    ends, values, series.getUnit());
-        }
-        if (s instanceof BloodPressureSample) {
-            BloodPressureSample bp = (BloodPressureSample) s;
-            BloodPressureSample copy = BloodPressureSample.create(
-                    bp.getSystolic(), bp.getDiastolic(), bp.getStartMillis());
-            copy.setPulse(bp.getPulse());
-            copy.setBodyPosition(bp.getBodyPosition());
-            copy.setMeasurementLocation(bp.getMeasurementLocation());
-            return copy;
-        }
-        if (s instanceof CategorySample) {
-            CategorySample c = (CategorySample) s;
-            return c.isInstantaneous()
-                    ? CategorySample.create(c.getType(), c.getValue(),
-                            c.getStartMillis())
-                    : CategorySample.create(c.getType(), c.getValue(),
-                            c.getStartMillis(), c.getEndMillis());
-        }
-        if (s instanceof SleepSample) {
-            SleepSample sleep = (SleepSample) s;
-            return SleepSample.create(sleep.getStartMillis(),
-                    sleep.getEndMillis(), sleep.getStages());
-        }
-        if (s instanceof WorkoutSample) {
-            WorkoutSample w = (WorkoutSample) s;
-            WorkoutSample copy = WorkoutSample.create(w.getActivityType(),
-                    w.getStartMillis(), w.getEndMillis());
-            copy.setPlatformCode(w.getPlatformCode());
-            copy.setTotalEnergy(w.getTotalEnergy());
-            copy.setTotalDistance(w.getTotalDistance());
-            copy.setActiveDurationMillis(w.getActiveDurationMillis());
-            return copy;
-        }
-        if (s instanceof NutritionSample) {
-            NutritionSample n = (NutritionSample) s;
-            NutritionSample copy = n.isInstantaneous()
-                    ? NutritionSample.create(n.getStartMillis())
-                    : NutritionSample.create(n.getStartMillis(),
-                            n.getEndMillis());
-            for (Nutrient nutrient : n.getNutrients()) {
-                HealthQuantity amount = n.getNutrient(nutrient);
-                if (amount != null) {
-                    copy.setNutrient(nutrient, amount.getRawValue(),
-                            amount.getUnit());
-                }
-            }
-            copy.setMealType(n.getMealType());
-            copy.setFoodName(n.getFoodName());
-            return copy;
-        }
-        return null;
     }
 
     private static void sort(List<HealthSample> list,

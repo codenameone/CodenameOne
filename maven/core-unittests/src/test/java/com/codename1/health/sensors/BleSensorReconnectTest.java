@@ -33,6 +33,8 @@ import com.codename1.bluetooth.le.ConnectionOptions;
 import com.codename1.bluetooth.le.ConnectionPriority;
 import com.codename1.bluetooth.le.ConnectionState;
 import com.codename1.bluetooth.le.L2capChannel;
+import com.codename1.health.HealthError;
+import com.codename1.health.HealthException;
 import com.codename1.junit.UITestBase;
 import com.codename1.util.AsyncResource;
 import org.junit.jupiter.api.Test;
@@ -183,6 +185,10 @@ class BleSensorReconnectTest extends UITestBase {
         /// What the Body Sensor Location characteristic answers, or null
         /// for a peripheral that does not expose one.
         Byte bodyLocation;
+        /// Holds the first subscribe in flight so a stop can land while
+        /// the caller is still waiting on the start.
+        boolean holdSubscribe;
+        private AsyncResource<Boolean> heldSubscribe;
         private int discoveries;
         private int connects;
 
@@ -311,7 +317,23 @@ class BleSensorReconnectTest extends UITestBase {
         protected void doSetNotifications(GattCharacteristic c,
                 boolean enable, boolean indication,
                 AsyncResource<Boolean> out) {
+            if (holdSubscribe && enable) {
+                // Left in flight, as a real strap can be: the session is
+                // then stopped underneath it and this completes late.
+                heldSubscribe = out;
+                return;
+            }
             out.complete(Boolean.TRUE);
+        }
+
+        /// Completes a subscribe that was held, as the transport would
+        /// when the platform finally answers.
+        void releaseSubscribe() {
+            AsyncResource<Boolean> held = heldSubscribe;
+            heldSubscribe = null;
+            if (held != null) {
+                held.complete(Boolean.TRUE);
+            }
         }
 
         @Override
@@ -1059,6 +1081,44 @@ class BleSensorReconnectTest extends UITestBase {
         assertEquals(connectsBefore, p.connects,
                 "a stopped session must not open a link");
         assertEquals(SensorSessionState.STOPPED, session.getState());
+    }
+
+    /**
+     * A start that loses to stop() settles the caller's resource.
+     *
+     * <p>The subscribe completion tore the subscription down and
+     * returned, so an app that stopped a session while its first
+     * subscribe was in flight waited on a {@code connect()} resource that
+     * could never be completed -- indistinguishable, from the caller'"'"'s
+     * side, from a strap that is simply slow.</p>
+     */
+    @Test
+    void aStartThatLosesToStopFailsTheCaller() throws Exception {
+        FakePeripheral p = new FakePeripheral();
+        p.holdSubscribe = true;
+        BleSensorSession session = new BleSensorSession("fake",
+                HealthSensorProfile.HEART_RATE,
+                new SensorSessionOptions(), p);
+        started.add(session);
+        AsyncResource<SensorSession> out =
+                new AsyncResource<SensorSession>();
+        session.start(out);
+        flushSerialCalls();
+        assertFalse(out.isDone(), "the subscribe is still in flight");
+
+        session.stop();
+        flushSerialCalls();
+        p.releaseSubscribe();
+        flushSerialCalls();
+
+        assertTrue(out.isDone(),
+                "the caller must not be left waiting for a callback that"
+                        + " cannot come");
+        Throwable err = errorOf(out);
+        assertNotNull(err, "and it must be an error, not a session");
+        assertTrue(err instanceof HealthException, String.valueOf(err));
+        assertEquals(HealthError.SESSION_STATE,
+                ((HealthException) err).getError());
     }
 
     /**

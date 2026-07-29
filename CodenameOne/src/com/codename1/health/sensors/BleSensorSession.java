@@ -162,13 +162,29 @@ final class BleSensorSession extends SensorSession {
         if (!setState(SensorSessionState.CONNECTING)) {
             return;
         }
-        // The cumulative trackers hold the previous connection's baseline.
-        // A sensor that power-cycled while away restarts its counters at
-        // zero, and even one that did not will have wrapped its 16-bit
-        // event timer several times across the gap, so the first delta
-        // after reconnecting would publish a large fabricated cadence into
-        // the live workout and into anything persisted from it.
-        resetCounters();
+        // The transport work under the lock teardown takes, and the
+        // terminal state re-read inside it -- exactly as start() does.
+        // Winning the transition is not enough on its own: a stop() in
+        // the gap disconnected and unregistered the session, and this
+        // then opened the link again on a session nobody holds.
+        synchronized (lifecycleLock) {
+            if (isTerminal()) {
+                return;
+            }
+            // The cumulative trackers hold the previous connection's
+            // baseline. A sensor that power-cycled while away restarts its
+            // counters at zero, and even one that did not will have
+            // wrapped its 16-bit event timer several times across the gap,
+            // so the first delta after reconnecting would publish a large
+            // fabricated cadence into the live workout and into anything
+            // persisted from it.
+            resetCounters();
+            reconnectInLock();
+        }
+    }
+
+    /// The reconnect's transport half. Call with [#lifecycleLock] held.
+    private void reconnectInLock() {
         peripheral.connect().onResult(new AsyncResult<BlePeripheral>() {
             @Override
             public void onReady(BlePeripheral value, Throwable err) {
@@ -354,7 +370,7 @@ final class BleSensorSession extends SensorSession {
                         // yet reporting itself live and delivering
                         // notifications. Stopped is terminal.
                         if (isTerminal()) {
-                            unsubscribeLate(listener);
+                            failLateSubscribe(out, listener);
                             return;
                         }
                         if (err != null) {
@@ -368,7 +384,7 @@ final class BleSensorSession extends SensorSession {
                         // caller was handed a stopped session as a
                         // successful start.
                         if (!setState(SensorSessionState.STREAMING)) {
-                            unsubscribeLate(listener);
+                            failLateSubscribe(out, listener);
                             return;
                         }
                         // A run of failures only retires the session when
@@ -393,6 +409,24 @@ final class BleSensorSession extends SensorSession {
     /// then, in which case this fails harmlessly. Leaving it is the worse
     /// option -- a live characteristic notification on a session the app
     /// has finished with.
+    /// Tears down a subscription whose session ended while it was in
+    /// flight, and settles whoever was waiting on the start.
+    ///
+    /// Both ways of losing that race come here. Returning without
+    /// completing the resource left an app that stopped a session while
+    /// its first subscribe was in flight waiting for a callback that could
+    /// never arrive -- and the reconnect path passes null, because nobody
+    /// is waiting on those.
+    private void failLateSubscribe(AsyncResource<SensorSession> out,
+            GattNotificationListener listener) {
+        unsubscribeLate(listener);
+        if (out != null) {
+            out.error(new HealthException(HealthError.SESSION_STATE,
+                    "the " + getProfile().getName() + " session was"
+                            + " stopped before it started streaming"));
+        }
+    }
+
     private void unsubscribeLate(GattNotificationListener listener) {
         try {
             peripheral.unsubscribe(measurement, listener);
