@@ -4585,7 +4585,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         deviceIntegrity().confirmAttestation();
     }
 
-    private IOSDeviceIntegrity deviceIntegrity() {
+    /**
+     * The App Attest coordinator, created once.
+     *
+     * <p>Synchronized because two concurrent first requests would otherwise each build
+     * one. Each carries its own {@code flowLock} and {@code bootstrapInFlight}, so
+     * neither would see the other's bootstrap -- two rate-limited hardware keys, and
+     * two sets of callbacks racing to persist an identity -- while the constructor
+     * overwrites the shared static the native callbacks dispatch through.</p>
+     */
+    private synchronized IOSDeviceIntegrity deviceIntegrity() {
         if (deviceIntegrity == null) {
             deviceIntegrity = new IOSDeviceIntegrity(nativeInstance);
         }

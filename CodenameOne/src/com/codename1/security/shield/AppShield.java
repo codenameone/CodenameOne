@@ -304,11 +304,17 @@ public final class AppShield {
         // A build with no engine must never block a request: that is the
         // degradation contract this API documents, and a fail-closed host in an
         // open-source or unentitled build would otherwise break outright.
-        if (policy.getFailureMode() == FailureMode.CLOSED && isProtected()) {
+        // Registered, not available. An engine may legitimately report itself
+        // unavailable -- an unsupported device, a failed initialization -- and that is
+        // exactly when a fail-closed host must refuse, not the moment to stop
+        // enforcing. Only a build with no engine at all is exempt, which is the
+        // degradation contract the open-source path documents.
+        boolean enginePresent = ShieldEngineRegistry.isEngineRegistered();
+        if (policy.getFailureMode() == FailureMode.CLOSED && enginePresent) {
             throw e;
         }
         Log.p("AppShield: continuing without a token (" + e.getStatus().getId()
-                + "); " + (isProtected() ? "host policy is fail-open."
+                + "); " + (enginePresent ? "host policy is fail-open."
                         : "no attestation engine is present, so nothing is enforced."));
     }
 

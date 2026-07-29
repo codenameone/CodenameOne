@@ -82,7 +82,13 @@ public final class ShieldEngineRegistry {
         return DefaultEngineContext.INSTANCE;
     }
 
-    /// True when a real engine was registered.
+    /// True when a real engine was registered, whatever it currently reports about its
+    /// availability.
+    ///
+    /// Distinct from [com.codename1.security.shield.AppShield#isProtected()], which asks
+    /// whether attestation can run *right now*. A fail-closed host must refuse when a
+    /// registered engine cannot attest -- that is the case it exists for -- and relax only
+    /// for a build that has no engine at all.
     public static boolean isEngineRegistered() {
         synchronized (ShieldEngineRegistry.class) {
             return engine != null;
