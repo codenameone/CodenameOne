@@ -31,10 +31,15 @@ import com.google.mlkit.nl.translate.Translation;
 import com.google.mlkit.nl.translate.TranslateLanguage;
 import com.google.mlkit.nl.translate.Translator;
 import com.google.mlkit.nl.translate.TranslatorOptions;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 /** ML Kit translation; retained only for {@code Translator} users. */
 final class AndroidTranslationAdapter extends AndroidLanguageAdapter {
+    private final Map<String, Translator> clients =
+            new HashMap<String, Translator>();
+
     @Override
     AsyncResource<String> translate(
             final String text, String sourceLanguage, String targetLanguage,
@@ -47,13 +52,7 @@ final class AndroidTranslationAdapter extends AndroidLanguageAdapter {
                     "Unsupported translation language"));
             return out;
         }
-        TranslatorOptions translatorOptions =
-                new TranslatorOptions.Builder()
-                        .setSourceLanguage(sourceCode)
-                        .setTargetLanguage(targetCode)
-                        .build();
-        final Translator client =
-                Translation.getClient(translatorOptions);
+        final Translator client = client(sourceCode, targetCode);
         client.downloadModelIfNeeded().onSuccessTask(
                 new SuccessContinuation<Void, String>() {
             public Task<String> then(Void ignored) {
@@ -62,10 +61,31 @@ final class AndroidTranslationAdapter extends AndroidLanguageAdapter {
         }).addOnSuccessListener(new OnSuccessListener<String>() {
             public void onSuccess(String value) {
                 complete(out, value);
-                client.close();
             }
-        }).addOnFailureListener(failure(out, client));
+        }).addOnFailureListener(failure(out));
         return out;
+    }
+
+    private synchronized Translator client(String sourceCode,
+                                           String targetCode) {
+        String key = sourceCode + "\n" + targetCode;
+        Translator client = clients.get(key);
+        if (client == null) {
+            TranslatorOptions options = new TranslatorOptions.Builder()
+                    .setSourceLanguage(sourceCode)
+                    .setTargetLanguage(targetCode)
+                    .build();
+            client = Translation.getClient(options);
+            clients.put(key, client);
+        }
+        return client;
+    }
+
+    public synchronized void close() {
+        for (Translator client : clients.values()) {
+            client.close();
+        }
+        clients.clear();
     }
 
     private static String languageCode(String languageTag) {

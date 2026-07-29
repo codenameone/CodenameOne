@@ -435,7 +435,7 @@ public final class IOSInferenceImpl extends InferenceImpl {
 
     private static byte[] loadModel(ModelSource source) throws IOException {
         if (source.getKind() == ModelSource.BYTES) {
-            return source.getBytes();
+            return source.getBytesUnsafe();
         }
         InputStream input;
         input = Display.getInstance().getResourceAsStream(

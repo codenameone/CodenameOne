@@ -25,13 +25,14 @@ package com.codename1.ai.vision;
 /// Creates reusable body-pose analyzers.
 public final class PoseDetector extends AbstractVisionAnalyzer<Pose> {
     /// Creates an analyzer using the platform default backend and options.
-    ///  VisionOptions
+    /// @see VisionOptions
     public PoseDetector() {
         this(null);
     }
 
     /// Creates a reusable analyzer with explicit backend and result options.
-    ///  options configuration captured by this analyzer; null uses defaults
+    /// @param options configuration captured by this analyzer; {@code null}
+    ///        uses defaults
     public PoseDetector(VisionOptions options) {
         super(VisionFeature.POSE_DETECTION, options);
     }

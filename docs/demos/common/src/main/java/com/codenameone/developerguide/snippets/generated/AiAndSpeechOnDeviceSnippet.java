@@ -26,6 +26,7 @@ import com.codename1.ai.inference.InferenceOptions;
 import com.codename1.ai.inference.InferenceSession;
 import com.codename1.ai.inference.ModelSource;
 import com.codename1.ai.inference.Tensor;
+import com.codename1.ai.language.LanguageBackends;
 import com.codename1.ai.language.LanguageOptions;
 import com.codename1.ai.language.Translator;
 import com.codename1.ai.vision.TextRecognizer;
@@ -82,9 +83,11 @@ class AiAndSpeechOnDeviceSnippet {
 
     void language() {
         // tag::ai-and-speech-on-device-language[]
-        if (Translator.isSupported()) {
+        LanguageOptions options = new LanguageOptions()
+                .backend(LanguageBackends.mlKitTranslation());
+        if (Translator.isSupported(options)) {
             Translator.translate("Where is the station?", "en", "fr",
-                    new LanguageOptions())
+                    options)
                 .ready(value -> Log.p(value))
                 .except(error -> Log.e(error));
         }

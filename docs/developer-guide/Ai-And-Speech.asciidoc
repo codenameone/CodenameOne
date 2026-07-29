@@ -308,7 +308,13 @@ linked backend, and OS version.
 `VisionPipeline` attaches an analyzer to a `CameraSession` frame stream
 and keeps only the newest pending frame. Live OCR and pose detection
 therefore can't build an unbounded queue when inference is slower than
-the camera. Results and errors are delivered on the Codename One EDT.
+the camera. While an analysis is busy, the pipeline reuses the pending
+buffer when newer same-sized frames replace it. Results and errors are
+delivered on the Codename One EDT.
+
+`CameraFrame.getRawBytes()` can be `null` even after requesting NV21 or
+RGBA8888 when a port cannot expose that format. JPEG bytes remain available;
+`VisionImage.fromCameraFrame(...)` automatically selects that fallback.
 
 `DocumentScanner` currently performs still-image rectangle correction on
 Apple platforms. Google's Android document scanner is an interactive
@@ -425,13 +431,21 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 `LanguageBackends.auto()` selects ML Kit on Android and Apple's Natural
 Language framework for language identification on iOS. The Apple default
 keeps arm64 simulator builds native and adds no third-party dependency.
-`LanguageBackends.mlKitLanguageIdentification()` opts language
-identification into the ML Kit iOS pod. Translation and Smart Reply use
-their feature-scoped ML Kit components on both mobile platforms; those
-two iOS components currently require the x86_64 simulator slice.
-The current Google ML Kit iOS pods also require iOS 15.5, so referencing
-translation or Smart Reply, or opting identification into ML Kit, raises
-the effective iOS deployment target to 15.5 automatically.
+`LanguageBackends.mlKitLanguageIdentification()` opts identification into
+the ML Kit iOS pod. iOS translation and Smart Reply are explicit opt-ins:
+use `LanguageBackends.mlKitTranslation()` or
+`LanguageBackends.mlKitSmartReply()` respectively. Merely referencing
+`Translator` or `SmartReply` doesn't add a pod or exclude the arm64
+simulator. Selecting one of those ML Kit backends requires the x86_64
+simulator slice and raises an iOS deployment target below 15.5.
+
+The static language methods are convenient for one operation and close their
+temporary backend after either success or failure. For repeated work, call
+`LanguageIdentifier.open(...)`, `Translator.open(...)`, or
+`SmartReply.open(...)`, reuse the returned feature session, and close it when
+the last pending operation completes. Reusable sessions retain backend state
+and, on Android, cache ML Kit clients and translation clients per language
+pair.
 Mac native and the other unsupported targets return `false` from the
 language service `isSupported()` checks. Completion and failure callbacks
 arrive on the EDT.
@@ -466,10 +480,10 @@ platform-specific integer arrays. `cn1-ai-whisper` and
 and models are intentionally large.
 
 Remove the retired cn1lib dependency before adding the built-in class.
-Keeping both packages can leave duplicate ML Kit versions in an
-Android or CocoaPods dependency graph. The builders don't ship
-compatibility aliases because those aliases would keep the
-old native-interface and packaging contracts alive.
+During migration, the builders deduplicate identical CocoaPods names and
+preserve an explicitly declared user version constraint. Removing the old
+library is still required because compatibility aliases would keep its old
+native-interface and packaging contracts alive.
 
 ==== Putting it all together
 

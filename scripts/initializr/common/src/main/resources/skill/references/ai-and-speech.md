@@ -319,7 +319,9 @@ InferenceSession.open(
     new InferenceOptions())
     .ready(session -> session.run(new Tensor[] {input}));
 
-Translator.translate("Bonjour", "fr", "en", new LanguageOptions())
+LanguageOptions translationOptions = new LanguageOptions()
+    .backend(LanguageBackends.mlKitTranslation());
+Translator.translate("Bonjour", "fr", "en", translationOptions)
     .ready(result -> Log.p(result));
 ```
 
@@ -353,8 +355,12 @@ enabled. Android and iOS reject `Accelerator.NPU` together with
 the Core ML delegate may also schedule work on CPU or GPU.
 
 Language identification defaults to Apple Natural Language on iOS and ML
-Kit on Android. Translation and Smart Reply use feature-scoped ML Kit
-components. Call `isSupported()` before exposing a feature. Vision has native backends
+Kit on Android. iOS translation and Smart Reply require their
+`mlKitTranslation()` and `mlKitSmartReply()` selectors; referencing the API
+class alone does not disable the arm64 simulator. The static methods own a
+one-shot backend. For repeated operations, reuse and close the feature session
+returned by `LanguageIdentifier.open()`, `Translator.open()`, or
+`SmartReply.open()`. Call `isSupported()` before exposing a feature. Vision has native backends
 on Android, iOS, and Mac native. Language services and LiteRT inference
 have native backends on Android and iOS. JavaSE, JavaScript, native
 Windows/Linux, watchOS, and tvOS return unsupported; Mac native returns

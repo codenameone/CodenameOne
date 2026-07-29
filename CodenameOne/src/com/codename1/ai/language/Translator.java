@@ -23,8 +23,8 @@
 package com.codename1.ai.language;
 
 import com.codename1.impl.LanguageImpl;
-import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
 
 /// Translates text on device with lazily installed language-pair models.
 /// The first request for a pair may take longer while ML Kit downloads the
@@ -38,22 +38,35 @@ public final class Translator {
         return isSupported(new LanguageOptions());
     }
 
+    /// Tests whether translation is available for a backend selection.
+    ///
+    /// This capability check creates and closes a temporary native backend.
+    /// Retain a {@link Session} from {@link #open(LanguageOptions)} when the
+    /// application will immediately perform repeated translations.
+    ///
+    /// @param options backend selection, or {@code null} for defaults
     /// @return whether the selected backend supports translation
     public static boolean isSupported(LanguageOptions options) {
-        LanguageOptions actual = options == null ? new LanguageOptions() : options;
-        LanguageImpl impl = Display.getInstance().getLanguageBackend();
-        return impl != null && impl.isSupported("translation",
-                actual.getBackend().getId());
+        return LanguageSession.isSupported("translation", options);
+    }
+
+    /// Opens a reusable translation session. Reuse it for repeated requests
+    /// so native translation clients and downloaded model state are retained.
+    ///
+    /// @param options backend options, or {@code null}
+    /// @return a reusable session that owns one native language backend
+    /// @throws UnsupportedOperationException if the selected backend is absent
+    public static Session open(LanguageOptions options) {
+        return new Session(LanguageSession.open("translation", options));
     }
 
     /// Option values are copied before asynchronous backend work begins.
-    ///
-    /// @param text source text
     /// Current ML Kit backends accept a BCP-47 tag with an optional script or
     /// region, such as {@code en-US}, and select the corresponding supported
     /// base-language model ({@code en} in this example). The asynchronous
     /// resource fails when either tag does not identify a supported model.
     ///
+    /// @param text source text; {@code null} is treated as empty
     /// @param sourceLanguage BCP-47 source language tag
     /// @param targetLanguage BCP-47 target language tag
     /// @param options backend options, or {@code null}
@@ -61,15 +74,71 @@ public final class Translator {
     public static AsyncResource<String> translate(String text, String sourceLanguage,
                                                    String targetLanguage,
                                                    LanguageOptions options) {
-        LanguageOptions actual = (options == null
-                ? new LanguageOptions() : options).snapshot();
-        LanguageImpl impl = Display.getInstance().getLanguageBackend();
-        if (impl == null || !impl.isSupported("translation", actual.getBackend().getId())) {
+        final Session session;
+        try {
+            session = open(options);
+        } catch (RuntimeException error) {
             AsyncResource<String> out = new AsyncResource<String>();
-            out.error(new UnsupportedOperationException("translation is not supported"));
+            out.error(error);
             return out;
         }
-        return impl.translate(text == null ? "" : text, sourceLanguage, targetLanguage,
-                actual.getBackend().getId(), actual);
+        AsyncResource<String> result = session.translate(text,
+                sourceLanguage, targetLanguage);
+        closeWhenFinished(result, session);
+        return result;
+    }
+
+    private static <T> void closeWhenFinished(AsyncResource<T> result,
+                                               final Session session) {
+        result.ready(new SuccessCallback<T>() {
+            public void onSucess(T value) {
+                session.close();
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            public void onSucess(Throwable error) {
+                session.close();
+            }
+        });
+    }
+
+    /// Reusable owner of a native translation backend.
+    ///
+    /// A session can serve multiple language pairs and retains native clients
+    /// between calls. Calling {@link #close()} prevents new requests and
+    /// defers release until pending translations finish.
+    public static final class Session implements AutoCloseable {
+        private final LanguageSession session;
+
+        private Session(LanguageSession session) {
+            this.session = session;
+        }
+
+        /// Translates text without recreating the native backend.
+        ///
+        /// @param text source text; {@code null} is treated as empty
+        /// @param sourceLanguage supported BCP-47 source language tag
+        /// @param targetLanguage supported BCP-47 target language tag
+        /// @return asynchronous translated text
+        /// @throws IllegalStateException if this session is closed
+        public AsyncResource<String> translate(final String text,
+                                               final String sourceLanguage,
+                                               final String targetLanguage) {
+            return session.execute(new LanguageSession.Operation<String>() {
+                public AsyncResource<String> run(
+                        LanguageImpl implementation,
+                        LanguageOptions options) {
+                    return implementation.translate(
+                            text == null ? "" : text, sourceLanguage,
+                            targetLanguage, options.getBackend().getId(),
+                            options);
+                }
+            });
+        }
+
+        /// Closes the session. This method is idempotent; native release is
+        /// deferred until pending translations finish.
+        public void close() {
+            session.close();
+        }
     }
 }

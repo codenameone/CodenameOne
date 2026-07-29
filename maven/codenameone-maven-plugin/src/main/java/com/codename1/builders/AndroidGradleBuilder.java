@@ -1329,6 +1329,9 @@ public class AndroidGradleBuilder extends Executor {
         // features to xPermissions right now.
         final PlatformFeatureCatalog.Accumulator aiAcc = new PlatformFeatureCatalog.Accumulator();
 
+        // scanClassesForPermissions invokes callbacks serially on this build
+        // thread. The mutable feature flags and source set are intentionally
+        // unsynchronized; parallelizing the scanner requires revisiting them.
         try {
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
 
@@ -5362,6 +5365,9 @@ public class AndroidGradleBuilder extends Executor {
         if ("com/codename1/ai/language/SmartReply".equals(cls)) {
             return "AndroidSmartReplyAdapter.java";
         }
+        // DocumentScanner is Apple-only. Returning null intentionally prunes
+        // the Android vision backend for an app that references only it; the
+        // public API then reports UNSUPPORTED without a native dependency.
         return null;
     }
 

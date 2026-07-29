@@ -23,6 +23,10 @@
 #import "CodenameOne_GLViewController.h"
 #import "xmlvm.h"
 
+#if !__has_feature(objc_arc)
+#error CN1Inference.m requires ARC (-fobjc-arc)
+#endif
+
 #if defined(INCLUDE_CN1_INFERENCE) && !TARGET_OS_WATCH && !TARGET_OS_TV
 #import <Foundation/Foundation.h>
 #import "java_lang_String.h"

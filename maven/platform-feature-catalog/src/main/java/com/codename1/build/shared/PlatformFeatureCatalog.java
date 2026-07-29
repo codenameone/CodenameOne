@@ -48,7 +48,17 @@ import java.util.Set;
  */
 public final class PlatformFeatureCatalog {
 
+    private static final String MLKIT_LANGUAGE_ID =
+            "com.google.mlkit:language-id:17.0.6";
+    private static final String MLKIT_TRANSLATE =
+            "com.google.mlkit:translate:17.0.3";
+    private static final String MLKIT_SMART_REPLY =
+            "com.google.mlkit:smart-reply:17.0.4";
+    private static final String MLKIT_SELFIE_SEGMENTATION =
+            "com.google.mlkit:segmentation-selfie:16.0.0-beta5";
     private static final List<Entry> ENTRIES;
+    private static final List<String> CLASS_PREFIXES;
+    private static final Set<String> METHOD_KEYS;
 
     static {
         List<Entry> e = new ArrayList<Entry>();
@@ -76,7 +86,7 @@ public final class PlatformFeatureCatalog {
                 .description("On-device speech-to-text"));
 
         e.add(new Entry("com/codename1/media/TextToSpeech")
-                .iosFrameworks("AVFAudio")
+                .iosFrameworks("AVFoundation")
                 .description("Text-to-speech"));
 
         // Compatibility mappings for the retired AI cn1libs. The artifacts
@@ -127,7 +137,7 @@ public final class PlatformFeatureCatalog {
                 .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
-                .androidGradle("com.google.mlkit:translate:17.0.1")
+                .androidGradle(MLKIT_TRANSLATE)
                 .androidMinimumSdk(21)
                 .description("Legacy ML Kit Translation cn1lib"));
         e.add(new Entry("com/codename1/ai/mlkit/smartreply/")
@@ -135,7 +145,7 @@ public final class PlatformFeatureCatalog {
                 .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
-                .androidGradle("com.google.mlkit:smart-reply:17.0.2")
+                .androidGradle(MLKIT_SMART_REPLY)
                 .androidMinimumSdk(21)
                 .description("Legacy ML Kit Smart Reply cn1lib"));
         e.add(new Entry("com/codename1/ai/mlkit/langid/")
@@ -143,7 +153,7 @@ public final class PlatformFeatureCatalog {
                 .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
-                .androidGradle("com.google.mlkit:language-id:17.0.4")
+                .androidGradle(MLKIT_LANGUAGE_ID)
                 .androidMinimumSdk(21)
                 .description("Legacy ML Kit Language ID cn1lib"));
         e.add(new Entry("com/codename1/ai/mlkit/pose/")
@@ -159,8 +169,7 @@ public final class PlatformFeatureCatalog {
                 .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
-                .androidGradle(
-                        "com.google.mlkit:segmentation-selfie:16.0.0-beta4")
+                .androidGradle(MLKIT_SELFIE_SEGMENTATION)
                 .androidMinimumSdk(21)
                 .description("Legacy ML Kit Selfie Segmentation cn1lib"));
         e.add(new Entry("com/codename1/ai/mlkit/docscan/")
@@ -260,8 +269,7 @@ public final class PlatformFeatureCatalog {
 
         e.add(new Entry("com/codename1/ai/vision/SelfieSegmenter")
                 .iosFrameworks("Vision", "CoreML")
-                .androidGradle(
-                        "com.google.mlkit:segmentation-selfie:16.0.0-beta5")
+                .androidGradle(MLKIT_SELFIE_SEGMENTATION)
                 .androidMinimumSdk(21)
                 .description("Selfie segmentation"));
         e.add(new Entry("com/codename1/ai/vision/SelfieSegmenter")
@@ -290,7 +298,7 @@ public final class PlatformFeatureCatalog {
 
         e.add(new Entry("com/codename1/ai/language/LanguageIdentifier")
                 .iosFrameworks("NaturalLanguage")
-                .androidGradle("com.google.mlkit:language-id:17.0.6")
+                .androidGradle(MLKIT_LANGUAGE_ID)
                 .androidMinimumSdk(21)
                 .description("On-device language identification"));
         e.add(new Entry("com/codename1/ai/language/LanguageIdentifier")
@@ -305,23 +313,31 @@ public final class PlatformFeatureCatalog {
         // the ML Kit adapters, so every target that compiles this source must
         // link the small system NaturalLanguage framework.
         e.add(new Entry("com/codename1/ai/language/Translator")
-                .iosPod("GoogleMLKit/Translate")
-                .iosMinimumDeploymentTarget("15.5")
                 .iosFrameworks("NaturalLanguage")
-                .iosDependenciesUnsupportedOnMacCatalyst()
-                .iosDependenciesUnsupportedOnArm64Simulator()
-                .androidGradle("com.google.mlkit:translate:17.0.3")
+                .androidGradle(MLKIT_TRANSLATE)
                 .androidMinimumSdk(21)
                 .description("On-device translation"));
-        e.add(new Entry("com/codename1/ai/language/SmartReply")
-                .iosPod("GoogleMLKit/SmartReply")
+        e.add(new Entry("com/codename1/ai/language/Translator")
+                .requiresMethod("com/codename1/ai/language/LanguageBackends",
+                        "mlKitTranslation")
+                .iosPod("GoogleMLKit/Translate")
                 .iosMinimumDeploymentTarget("15.5")
-                .iosFrameworks("NaturalLanguage")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
-                .androidGradle("com.google.mlkit:smart-reply:17.0.4")
+                .description("ML Kit iOS translation backend"));
+        e.add(new Entry("com/codename1/ai/language/SmartReply")
+                .iosFrameworks("NaturalLanguage")
+                .androidGradle(MLKIT_SMART_REPLY)
                 .androidMinimumSdk(21)
                 .description("On-device smart reply"));
+        e.add(new Entry("com/codename1/ai/language/SmartReply")
+                .requiresMethod("com/codename1/ai/language/LanguageBackends",
+                        "mlKitSmartReply")
+                .iosPod("GoogleMLKit/SmartReply")
+                .iosMinimumDeploymentTarget("15.5")
+                .iosDependenciesUnsupportedOnMacCatalyst()
+                .iosDependenciesUnsupportedOnArm64Simulator()
+                .description("ML Kit iOS Smart Reply backend"));
 
         e.add(new Entry("com/codename1/ai/whisper/")
                 .iosFrameworks("Accelerate")
@@ -350,6 +366,7 @@ public final class PlatformFeatureCatalog {
                 .androidGradle("androidx.camera:camera-lifecycle:1.3.4")
                 .androidGradle("androidx.camera:camera-view:1.3.4")
                 .androidGradle("androidx.camera:camera-video:1.3.4")
+                .androidMinimumSdk(21)
                 .description("Cross-platform camera (preview + frames + photo + video)"));
 
         // First-class Bluetooth (com.codename1.bluetooth.*): CoreBluetooth
@@ -398,12 +415,27 @@ public final class PlatformFeatureCatalog {
                 .description("Cross-platform augmented reality (world/image/face tracking)"));
 
         ENTRIES = Collections.unmodifiableList(e);
+        Set<String> classPrefixes = new LinkedHashSet<String>();
+        Set<String> methodKeys = new LinkedHashSet<String>();
+        for (Entry entry : e) {
+            classPrefixes.add(entry.classPrefix);
+            if (entry.hasMethodRequirement()) {
+                methodKeys.add(entry.methodOwner + "#" + entry.methodName);
+            }
+        }
+        CLASS_PREFIXES = Collections.unmodifiableList(
+                new ArrayList<String>(classPrefixes));
+        METHOD_KEYS = Collections.unmodifiableSet(methodKeys);
     }
 
     private PlatformFeatureCatalog() {
     }
 
-    /** All registered entries. Mostly useful for tests and tooling. */
+    /**
+     * Returns every registered platform feature in declaration order.
+     *
+     * @return immutable catalog entry list used by builders and tooling
+     */
     public static List<Entry> entries() {
         return ENTRIES;
     }
@@ -413,6 +445,9 @@ public final class PlatformFeatureCatalog {
      * given internal-form class name (slashes, not dots). When the
      * prefix ends with a slash, package-prefix matching is used;
      * otherwise an exact class match is required.
+     *
+     * @param internalClassName JVM internal-form class name
+     * @return immutable matching entries that have no method requirement
      */
     public static List<Entry> matchesFor(String internalClassName) {
         if (internalClassName == null) {
@@ -434,29 +469,68 @@ public final class PlatformFeatureCatalog {
     public static final class Accumulator {
         private final Set<String> classes = new LinkedHashSet<String>();
         private final Set<String> methods = new LinkedHashSet<String>();
+        private Set<Entry> cachedHits = Collections.emptySet();
+        private boolean dirty = true;
 
+        /**
+         * Records a class only when it can match at least one catalog entry.
+         * The scanner calls this for the full application and framework
+         * graph, so filtering here keeps memory proportional to catalog usage
+         * rather than application size.
+         *
+         * @param internalClassName JVM internal-form class name
+         */
         public void consume(String internalClassName) {
-            if (internalClassName != null) {
-                classes.add(internalClassName);
+            if (isCatalogClass(internalClassName)
+                    && classes.add(internalClassName)) {
+                dirty = true;
             }
         }
 
+        /**
+         * Records a method reference only when an entry requires that exact
+         * owner and method name.
+         *
+         * @param internalClassName JVM internal-form owner name
+         * @param methodName referenced method name
+         */
         public void consumeMethod(String internalClassName, String methodName) {
             if (internalClassName != null && methodName != null) {
-                methods.add(internalClassName + "#" + methodName);
+                String key = internalClassName + "#" + methodName;
+                if (METHOD_KEYS.contains(key) && methods.add(key)) {
+                    dirty = true;
+                }
             }
         }
 
+        /**
+         * Returns the immutable matched-entry set. The result is recomputed
+         * only after a relevant class or method is newly observed.
+         *
+         * @return matched catalog entries in declaration order
+         */
         public Set<Entry> hits() {
+            if (!dirty) {
+                return cachedHits;
+            }
             Set<Entry> hits = new LinkedHashSet<Entry>();
             for (Entry entry : ENTRIES) {
                 if (entry.requirementsMet(classes, methods)) {
                     hits.add(entry);
                 }
             }
-            return hits;
+            cachedHits = Collections.unmodifiableSet(hits);
+            dirty = false;
+            return cachedHits;
         }
 
+        /**
+         * Tests whether any observed feature requires the builder's larger
+         * upload allowance.
+         *
+         * @return {@code true} when at least one matched entry is marked as a
+         *         large upload
+         */
         public boolean anyRequiresBigUpload() {
             for (Entry e : hits()) {
                 if (e.requiresBigUpload) {
@@ -505,6 +579,22 @@ public final class PlatformFeatureCatalog {
             }
             return Collections.unmodifiableSet(frameworks);
         }
+    }
+
+    private static boolean isCatalogClass(String internalClassName) {
+        if (internalClassName == null) {
+            return false;
+        }
+        for (String prefix : CLASS_PREFIXES) {
+            if (prefix.endsWith("/")) {
+                if (internalClassName.startsWith(prefix)) {
+                    return true;
+                }
+            } else if (internalClassName.equals(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -651,14 +741,17 @@ public final class PlatformFeatureCatalog {
             return this;
         }
 
+        /** @return exact class or package prefix that activates this entry */
         public String classPrefix() {
             return classPrefix;
         }
 
+        /** @return immutable CocoaPods dependency specifications */
         public List<String> iosPods() {
             return Collections.unmodifiableList(iosPods);
         }
 
+        /** @return immutable Swift Package Manager dependency descriptors */
         public List<IosSpm> iosSpmSpecs() {
             return Collections.unmodifiableList(iosSpm);
         }
@@ -666,6 +759,8 @@ public final class PlatformFeatureCatalog {
         /**
          * Whether this entry's CocoaPod/SPM payload has a Mac Catalyst slice.
          * System frameworks are not affected by this flag.
+         *
+         * @return {@code true} when catalog dependencies support Catalyst
          */
         public boolean iosDependenciesSupportMacCatalyst() {
             return iosDependenciesSupportMacCatalyst;
@@ -675,6 +770,9 @@ public final class PlatformFeatureCatalog {
          * Whether this entry's CocoaPod/SPM payload has an arm64 iOS
          * Simulator slice. Dependencies that return {@code false} still
          * support the x86_64 simulator.
+         *
+         * @return {@code true} when catalog dependencies support arm64
+         *         simulator builds
          */
         public boolean iosDependenciesSupportArm64Simulator() {
             return iosDependenciesSupportArm64Simulator;
@@ -697,17 +795,22 @@ public final class PlatformFeatureCatalog {
             return iosMinimumDeploymentTarget;
         }
 
+        /** @return immutable Apple system-framework names without suffixes */
         public List<String> iosFrameworks() {
             return Collections.unmodifiableList(iosFrameworks);
         }
 
         /** Each entry is {key, defaultValue}. The builder injects the
          * value only if the app hasn't already declared one for the
-         * same key in its build hints. */
+         * same key in its build hints.
+         *
+         * @return immutable list of two-element property-list entries
+         */
         public List<String[]> iosPlistEntries() {
             return Collections.unmodifiableList(iosPlist);
         }
 
+        /** @return immutable Android Gradle dependency coordinates */
         public List<String> androidGradleDeps() {
             return Collections.unmodifiableList(androidGradle);
         }
@@ -728,35 +831,49 @@ public final class PlatformFeatureCatalog {
             return androidMinimumSdk;
         }
 
+        /** @return immutable Android manifest permission names */
         public List<String> androidPermissions() {
             return Collections.unmodifiableList(androidPermissions);
         }
 
+        /** @return immutable Android manifest feature names */
         public List<String> androidFeatures() {
             return Collections.unmodifiableList(androidFeatures);
         }
 
         /** Each entry is {name, value}: an application-level manifest
          * &lt;meta-data&gt; element the Android builder injects unless the
-         * app already declares the same name. */
+         * app already declares the same name.
+         *
+         * @return immutable list of two-element manifest metadata entries
+         */
         public List<String[]> androidMetaDataEntries() {
             return Collections.unmodifiableList(androidMetaData);
         }
 
+        /** @return whether this entry requires the larger upload allowance */
         public boolean requiresBigUpload() {
             return requiresBigUpload;
         }
 
+        /** @return user-readable feature or dependency description */
         public String description() {
             return description;
         }
     }
 
-    /** Swift Package Manager dependency descriptor. */
+    /**
+     * Immutable Swift Package Manager dependency descriptor consumed by the
+     * iOS builder.
+     */
     public static final class IosSpm {
+        /** Stable package identity used for de-duplication. */
         public final String identity;
+        /** Package repository URL. */
         public final String url;
+        /** Builder-formatted version or branch requirement. */
         public final String requirement;
+        /** Immutable package product names linked into the app. */
         public final List<String> products;
 
         IosSpm(String identity, String url, String requirement, List<String> products) {

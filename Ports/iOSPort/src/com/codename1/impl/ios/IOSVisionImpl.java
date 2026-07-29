@@ -36,6 +36,7 @@ import com.codename1.ai.vision.VisionMetadata;
 import com.codename1.ai.vision.VisionOptions;
 import com.codename1.ai.vision.VisionPoint;
 import com.codename1.ai.vision.VisionRect;
+import com.codename1.camera.FrameFormat;
 import com.codename1.impl.VisionImpl;
 import com.codename1.io.JSONParser;
 import com.codename1.ui.Display;
@@ -60,7 +61,7 @@ public final class IOSVisionImpl extends VisionImpl {
             return false;
         }
         return IOSImplementation.nativeInstance.cn1VisionIsSupported(
-                feature.ordinal(), "ml-kit".equals(backendId));
+                nativeFeatureId(feature), "ml-kit".equals(backendId));
     }
 
     @Override
@@ -81,7 +82,7 @@ public final class IOSVisionImpl extends VisionImpl {
         final int width = encoded == null ? image.getWidth() : 0;
         final int height = encoded == null ? image.getHeight() : 0;
         final int frameFormat = encoded == null
-                ? image.getFormat().ordinal() : 0;
+                ? nativeFrameFormatId(image.getFormat()) : 0;
         if (input == null || input.length == 0) {
             out.error(new VisionException(VisionException.INVALID_IMAGE,
                     "Apple Vision requires encoded, NV21, or RGBA8888 input"));
@@ -107,7 +108,7 @@ public final class IOSVisionImpl extends VisionImpl {
             public void run() {
                 try {
                     String json = IOSImplementation.nativeInstance.cn1VisionAnalyze(
-                            input, feature.ordinal(), mlKit,
+                            input, nativeFeatureId(feature), mlKit,
                             rotation, width, height, frameFormat);
                     if (json == null || json.length() == 0) {
                         throw new VisionException(VisionException.BACKEND_ERROR,
@@ -132,6 +133,42 @@ public final class IOSVisionImpl extends VisionImpl {
                 }
             }
         });
+    }
+
+    private static int nativeFeatureId(VisionFeature feature) {
+        switch (feature) {
+            case TEXT_RECOGNITION:
+                return 0;
+            case BARCODE_SCANNING:
+                return 1;
+            case FACE_DETECTION:
+                return 2;
+            case IMAGE_LABELING:
+                return 3;
+            case POSE_DETECTION:
+                return 4;
+            case SELFIE_SEGMENTATION:
+                return 5;
+            case DOCUMENT_SCANNING:
+                return 6;
+            default:
+                throw new IllegalArgumentException(
+                        "Unsupported vision feature " + feature);
+        }
+    }
+
+    private static int nativeFrameFormatId(FrameFormat format) {
+        switch (format) {
+            case JPEG:
+                return 0;
+            case NV21:
+                return 1;
+            case RGBA8888:
+                return 2;
+            default:
+                throw new IllegalArgumentException(
+                        "Unsupported camera frame format " + format);
+        }
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

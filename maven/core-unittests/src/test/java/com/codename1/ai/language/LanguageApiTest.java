@@ -118,11 +118,47 @@ class LanguageApiTest extends UITestBase {
         assertEquals(original, backend.conversation[0]);
     }
 
+    @Test
+    void reusableSessionRetainsBackendUntilClosed() {
+        RecordingLanguageImpl backend = new RecordingLanguageImpl();
+        implementation.setLanguageImpl(backend);
+
+        Translator.Session session = Translator.open(
+                new LanguageOptions().backend(
+                        LanguageBackends.mlKitTranslation()));
+        assertEquals("hello",
+                session.translate("bonjour", "fr", "en").get());
+        assertEquals("hello",
+                session.translate("salut", "fr", "en").get());
+        assertEquals(2, backend.translationCalls);
+        assertEquals(0, backend.closeCount);
+
+        session.close();
+        session.close();
+        assertEquals(1, backend.closeCount);
+        assertThrows(IllegalStateException.class,
+                () -> session.translate("bonjour", "fr", "en"));
+    }
+
+    @Test
+    void staticConvenienceOperationClosesItsEphemeralBackend() {
+        RecordingLanguageImpl backend = new RecordingLanguageImpl();
+        implementation.setLanguageImpl(backend);
+
+        assertEquals("hello",
+                Translator.translate("bonjour", "fr", "en",
+                        new LanguageOptions().backend(
+                                LanguageBackends.mlKitTranslation())).get());
+        assertEquals(1, backend.closeCount);
+    }
+
     private static final class RecordingLanguageImpl extends LanguageImpl {
         String feature;
         String backend;
         LanguageOptions options;
         SmartReplyMessage[] conversation;
+        int translationCalls;
+        int closeCount;
 
         public boolean isSupported(String value, String backendId) {
             feature = value;
@@ -132,6 +168,7 @@ class LanguageApiTest extends UITestBase {
 
         public AsyncResource<LanguageCandidate[]> identify(
                 String text, String backendId, LanguageOptions value) {
+            feature = "language-id";
             backend = backendId;
             options = value;
             AsyncResource<LanguageCandidate[]> result =
@@ -146,6 +183,7 @@ class LanguageApiTest extends UITestBase {
                 String text, String sourceLanguage, String targetLanguage,
                 String backendId, LanguageOptions value) {
             feature = "translation";
+            translationCalls++;
             AsyncResource<String> result = new AsyncResource<String>();
             result.complete("hello");
             return result;
@@ -162,6 +200,7 @@ class LanguageApiTest extends UITestBase {
         }
 
         public void close() {
+            closeCount++;
         }
     }
 }

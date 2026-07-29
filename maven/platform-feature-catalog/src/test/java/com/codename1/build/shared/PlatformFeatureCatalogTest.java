@@ -24,11 +24,15 @@ package com.codename1.build.shared;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PlatformFeatureCatalogTest {
@@ -105,6 +109,21 @@ class PlatformFeatureCatalogTest {
                         entry.description());
             }
         }
+        assertEquals(1, podEntries,
+                "Language class references alone must preserve the arm64 simulator");
+
+        acc.consumeMethod("com/codename1/ai/language/LanguageBackends",
+                "mlKitTranslation");
+        acc.consumeMethod("com/codename1/ai/language/LanguageBackends",
+                "mlKitSmartReply");
+        podEntries = 0;
+        for (PlatformFeatureCatalog.Entry entry : acc.hits()) {
+            if (!entry.iosPods().isEmpty()) {
+                podEntries++;
+                assertEquals("15.5", entry.iosMinimumDeploymentTarget(),
+                        entry.description());
+            }
+        }
         assertEquals(3, podEntries);
     }
 
@@ -126,7 +145,7 @@ class PlatformFeatureCatalogTest {
                 "com/codename1/media/TextToSpeech");
         assertEquals(1, hits.size());
         PlatformFeatureCatalog.Entry e = hits.get(0);
-        assertTrue(e.iosFrameworks().contains("AVFAudio"));
+        assertTrue(e.iosFrameworks().contains("AVFoundation"));
         assertTrue(e.androidPermissions().isEmpty(),
                 "TTS is built-in on every supported OS -- no permission needed");
         assertTrue(e.iosPlistEntries().isEmpty(),
@@ -277,7 +296,8 @@ class PlatformFeatureCatalogTest {
             }
         }
         assertEquals(22, checked,
-                "Expected built-in and compatibility AI dependencies");
+                "If an AI dependency is intentionally added or removed, "
+                + "update this lock count after verifying its Android floor");
     }
 
     @Test
@@ -350,14 +370,40 @@ class PlatformFeatureCatalogTest {
     }
 
     @Test
-    void accumulatorDeduplicates() {
-        // Same class twice in the same scan shouldn't add the entry
-        // twice -- otherwise we'd inject duplicate Gradle / pod
-        // lines on the wire.
+    void accumulatorFiltersUnrelatedSymbolsAndMemoizesHits() {
         PlatformFeatureCatalog.Accumulator acc = new PlatformFeatureCatalog.Accumulator();
+        for (int i = 0; i < 10000; i++) {
+            acc.consume("example/unrelated/Class" + i);
+            acc.consumeMethod("example/unrelated/Class" + i, "method" + i);
+        }
+        Set<PlatformFeatureCatalog.Entry> empty = acc.hits();
+        assertTrue(empty.isEmpty());
+        assertSame(empty, acc.hits(),
+                "Unchanged scans should reuse the memoized result");
+
         acc.consume("com/codename1/ai/vision/TextRecognizer");
         acc.consume("com/codename1/ai/vision/TextRecognizer");
         assertEquals(1, acc.hits().size());
+    }
+
+    @Test
+    void catalogUsesOneVersionPerAndroidArtifact() {
+        Map<String, String> versions = new HashMap<String, String>();
+        for (PlatformFeatureCatalog.Entry entry
+                : PlatformFeatureCatalog.entries()) {
+            for (String dependency : entry.androidGradleDeps()) {
+                String[] parts = dependency.split(":");
+                if (parts.length < 3) {
+                    continue;
+                }
+                String artifact = parts[0] + ":" + parts[1];
+                String previous = versions.put(artifact, parts[2]);
+                if (previous != null) {
+                    assertEquals(previous, parts[2],
+                            "Version drift for " + artifact);
+                }
+            }
+        }
     }
 
     @Test

@@ -23,8 +23,8 @@
 package com.codename1.ai.language;
 
 import com.codename1.impl.LanguageImpl;
-import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
 
 /// Identifies possible languages entirely on device. Results are ranked by
 /// descending backend confidence and filtered by
@@ -41,10 +41,18 @@ public final class LanguageIdentifier {
     /// @param options backend selection, or {@code null} for defaults
     /// @return whether the selected backend is available on this target
     public static boolean isSupported(LanguageOptions options) {
-        LanguageImpl impl = Display.getInstance().getLanguageBackend();
-        LanguageOptions actual = options == null ? new LanguageOptions() : options;
-        return impl != null && impl.isSupported("language-id",
-                actual.getBackend().getId());
+        return LanguageSession.isSupported("language-id", options);
+    }
+
+    /// Opens a reusable language-identification session. Reusing a session
+    /// avoids repeatedly creating the native recognizer when classifying many
+    /// strings. Close it when no more identifications are pending.
+    ///
+    /// @param options backend and confidence options, or {@code null}
+    /// @return a reusable session that owns one native language backend
+    /// @throws UnsupportedOperationException if the selected backend is absent
+    public static Session open(LanguageOptions options) {
+        return new Session(LanguageSession.open("language-id", options));
     }
 
     /// Identifies possible languages off the EDT without uploading text. The
@@ -55,18 +63,67 @@ public final class LanguageIdentifier {
     /// @return asynchronous ranked candidates; may be empty for undetermined text
     public static AsyncResource<LanguageCandidate[]> identify(
             String text, LanguageOptions options) {
-        LanguageOptions actual = (options == null
-                ? new LanguageOptions() : options).snapshot();
-        LanguageImpl impl = Display.getInstance().getLanguageBackend();
-        if (impl == null || !impl.isSupported("language-id",
-                actual.getBackend().getId())) {
+        final Session session;
+        try {
+            session = open(options);
+        } catch (RuntimeException error) {
             AsyncResource<LanguageCandidate[]> out =
                     new AsyncResource<LanguageCandidate[]>();
-            out.error(new UnsupportedOperationException(
-                    "language-id is not supported"));
+            out.error(error);
             return out;
         }
-        return impl.identify(text == null ? "" : text,
-                actual.getBackend().getId(), actual);
+        AsyncResource<LanguageCandidate[]> result = session.identify(text);
+        closeWhenFinished(result, session);
+        return result;
+    }
+
+    private static <T> void closeWhenFinished(AsyncResource<T> result,
+                                               final Session session) {
+        result.ready(new SuccessCallback<T>() {
+            public void onSucess(T value) {
+                session.close();
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            public void onSucess(Throwable error) {
+                session.close();
+            }
+        });
+    }
+
+    /// Reusable owner of a native language-identification backend.
+    ///
+    /// A session accepts multiple asynchronous requests. Calling
+    /// {@link #close()} prevents new requests immediately and defers native
+    /// release until requests already in progress have completed.
+    public static final class Session implements AutoCloseable {
+        private final LanguageSession session;
+
+        private Session(LanguageSession session) {
+            this.session = session;
+        }
+
+        /// Identifies languages without recreating the native backend.
+        ///
+        /// @param text text to classify; {@code null} is treated as empty
+        /// @return asynchronous ranked candidates, possibly empty
+        /// @throws IllegalStateException if this session is closed
+        public AsyncResource<LanguageCandidate[]> identify(final String text) {
+            return session.execute(
+                    new LanguageSession.Operation<LanguageCandidate[]>() {
+                        public AsyncResource<LanguageCandidate[]> run(
+                                LanguageImpl implementation,
+                                LanguageOptions options) {
+                            return implementation.identify(
+                                    text == null ? "" : text,
+                                    options.getBackend().getId(), options);
+                        }
+                    });
+        }
+
+        /// Closes the session. This method is idempotent; native release is
+        /// deferred until pending identifications finish.
+        public void close() {
+            session.close();
+        }
     }
 }

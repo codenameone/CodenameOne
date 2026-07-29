@@ -89,6 +89,19 @@ public final class ModelSource {
         return out;
     }
 
+    /// Returns the internal model byte array without copying it.
+    ///
+    /// This escape hatch is intended for native backend handoff and
+    /// memory-sensitive applications. The returned array must be treated as
+    /// read-only: modifying it changes the model source and violates this
+    /// class's immutability contract. Prefer {@link #getBytes()} unless the
+    /// additional full-model copy is known to be unacceptable.
+    ///
+    /// @return internal model bytes, or {@code null} for non-byte sources
+    public byte[] getBytesUnsafe() {
+        return bytes;
+    }
+
     /// @return the file/resource path, or {@code null} for a byte source
     public String getPath() {
         return path;

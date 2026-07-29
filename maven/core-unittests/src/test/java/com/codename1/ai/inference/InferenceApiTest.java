@@ -52,6 +52,15 @@ class InferenceApiTest extends UITestBase {
     }
 
     @Test
+    void modelSourceOffersExplicitReadOnlyZeroCopyAccess() {
+        byte[] source = new byte[] {1, 2, 3};
+        ModelSource model = ModelSource.bytes(source);
+        assertNotSame(source, model.getBytesUnsafe());
+        assertSame(model.getBytesUnsafe(), model.getBytesUnsafe());
+        assertNotSame(model.getBytesUnsafe(), model.getBytes());
+    }
+
+    @Test
     void modelCacheCompletionIsSingleShot() {
         AsyncResource<String> resource = new AsyncResource<String>();
         ModelCache.Completion<String> completion =
@@ -278,7 +287,11 @@ class InferenceApiTest extends UITestBase {
         implementation.setInferenceImpl(backend);
         InferenceSession session = await(InferenceSession.open(
                 ModelSource.bytes(new byte[] {1}), new InferenceOptions().threads(2)));
-        assertEquals(2, session.getInputs()[0].getShape()[1]);
+        TensorInfo[] inputs = session.getInputs();
+        assertEquals(2, inputs[0].getShape()[1]);
+        assertNotSame(inputs, session.getInputs());
+        inputs[0] = null;
+        assertNotNull(session.getInputs()[0]);
         Tensor[] output = await(session.run(new Tensor[] {
                 Tensor.floats("input", new int[] {1, 2}, new float[] {1, 2})
         }));

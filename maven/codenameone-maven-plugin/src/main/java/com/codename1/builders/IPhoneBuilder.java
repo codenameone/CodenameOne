@@ -357,6 +357,37 @@ public class IPhoneBuilder extends Executor {
         return out;
     }
 
+    static String appendPodSpecIfAbsent(String pods, String candidate) {
+        String out = pods == null ? "" : pods;
+        String candidateName = podName(candidate);
+        for (String existing : out.split("[,;]")) {
+            if (candidateName.equalsIgnoreCase(podName(existing))) {
+                return out;
+            }
+        }
+        return out.length() == 0 ? candidate : out + "," + candidate;
+    }
+
+    static String deduplicatePodSpecs(String pods) {
+        String out = "";
+        if (pods == null) {
+            return out;
+        }
+        for (String podSpec : pods.split("[,;]")) {
+            podSpec = podSpec.trim();
+            if (podSpec.length() > 0) {
+                out = appendPodSpecIfAbsent(out, podSpec);
+            }
+        }
+        return out;
+    }
+
+    private static String podName(String podSpec) {
+        String value = podSpec == null ? "" : podSpec.trim();
+        int separator = value.indexOf(' ');
+        return separator < 0 ? value : value.substring(0, separator).trim();
+    }
+
     private void applyCatalogPlistEntry(BuildRequest request,
                                         String[] plistEntry) {
         String privacyKey = plistEntry[0];
@@ -384,6 +415,11 @@ public class IPhoneBuilder extends Executor {
 
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
+        // Builder instances are normally single-use, but keep scan-derived
+        // native feature state deterministic if an instance is reused.
+        usesCn1Vision = false;
+        usesCn1Language = false;
+        usesCn1Inference = false;
         Stopwatch stopwatch = new Stopwatch();
         addMinDeploymentTarget(DEFAULT_MIN_DEPLOYMENT_VERSION);
         if (request.getArg("ios.deployment_target", null) == null) {
@@ -1059,7 +1095,8 @@ public class IPhoneBuilder extends Executor {
         // iosPods string and SPM entries through the request build
         // hints, so the IOSDependencyManager.resolve() call below can
         // pick them up consistently with manually-declared deps.
-        if (!aiAcc.hits().isEmpty()) {
+        Set<PlatformFeatureCatalog.Entry> platformFeatureHits = aiAcc.hits();
+        if (!platformFeatureHits.isEmpty()) {
             // Prefer SPM when the project already uses SPM and the
             // entry exposes an SPM spec; otherwise pods. A handful
             // of ML Kit libs are pods-only -- those force pods on
@@ -1067,7 +1104,7 @@ public class IPhoneBuilder extends Executor {
             // upgrade the effective mode to BOTH below).
             boolean projectPrefersSpm = dependencyConfig.usesSwiftPackages() && !dependencyConfig.usesCocoaPods();
             StringBuilder spmPackages = new StringBuilder(request.getArg("ios.spm.packages", ""));
-            for (PlatformFeatureCatalog.Entry entry : aiAcc.hits()) {
+            for (PlatformFeatureCatalog.Entry entry : platformFeatureHits) {
                 // Third-party AI packages may omit Catalyst or arm64
                 // simulator slices. Keep framework-only Apple Vision enabled
                 // for macNative and record the simulator constraint for the
@@ -1085,6 +1122,10 @@ public class IPhoneBuilder extends Executor {
                         && (!entry.iosPods().isEmpty()
                         || !entry.iosSpmSpecs().isEmpty())) {
                     excludeArm64Simulator = true;
+                    log("Catalog-selected iOS dependency \""
+                            + entry.description()
+                            + "\" has no arm64 simulator slice. The generated "
+                            + "project will use the x86_64 simulator architecture.");
                 }
                 boolean handledViaSpm = false;
                 if (includeApplePackageDependencies
@@ -1111,14 +1152,16 @@ public class IPhoneBuilder extends Executor {
                 }
                 if (includeApplePackageDependencies && !handledViaSpm) {
                     for (String pod : entry.iosPods()) {
-                        if (iosPods.length() > 0) iosPods += ",";
-                        iosPods += pod;
+                        // User-declared specs are already first in iosPods, so
+                        // they win when the catalog requests the same pod.
+                        iosPods = appendPodSpecIfAbsent(iosPods, pod);
                     }
                 }
                 for (String[] plistEntry : entry.iosPlistEntries()) {
                     applyCatalogPlistEntry(request, plistEntry);
                 }
             }
+            iosPods = deduplicatePodSpecs(iosPods);
             if (spmPackages.length() > 0) {
                 request.putArgument("ios.spm.packages", spmPackages.toString());
             }
@@ -2534,7 +2577,8 @@ public class IPhoneBuilder extends Executor {
             // Augmented reality: uncomment INCLUDE_CN1_AR so the CN1AR
             // natives (ARKit + ARSCNView) compile in, and link ARKit /
             // SceneKit explicitly -- neither is default-linked and the
-            // PlatformFeatureCatalog iosFrameworks field is documentation-only.
+            // Catalog frameworks are linked below. This explicit AR block also
+            // controls the native compile define and remains for compatibility.
             // Apps that never reference com.codename1.ar leave the define
             // commented out so no ARKit symbol is referenced, which keeps
             // Apple's API-usage scan quiet and tvOS/watchOS slices clean.
@@ -3325,6 +3369,20 @@ public class IPhoneBuilder extends Executor {
 
                     }
 
+                    String arcPhaseFixScript =
+                            usesCn1Vision || usesCn1Language || usesCn1Inference
+                            ? "    arc_sources = ['CN1Vision.m', 'CN1Language.m', 'CN1Inference.m']\n"
+                            + "    main_target.source_build_phase.files.each do |bf|\n"
+                            + "      ref = bf.file_ref\n"
+                            + "      name = ref && File.basename(ref.path || ref.name || '')\n"
+                            + "      next unless arc_sources.include?(name)\n"
+                            + "      settings = bf.settings || {}\n"
+                            + "      flags = settings['COMPILER_FLAGS'].to_s.split\n"
+                            + "      flags << '-fobjc-arc' unless flags.include?('-fobjc-arc')\n"
+                            + "      settings['COMPILER_FLAGS'] = flags.join(' ')\n"
+                            + "      bf.settings = settings\n"
+                            + "    end\n"
+                            : "";
                     String createSchemesScript = "#!/usr/bin/env ruby\n" +
                             "require 'xcodeproj'\n" +
                             "require 'pathname'\n" +
@@ -3435,17 +3493,7 @@ public class IPhoneBuilder extends Executor {
                             + "      end\n"
                             + "      raise \"Swift files/resources still present in Copy Bundle Resources: #{names.join(', ')}\"\n"
                             + "    end\n"
-                            + "    arc_sources = ['CN1Vision.m', 'CN1Language.m', 'CN1Inference.m']\n"
-                            + "    main_target.source_build_phase.files.each do |bf|\n"
-                            + "      ref = bf.file_ref\n"
-                            + "      name = ref && File.basename(ref.path || ref.name || '')\n"
-                            + "      next unless arc_sources.include?(name)\n"
-                            + "      settings = bf.settings || {}\n"
-                            + "      flags = settings['COMPILER_FLAGS'].to_s.split\n"
-                            + "      flags << '-fobjc-arc' unless flags.include?('-fobjc-arc')\n"
-                            + "      settings['COMPILER_FLAGS'] = flags.join(' ')\n"
-                            + "      bf.settings = settings\n"
-                            + "    end\n"
+                            + arcPhaseFixScript
                             + "  end\n"
                             + "rescue => e\n"
                             + "  puts \"Error while correcting Swift build phases: #{$!}\"\n"
@@ -3481,7 +3529,7 @@ public class IPhoneBuilder extends Executor {
                         return false;
                     }
                     String podFileContents = "target '" + request.getMainClass() + "' do\n";
-                    String[] pods = iosPods.split("[,;]");
+                    String[] pods = deduplicatePodSpecs(iosPods).split("[,;]");
                     for (String podLib : pods) {
                         podLib = podLib.trim();
                         if (podLib.isEmpty()) {

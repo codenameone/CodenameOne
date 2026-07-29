@@ -35,16 +35,15 @@ import java.util.List;
 
 /** ML Kit language ID; retained only for {@code LanguageIdentifier} users. */
 final class AndroidLanguageIdAdapter extends AndroidLanguageAdapter {
+    private LanguageIdentifier client;
+
     @Override
     AsyncResource<LanguageCandidate[]> identify(
             String text, LanguageOptions options) {
         final AsyncResource<LanguageCandidate[]> out =
                 new AsyncResource<LanguageCandidate[]>();
-        final LanguageIdentifier client = LanguageIdentification.getClient(
-                new LanguageIdentificationOptions.Builder()
-                        .setConfidenceThreshold(options.getMinimumConfidence())
-                        .build());
-        client.identifyPossibleLanguages(text).addOnSuccessListener(
+        final LanguageIdentifier current = client(options);
+        current.identifyPossibleLanguages(text).addOnSuccessListener(
                 new OnSuccessListener<List<IdentifiedLanguage>>() {
             public void onSuccess(List<IdentifiedLanguage> values) {
                 LanguageCandidate[] result =
@@ -55,9 +54,26 @@ final class AndroidLanguageIdAdapter extends AndroidLanguageAdapter {
                             value.getLanguageTag(), value.getConfidence());
                 }
                 complete(out, result);
-                client.close();
             }
-        }).addOnFailureListener(failure(out, client));
+        }).addOnFailureListener(failure(out));
         return out;
+    }
+
+    private synchronized LanguageIdentifier client(LanguageOptions options) {
+        if (client == null) {
+            client = LanguageIdentification.getClient(
+                    new LanguageIdentificationOptions.Builder()
+                            .setConfidenceThreshold(
+                                    options.getMinimumConfidence())
+                            .build());
+        }
+        return client;
+    }
+
+    public synchronized void close() {
+        if (client != null) {
+            client.close();
+            client = null;
+        }
     }
 }

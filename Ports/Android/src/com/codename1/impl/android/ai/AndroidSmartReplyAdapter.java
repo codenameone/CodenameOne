@@ -37,11 +37,13 @@ import java.util.List;
 
 /** ML Kit Smart Reply; retained only for {@code SmartReply} users. */
 final class AndroidSmartReplyAdapter extends AndroidLanguageAdapter {
+    private SmartReplyGenerator client;
+
     @Override
     AsyncResource<String[]> suggestReplies(
             SmartReplyMessage[] conversation, LanguageOptions options) {
         final AsyncResource<String[]> out = new AsyncResource<String[]>();
-        final SmartReplyGenerator client = SmartReply.getClient();
+        final SmartReplyGenerator current = client();
         List<TextMessage> messages = new ArrayList<TextMessage>();
         for (int i = 0; i < conversation.length; i++) {
             SmartReplyMessage message = conversation[i];
@@ -54,7 +56,7 @@ final class AndroidSmartReplyAdapter extends AndroidLanguageAdapter {
                                     ? "remote"
                                     : message.getParticipantId()));
         }
-        client.suggestReplies(messages).addOnSuccessListener(
+        current.suggestReplies(messages).addOnSuccessListener(
                 new OnSuccessListener<SmartReplySuggestionResult>() {
             public void onSuccess(SmartReplySuggestionResult value) {
                 List<SmartReplySuggestion> suggestions =
@@ -64,9 +66,22 @@ final class AndroidSmartReplyAdapter extends AndroidLanguageAdapter {
                     result[i] = suggestions.get(i).getText();
                 }
                 complete(out, result);
-                client.close();
             }
-        }).addOnFailureListener(failure(out, client));
+        }).addOnFailureListener(failure(out));
         return out;
+    }
+
+    private synchronized SmartReplyGenerator client() {
+        if (client == null) {
+            client = SmartReply.getClient();
+        }
+        return client;
+    }
+
+    public synchronized void close() {
+        if (client != null) {
+            client.close();
+            client = null;
+        }
     }
 }

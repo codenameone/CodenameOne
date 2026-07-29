@@ -24,10 +24,11 @@
 /// reply.
 ///
 /// <p>Android uses feature-scoped ML Kit components. On iOS, automatic
-/// language identification uses Apple's Natural Language framework, while
-/// translation and Smart Reply use their matching ML Kit components. An
-/// application may opt into ML Kit language identification with
-/// {@link com.codename1.ai.language.LanguageBackends#mlKitLanguageIdentification()}.
+/// language identification uses Apple's Natural Language framework. An
+/// application opts into each iOS ML Kit component with
+/// {@link com.codename1.ai.language.LanguageBackends#mlKitLanguageIdentification()},
+/// {@link com.codename1.ai.language.LanguageBackends#mlKitTranslation()}, or
+/// {@link com.codename1.ai.language.LanguageBackends#mlKitSmartReply()}.
 /// Each entry point and optional selector is scanned independently, so using
 /// one feature does not bundle the others. Translation model payloads are
 /// installed lazily by ML Kit. Other targets expose the same API with an

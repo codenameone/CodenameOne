@@ -371,7 +371,7 @@ public final class AndroidInferenceImpl extends InferenceImpl {
         }
         byte[] bytes;
         if (source.getKind() == ModelSource.BYTES) {
-            bytes = source.getBytes();
+            bytes = source.getBytesUnsafe();
         } else {
             InputStream input = Display.getInstance().getResourceAsStream(
                     AndroidInferenceImpl.class, source.getPath());

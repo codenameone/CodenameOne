@@ -199,6 +199,18 @@ class IPhoneBuilderDependencyConfigTest {
     }
 
     @Test
+    void catalogPodsDoNotOverrideUserVersionSpecs() {
+        String pods = IPhoneBuilder.appendPodSpecIfAbsent(
+                "GoogleMLKit/TextRecognition ~> 7.0,OtherPod",
+                "GoogleMLKit/TextRecognition");
+        assertEquals("GoogleMLKit/TextRecognition ~> 7.0,OtherPod", pods);
+
+        assertEquals("GoogleMLKit/TextRecognition ~> 7.0,OtherPod",
+                IPhoneBuilder.deduplicatePodSpecs(
+                        pods + ",GoogleMLKit/TextRecognition;OtherPod"));
+    }
+
+    @Test
     void dependencyFloorRaisesExplicitDeploymentTarget() throws Exception {
         IPhoneBuilder builder = new IPhoneBuilder();
         Method addTarget = IPhoneBuilder.class.getDeclaredMethod(

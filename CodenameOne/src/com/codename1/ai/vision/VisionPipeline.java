@@ -25,6 +25,7 @@ package com.codename1.ai.vision;
 import com.codename1.camera.CameraFrame;
 import com.codename1.camera.CameraSession;
 import com.codename1.camera.FrameListener;
+import com.codename1.camera.FrameFormat;
 import com.codename1.ui.Display;
 import com.codename1.util.SuccessCallback;
 
@@ -38,7 +39,7 @@ public final class VisionPipeline<T> implements AutoCloseable {
     private final VisionAnalyzer<T> analyzer;
     private final VisionPipelineListener<T> listener;
     private final FrameListener frameListener;
-    private VisionImage pending;
+    private PendingFrame pending;
     private boolean busy;
     private boolean closed;
 
@@ -57,24 +58,27 @@ public final class VisionPipeline<T> implements AutoCloseable {
         frameListener = new FrameListener() {
             @Override
             public void onFrame(CameraFrame frame) {
-                accept(VisionImage.fromCameraFrame(frame));
+                accept(frame);
             }
         };
         session.setFrameListener(frameListener);
     }
 
-    private void accept(VisionImage image) {
+    private void accept(CameraFrame frame) {
         synchronized (this) {
             if (closed) {
                 return;
             }
             if (busy) {
-                pending = image;
+                if (pending == null) {
+                    pending = new PendingFrame();
+                }
+                pending.copyFrom(frame);
                 return;
             }
             busy = true;
         }
-        process(image);
+        process(VisionImage.fromCameraFrame(frame));
     }
 
     private void process(final VisionImage image) {
@@ -86,11 +90,13 @@ public final class VisionPipeline<T> implements AutoCloseable {
                     pending = null;
                     return;
                 }
-                operation = analyzer.process(image);
-                if (operation == null) {
-                    throw new IllegalStateException(
-                            "Vision analyzer returned no operation");
-                }
+            }
+            // Native analyzers may complete synchronously or re-enter app
+            // code. Do not invoke them while holding the pipeline monitor.
+            operation = analyzer.process(image);
+            if (operation == null) {
+                throw new IllegalStateException(
+                        "Vision analyzer returned no operation");
             }
         } catch (final Throwable error) {
             onFinished(new Runnable() {
@@ -128,22 +134,22 @@ public final class VisionPipeline<T> implements AutoCloseable {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                VisionImage next;
+                PendingFrame pendingFrame;
                 synchronized (VisionPipeline.this) {
                     if (closed) {
                         busy = false;
                         pending = null;
                         return;
                     }
-                    next = pending;
+                    pendingFrame = pending;
                     pending = null;
-                    busy = next != null;
+                    busy = pendingFrame != null;
                 }
                 try {
                     notification.run();
                 } finally {
-                    if (next != null) {
-                        process(next);
+                    if (pendingFrame != null) {
+                        process(pendingFrame.toImage());
                     }
                 }
             }
@@ -176,5 +182,41 @@ public final class VisionPipeline<T> implements AutoCloseable {
         }
         session.removeFrameListener(frameListener);
         analyzer.close();
+    }
+
+    private static final class PendingFrame {
+        private byte[] data;
+        private boolean raw;
+        private int width;
+        private int height;
+        private int rotationDegrees;
+        private long timestampNanos;
+        private FrameFormat format;
+
+        void copyFrom(CameraFrame frame) {
+            FrameFormat requested = frame.getFormat() == null
+                    ? FrameFormat.JPEG : frame.getFormat();
+            byte[] rawBytes = frame.getRawBytes();
+            raw = requested != FrameFormat.JPEG
+                    && rawBytes != null && rawBytes.length > 0;
+            byte[] source = raw ? rawBytes : frame.getJpegBytes();
+            if (source == null) {
+                source = new byte[0];
+            }
+            if (data == null || data.length != source.length) {
+                data = new byte[source.length];
+            }
+            System.arraycopy(source, 0, data, 0, source.length);
+            width = frame.getWidth();
+            height = frame.getHeight();
+            rotationDegrees = frame.getRotationDegrees();
+            timestampNanos = frame.getTimestampNanos();
+            format = raw ? requested : FrameFormat.JPEG;
+        }
+
+        VisionImage toImage() {
+            return VisionImage.detachedCameraData(data, raw, width, height,
+                    rotationDegrees, timestampNanos, format);
+        }
     }
 }

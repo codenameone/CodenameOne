@@ -124,6 +124,69 @@ class VisionPipelineTest extends UITestBase {
         assertFalse(pipeline.isBusy());
     }
 
+    @Test
+    void busyPipelineKeepsOnlyNewestPendingFrame() {
+        final RecordingAnalyzer analyzer = new RecordingAnalyzer();
+        pipeline = new VisionPipeline<String>(session, analyzer,
+                new VisionPipelineListener<String>() {
+                    public void result(String value, VisionImage image) {
+                    }
+
+                    public void error(Throwable error) {
+                    }
+                });
+
+        implementationBackend.lastFrameListener.onFrame(frame(1));
+        implementationBackend.lastFrameListener.onFrame(frame(2));
+        implementationBackend.lastFrameListener.onFrame(frame(3));
+        analyzer.operations.get(0).complete("first");
+        flushSerialCalls();
+
+        assertEquals(2, analyzer.operations.size());
+        assertEquals(Integer.valueOf(3), analyzer.inputValues.get(1));
+    }
+
+    @Test
+    void synchronousAnalyzerFailureDoesNotStallPipeline() {
+        final int[] errors = new int[1];
+        VisionAnalyzer<String> analyzer = new VisionAnalyzer<String>() {
+            int calls;
+
+            public boolean isSupported() {
+                return true;
+            }
+
+            public AsyncResource<String> process(VisionImage image) {
+                calls++;
+                if (calls == 1) {
+                    throw new IllegalStateException("synchronous failure");
+                }
+                AsyncResource<String> result =
+                        new AsyncResource<String>();
+                result.complete("recovered");
+                return result;
+            }
+
+            public void close() {
+            }
+        };
+        pipeline = new VisionPipeline<String>(session, analyzer,
+                new VisionPipelineListener<String>() {
+                    public void result(String value, VisionImage image) {
+                    }
+
+                    public void error(Throwable error) {
+                        errors[0]++;
+                    }
+                });
+
+        implementationBackend.lastFrameListener.onFrame(frame(1));
+        implementationBackend.lastFrameListener.onFrame(frame(2));
+        flushSerialCalls();
+        assertEquals(1, errors[0]);
+        assertFalse(pipeline.isBusy());
+    }
+
     private static CameraFrame frame(int value) {
         return new CameraFrame(new byte[] {(byte) value}, null,
                 1, 1, 0, value, FrameFormat.JPEG);
@@ -133,6 +196,7 @@ class VisionPipelineTest extends UITestBase {
             implements VisionAnalyzer<String> {
         final List<AsyncResource<String>> operations =
                 new ArrayList<AsyncResource<String>>();
+        final List<Integer> inputValues = new ArrayList<Integer>();
         int closeCount;
 
         public boolean isSupported() {
@@ -140,6 +204,7 @@ class VisionPipelineTest extends UITestBase {
         }
 
         public AsyncResource<String> process(VisionImage image) {
+            inputValues.add((int) image.getEncodedBytesUnsafe()[0]);
             AsyncResource<String> operation = new AsyncResource<String>();
             operations.add(operation);
             return operation;

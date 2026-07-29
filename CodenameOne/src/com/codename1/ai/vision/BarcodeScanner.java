@@ -25,13 +25,14 @@ package com.codename1.ai.vision;
 /// Creates reusable still-image or live-frame barcode analyzers.
 public final class BarcodeScanner extends AbstractVisionAnalyzer<Barcode[]> {
     /// Creates an analyzer using the platform default backend and options.
-    ///  VisionOptions
+    /// @see VisionOptions
     public BarcodeScanner() {
         this(null);
     }
 
     /// Creates a reusable analyzer with explicit backend and result options.
-    ///  options configuration captured by this analyzer; null uses defaults
+    /// @param options configuration captured by this analyzer; {@code null}
+    ///        uses defaults
     public BarcodeScanner(VisionOptions options) {
         super(VisionFeature.BARCODE_SCANNING, options);
     }

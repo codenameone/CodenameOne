@@ -26,6 +26,13 @@ package com.codename1.ai.vision;
 /// ML Kit on Android. Feature-specific ML Kit methods are separate so one
 /// selector never adds unrelated OCR, barcode, face, pose, labeling, or
 /// segmentation pods.
+///
+/// Each ML Kit selector call is also a build-time dependency marker. The
+/// methods intentionally return the same runtime backend id but must remain
+/// distinct so the builder can include only the selected feature. Pass the
+/// selector that corresponds to the analyzer being constructed; for example,
+/// the face-detection selector cannot satisfy a text recognizer and that
+/// mismatched analyzer reports unsupported.
 public final class VisionBackends {
     private static final VisionBackend AUTO = new NamedBackend("auto");
     private static final VisionBackend APPLE = new NamedBackend("apple-vision");

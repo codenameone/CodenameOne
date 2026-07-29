@@ -40,13 +40,30 @@ public final class VisionImage {
 
     private VisionImage(byte[] encodedBytes, byte[] pixels, int width, int height,
                         int rotationDegrees, long timestampNanos, FrameFormat format) {
-        this.encodedBytes = copy(encodedBytes);
-        this.pixels = copy(pixels);
+        this(encodedBytes, pixels, width, height, rotationDegrees,
+                timestampNanos, format, true);
+    }
+
+    private VisionImage(byte[] encodedBytes, byte[] pixels, int width, int height,
+                        int rotationDegrees, long timestampNanos,
+                        FrameFormat format, boolean copyData) {
+        this.encodedBytes = copyData ? copy(encodedBytes) : encodedBytes;
+        this.pixels = copyData ? copy(pixels) : pixels;
         this.width = width;
         this.height = height;
         this.rotationDegrees = normalizeRotation(rotationDegrees);
         this.timestampNanos = timestampNanos;
         this.format = format == null ? FrameFormat.JPEG : format;
+    }
+
+    static VisionImage detachedCameraData(byte[] data, boolean raw,
+                                          int width, int height,
+                                          int rotationDegrees,
+                                          long timestampNanos,
+                                          FrameFormat format) {
+        return new VisionImage(raw ? null : data, raw ? data : null,
+                width, height, rotationDegrees, timestampNanos,
+                raw ? format : FrameFormat.JPEG, false);
     }
 
     /// Creates an encoded JPEG or PNG input whose stored pixels are already

@@ -35,7 +35,10 @@ scanner is an interactive Activity camera flow, while the core
 
 `maven/platform-feature-catalog` is the authoritative dependency registry.
 `PlatformFeatureCatalog.Accumulator` consumes exact class and method
-references from the existing bytecode scanners.
+references from the existing bytecode scanners. It rejects unrelated symbols
+at consume time and memoizes its immutable hit set behind a dirty flag, so
+memory and repeated builder queries scale with catalog matches rather than
+total application bytecode.
 
 The local Maven plugin and BuildDaemon both consume the same source contract:
 
@@ -52,6 +55,17 @@ Local source builds replace the generated iOS/Mac project directory before
 copying the new result. This is required for granular removal: a plain
 directory merge would retain an old Podfile, workspace, Pods directory, or
 optional native source after the application stops referencing a feature.
+
+Catalog-selected CocoaPods are deduplicated by pod name. An existing
+user-declared spec appears first and wins, preserving constraints such as
+`GoogleMLKit/TextRecognition ~> 7.0`. Explicit `ios.dependencyManager=spm`
+and `none` modes reject incompatible declared or catalog-selected
+dependencies instead of silently omitting them.
+
+The companion archive extraction hardening is intentionally broader than AI:
+every Android/build archive entry is canonicalized and checked for traversal
+before extraction. Trusted extraction filters may still route a validated
+entry to a deliberate sibling such as the project settings file.
 
 ### Android source granularity
 
@@ -97,8 +111,10 @@ when it observes both:
 
 On iOS, language identification defaults to the system Natural Language
 framework. Calling `LanguageBackends.mlKitLanguageIdentification()` opts
-into `GoogleMLKit/LanguageID`; translation and Smart Reply map independently
-to `GoogleMLKit/Translate` and `GoogleMLKit/SmartReply`. `InferenceSession` selects
+into `GoogleMLKit/LanguageID`. Translation and Smart Reply pods are selected
+only by calls to `LanguageBackends.mlKitTranslation()` and
+`LanguageBackends.mlKitSmartReply()`. Merely referencing their API classes
+does not change simulator architectures. `InferenceSession` selects
 `TensorFlowLiteObjC/CoreML`.
 
 The native implementation is disabled for watchOS and tvOS. Mac native uses
@@ -114,10 +130,9 @@ Google ML Kit's iOS binary frameworks contain device `arm64` and simulator
 constraint independently from Catalyst support. When one of those entries is
 selected, both builders set
 `EXCLUDED_ARCHS[sdk=iphonesimulator*]=arm64` on the generated application and
-Pods projects. The repository's iOS UI and native-test runners also select
-`ARCHS=x86_64`, so Apple Silicon hosts use the supported simulator slice
-without requiring an application build hint. TensorFlow Lite's XCFramework
-does include an `arm64` simulator slice and does not trigger this fallback.
+Pods projects and emit a diagnostic identifying the selected dependency.
+TensorFlow Lite's XCFramework does include an `arm64` simulator slice and
+does not trigger this fallback.
 The same Google ML Kit catalog entries declare an iOS 15.5 deployment floor.
 The iOS builder folds that value into its existing maximum-target calculation
 before generating the app target and Podfile, preventing a lower application
@@ -150,8 +165,10 @@ without accidentally selecting the encoded path. When a camera port cannot
 supply the requested raw buffer, `fromCameraFrame()` retains the JPEG fallback
 and reports JPEG as the image format instead of creating an empty image.
 `VisionPipeline` allows one request to run and retains only the newest pending
-frame. This bounds memory and latency for live OCR, barcode, face, pose,
-labeling, or segmentation.
+frame. Superseding same-sized pending frames reuse one detached buffer, and
+analyzer invocation occurs outside the pipeline monitor. This bounds memory,
+latency, and lock re-entry for live OCR, barcode, face, pose, labeling, or
+segmentation.
 
 Native results are converted to stable Codename One value types. Geometry is
 normalized to the top-left coordinate system. `VisionMetadata` carries the
@@ -183,11 +200,13 @@ best effort when fallback is enabled. Strict NPU requests are rejected on
 Android because LiteRT cannot verify that NNAPI delegated every operation,
 and on iOS because the Core ML delegate may schedule work on CPU or GPU.
 
-All native sessions and analyzers must be closed. Expensive open, analysis,
-and inference work runs off the EDT; completion and error delivery return to
-the EDT. A session rejects metadata queries, resizing, and another invocation
-while a run is pending so no two API calls can touch the mutable native
-interpreter concurrently.
+All native sessions and analyzers must be closed. Language APIs expose
+reusable feature sessions in addition to static one-shot methods; Android
+sessions cache their ML Kit client or translation clients by language pair.
+Expensive open, analysis, and inference work runs off the EDT; completion and
+error delivery return to the EDT. An inference session rejects metadata
+queries, resizing, and another invocation while a run is pending so no two API
+calls can touch the mutable native interpreter concurrently.
 
 ## Permanent cross-platform coverage
 

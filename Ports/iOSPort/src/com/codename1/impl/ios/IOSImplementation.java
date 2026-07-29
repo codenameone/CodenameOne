@@ -4766,7 +4766,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public com.codename1.impl.VisionImpl createVisionImpl() {
-        for (int feature = 0; feature <= 6; feature++) {
+        for (int feature = 0;
+                feature < com.codename1.ai.vision.VisionFeature.values().length;
+                feature++) {
             if (nativeInstance.cn1VisionIsSupported(feature, false)
                     || nativeInstance.cn1VisionIsSupported(feature, true)) {
                 return new IOSVisionImpl();

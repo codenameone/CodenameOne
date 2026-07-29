@@ -68,6 +68,9 @@ class AndroidAiSourceSelectionTest {
     @Test
     void ignoresSharedApiAndUnrelatedClasses() {
         assertNull(AndroidGradleBuilder.androidAiAdapterSource(
+                "com/codename1/ai/vision/DocumentScanner"),
+                "DocumentScanner is Apple-only and must not retain an Android backend");
+        assertNull(AndroidGradleBuilder.androidAiAdapterSource(
                 "com/codename1/ai/vision/VisionPipeline"));
         assertNull(AndroidGradleBuilder.androidAiAdapterSource(
                 "com/codename1/ui/Form"));

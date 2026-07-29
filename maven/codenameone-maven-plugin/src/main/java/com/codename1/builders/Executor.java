@@ -1398,7 +1398,10 @@ public abstract class Executor {
                 int count;
                 byte[] data = new byte[8192];
 
-                // write the files to the disk
+                // Validate the untrusted archive name before the trusted
+                // filter sees it. The filter deliberately owns final routing
+                // and may select a sibling (for example, project settings),
+                // so its canonical result is not constrained to destDir.
                 resolveArchiveEntry(destDir, entryName);
                 File destFile = filter.destFile(currentDir, entryName);
                 if (destFile == null) {

@@ -30,7 +30,7 @@ import com.codename1.util.AsyncResource;
 import com.google.android.gms.tasks.OnFailureListener;
 
 /** Shared contract and completion helpers for Android language adapters. */
-abstract class AndroidLanguageAdapter {
+abstract class AndroidLanguageAdapter implements AutoCloseable {
     AsyncResource<LanguageCandidate[]> identify(
             String text, LanguageOptions options) {
         return unsupported("Language identification is not supported");
@@ -61,8 +61,7 @@ abstract class AndroidLanguageAdapter {
         });
     }
 
-    static OnFailureListener failure(final AsyncResource<?> out,
-                                     final AutoCloseable client) {
+    static OnFailureListener failure(final AsyncResource<?> out) {
         return new OnFailureListener() {
             public void onFailure(final Exception error) {
                 Display.getInstance().callSerially(new Runnable() {
@@ -70,11 +69,10 @@ abstract class AndroidLanguageAdapter {
                         out.error(error);
                     }
                 });
-                try {
-                    client.close();
-                } catch (Exception ignored) {
-                }
             }
         };
+    }
+
+    public void close() {
     }
 }

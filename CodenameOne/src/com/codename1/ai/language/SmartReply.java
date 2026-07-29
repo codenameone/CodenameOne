@@ -23,8 +23,8 @@
 package com.codename1.ai.language;
 
 import com.codename1.impl.LanguageImpl;
-import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
 
 /// Produces short reply suggestions for a chronological conversation without
 /// uploading its messages. ML Kit may return no suggestions when the language
@@ -38,13 +38,26 @@ public final class SmartReply {
         return isSupported(new LanguageOptions());
     }
 
+    /// Tests whether Smart Reply is available for a backend selection.
+    ///
+    /// This capability check creates and closes a temporary native backend.
+    /// Retain a {@link Session} from {@link #open(LanguageOptions)} when the
+    /// application will immediately request repeated suggestions.
+    ///
+    /// @param options backend selection, or {@code null} for defaults
     /// @return whether the selected backend supports Smart Reply
     public static boolean isSupported(LanguageOptions options) {
-        LanguageOptions actual = options == null
-                ? new LanguageOptions() : options;
-        LanguageImpl impl = Display.getInstance().getLanguageBackend();
-        return impl != null && impl.isSupported(
-                "smart-reply", actual.getBackend().getId());
+        return LanguageSession.isSupported("smart-reply", options);
+    }
+
+    /// Opens a reusable Smart Reply session. Reuse it for conversations that
+    /// need repeated suggestions to avoid recreating the native client.
+    ///
+    /// @param options backend options, or {@code null}
+    /// @return a reusable session that owns one native language backend
+    /// @throws UnsupportedOperationException if the selected backend is absent
+    public static Session open(LanguageOptions options) {
+        return new Session(LanguageSession.open("smart-reply", options));
     }
 
     /// The conversation array and option values are copied before backend work
@@ -55,16 +68,30 @@ public final class SmartReply {
     /// @return asynchronous suggestions, possibly an empty array
     public static AsyncResource<String[]> suggest(SmartReplyMessage[] conversation,
                                                    LanguageOptions options) {
-        LanguageOptions actual = (options == null
-                ? new LanguageOptions() : options).snapshot();
-        LanguageImpl impl = Display.getInstance().getLanguageBackend();
-        if (impl == null || !impl.isSupported("smart-reply", actual.getBackend().getId())) {
+        final Session session;
+        try {
+            session = open(options);
+        } catch (RuntimeException error) {
             AsyncResource<String[]> out = new AsyncResource<String[]>();
-            out.error(new UnsupportedOperationException("smart reply is not supported"));
+            out.error(error);
             return out;
         }
-        return impl.suggestReplies(copyConversation(conversation),
-                actual.getBackend().getId(), actual);
+        AsyncResource<String[]> result = session.suggest(conversation);
+        closeWhenFinished(result, session);
+        return result;
+    }
+
+    private static <T> void closeWhenFinished(AsyncResource<T> result,
+                                               final Session session) {
+        result.ready(new SuccessCallback<T>() {
+            public void onSucess(T value) {
+                session.close();
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            public void onSucess(Throwable error) {
+                session.close();
+            }
+        });
     }
 
     private static SmartReplyMessage[] copyConversation(
@@ -78,5 +105,43 @@ public final class SmartReply {
             copy[i] = conversation[i];
         }
         return copy;
+    }
+
+    /// Reusable owner of a native Smart Reply backend.
+    ///
+    /// Calling {@link #close()} prevents new requests immediately and defers
+    /// native release until suggestions already in progress have completed.
+    public static final class Session implements AutoCloseable {
+        private final LanguageSession session;
+
+        private Session(LanguageSession session) {
+            this.session = session;
+        }
+
+        /// Generates reply suggestions without recreating the native backend.
+        ///
+        /// @param conversation chronological messages, oldest first;
+        ///        {@code null} is treated as an empty conversation
+        /// @return asynchronous suggestions, possibly empty
+        /// @throws IllegalStateException if this session is closed
+        public AsyncResource<String[]> suggest(
+                final SmartReplyMessage[] conversation) {
+            final SmartReplyMessage[] snapshot =
+                    copyConversation(conversation);
+            return session.execute(new LanguageSession.Operation<String[]>() {
+                public AsyncResource<String[]> run(
+                        LanguageImpl implementation,
+                        LanguageOptions options) {
+                    return implementation.suggestReplies(snapshot,
+                            options.getBackend().getId(), options);
+                }
+            });
+        }
+
+        /// Closes the session. This method is idempotent; native release is
+        /// deferred until pending suggestions finish.
+        public void close() {
+            session.close();
+        }
     }
 }

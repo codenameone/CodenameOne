@@ -55,6 +55,7 @@ public class LanguageOnDeviceApiTest extends BaseTest {
         try {
             checkValuesAndOptions();
             checkCapabilities();
+            checkReusableSessionLifecycle();
             done();
             return true;
         } catch (Throwable t) {
@@ -115,6 +116,31 @@ public class LanguageOnDeviceApiTest extends BaseTest {
                             new SmartReplyMessage("Hello", "remote", false, 1)
                     }, null), "smart reply");
         }
+    }
+
+    private void checkReusableSessionLifecycle() {
+        LanguageIdentifier.Session identifier =
+                LanguageIdentifier.open(new LanguageOptions());
+        Translator.Session translator =
+                Translator.open(new LanguageOptions());
+        SmartReply.Session smartReply =
+                SmartReply.open(new LanguageOptions());
+        identifier.close();
+        translator.close();
+        smartReply.close();
+        // Closing is intentionally idempotent so owners can use one cleanup path.
+        identifier.close();
+        translator.close();
+        smartReply.close();
+
+        assertImmediateFailure(identifier.identify("hello"),
+                "closed language-identification session");
+        assertImmediateFailure(translator.translate(
+                "bonjour", "fr", "en"), "closed translation session");
+        assertImmediateFailure(smartReply.suggest(
+                new SmartReplyMessage[] {
+                        new SmartReplyMessage("Hello", "remote", false, 1)
+                }), "closed smart-reply session");
     }
 
     private void assertImmediateFailure(AsyncResource<?> resource,

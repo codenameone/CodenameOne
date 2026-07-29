@@ -25,7 +25,7 @@ package com.codename1.ai.vision;
 /// Common analyzer configuration. An analyzer captures the supplied options
 /// when constructed; reuse it for frames needing the same backend, confidence
 /// threshold, and result limit.
-public class VisionOptions {
+public final class VisionOptions {
     private VisionBackend backend = VisionBackends.auto();
     private float minimumConfidence;
     private int maximumResults;

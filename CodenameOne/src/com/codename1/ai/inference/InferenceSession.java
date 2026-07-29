@@ -128,7 +128,7 @@ public final class InferenceSession implements AutoCloseable {
         synchronized (this) {
             ensureOpen();
             ensureNotRunning("read input metadata");
-            return implementation.getInputs(handle);
+            return copyMetadata(implementation.getInputs(handle));
         }
     }
 
@@ -145,8 +145,17 @@ public final class InferenceSession implements AutoCloseable {
         synchronized (this) {
             ensureOpen();
             ensureNotRunning("read output metadata");
-            return implementation.getOutputs(handle);
+            return copyMetadata(implementation.getOutputs(handle));
         }
+    }
+
+    private static TensorInfo[] copyMetadata(TensorInfo[] metadata) {
+        if (metadata == null || metadata.length == 0) {
+            return new TensorInfo[0];
+        }
+        TensorInfo[] copy = new TensorInfo[metadata.length];
+        System.arraycopy(metadata, 0, copy, 0, metadata.length);
+        return copy;
     }
 
     /// Copies input tensors to native memory, invokes the model, and returns

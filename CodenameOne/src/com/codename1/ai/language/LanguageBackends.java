@@ -24,8 +24,13 @@ package com.codename1.ai.language;
 
 /// Selects native backends for language identification, translation, and
 /// Smart Reply. Automatic selection uses ML Kit on Android, Apple Natural
-/// Language for iOS identification, and feature-scoped ML Kit components for
-/// iOS translation and Smart Reply.
+/// Language for iOS identification. iOS translation and Smart Reply require
+/// their feature-specific ML Kit selector methods.
+///
+/// The feature-specific methods are also build-time dependency markers. They
+/// intentionally remain distinct even though they return the same runtime
+/// backend id, because the builder scans each call site to include only the
+/// requested ML Kit component.
 public final class LanguageBackends {
     private static final LanguageBackend AUTO = new Named("auto");
     private static final LanguageBackend ML_KIT = new Named("ml-kit");
@@ -55,6 +60,24 @@ public final class LanguageBackends {
     ///
     /// @return the ML Kit language-identification selector
     public static LanguageBackend mlKitLanguageIdentification() {
+        return ML_KIT;
+    }
+
+    /// Selects ML Kit translation. Calling this method is the build-time
+    /// marker that adds the translation pod on iOS; merely referencing
+    /// {@link Translator} does not add it or disable the arm64 simulator.
+    ///
+    /// @return the ML Kit translation selector
+    public static LanguageBackend mlKitTranslation() {
+        return ML_KIT;
+    }
+
+    /// Selects ML Kit Smart Reply. Calling this method is the build-time
+    /// marker that adds the Smart Reply pod on iOS; merely referencing
+    /// {@link SmartReply} does not add it or disable the arm64 simulator.
+    ///
+    /// @return the ML Kit Smart Reply selector
+    public static LanguageBackend mlKitSmartReply() {
         return ML_KIT;
     }
 

@@ -34,6 +34,9 @@ import com.codename1.util.AsyncResource;
  */
 public final class AndroidLanguageImpl extends LanguageImpl {
     private volatile boolean closed;
+    private AndroidLanguageAdapter languageIdAdapter;
+    private AndroidLanguageAdapter translationAdapter;
+    private AndroidLanguageAdapter smartReplyAdapter;
 
     @Override
     public boolean isSupported(String feature, String backendId) {
@@ -75,30 +78,63 @@ public final class AndroidLanguageImpl extends LanguageImpl {
                 : adapter.suggestReplies(conversation, options);
     }
 
-    private static AndroidLanguageAdapter adapter(String feature) {
+    private synchronized AndroidLanguageAdapter adapter(String feature) {
+        if (closed) {
+            return null;
+        }
+        AndroidLanguageAdapter cached;
         String className;
         if ("language-id".equals(feature)) {
+            cached = languageIdAdapter;
             className =
                     "com.codename1.impl.android.ai.AndroidLanguageIdAdapter";
         } else if ("translation".equals(feature)) {
+            cached = translationAdapter;
             className =
                     "com.codename1.impl.android.ai.AndroidTranslationAdapter";
         } else if ("smart-reply".equals(feature)) {
+            cached = smartReplyAdapter;
             className =
                     "com.codename1.impl.android.ai.AndroidSmartReplyAdapter";
         } else {
             return null;
         }
+        if (cached != null) {
+            return cached;
+        }
         try {
-            return (AndroidLanguageAdapter)
+            cached = (AndroidLanguageAdapter)
                     Class.forName(className).newInstance();
+            if ("language-id".equals(feature)) {
+                languageIdAdapter = cached;
+            } else if ("translation".equals(feature)) {
+                translationAdapter = cached;
+            } else {
+                smartReplyAdapter = cached;
+            }
+            return cached;
         } catch (Throwable ignored) {
             return null;
         }
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
+        if (closed) {
+            return;
+        }
         closed = true;
+        closeAdapter(languageIdAdapter);
+        closeAdapter(translationAdapter);
+        closeAdapter(smartReplyAdapter);
+        languageIdAdapter = null;
+        translationAdapter = null;
+        smartReplyAdapter = null;
+    }
+
+    private static void closeAdapter(AndroidLanguageAdapter adapter) {
+        if (adapter != null) {
+            adapter.close();
+        }
     }
 }
