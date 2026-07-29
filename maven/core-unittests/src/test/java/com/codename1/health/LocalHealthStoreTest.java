@@ -584,6 +584,34 @@ class LocalHealthStoreTest extends UITestBase {
                         + " remain, got: " + read.size());
     }
 
+    /**
+     * What the store says it supports is what a query may ask for.
+     *
+     * <p>A composite type aggregates as DISCRETE, so the capability list
+     * advertised AVERAGE, MINIMUM, MAXIMUM and LATEST while shared
+     * validation refuses every one of them -- capability-driven code
+     * built a query out of what this store said it could do and was told
+     * INVALID_ARGUMENT by the same store.</p>
+     */
+    @Test
+    void everyAdvertisedMetricIsOneAQueryAccepts() {
+        for (HealthDataType type : new HealthDataType[] {
+                HealthDataType.BLOOD_PRESSURE, HealthDataType.STEPS,
+                HealthDataType.HEART_RATE, HealthDataType.BODY_MASS }) {
+            for (AggregateMetric metric : store.getSupportedMetrics(type)) {
+                assertTrue(AggregateQuery.isMeaningful(type, metric),
+                        type.getId() + " advertises " + metric
+                                + ", which a query refuses");
+            }
+        }
+        List<AggregateMetric> composite = store.getSupportedMetrics(
+                HealthDataType.BLOOD_PRESSURE);
+        assertTrue(composite.contains(AggregateMetric.COUNT),
+                "counting composite readings is still meaningful");
+        assertFalse(composite.contains(AggregateMetric.AVERAGE),
+                "averaging two numbers that mean nothing apart is not");
+    }
+
     @Test
     void descendingSortReturnsNewestFirst() {
         writeSteps(utc(2026, 1, 1, 9), utc(2026, 1, 1, 10), 100);

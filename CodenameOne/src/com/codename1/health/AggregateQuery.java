@@ -206,7 +206,7 @@ public final class AggregateQuery {
         // value to average or compare. Accepting the metric and returning
         // null looked like "no data" for a bucket that genuinely had
         // readings, which is the worse of the two answers.
-        if (type == HealthDataType.BLOOD_PRESSURE) {
+        if (type.getKind() == HealthDataKind.COMPOSITE) {
             return false;
         }
         HealthAggregationStyle style = type.getAggregationStyle();

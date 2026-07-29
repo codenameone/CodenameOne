@@ -25,7 +25,6 @@ package com.codename1.impl.health;
 import com.codename1.health.AggregateMetric;
 import com.codename1.health.AggregateQuery;
 import com.codename1.health.AggregateResult;
-import com.codename1.health.HealthAggregationStyle;
 import com.codename1.health.HealthAuthorizationStatus;
 import com.codename1.health.HealthDataType;
 import com.codename1.health.HealthException;
@@ -118,16 +117,18 @@ public class LocalHealthStore extends HealthStore {
         if (type == null) {
             return out;
         }
-        out.add(AggregateMetric.COUNT);
-        out.add(AggregateMetric.DURATION);
-        if (type.getAggregationStyle() == HealthAggregationStyle.CUMULATIVE) {
-            out.add(AggregateMetric.TOTAL);
-        } else if (type.getAggregationStyle()
-                == HealthAggregationStyle.DISCRETE) {
-            out.add(AggregateMetric.AVERAGE);
-            out.add(AggregateMetric.MINIMUM);
-            out.add(AggregateMetric.MAXIMUM);
-            out.add(AggregateMetric.LATEST);
+        // Asked of the same rule the query is validated against, rather
+        // than restated here. Restated, the two disagreed: a composite
+        // type aggregates as DISCRETE and was advertised as supporting
+        // AVERAGE and the rest, while validation refuses every one of
+        // them -- so capability-driven code built a query out of what
+        // this store said it could do and was told INVALID_ARGUMENT by
+        // the same store. One rule also means a metric added later
+        // appears here without anyone remembering to add it.
+        for (AggregateMetric metric : AggregateMetric.values()) {
+            if (AggregateQuery.isMeaningful(type, metric)) {
+                out.add(metric);
+            }
         }
         return out;
     }
