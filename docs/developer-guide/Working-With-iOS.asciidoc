@@ -276,7 +276,7 @@ Supported need formats are `from:`, `exact:`, `branch:`, `revision:`, and `range
 
 `ios.dependencyManager=auto` preserves backward compatibility. Existing projects with `ios.pods` continue to use CocoaPods. Projects with `ios.spm.*` use SPM. If both hint families are present, both are applied.
 
-Explicit dependency-manager modes are validated rather than silently dropping
+Explicit dependency-manager modes are validated rather than dropping
 dependencies. `ios.dependencyManager=spm` fails when the project or a built-in
 API requires a CocoaPod; use `auto` or `both`. Likewise,
 `ios.dependencyManager=none` fails while pod or SPM hints are present; remove

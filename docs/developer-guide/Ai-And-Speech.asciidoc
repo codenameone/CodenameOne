@@ -313,7 +313,7 @@ buffer when newer same-sized frames replace it. Results and errors are
 delivered on the Codename One EDT.
 
 `CameraFrame.getRawBytes()` can be `null` even after requesting NV21 or
-RGBA8888 when a port cannot expose that format. JPEG bytes remain available;
+RGBA8888 when a port can't expose that format. JPEG bytes remain available;
 `VisionImage.fromCameraFrame(...)` automatically selects that fallback.
 
 `DocumentScanner` currently performs still-image rectangle correction on
