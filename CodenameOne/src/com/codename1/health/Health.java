@@ -83,15 +83,25 @@ import java.util.List;
 /// [HealthBackgroundListener] -- always arrive on the EDT. A background
 /// delivery may run with no visible UI, after the OS relaunched your app.
 ///
-/// **Results of the operations you start do not carry that guarantee.**
-/// They arrive on whichever thread produced the answer: the platform SDK's
-/// callback thread on iOS and Android, and on desktop, the simulator and
-/// JavaScript -- where the store is local rather than platform-backed --
-/// the very thread that made the call. So a query started off the EDT can
-/// resolve off the EDT. Touch components from those callbacks through
+/// Results of the operations you start arrive on the EDT **on iOS and
+/// Android**. Both ports marshal every platform answer onto it, and the
+/// shared post-processing of a large read hops back to it when it is
+/// done, so a query started from a worker thread still calls you back on
+/// the EDT there.
+///
+/// **The local-backed ports do not carry that guarantee.** On desktop,
+/// the simulator and JavaScript the store is local rather than
+/// platform-backed, and a result is delivered on the very thread that
+/// asked for it -- so a query started off the EDT resolves off the EDT.
+/// Touch components from those callbacks through
 /// `Display.getInstance().callSerially(...)`, or start the operation from
 /// the EDT in the first place, which is the usual case and where the
 /// distinction never arises.
+///
+/// The asymmetry is a gap rather than a design, and it is written down
+/// here so that nobody has to discover it from a repaint glitch. Code
+/// written for the local ports is correct everywhere; code written for
+/// the mobile guarantee alone is not.
 ///
 /// #### Platform support
 ///

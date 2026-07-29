@@ -61,15 +61,18 @@ import java.util.Map;
 /// Change deliveries -- [HealthChangeListener] and
 /// [HealthBackgroundListener] -- always arrive on the EDT.
 ///
-/// **Results of the operations you start do not carry that guarantee.**
-/// They arrive on whichever thread produced the answer: the platform SDK's
-/// callback thread on iOS and Android, and on the local-backed ports --
-/// desktop, JavaScript, the simulator -- the thread that made the call. So
-/// a read started from a worker thread on the desktop calls you back on
-/// that worker, and touching the UI from there needs your own
-/// `callSerially`. [Health] and the developer guide say the same; this
-/// used to claim an unconditional EDT guarantee that the local store never
-/// offered.
+/// Results of the operations you start arrive on the EDT **on iOS and
+/// Android**: both ports marshal every platform answer onto it, and the
+/// post-processing below hops back to it when it is done.
+///
+/// **The local-backed ports do not carry that guarantee.** On desktop,
+/// JavaScript and the simulator a result is delivered on the thread that
+/// asked for it, so a read started from a worker calls you back on that
+/// worker and touching the UI from there needs your own `callSerially`.
+/// [Health] and the developer guide say the same. This section has been
+/// wrong in both directions -- it claimed an unconditional EDT guarantee
+/// the local store never offered, and then denied the one the mobile
+/// ports do make.
 ///
 /// Post-processing of large result sets -- unit conversion across a
 /// hundred thousand samples -- happens on a shared background thread, so

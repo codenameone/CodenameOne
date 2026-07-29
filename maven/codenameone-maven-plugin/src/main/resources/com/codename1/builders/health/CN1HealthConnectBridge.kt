@@ -308,6 +308,10 @@ class CN1HealthConnectBridge(private val context: Context)
             // simply wrong.
             val perTypeBudget = budget
             val perType = ArrayList<String>()
+            // Set when a type returned less than its range held. It is
+            // not a continuation: SamplePage carries the two separately,
+            // and a page can be the last one and still be truncated.
+            var anyTruncated = false
             for (i in 0 until types.length()) {
                 val token = types.getString(i)
                 val block = StringBuilder()
@@ -315,6 +319,7 @@ class CN1HealthConnectBridge(private val context: Context)
                     perTypeBudget, origins, ascending, inTokens[token],
                     flatten)
                 perType.add(block.toString())
+                anyTruncated = anyTruncated || r.truncated
                 // Exhausted types are recorded with an empty token, not
                 // omitted. Omitting them made the next page see no token
                 // for that type and read it from the beginning again,
@@ -370,7 +375,8 @@ class CN1HealthConnectBridge(private val context: Context)
             // made every page look complete, so the caller's paging loop
             // stopped at the first limit and lost the rest.
             sb.append('#').append(encodeTokens(outTokens)).append('\t')
-                .append(if (outTokens.isEmpty()) "0" else "1")
+                .append(if (outTokens.isEmpty() && !anyTruncated) "0"
+                    else "1")
                 .append('\n')
             sb.toString()
         }
@@ -645,19 +651,17 @@ class CN1HealthConnectBridge(private val context: Context)
         }
         val kept = topByTime(out.toString(), limit, ascending)
         sb.append(kept.first)
-        // No token, and no has-more either.
+        // No token, but truncated when the selection dropped anything.
         //
-        // The scan walked past records a continuation would have to come
-        // back to, so there is nothing to resume from -- and advertising
-        // a next page without one is worse than admitting there is none:
-        // the caller submits an empty token, which reads as a fresh
-        // query, and the first page repeats for ever. This file already
-        // had that bug once through empty tokens, and flagging a capped
-        // reply as truncated recreated it.
-        //
-        // The caller asked for N and has N, which is the honest answer
-        // to the question it put.
-        return Read(kept.second, null)
+        // These are two different statements and conflating them is what
+        // went wrong here before. There is nothing to resume from -- the
+        // scan walked past records a continuation would have to come back
+        // to -- so the token stays null, and a caller that loops on the
+        // token cannot spin. But the range did hold more than was
+        // returned, and SamplePage.isTruncated() exists to say exactly
+        // that: it documents a page that is both the last one and
+        // incomplete, which is precisely this reply.
+        return Read(kept.second, null, kept.second < emitted)
     }
 
     /**
@@ -692,7 +696,8 @@ class CN1HealthConnectBridge(private val context: Context)
      * One type's contribution to a read: the lines emitted and the token
      * to resume with, if there is one.
      */
-    private class Read(val emitted: Int, val token: String?)
+    private class Read(val emitted: Int, val token: String?,
+                       val truncated: Boolean = false)
 
     /**
      * Emits one record in the shared line format, tagged with `token`.
