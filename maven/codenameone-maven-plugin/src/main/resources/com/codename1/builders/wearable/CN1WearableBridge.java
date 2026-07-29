@@ -140,7 +140,10 @@ public class CN1WearableBridge implements WearableBridge {
     /// Nodes the Data Layer knows about whether or not they are currently connected.
     private List<String> bondedNodeIds() {
         if (com.codename1.ui.CN.isEdt()) {
-            // Never block the EDT; the cached answer is refreshed off it.
+            // Never block the EDT -- but the cache has to be filled by someone, or an installed
+            // companion is reported absent forever. Kick off a refresh and answer with what is
+            // known so far; listeners are notified when it lands.
+            refreshBondedAsync();
             return cachedBonded;
         }
         List<String> out = new ArrayList<String>();
@@ -159,6 +162,28 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     private volatile List<String> cachedBonded = new ArrayList<String>();
+    private volatile boolean refreshingBonded;
+
+    private void refreshBondedAsync() {
+        if (refreshingBonded) {
+            return;
+        }
+        refreshingBonded = true;
+        capabilityClient.getCapability("cn1_wearable", CapabilityClient.FILTER_ALL)
+                .addOnCompleteListener(new com.google.android.gms.tasks.OnCompleteListener<CapabilityInfo>() {
+                    public void onComplete(com.google.android.gms.tasks.Task<CapabilityInfo> task) {
+                        List<String> out = new ArrayList<String>();
+                        if (task.isSuccessful() && task.getResult() != null) {
+                            for (Node n : task.getResult().getNodes()) {
+                                out.add(n.getId());
+                            }
+                        }
+                        cachedBonded = out;
+                        refreshingBonded = false;
+                        WearableConnection.notifyStateChanged();
+                    }
+                });
+    }
 
     public boolean isReachable() {
         for (Node n : connectedNodes()) {
