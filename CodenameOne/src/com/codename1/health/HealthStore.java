@@ -1809,6 +1809,7 @@ public class HealthStore {
     /// Deliberately lazy rather than eager: restoring calls into
     /// `doSubscribe`, so it cannot run until the port is fully built.
     private void ensureSubscriptionsRestored() {
+        boolean interrupted = false;
         synchronized (subscriptions) {
             if (restoringThread == Thread.currentThread()) {
                 // Restoration itself calls doSubscribe, and a port is
@@ -1829,14 +1830,28 @@ public class HealthStore {
                 try {
                     subscriptions.wait();
                 } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                    return;
+                    // Interrupted, but still waiting. Returning here let
+                    // the caller carry on against the half-filled
+                    // registry -- an interrupted unsubscribe could delete
+                    // an entry restoration had read and not yet inserted,
+                    // and the restoring thread then put it back and
+                    // subscribed it. That is the resurrection this wait
+                    // exists to prevent, reachable again through the one
+                    // exit that skipped it. The flag is preserved for the
+                    // caller to act on once the registry is whole.
+                    interrupted = true;
                 }
             }
             if (subscriptionsRestored) {
+                if (interrupted) {
+                    Thread.currentThread().interrupt();
+                }
                 return;
             }
             restoringThread = Thread.currentThread();
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
         }
         try {
             restoreSubscriptions();

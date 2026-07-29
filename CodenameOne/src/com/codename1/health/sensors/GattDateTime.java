@@ -98,6 +98,27 @@ final class GattDateTime {
         c.set(Calendar.MINUTE, minute);
         c.set(Calendar.SECOND, second);
         c.set(Calendar.MILLISECOND, 0);
-        return c.getTime().getTime();
+        long stamped = c.getTime().getTime();
+        if (stamped - System.currentTimeMillis() > MAX_SKEW_MILLIS) {
+            // A structurally valid date the reading cannot have been
+            // taken at. A cuff or scale with its clock left at 2099 --
+            // out of the box, or after a battery change -- passes every
+            // field check above, and the session then prefers that stamp
+            // over the moment the notification arrived, stores the
+            // reading under it, and getLatest() reports it as the
+            // freshest there is because its age comes out negative.
+            //
+            // Refused rather than clamped, so the caller falls back to
+            // receipt time instead of being handed a fabricated one. Same
+            // bound and same reasoning as the glucose time offset.
+            return -1;
+        }
+        return stamped;
     }
+
+    /// How far ahead of now a device may stamp a reading before the
+    /// timestamp is refused: a day, which is slack for a clock that
+    /// disagrees with the phone's rather than a licence to record in the
+    /// future.
+    private static final long MAX_SKEW_MILLIS = 24L * 60 * 60 * 1000;
 }

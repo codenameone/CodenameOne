@@ -654,4 +654,27 @@ class SensorParserTest {
         assertEquals(300.0, t.update(115, 2048), 0.1,
                 "five revolutions in the next second");
     }
+
+    /**
+     * A device clock set to the future is refused, so the caller falls
+     * back to receipt time.
+     *
+     * <p>A cuff or scale left at 2099 -- out of the box, or after a
+     * battery change -- passes every field check, and the session then
+     * prefers that stamp over the moment the notification arrived, stores
+     * the reading under it, and {@code getLatest()} reports it as the
+     * freshest there is because its age comes out negative. Same bound
+     * and same reasoning as the glucose time offset.</p>
+     */
+    @Test
+    void aDeviceClockInTheFutureIsRefused() {
+        // The date decoder is what this pins; read it directly so the
+        // assertion does not depend on which profile carries a timestamp.
+        assertEquals(-1L, GattDateTime.read(new GattReader(new byte[] {
+            0x2B, 0x08, 12, 25, 9, 30, 0
+        })), "a timestamp years ahead of now must be refused");
+        assertTrue(GattDateTime.read(new GattReader(new byte[] {
+            (byte) 0xEA, 0x07, 1, 1, 12, 0, 0
+        })) > 0, "and an ordinary past timestamp must still decode");
+    }
 }

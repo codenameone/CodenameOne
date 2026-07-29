@@ -583,6 +583,17 @@ class AndroidHealthStore extends HealthStore {
         HealthAnchor anchor = sub.getAnchor();
         String token = anchor == null ? null : anchor.toStorableString();
         if ((token == null || token.length() == 0)
+                && !isBaselineInFlight(sub)) {
+            // Re-read after the check, not before it. The seed can land
+            // between the two, and then the in-flight entry is gone while
+            // this token is still the null read a moment earlier -- so
+            // the drain took a second baseline and lost everything
+            // between the two issuances, which is the very hole the
+            // waiting exists to close.
+            anchor = sub.getAnchor();
+            token = anchor == null ? null : anchor.toStorableString();
+        }
+        if ((token == null || token.length() == 0)
                 && isBaselineInFlight(sub)) {
             // Its starting cursor is still being issued. Taking a second
             // one here is what makes the window real: two baselines then

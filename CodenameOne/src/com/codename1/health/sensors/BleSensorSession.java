@@ -387,6 +387,14 @@ final class BleSensorSession extends SensorSession {
             peripheral.removeConnectionListener(listener);
         }
         setState(SensorSessionState.FAILED);
+        // The buffered readings go to the store, exactly as stop() does
+        // with them. A session that gave up reconnecting still holds
+        // whatever arrived since the last batch boundary -- up to a full
+        // storeBatchMillis of it, sixty seconds by default -- and the
+        // transition above cancels the timer that would have written it.
+        // Without this they sat in the buffer until the process ended and
+        // were never seen again, silently.
+        flushPendingWrites();
         forgetFromManager();
         peripheral.disconnect();
     }

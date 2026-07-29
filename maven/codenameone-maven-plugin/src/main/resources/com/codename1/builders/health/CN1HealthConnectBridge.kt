@@ -951,11 +951,22 @@ class CN1HealthConnectBridge(private val context: Context)
             // reading, and every flattened series point is one too, so
             // without a span of its own every ordinary Android heart-rate
             // write threw before it reached the insert.
-            "heart_rate" -> HeartRateRecord(startTime = start,
-                endTime = if (end.isAfter(start)) end else start.plusMillis(1),
-                startZoneOffset = zone, endZoneOffset = endZone,
-                samples = listOf(HeartRateRecord.Sample(time = start,
-                    beatsPerMinute = wholeCount(token, value))), metadata = meta)
+            "heart_rate" -> {
+                val hrEnd = if (end.isAfter(start)) end
+                    else start.plusMillis(1)
+                HeartRateRecord(startTime = start, endTime = hrEnd,
+                    startZoneOffset = zone,
+                    // From the end this record actually uses, not from
+                    // the end that was passed in: the synthetic end above
+                    // is computed after both offsets were, so a reading
+                    // written just before a daylight-saving change got a
+                    // record crossing the transition with the start
+                    // side's offset at its end.
+                    endZoneOffset = rules.getOffset(hrEnd),
+                    samples = listOf(HeartRateRecord.Sample(time = start,
+                        beatsPerMinute = wholeCount(token, value))),
+                    metadata = meta)
+            }
 
             else -> throw IllegalArgumentException(
                 "Health Connect writes are not implemented for '" + token

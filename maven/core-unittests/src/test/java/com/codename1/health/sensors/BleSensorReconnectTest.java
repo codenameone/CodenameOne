@@ -724,17 +724,19 @@ class BleSensorReconnectTest extends UITestBase {
     }
 
     /**
-     * A flush armed before the session ended does not run after it.
+     * A session that gives up flushes exactly once, and never again.
      *
-     * <p>The re-arm was guarded but the tick already scheduled was not,
-     * so a dead session issued one last write from a timer nobody could
-     * cancel. Held deterministically: the batch window is long enough
-     * that the session is unambiguously terminal well before the tick
-     * would have fired.</p>
+     * <p>Two things have to hold at once here, and an earlier version of
+     * this test asserted only the second by demanding no write at all.
+     * The buffer must reach the store -- a session that exhausted its
+     * reconnects still holds whatever arrived since the last batch
+     * boundary, up to a full {@code storeBatchMillis} of it -- and the
+     * timer that was armed for that batch must not then fire a second
+     * write from a session nobody holds.</p>
      */
     @Test
-    void aFlushArmedBeforeTheEndDoesNotRunAfterIt() throws Exception {
-        final HalfCommittingStore store = new HalfCommittingStore();
+    void aSessionThatGivesUpFlushesOnceAndNeverAgain() throws Exception {
+        final CountingStore store = new CountingStore();
         implementation.setHealth(new com.codename1.health.Health() {
             @Override
             public boolean isSupported() {
@@ -750,6 +752,8 @@ class BleSensorReconnectTest extends UITestBase {
             FakePeripheral p = new FakePeripheral();
             BleSensorSession session = new BleSensorSession("fake",
                     HealthSensorProfile.HEART_RATE,
+                    // Long enough that nothing is written on the timer:
+                    // any write this test sees is the teardown's.
                     new SensorSessionOptions().setWriteToStore(true)
                             .setStoreBatchMillis(600), p);
             started.add(session);
@@ -758,18 +762,18 @@ class BleSensorReconnectTest extends UITestBase {
             session.start(out);
             flushSerialCalls();
 
-            // Arms the flush, then fails the session long before it fires.
             p.notifyHeartRate(70);
             flushSerialCalls();
             p.failDiscoveries = 99;
             p.dropLink();
             pumpUntil(session, SensorSessionState.FAILED);
-            assertTrue(session.isTerminal());
 
-            pump(1500);
-            assertEquals(0, store.written.size(),
-                    "a session that failed before its flush window"
-                            + " elapsed must never issue that write");
+            assertEquals(1, pumpFor(1500, store),
+                    "the buffered reading must reach the store when the"
+                            + " session gives up");
+            assertEquals(1, pumpFor(800, store),
+                    "and the timer armed for that batch must not fire a"
+                            + " second write afterwards");
         } finally {
             implementation.setHealth(null);
         }
