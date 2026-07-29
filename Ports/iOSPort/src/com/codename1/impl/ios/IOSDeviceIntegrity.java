@@ -376,16 +376,8 @@ final class IOSDeviceIntegrity {
                     // rate-limited key, and would do so on every subsequent request --
                     // the exact loop the spent marker exists to stop. Report instead.
                     bootstrapInFlight = false;
-                    final AsyncResource<String> exhausted = r;
-                    Display.getInstance().callSerially(new Runnable() {
-                        public void run() {
-                            if (!exhausted.isDone()) {
-                                exhausted.error(new RuntimeException("App Attest could not "
-                                        + "establish a usable key on this device; call "
-                                        + "DeviceIntegrity.resetAttestation() to try again"));
-                            }
-                        }
-                    });
+                    failResource(r, "App Attest could not establish a usable key on this "
+                            + "device; call DeviceIntegrity.resetAttestation() to try again");
                     return r;
                 } else if (keyId != null && keyId.length() > 0) {
                     // Attestation WAS started for this key and we never recorded the
@@ -452,16 +444,8 @@ final class IOSDeviceIntegrity {
         if (!SecureStorage.getInstance().set(KEY_ATTEST_STARTED, "1")) {
             bootstrapInFlight = false;
             failBootstrapWaiters("App Attest could not record that attestation had started");
-            final AsyncResource<String> target = r;
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    if (!target.isDone()) {
-                        target.error(new RuntimeException("App Attest could not record that "
-                                + "attestation had started, so it was not attempted rather "
-                                + "than risk spending the key untracked"));
-                    }
-                }
-            });
+            failResource(r, "App Attest could not record that attestation had started, so it "
+                    + "was not attempted rather than risk spending the key untracked");
             return;
         }
         PendingRequest pending = new PendingRequest(r, nonce, PendingRequest.OP_ATTEST, keyId);
@@ -838,6 +822,24 @@ final class IOSDeviceIntegrity {
                     }
                 }
                 pending.result.complete(token);
+            }
+        });
+    }
+
+    /**
+     * Fails a caller that has no PendingRequest yet, on the EDT.
+     *
+     * <p>Static, and not merely for tidiness: the callers are instance methods, so an
+     * anonymous Runnable written inline there captures the enclosing IOSDeviceIntegrity.
+     * That reference outlives the call for as long as the EDT queue holds the Runnable,
+     * and it is a reference nothing here needs.</p>
+     */
+    private static void failResource(final AsyncResource<String> r, final String msg) {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                if (!r.isDone()) {
+                    r.error(new RuntimeException(msg));
+                }
             }
         });
     }

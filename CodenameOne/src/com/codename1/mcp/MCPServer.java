@@ -178,14 +178,32 @@ public class MCPServer {
                 && transport == t; // NOPMD identity is the question, not equality
     }
 
-    /// Clears the running flag, but only on behalf of the transport that is still current.
-    /// A thread unwinding from a superseded transport must not stop a server that has since
-    /// been restarted over a new one.
-    private synchronized void stopIfCurrent(MCPTransport t, int generation) {
+    /// Clears the running flag when this thread is still the current run, and answers the
+    /// only other question a thread unwinding from `t` has: does it close `t`?
+    ///
+    /// Both halves have to be decided together under this lock. Deciding "am I current" and
+    /// then closing outside it leaves a window where a `stop()`/`start(sameTransport)` pair
+    /// hands `t` to a fresh generation -- and the old thread, correctly declining to stop
+    /// the *server*, would still close the transport the replacement is now serving over,
+    /// killing a server that had just been restarted.
+    ///
+    /// Three cases, only one of which closes nothing:
+    ///
+    /// - still current: this run is over, so clear `running` and close.
+    /// - superseded, and the replacement holds a different transport: nobody else can close
+    ///   `t`, so this thread must. Leaking it is not benign -- an open transport stays
+    ///   registered process-wide and every later `open()` is refused.
+    /// - superseded, and the replacement holds this same transport: leave it alone. It is
+    ///   the live server's transport now, and the replacement thread will close it.
+    ///
+    /// @return true when the caller owns the close of `t`
+    private synchronized boolean releaseIfCurrent(MCPTransport t, int generation) {
         if (startGeneration == generation
                 && transport == t) { // NOPMD identity: is this still our transport?
             running = false;
+            return true;
         }
+        return transport != t; // NOPMD identity: reused by the replacement, or orphaned?
     }
 
     private void runLoop(MCPTransport t, int generation) {
@@ -210,14 +228,19 @@ public class MCPServer {
             } catch (Throwable logErr) {
                 System.err.println("[cn1.mcp] transport open failed: " + ex);
             }
-            stopIfCurrent(t, generation);
-            t.close();
+            if (releaseIfCurrent(t, generation)) {
+                t.close();
+            }
             return;
         }
         if (!isCurrent(t, generation)) {
             // Same window, the far side of it: the server moved on while open() was in
-            // flight. Undo the registration this thread just took.
-            t.close();
+            // flight. Undo the registration this thread just took -- unless the server
+            // moved on by restarting over this very transport, in which case it is not
+            // ours to undo.
+            if (releaseIfCurrent(t, generation)) {
+                t.close();
+            }
             return;
         }
         while (isCurrent(t, generation)) {
@@ -242,8 +265,9 @@ public class MCPServer {
                 }
             }
         }
-        stopIfCurrent(t, generation);
-        t.close();
+        if (releaseIfCurrent(t, generation)) {
+            t.close();
+        }
     }
 
     /// Handles one inbound JSON-RPC message and returns the response line, or null

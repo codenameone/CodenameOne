@@ -35,8 +35,10 @@ import java.io.IOException;
 /// would only ever be attached by an app calling [AppShield#attach(ConnectionRequest)] by hand.
 /// Installed once from [AppShield#init(ShieldConfig)].
 ///
-/// Package-private: apps configure behaviour through [ShieldConfig], and an app-supplied guard
-/// could only weaken this one.
+/// The class stays package-private -- apps configure behaviour through [ShieldConfig], and there
+/// is nothing here to subclass or reconfigure. The *instance* is reachable through
+/// [AppShield#getNetworkGuard()], because [com.codename1.io.NetworkManager] holds one guard and
+/// an app that needs its own has to be able to delegate to this one rather than displace it.
 final class ShieldNetworkGuard implements NetworkGuard {
 
     @Override

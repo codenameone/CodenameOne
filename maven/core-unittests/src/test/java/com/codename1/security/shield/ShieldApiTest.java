@@ -22,6 +22,7 @@
  */
 package com.codename1.security.shield;
 
+import com.codename1.io.NetworkGuard;
 import org.junit.jupiter.api.Test;
 
 import java.util.Hashtable;
@@ -29,6 +30,7 @@ import java.util.Vector;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -387,6 +389,30 @@ class ShieldApiTest {
     void severityIsClampedToTheDocumentedRange() {
         assertEquals(100, new ShieldSignal("x", 5000, null).getSeverity());
         assertEquals(0, new ShieldSignal("x", -5, null).getSeverity());
+    }
+
+    // --- guard composition ----------------------------------------------
+
+    @Test
+    void theShieldGuardIsReachableAndStableSoAnAppCanDelegateToIt() {
+        // NetworkManager holds exactly one guard and seals the slot, so an app with its own
+        // guard can only keep the shield by delegating to it. Before this was reachable, the
+        // documented recovery was "call attach() yourself", which restores the token header
+        // and silently drops the certificate callbacks that enforce isEnforcePins() -- the
+        // half of the shield whose absence looks exactly like success.
+        NetworkGuard g = AppShield.getNetworkGuard();
+        assertNotNull(g, "the shield's guard must be reachable for composition");
+        assertSame(g, AppShield.getNetworkGuard(),
+                "delegating apps hold on to the guard, so it has to be the same instance");
+
+        // The pin callbacks are the point: they must be present on the returned type, not
+        // only on a package-private class an app cannot name.
+        assertFalse(g.isCertificateCheckRequired("https://unregistered.example/x"),
+                "an unregistered host must not trigger certificate collection");
+        String[] interesting = g.interestingResponseHeaders();
+        assertNotNull(interesting,
+                "a composing guard has to be able to union these with its own");
+        assertTrue(interesting.length > 0);
     }
 
     @Test

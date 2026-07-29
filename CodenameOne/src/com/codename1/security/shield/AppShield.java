@@ -24,6 +24,7 @@ package com.codename1.security.shield;
 
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Log;
+import com.codename1.io.NetworkGuard;
 import com.codename1.io.NetworkManager;
 import com.codename1.security.shield.spi.ShieldEngine;
 import com.codename1.security.shield.spi.ShieldEngineRegistry;
@@ -77,6 +78,7 @@ public final class AppShield {
 
     private static ShieldConfig config;
     private static boolean initialized;
+    private static NetworkGuard guard;
     private static ShieldStatus lastStatus = ShieldStatus.NOT_INITIALIZED;
     private static final Vector listeners = new Vector();
     private static final Hashtable runtimeHosts = new Hashtable();
@@ -130,17 +132,72 @@ public final class AppShield {
     /// behaviour identical whether or not the enterprise engine was injected.
     private static void installNetworkGuard() {
         try {
-            NetworkManager.setNetworkGuard(new ShieldNetworkGuard());
+            NetworkManager.setNetworkGuard(getNetworkGuard());
         } catch (IllegalStateException e) {
-            // The slot seals after the first install. An app that installed its
-            // own guard keeps it; say so rather than failing startup, because the
-            // consequence is that protected hosts are not decorated automatically
-            // and that is worth knowing about.
-            Log.p("AppShield: a network guard is already installed, so protected hosts will "
-                    + "not be decorated automatically. Call AppShield.attach(request) from "
-                    + "your own guard if you need both.");
+            // The slot seals after the first install. An app that installed its own guard
+            // keeps it; say so rather than failing startup, and point at the composition
+            // that gets everything back -- not just the token. Advising attach() alone
+            // would restore header decoration while quietly dropping pin enforcement,
+            // which is the half of the shield an app cannot notice is missing.
+            Log.p("AppShield: a network guard is already installed, so protected hosts are "
+                    + "not decorated or pinned automatically. Delegate to "
+                    + "AppShield.getNetworkGuard() from your own guard to restore both; "
+                    + "see the AppShield.getNetworkGuard() documentation.");
         } catch (Throwable t) {
             Log.e(t);
+        }
+    }
+
+    /// The shield's own [NetworkGuard], for an app that has to install a guard of its own.
+    ///
+    /// [NetworkManager] holds a single guard and seals the slot on first install, so an app
+    /// with its own guard leaves no room for the shield's. Delegating to this one is the
+    /// supported way to have both. Delegate every method, not only
+    /// [NetworkGuard#beforeRequest(ConnectionRequest)]: attaching the token is the visible
+    /// half of the shield, and the certificate callbacks are the half that enforces
+    /// [HostPolicy#isEnforcePins()]. An app that forwards only `beforeRequest` gets tokens
+    /// and no pinning, and nothing about its behaviour says so.
+    ///
+    /// ```java
+    /// final NetworkGuard shield = AppShield.getNetworkGuard();
+    /// NetworkManager.setNetworkGuard(new NetworkGuard() {
+    ///     public void beforeRequest(ConnectionRequest r) throws IOException {
+    ///         myOwnHeaders(r);
+    ///         shield.beforeRequest(r);
+    ///     }
+    ///     public boolean isCertificateCheckRequired(String url) {
+    ///         return myOwnCheckNeeded(url) || shield.isCertificateCheckRequired(url);
+    ///     }
+    ///     public void checkCertificates(ConnectionRequest r,
+    ///             ConnectionRequest.SSLCertificate[] c) throws IOException {
+    ///         myOwnCheck(r, c);
+    ///         shield.checkCertificates(r, c);
+    ///     }
+    ///     public String[] interestingResponseHeaders() {
+    ///         return concat(myOwnHeaderNames(), shield.interestingResponseHeaders());
+    ///     }
+    ///     public void afterResponse(ConnectionRequest r, int code, String[] headers) {
+    ///         shield.afterResponse(r, code, headers);
+    ///     }
+    /// });
+    /// AppShield.init(cfg);
+    /// ```
+    ///
+    /// Note that `interestingResponseHeaders()` has to be the union of both guards' names, and
+    /// that the `headers` array handed to `afterResponse` is positional against it -- so a
+    /// composing guard must pass the shield the slice that corresponds to the shield's own
+    /// names, in that order. Installing the shield's guard directly, by calling
+    /// [#init(ShieldConfig)] before installing anything of your own, avoids the bookkeeping
+    /// entirely and is what most apps should do.
+    ///
+    /// Safe to call before [#init(ShieldConfig)]; the returned guard reads the configuration
+    /// live rather than capturing it.
+    public static NetworkGuard getNetworkGuard() {
+        synchronized (AppShield.class) {
+            if (guard == null) {
+                guard = new ShieldNetworkGuard();
+            }
+            return guard;
         }
     }
 
