@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.ios;
 
+import com.codename1.io.Log;
 import com.codename1.security.Hash;
 import com.codename1.security.SecureStorage;
 import com.codename1.ui.Display;
@@ -170,7 +171,14 @@ final class IOSDeviceIntegrity {
         // mark only that callback stale and leave the resurrected key behind for the
         // next bootstrap to find.
         synchronized (flowLock) {
-            resetLocked();
+            try {
+                resetLocked();
+            } catch (IllegalStateException e) {
+                // Public API entry point, so the failure is logged rather than thrown at
+                // an app that asked us to forget a key. The state is untouched, so the
+                // next attempt can retry it.
+                Log.e(e);
+            }
         }
     }
 
@@ -178,10 +186,19 @@ final class IOSDeviceIntegrity {
     /// the old identity and starting the replacement. Caller holds `flowLock`.
     private void resetLocked() {
         SecureStorage store = SecureStorage.getInstance();
-        store.remove(KEY_ID);
-        store.remove(KEY_STATE);
+        // The two that carry the identity are checked. If the keychain refuses to
+        // delete them the reset has not happened, and advancing the generation anyway
+        // would report success while the next request reloads the very key the backend
+        // asked us to discard -- and keeps asserting with it. Better to leave the state
+        // visibly unchanged so the caller fails and can retry.
+        boolean cleared = store.remove(KEY_ID);
+        cleared &= store.remove(KEY_STATE);
         store.remove(KEY_RETRY_AFTER);
         store.remove(KEY_PENDING_SINCE);
+        if (!cleared) {
+            throw new IllegalStateException("App Attest could not discard its stored key; "
+                    + "the keychain refused the deletion");
+        }
         currentBackoff = MIN_BACKOFF_MILLIS;
         bootstrapInFlight = false;
         // Any callback still outstanding now belongs to an abandoned flow.
@@ -538,7 +555,17 @@ final class IOSDeviceIntegrity {
                 if (errorCode == DC_ERROR_INVALID_KEY && !pending.retried) {
                     // The key is gone or was never valid. Wipe it and try once from
                     // scratch; a second failure is reported rather than looped.
-                    instance.resetLocked();
+                    try {
+                        instance.resetLocked();
+                    } catch (IllegalStateException e) {
+                        // Nothing was discarded, so starting a replacement would leave
+                        // two identities and the old one still usable. Fail the caller.
+                        instance.bootstrapInFlight = false;
+                        fail(pending, "App Attest could not discard the rejected key");
+                        instance.failBootstrapWaiters(
+                                "App Attest could not discard the rejected key");
+                        return;
+                    }
                     PendingRequest retry = new PendingRequest(pending.result, pending.nonce,
                             PendingRequest.OP_GENERATE_KEY, null);
                     retry.retried = true;

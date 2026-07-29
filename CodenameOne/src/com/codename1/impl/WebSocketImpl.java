@@ -83,16 +83,26 @@ public abstract class WebSocketImpl {
         if (name == null || name.length() == 0) {
             return;
         }
+        // Keyed by the folded name, because HTTP header names are case-insensitive.
+        // Keying by the spelling the caller happened to use meant
+        // header("Authorization", v) followed by header("authorization", null) left the
+        // credential in place, and setting both emitted the field twice -- leaving the
+        // server to pick one, which is not a thing to leave to chance for an
+        // Authorization header. The caller's spelling is kept for emission.
+        String key = asciiLower(name);
         if (value == null) {
-            requestHeaders.remove(name);
+            requestHeaders.remove(key);
         } else {
-            requestHeaders.put(name, value);
+            requestHeaders.put(key, new String[] {name, value});
         }
     }
 
-    /// The extra handshake headers, keyed by name. Never null; ports read this
-    /// while building the handshake. Ports must not emit an entry whose name
-    /// collides with a header the handshake sets itself.
+    /// The extra handshake headers, keyed by the ASCII-folded name. Each value is a
+    /// two-element `String[]` of `{ name as the caller spelled it, value }`, so lookups
+    /// and removals are case-insensitive the way HTTP is while emission preserves the
+    /// caller's capitalization. Never null; ports read this while building the
+    /// handshake. Ports must not emit an entry whose name collides with a header the
+    /// handshake sets itself.
     protected final java.util.Hashtable requestHeaders() {
         return requestHeaders;
     }
@@ -106,8 +116,10 @@ public abstract class WebSocketImpl {
     protected final void appendRequestHeaders(StringBuilder req) {
         java.util.Enumeration keys = requestHeaders.keys();
         while (keys.hasMoreElements()) {
-            String name = (String) keys.nextElement();
-            String value = (String) requestHeaders.get(name);
+            String key = (String) keys.nextElement();
+            String[] pair = (String[]) requestHeaders.get(key);
+            String name = pair[0];
+            String value = pair[1];
             if (isReservedHandshakeHeader(name)) {
                 continue;
             }
