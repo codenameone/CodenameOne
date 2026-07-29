@@ -40,10 +40,21 @@ public class FakeHealthStore extends HealthStore {
 
     /** Pages returned by successive doReadSamples calls. */
     public final List<SamplePage> pages = new ArrayList<SamplePage>();
-    /** Queries the base class actually issued, in order. */
-    public final List<SampleQuery> queriesSeen = new ArrayList<SampleQuery>();
+    /// Queries the base class actually issued, in order.
+    ///
+    /// Synchronized, both of them: paging calls doReadSamples for the
+    /// first page on the caller's thread and for every page after it on
+    /// the health worker, so an unsynchronized ArrayList is appended from
+    /// two threads and loses or misplaces entries. That is a race in the
+    /// fake, and it reads exactly like a race in the code under test --
+    /// which is how it presented.
+    public final List<SampleQuery> queriesSeen =
+            java.util.Collections.synchronizedList(
+                    new ArrayList<SampleQuery>());
     /** The thread each of those queries arrived on, in order. */
-    public final List<String> readThreads = new ArrayList<String>();
+    public final List<String> readThreads =
+            java.util.Collections.synchronizedList(
+                    new ArrayList<String>());
     /** Chunks the base class actually issued to doWrite, in order. */
     public final List<List<HealthSample>> writeChunks =
             new ArrayList<List<HealthSample>>();
@@ -56,6 +67,15 @@ public class FakeHealthStore extends HealthStore {
     public HealthException failDrainAfterFiring;
     /** Run inside doSubscribe, so a test can hold restoration open. */
     public Runnable duringSubscribe;
+    /** Captured so a test can answer after the timeout has fired. */
+    public AsyncResource<HealthWriteResult> lateWrite;
+    /** When set, doWrite keeps the resource instead of answering. */
+    public boolean holdWrite;
+
+    /** Shortens the per-operation safety timeout for a test. */
+    public void setOperationTimeoutForTest(int millis) {
+        setOperationTimeout(millis);
+    }
 
     @Override
     protected void doSubscribe(SubscriptionRequest request,
@@ -113,6 +133,10 @@ public class FakeHealthStore extends HealthStore {
             AsyncResource<HealthWriteResult> out) {
         int index = writeIndex++;
         writeChunks.add(new ArrayList<HealthSample>(samples));
+        if (holdWrite) {
+            lateWrite = out;
+            return;
+        }
         if (index == failWriteChunk) {
             out.error(new HealthException(HealthError.UNKNOWN,
                     "scripted failure on chunk " + index));

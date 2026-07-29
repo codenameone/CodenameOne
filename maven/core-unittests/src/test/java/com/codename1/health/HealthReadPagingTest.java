@@ -224,4 +224,46 @@ class HealthReadPagingTest extends UITestBase {
                 "converting must not drop the rest of the reading");
         assertEquals("left", bp.getMetadata().get("cuff"));
     }
+
+    /**
+     * A platform answer that arrives after the timeout is ignored.
+     *
+     * <p>{@code AsyncResource} allows a resource to be completed more
+     * than once, and every operation here is armed with a timeout -- so a
+     * write reported TIMEOUT and then reported success on the same
+     * resource. A caller that retried on the timeout had both inserts
+     * commit, which is a duplicate record in someone's health data.</p>
+     */
+    @Test
+    void aPlatformAnswerAfterTheTimeoutIsIgnored() throws Exception {
+        FakeHealthStore store = new FakeHealthStore();
+        store.holdWrite = true;
+        store.setOperationTimeoutForTest(120);
+        List<HealthSample> one = new ArrayList<HealthSample>();
+        one.add(FakeHealthStore.sample(HealthDataType.STEPS,
+                1000L, 2000L, 5));
+
+        final Throwable[] first = new Throwable[1];
+        final int[] outcomes = new int[1];
+        final CountDownLatch timedOut = new CountDownLatch(1);
+        store.write(one).onResult(new AsyncResult<HealthWriteResult>() {
+            public void onReady(HealthWriteResult value, Throwable err) {
+                outcomes[0]++;
+                if (first[0] == null) {
+                    first[0] = err;
+                }
+                timedOut.countDown();
+            }
+        });
+        assertTrue(timedOut.await(5, TimeUnit.SECONDS),
+                "the timeout must fire");
+        assertNotNull(first[0], "and it must arrive as an error");
+
+        // The platform answers late, as a slow bridge does.
+        assertNotNull(store.lateWrite);
+        store.lateWrite.complete(new HealthWriteResult());
+        flushSerialCalls();
+        assertEquals(1, outcomes[0],
+                "a late answer must not report a second outcome");
+    }
 }

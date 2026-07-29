@@ -180,7 +180,7 @@ public class HealthStore {
     /// [HealthError#USER_CANCELED].
     public final AsyncResource<Boolean> requestAuthorization(
             HealthAccess... access) {
-        AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        AsyncResource<Boolean> out = new OneShot<Boolean>();
         if (failIfUnsupported(out)) {
             return out;
         }
@@ -271,7 +271,7 @@ public class HealthStore {
     public final AsyncResource<HealthRequestStatus>
             getAuthorizationRequestStatus(HealthAccess... access) {
         AsyncResource<HealthRequestStatus> out =
-                new AsyncResource<HealthRequestStatus>();
+                new OneShot<HealthRequestStatus>();
         if (!isSupported()) {
             out.complete(HealthRequestStatus.UNKNOWN);
             return out;
@@ -478,7 +478,7 @@ public class HealthStore {
             out.error(ex);
             return out;
         }
-        final AsyncResource<SamplePage> raw = new AsyncResource<SamplePage>();
+        final AsyncResource<SamplePage> raw = new OneShot<SamplePage>();
         raw.onResult(new AsyncResult<SamplePage>() {
             @Override
             public void onReady(SamplePage page, Throwable err) {
@@ -685,6 +685,39 @@ public class HealthStore {
     }
 
     /// Delivers the timeout failure on the EDT.
+    /// An [AsyncResource] that keeps the first outcome and ignores the
+    /// rest.
+    ///
+    /// Every operation here is armed with a timeout, and `AsyncResource`
+    /// itself allows a resource to be completed more than once -- so a
+    /// platform call that answered after its timeout had fired ran the
+    /// callbacks a second time. A write reported TIMEOUT and then
+    /// reported success; a caller that retried on the timeout had both
+    /// inserts commit, which is a duplicate record in the user's health
+    /// data. A late drain re-ran the gate and cleared the in-flight state
+    /// of whichever drain was running by then.
+    ///
+    /// The port is not asked to be careful about this. It gets one of
+    /// these and may answer whenever it likes; a late answer is dropped.
+    static final class OneShot<T> extends AsyncResource<T> {
+
+        @Override
+        public synchronized void complete(T value) {
+            if (isDone()) {
+                return;
+            }
+            super.complete(value);
+        }
+
+        @Override
+        public synchronized void error(Throwable t) {
+            if (isDone()) {
+                return;
+            }
+            super.error(t);
+        }
+    }
+
     private static final class FailTimedOut implements Runnable {
         private final AsyncResource resource;
 
@@ -1034,7 +1067,7 @@ public class HealthStore {
     public final AsyncResource<List<AggregateResult>> aggregate(
             AggregateQuery query) {
         AsyncResource<List<AggregateResult>> out =
-                new AsyncResource<List<AggregateResult>>();
+                new OneShot<List<AggregateResult>>();
         if (failIfUnsupported(out)) {
             return out;
         }
@@ -1544,7 +1577,7 @@ public class HealthStore {
                 all.subList(from, to));
         final int nextFrom = to;
         AsyncResource<HealthWriteResult> chunkResult =
-                new AsyncResource<HealthWriteResult>();
+                new OneShot<HealthWriteResult>();
         chunkResult.onResult(
                 new AsyncResult<HealthWriteResult>() {
                     @Override
@@ -1662,7 +1695,7 @@ public class HealthStore {
 
     /// Deletes samples this app wrote. See [HealthDeleteRequest].
     public final AsyncResource<Integer> delete(HealthDeleteRequest request) {
-        AsyncResource<Integer> out = new AsyncResource<Integer>();
+        AsyncResource<Integer> out = new OneShot<Integer>();
         if (failIfUnsupported(out)) {
             return out;
         }
@@ -1786,6 +1819,15 @@ public class HealthStore {
             } else {
                 liveListeners.put(request.getId(), listener);
             }
+            // Persisted inside the same critical section that published
+            // the handle. Between the two, another thread could
+            // unsubscribe this id or replace it -- and this registration,
+            // already stale, then wrote its request back over the
+            // cancellation. The live registry and PREF_SUBS disagreed
+            // from that moment, and the cancelled subscription, or the
+            // replaced one's old types and options, came back at the next
+            // launch.
+            rememberSubscriptionLocked(request);
         }
         if (listener != null) {
             // An id previously bound to a background listener class keeps
@@ -1796,7 +1838,6 @@ public class HealthStore {
             // writes the binding back immediately after this returns.
             Preferences.delete(PREF_LISTENER + request.getId());
         }
-        rememberSubscription(request);
         if (isSupported()) {
             doSubscribe(request, sub);
         }
@@ -1937,7 +1978,7 @@ public class HealthStore {
         // through callSerially -- so an app polling again from the
         // completion callback used to find the cursor unmoved and fetch
         // the same page a second time.
-        AsyncResource<Integer> portResult = new AsyncResource<Integer>();
+        AsyncResource<Integer> portResult = new OneShot<Integer>();
         portResult.onResult(new DrainGate(this, out));
         // Armed like every other platform call. Without it a delegate that
         // never calls back leaves DrainGate unrun and `drainInFlight` set
@@ -2480,22 +2521,16 @@ public class HealthStore {
         }
     }
 
-    /// Adds `request` to the persisted list.
+    /// Adds `request` to the persisted list. **The caller must hold the
+    /// registry lock.**
     ///
-    /// Under the registry lock, because this is a read-modify-write over
-    /// one preference: two threads subscribing under different ids read
-    /// the same old value and the second write dropped the first. Both
-    /// subscriptions were live in memory and only one survived the next
-    /// launch, so a subscription the app had registered simply stopped
-    /// being drained -- after a restart, which is nowhere near the call
-    /// that lost it. The same lock as the map, so the two cannot disagree
+    /// It is a read-modify-write over one preference, so two threads
+    /// subscribing under different ids read the same old value and the
+    /// second write drops the first -- both live in memory, one gone at
+    /// the next launch and never drained again. Under the same lock as
+    /// the map, and in the same critical section that publishes the
+    /// handle, so the registry and the persisted list cannot disagree
     /// about what is registered.
-    private void rememberSubscription(SubscriptionRequest request) {
-        synchronized (subscriptions) {
-            rememberSubscriptionLocked(request);
-        }
-    }
-
     private void rememberSubscriptionLocked(SubscriptionRequest request) {
         StringBuilder sb = new StringBuilder();
         List<String> kept = readStoredEntries(request.getId());

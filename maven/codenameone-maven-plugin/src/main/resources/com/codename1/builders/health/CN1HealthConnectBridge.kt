@@ -469,7 +469,25 @@ class CN1HealthConnectBridge(private val context: Context)
         // a caller wanting more records than one page holds is served by
         // walking pages rather than by failing the read. Without this an
         // ordinary unbounded query throws before it reads anything.
-        var remaining = if (limit > 0) limit else Int.MAX_VALUE
+        // A series read is not bounded by the caller's limit.
+        //
+        // A sample lies anywhere inside its record's span and records
+        // arrive ordered by start, so the newest sample can sit in a
+        // record that starts arbitrarily earlier than the ones already
+        // read. Letting a limit of one fetch one record -- or eight, or
+        // any constant -- answers "the latest reading" from a prefix, and
+        // no fixed lookahead makes that sound: it only moves the number
+        // of overlapping recordings needed to break it.
+        //
+        // So the range is read through, bounded by a ceiling on samples
+        // rather than by the caller's limit, and the shared layer picks
+        // the top N out of what comes back. That is exact whenever the
+        // requested range holds fewer than SERIES_SCAN_CEILING samples.
+        // Past that the reply keeps its continuation token, so the answer
+        // is a bounded prefix that says it is one rather than a wrong
+        // answer that claims to be complete.
+        var remaining = if (isSeriesToken(token)) SERIES_SCAN_CEILING
+            else if (limit > 0) limit else Int.MAX_VALUE
         var emitted = 0
         var pageToken: String? = resumeToken
         // Samples seen per record so far. The caller's limit counts
@@ -481,35 +499,14 @@ class CN1HealthConnectBridge(private val context: Context)
         // guessed: it starts at one sample per record, which is exactly
         // right for every scalar type, and the first page of a series type
         // corrects it for every page after.
-        // A series-shaped type is known to hold many samples per record,
-        // so the first page asks for one record rather than `limit` of
-        // them: nothing fetched can be given back, the token having
-        // already moved past it, so an oversized first page is memory
-        // spent that the estimate below can only avoid on page two. One
-        // extra round trip on a large series read is the cheaper mistake.
-        var samplesPerRecord = if (isSeriesToken(token)) limit else 1
-        var firstPage = true
+        var samplesPerRecord = 1
         while (remaining > 0) {
-            // The first page of a series read asks for several records
-            // however small the limit is. Series records overlap -- a
-            // phone and a watch both recording heart rate -- so the
-            // newest sample is not necessarily in the record with the
-            // newest start, and a limit of one collapsed this to a single
-            // record. The merge then had nothing to compare it against,
-            // and the token moved past the record that actually held the
-            // latest sample.
-            //
-            // A floor rather than an exact answer, and it is worth being
-            // clear that it is one: a sample lies inside its record's
-            // span, and records arrive ordered by start, so knowing that
-            // no unread record can beat the best sample so far needs
-            // their end times -- which are only known once fetched.
-            // MIN_SERIES_RECORDS covers the overlap a person actually
-            // wears; nothing bounds it in principle.
-            val floor = if (isSeriesToken(token) && firstPage)
-                MIN_SERIES_RECORDS else 1
-            firstPage = false
-            val wantRecords = maxOf(floor, remaining / samplesPerRecord)
+            // Series records are fetched a fixed number at a time rather
+            // than by dividing a sample budget: the budget above is a
+            // ceiling, not a target, and dividing by it would ask for one
+            // enormous page.
+            val wantRecords = if (isSeriesToken(token)) SERIES_PAGE_RECORDS
+                else maxOf(1, remaining / samplesPerRecord)
             val page = requireClient().readRecords(
                 ReadRecordsRequest(type, timeRangeFilter = filter,
                     // Source filtering happens here rather than after the
@@ -1158,20 +1155,21 @@ class CN1HealthConnectBridge(private val context: Context)
      */
     private val MAX_PAGE_SIZE = 5000
 
+    /** How many series records one round trip asks for. */
+    private val SERIES_PAGE_RECORDS = 64
+
     /**
-     * How many series records the first page reads however small the
-     * caller's limit is, so that overlapping records can be compared.
+     * The most samples a single series read will gather before it stops
+     * and hands back a continuation token.
      *
-     * Series records overlap whenever more than one device is recording,
-     * and the newest sample need not be in the record with the newest
-     * start -- so a limit of one, which otherwise asks for exactly one
-     * record, would let the merge pick from a single record and the token
-     * move past the one that held the later sample. Eight covers a phone,
-     * a watch and a strap or two with room to spare; a read whose limit
-     * is genuinely larger is unaffected, since it asks for more than this
-     * anyway.
+     * This bounds memory, and nothing else: the caller's limit cannot,
+     * because the newest sample may sit in a record that starts long
+     * before the ones already read, so a read that stopped at the limit
+     * would answer from a prefix. Below this ceiling the answer is exact;
+     * above it the reply keeps its token and is a bounded prefix that
+     * says so.
      */
-    private val MIN_SERIES_RECORDS = 8
+    private val SERIES_SCAN_CEILING = 20000
 
     /// Whether this type's records hold many samples each.
     ///
