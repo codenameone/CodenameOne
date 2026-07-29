@@ -2226,20 +2226,21 @@ public class HealthStore {
                     com.codename1.io.Log.e(t);
                     return false;
                 }
+                // Checked after the listener returned, and before the
+                // successor is queued. A listener is free to call
+                // unsubscribe() -- or re-register its id -- from inside
+                // healthDataChanged, and persisting this batch's cursor
+                // afterwards recreated the very cursor unsubscribe() had
+                // just discarded. Queuing the next chunk first counted
+                // the abandoned tail twice: once by this runnable and
+                // once by the one it had already scheduled.
+                if (!store.isStillRegistered(subscription)) {
+                    return false;
+                }
                 if (index + 1 < chunks.size()) {
                     Display.getInstance().callSerially(
                             makeDeliveryRunnable(store, listener, chunks,
                                     index + 1, subscription));
-                }
-                if (!store.isStillRegistered(subscription)) {
-                    // Checked again after the listener returned, not only
-                    // before it ran. A listener is free to call
-                    // unsubscribe() -- or re-register its id -- from
-                    // inside healthDataChanged, and persisting this
-                    // batch's cursor afterwards recreated the very cursor
-                    // unsubscribe() had just discarded, for the next
-                    // registration under that id to load and resume from.
-                    return false;
                 }
                 if (batch.isResyncRequired()) {
                     // The cursor the platform rejected is dropped here,
@@ -2249,20 +2250,17 @@ public class HealthStore {
                     // the queued delivery ran, loses the notification *and*
                     // the expired token, so the next drain quietly starts a
                     // fresh baseline and the missed history is never read.
-                    store.clearAnchor(batch.getSubscriptionId());
+                    store.clearAnchorIfCurrent(subscription);
                 } else if (batch.getAnchor() != null) {
-                    store.storeAnchor(batch.getSubscriptionId(),
+                    store.storeAnchorIfCurrent(subscription,
                             batch.getAnchor());
-                    subscription.noteDelivery(batch.getAnchor(),
-                            System.currentTimeMillis());
                 } else {
                     // A batch with no anchor is one we deliberately did not
                     // advance past -- a truncated page. Overwriting the
                     // in-memory cursor with null would send the next drain
                     // back to a fresh baseline, which on Android means
                     // discarding the change token entirely.
-                    subscription.noteDelivery(subscription.getAnchor(),
-                            System.currentTimeMillis());
+                    store.touchDeliveryIfCurrent(subscription);
                 }
                 return true;
             }
@@ -2379,14 +2377,64 @@ public class HealthStore {
     /// seed from an accepted one.
     protected final boolean seedAnchor(HealthSubscription subscription,
             HealthAnchor anchor) {
-        if (subscription == null || anchor == null
-                || !isStillRegistered(subscription)
-                || subscription.getAnchor() != null) {
+        if (subscription == null || anchor == null) {
             return false;
         }
-        subscription.seedAnchor(anchor);
-        storeAnchor(subscription.getId(), anchor);
-        return true;
+        // Check and both writes in one critical section. A cancellation
+        // landing between them removed the handle and deleted its
+        // preference, and this callback -- which had already passed the
+        // check -- then seeded the dead handle and wrote its token back,
+        // for a later registration under that id to load a cursor issued
+        // for a different type set.
+        synchronized (subscriptions) {
+            if (!isStillRegistered(subscription)
+                    || subscription.getAnchor() != null) {
+                return false;
+            }
+            subscription.seedAnchor(anchor);
+            storeAnchor(subscription.getId(), anchor);
+            return true;
+        }
+    }
+
+    /// Persists `anchor` for `subscription`, in memory and on disk, but
+    /// only while that handle is still the registered one.
+    ///
+    /// The check and the write are one critical section on purpose. Held
+    /// apart, a cancellation landing between them deleted the cursor and
+    /// this delivery recreated it a moment later -- so a later
+    /// registration under the same id resumed from a token issued for a
+    /// subscription the app had stopped, and skipped its own baseline.
+    void storeAnchorIfCurrent(HealthSubscription subscription,
+            HealthAnchor anchor) {
+        synchronized (subscriptions) {
+            if (!isStillRegistered(subscription)) {
+                return;
+            }
+            storeAnchor(subscription.getId(), anchor);
+            subscription.noteDelivery(anchor, System.currentTimeMillis());
+        }
+    }
+
+    /// Drops `subscription`'s cursor if that handle is still current.
+    void clearAnchorIfCurrent(HealthSubscription subscription) {
+        synchronized (subscriptions) {
+            if (!isStillRegistered(subscription)) {
+                return;
+            }
+            clearAnchor(subscription.getId());
+        }
+    }
+
+    /// Records a delivery that deliberately did not move the cursor.
+    void touchDeliveryIfCurrent(HealthSubscription subscription) {
+        synchronized (subscriptions) {
+            if (!isStillRegistered(subscription)) {
+                return;
+            }
+            subscription.noteDelivery(subscription.getAnchor(),
+                    System.currentTimeMillis());
+        }
     }
 
     /// Persists a cursor. Called by [#fireChanges(HealthChangeBatch)]

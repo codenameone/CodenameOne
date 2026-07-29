@@ -122,8 +122,13 @@ final class BleSensorSession extends SensorSession {
 
     /// Re-runs discovery and subscription after an unexpected drop.
     void reconnect() {
-        if (getState() == SensorSessionState.STOPPED
-                || !getOptions().isAutoReconnect()) {
+        // Either terminal state. A DISCONNECTED listener runs on the EDT
+        // and can pass its own state check while a connect, discovery or
+        // subscribe callback on another thread is exhausting the retry
+        // budget -- so a stopped-only guard moved a session the ladder
+        // had already retired as FAILED back to CONNECTING, and
+        // reconnected a handle the manager no longer holds.
+        if (isTerminal() || !getOptions().isAutoReconnect()) {
             return;
         }
         setState(SensorSessionState.CONNECTING);

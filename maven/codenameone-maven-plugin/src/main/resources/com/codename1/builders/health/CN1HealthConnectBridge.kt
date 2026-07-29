@@ -631,7 +631,11 @@ class CN1HealthConnectBridge(private val context: Context)
             // So it fails, and says what to do: a smaller range needs no
             // scan this large, and a limit at or above the ceiling asks
             // for paging instead of selection and is served normally.
-            throw IllegalStateException("A limited read of '" + token
+            // An argument problem, not a provider one. Mapped to
+            // ERR_PROVIDER the caller is told Health Connect is
+            // unavailable and may go off to launch provider setup, when
+            // what is wrong is the range and the limit it asked with.
+            throw IllegalArgumentException("A limited read of '" + token
                 + "' spans more than " + SERIES_SCAN_CEILING
                 + " measurements. Selecting the " + limit
                 + " you asked for would mean reading past that bound, so"
