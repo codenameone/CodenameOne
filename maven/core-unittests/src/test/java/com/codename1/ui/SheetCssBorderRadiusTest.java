@@ -243,6 +243,29 @@ class SheetCssBorderRadiusTest extends UITestBase {
                 "the style inset first is restored however many were recorded after it");
     }
 
+    @FormTest
+    void changingOneSideAfterTheInsetLeavesTheOtherThreeRestorable() {
+        // Each side stands on its own: padding one side after the inset says what that side should
+        // be, and says nothing about the three the inset is still sitting on.
+        Sheet sheet = showSheet(RoundRectBorder.create().cornerRadius(4f));
+        Style contentStyle = sheet.getContentPane().getStyle();
+
+        contentStyle.setPaddingUnitTop(Style.UNIT_TYPE_PIXELS);
+        contentStyle.setPadding(Component.TOP, 5f);
+
+        sheet.getAllStyles().setBorder(cssBorder());
+        show(sheet);
+
+        assertEquals(5, contentStyle.getPaddingTop(),
+                "the side padded after the inset keeps what it was given");
+        assertEquals(0, contentStyle.getPaddingBottom(),
+                "the sides still holding the inset are restored");
+        assertEquals(0, contentStyle.getPaddingLeftNoRTL(),
+                "the sides still holding the inset are restored");
+        assertEquals(0, contentStyle.getPaddingRightNoRTL(),
+                "the sides still holding the inset are restored");
+    }
+
     private RoundRectBorder cssBorder() {
         // What the CSS compiler emits for border-radius: 4mm 4mm 0mm 0mm
         return RoundRectBorder.create()

@@ -810,11 +810,12 @@ public class Sheet extends Container {
             // pads the disabled style. Each style that gets inset is recorded separately
             Style contentStyle = contentPane.getStyle();
             ContentPaneInset inset = contentPaneInsetFor(contentStyle);
-            if (inset == null || !inset.isIntact()) {
-                // Nothing was inset in this style yet, or what was inset is gone because the
-                // padding was changed since. Either way the padding in front of us now is the one
-                // to preserve
+            if (inset == null) {
                 inset = recordContentPaneInset(contentStyle);
+            } else {
+                // A side that no longer holds the inset was padded since, so the padding in front
+                // of us now is the one to preserve for that side
+                inset.rememberChangedSides();
             }
             $(contentPane).setPaddingMillimeters(((RoundRectBorder) border).getCornerRadius());
             inset.recordApplied();
@@ -995,7 +996,7 @@ public class Sheet extends Container {
         }
         for (int iter = contentPaneInsets.size() - 1; iter >= 0; iter--) {
             ContentPaneInset recorded = contentPaneInsets.get(iter);
-            if (recorded.style == style || !recorded.isIntact()) { //NOPMD CompareObjectsWithEquals
+            if (recorded.style == style || !recorded.hasIntactSide()) { //NOPMD CompareObjectsWithEquals
                 contentPaneInsets.remove(iter);
             }
         }
@@ -1520,8 +1521,9 @@ public class Sheet extends Container {
 
     /// The padding of one style of the content pane as it was before the corner radius of a hand
     /// written `RoundRectBorder` replaced it, kept alongside that style and the padding the inset
-    /// wrote into it. Restoring writes the old padding back only while the style still holds
-    /// exactly what the inset left, so padding changed since is not overwritten.
+    /// wrote into it. Each side is tracked on its own: a side is put back only while it still holds
+    /// what the inset wrote there, so padding changed since is not overwritten, and changing one
+    /// side does not strand the inset on the other three.
     ///
     /// The inset is applied through the component selector, which pads the style the content pane
     /// presents at the time rather than all of its styles. Which style that is follows the state of
@@ -1529,74 +1531,102 @@ public class Sheet extends Container {
     /// even if the pane is disabled by the time the sheet is restyled. Hence the style is held
     /// here, and the sheet keeps one of these per style it inset.
     private static class ContentPaneInset {
+        /// The sides of a style, in the order `Style#getPaddingUnit` indexes them.
+        private static final int[] SIDES = {Component.TOP, Component.LEFT, Component.BOTTOM, Component.RIGHT};
         private final Style style;
-        private final float[] padding;
-        private final byte[] units;
+        private final float[] padding = new float[SIDES.length];
+        private final byte[] units = new byte[SIDES.length];
         private float[] appliedPadding;
         private byte[] appliedUnits;
 
         ContentPaneInset(Style style) {
             this.style = style;
-            padding = paddingOf(style);
-            units = unitsOf(style);
+            for (int iter = 0; iter < SIDES.length; iter++) {
+                remember(SIDES[iter]);
+            }
+        }
+
+        /// Takes the padding of the given side as the one to put back.
+        private void remember(int side) {
+            padding[side] = style.getPaddingFloatValue(false, side);
+            units[side] = unitOf(style, side);
+        }
+
+        /// Takes the padding of every side the inset no longer holds as the one to put back. Called
+        /// before insetting again, so a side padded since the last inset keeps the padding it was
+        /// given rather than the one from before that inset.
+        void rememberChangedSides() {
+            if (appliedPadding == null) {
+                return;
+            }
+            for (int iter = 0; iter < SIDES.length; iter++) {
+                if (!isIntact(SIDES[iter])) {
+                    remember(SIDES[iter]);
+                }
+            }
         }
 
         /// Records what the inset left in the style, which is what `#isIntact` looks for later.
         void recordApplied() {
-            appliedPadding = paddingOf(style);
-            appliedUnits = unitsOf(style);
+            appliedPadding = new float[SIDES.length];
+            appliedUnits = new byte[SIDES.length];
+            for (int iter = 0; iter < SIDES.length; iter++) {
+                int side = SIDES[iter];
+                appliedPadding[side] = style.getPaddingFloatValue(false, side);
+                appliedUnits[side] = unitOf(style, side);
+            }
         }
 
-        /// True when the style still holds the inset that was applied to it.
-        boolean isIntact() {
+        /// True when the given side of the style still holds the inset that was applied to it.
+        boolean isIntact(int side) {
             return appliedPadding != null
-                    && same(paddingOf(style), appliedPadding)
-                    && same(unitsOf(style), appliedUnits);
+                    && style.getPaddingFloatValue(false, side) == appliedPadding[side]
+                    && unitOf(style, side) == appliedUnits[side];
         }
 
-        /// Puts the padding back if the inset it replaced is still in place, otherwise leaves the
-        /// style alone.
+        /// True when any side still holds its inset, meaning there is something left to restore.
+        boolean hasIntactSide() {
+            for (int iter = 0; iter < SIDES.length; iter++) {
+                if (isIntact(SIDES[iter])) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// Puts back the padding of every side that still holds its inset, leaving the sides that
+        /// were changed since as they are.
         void restore() {
-            if (!isIntact()) {
-                return;
+            for (int iter = 0; iter < SIDES.length; iter++) {
+                int side = SIDES[iter];
+                if (isIntact(side)) {
+                    setPaddingUnit(style, side, units[side]);
+                    style.setPadding(side, padding[side]);
+                }
             }
-            style.setPaddingUnit(units);
-            style.setPadding(padding[0], padding[1], padding[2], padding[3]);
         }
 
-        private static float[] paddingOf(Style s) {
-            return new float[]{
-                    s.getPaddingFloatValue(false, Component.TOP),
-                    s.getPaddingFloatValue(false, Component.BOTTOM),
-                    s.getPaddingFloatValue(false, Component.LEFT),
-                    s.getPaddingFloatValue(false, Component.RIGHT)
-            };
-        }
-
-        private static byte[] unitsOf(Style s) {
+        private static byte unitOf(Style s, int side) {
             byte[] u = s.getPaddingUnit();
-            return u == null ? null : new byte[]{u[0], u[1], u[2], u[3]};
+            // A style with no units of its own measures in pixels
+            return u == null ? Style.UNIT_TYPE_PIXELS : u[side];
         }
 
-        private static boolean same(float[] a, float[] b) {
-            for (int i = 0; i < a.length; i++) {
-                if (a[i] != b[i]) {
-                    return false;
-                }
+        private static void setPaddingUnit(Style s, int side, byte unit) {
+            switch (side) {
+                case Component.TOP:
+                    s.setPaddingUnitTop(unit);
+                    break;
+                case Component.BOTTOM:
+                    s.setPaddingUnitBottom(unit);
+                    break;
+                case Component.LEFT:
+                    s.setPaddingUnitLeft(unit);
+                    break;
+                default:
+                    s.setPaddingUnitRight(unit);
+                    break;
             }
-            return true;
-        }
-
-        private static boolean same(byte[] a, byte[] b) {
-            if (a == null || b == null) {
-                return a == b; //NOPMD CompareObjectsWithEquals
-            }
-            for (int i = 0; i < a.length; i++) {
-                if (a[i] != b[i]) {
-                    return false;
-                }
-            }
-            return true;
         }
     }
 }
