@@ -237,11 +237,14 @@ public final class AndroidSecureStorage extends SecureStorage {
                 if (prefs == null) {
                     return false;
                 }
-                prefs.edit()
+                // commit(), not apply(): apply() is asynchronous, so the write could land
+                // on disk after a reset that ran once this lock was released -- storing
+                // ciphertext under a key that had already been deleted. Holding the lock
+                // is only atomic if the persist finishes inside it.
+                return prefs.edit()
                         .putString(account, Base64.encodeToString(c.getIV(), Base64.NO_WRAP)
                                 + ":" + Base64.encodeToString(enc, Base64.NO_WRAP))
-                        .apply();
-                return true;
+                        .commit();
             }
         } catch (InvalidKeyException e) {
             // Includes KeyPermanentlyInvalidatedException.
@@ -388,7 +391,10 @@ public final class AndroidSecureStorage extends SecureStorage {
             }
             SharedPreferences prefs = plainPrefs();
             if (prefs != null) {
-                prefs.edit().clear().apply();
+                // Also commit(), for the same reason: this method's whole purpose is to
+                // make the key deletion and the ciphertext deletion one step, and an
+                // asynchronous clear can be reordered after a writer's pending write.
+                prefs.edit().clear().commit();
             }
         }
     }

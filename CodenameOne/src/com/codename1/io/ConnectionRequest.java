@@ -960,7 +960,15 @@ public class ConnectionRequest implements IOProgressListener {
                 // may have opted into inspection by itself.
                 SSLCertificate[] forGuard = _connection == null
                         ? null : guardSSLCertificates(_connection, url);
-                guard.checkCertificates(this, forGuard == null ? certs : forGuard);
+                try {
+                    guard.checkCertificates(this, forGuard == null ? certs : forGuard);
+                } catch (RuntimeException t) {
+                    // This runs on the iOS TLS delegate thread with the handshake open,
+                    // so an unchecked exception escaping would take the process with it.
+                    // A guard that crashes has not observed a mismatch, so it fails open;
+                    // an IOException is a real veto and is left to propagate.
+                    Log.e(t);
+                }
             }
             return !shouldStop();
         } catch (IOException ex) {

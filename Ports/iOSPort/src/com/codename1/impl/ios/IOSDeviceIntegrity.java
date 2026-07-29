@@ -100,6 +100,15 @@ final class IOSDeviceIntegrity {
      * -- and the key may well be spent, so the only safe move is a fresh one.</p>
      */
     private static final String KEY_ATTEST_STARTED = "cn1.appattest.attestStarted";
+    /**
+     * Marks the one-shot invalid-key recovery as already spent.
+     *
+     * <p>Persisted rather than carried on the in-flight request: {@code pending.retried}
+     * dies with that request, so the next caller was reconstructed as a first attempt
+     * and allowed to reset and burn another rate-limited key -- repeatedly, once the OS
+     * has decided it dislikes this device's keys.</p>
+     */
+    private static final String KEY_RECOVERY_SPENT = "cn1.appattest.recoverySpent";
 
     private static final String STATE_NEW = "new";
     private static final String STATE_ATTESTED = "attested";
@@ -215,6 +224,7 @@ final class IOSDeviceIntegrity {
         store.remove(KEY_RETRY_AFTER);
         store.remove(KEY_PENDING_SINCE);
         store.remove(KEY_ATTEST_STARTED);
+        store.remove(KEY_RECOVERY_SPENT);
         if (!idGone || !stateGone) {
             // The two deletions are not atomic, so a partial failure leaves half the
             // identity gone. Treating that as "untouched" would let a callback from the
@@ -633,7 +643,9 @@ final class IOSDeviceIntegrity {
                             "App Attest state was reset while this request was in flight");
                     return;
                 }
-                if (errorCode == DC_ERROR_INVALID_KEY && !pending.retried) {
+                boolean recoverySpent = pending.retried
+                        || SecureStorage.getInstance().get(KEY_RECOVERY_SPENT) != null;
+                if (errorCode == DC_ERROR_INVALID_KEY && !recoverySpent) {
                     // The key is gone or was never valid. Wipe it and try once from
                     // scratch; a second failure is reported rather than looped.
                     try {
@@ -647,6 +659,9 @@ final class IOSDeviceIntegrity {
                                 "App Attest could not discard the rejected key");
                         return;
                     }
+                    // Recorded before the replacement starts, so a request arriving after
+                    // this process dies still sees the recovery as used.
+                    SecureStorage.getInstance().set(KEY_RECOVERY_SPENT, "1");
                     PendingRequest retry = new PendingRequest(pending.result, pending.nonce,
                             PendingRequest.OP_GENERATE_KEY, null);
                     retry.retried = true;
