@@ -14641,6 +14641,13 @@ void com_codename1_impl_ios_IOSNative_appAttestAttestKey___int_java_lang_String_
         NSString *nsHash = (clientDataHashB64 == JAVA_NULL) ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG clientDataHashB64);
         NSData *clientDataHash = nsHash == nil ? nil
             : [[NSData alloc] initWithBase64EncodedString:nsHash options:0];
+#ifndef CN1_USE_ARC
+        // initWithBase64EncodedString returns an owned object. The block below
+        // retains it for the duration of the call, so hand ownership to the pool
+        // rather than leaking one decoded hash per request. Guarded because ARC
+        // forbids an explicit autorelease, and this file builds both ways.
+        [clientDataHash autorelease];
+#endif
         if (nsKeyId == nil || clientDataHash == nil) {
             cn1AppAttestFail(requestId, nil, @"App Attest attestation missing key or hash");
             POOL_END();
@@ -14675,6 +14682,13 @@ void com_codename1_impl_ios_IOSNative_appAttestGenerateAssertion___int_java_lang
         NSString *nsHash = (clientDataHashB64 == JAVA_NULL) ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG clientDataHashB64);
         NSData *clientDataHash = nsHash == nil ? nil
             : [[NSData alloc] initWithBase64EncodedString:nsHash options:0];
+#ifndef CN1_USE_ARC
+        // initWithBase64EncodedString returns an owned object. The block below
+        // retains it for the duration of the call, so hand ownership to the pool
+        // rather than leaking one decoded hash per request. Guarded because ARC
+        // forbids an explicit autorelease, and this file builds both ways.
+        [clientDataHash autorelease];
+#endif
         if (nsKeyId == nil || clientDataHash == nil) {
             cn1AppAttestFail(requestId, nil, @"App Attest assertion missing key or hash");
             POOL_END();

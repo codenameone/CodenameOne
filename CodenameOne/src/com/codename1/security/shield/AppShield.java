@@ -297,9 +297,26 @@ public final class AppShield {
     /// runtime.
     public static void addProtectedHost(String host, HostPolicy policy) {
         if (host != null && host.length() > 0) {
+            // Same rule as ShieldConfig.protect: an omitted policy has to pick up
+            // the configured default failure mode, or setting a fail-closed
+            // default silently does nothing on this path too.
             runtimeHosts.put(host.toLowerCase(),
-                    policy == null ? HostPolicy.PROTECTED : policy);
+                    policy == null ? implicitPolicy() : policy);
         }
+    }
+
+    /// Registers a host with the default policy, honouring
+    /// [ShieldConfig#defaultFailureMode(FailureMode)].
+    public static void addProtectedHost(String host) {
+        addProtectedHost(host, null);
+    }
+
+    private static HostPolicy implicitPolicy() {
+        FailureMode mode = getConfig().getDefaultFailureMode();
+        if (mode == FailureMode.OPEN) {
+            return HostPolicy.PROTECTED;
+        }
+        return new HostPolicy(true, true, mode);
     }
 
     /// The policy in force for a host. Returns [HostPolicy#UNPROTECTED] for anything not

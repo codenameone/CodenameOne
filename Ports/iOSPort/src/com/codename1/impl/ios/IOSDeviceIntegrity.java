@@ -312,10 +312,16 @@ final class IOSDeviceIntegrity {
             synchronized (instance.flowLock) {
                 instance.currentBackoff = MIN_BACKOFF_MILLIS;
                 instance.bootstrapInFlight = false;
-                // Callers that arrived mid-bootstrap now assert against the key
-                // this attestation established, rather than each attesting one
-                // of their own.
-                instance.drainBootstrapWaiters(pending.keyId);
+                // Deliberately NOT asserted here. Apple has returned the
+                // attestation object, but the backend has not seen it yet -- the
+                // first caller's token is only completed below, and registration
+                // happens after that. An assertion sent now would reference a key
+                // the server does not know, which it would reject and which would
+                // trigger a pointless invalid-key reset. Queued callers are told
+                // to retry instead; by then the key is registered and their
+                // request costs one cheap assertion.
+                instance.failBootstrapWaiters("App Attest is completing first-run "
+                        + "registration for this device; retry shortly");
             }
         }
         succeed(pending, TOKEN_PREFIX + ":attest:" + base64(bytes(pending.keyId))
@@ -380,15 +386,6 @@ final class IOSDeviceIntegrity {
             }
         }
         fail(pending, message);
-    }
-
-    /** Assert for everyone who queued behind the bootstrap. Caller holds flowLock. */
-    private void drainBootstrapWaiters(String keyId) {
-        while (!waitingForBootstrap.isEmpty()) {
-            PendingRequest waiting = (PendingRequest) waitingForBootstrap.elementAt(0);
-            waitingForBootstrap.removeElementAt(0);
-            assertWithKey(waiting.result, waiting.nonce, keyId);
-        }
     }
 
     /** Caller holds flowLock. Leaving these unresolved would hang the callers. */
