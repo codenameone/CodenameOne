@@ -137,6 +137,16 @@ final class IOSDeviceIntegrity {
     /** Guards the whole attest flow so concurrent callers cannot each burn a key. */
     private final Object flowLock = new Object();
     private long currentBackoff = MIN_BACKOFF_MILLIS;
+    /**
+     * The throttle deadline, held in memory as well as in the keychain.
+     *
+     * <p>{@code requestToken} reads the deadline from storage, so a refused write left
+     * the backoff existing only as a duration nobody consulted -- and the next caller
+     * went straight back to a throttled App Attest service, which is how a suspension
+     * gets extended rather than waited out. This survives at least until the process
+     * dies, which is the case the keychain was covering.</p>
+     */
+    private long retryAfterFallback;
     /** True while a generate-then-attest bootstrap is running. */
     private boolean bootstrapInFlight;
     /**
@@ -208,6 +218,7 @@ final class IOSDeviceIntegrity {
                     + "the keychain refused the deletion");
         }
         currentBackoff = MIN_BACKOFF_MILLIS;
+        retryAfterFallback = 0L;
         bootstrapInFlight = false;
         // Any callback still outstanding now belongs to an abandoned flow.
         generation++;
@@ -267,7 +278,7 @@ final class IOSDeviceIntegrity {
             return r;
         }
         synchronized (flowLock) {
-            long retryAfter = readRetryAfter();
+            long retryAfter = Math.max(readRetryAfter(), retryAfterFallback);
             if (retryAfter > System.currentTimeMillis()) {
                 r.error(new RuntimeException("App Attest is backing off after a throttle; "
                         + "retry in " + ((retryAfter - System.currentTimeMillis()) / 1000)
@@ -599,10 +610,14 @@ final class IOSDeviceIntegrity {
                 }
                 if (errorCode == DC_ERROR_SERVER_UNAVAILABLE) {
                     // Never retry a throttle in a loop -- that is what gets an app's
-                    // whole attestation budget suspended.
+                    // whole attestation budget suspended. Recorded in memory as well as
+                    // in the keychain, because a refused write must not mean no backoff.
                     long backoff = instance.currentBackoff;
+                    long deadline = System.currentTimeMillis() + backoff;
+                    instance.retryAfterFallback = Math.max(instance.retryAfterFallback,
+                            deadline);
                     SecureStorage.getInstance().set(KEY_RETRY_AFTER,
-                            Long.toString(System.currentTimeMillis() + backoff));
+                            Long.toString(deadline));
                     instance.currentBackoff = Math.min(backoff * 2, MAX_BACKOFF_MILLIS);
                 }
                 if (pending.op != PendingRequest.OP_ASSERT) {
