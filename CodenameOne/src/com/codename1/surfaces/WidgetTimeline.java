@@ -73,10 +73,10 @@ public class WidgetTimeline {
     }
 
     private SurfaceNode defaultContent;
-    private SurfaceNode smallContent;
-    private SurfaceNode mediumContent;
-    private SurfaceNode largeContent;
-    private SurfaceNode lockscreenContent;
+    /// Per-family layout overrides. A map rather than a field per family: the catalog grows (the
+    /// watch accessory families joined the phone ones) and a switch per accessor did not.
+    private final Map<WidgetSize, SurfaceNode> overrides =
+            new java.util.EnumMap<WidgetSize, SurfaceNode>(WidgetSize.class);
     private final List<Entry> entries = new ArrayList<Entry>();
     private int reloadPolicy = RELOAD_AT_END;
 
@@ -105,21 +105,12 @@ public class WidgetTimeline {
     ///
     /// this timeline, for chaining
     public WidgetTimeline setContent(WidgetSize size, SurfaceNode root) {
-        switch (size) {
-            case SMALL:
-                smallContent = root;
-                break;
-            case MEDIUM:
-                mediumContent = root;
-                break;
-            case LARGE:
-                largeContent = root;
-                break;
-            case LOCKSCREEN:
-                lockscreenContent = root;
-                break;
-            default:
-                break;
+        if (size != null) {
+            if (root == null) {
+                overrides.remove(size);
+            } else {
+                overrides.put(size, root);
+            }
         }
         return this;
     }
@@ -172,41 +163,14 @@ public class WidgetTimeline {
     ///
     /// the layout root, or null when neither an override nor a default was set
     public SurfaceNode getContent(WidgetSize size) {
-        SurfaceNode override = null;
-        switch (size) {
-            case SMALL:
-                override = smallContent;
-                break;
-            case MEDIUM:
-                override = mediumContent;
-                break;
-            case LARGE:
-                override = largeContent;
-                break;
-            case LOCKSCREEN:
-                override = lockscreenContent;
-                break;
-            default:
-                break;
-        }
+        SurfaceNode override = size == null ? null : overrides.get(size);
         return override != null ? override : defaultContent;
     }
 
     /// Returns the explicit per-size override, or null when the size family falls back to the
     /// default content. Used by the serializer so only real overrides are emitted per size.
     SurfaceNode getExplicitContent(WidgetSize size) {
-        switch (size) {
-            case SMALL:
-                return smallContent;
-            case MEDIUM:
-                return mediumContent;
-            case LARGE:
-                return largeContent;
-            case LOCKSCREEN:
-                return lockscreenContent;
-            default:
-                return null;
-        }
+        return size == null ? null : overrides.get(size);
     }
 
     /// Returns the layout used for size families without an explicit override, or null.

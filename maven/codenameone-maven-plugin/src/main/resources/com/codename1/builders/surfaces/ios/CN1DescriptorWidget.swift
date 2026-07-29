@@ -41,22 +41,46 @@ struct CN1WidgetEntryView: View {
     }
 }
 
+/// Maps a WidgetKit family onto the Codename One size families, most specific first.
+///
+/// The accessory families are shared between the iOS lock screen and the watch face, so
+/// accessoryRectangular resolves to the watch layout when one was published and falls back to the
+/// lock-screen layout otherwise -- an app that only publishes "lockscreen" still gets a
+/// complication, and one that publishes both gets the layout it designed for each surface.
 func cn1LayoutForFamily(_ layouts: [String: Any], family: WidgetFamily) -> [String: Any]? {
-    let key: String
+    var keys: [String]
     switch family {
     case .systemSmall:
-        key = "small"
+        keys = ["small"]
     case .systemMedium:
-        key = "medium"
+        keys = ["medium"]
     case .systemLarge, .systemExtraLarge:
-        key = "large"
-    case .accessoryRectangular:
-        key = "lockscreen"
+        keys = ["large"]
     default:
-        key = "default"
+        keys = []
     }
-    if let layout = layouts[key] as? [String: Any] {
-        return layout
+    if #available(iOS 16.0, watchOS 9.0, *) {
+        switch family {
+        case .accessoryCircular:
+            keys = ["watchCircular"]
+        case .accessoryRectangular:
+            keys = ["watchRectangular", "lockscreen"]
+        case .accessoryInline:
+            keys = ["watchInline"]
+        default:
+            break
+        }
+#if os(watchOS)
+        if family == .accessoryCorner {
+            // No corner slot outside watchOS; the circular layout is the closest shape.
+            keys = ["watchCorner", "watchCircular"]
+        }
+#endif
+    }
+    for key in keys {
+        if let layout = layouts[key] as? [String: Any] {
+            return layout
+        }
     }
     return layouts["default"] as? [String: Any]
 }

@@ -403,7 +403,24 @@ public class IOSWidgetExtensionBuilder {
             sb.append("                kind: \"").append(escapeSwift(kind.getId())).append("\",\n");
             sb.append("                displayName: \"").append(escapeSwift(kind.getName())).append("\",\n");
             sb.append("                description: \"").append(escapeSwift(kind.getDescription())).append("\",\n");
-            sb.append("                families: [").append(familiesSwift(kind)).append("])\n");
+            // .accessoryCorner exists only on watchOS, so the corner family is emitted behind a
+            // platform guard rather than in the shared list -- naming the symbol on iOS would not
+            // compile even in code that never runs.
+            String shared = familiesSwift(kind, false);
+            String watchOnly = watchOnlyFamiliesSwift(kind);
+            if (watchOnly.length() == 0) {
+                sb.append("                families: [").append(shared).append("])\n");
+            } else {
+                sb.append("#if os(watchOS)\n");
+                sb.append("                families: [").append(shared);
+                if (shared.length() > 0) {
+                    sb.append(", ");
+                }
+                sb.append(watchOnly).append("])\n");
+                sb.append("#else\n");
+                sb.append("                families: [").append(shared).append("])\n");
+                sb.append("#endif\n");
+            }
             sb.append("    }\n");
             sb.append("}\n");
         }
@@ -414,12 +431,12 @@ public class IOSWidgetExtensionBuilder {
         return "CN1Widget_" + kind.getId();
     }
 
-    private static String familiesSwift(Kind kind) {
+    private static String familiesSwift(Kind kind, boolean watchTarget) {
         List<String> families = kind.getIosFamilies();
         StringBuilder sb = new StringBuilder();
         if (families != null) {
             for (String family : families) {
-                String mapped = mapFamily(family);
+                String mapped = mapFamily(family, watchTarget);
                 if (mapped != null && sb.indexOf(mapped) < 0) {
                     if (sb.length() > 0) {
                         sb.append(", ");
@@ -435,7 +452,16 @@ public class IOSWidgetExtensionBuilder {
         return sb.toString();
     }
 
-    private static String mapFamily(String family) {
+    /// The families that exist only on watchOS, emitted behind an os(watchOS) guard.
+    private static String watchOnlyFamiliesSwift(Kind kind) {
+        List<String> families = kind.getIosFamilies();
+        if (families != null && families.contains("watchCorner")) {
+            return ".accessoryCorner";
+        }
+        return "";
+    }
+
+    private static String mapFamily(String family, boolean watchTarget) {
         // Both the portable names (matching the core WidgetSize wire names) and the
         // WidgetKit-style spellings are accepted, so manifests written against either
         // naming in the docs resolve to the same families.
@@ -451,8 +477,43 @@ public class IOSWidgetExtensionBuilder {
         if ("lockscreen".equals(family) || "accessoryRectangular".equals(family)) {
             return ".accessoryRectangular";
         }
+        // Watch complications. On Apple a complication is a WidgetKit widget in an accessory
+        // family, which is why they map here rather than through an API of their own.
+        // watchRectangular shares .accessoryRectangular with the lock screen -- the Swift renderer
+        // picks the more specific published layout when both exist.
+        if ("watchCircular".equals(family)) {
+            return ".accessoryCircular";
+        }
+        if ("watchRectangular".equals(family)) {
+            return ".accessoryRectangular";
+        }
+        if ("watchInline".equals(family)) {
+            return ".accessoryInline";
+        }
+        if ("watchCorner".equals(family)) {
+            // Emitted separately behind an os(watchOS) guard; see watchOnlyFamiliesSwift.
+            return null;
+        }
         // Unknown family names are skipped so newer manifests degrade gracefully.
         return null;
+    }
+
+    /// True when the kind declares at least one watch complication family, which is what decides
+    /// whether the watch flavour of the extension is worth generating at all.
+    ///
+    /// @param kind the kind to inspect
+    /// @return true if the kind offers a complication
+    public static boolean hasWatchFamily(Kind kind) {
+        List<String> families = kind.getIosFamilies();
+        if (families == null) {
+            return false;
+        }
+        for (String family : families) {
+            if (family != null && family.startsWith("watch")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void plistKeyString(StringBuilder sb, String key, String value) {

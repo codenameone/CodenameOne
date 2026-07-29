@@ -50,6 +50,18 @@ public final class SurfaceSerializer {
     private SurfaceSerializer() {
     }
 
+    /// True when the timeline carries a layout for at least one size family. Iterating the enum
+    /// rather than naming families keeps this correct as the catalog grows -- the watch
+    /// complication families joined it without touching this method.
+    private static boolean hasAnyExplicitContent(WidgetTimeline timeline) {
+        for (WidgetSize size : WidgetSize.values()) {
+            if (timeline.getExplicitContent(size) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Serializes a widget timeline.
     ///
     /// #### Parameters
@@ -63,11 +75,7 @@ public final class SurfaceSerializer {
     /// the timeline JSON
     public static String serializeTimeline(String kindId, WidgetTimeline timeline,
             Map<String, byte[]> imagesOut) {
-        if (timeline.getDefaultContent() == null
-                && timeline.getContent(WidgetSize.SMALL) == null
-                && timeline.getContent(WidgetSize.MEDIUM) == null
-                && timeline.getContent(WidgetSize.LARGE) == null
-                && timeline.getContent(WidgetSize.LOCKSCREEN) == null) {
+        if (timeline.getDefaultContent() == null && !hasAnyExplicitContent(timeline)) {
             throw new IllegalArgumentException("A widget timeline needs content: call "
                     + "setContent(...) before publishing");
         }
