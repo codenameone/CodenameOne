@@ -807,7 +807,7 @@ public class Sheet extends Container {
         if (border instanceof RoundRectBorder && !((RoundRectBorder) border).isCssBoxModel()) {
             // The inset pads the current style of the content pane, which is not always the same
             // style: it follows the state of the pane, so a sheet shown while the pane is disabled
-            // pads the disabled style. Each style that gets insetted is recorded separately
+            // pads the disabled style. Each style that gets inset is recorded separately
             Style contentStyle = contentPane.getStyle();
             ContentPaneInset inset = contentPaneInsetFor(contentStyle);
             if (inset == null || !inset.isIntact()) {
@@ -966,7 +966,7 @@ public class Sheet extends Container {
     }
 
     /// The inset recorded for the given style of the content pane, null when that style was never
-    /// insetted.
+    /// inset.
     private ContentPaneInset contentPaneInsetFor(Style style) {
         if (contentPaneInsets == null) {
             return null;
@@ -1527,7 +1527,7 @@ public class Sheet extends Container {
     /// presents at the time rather than all of its styles. Which style that is follows the state of
     /// the pane, so an inset applied while it was enabled has to be taken off the unselected style
     /// even if the pane is disabled by the time the sheet is restyled. Hence the style is held
-    /// here, and the sheet keeps one of these per style it insetted.
+    /// here, and the sheet keeps one of these per style it inset.
     private static class ContentPaneInset {
         private final Style style;
         private final float[] padding;
