@@ -45,7 +45,6 @@ public final class SubscriptionRequest {
     private final List<HealthDataType> types = new ArrayList<HealthDataType>();
     private boolean includeDeletions = true;
     private boolean deliverSamples = true;
-    private int minIntervalSeconds;
     private int maxSamplesPerBatch = DEFAULT_MAX_SAMPLES_PER_BATCH;
 
     /// Creates a request under a stable identifier.
@@ -130,19 +129,6 @@ public final class SubscriptionRequest {
     /// `true` when batches carry samples.
     public boolean isDeliverSamples() {
         return deliverSamples;
-    }
-
-    /// Asks the platform not to deliver more often than this. A hint only:
-    /// iOS honours a coarse frequency per type and Android polls whenever
-    /// the app asks it to, so neither treats this as a guarantee.
-    public SubscriptionRequest setMinIntervalSeconds(int minIntervalSeconds) {
-        this.minIntervalSeconds = minIntervalSeconds;
-        return this;
-    }
-
-    /// The requested minimum delivery interval in seconds, 0 for none.
-    public int getMinIntervalSeconds() {
-        return minIntervalSeconds;
     }
 
     /// Caps how many samples one batch carries. Batches beyond the cap are

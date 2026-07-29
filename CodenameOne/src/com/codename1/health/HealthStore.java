@@ -2612,14 +2612,38 @@ public class HealthStore {
             changed = true;
         }
         int cap = sub.getMaxSamplesPerBatch();
-        if (cap > 0 && added.size() > cap) {
-            for (int i = 0; i < added.size(); i += cap) {
-                int to = Math.min(added.size(), i + cap);
-                boolean last = to == added.size();
+        // Deletions count against the cap too. Splitting only the
+        // additions and hanging every deleted identifier off the last
+        // chunk meant a page of two additions and forty thousand
+        // deletions arrived whole -- and a page of deletions alone was
+        // never split at all, so the cap that exists to keep one
+        // background callback inside its few seconds of wall clock did
+        // nothing on the path that produces the most identifiers.
+        if (cap > 0 && added.size() + deleted.size() > cap) {
+            int addedCount = added.size();
+            int deletedCount = deleted.size();
+            int nextAdded = 0;
+            int nextDeleted = 0;
+            while (nextAdded < addedCount || nextDeleted < deletedCount) {
+                // Additions first, then whatever room is left goes to
+                // deletions, so a chunk carries at most `cap` items of
+                // either kind rather than `cap` of each.
+                int toAdded = Math.min(addedCount, nextAdded + cap);
+                int room = cap - (toAdded - nextAdded);
+                int toDeleted = Math.min(deletedCount, nextDeleted + room);
+                List<HealthSample> chunkAdded = new ArrayList<HealthSample>(
+                        added.subList(nextAdded, toAdded));
+                List<String> chunkDeleted = new ArrayList<String>(
+                        deleted.subList(nextDeleted, toDeleted));
+                nextAdded = toAdded;
+                nextDeleted = toDeleted;
+                boolean last = nextAdded >= addedCount
+                        && nextDeleted >= deletedCount;
+                // The anchor rides on the final chunk alone: persisting it
+                // earlier would say the whole page had been handled while
+                // chunks of it were still undelivered.
                 out.add(new HealthChangeBatch(batch.getSubscriptionId(),
-                        batch.getTypes(),
-                        new ArrayList<HealthSample>(added.subList(i, to)),
-                        last ? deleted : new ArrayList<String>(),
+                        batch.getTypes(), chunkAdded, chunkDeleted,
                         batch.isResyncRequired(),
                         last ? batch.getAnchor() : null,
                         batch.getDeadlineMillis(),

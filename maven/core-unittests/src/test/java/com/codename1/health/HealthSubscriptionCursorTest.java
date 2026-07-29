@@ -87,7 +87,11 @@ class HealthSubscriptionCursorTest extends UITestBase {
     /// the batch actually arrived.
     private static class Collector implements HealthChangeListener {
         final List<HealthSample> seen = new ArrayList<HealthSample>();
+        final List<String> deleted = new ArrayList<String>();
         final List<HealthAnchor> anchors = new ArrayList<HealthAnchor>();
+        /// Items per delivery, added and deleted together: what the cap
+        /// is a cap on.
+        final List<Integer> sizes = new ArrayList<Integer>();
         final CountDownLatch latch;
         int batches;
 
@@ -98,8 +102,93 @@ class HealthSubscriptionCursorTest extends UITestBase {
         public void healthDataChanged(HealthChangeBatch batch) {
             batches++;
             seen.addAll(batch.getAdded());
+            deleted.addAll(batch.getDeletedSampleIds());
+            sizes.add(Integer.valueOf(batch.getAdded().size()
+                    + batch.getDeletedSampleIds().size()));
             anchors.add(batch.getAnchor());
             latch.countDown();
+        }
+    }
+
+    private static List<String> ids(int count) {
+        List<String> out = new ArrayList<String>();
+        for (int i = 0; i < count; i++) {
+            out.add("gone-" + i);
+        }
+        return out;
+    }
+
+    /**
+     * Deleted identifiers count against the cap as well.
+     *
+     * <p>Splitting only the additions and hanging every deletion off the
+     * last chunk meant a page of two additions and forty thousand
+     * deletions arrived whole -- and a page of deletions alone was never
+     * split at all. The cap exists to keep one background callback inside
+     * the few seconds of wall clock it gets, so it did nothing on the path
+     * that produces the most identifiers.</p>
+     */
+    @Test
+    void deletionsCountAgainstTheBatchCap() {
+        FakeHealthStore store = newStore();
+        Collector listener = new Collector(3);
+        SubscriptionRequest req = new SubscriptionRequest("cap-deletes")
+                .addType(HealthDataType.STEPS)
+                .setMaxSamplesPerBatch(2);
+        store.subscribe(req, listener);
+
+        store.batchesToFire.add(new HealthChangeBatch("cap-deletes",
+                req.getTypes(), samples(1), ids(4), false,
+                HealthAnchor.of("cursor-after-page"), 0L, false));
+        store.drainChanges();
+        waitFor(listener.latch, 5000);
+
+        assertEquals(1, listener.seen.size(),
+                "the addition must still arrive");
+        assertEquals(4, listener.deleted.size(),
+                "and every deleted identifier, across the chunks");
+        for (Integer size : listener.sizes) {
+            assertTrue(size.intValue() <= 2,
+                    "no delivery may exceed the cap, saw: "
+                            + listener.sizes);
+        }
+
+        int withAnchor = 0;
+        for (HealthAnchor a : listener.anchors) {
+            if (a != null) {
+                withAnchor++;
+            }
+        }
+        assertEquals(1, withAnchor,
+                "exactly one chunk may advance the cursor");
+        assertNotNull(listener.anchors.get(listener.anchors.size() - 1),
+                "and it must be the last one");
+    }
+
+    /**
+     * A page of nothing but deletions is split too. It used to skip the
+     * cap entirely, because the only thing measured was the additions.
+     */
+    @Test
+    void aPageOfOnlyDeletionsIsStillCapped() {
+        FakeHealthStore store = newStore();
+        Collector listener = new Collector(3);
+        SubscriptionRequest req = new SubscriptionRequest("cap-deletes-only")
+                .addType(HealthDataType.STEPS)
+                .setMaxSamplesPerBatch(2);
+        store.subscribe(req, listener);
+
+        store.batchesToFire.add(new HealthChangeBatch("cap-deletes-only",
+                req.getTypes(), new ArrayList<HealthSample>(), ids(5), false,
+                HealthAnchor.of("cursor-after-page"), 0L, false));
+        store.drainChanges();
+        waitFor(listener.latch, 5000);
+
+        assertEquals(5, listener.deleted.size());
+        assertEquals(3, listener.batches,
+                "five identifiers at a cap of two is three deliveries");
+        for (Integer size : listener.sizes) {
+            assertTrue(size.intValue() <= 2, listener.sizes.toString());
         }
     }
 
