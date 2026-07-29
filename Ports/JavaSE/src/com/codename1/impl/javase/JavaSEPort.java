@@ -5667,6 +5667,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                     "Watch App", javax.swing.JOptionPane.INFORMATION_MESSAGE);
             return;
         }
+        if (JavaSEPort.class.getResource(WATCH_COMPANION_SKIN) == null) {
+            // Without the skin the companion comes up on a phone skin, CN.isWatch() stays false and
+            // the whole point of the window is lost -- say so rather than launching something
+            // misleading.
+            javax.swing.JOptionPane.showMessageDialog(window,
+                    "The watch skin " + WATCH_COMPANION_SKIN + " is not on the classpath.\n\n"
+                    + "It ships with the Codename One JavaSE port; a stale or partial build of that\n"
+                    + "port is the usual cause. Rebuild it and try again.",
+                    "Watch App", javax.swing.JOptionPane.ERROR_MESSAGE);
+            return;
+        }
         try {
             List<String> cmd = new ArrayList<String>();
             cmd.add(new File(new File(System.getProperty("java.home"), "bin"), "java").getAbsolutePath());

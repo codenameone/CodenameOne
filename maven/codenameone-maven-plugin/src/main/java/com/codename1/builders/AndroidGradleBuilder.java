@@ -314,6 +314,27 @@ public class AndroidGradleBuilder extends Executor {
     // play-services-wearable dependency, the WearableListenerService manifest entry and the
     // injected Data Layer glue.
     private boolean usesWearable;
+
+    /**
+     * The lifecycle class the generated stub instantiates.
+     *
+     * <p>Normally the phone main class. In a standalone Wear OS build the watch app is the product
+     * -- there is no phone app beside it -- so the single APK is rooted at {@code
+     * codename1.watchMain} instead; without this the watch declaration only reached the manifest
+     * and the app still started the phone UI.
+     *
+     * @param request the build being generated
+     * @return the class name the stub should instantiate
+     */
+    private static String appLifecycleClass(BuildRequest request) {
+        String watchMain = request.getArg("watchMain", "").trim();
+        boolean standalone = "true".equals(request.getArg("watchStandalone", "false"));
+        if (watchMain.length() > 0 && standalone) {
+            return watchMain;
+        }
+        return request.getMainClass();
+    }
+
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
@@ -4124,14 +4145,14 @@ public class AndroidGradleBuilder extends Executor {
                     + "    public static final String LICENSE_KEY = \"" + xorEncode(licenseKey) + "\";\n"
                     + "    String [] consumable = new String[]{" + consumable + "};\n"
                     + "    private static " + request.getMainClass() + "Stub stubInstance;\n"
-                    + "    private static " + request.getMainClass() + " i;\n"
+                    + "    private static " + appLifecycleClass(request) + " i;\n"
                     + "    private boolean running;\n"
                     + "    private" + firstTimeStatic + " boolean firstTime = true;\n"
                     + "    private Form currentForm;\n"
                     + "    private static final Object LOCK = new Object();\n"
                     + additionalMembers
                     + headphonesVars
-                    + "    public static " + request.getMainClass() + " getAppInstance() {\n"
+                    + "    public static " + appLifecycleClass(request) + " getAppInstance() {\n"
                     + "        return i;\n"
                     + "    }\n\n"
                     + activityBillingSource
@@ -4191,7 +4212,7 @@ public class AndroidGradleBuilder extends Executor {
                     + reinitCode
                     + "        }\n"
                     + "        if (i == null) {\n"
-                    + "          i = new " + request.getMainClass() + "();\n"
+                    + "          i = new " + appLifecycleClass(request) + "();\n"
                     + "          if(i instanceof PushCallback) {\n"
                     + "                com.codename1.impl.CodenameOneImplementation.setPushCallback((PushCallback)i);\n"
                     + "          }\n";

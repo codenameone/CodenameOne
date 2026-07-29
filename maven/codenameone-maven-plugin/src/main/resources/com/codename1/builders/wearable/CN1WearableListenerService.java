@@ -59,12 +59,37 @@ public class CN1WearableListenerService extends WearableListenerService {
         return false;
     }
 
+    /**
+     * Brings the app process up so its {@code init()} runs and its listeners exist.
+     *
+     * <p>Android starts this service in a dead process to deliver traffic. Queueing the delivery is
+     * only half the answer: without the app itself starting, nothing ever registers a listener and
+     * the queue is never drained. Launching is a no-op when the app is already running.
+     */
+    private void ensureAppRunning() {
+        try {
+            if (com.codename1.ui.Display.isInitialized()) {
+                return;
+            }
+            android.content.Intent launch = getPackageManager()
+                    .getLaunchIntentForPackage(getApplicationInfo().packageName);
+            if (launch != null) {
+                launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(launch);
+            }
+        } catch (Throwable notPermitted) {
+            // Background activity starts are restricted on newer Android; the delivery stays queued
+            // and is replayed the next time the user opens the app.
+        }
+    }
+
     @Override
     public void onMessageReceived(MessageEvent event) {
         String path = event.getPath();
         if (path == null || !isFromAKnownNode(event.getSourceNodeId())) {
             return;
         }
+        ensureAppRunning();
         if (path.startsWith(CN1WearableBridge.replyPath())) {
             // An answer to a request we sent. The token rides in the path.
             String token = path.substring(CN1WearableBridge.replyPath().length());
@@ -104,6 +129,7 @@ public class CN1WearableListenerService extends WearableListenerService {
 
     @Override
     public void onDataChanged(DataEventBuffer events) {
+        ensureAppRunning();
         for (DataEvent event : events) {
             String path = event.getDataItem().getUri().getPath();
             if (path == null || !path.startsWith(CN1WearableBridge.pathPrefix())) {
