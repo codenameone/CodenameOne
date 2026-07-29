@@ -312,6 +312,69 @@ class LocalHealthStoreTest extends UITestBase {
         assertTrue(page.isTruncated());
     }
 
+    /**
+     * The limit counts measurements, not containers.
+     *
+     * <p>A series record holds many readings and the shared layer expands
+     * it when flattening is on, so counting containers made a page of ten
+     * records mean half a million samples -- and this store is the one
+     * backing desktop, the browser and the simulator, where that is the
+     * difference between a bounded read and an OutOfMemoryError.</p>
+     */
+    @Test
+    void theLimitCountsFlattenedMeasurements() {
+        long base = utc(2026, 1, 1, 9);
+        for (int record = 0; record < 4; record++) {
+            long at = base + record * 60000L;
+            store.write(SeriesSample.create(HealthDataType.HEART_RATE,
+                    at, at + 2000,
+                    new long[] { at, at + 1000, at + 2000 },
+                    new long[] { at, at + 1000, at + 2000 },
+                    new double[] { 60, 62, 64 },
+                    HealthUnit.COUNT_PER_MINUTE)).get();
+        }
+        SamplePage page = store.readSamplePage(new SampleQuery()
+                .addType(HealthDataType.HEART_RATE)
+                .setLimit(4)
+                .setTimeRange(HealthTimeRange.between(utc(2026, 1, 1, 0),
+                        utc(2026, 1, 2, 0)))).get();
+        // Whole records only, so the second one overshoots four rather
+        // than being cut: its measurements share an identifier and this
+        // store hands back no token to resume past them.
+        assertEquals(6, page.size(),
+                "twelve measurements were stored and the limit was four,"
+                        + " so a page of them all means the limit counted"
+                        + " containers");
+        assertTrue(page.isTruncated(),
+                "and the records left out must be reported as truncated");
+    }
+
+    /**
+     * Turning flattening off means the records are what the caller
+     * counts, so the limit counts records again.
+     */
+    @Test
+    void anUnflattenedReadCountsRecords() {
+        long base = utc(2026, 1, 1, 9);
+        for (int record = 0; record < 4; record++) {
+            long at = base + record * 60000L;
+            store.write(SeriesSample.create(HealthDataType.HEART_RATE,
+                    at, at + 2000,
+                    new long[] { at, at + 1000, at + 2000 },
+                    new long[] { at, at + 1000, at + 2000 },
+                    new double[] { 60, 62, 64 },
+                    HealthUnit.COUNT_PER_MINUTE)).get();
+        }
+        SamplePage page = store.readSamplePage(new SampleQuery()
+                .addType(HealthDataType.HEART_RATE)
+                .setFlattenSeries(false)
+                .setLimit(2)
+                .setTimeRange(HealthTimeRange.between(utc(2026, 1, 1, 0),
+                        utc(2026, 1, 2, 0)))).get();
+        assertEquals(2, page.size());
+        assertTrue(page.isTruncated());
+    }
+
     @Test
     void descendingSortReturnsNewestFirst() {
         writeSteps(utc(2026, 1, 1, 9), utc(2026, 1, 1, 10), 100);

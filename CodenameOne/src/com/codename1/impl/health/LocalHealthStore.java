@@ -185,13 +185,44 @@ public class LocalHealthStore extends HealthStore {
             }
         }
         sort(matched, query.isSortDescending());
-        boolean truncated = matched.size() > query.getLimit();
-        while (matched.size() > query.getLimit()) {
-            matched.remove(matched.size() - 1);
+        // Measurements, not records. A series record holds many readings
+        // and the shared layer expands it when flattening is on, so
+        // counting containers let one page of ten records mean half a
+        // million samples -- the limit exists to bound exactly that, and
+        // this store is the one backing desktop, the browser and the
+        // simulator, where the heap is not generous.
+        //
+        // Whole records only, matching the trim the shared layer performs
+        // after flattening: the measurements of one series share an
+        // identifier, and this store hands back no continuation token, so
+        // anything cut from the middle of a record is gone for good. The
+        // last record is therefore kept entire and may overshoot.
+        boolean flatten = query.isFlattenSeries();
+        int limit = query.getLimit();
+        boolean truncated = false;
+        List<HealthSample> page = new ArrayList<HealthSample>();
+        int counted = 0;
+        for (HealthSample s : matched) {
+            if (counted >= limit) {
+                truncated = true;
+                break;
+            }
+            page.add(s);
+            counted += weigh(s, flatten);
         }
+        matched = page;
         // Everything is in memory, so a single page always satisfies the
         // query; there is no continuation token to hand back.
         completeInline(out, new SamplePage(matched, null, truncated));
+    }
+
+    /// How many samples `s` becomes once the shared layer is done with
+    /// it: one, or the size of the series when flattening is on.
+    private static int weigh(HealthSample s, boolean flatten) {
+        if (flatten && s instanceof SeriesSample) {
+            return Math.max(1, ((SeriesSample) s).size());
+        }
+        return 1;
     }
 
     private boolean matches(HealthSample s, SampleQuery query,
