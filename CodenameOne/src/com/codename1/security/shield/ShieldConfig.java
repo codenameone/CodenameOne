@@ -50,6 +50,9 @@ public final class ShieldConfig {
     private String endpoint = DEFAULT_ENDPOINT;
     private String tokenHeader = DEFAULT_TOKEN_HEADER;
     private FailureMode defaultFailureMode = FailureMode.OPEN;
+    /// Hosts registered without an explicit policy. Their policy is resolved from the default at
+    /// read time, so it does not depend on the order the builder was called in.
+    private final java.util.Vector implicitHosts = new java.util.Vector();
     private int refreshThresholdPercent = 50;
     private boolean collectSignals = true;
     private final Hashtable hostPolicies = new Hashtable();
@@ -100,8 +103,20 @@ public final class ShieldConfig {
     /// subdomains. Hosts not registered here are never touched.
     public ShieldConfig protect(String hostPattern, HostPolicy policy) {
         if (hostPattern != null && hostPattern.length() > 0) {
-            hostPolicies.put(ShieldHosts.normalize(hostPattern),
-                    policy == null ? implicitPolicy() : policy);
+            String key = ShieldHosts.normalize(hostPattern);
+            if (policy == null) {
+                // Recorded as implicit rather than resolved now. A builder is chained in
+                // whatever order reads well, so `.protect(h).defaultFailureMode(CLOSED)`
+                // must mean the same thing as the reverse -- snapshotting the default at
+                // registration time left the host fail-open while the finished config
+                // reported a closed default, which is the kind of disagreement nobody
+                // finds until it matters.
+                hostPolicies.remove(key);
+                implicitHosts.addElement(key);
+            } else {
+                implicitHosts.removeElement(key);
+                hostPolicies.put(key, policy);
+            }
         }
         return this;
     }
@@ -109,7 +124,7 @@ public final class ShieldConfig {
     /// Registers a host with the default policy, which honours
     /// [#defaultFailureMode(FailureMode)].
     public ShieldConfig protect(String hostPattern) {
-        return protect(hostPattern, implicitPolicy());
+        return protect(hostPattern, null);
     }
 
     /// The policy used when a host is registered without an explicit one.
@@ -153,28 +168,48 @@ public final class ShieldConfig {
             return HostPolicy.UNPROTECTED;
         }
         String h = ShieldHosts.normalize(host);
-        Object exact = hostPolicies.get(h);
+        HostPolicy exact = policyForKey(h);
         if (exact != null) {
-            return (HostPolicy) exact;
+            return exact;
         }
         int dot = h.indexOf('.');
         while (dot >= 0 && dot < h.length() - 1) {
-            Object wild = hostPolicies.get("*." + h.substring(dot + 1));
+            HostPolicy wild = policyForKey("*." + h.substring(dot + 1));
             if (wild != null) {
-                return (HostPolicy) wild;
+                return wild;
             }
             dot = h.indexOf('.', dot + 1);
         }
         return HostPolicy.UNPROTECTED;
     }
 
-    /// True when at least one host is registered, so callers can skip work entirely.
-    public boolean hasProtectedHosts() {
-        return !hostPolicies.isEmpty();
+    /// The policy registered for an exact key, or null. Implicit registrations resolve against the
+    /// default as it stands now, not as it stood when they were registered.
+    private HostPolicy policyForKey(String key) {
+        Object explicit = hostPolicies.get(key);
+        if (explicit != null) {
+            return (HostPolicy) explicit;
+        }
+        return implicitHosts.contains(key) ? implicitPolicy() : null;
     }
 
-    /// The registered host patterns.
+    /// True when at least one host is registered, so callers can skip work entirely.
+    public boolean hasProtectedHosts() {
+        return !hostPolicies.isEmpty() || !implicitHosts.isEmpty();
+    }
+
+    /// The registered host patterns, explicit and implicit alike.
     public Enumeration protectedHosts() {
-        return hostPolicies.keys();
+        java.util.Vector all = new java.util.Vector();
+        Enumeration keys = hostPolicies.keys();
+        while (keys.hasMoreElements()) {
+            all.addElement(keys.nextElement());
+        }
+        for (int i = 0; i < implicitHosts.size(); i++) {
+            if (!all.contains(implicitHosts.elementAt(i))) {
+                all.addElement(implicitHosts.elementAt(i));
+            }
+        }
+        return all.elements();
     }
 }

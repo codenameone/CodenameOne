@@ -165,6 +165,9 @@ final class IOSDeviceIntegrity {
      * dies, which is the case the keychain was covering.</p>
      */
     private long retryAfterFallback;
+    /// Mirrors [#KEY_RECOVERY_SPENT] in memory, so a refused keychain write still bounds the
+    /// one-shot recovery for the life of the process rather than letting it repeat per request.
+    private boolean recoverySpentInMemory;
     /** True while a generate-then-attest bootstrap is running. */
     private boolean bootstrapInFlight;
     /**
@@ -225,6 +228,7 @@ final class IOSDeviceIntegrity {
         store.remove(KEY_PENDING_SINCE);
         store.remove(KEY_ATTEST_STARTED);
         store.remove(KEY_RECOVERY_SPENT);
+        recoverySpentInMemory = false;
         if (!idGone || !stateGone) {
             // The two deletions are not atomic, so a partial failure leaves half the
             // identity gone. Treating that as "untouched" would let a callback from the
@@ -365,7 +369,8 @@ final class IOSDeviceIntegrity {
                     // that key rather than burning another.
                     attestKey(r, nonce, keyId);
                 } else if (keyId != null && keyId.length() > 0
-                        && store.get(KEY_RECOVERY_SPENT) != null) {
+                        && (recoverySpentInMemory
+                            || store.get(KEY_RECOVERY_SPENT) != null)) {
                     // The interrupted key belongs to a recovery that has already been
                     // used once. Discarding it here would generate yet another
                     // rate-limited key, and would do so on every subsequent request --
@@ -613,6 +618,7 @@ final class IOSDeviceIntegrity {
             // THIS key, and every later assertion would fail until the app reset by hand.
             store.remove(KEY_ATTEST_STARTED);
             store.remove(KEY_RECOVERY_SPENT);
+            instance.recoverySpentInMemory = false;
             instance.currentBackoff = MIN_BACKOFF_MILLIS;
             instance.bootstrapInFlight = false;
             // Deliberately NOT asserted here, for the reason above. Queued callers
@@ -683,7 +689,7 @@ final class IOSDeviceIntegrity {
                             "App Attest state was reset while this request was in flight");
                     return;
                 }
-                boolean recoverySpent = pending.retried
+                boolean recoverySpent = pending.retried || instance.recoverySpentInMemory
                         || SecureStorage.getInstance().get(KEY_RECOVERY_SPENT) != null;
                 if (errorCode == DC_ERROR_INVALID_KEY && !recoverySpent) {
                     // The key is gone or was never valid. Wipe it and try once from
@@ -700,7 +706,11 @@ final class IOSDeviceIntegrity {
                         return;
                     }
                     // Recorded before the replacement starts, so a request arriving after
-                    // this process dies still sees the recovery as used.
+                    // this process dies still sees the recovery as used. The in-memory
+                    // copy is set regardless: if the keychain refuses the write, the
+                    // one-shot limit still holds for the life of the process rather than
+                    // letting every later request burn another key.
+                    instance.recoverySpentInMemory = true;
                     SecureStorage.getInstance().set(KEY_RECOVERY_SPENT, "1");
                     PendingRequest retry = new PendingRequest(pending.result, pending.nonce,
                             PendingRequest.OP_GENERATE_KEY, null);
