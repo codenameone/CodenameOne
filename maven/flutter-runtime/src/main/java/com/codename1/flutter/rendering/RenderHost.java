@@ -6,6 +6,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Toolbar;
+import com.codename1.ui.layouts.Layout;
 
 import dart.runtime.Funcs;
 
@@ -271,8 +272,21 @@ public class RenderHost {
         if (container == null) {
             return;
         }
-        container.setShouldCalcPreferredSize(true);
-        container.layoutContainer();
+        // Run OUR constraint pass and nothing else. It writes every component's bounds
+        // absolutely, so none of Codename One's own layout machinery has to participate.
+        //
+        // What must NOT happen here is invalidating preferred sizes.
+        // setShouldCalcPreferredSize(true) - which is also the first thing revalidate() does
+        // - recurses down every child container and throws away CN1's cached measurements,
+        // so every Label re-measures its text. Measured on the gallery home, that was the
+        // whole of the cost: the Flutter constraint pass itself is ~2ms across ~4900 boxes,
+        // while the frame was ~200ms. A component whose content actually changed invalidates
+        // itself (Label.setText does), so blanket-invalidating a subtree only discards
+        // measurements that were still valid.
+        Layout layout = container.getLayout();
+        if (layout != null) {
+            layout.layoutContainer(container);
+        }
         container.repaint();
     }
 }
