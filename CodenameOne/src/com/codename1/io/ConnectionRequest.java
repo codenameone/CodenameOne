@@ -1787,7 +1787,14 @@ public class ConnectionRequest implements IOProgressListener {
         if (!collectPublicKeyDigests || !impl.canGetPublicKeyDigests()) {
             return null;
         }
-        return parseGroupedCertificates(impl.getSSLCertificatesEx(connection, url));
+        SSLCertificate[] enriched =
+                parseGroupedCertificates(impl.getSSLCertificatesEx(connection, url));
+        // Null, not an empty array, when the richer form produced nothing. Ports return
+        // empty on any failure, and the guard reads empty as "no chain available" and
+        // fails open -- so a hiccup in the enriched path would silently disable pinning
+        // while the flat fingerprints were still perfectly obtainable. Null makes the
+        // caller fall back to those instead of to no enforcement.
+        return enriched.length == 0 ? null : enriched;
     }
 
     /// The flat, one-entry-per-fingerprint view every existing caller has always seen.
