@@ -344,9 +344,42 @@ public abstract class WorkoutSession {
                 samples.size());
         for (HealthSample sample : samples) {
             if (sample != null) {
-                rollUp(sample);
                 kept.add(sample);
             }
+        }
+        // Every value resolved before a single total moves. Converting a
+        // quantity into its type's canonical unit is the one step here
+        // that can fail -- a sample whose unit measures the wrong
+        // dimension -- and rolling up as we went left the earlier
+        // samples' totals applied while the batch itself was refused, so
+        // the workout ended reporting a total with no child sample
+        // behind it.
+        List<QuantitySample> flat = new ArrayList<QuantitySample>();
+        for (HealthSample sample : kept) {
+            flatten(sample, flat);
+        }
+        double[] values = new double[flat.size()];
+        for (int i = 0; i < flat.size(); i++) {
+            QuantitySample q = flat.get(i);
+            try {
+                values[i] = q.getValue(q.getType().getCanonicalUnit());
+            } catch (RuntimeException incompatible) {
+                // Reported, not thrown. addSamples is called from the
+                // sensor callback thread as well as the app's own, and an
+                // exception escaping there lands in the Bluetooth stack.
+                out.error(new HealthException(HealthError.INVALID_ARGUMENT,
+                        "a " + q.getType().getId() + " sample is measured"
+                                + " in " + q.getQuantity().getUnit()
+                                        .getSymbol()
+                                + ", which is not a "
+                                + q.getType().getCanonicalUnit().getSymbol()
+                                + "; the batch was not accepted",
+                        incompatible));
+                return out;
+            }
+        }
+        for (int i = 0; i < flat.size(); i++) {
+            applyRollUp(flat.get(i), values[i]);
         }
         if (kept.isEmpty()) {
             out.complete(Boolean.TRUE);
@@ -405,15 +438,21 @@ public abstract class WorkoutSession {
     /// and latest values. Shared by every port, so a session reports its
     /// statistics the same way wherever it runs -- and would go on doing
     /// so if a live session were feeding it instead of the app.
-    private void rollUp(HealthSample sample) {
+    /// The measurements `sample` contributes to the rollup, expanded but
+    /// not yet converted.
+    ///
+    /// A heart-rate trace fed in whole is workout data like any other.
+    /// Skipping series left AVERAGE, MINIMUM, MAXIMUM and LATEST null or
+    /// stale for measurements the session was collecting and would go on
+    /// to persist. A sample with no numeric value, or of a type with no
+    /// canonical unit, contributes nothing and is dropped here rather
+    /// than checked again downstream.
+    private static void flatten(HealthSample sample,
+            List<QuantitySample> out) {
         if (sample instanceof SeriesSample) {
-            // A heart-rate trace fed in whole is workout data like any
-            // other. Returning here left AVERAGE, MINIMUM, MAXIMUM and
-            // LATEST null or stale for measurements the session was
-            // collecting and would go on to persist.
             SeriesSample series = (SeriesSample) sample;
             for (int i = 0; i < series.size(); i++) {
-                rollUp(series.toQuantitySample(i));
+                flatten(series.toQuantitySample(i), out);
             }
             return;
         }
@@ -421,12 +460,18 @@ public abstract class WorkoutSession {
             return;
         }
         QuantitySample q = (QuantitySample) sample;
-        HealthDataType type = q.getType();
-        HealthUnit unit = type.getCanonicalUnit();
-        if (unit == null) {
+        if (q.getType().getCanonicalUnit() == null) {
             return;
         }
-        double v = q.getValue(unit);
+        out.add(q);
+    }
+
+    /// Folds one already-converted measurement into the rollup. Cannot
+    /// fail, which is what lets the batch be all-or-nothing.
+    private void applyRollUp(QuantitySample sample, double v) {
+        QuantitySample q = sample;
+        HealthDataType type = q.getType();
+        HealthUnit unit = type.getCanonicalUnit();
         synchronized (statistics) {
             Integer nBox = counts.get(type.getId());
             int n = nBox == null ? 0 : nBox.intValue();

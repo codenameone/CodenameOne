@@ -429,6 +429,40 @@ class WorkoutAndNutritionTest extends UITestBase {
         }
     }
 
+    /**
+     * A batch the rollup cannot take leaves the totals alone.
+     *
+     * <p>Rolling up as it went applied the earlier samples' totals and
+     * then threw on a sample whose unit measures the wrong dimension --
+     * and because the batch was refused, none of it was retained. The
+     * workout then ended reporting a total with no child sample behind
+     * it.</p>
+     */
+    @Test
+    void aBatchWithAnUnconvertibleSampleChangesNothing() {
+        WorkoutManager m = new WorkoutManager();
+        WorkoutSession s = m.startSession(new WorkoutConfiguration()).get();
+        s.start();
+
+        List<HealthSample> batch = new ArrayList<HealthSample>();
+        batch.add(QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(500, HealthUnit.COUNT),
+                1000L, 2000L));
+        // Steps in kilograms: accepted by the constructor, refused by the
+        // conversion the rollup needs.
+        batch.add(QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(7, HealthUnit.KILOGRAM),
+                2000L, 3000L));
+
+        AsyncResource<Boolean> out = s.addSamples(batch);
+
+        assertNotNull(errorOf(out), "the batch must be refused");
+        assertNull(s.getStatistic(HealthDataType.STEPS,
+                AggregateMetric.TOTAL),
+                "and no total may be left behind by the sample that did"
+                        + " convert");
+    }
+
     @Test
     void workoutSampleTotalsAreNullUntilSet() {
         WorkoutSample w = WorkoutSample.create(WorkoutActivityType.RUNNING,

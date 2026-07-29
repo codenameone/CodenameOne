@@ -475,7 +475,10 @@ class WatchNativeBuilder {
         }
         boolean watchHealth =
                 watchUsesHealth(healthShare != null || healthUpdate != null);
-        if (needsPurposeString(watchHealth, healthShare, healthUpdate)) {
+        boolean workoutProcessing =
+                "true".equalsIgnoreCase(workoutProcessingHint);
+        if (needsPurposeString(watchHealth, healthShare, healthUpdate,
+                workoutProcessing)) {
             // Entitled but with no purpose string in its own Info.plist,
             // which builds cleanly and then fails the moment the watch asks
             // for authorization. Apple requires a specific string and this
@@ -487,7 +490,11 @@ class WatchNativeBuilder {
                     + " its own Info.plist, and watchOS refuses a HealthKit"
                     + " authorization request from a bundle with no purpose"
                     + " string. Set the one that matches what the watch"
-                    + " does.",
+                    + " does"
+                    + (workoutProcessing
+                        ? " -- a workout saves its session, so that is"
+                            + " ios.NSHealthUpdateUsageDescription."
+                        : "."),
                     new RuntimeException("watch health usage string unset"));
         }
         writeWatchEntitlements(request, appSrcDir, watchHealth);
@@ -514,8 +521,24 @@ class WatchNativeBuilder {
      * copied into the watch plist.</p>
      */
     static boolean needsPurposeString(boolean watchUsesHealth,
-            String healthShare, String healthUpdate) {
-        return watchUsesHealth && healthShare == null && healthUpdate == null;
+            String healthShare, String healthUpdate,
+            boolean workoutProcessing) {
+        if (!watchUsesHealth) {
+            return false;
+        }
+        if (workoutProcessing) {
+            // A workout writes: it saves the session and the child
+            // samples the app fed it, and reads nothing -- the rollup is
+            // computed from what it was given. So the update string is
+            // the one that has to be there, and a watch declaring only
+            // the share string passed this check and was refused the
+            // moment it asked to save the workout.
+            return healthUpdate == null;
+        }
+        // Direction unknown: watchNative.health says the bundle uses
+        // HealthKit and nothing more, so either string is evidence that
+        // somebody thought about what it does.
+        return healthShare == null && healthUpdate == null;
     }
 
     /**

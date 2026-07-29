@@ -160,6 +160,29 @@ public class WatchHealthEntitlementTest {
                 .watchUsesHealth(true));
     }
 
+    /**
+     * A watch that records workouts needs the *update* string, not just
+     * one of the two.
+     *
+     * <p>A workout writes: it saves the session and the child samples the
+     * app fed it, and reads nothing. A watch declaring only the share
+     * string passed this check and was refused the moment it asked to
+     * save the workout -- which is the failure the check exists to
+     * prevent, arriving from the other direction.</p>
+     */
+    @Test
+    void aWatchWorkoutNeedsTheUpdateString() {
+        assertTrue(WatchNativeBuilder.needsPurposeString(true, "Reads", null,
+                true),
+                "the share string alone does not let a workout be saved");
+        assertFalse(WatchNativeBuilder.needsPurposeString(true, null,
+                "Writes", true),
+                "and the update string alone is exactly what it needs");
+        assertFalse(WatchNativeBuilder.needsPurposeString(false, null, null,
+                true),
+                "a watch that does not use HealthKit needs nothing");
+    }
+
     /** The explicit hint settles it in both directions. */
     @Test
     void theExplicitHintWins() {
@@ -187,11 +210,14 @@ public class WatchHealthEntitlementTest {
      */
     @Test
     void anEntitledWatchNeedsAPurposeString() {
-        assertTrue(WatchNativeBuilder.needsPurposeString(true, null, null));
-        assertFalse(WatchNativeBuilder.needsPurposeString(true, "Reads", null));
-        assertFalse(WatchNativeBuilder.needsPurposeString(true, null, "Writes"));
+        assertTrue(WatchNativeBuilder.needsPurposeString(true, null, null,
+                false));
+        assertFalse(WatchNativeBuilder.needsPurposeString(true, "Reads", null,
+                false));
+        assertFalse(WatchNativeBuilder.needsPurposeString(true, null, "Writes",
+                false));
         // Not entitled, so nothing to disclose.
-        assertFalse(WatchNativeBuilder.needsPurposeString(false, null, null));
+        assertFalse(WatchNativeBuilder.needsPurposeString(false, null, null, false));
     }
 
     /**
@@ -211,6 +237,6 @@ public class WatchHealthEntitlementTest {
                 WatchNativeBuilder.trimToNull("  Reads workouts  "));
         assertTrue(WatchNativeBuilder.needsPurposeString(true,
                 WatchNativeBuilder.trimToNull("   "),
-                WatchNativeBuilder.trimToNull(null)));
+                WatchNativeBuilder.trimToNull(null), false));
     }
 }
