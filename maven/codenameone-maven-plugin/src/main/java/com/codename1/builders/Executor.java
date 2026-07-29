@@ -1245,15 +1245,14 @@ public abstract class Executor {
             while ((entry = zis.getNextEntry()) != null) {
                 String entryName = entry.getName();
 
-                // Validate the original ZIP name before any archive-specific
-                // branch can route it into a generated tar and continue.
-                resolveArchiveEntry(resDir, entryName);
-
-                if(!"html.tar".equals(entryName)&& (entryName.startsWith("html") || entryName.startsWith("/html"))) {
+                if (entryName.startsWith("html/")
+                        || entryName.startsWith("/html/")) {
                     if(entry.isDirectory()) {
                         continue;
                     }
-                    entryName = entryName.substring(5);
+                    int htmlPrefix = entryName.startsWith("html/")
+                            ? "html/".length() : "/html/".length();
+                    entryName = entryName.substring(htmlPrefix);
                     // The stripped name becomes a member of another archive,
                     // so validate it independently against that archive's root.
                     resolveArchiveEntry(resDir, entryName);
@@ -1315,6 +1314,11 @@ public abstract class Executor {
                     }
                     continue;
                 }
+
+                // Entries outside the supported virtual cn1lib namespaces
+                // retain their original ZIP name, which must be relative and
+                // remain inside the extraction root.
+                resolveArchiveEntry(resDir, entryName);
 
                 if (entry.isDirectory()) {
                     File dir = resolveArchiveEntry(classesDir, entryName);

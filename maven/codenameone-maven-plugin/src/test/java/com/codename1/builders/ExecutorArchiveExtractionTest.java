@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,7 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ExecutorArchiveExtractionTest {
     @TempDir
@@ -111,14 +113,36 @@ class ExecutorArchiveExtractionTest {
         assertSpecialEntryRejected("podspecs/../payload", "podspecs.tar");
         assertSpecialEntryRejected("javase.lib/../payload",
                 "javase.lib.tar");
+        assertSpecialEntryRejected("/html/../payload", "html.tar");
+        assertSpecialEntryRejected("/podspecs/../payload", "podspecs.tar");
+        assertSpecialEntryRejected("/javase.lib/../payload",
+                "javase.lib.tar");
+    }
+
+    @Test
+    void preservesSupportedLeadingSlashVirtualEntries() throws Exception {
+        assertSpecialEntryAccepted("/html/index.html", "html.tar");
+        assertSpecialEntryAccepted("/podspecs/library.podspec",
+                "podspecs.tar");
+        assertSpecialEntryAccepted("/javase.lib/library.jar",
+                "javase.lib.tar");
     }
 
     private static byte[] zipEntry(String name, String contents)
             throws IOException {
+        byte[] payload = contents.getBytes(StandardCharsets.UTF_8);
+        CRC32 checksum = new CRC32();
+        checksum.update(payload);
+        ZipEntry entry = new ZipEntry(name);
+        entry.setMethod(ZipEntry.STORED);
+        entry.setSize(payload.length);
+        entry.setCompressedSize(payload.length);
+        entry.setCrc(checksum.getValue());
+
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         ZipOutputStream zip = new ZipOutputStream(bytes);
-        zip.putNextEntry(new ZipEntry(name));
-        zip.write(contents.getBytes(StandardCharsets.UTF_8));
+        zip.putNextEntry(entry);
+        zip.write(payload);
         zip.closeEntry();
         zip.close();
         return bytes.toByteArray();
@@ -126,8 +150,29 @@ class ExecutorArchiveExtractionTest {
 
     private void assertSpecialEntryRejected(String entryName,
             String generatedArchive) throws Exception {
-        File root = temporaryDirectory.resolve("special-"
+        File root = specialRoot(entryName);
+        File resources = unzipSpecialEntry(root, entryName);
+
+        assertFalse(new File(resources, generatedArchive).exists(),
+                "Unsafe entry must not create " + generatedArchive);
+    }
+
+    private void assertSpecialEntryAccepted(String entryName,
+            String generatedArchive) throws Exception {
+        File root = specialRoot(entryName);
+        File resources = unzipSpecialEntry(root, entryName);
+
+        assertTrue(new File(resources, generatedArchive).isFile(),
+                "Supported entry must create " + generatedArchive);
+    }
+
+    private File specialRoot(String entryName) {
+        return temporaryDirectory.resolve("special-"
                 + Math.abs(entryName.hashCode())).toFile();
+    }
+
+    private static File unzipSpecialEntry(File root, String entryName)
+            throws Exception {
         File classes = new File(root, "classes");
         File resources = new File(root, "resources");
         File sources = new File(root, "sources");
@@ -138,8 +183,6 @@ class ExecutorArchiveExtractionTest {
         new IPhoneBuilder().unzip(
                 new ByteArrayInputStream(zipEntry(entryName, "payload")),
                 classes, resources, sources);
-
-        assertFalse(new File(resources, generatedArchive).exists(),
-                "Unsafe entry must not create " + generatedArchive);
+        return resources;
     }
 }
