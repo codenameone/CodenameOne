@@ -5694,6 +5694,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             cmd.add(Simulator.class.getName());
             cmd.add(watchMain);
+            // Without -force the launcher ignores this argument whenever the project configures a
+            // package name, and starts codename1.packageName + codename1.mainName instead -- which
+            // would put the phone lifecycle on a watch skin and look like the watch app.
+            cmd.add("-force");
             new ProcessBuilder(cmd).inheritIO().start();
         } catch (Exception err) {
             javax.swing.JOptionPane.showMessageDialog(window,
