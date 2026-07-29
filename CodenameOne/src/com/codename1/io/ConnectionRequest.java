@@ -954,15 +954,6 @@ public class ConnectionRequest implements IOProgressListener {
             return true;
         }
         pinFailure = null;
-        NetworkGuard requestGuard = NetworkManager.getNetworkGuard();
-        if (requestGuard != null) {
-            // Deliberately here rather than in initConnection(): that method is
-            // protected, and a subclass that overrides it without calling super
-            // would silently lose the decoration. Also deliberately not in
-            // NetworkThread.prepare(), which runs inside the queue lock where a
-            // blocking token fetch would stall every other request.
-            requestGuard.beforeRequest(this);
-        }
         if (cacheMode == CachingMode.OFFLINE || cacheMode == CachingMode.OFFLINE_FIRST) {
             InputStream is = null; //NOPMD CloseResource
             try {
@@ -980,6 +971,20 @@ public class ConnectionRequest implements IOProgressListener {
                 Util.cleanup(is);
             }
         }
+        NetworkGuard requestGuard = NetworkManager.getNetworkGuard();
+        if (requestGuard != null) {
+            // After the offline-cache check: a cache hit needs no network, so a
+            // fail-closed guard must not get the chance to block it by failing to
+            // fetch a token on a device that is offline.
+            //
+            // Deliberately here rather than in initConnection(): that method is
+            // protected, and a subclass that overrides it without calling super
+            // would silently lose the decoration. Also deliberately not in
+            // NetworkThread.prepare(), which runs inside the queue lock where a
+            // blocking token fetch would stall every other request.
+            requestGuard.beforeRequest(this);
+        }
+
         CodenameOneImplementation impl = Util.getImplementation();
         Object connection = null;
         input = null;
@@ -1634,6 +1639,11 @@ public class ConnectionRequest implements IOProgressListener {
     /// delimiter starting each certificate's group. Anything before the first delimiter is treated
     /// as the leaf, so a port that reports digests without grouping still yields usable data.
     static SSLCertificate[] parseGroupedCertificates(String[] entries) {
+        if (entries == null) {
+            // A port that returns null here would otherwise surface as an NPE on
+            // the network path, i.e. as an unrelated connection failure.
+            return new SSLCertificate[0];
+        }
         java.util.Vector out = new java.util.Vector();
         SSLCertificate current = null;
         int index = 0;

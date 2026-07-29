@@ -205,9 +205,15 @@ int connections = 0;
 }
 
 - (NSString*) getFingerprint: (SecCertificateRef) cert {
-    NSData* certData = (__bridge NSData*) SecCertificateCopyData(cert);
+    // SecCertificateCopyData follows the Copy rule, so the result is owned here.
+    // The bridged cast alone leaked it on every handshake.
+    CFDataRef certData = SecCertificateCopyData(cert);
+    if (certData == NULL) {
+        return @"";
+    }
     unsigned char sha1Bytes[CC_SHA1_DIGEST_LENGTH];
-    CC_SHA1(certData.bytes, (int)certData.length, sha1Bytes);
+    CC_SHA1(CFDataGetBytePtr(certData), (CC_LONG)CFDataGetLength(certData), sha1Bytes);
+    CFRelease(certData);
     NSMutableString *fingerprint = [NSMutableString stringWithCapacity:CC_SHA1_DIGEST_LENGTH * 3];
     for (int i = 0; i < CC_SHA1_DIGEST_LENGTH; ++i) {
         [fingerprint appendFormat:@"%02x ", sha1Bytes[i]];
@@ -320,10 +326,15 @@ cleanup:
 }
 
 - (NSString*) getFingerprint256: (SecCertificateRef) cert {
-    NSData* keyData = (__bridge NSData*) SecCertificateCopyData(cert);
-
+    // Same ownership rule as getFingerprint: this was leaking one certificate's
+    // worth of data per digest, on every connection.
+    CFDataRef keyData = SecCertificateCopyData(cert);
+    if (keyData == NULL) {
+        return @"";
+    }
     uint8_t digest[CC_SHA256_DIGEST_LENGTH]={0};
-    CC_SHA256(keyData.bytes, keyData.length, digest);
+    CC_SHA256(CFDataGetBytePtr(keyData), (CC_LONG)CFDataGetLength(keyData), digest);
+    CFRelease(keyData);
     NSData *out=[NSData dataWithBytes:digest length:CC_SHA256_DIGEST_LENGTH];
     NSString *hash=[out description];
     hash = [hash stringByReplacingOccurrencesOfString:@" " withString:@""];

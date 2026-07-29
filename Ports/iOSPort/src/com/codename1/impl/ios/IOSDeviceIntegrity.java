@@ -93,8 +93,14 @@ final class IOSDeviceIntegrity {
     private static final String STATE_NEW = "new";
     private static final String STATE_ATTESTED = "attested";
 
-    /** DCError.invalidKey -- the server or the OS no longer knows this key. */
-    private static final int DC_ERROR_INVALID_KEY = 2;
+    // Ordinals from DeviceCheck's DCError enum, which declares no explicit
+    // values: unknownSystemFailure, featureUnsupported, invalidInput,
+    // invalidKey, serverUnavailable. Getting invalidKey wrong is quiet and
+    // expensive -- an invalidated key would never enter the reset-and-reattest
+    // branch, so the device would fail forever while malformed input would
+    // pointlessly burn a fresh key.
+    /** DCError.invalidKey -- the OS no longer recognises this key. */
+    private static final int DC_ERROR_INVALID_KEY = 3;
     /** DCError.serverUnavailable -- Apple is throttling or unreachable. */
     private static final int DC_ERROR_SERVER_UNAVAILABLE = 4;
 
@@ -111,6 +117,10 @@ final class IOSDeviceIntegrity {
     /** Guards the whole attest flow so concurrent callers cannot each burn a key. */
     private final Object flowLock = new Object();
     private long currentBackoff = MIN_BACKOFF_MILLIS;
+    /** True while a generate-then-attest bootstrap is running. */
+    private boolean bootstrapInFlight;
+    /** Callers that arrived mid-bootstrap and will assert once it completes. */
+    private final java.util.Vector waitingForBootstrap = new java.util.Vector();
 
     IOSDeviceIntegrity(IOSNative nativeInstance) {
         this.nativeInstance = nativeInstance;
@@ -133,6 +143,8 @@ final class IOSDeviceIntegrity {
         store.remove(KEY_RETRY_AFTER);
         synchronized (flowLock) {
             currentBackoff = MIN_BACKOFF_MILLIS;
+            bootstrapInFlight = false;
+            failBootstrapWaiters("App Attest state was reset while a bootstrap was in flight");
         }
     }
 
@@ -172,8 +184,20 @@ final class IOSDeviceIntegrity {
             SecureStorage store = SecureStorage.getInstance();
             String keyId = store.get(KEY_ID);
             if (keyId == null || keyId.length() == 0) {
-                // No key yet: generate one, then continue into attestation.
-                int rid = register(new PendingRequest(r, nonce, PendingRequest.OP_GENERATE_KEY, null));
+                PendingRequest pending =
+                        new PendingRequest(r, nonce, PendingRequest.OP_GENERATE_KEY, null);
+                if (bootstrapInFlight) {
+                    // Key generation is asynchronous, so holding the lock only
+                    // until the native call is issued is not enough: a second
+                    // caller would still see no key and generate its own,
+                    // burning a second hardware key against Apple's per-device
+                    // budget. Queue instead, and assert once the first bootstrap
+                    // lands -- assertions are unlimited.
+                    waitingForBootstrap.addElement(pending);
+                    return r;
+                }
+                bootstrapInFlight = true;
+                int rid = register(pending);
                 nativeInstance.appAttestGenerateKey(rid);
                 return r;
             }
@@ -189,10 +213,16 @@ final class IOSDeviceIntegrity {
     // --- flow steps ------------------------------------------------------
 
     private void attestKey(AsyncResource<String> r, String nonce, String keyId) {
+        attestKey(r, nonce, keyId, false);
+    }
+
+    private void attestKey(AsyncResource<String> r, String nonce, String keyId, boolean retried) {
         // The attestation binds to SHA-256 of the raw nonce. Hashing here rather
         // than natively keeps a single hash implementation across both paths.
         String hash = base64(Hash.sha256(bytes(nonce)));
-        int rid = register(new PendingRequest(r, nonce, PendingRequest.OP_ATTEST, keyId));
+        PendingRequest pending = new PendingRequest(r, nonce, PendingRequest.OP_ATTEST, keyId);
+        pending.retried = retried;
+        int rid = register(pending);
         nativeInstance.appAttestAttestKey(rid, keyId, hash);
     }
 
@@ -246,7 +276,10 @@ final class IOSDeviceIntegrity {
         store.set(KEY_ID, keyId);
         store.set(KEY_STATE, STATE_NEW);
         synchronized (instance.flowLock) {
-            instance.attestKey(pending.result, pending.nonce, keyId);
+            // Carry the marker forward: without it a recovery attempt whose
+            // replacement key also reports invalidKey would recover again, and
+            // again, instead of surfacing the failure.
+            instance.attestKey(pending.result, pending.nonce, keyId, pending.retried);
         }
     }
 
@@ -268,6 +301,11 @@ final class IOSDeviceIntegrity {
         if (instance != null) {
             synchronized (instance.flowLock) {
                 instance.currentBackoff = MIN_BACKOFF_MILLIS;
+                instance.bootstrapInFlight = false;
+                // Callers that arrived mid-bootstrap now assert against the key
+                // this attestation established, rather than each attesting one
+                // of their own.
+                instance.drainBootstrapWaiters(pending.keyId);
             }
         }
         succeed(pending, TOKEN_PREFIX + ":attest:" + base64(bytes(pending.keyId))
@@ -319,7 +357,32 @@ final class IOSDeviceIntegrity {
                 instance.currentBackoff = Math.min(backoff * 2, MAX_BACKOFF_MILLIS);
             }
         }
-        fail(pending, msg == null ? "App Attest failed (code " + errorCode + ")" : msg);
+        String message = msg == null ? "App Attest failed (code " + errorCode + ")" : msg;
+        if (instance != null && pending.op != PendingRequest.OP_ASSERT) {
+            synchronized (instance.flowLock) {
+                instance.bootstrapInFlight = false;
+                instance.failBootstrapWaiters(message);
+            }
+        }
+        fail(pending, message);
+    }
+
+    /** Assert for everyone who queued behind the bootstrap. Caller holds flowLock. */
+    private void drainBootstrapWaiters(String keyId) {
+        while (!waitingForBootstrap.isEmpty()) {
+            PendingRequest waiting = (PendingRequest) waitingForBootstrap.elementAt(0);
+            waitingForBootstrap.removeElementAt(0);
+            assertWithKey(waiting.result, waiting.nonce, keyId);
+        }
+    }
+
+    /** Caller holds flowLock. Leaving these unresolved would hang the callers. */
+    private void failBootstrapWaiters(String message) {
+        while (!waitingForBootstrap.isEmpty()) {
+            PendingRequest waiting = (PendingRequest) waitingForBootstrap.elementAt(0);
+            waitingForBootstrap.removeElementAt(0);
+            fail(waiting, message);
+        }
     }
 
     // --- helpers ---------------------------------------------------------

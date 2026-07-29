@@ -144,6 +144,7 @@ public final class JavaSEShield {
         serveExpiredToken = false;
         forcePinMismatch = false;
         failPinFetch = false;
+        secureScreen = false;
     }
 
     /** A human-readable dump for the menu's status dialog. */
