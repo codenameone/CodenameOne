@@ -170,9 +170,11 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     public boolean isCompanionAppInstalled() {
-        // A node only appears in the Data Layer's node list when it is running a build of this same
-        // app, so a connected node is the same answer.
-        return !connectedNodes().isEmpty();
+        // A connected node is a connected *device*, not a device running this app -- so the node
+        // list alone would report a bare watch as having the companion installed. The peer half
+        // advertises the "cn1_wearable" capability (declared in res/values/cn1_wearable.xml by the
+        // build), so asking who advertises it is the actual question.
+        return !bondedNodeIds().isEmpty();
     }
 
     public String[] getConnectedNodes() {

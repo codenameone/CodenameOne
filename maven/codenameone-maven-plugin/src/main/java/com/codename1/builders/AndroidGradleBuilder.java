@@ -326,6 +326,11 @@ public class AndroidGradleBuilder extends Executor {
      * @param request the build being generated
      * @return the class name the stub should instantiate
      */
+    /** The declared watch lifecycle class, or an empty string when the project declares none. */
+    private static String watchMainClass(BuildRequest request) {
+        return request.getArg("watchMain", "").trim();
+    }
+
     private static String appLifecycleClass(BuildRequest request) {
         String watchMain = request.getArg("watchMain", "").trim();
         boolean standalone = "true".equals(request.getArg("watchStandalone", "false"));
@@ -2349,6 +2354,30 @@ public class AndroidGradleBuilder extends Executor {
                 }
             }
             playServicesWear = true;
+            // The capability the peer half advertises, so isCompanionAppInstalled() can tell a
+            // watch running this app from a watch that merely exists.
+            File wearValues = new File(projectDir, "app/src/main/res/values");
+            wearValues.mkdirs();
+            try {
+                createFile(new File(wearValues, "cn1_wearable.xml"),
+                        ("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                        + "<resources>\n"
+                        + "    <string-array name=\"android_wear_capabilities\">\n"
+                        + "        <item>cn1_wearable</item>\n"
+                        + "    </string-array>\n"
+                        + "</resources>\n").getBytes("UTF-8"));
+            } catch (IOException ex) {
+                throw new BuildException("Failed to write the wearable capability declaration", ex);
+            }
+        }
+        if (watchMainClass(request).length() > 0
+                && !"true".equals(request.getArg("watchStandalone", "false"))) {
+            // Say so rather than quietly producing one artifact: a companion Wear APK is not
+            // generated yet (see the wearables chapter of the developer guide).
+            log("[wearable] codename1.watchMain is set without codename1.watchStandalone. The "
+                    + "Apple Watch companion is built, but a companion Wear OS APK is not produced "
+                    + "yet -- set codename1.watchStandalone=true to build the watch app as the "
+                    + "Android product.");
         }
 
         // External surfaces (com.codename1.surfaces): parse the build-time kinds manifest,
