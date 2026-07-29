@@ -202,11 +202,15 @@ final class IOSDeviceIntegrity {
      * point of attest-once is not to burn keys that way.</p>
      */
     void confirmAttestation() {
-        SecureStorage store = SecureStorage.getInstance();
-        if (!STATE_PENDING.equals(store.get(KEY_STATE))) {
-            return;
-        }
         synchronized (flowLock) {
+            // Re-read inside the lock. Checking first and transitioning afterwards let a
+            // reset and a replacement key land in between, so this would stamp
+            // STATE_ATTESTED over a STATE_NEW key Apple has not attested yet -- and the
+            // next request would assert against it.
+            SecureStorage store = SecureStorage.getInstance();
+            if (!STATE_PENDING.equals(store.get(KEY_STATE))) {
+                return;
+            }
             store.set(KEY_STATE, STATE_ATTESTED);
             store.remove(KEY_PENDING_SINCE);
         }
@@ -518,6 +522,21 @@ final class IOSDeviceIntegrity {
         PendingRequest pending = take(requestId);
         if (pending == null) {
             return;
+        }
+        if (instance != null) {
+            boolean stale;
+            synchronized (instance.flowLock) {
+                stale = isStale(pending);
+            }
+            if (stale) {
+                // Belongs to a flow that was already abandoned. Acting on it would reset
+                // the identity a newer bootstrap just established and burn another
+                // rate-limited key replacing it -- and for a non-invalid-key error it
+                // would clear bootstrapInFlight for a generation it knows nothing about,
+                // letting a concurrent request start a second key alongside the first.
+                fail(pending, "App Attest state was reset while this request was in flight");
+                return;
+            }
         }
         if (errorCode == DC_ERROR_INVALID_KEY && instance != null && !pending.retried) {
             // The key is gone or was never valid. Wipe it and try once from scratch; a

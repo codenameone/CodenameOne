@@ -119,10 +119,25 @@ public abstract class WebSocketImpl {
     }
 
     private static boolean isReservedHandshakeHeader(String name) {
-        String n = name.toLowerCase();
+        // ASCII folding, not toLowerCase(): under the Turkish and Azerbaijani locales an
+        // uppercase I folds to a dotless letter outside ASCII, so a header spelled
+        // CONNECTION would not be recognised as reserved and would be emitted alongside
+        // the handshake's own -- producing a conflicting or rejected opening handshake
+        // while the API promises reserved names are ignored.
+        String n = asciiLower(name);
         return "host".equals(n) || "upgrade".equals(n) || "connection".equals(n)
                 || "sec-websocket-key".equals(n) || "sec-websocket-version".equals(n)
                 || "sec-websocket-protocol".equals(n) || "content-length".equals(n);
+    }
+
+    /// Lowercases ASCII letters only, so the result never depends on the device locale.
+    private static String asciiLower(String s) {
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            sb.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
+        }
+        return sb.toString();
     }
 
     private static boolean containsCrLf(String s) {

@@ -26,9 +26,10 @@ package com.codename1.security.shield;
 ///
 /// #### Why not `String.toLowerCase()`
 ///
-/// It folds using the device's locale. Under the Turkish locale an uppercase ASCII `I` becomes the
-/// dotless `ı`, so a request to `API.example.com` stops matching a policy registered as
-/// `api.example.com`. The consequence is not a display glitch: the host silently looks unprotected,
+/// It folds using the device's locale. Under the Turkish locale an uppercase ASCII `I` becomes a
+/// dotless lowercase letter outside ASCII, so a request to `API.example.com` stops matching a
+/// policy registered as `api.example.com`. The consequence is not a display glitch: the host
+/// silently looks unprotected,
 /// so no token is attached and no pin is enforced -- on precisely the devices whose users the
 /// developer never tests with.
 ///
@@ -40,10 +41,19 @@ final class ShieldHosts {
     private ShieldHosts() {
     }
 
-    /// Lowercases the ASCII letters and leaves every other character alone. Null in, null out.
+    /// Lowercases the ASCII letters and drops a terminal DNS root dot. Null in, null out.
+    ///
+    /// `https://api.example.com./` is a valid absolute name that resolves identically to
+    /// `api.example.com`, so keeping the dot would leave a normally registered policy unmatched --
+    /// and the failure is the silent kind: no token attached, no pin enforced. Applied to
+    /// configured, runtime, request and pin hosts alike, since they all pass through here.
     static String normalize(String s) {
         if (s == null) {
             return null;
+        }
+        // Only one, and never on a bare "." -- an empty host is not an improvement.
+        if (s.length() > 1 && s.charAt(s.length() - 1) == '.') {
+            s = s.substring(0, s.length() - 1);
         }
         int len = s.length();
         StringBuilder sb = null;
