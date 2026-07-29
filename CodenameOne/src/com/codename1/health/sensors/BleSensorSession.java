@@ -128,16 +128,25 @@ final class BleSensorSession extends SensorSession {
 
     /// Re-runs discovery and subscription after an unexpected drop.
     void reconnect() {
-        // Either terminal state. A DISCONNECTED listener runs on the EDT
-        // and can pass its own state check while a connect, discovery or
-        // subscribe callback on another thread is exhausting the retry
-        // budget -- so a stopped-only guard moved a session the ladder
-        // had already retired as FAILED back to CONNECTING, and
-        // reconnected a handle the manager no longer holds.
-        if (isTerminal() || !getOptions().isAutoReconnect()) {
+        if (!getOptions().isAutoReconnect()) {
             return;
         }
-        setState(SensorSessionState.CONNECTING);
+        // The transition is the check. Reading the state first and then
+        // moving it is two steps, and stop() runs between them: a
+        // DISCONNECTED listener fires on the EDT while a connect,
+        // discovery or subscribe callback is on another thread, so the
+        // read saw a live session, teardown disconnected and unregistered
+        // it, and this went on to reconnect a handle the manager no
+        // longer holds -- leaving a stopped session's peripheral
+        // connected with nothing left to disconnect it.
+        //
+        // setState refuses out of either terminal state under the state
+        // lock, and answers true when the session is already CONNECTING,
+        // so this covers what the separate terminal check covered and
+        // closes the window it left open.
+        if (!setState(SensorSessionState.CONNECTING)) {
+            return;
+        }
         // The cumulative trackers hold the previous connection's baseline.
         // A sensor that power-cycled while away restarts its counters at
         // zero, and even one that did not will have wrapped its 16-bit

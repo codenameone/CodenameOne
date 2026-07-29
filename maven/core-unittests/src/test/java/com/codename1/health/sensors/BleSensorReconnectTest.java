@@ -939,4 +939,42 @@ class BleSensorReconnectTest extends UITestBase {
                 "and a reconnect must not resurrect it either");
         assertTrue(session.isTerminal());
     }
+
+    /**
+     * A reconnect that loses the race with stop() touches the radio.
+     *
+     * <p>Reading the state and then moving it are two steps, and stop()
+     * runs between them: the read sees a live session, teardown
+     * disconnects and unregisters it, and the reconnect goes on to
+     * connect a handle nobody holds -- a stopped session's peripheral
+     * left connected with nothing to disconnect it.</p>
+     *
+     * <p>The interleaving needs the listener suspended mid-method, so
+     * what is driven here is the state the losing side finds: the
+     * refused transition is the only thing standing between it and the
+     * radio, and it has to stop there rather than carry on.</p>
+     */
+    @Test
+    void aReconnectRefusedByTeardownNeverTouchesTheRadio() throws Exception {
+        FakePeripheral p = new FakePeripheral();
+        BleSensorSession session = new BleSensorSession("fake",
+                HealthSensorProfile.HEART_RATE,
+                new SensorSessionOptions(), p);
+        started.add(session);
+        session.start(new AsyncResource<SensorSession>());
+        flushSerialCalls();
+
+        session.stop();
+        flushSerialCalls();
+        int connectsBeforeTheLateReconnect = p.connects;
+
+        // What the DISCONNECTED listener does after teardown has won.
+        session.reconnect();
+        flushSerialCalls();
+
+        assertEquals(connectsBeforeTheLateReconnect, p.connects,
+                "a refused reconnect must not connect the peripheral");
+        assertEquals(SensorSessionState.STOPPED, session.getState(),
+                "and it must leave the session stopped");
+    }
 }
