@@ -168,13 +168,8 @@ public class LanguageOnDeviceApiTest extends BaseTest {
                                         String label) {
         check(resource.isDone(), label
                 + " unsupported fallback must complete immediately");
-        try {
-            resource.get();
-            throw new IllegalStateException(label
-                    + " unsupported fallback unexpectedly succeeded");
-        } catch (AsyncResource.AsyncExecutionException expected) {
-            // The documented unsupported-resource contract.
-        }
+        check(!resource.isReady(), label
+                + " unsupported fallback unexpectedly succeeded");
     }
 
     private void check(boolean value, String label) {
