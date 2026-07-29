@@ -5,8 +5,7 @@ import com.codename1.flutter.Element;
 import com.codename1.flutter.Widget;
 
 /**
- * Clips its child to a rectangle. Clipping is not yet applied; the child
- * renders unchanged. See {@link PassThroughRenderElement}.
+ * Clips its child to a rectangle. See {@link ClipRectRenderElement}.
  */
 public class ClipRect extends Widget implements HasChild {
 
@@ -22,6 +21,10 @@ public class ClipRect extends Widget implements HasChild {
         this.clipBehavior = v;
     }
 
+    public Clip getClipBehavior() {
+        return clipBehavior;
+    }
+
     public void child(Widget v) {
         this.child = v;
     }
@@ -33,6 +36,6 @@ public class ClipRect extends Widget implements HasChild {
 
     @Override
     public Element createElement() {
-        return new PassThroughRenderElement(this);
+        return new ClipRectRenderElement(this);
     }
 }

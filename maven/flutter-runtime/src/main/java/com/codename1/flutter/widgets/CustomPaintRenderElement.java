@@ -106,7 +106,14 @@ public class CustomPaintRenderElement extends SingleChildRenderElement {
             try {
                 // the painter's box, in the logical pixels it expects
                 Size logical = new Size(getWidth() / dpr, getHeight() / dpr);
-                painter.paint(new GraphicsCanvas(g, getAbsoluteX(), getAbsoluteY(), dpr), logical);
+                // The origin is this component's PARENT-RELATIVE position, because a Graphics
+                // being painted through has already accumulated its ancestors' translation
+                // (Container.paintChildren translates by getX()/getY() on the way down) - which
+                // is why the whole of Codename One draws with getX(), not getAbsoluteX(). Using
+                // the absolute position here added the ancestors' offset a second time and
+                // pushed the drawing outside the bounds this component clips to, so the painter
+                // ran and nothing appeared.
+                painter.paint(new GraphicsCanvas(g, getX(), getY(), dpr), logical);
             } catch (Throwable t) {
                 // one misbehaving painter must not take the whole frame down
                 Log.p("Flutter runtime: CustomPainter failed: " + t);

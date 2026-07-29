@@ -28,17 +28,37 @@ public class AlignRenderElement extends SingleChildRenderElement {
         return ((Align) widget()).getChild();
     }
 
+    /**
+     * Flutter shrink-wraps an axis when a factor is given for it, or when that axis is
+     * unbounded; otherwise the box expands to fill.
+     */
+    private static boolean shrinkWraps(Double factor, boolean bounded) {
+        return factor != null || !bounded;
+    }
+
+    private static double factored(Double factor, double childExtent) {
+        return childExtent * (factor == null ? 1.0 : factor.doubleValue());
+    }
+
     @Override
     protected Size performLayout(BoxConstraints constraints) {
+        Align self0 = (Align) widget();
+        Double wf = self0.getWidthFactor();
+        Double hf = self0.getHeightFactor();
+        boolean shrinkW = shrinkWraps(wf, constraints.hasBoundedWidth());
+        boolean shrinkH = shrinkWraps(hf, constraints.hasBoundedHeight());
         RenderElement child = renderChild();
         if (child == null) {
             return constraints.constrain(new Size(
-                    constraints.hasBoundedWidth() ? constraints.maxWidth() : 0,
-                    constraints.hasBoundedHeight() ? constraints.maxHeight() : 0));
+                    shrinkW ? 0 : constraints.maxWidth(),
+                    shrinkH ? 0 : constraints.maxHeight()));
         }
         Size cs = child.layout(constraints.loosen());
-        double w = constraints.hasBoundedWidth() ? constraints.maxWidth() : cs.width();
-        double h = constraints.hasBoundedHeight() ? constraints.maxHeight() : cs.height();
+        // A factor scales the box to a FRACTION of the child, which is how an expand/collapse
+        // animates: heightFactor runs 0 -> 1 while the child keeps its full size, and the
+        // enclosing ClipRect hides the part that does not fit yet.
+        double w = shrinkW ? factored(wf, cs.width()) : constraints.maxWidth();
+        double h = shrinkH ? factored(hf, cs.height()) : constraints.maxHeight();
         Size self = constraints.constrain(new Size(w, h));
         Alignment a = alignment();
         setChildOffset(child,

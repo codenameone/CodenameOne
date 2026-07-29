@@ -50,19 +50,58 @@ public abstract class Gradient {
         return colors;
     }
 
+    public Object getBegin() {
+        return begin;
+    }
+
+    public Object getEnd() {
+        return end;
+    }
+
+    /**
+     * The gradient's colour ramp as ARGB values, in order, or an empty array when the
+     * gradient carries no usable colours. Dart hands the list over as a {@code DartList} of
+     * {@link Color}, so it arrives here as an untyped {@link java.util.List}.
+     */
+    public int[] colorRamp() {
+        if (!(colors instanceof java.util.List)) {
+            return new int[0];
+        }
+        java.util.List<?> list = (java.util.List<?>) colors;
+        java.util.List<Integer> out = new java.util.ArrayList<Integer>();
+        for (Object o : list) {
+            if (o instanceof Color) {
+                out.add(Integer.valueOf(((Color) o).value()));
+            }
+        }
+        int[] ramp = new int[out.size()];
+        for (int i = 0; i < ramp.length; i++) {
+            ramp[i] = out.get(i).intValue();
+        }
+        return ramp;
+    }
+
     /** Produces a shader painting this gradient over {@code rect}. */
     public Shader createShader(Rect rect, Object textDirection) {
         return new GradientShader(this, rect);
     }
 
     /** A concrete {@link Shader} bound to a gradient and a rectangle. */
-    static final class GradientShader extends Shader {
+    public static final class GradientShader extends Shader {
         final Gradient gradient;
         final Rect rect;
 
         GradientShader(Gradient gradient, Rect rect) {
             this.gradient = gradient;
             this.rect = rect;
+        }
+
+        public Gradient gradient() {
+            return gradient;
+        }
+
+        public Rect rect() {
+            return rect;
         }
     }
 }

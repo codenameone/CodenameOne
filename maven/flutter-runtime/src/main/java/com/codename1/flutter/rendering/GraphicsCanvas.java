@@ -1,7 +1,9 @@
 package com.codename1.flutter.rendering;
 
+import com.codename1.flutter.Alignment;
 import com.codename1.flutter.Canvas;
 import com.codename1.flutter.Color;
+import com.codename1.flutter.Gradient;
 import com.codename1.flutter.Offset;
 import com.codename1.flutter.Paint;
 import com.codename1.flutter.PaintingStyle;
@@ -14,6 +16,7 @@ import com.codename1.flutter.StrokeJoin;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -234,35 +237,47 @@ public class GraphicsCanvas extends Canvas {
         GeneralPath p = new GeneralPath();
         double cx = 0;
         double cy = 0;
+        // Whether the path has a current point, which decides how an arcTo with
+        // forceMoveTo=false attaches: it JOINS the current point with a line, and only
+        // starts a subpath of its own when there is nothing to join to.
+        boolean hasCurrent = false;
         for (Path.Segment s : path.segments()) {
             double[] v = s.coords;
             if ("moveTo".equals(s.verb)) {
                 p.moveTo(mapX(v[0], v[1]), mapY(v[0], v[1]));
-                cx = v[0]; cy = v[1];
+                cx = v[0]; cy = v[1]; hasCurrent = true;
             } else if ("lineTo".equals(s.verb)) {
                 p.lineTo(mapX(v[0], v[1]), mapY(v[0], v[1]));
-                cx = v[0]; cy = v[1];
+                cx = v[0]; cy = v[1]; hasCurrent = true;
             } else if ("cubicTo".equals(s.verb)) {
                 p.curveTo(mapX(v[0], v[1]), mapY(v[0], v[1]),
                         mapX(v[2], v[3]), mapY(v[2], v[3]),
                         mapX(v[4], v[5]), mapY(v[4], v[5]));
-                cx = v[4]; cy = v[5];
+                cx = v[4]; cy = v[5]; hasCurrent = true;
             } else if ("quadraticBezierTo".equals(s.verb) || "conicTo".equals(s.verb)) {
                 // a conic is approximated by its quadratic control polygon
                 p.quadTo(mapX(v[0], v[1]), mapY(v[0], v[1]),
                         mapX(v[2], v[3]), mapY(v[2], v[3]));
-                cx = v[2]; cy = v[3];
+                cx = v[2]; cy = v[3]; hasCurrent = true;
             } else if ("arcTo".equals(s.verb)) {
-                appendArc(p, Rect.fromLTRB(v[0], v[1], v[2], v[3]), v[4], v[5], false);
+                Rect oval = Rect.fromLTRB(v[0], v[1], v[2], v[3]);
+                boolean forceMoveTo = v[6] != 0;
+                appendArc(p, oval, v[4], v[5], false, forceMoveTo || !hasCurrent);
+                double end = v[4] + v[5];
+                cx = oval.center().dx() + oval.width() / 2 * Math.cos(end);
+                cy = oval.center().dy() + oval.height() / 2 * Math.sin(end);
+                hasCurrent = true;
             } else if ("arcToPoint".equals(s.verb)) {
                 // without full elliptical-arc solving, a straight segment to
                 // the arc's end point keeps the outline closed
                 p.lineTo(mapX(v[0], v[1]), mapY(v[0], v[1]));
-                cx = v[0]; cy = v[1];
+                cx = v[0]; cy = v[1]; hasCurrent = true;
             } else if ("addRect".equals(s.verb)) {
                 appendRect(p, v[0], v[1], v[2], v[3]);
+                hasCurrent = true;
             } else if ("addOval".equals(s.verb) || "addRRect".equals(s.verb)) {
                 appendOval(p, v[0], v[1], v[2], v[3]);
+                hasCurrent = true;
             } else if ("close".equals(s.verb)) {
                 p.closePath();
             }
@@ -332,6 +347,17 @@ public class GraphicsCanvas extends Canvas {
 
     /** Flattens the arc into line segments — enough for chart arcs and gauges. */
     private void appendArc(GeneralPath p, Rect rect, double startAngle, double sweepAngle, boolean useCenter) {
+        appendArc(p, rect, startAngle, sweepAngle, useCenter, true);
+    }
+
+    /**
+     * Appends an arc. When {@code startsNewSubpath} is false the arc is JOINED to whatever
+     * the path already ends at, with a line to its start point - Flutter's
+     * {@code arcTo(..., forceMoveTo: false)}. That join is what turns two opposing
+     * half-circle arcs into one stadium outline instead of two separate discs.
+     */
+    private void appendArc(GeneralPath p, Rect rect, double startAngle, double sweepAngle,
+                           boolean useCenter, boolean startsNewSubpath) {
         double cx = rect.center().dx();
         double cy = rect.center().dy();
         double rx = rect.width() / 2;
@@ -344,7 +370,7 @@ public class GraphicsCanvas extends Canvas {
             double ang = startAngle + sweepAngle * i / steps;
             double x = cx + rx * Math.cos(ang);
             double y = cy + ry * Math.sin(ang);
-            if (i == 0 && !useCenter) {
+            if (i == 0 && !useCenter && startsNewSubpath) {
                 p.moveTo(mapX(x, y), mapY(x, y));
             } else {
                 p.lineTo(mapX(x, y), mapY(x, y));
@@ -379,12 +405,87 @@ public class GraphicsCanvas extends Canvas {
     }
 
     private void fillShape(GeneralPath p, Paint paint) {
+        if (fillWithGradient(p, paint)) {
+            return;
+        }
         int alpha = g.getAlpha();
         applyColor(paint);
         if (shapes) {
             g.fillShape(p);
         }
         g.setAlpha(alpha);
+    }
+
+    /**
+     * Fills {@code p} with the Paint's gradient shader, if it has one, by clipping to the
+     * shape and running Codename One's linear gradient across its bounding box. Returns
+     * false when there is no gradient to paint, leaving the solid path to the caller.
+     *
+     * <p>Without this a shaded Paint carries no {@code color} at all and everything it
+     * draws comes out the default black - which is what the gallery's settings icon did,
+     * its pink and teal sticks both painting black.</p>
+     */
+    private boolean fillWithGradient(GeneralPath p, Paint paint) {
+        if (paint == null || !(paint.shader() instanceof Gradient.GradientShader)) {
+            return false;
+        }
+        Gradient gradient = ((Gradient.GradientShader) paint.shader()).gradient();
+        int[] ramp = gradient.colorRamp();
+        if (ramp.length == 0) {
+            return false;
+        }
+        int start = ramp[0];
+        int end = ramp[ramp.length - 1];
+        Rectangle bounds = p.getBounds();
+        if (bounds.getWidth() <= 0 || bounds.getHeight() <= 0) {
+            return false;
+        }
+        int alpha = g.getAlpha();
+        int clipX = g.getClipX();
+        int clipY = g.getClipY();
+        int clipW = g.getClipWidth();
+        int clipH = g.getClipHeight();
+        try {
+            g.setAlpha(((start >>> 24) & 0xff));
+            if (shapes && g.isShapeClipSupported()) {
+                // A real ramp, confined to the shape.
+                g.setClip(p);
+                g.fillLinearGradient(start & 0xffffff, end & 0xffffff,
+                        bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(),
+                        !isVertical(gradient));
+            } else if (shapes) {
+                // No shape clipping on this port: the shape still beats the ramp, so fill it
+                // solid with the ramp's midpoint rather than dropping either.
+                g.setColor(blend(start, end));
+                g.fillShape(p);
+            } else {
+                return false;
+            }
+        } finally {
+            g.setClip(clipX, clipY, clipW, clipH);
+            g.setAlpha(alpha);
+        }
+        return true;
+    }
+
+    /** Whether the gradient runs top-to-bottom rather than left-to-right. */
+    private static boolean isVertical(Gradient gradient) {
+        Object begin = gradient.getBegin();
+        Object end = gradient.getEnd();
+        if (!(begin instanceof Alignment) || !(end instanceof Alignment)) {
+            return false;   // Flutter's default is centerLeft -> centerRight
+        }
+        double dx = Math.abs(((Alignment) end).x() - ((Alignment) begin).x());
+        double dy = Math.abs(((Alignment) end).y() - ((Alignment) begin).y());
+        return dy > dx;
+    }
+
+    /** The midpoint of two ARGB colours, as an RGB value. */
+    private static int blend(int a, int b) {
+        int r = (((a >> 16) & 0xff) + ((b >> 16) & 0xff)) / 2;
+        int gr = (((a >> 8) & 0xff) + ((b >> 8) & 0xff)) / 2;
+        int bl = ((a & 0xff) + (b & 0xff)) / 2;
+        return (r << 16) | (gr << 8) | bl;
     }
 
     private void strokeShape(GeneralPath p, Paint paint) {
