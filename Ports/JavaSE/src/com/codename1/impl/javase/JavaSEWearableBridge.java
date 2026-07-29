@@ -161,11 +161,21 @@ class JavaSEWearableBridge implements WearableBridge {
         File f = dataFile(path);
         try {
             f.getParentFile().mkdirs();
-            FileOutputStream out = new FileOutputStream(f);
+            // Write-then-rename: the peer polls this directory every 500ms, and writing in place
+            // would let it read a truncated payload mid-write and report a malformed value.
+            File tmp = new File(f.getParentFile(), f.getName() + ".tmp");
+            FileOutputStream out = new FileOutputStream(tmp);
             try {
-                out.write(payload);
+                out.write(payload == null ? new byte[0] : payload);
+                out.flush();
             } finally {
                 out.close();
+            }
+            if (!tmp.renameTo(f)) {
+                f.delete();
+                if (!tmp.renameTo(f)) {
+                    throw new IOException("could not replace " + f);
+                }
             }
             // Our own write must not come back to us as a peer change.
             synchronized (seenData) {
@@ -204,7 +214,7 @@ class JavaSEWearableBridge implements WearableBridge {
         }
         List<String> out = new ArrayList<String>();
         for (File f : files) {
-            if (f.isFile()) {
+            if (f.isFile() && !f.getName().endsWith(".tmp")) {
                 out.add(decodePath(f.getName()));
             }
         }
@@ -365,20 +375,15 @@ class JavaSEWearableBridge implements WearableBridge {
         t.start();
     }
 
-    /// Records what is already on disk without reporting it, so a restart does not replay every
-    /// value the app itself published last run.
+    /// Leaves what is already on disk unrecorded, so the first watcher pass replays it.
+    ///
+    /// A value the peer published while this side was stopped is exactly what a starting app needs
+    /// to see -- that is the guarantee replicated data makes, and recording the files as already
+    /// seen would silently break it. The cost is that a value this app published itself last run is
+    /// replayed to it too, which listeners handle the same way they handle any republish.
     private void primeSeenData() {
-        File[] files = dataDir.listFiles();
-        if (files == null) {
-            return;
-        }
-        synchronized (seenData) {
-            for (File f : files) {
-                if (f.isFile()) {
-                    seenData.put(f.getName(), Long.valueOf(f.lastModified()));
-                }
-            }
-        }
+        // Deliberately empty: see above. Kept as a named step so the reasoning has somewhere to
+        // live rather than being an absence.
     }
 
     private void scanData() {
@@ -389,7 +394,7 @@ class JavaSEWearableBridge implements WearableBridge {
         }
         if (files != null) {
             for (File f : files) {
-                if (!f.isFile()) {
+                if (!f.isFile() || f.getName().endsWith(".tmp")) {
                     continue;
                 }
                 gone.remove(f.getName());

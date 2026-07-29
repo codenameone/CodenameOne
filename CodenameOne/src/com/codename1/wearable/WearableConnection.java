@@ -61,18 +61,47 @@ public final class WearableConnection {
 
     /// Payloads that arrived before anyone was listening. The platform can start an app purely to
     /// hand it a message, so dropping these would lose exactly the payload that mattered most.
-    private static final List<Runnable> pendingDeliveries = new ArrayList<Runnable>();
+    ///
+    /// Queued separately per listener type: an app that registers its data listener first would
+    /// otherwise drain a queued *message* while messageListeners was still empty, losing it for
+    /// good.
+    private static final List<Runnable> pendingMessages = new ArrayList<Runnable>();
+    private static final List<Runnable> pendingData = new ArrayList<Runnable>();
 
-    /// Reply handlers for outstanding requests, keyed by the token handed to the bridge.
-    private static final Map<Integer, WearableReplyHandler> pendingReplies =
-            new HashMap<Integer, WearableReplyHandler>();
+    /// Outstanding requests, keyed by the token handed to the bridge. The request path is kept
+    /// alongside the handler so the reply decodes onto a real path -- a payload has to have one.
+    private static final Map<Integer, PendingReply> pendingReplies =
+            new HashMap<Integer, PendingReply>();
     private static int nextReplyToken = 1;
+
+    /// A request waiting for its answer.
+    private static final class PendingReply {
+        final WearableReplyHandler handler;
+        final String path;
+
+        PendingReply(WearableReplyHandler handler, String path) {
+            this.handler = handler;
+            this.path = path;
+        }
+    }
 
     private WearableConnection() {
     }
 
     private static WearableBridge bridge() {
         return Display.getInstance().getWearableBridge();
+    }
+
+    /// Brings the platform bridge into existence.
+    ///
+    /// An app that only listens never calls anything that would otherwise create it, and on Apple
+    /// the native session is not activated until the bridge is first touched -- so a pure listener
+    /// would sit waiting for traffic that the platform was never told to deliver.
+    private static void activate() {
+        WearableBridge b = bridge();
+        if (b != null) {
+            b.isSupported();
+        }
     }
 
     // --- state --------------------------------------------------------------
@@ -195,7 +224,8 @@ public final class WearableConnection {
         if (reply != null) {
             synchronized (pendingReplies) {
                 token = nextReplyToken++;
-                pendingReplies.put(Integer.valueOf(token), reply);
+                pendingReplies.put(Integer.valueOf(token),
+                        new PendingReply(reply, message.getPath()));
             }
         }
         b.sendMessage(message.getPath(), message.toByteArray(), token);
@@ -303,7 +333,8 @@ public final class WearableConnection {
     public static void addMessageListener(WearableMessageListener l) {
         if (l != null && !messageListeners.contains(l)) {
             messageListeners.add(l);
-            drainPending();
+            activate();
+            drainPending(pendingMessages);
         }
     }
 
@@ -325,7 +356,8 @@ public final class WearableConnection {
     public static void addDataListener(WearableDataListener l) {
         if (l != null && !dataListeners.contains(l)) {
             dataListeners.add(l);
-            drainPending();
+            activate();
+            drainPending(pendingData);
         }
     }
 
@@ -347,6 +379,7 @@ public final class WearableConnection {
     public static void addStateListener(WearableStateListener l) {
         if (l != null && !stateListeners.contains(l)) {
             stateListeners.add(l);
+            activate();
         }
     }
 
@@ -372,6 +405,7 @@ public final class WearableConnection {
     /// - `replyToken`: a positive token when the peer is waiting for an answer, otherwise 0
     public static void deliverMessage(final String path, final byte[] payload, final int replyToken) {
         deliver(new Runnable() {
+            @Override
             public void run() {
                 WearableMessage m = WearableMessage.fromByteArray(path, payload);
                 WearableMessage reply = null;
@@ -391,7 +425,7 @@ public final class WearableConnection {
                     }
                 }
             }
-        }, !messageListeners.isEmpty());
+        }, !messageListeners.isEmpty(), pendingMessages);
     }
 
     /// Framework/port entry point: hands the peer's answer to the waiting reply handler. Called by
@@ -403,19 +437,23 @@ public final class WearableConnection {
     /// - `payload`: the encoded reply payload, or null when the request failed
     /// - `error`: a description of the failure, or null on success
     public static void deliverReply(int replyToken, final byte[] payload, final String error) {
-        final WearableReplyHandler handler;
+        final PendingReply pending;
         synchronized (pendingReplies) {
-            handler = pendingReplies.remove(Integer.valueOf(replyToken));
+            pending = pendingReplies.remove(Integer.valueOf(replyToken));
         }
-        if (handler == null) {
+        if (pending == null) {
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 if (error != null) {
-                    handler.replyFailed(error);
+                    pending.handler.replyFailed(error);
                 } else {
-                    handler.replyReceived(WearableMessage.fromByteArray("", payload));
+                    // On the request's own path: a message always has one, and answering on the
+                    // path you asked about is what a handler wants to see.
+                    pending.handler.replyReceived(
+                            WearableMessage.fromByteArray(pending.path, payload));
                 }
             }
         });
@@ -430,6 +468,7 @@ public final class WearableConnection {
     /// - `payload`: the encoded new value
     public static void deliverDataChanged(final String path, final byte[] payload) {
         deliver(new Runnable() {
+            @Override
             public void run() {
                 WearableMessage m = WearableMessage.fromByteArray(path, payload);
                 WearableDataListener[] copy =
@@ -438,7 +477,7 @@ public final class WearableConnection {
                     l.dataChanged(m);
                 }
             }
-        }, !dataListeners.isEmpty());
+        }, !dataListeners.isEmpty(), pendingData);
     }
 
     /// Framework/port entry point: reports that the peer removed a replicated value. Called by the
@@ -449,6 +488,7 @@ public final class WearableConnection {
     /// - `path`: the path whose value is gone
     public static void deliverDataRemoved(final String path) {
         deliver(new Runnable() {
+            @Override
             public void run() {
                 WearableDataListener[] copy =
                         dataListeners.toArray(new WearableDataListener[dataListeners.size()]);
@@ -456,7 +496,7 @@ public final class WearableConnection {
                     l.dataRemoved(path);
                 }
             }
-        }, !dataListeners.isEmpty());
+        }, !dataListeners.isEmpty(), pendingData);
     }
 
     /// Framework/port entry point: reports that reachability, pairing or peer-app installation
@@ -464,6 +504,7 @@ public final class WearableConnection {
     /// re-queried by the listener, so a stale notification is worthless.
     public static void notifyStateChanged() {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 WearableStateListener[] copy =
                         stateListeners.toArray(new WearableStateListener[stateListeners.size()]);
@@ -479,24 +520,25 @@ public final class WearableConnection {
     /// The platform starts an app to hand it a payload, so the payload routinely arrives before the
     /// app has finished wiring itself up. Parking rather than dropping is what makes it safe to
     /// register listeners in `init()`.
-    private static void deliver(Runnable delivery, boolean hasListener) {
+    private static void deliver(Runnable delivery, boolean hasListener, List<Runnable> queue) {
         if (!hasListener) {
-            synchronized (pendingDeliveries) {
-                pendingDeliveries.add(delivery);
+            synchronized (queue) {
+                queue.add(delivery);
             }
             return;
         }
         Display.getInstance().callSerially(delivery);
     }
 
-    private static void drainPending() {
+    /// Replays what was queued for one listener type, once a listener of that type exists.
+    private static void drainPending(List<Runnable> queue) {
         List<Runnable> drained;
-        synchronized (pendingDeliveries) {
-            if (pendingDeliveries.isEmpty()) {
+        synchronized (queue) {
+            if (queue.isEmpty()) {
                 return;
             }
-            drained = new ArrayList<Runnable>(pendingDeliveries);
-            pendingDeliveries.clear();
+            drained = new ArrayList<Runnable>(queue);
+            queue.clear();
         }
         for (Runnable r : drained) {
             Display.getInstance().callSerially(r);
@@ -505,6 +547,7 @@ public final class WearableConnection {
 
     private static void failReply(final WearableReplyHandler reply, final String message) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 reply.replyFailed(message);
             }

@@ -300,6 +300,25 @@ public class WearableMessage {
         return o instanceof byte[] ? (byte[]) o : defaultValue;
     }
 
+
+    /// Writes a string as a 32-bit length followed by its UTF-8 bytes.
+    ///
+    /// Not `DataOutputStream.writeUTF`: that caps a string at 65,535 encoded bytes and throws
+    /// beyond it. Nothing in the public API says a value has to be short, and a payload that
+    /// silently fails to encode because a string grew is a poor way to find out.
+    private static void writeLongUTF(DataOutputStream out, String value) throws IOException {
+        byte[] utf8 = value.getBytes("UTF-8");
+        out.writeInt(utf8.length);
+        out.write(utf8);
+    }
+
+    /// Reads a string written by [#writeLongUTF(DataOutputStream,String)].
+    private static String readLongUTF(DataInputStream in) throws IOException {
+        byte[] utf8 = new byte[in.readInt()];
+        in.readFully(utf8);
+        return new String(utf8, "UTF-8");
+    }
+
     // --- wire format --------------------------------------------------------
 
     /// Serializes the payload to the compact form the platform bridges carry. Application code does
@@ -315,11 +334,11 @@ public class WearableMessage {
             out.writeByte(FORMAT_VERSION);
             out.writeShort(values.size());
             for (Map.Entry<String, Object> e : values.entrySet()) {
-                out.writeUTF(e.getKey());
+                writeLongUTF(out, e.getKey());
                 Object v = e.getValue();
                 if (v instanceof String) {
                     out.writeByte(TYPE_STRING);
-                    out.writeUTF((String) v);
+                    writeLongUTF(out, (String) v);
                 } else if (v instanceof Integer) {
                     out.writeByte(TYPE_INT);
                     out.writeInt(((Integer) v).intValue());
@@ -343,7 +362,10 @@ public class WearableMessage {
         } catch (IOException err) {
             // A ByteArrayOutputStream cannot fail; rethrowing keeps callers honest
             // if that ever stops being true.
-            throw new IllegalStateException("Failed to encode wearable payload: " + err);
+            IllegalStateException wrapped =
+                    new IllegalStateException("Failed to encode wearable payload: " + err);
+            wrapped.initCause(err);
+            throw wrapped;
         }
         return bo.toByteArray();
     }
@@ -378,11 +400,11 @@ public class WearableMessage {
             }
             int count = in.readShort();
             for (int i = 0; i < count; i++) {
-                String key = in.readUTF();
+                String key = readLongUTF(in);
                 int type = in.readByte();
                 switch (type) {
                     case TYPE_STRING:
-                        m.put(key, in.readUTF());
+                        m.put(key, readLongUTF(in));
                         break;
                     case TYPE_INT:
                         m.put(key, in.readInt());

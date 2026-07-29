@@ -3241,6 +3241,10 @@ public class AndroidGradleBuilder extends Executor {
         String wearableListenerService = "";
         if (usesWearable) {
             wearableListenerService =
+                    // Exported because Play services binds it -- that is not optional for a
+                    // WearableListenerService. There is no binding permission Play services holds
+                    // that would narrow it, so the service validates the source node of every event
+                    // instead (see CN1WearableListenerService).
                     "        <service android:name=\"com.codename1.impl.android.CN1WearableListenerService\" android:exported=\"true\">\n"
                     + "            <intent-filter>\n"
                     + "                <action android:name=\"com.google.android.gms.wearable.MESSAGE_RECEIVED\" />\n"

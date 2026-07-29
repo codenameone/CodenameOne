@@ -38,6 +38,8 @@ static NSString *const kReplyKey = @"cn1.reply";
     // asynchronously on the EDT, so the block has to outlive the delegate callback.
     NSMutableDictionary<NSNumber *, void (^)(NSDictionary<NSString *, id> *)> *_pendingReplies;
     int _nextInboundToken;
+    /// Keys the peer's last context carried, so a key that vanishes is reported as a removal.
+    NSSet<NSString *> *_lastReceivedKeys;
 }
 
 + (CN1WatchConnectivity *)shared {
@@ -55,6 +57,7 @@ static NSString *const kReplyKey = @"cn1.reply";
     if (self != nil) {
         _pendingReplies = [[NSMutableDictionary alloc] init];
         _nextInboundToken = 1;
+        _lastReceivedKeys = [[NSSet alloc] init];
     }
     return self;
 }
@@ -136,11 +139,14 @@ static NSString *const kReplyKey = @"cn1.reply";
     void (^handler)(NSDictionary<NSString *, id> *);
     @synchronized (_pendingReplies) {
         NSNumber *key = @(replyToken);
-        handler = _pendingReplies[key];
+        // ARC is off in this port, so the dictionary's reference is the only one keeping the block
+        // alive: retain before removing, or the block is deallocated before it is called.
+        handler = [_pendingReplies[key] retain];
         [_pendingReplies removeObjectForKey:key];
     }
     if (handler != nil) {
         handler(@{kReplyKey: (payload == nil ? [NSData data] : payload)});
+        [handler release];
     }
 }
 
@@ -157,7 +163,7 @@ static NSString *const kReplyKey = @"cn1.reply";
     }
     NSMutableDictionary *ctx = [[s applicationContext] mutableCopy];
     if (ctx == nil) {
-        ctx = [NSMutableDictionary dictionary];
+        ctx = [[NSMutableDictionary alloc] init];
     }
     ctx[path] = (payload == nil ? [NSData data] : payload);
     NSError *err = nil;
@@ -165,6 +171,7 @@ static NSString *const kReplyKey = @"cn1.reply";
     if (err != nil) {
         NSLog(@"[cn1.wearable] failed to publish %@: %@", path, err.localizedDescription);
     }
+    [ctx release];
 }
 
 - (NSData *)getData:(NSString *)path {
@@ -184,12 +191,17 @@ static NSString *const kReplyKey = @"cn1.reply";
         return;
     }
     NSMutableDictionary *ctx = [[s applicationContext] mutableCopy];
-    if (ctx == nil || ctx[path] == nil) {
+    if (ctx == nil) {
+        return;
+    }
+    if (ctx[path] == nil) {
+        [ctx release];
         return;
     }
     [ctx removeObjectForKey:path];
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
+    [ctx release];
 }
 
 - (NSArray<NSString *> *)dataPaths {
@@ -269,7 +281,11 @@ static NSString *const kReplyKey = @"cn1.reply";
         // Park the block so the Java side can answer after it has hopped to the EDT.
         @synchronized (_pendingReplies) {
             token = _nextInboundToken++;
-            _pendingReplies[@(token)] = [replyHandler copy];
+            // -copy returns +1 under manual reference counting and the dictionary retains it too,
+            // so hand off the copy's ownership rather than leaking it.
+            void (^stored)(NSDictionary<NSString *, id> *) = [replyHandler copy];
+            _pendingReplies[@(token)] = stored;
+            [stored release];
         }
     }
     cn1_wearable_deliverMessage(path.UTF8String, body.bytes, (int) body.length, token);
@@ -277,14 +293,22 @@ static NSString *const kReplyKey = @"cn1.reply";
 
 - (void)session:(WCSession *)session
         didReceiveApplicationContext:(NSDictionary<NSString *, id> *)applicationContext {
-    // The peer replaced its whole context; report every entry and let the Java listeners decide
-    // what changed. Contexts are small by design, so this is cheaper than diffing.
+    // The peer replaces its whole context on every publish, so a removal shows up as a key that has
+    // simply stopped being there. Report what is present, then whatever disappeared since last
+    // time -- otherwise removeData on one side is invisible on the other.
     for (NSString *path in applicationContext) {
         NSData *body = applicationContext[path];
         if ([body isKindOfClass:[NSData class]]) {
             cn1_wearable_deliverDataChanged(path.UTF8String, body.bytes, (int) body.length);
         }
     }
+    for (NSString *gone in _lastReceivedKeys) {
+        if (applicationContext[gone] == nil) {
+            cn1_wearable_deliverDataRemoved(gone.UTF8String);
+        }
+    }
+    [_lastReceivedKeys release];
+    _lastReceivedKeys = [[NSSet setWithArray:applicationContext.allKeys] retain];
 }
 
 - (void)session:(WCSession *)session didReceiveFile:(WCSessionFile *)file {

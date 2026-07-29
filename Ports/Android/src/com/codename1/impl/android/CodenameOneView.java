@@ -255,6 +255,10 @@ public class CodenameOneView {
                         rect.right = 0;
                         rect.bottom = 0;
                     }
+                    // This branch assigns asynchronously, so the round inset has to be reapplied
+                    // here -- applying it at the end of updateSafeArea would run first and be
+                    // overwritten by the four assignments above.
+                    applyRoundScreenInset(rect);
                 }
             });
         } else {

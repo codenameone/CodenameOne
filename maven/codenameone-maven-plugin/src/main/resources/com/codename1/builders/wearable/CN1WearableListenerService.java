@@ -41,10 +41,28 @@ import com.google.android.gms.wearable.WearableListenerService;
  */
 public class CN1WearableListenerService extends WearableListenerService {
 
+    /**
+     * The service has to be exported for Play services to bind it, and there is no binding
+     * permission that would narrow that to Play services alone. So rather than trust the caller,
+     * every event is checked against the nodes the Data Layer actually reports: a crafted intent
+     * from another app on the device carries a source node that is not one of them and is dropped.
+     */
+    private boolean isFromAKnownNode(String sourceNodeId) {
+        if (sourceNodeId == null || sourceNodeId.length() == 0) {
+            return false;
+        }
+        for (String id : CN1WearableBridge.connectedNodeIds(this)) {
+            if (sourceNodeId.equals(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public void onMessageReceived(MessageEvent event) {
         String path = event.getPath();
-        if (path == null) {
+        if (path == null || !isFromAKnownNode(event.getSourceNodeId())) {
             return;
         }
         if (path.startsWith(CN1WearableBridge.replyPath())) {
@@ -67,6 +85,9 @@ public class CN1WearableListenerService extends WearableListenerService {
             }
             try {
                 int token = Integer.parseInt(rest.substring(0, slash));
+                // Remember who asked so the answer goes back to that watch: tokens are allocated per
+                // node and collide across them, so a broadcast reply would answer the wrong request.
+                CN1WearableBridge.rememberRequestOrigin(token, event.getSourceNodeId());
                 WearableConnection.deliverMessage(
                         CN1WearableBridge.decode(rest.substring(slash)), event.getData(), token);
             } catch (NumberFormatException malformed) {

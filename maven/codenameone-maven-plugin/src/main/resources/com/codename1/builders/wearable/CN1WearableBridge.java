@@ -26,6 +26,7 @@ import android.content.Context;
 import android.net.Uri;
 
 import com.codename1.wearable.WearableConnection;
+import com.codename1.wearable.WearableMessage;
 import com.codename1.wearable.spi.WearableBridge;
 
 import com.google.android.gms.tasks.Tasks;
@@ -41,7 +42,9 @@ import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -70,6 +73,15 @@ public class CN1WearableBridge implements WearableBridge {
     private static final String PAYLOAD_KEY = "cn1.payload";
     /** How long a blocking Data Layer call may take before we give up and answer "not available". */
     private static final long TIMEOUT_SECONDS = 5;
+    /**
+     * The Codename One EDT must never wait five seconds on Play services -- isPaired/isReachable are
+     * exactly the sort of thing an app calls from init() or a button handler. The node list is
+     * therefore cached and refreshed off the EDT; callers get the last known answer immediately.
+     */
+    private static final long NODE_CACHE_MILLIS = 3000;
+    private volatile List<Node> cachedNodes = new ArrayList<Node>();
+    private volatile long cachedNodesStamp;
+    private volatile boolean refreshingNodes;
 
     private final Context context;
     private final MessageClient messageClient;
@@ -101,8 +113,52 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     public boolean isPaired() {
-        return !connectedNodes().isEmpty();
+        // Pairing, not reachability: a paired watch that is switched off or out of range reports no
+        // connected node, and the API promises these are different questions.
+        return !connectedNodes().isEmpty() || !bondedNodeIds().isEmpty();
     }
+
+    /// Ids of the nodes the Data Layer currently reports, for the listener service's caller check.
+    ///
+    /// @param context any context; the Data Layer clients are cheap to obtain
+    /// @return the connected node ids, never null
+    static List<String> connectedNodeIds(Context context) {
+        List<String> out = new ArrayList<String>();
+        try {
+            List<Node> nodes = Tasks.await(
+                    Wearable.getNodeClient(context.getApplicationContext()).getConnectedNodes(),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            for (Node n : nodes) {
+                out.add(n.getId());
+            }
+        } catch (Throwable unavailable) {
+            // Nothing reachable: nothing is trusted.
+        }
+        return out;
+    }
+
+    /// Nodes the Data Layer knows about whether or not they are currently connected.
+    private List<String> bondedNodeIds() {
+        if (com.codename1.ui.CN.isEdt()) {
+            // Never block the EDT; the cached answer is refreshed off it.
+            return cachedBonded;
+        }
+        List<String> out = new ArrayList<String>();
+        try {
+            CapabilityInfo info = Tasks.await(
+                    capabilityClient.getCapability("cn1_wearable", CapabilityClient.FILTER_ALL),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            for (Node n : info.getNodes()) {
+                out.add(n.getId());
+            }
+        } catch (Throwable unavailable) {
+            // No capability info: fall back to "nothing known".
+        }
+        cachedBonded = out;
+        return out;
+    }
+
+    private volatile List<String> cachedBonded = new ArrayList<String>();
 
     public boolean isReachable() {
         for (Node n : connectedNodes()) {
@@ -130,12 +186,48 @@ public class CN1WearableBridge implements WearableBridge {
         return out;
     }
 
+    /**
+     * The nodes last seen, refreshed in the background. Blocking is only acceptable off the EDT --
+     * on it, a stale answer now beats a correct answer after a five-second freeze.
+     */
     private List<Node> connectedNodes() {
-        try {
-            return Tasks.await(nodeClient.getConnectedNodes(), TIMEOUT_SECONDS, TimeUnit.SECONDS);
-        } catch (Throwable unavailable) {
-            return new ArrayList<Node>();
+        long age = System.currentTimeMillis() - cachedNodesStamp;
+        if (age > NODE_CACHE_MILLIS) {
+            if (com.codename1.ui.CN.isEdt()) {
+                refreshNodesAsync();
+            } else {
+                refreshNodesNow();
+            }
         }
+        return cachedNodes;
+    }
+
+    private void refreshNodesNow() {
+        try {
+            cachedNodes = Tasks.await(nodeClient.getConnectedNodes(),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (Throwable unavailable) {
+            cachedNodes = new ArrayList<Node>();
+        }
+        cachedNodesStamp = System.currentTimeMillis();
+    }
+
+    private void refreshNodesAsync() {
+        if (refreshingNodes) {
+            return;
+        }
+        refreshingNodes = true;
+        nodeClient.getConnectedNodes().addOnCompleteListener(
+                new com.google.android.gms.tasks.OnCompleteListener<List<Node>>() {
+                    public void onComplete(com.google.android.gms.tasks.Task<List<Node>> task) {
+                        cachedNodes = task.isSuccessful() && task.getResult() != null
+                                ? task.getResult() : new ArrayList<Node>();
+                        cachedNodesStamp = System.currentTimeMillis();
+                        refreshingNodes = false;
+                        // Reachability may have changed; let listeners re-query.
+                        WearableConnection.notifyStateChanged();
+                    }
+                });
     }
 
     // --- messages -----------------------------------------------------------
@@ -149,8 +241,23 @@ public class CN1WearableBridge implements WearableBridge {
             }
             // The peer needs both the CN1 path and, when an answer is wanted, the token to answer
             // with. Both ride in the Data Layer path so the payload stays exactly the app's bytes.
-            String wire = (replyToken == 0 ? MESSAGE_PATH : REQUEST_PATH + replyToken) + encode(path);
-            messageClient.sendMessage(n.getId(), wire, payload);
+            // The '/' after the token is the delimiter the listener splits on; a CN1 path is only
+            // conventionally slash-prefixed, so add one rather than assuming it.
+            String wire = (replyToken == 0 ? MESSAGE_PATH : REQUEST_PATH + replyToken)
+                    + slashPrefixed(encode(path));
+            com.google.android.gms.tasks.Task<Integer> task =
+                    messageClient.sendMessage(n.getId(), wire, payload);
+            if (replyToken != 0) {
+                // Discovery can hand back a node that disconnects before the send lands. Without
+                // this the caller's reply handler is never completed at all.
+                final int token = replyToken;
+                task.addOnFailureListener(new com.google.android.gms.tasks.OnFailureListener() {
+                    public void onFailure(Exception e) {
+                        WearableConnection.deliverReply(token, null,
+                                "The message could not be delivered: " + e.getMessage());
+                    }
+                });
+            }
             sentToAnyone = true;
         }
         if (!sentToAnyone && replyToken != 0) {
@@ -159,11 +266,30 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     public void sendReply(int replyToken, byte[] payload) {
-        for (Node n : connectedNodes()) {
-            if (n.isNearby()) {
-                messageClient.sendMessage(n.getId(), REPLY_PATH + replyToken, payload);
-            }
+        // Back to the node that asked, not to every watch on the wrist rack: tokens are allocated
+        // per node and routinely collide, so broadcasting would answer the wrong request.
+        String node;
+        synchronized (inboundNodes) {
+            node = inboundNodes.remove(Integer.valueOf(replyToken));
         }
+        if (node == null) {
+            return;
+        }
+        messageClient.sendMessage(node, REPLY_PATH + replyToken, payload);
+    }
+
+    /// Records which node sent a request, so its answer can be routed back to it. Called by
+    /// {@link CN1WearableListenerService} as the request arrives.
+    static void rememberRequestOrigin(int replyToken, String nodeId) {
+        synchronized (inboundNodes) {
+            inboundNodes.put(Integer.valueOf(replyToken), nodeId);
+        }
+    }
+
+    private static final Map<Integer, String> inboundNodes = new HashMap<Integer, String>();
+
+    private static String slashPrefixed(String path) {
+        return path.startsWith("/") ? path : "/" + path;
     }
 
     // --- replicated data ----------------------------------------------------
@@ -178,7 +304,9 @@ public class CN1WearableBridge implements WearableBridge {
 
     public byte[] getData(String path) {
         try {
-            Uri uri = new Uri.Builder().scheme("wear").path(dataPath(path)).build();
+            // The authority is required: a wear:// Uri without one matches nothing. "*" means
+            // "any node", which is what a reader wants -- the value may have come from either side.
+            Uri uri = new Uri.Builder().scheme("wear").authority("*").path(dataPath(path)).build();
             DataItemBuffer items = Tasks.await(dataClient.getDataItems(uri),
                     TIMEOUT_SECONDS, TimeUnit.SECONDS);
             try {
@@ -195,7 +323,7 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     public void removeData(String path) {
-        Uri uri = new Uri.Builder().scheme("wear").path(dataPath(path)).build();
+        Uri uri = new Uri.Builder().scheme("wear").authority("*").path(dataPath(path)).build();
         dataClient.deleteDataItems(uri);
     }
 
@@ -222,9 +350,13 @@ public class CN1WearableBridge implements WearableBridge {
 
     public void transferFile(String path, String name, byte[] contents) {
         // A DataItem already syncs in the background and survives both apps being killed, which is
-        // the guarantee a file transfer makes. Naming it under the path keeps several files from
-        // overwriting each other.
-        putData(path + "/" + (name == null ? "file" : name), contents);
+        // the guarantee a file transfer makes. The bytes are the file's own, not a WearableMessage,
+        // so wrap them in one -- the receiver decodes every DataItem as a payload and would
+        // otherwise read a PNG as a malformed message.
+        WearableMessage wrapper = new WearableMessage(path)
+                .put("name", name == null ? "file" : name)
+                .put("contents", contents == null ? new byte[0] : contents);
+        putData(path + "/" + (name == null ? "file" : name), wrapper.toByteArray());
     }
 
     // --- paths --------------------------------------------------------------

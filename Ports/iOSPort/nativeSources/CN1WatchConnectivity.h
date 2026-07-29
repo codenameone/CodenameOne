@@ -36,6 +36,11 @@
 #define CN1WatchConnectivity_h
 
 #include "TargetConditionals.h"
+// CN1_USE_WATCHCONNECTIVITY lives in the central header the builder edits. Every translation unit
+// that tests it has to see that definition, so import it here rather than in the .m: without this
+// the guard below is always false, the implementation compiles away, and the app fails to link
+// against a class the natives call.
+#import "CodenameOne_GLViewController.h"
 
 #if defined(CN1_USE_WATCHCONNECTIVITY) && !TARGET_OS_TV && !TARGET_OS_MACCATALYST
 

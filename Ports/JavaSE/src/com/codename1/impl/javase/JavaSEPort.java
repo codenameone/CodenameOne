@@ -405,7 +405,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// from the same `codename1.watchMain` setting the device builds use, which the simulator
     /// launcher exposes as a system property.
     static String getWatchMainClass() {
+        // The system property is how the companion process is told what to run. A normal `mvn
+        // cn1:run` sets no such property, so fall back to the project settings on disk -- otherwise
+        // the whole watch feature would be invisible under the standard simulator launch.
         String s = System.getProperty("codename1.watchMain");
+        if (s == null || s.trim().length() == 0) {
+            Properties cnop = loadCodenameOneSettings();
+            s = cnop == null ? null : cnop.getProperty("codename1.watchMain");
+        }
         if (s == null || s.trim().length() == 0) {
             return null;
         }
