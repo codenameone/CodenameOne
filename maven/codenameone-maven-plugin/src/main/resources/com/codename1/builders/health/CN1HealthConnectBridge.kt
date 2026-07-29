@@ -353,8 +353,18 @@ class CN1HealthConnectBridge(private val context: Context)
             // in time order, the reply overshoots the limit by at most the
             // tail of one page per type, and the shared layer trims for
             // the caller on a record boundary.
-            val merged = if (types.length() == 1) perType[0]
-                else mergeByTime(perType, ascending)
+            // Single-type output goes through the same merge. Health
+            // Connect orders *records*, and a series record orders its own
+            // samples, but two overlapping series -- a watch and a phone
+            // both recording heart rate -- flatten into samples that are
+            // globally out of order: one record emits 100 and a
+            // later-starting one then emits 60. A "latest N" query trimmed
+            // on that keeps the wrong N.
+            //
+            // With one block this is just a global sort by sample time,
+            // which is what the flattened output should have been all
+            // along.
+            val merged = mergeByTime(perType, ascending)
             val truncated = false
             sb.append(merged)
             // Trailer: what is left on the platform side. Reporting nothing
