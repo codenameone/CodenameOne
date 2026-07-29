@@ -145,6 +145,28 @@ class SheetCssBorderRadiusTest extends UITestBase {
                 "the padding unit of the developer comes back too");
     }
 
+    @FormTest
+    void restoringLeavesTheOtherStylesOfTheContentPaneAlone() {
+        // The inset pads the current style of the content pane, not all of its styles, so restoring
+        // may not write the padding of the current style over the selected, pressed and disabled
+        // styles the inset never touched.
+        Sheet sheet = new Sheet(null, "Title");
+        sheet.getContentPane().getSelectedStyle().setPadding(7, 7, 7, 7);
+        sheet.getContentPane().getPressedStyle().setPadding(9, 9, 9, 9);
+        sheet.getAllStyles().setBorder(RoundRectBorder.create().cornerRadius(4f));
+        zeroBox(sheet);
+        sheet.getContentPane().add(new Label("Test label 1"));
+        show(sheet);
+
+        sheet.getAllStyles().setBorder(cssBorder());
+        show(sheet);
+
+        assertEquals(7, sheet.getContentPane().getSelectedStyle().getPaddingTop(),
+                "the selected style of the content pane is not part of the inset");
+        assertEquals(9, sheet.getContentPane().getPressedStyle().getPaddingTop(),
+                "the pressed style of the content pane is not part of the inset");
+    }
+
     private RoundRectBorder cssBorder() {
         // What the CSS compiler emits for border-radius: 4mm 4mm 0mm 0mm
         return RoundRectBorder.create()

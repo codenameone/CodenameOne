@@ -942,6 +942,11 @@ public class Sheet extends Container {
     /// Stores the padding of the content pane as it is before the corner radius of a hand written
     /// border insets it. Only the first inset is recorded, so showing the sheet again does not
     /// record the inset as if it were the padding of the developer.
+    ///
+    /// The inset is written by the component selector, which pads the current style of the content
+    /// pane rather than all of its styles, so this reads that same style and
+    /// `#restoreContentPanePadding` writes back to it. The selected, pressed and disabled styles
+    /// are never insetted and so have nothing to restore.
     private void rememberContentPanePadding() {
         if (contentPaneInset != null) {
             return;
@@ -963,7 +968,7 @@ public class Sheet extends Container {
         if (contentPaneInset == null) {
             return;
         }
-        Style cps = contentPane.getAllStyles();
+        Style cps = contentPane.getStyle();
         cps.setPaddingUnit(contentPaneInsetUnits);
         cps.setPadding(contentPaneInset[0], contentPaneInset[1], contentPaneInset[2], contentPaneInset[3]);
         contentPaneInset = null;
