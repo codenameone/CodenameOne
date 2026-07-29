@@ -39,6 +39,24 @@ public final class WorkoutConfiguration {
             new ArrayList<HealthDataType>();
     private String title;
 
+    /// An independent copy of this configuration.
+    ///
+    /// A session takes one when it is constructed. The builder is fluent
+    /// and callers reuse a single instance across workouts, while a
+    /// recorded session reads the activity type and title only when it
+    /// ends -- so a run was saved under whatever the configuration had
+    /// been changed to in the meantime. The collected types are copied
+    /// too, for the same reason.
+    WorkoutConfiguration copy() {
+        WorkoutConfiguration out = new WorkoutConfiguration();
+        out.activityType = activityType;
+        out.locationType = locationType;
+        out.keepAliveInBackground = keepAliveInBackground;
+        out.title = title;
+        out.collectedTypes.addAll(collectedTypes);
+        return out;
+    }
+
     /// The kind of exercise. Defaults to [WorkoutActivityType#OTHER].
     public WorkoutConfiguration setActivityType(
             WorkoutActivityType activityType) {

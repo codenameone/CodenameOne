@@ -279,6 +279,38 @@ class WorkoutAndNutritionTest extends UITestBase {
         // release, and this case asserted that it was stored.
     }
 
+    /**
+     * The session keeps the configuration it started with.
+     *
+     * <p>The builder is fluent and callers reuse a single instance across
+     * workouts, while a recorded session reads the activity type and title
+     * only when it ends -- so a run was persisted under whatever the
+     * configuration had been changed to since, which for a reused builder
+     * is the next workout's settings.</p>
+     */
+    @Test
+    void mutatingTheConfigurationLaterDoesNotRewriteTheSession() {
+        WorkoutConfiguration c = new WorkoutConfiguration()
+                .setActivityType(WorkoutActivityType.RUNNING)
+                .setTitle("Morning run")
+                .addCollectedType(HealthDataType.HEART_RATE);
+        WorkoutManager m = new WorkoutManager();
+        WorkoutSession s = m.startSession(c).get();
+
+        // The same builder, reused for the next workout.
+        c.setActivityType(WorkoutActivityType.CYCLING)
+                .setTitle("Evening ride")
+                .addCollectedType(HealthDataType.STEPS);
+
+        assertEquals(WorkoutActivityType.RUNNING,
+                s.getConfiguration().getActivityType(),
+                "the session must keep the activity it started with");
+        assertEquals("Morning run", s.getConfiguration().getTitle());
+        assertEquals(1, s.getConfiguration().getCollectedTypes().size(),
+                "and the collected types must be a snapshot too, got: "
+                        + s.getConfiguration().getCollectedTypes());
+    }
+
     @Test
     void workoutSampleTotalsAreNullUntilSet() {
         WorkoutSample w = WorkoutSample.create(WorkoutActivityType.RUNNING,

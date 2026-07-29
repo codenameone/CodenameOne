@@ -87,6 +87,15 @@ public abstract class WorkoutSession {
     private final Map<String, Integer> counts = new HashMap<String, Integer>();
     private final List<WorkoutEvent> events = new ArrayList<WorkoutEvent>();
 
+    /// Guards the state and the clocks it is read alongside.
+    ///
+    /// Samples arrive on a Bluetooth callback thread while the transitions
+    /// are driven from the EDT, so reading the state and then acting on it
+    /// is two steps with the other thread able to run between them -- and
+    /// on a field neither side synchronizes, the sensor thread is not
+    /// obliged to observe the transition at all.
+    private final Object stateLock = new Object();
+
     private WorkoutSessionState state = WorkoutSessionState.NOT_STARTED;
     private long startedAtMillis;
     private long endedAtMillis;
@@ -95,8 +104,12 @@ public abstract class WorkoutSession {
 
     /// Ports and the framework construct sessions.
     protected WorkoutSession(WorkoutConfiguration configuration) {
+        // A snapshot. The builder is fluent and callers reuse one across
+        // workouts, and doEnd reads the activity type and title only when
+        // the session ends -- so a run was persisted under whatever the
+        // configuration had been changed to since it started.
         this.configuration = configuration == null
-                ? new WorkoutConfiguration() : configuration;
+                ? new WorkoutConfiguration() : configuration.copy();
     }
 
     /// The configuration this session was started with.
@@ -106,7 +119,9 @@ public abstract class WorkoutSession {
 
     /// The current state.
     public final WorkoutSessionState getState() {
-        return state;
+        synchronized (stateLock) {
+            return state;
+        }
     }
 
     /// Whether the operating system is running a real workout session --
@@ -120,10 +135,13 @@ public abstract class WorkoutSession {
     /// countdown. Optional; `start()` works without it.
     public final AsyncResource<Boolean> prepare() {
         AsyncResource<Boolean> out = new AsyncResource<Boolean>();
-        if (!requireState(out, WorkoutSessionState.NOT_STARTED, "prepare")) {
-            return out;
+        synchronized (stateLock) {
+            if (!requireState(out, WorkoutSessionState.NOT_STARTED,
+                    "prepare")) {
+                return out;
+            }
+            setState(WorkoutSessionState.PREPARING);
         }
-        setState(WorkoutSessionState.PREPARING);
         doPrepare(out);
         return out;
     }
@@ -131,15 +149,17 @@ public abstract class WorkoutSession {
     /// Starts recording.
     public final AsyncResource<Boolean> start() {
         AsyncResource<Boolean> out = new AsyncResource<Boolean>();
-        if (state != WorkoutSessionState.NOT_STARTED
-                && state != WorkoutSessionState.PREPARING) {
-            failState(out, "start");
-            return out;
+        synchronized (stateLock) {
+            if (state != WorkoutSessionState.NOT_STARTED
+                    && state != WorkoutSessionState.PREPARING) {
+                failState(out, "start");
+                return out;
+            }
+            startedAtMillis = System.currentTimeMillis();
+            resumedAtMillis = startedAtMillis;
+            accumulatedMillis = 0;
+            setState(WorkoutSessionState.RUNNING);
         }
-        startedAtMillis = System.currentTimeMillis();
-        resumedAtMillis = startedAtMillis;
-        accumulatedMillis = 0;
-        setState(WorkoutSessionState.RUNNING);
         doStart(out);
         return out;
     }
@@ -147,11 +167,13 @@ public abstract class WorkoutSession {
     /// Pauses recording. The elapsed clock stops.
     public final AsyncResource<Boolean> pause() {
         AsyncResource<Boolean> out = new AsyncResource<Boolean>();
-        if (!requireState(out, WorkoutSessionState.RUNNING, "pause")) {
-            return out;
+        synchronized (stateLock) {
+            if (!requireState(out, WorkoutSessionState.RUNNING, "pause")) {
+                return out;
+            }
+            accumulatedMillis += System.currentTimeMillis() - resumedAtMillis;
+            setState(WorkoutSessionState.PAUSED);
         }
-        accumulatedMillis += System.currentTimeMillis() - resumedAtMillis;
-        setState(WorkoutSessionState.PAUSED);
         addEvent(new WorkoutEvent(WorkoutEvent.Kind.PAUSE,
                 System.currentTimeMillis(), null));
         doPause(out);
@@ -161,13 +183,17 @@ public abstract class WorkoutSession {
     /// Resumes after a pause.
     public final AsyncResource<Boolean> resume() {
         AsyncResource<Boolean> out = new AsyncResource<Boolean>();
-        if (!requireState(out, WorkoutSessionState.PAUSED, "resume")) {
-            return out;
+        long resumedAt;
+        synchronized (stateLock) {
+            if (!requireState(out, WorkoutSessionState.PAUSED, "resume")) {
+                return out;
+            }
+            resumedAtMillis = System.currentTimeMillis();
+            resumedAt = resumedAtMillis;
+            setState(WorkoutSessionState.RUNNING);
         }
-        resumedAtMillis = System.currentTimeMillis();
-        setState(WorkoutSessionState.RUNNING);
         addEvent(new WorkoutEvent(WorkoutEvent.Kind.RESUME,
-                resumedAtMillis, null));
+                resumedAt, null));
         doResume(out);
         return out;
     }
@@ -176,17 +202,27 @@ public abstract class WorkoutSession {
     /// the persisted record.
     public final AsyncResource<WorkoutSample> end() {
         AsyncResource<WorkoutSample> out = new AsyncResource<WorkoutSample>();
-        if (state != WorkoutSessionState.RUNNING
-                && state != WorkoutSessionState.PAUSED) {
-            out.error(new HealthException(HealthError.SESSION_STATE,
-                    "cannot end a workout in state " + state));
-            return out;
+        // The whole claim under one lock, so a sample being accepted on a
+        // sensor thread is either already in what doEnd is about to
+        // snapshot or is refused. Checked separately, a reading could pass
+        // the state check, wait, and then roll itself into totals whose
+        // workout had already been written -- reported as accepted while
+        // absent from the record, or present in the totals with no sample
+        // behind it.
+        synchronized (stateLock) {
+            if (state != WorkoutSessionState.RUNNING
+                    && state != WorkoutSessionState.PAUSED) {
+                out.error(new HealthException(HealthError.SESSION_STATE,
+                        "cannot end a workout in state " + state));
+                return out;
+            }
+            if (state == WorkoutSessionState.RUNNING) {
+                accumulatedMillis +=
+                        System.currentTimeMillis() - resumedAtMillis;
+            }
+            endedAtMillis = System.currentTimeMillis();
+            setState(WorkoutSessionState.STOPPED);
         }
-        if (state == WorkoutSessionState.RUNNING) {
-            accumulatedMillis += System.currentTimeMillis() - resumedAtMillis;
-        }
-        endedAtMillis = System.currentTimeMillis();
-        setState(WorkoutSessionState.STOPPED);
         doEnd(out);
         return out;
     }
@@ -201,31 +237,39 @@ public abstract class WorkoutSession {
     /// or delete the samples afterwards through the identifiers the write
     /// reports.
     public final void discard() {
-        if (state == WorkoutSessionState.ENDED
-                || state == WorkoutSessionState.STOPPED) {
-            return;
+        synchronized (stateLock) {
+            if (state == WorkoutSessionState.ENDED
+                    || state == WorkoutSessionState.STOPPED) {
+                return;
+            }
+            setState(WorkoutSessionState.FAILED);
         }
-        setState(WorkoutSessionState.FAILED);
         doDiscard();
     }
 
     /// Time spent recording, excluding pauses.
     public final long getElapsedMillis() {
-        if (state == WorkoutSessionState.RUNNING) {
-            return accumulatedMillis
-                    + (System.currentTimeMillis() - resumedAtMillis);
+        synchronized (stateLock) {
+            if (state == WorkoutSessionState.RUNNING) {
+                return accumulatedMillis
+                        + (System.currentTimeMillis() - resumedAtMillis);
+            }
+            return accumulatedMillis;
         }
-        return accumulatedMillis;
     }
 
     /// When the workout started, epoch millis, or 0 before [#start()].
     public final long getStartedAtMillis() {
-        return startedAtMillis;
+        synchronized (stateLock) {
+            return startedAtMillis;
+        }
     }
 
     /// When it ended, epoch millis, or 0 while still running.
     public final long getEndedAtMillis() {
-        return endedAtMillis;
+        synchronized (stateLock) {
+            return endedAtMillis;
+        }
     }
 
     /// A live statistic, or **`null`** when the platform does not compute
@@ -248,6 +292,18 @@ public abstract class WorkoutSession {
     /// only way anything is collected.
     public final AsyncResource<Boolean> addSamples(List<HealthSample> samples) {
         AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        // Held across the acceptance, not just the check. end() claims its
+        // transition under this same lock before doEnd takes any snapshot,
+        // so a reading arriving from a sensor thread either lands in the
+        // workout that is being written or is refused -- never accepted
+        // into a record that has already been sealed.
+        synchronized (stateLock) {
+            return addSamplesLocked(samples, out);
+        }
+    }
+
+    private AsyncResource<Boolean> addSamplesLocked(
+            List<HealthSample> samples, AsyncResource<Boolean> out) {
         if (state != WorkoutSessionState.RUNNING
                 && state != WorkoutSessionState.PAUSED) {
             failState(out, "addSamples");
@@ -502,11 +558,14 @@ public abstract class WorkoutSession {
     /// Moves to a new state and notifies listeners. Ports call this for
     /// transitions the platform initiated.
     protected final void setState(WorkoutSessionState newState) {
-        if (newState == null || newState == state) {
-            return;
+        Object[] snapshot;
+        synchronized (stateLock) {
+            if (newState == null || newState == state) {
+                return;
+            }
+            state = newState;
+            snapshot = listenerSnapshot();
         }
-        state = newState;
-        Object[] snapshot = listenerSnapshot();
         if (snapshot != null) {
             Display.getInstance().callSerially(
                     makeStateRunnable(this, snapshot, newState));
