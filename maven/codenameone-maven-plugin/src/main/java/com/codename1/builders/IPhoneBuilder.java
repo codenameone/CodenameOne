@@ -1016,25 +1016,37 @@ public class IPhoneBuilder extends Executor {
                 }
 
                 @Override
+                public void usesClassMethodWithBooleanArgument(String cls,
+                        String method, Boolean value) {
+                    // Sensor write-through is HealthKit use. An app enables
+                    // it with SensorSessionOptions.setWriteToStore(true)
+                    // and need never name HealthStore, so the
+                    // sensors-package exemption -- there so a BLE-only app
+                    // is not linked against HealthKit -- hid the one call
+                    // in that package that genuinely needs it, and the
+                    // build omitted the framework, the entitlement and the
+                    // purpose-string check.
+                    //
+                    // The argument decides it, which is why this is not in
+                    // usesClassMethod: an explicit setWriteToStore(false)
+                    // is a BLE-only app switching the store off, and
+                    // reading it as store use linked that app against
+                    // HealthKit and demanded purpose strings for data it
+                    // had just declined to touch.
+                    if (HealthManifestFragments.enablesSensorWriteThrough(
+                            cls, method, value)) {
+                        usesHealth = true;
+                        usesHealthStore = true;
+                        usesHealthWrite = true;
+                    }
+                }
+
+                @Override
                 public void usesClassMethod(String cls, String method) {
                     // Health.getStore()/getWorkouts() mean a real platform
                     // store; Health.getSensors() means BLE only. The class
                     // reference alone cannot tell them apart, so the facade
                     // is decided here.
-                    // Sensor write-through is HealthKit use. An app enables
-                    // it with SensorSessionOptions.setWriteToStore(true) and
-                    // need never name HealthStore, so the sensors-package
-                    // exemption -- there so a BLE-only app is not linked
-                    // against HealthKit -- hid the one call in that package
-                    // that genuinely needs it, and the build omitted the
-                    // framework, the entitlement and the purpose-string check.
-                    if ("com/codename1/health/sensors/SensorSessionOptions"
-                            .equals(cls)
-                            && method.startsWith("setWriteToStore")) {
-                        usesHealth = true;
-                        usesHealthStore = true;
-                        usesHealthWrite = true;
-                    }
                     if ("com/codename1/health/Health".equals(cls)) {
                         usesHealth = true;
                         if (method.startsWith("getStore")

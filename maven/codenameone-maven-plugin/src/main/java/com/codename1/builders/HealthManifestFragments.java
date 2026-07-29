@@ -337,6 +337,37 @@ final class HealthManifestFragments {
                         || isBothDirections(method));
     }
 
+    /// The class whose write-through setter drags a sensor app into the
+    /// store.
+    static final String SENSOR_OPTIONS =
+            "com/codename1/health/sensors/SensorSessionOptions";
+
+    /// Whether this call enables sensor write-through, which is store use.
+    ///
+    /// `setWriteToStore(true)` is the one call inside the sensors package
+    /// that needs the health stack, and the package-wide exemption -- there
+    /// so a Bluetooth-only app is not dragged into Health Connect, a
+    /// privacy policy and a Play health review -- hides it by default.
+    ///
+    /// `lastArgument` is what the scanner saw pushed immediately before
+    /// the call, and null when it was not a literal. An explicit
+    /// `setWriteToStore(false)` is the app saying it wants no store at
+    /// all, and answering yes to it cost a BLE-only build the whole
+    /// Health Connect apparatus for a feature it had just switched off.
+    /// Anything else -- a variable, a branch, a computed flag -- answers
+    /// yes: over-declaring costs a permission the app does not use, while
+    /// under-declaring costs a SecurityException on a user's device.
+    ///
+    /// Lives here rather than in the builders so the twins share one
+    /// classification instead of two that can drift apart.
+    static boolean enablesSensorWriteThrough(String cls, String method,
+            Boolean lastArgument) {
+        return SENSOR_OPTIONS.equals(cls)
+                && method != null
+                && method.startsWith("setWriteToStore")
+                && !Boolean.FALSE.equals(lastArgument);
+    }
+
     static List<String> parseTypeList(String hintValue) {
         List<String> out = new ArrayList<String>();
         if (hintValue == null) {

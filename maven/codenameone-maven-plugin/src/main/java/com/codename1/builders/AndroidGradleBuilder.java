@@ -1652,6 +1652,32 @@ public class AndroidGradleBuilder extends Executor {
 
 
                 @Override
+                public void usesClassMethodWithBooleanArgument(String cls,
+                        String method, Boolean value) {
+                    // Sensor write-through is store use. An app can enable
+                    // it with SensorSessionOptions.setWriteToStore(true)
+                    // and never name HealthStore, so the sensors-package
+                    // exemption -- which exists so a BLE-only app is not
+                    // dragged into Health Connect -- hid the one call that
+                    // genuinely needs it, and the build shipped no bridge
+                    // and no permissions for a documented flow.
+                    //
+                    // The argument decides it, which is why this is not in
+                    // usesClassMethod: an explicit setWriteToStore(false)
+                    // is a BLE-only app switching the store off, and
+                    // reading it as store use handed that app a Health
+                    // Connect dependency, a permission set and a Play
+                    // health review it had just declined.
+                    if (HealthManifestFragments.enablesSensorWriteThrough(
+                            cls, method, value)) {
+                        usesHealth = true;
+                        usesHealthStore = true;
+                        usesHealthData = true;
+                        usesHealthWrite = true;
+                    }
+                }
+
+                @Override
                 public void usesClassMethod(String cls, String method) {
                     // Health.getStore()/getWorkouts() mean a real platform
                     // store; Health.getSensors() means BLE only. The class
@@ -1662,20 +1688,6 @@ public class AndroidGradleBuilder extends Executor {
                 // cannot see it -- and without this the build skipped the
                 // type validation and shipped a manifest with no per-type
                 // permissions, leaving those calls unauthorized.
-                // Sensor write-through is store use. An app can enable it
-                // with SensorSessionOptions.setWriteToStore(true) and never
-                // name HealthStore, so the sensors-package exemption -- which
-                // exists so a BLE-only app is not dragged into Health Connect
-                // -- hid the one call that genuinely needs it, and the build
-                // shipped no bridge and no permissions for a documented flow.
-                if ("com/codename1/health/sensors/SensorSessionOptions"
-                        .equals(cls)
-                        && method.startsWith("setWriteToStore")) {
-                    usesHealth = true;
-                    usesHealthStore = true;
-                    usesHealthData = true;
-                    usesHealthWrite = true;
-                }
                 if (cls.indexOf("com/codename1/health/HealthStore") == 0) {
                     usesHealth = true;
                     usesHealthStore = true;

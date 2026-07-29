@@ -41,6 +41,9 @@ import java.util.TimeZone;
 /// Calendar-based intervals require an explicit [TimeZone]. Nothing here
 /// reads the JVM default, because a server-side default of UTC would put a
 /// user's evening walk into the wrong day.
+///
+/// The zone is captured by reference and must not be modified afterwards
+/// -- see [#getTimeZone()], which explains why a copy is not taken.
 public final class HealthInterval {
 
     private final long fixedMillis;
@@ -137,6 +140,21 @@ public final class HealthInterval {
 
     /// The time zone calendar boundaries are computed in, or null for a
     /// fixed-duration interval.
+    ///
+    /// The caller's own instance, not a copy. `java.util.TimeZone` is
+    /// mutable in principle -- `SimpleTimeZone` has setters -- so an
+    /// interval built from one and then reconfigured moves its bucket
+    /// boundaries, and the same samples fall into different days. The
+    /// framework cannot defend against that here: the compile target is
+    /// the CLDC 1.1 subset, where `TimeZone` does not expose a public
+    /// `clone()` and `getTimeZone(getID())` answers GMT for an id it does
+    /// not recognise -- which would silently discard the rules of the
+    /// very zone that needs defending.
+    ///
+    /// So it is a contract rather than a guarantee: pass a zone you do
+    /// not go on to modify. `TimeZone.getTimeZone("Europe/Berlin")` and
+    /// `TimeZone.getDefault()` are both fine; a `SimpleTimeZone` you keep
+    /// a reference to and reconfigure is not.
     public TimeZone getTimeZone() {
         return timeZone;
     }

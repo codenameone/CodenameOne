@@ -460,6 +460,30 @@ public abstract class Executor {
         /** Reports that {@code cls} is public. */
         public default void declaresPublicType(String cls) {
         }
+
+        /**
+         * Reports a call whose last argument was pushed as a literal
+         * {@code boolean}, or null when it was not.
+         *
+         * <p>{@link #usesClassMethod(String, String)} fires for the same
+         * call and says nothing about the arguments, which is enough for
+         * "this class is used" but not for a setter that switches a
+         * feature on or off: {@code setWriteToStore(false)} is the app
+         * saying it wants no store at all, and treating it like
+         * {@code true} dragged a Bluetooth-only build into Health
+         * Connect, a privacy policy and a Play health review.</p>
+         *
+         * <p>{@code value} is null unless the constant is the instruction
+         * immediately before the call, so anything computed, loaded from
+         * a variable or reached through a branch reads as unknown. The
+         * caller must treat unknown as the feature being on: the cost of
+         * over-declaring is a permission the app does not need, and the
+         * cost of under-declaring is a SecurityException on a user's
+         * device.</p>
+         */
+        public default void usesClassMethodWithBooleanArgument(String cls,
+                String method, Boolean value) {
+        }
     }
 
     public static interface InternalClassRemapper {
@@ -657,42 +681,71 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitFrame(int i, int i1, Object[] os, int i2, Object[] os1) {
+                                    pushedBoolean = null;
                                 }
+
+                                /**
+                                  * The literal pushed immediately before
+                                  * the next call, or null. Cleared by
+                                  * every other visit below -- including
+                                  * labels and frames, since a constant
+                                  * that is last before a merge point is
+                                  * not a straight-line argument -- so
+                                  * "unknown" is what a missed case
+                                  * degrades to.
+                                  */
+                                private Boolean pushedBoolean;
 
                                 @Override
                                 public void visitInsn(int i) {
+                                    pushedBoolean = i == Opcodes.ICONST_0
+                                            ? Boolean.FALSE
+                                            : i == Opcodes.ICONST_1
+                                                    ? Boolean.TRUE : null;
                                 }
 
                                 @Override
                                 public void visitIntInsn(int i, int i1) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitVarInsn(int i, int i1) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitTypeInsn(int i, String string) {
+                                    pushedBoolean = null;
                                     scanner.usesClass(string);
                                 }
 
                                 @Override
                                 public void visitFieldInsn(int i, String string, String string1, String string2) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitMethodInsn(int i, String owner, String name, String string2) {
+                                    Boolean arg = pushedBoolean;
+                                    pushedBoolean = null;
                                     scanner.usesClass(owner);
                                     if (name != null && !name.equals("<init>")) {
                                         scanner.usesClassMethod(owner, name);
+                                        scanner.usesClassMethodWithBooleanArgument(
+                                                owner, name, arg);
                                     }
                                 }
 
                                 @Override
                                 public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+                                    Boolean arg = pushedBoolean;
+                                    pushedBoolean = null;
                                     scanner.usesClass(owner);
                                     if (name != null && !name.equals("<init>")) {
                                         scanner.usesClassMethod(owner, name);
+                                        scanner.usesClassMethodWithBooleanArgument(
+                                                owner, name, arg);
                                     }
                                 }
 
@@ -700,6 +753,7 @@ public abstract class Executor {
                                 public void visitInvokeDynamicInsn(String name,
                                         String descriptor, Handle bootstrap,
                                         Object... args) {
+                                    pushedBoolean = null;
                                     // A method reference -- store::readSamples,
                                     // or a lambda body -- is an invokedynamic
                                     // whose real target sits in the bootstrap
@@ -732,14 +786,17 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitJumpInsn(int i, Label label) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitLabel(Label label) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitLdcInsn(Object o) {
+                                    pushedBoolean = null;
                                     if (o instanceof Type) {
                                         scanner.usesClass(((Type) o).getClassName());
                                     }
@@ -747,18 +804,22 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitIincInsn(int i, int i1) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitTableSwitchInsn(int i, int i1, Label label, Label[] labels) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitLookupSwitchInsn(Label label, int[] ints, Label[] labels) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitMultiANewArrayInsn(String string, int i) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
@@ -774,6 +835,7 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitLineNumber(int i, Label label) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override

@@ -54,6 +54,52 @@ class HealthManifestFragmentsTest {
         return n;
     }
 
+    /**
+     * A Bluetooth-only app that switches write-through off stays a
+     * Bluetooth-only app. Reading the setter without its argument dragged
+     * it into Health Connect, a per-type permission set, a privacy policy
+     * and a Play health review for a feature it had just declined.
+     */
+    @Test
+    void explicitlyDisablingWriteThroughIsNotStoreUse() {
+        assertFalse(HealthManifestFragments.enablesSensorWriteThrough(
+                HealthManifestFragments.SENSOR_OPTIONS,
+                "setWriteToStore", Boolean.FALSE));
+    }
+
+    @Test
+    void enablingWriteThroughIsStoreUse() {
+        assertTrue(HealthManifestFragments.enablesSensorWriteThrough(
+                HealthManifestFragments.SENSOR_OPTIONS,
+                "setWriteToStore", Boolean.TRUE));
+    }
+
+    /**
+     * An argument the scanner could not read is the feature being on.
+     * Over-declaring costs a permission the app does not use; the other
+     * way costs a SecurityException on a user's device.
+     */
+    @Test
+    void anArgumentThatIsNotALiteralIsTreatedAsEnabling() {
+        assertTrue(HealthManifestFragments.enablesSensorWriteThrough(
+                HealthManifestFragments.SENSOR_OPTIONS,
+                "setWriteToStore", null));
+    }
+
+    @Test
+    void otherCallsAreNotWriteThrough() {
+        assertFalse(HealthManifestFragments.enablesSensorWriteThrough(
+                HealthManifestFragments.SENSOR_OPTIONS,
+                "setAutoReconnect", Boolean.TRUE),
+                "another boolean setter on the same class must not count");
+        assertFalse(HealthManifestFragments.enablesSensorWriteThrough(
+                "com/codename1/health/HealthStore", "setWriteToStore",
+                Boolean.TRUE),
+                "and the class has to match");
+        assertFalse(HealthManifestFragments.enablesSensorWriteThrough(
+                HealthManifestFragments.SENSOR_OPTIONS, null, Boolean.TRUE));
+    }
+
     @Test
     void readTokensBecomeReadPermissions() {
         String out = HealthManifestFragments.injectPermissions("",

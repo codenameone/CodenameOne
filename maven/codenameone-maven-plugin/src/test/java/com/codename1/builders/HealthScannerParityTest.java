@@ -61,6 +61,12 @@ public class HealthScannerParityTest {
      * Enabling sensor write-through is store use on both platforms. It is
      * the one call inside the sensors package that needs the health
      * stack, and the package-wide exemption hides it by default.
+     *
+     * <p>Both must reach that verdict through the shared classifier and
+     * from the callback that carries the argument: the same call with a
+     * literal {@code false} is a Bluetooth-only app switching the store
+     * off, and answering yes to it costs that app the whole health
+     * apparatus on both platforms.</p>
      */
     @Test
     void bothScannersTreatSensorWriteThroughAsStoreUse() throws Exception {
@@ -68,10 +74,14 @@ public class HealthScannerParityTest {
                 "IPhoneBuilder"}) {
             String src = source(builder);
             assertTrue(src.contains(
-                    "com/codename1/health/sensors/SensorSessionOptions"),
+                    "HealthManifestFragments.enablesSensorWriteThrough"),
                     builder + " must classify setWriteToStore as store use;"
                             + " the sensors exemption hides it otherwise");
-            assertTrue(src.contains("setWriteToStore"), builder);
+            assertTrue(src.contains(
+                    "usesClassMethodWithBooleanArgument"),
+                    builder + " must decide it where the argument is"
+                            + " visible, or setWriteToStore(false) reads"
+                            + " the same as setWriteToStore(true)");
         }
     }
 
