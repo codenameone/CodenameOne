@@ -756,6 +756,28 @@ public class HealthStore {
     /// these and may answer whenever it likes; a late answer is dropped.
     static final class OneShot<T> extends AsyncResource<T> {
 
+        /// Cancellation is a terminal transition like the other two, and
+        /// it has to share their monitor.
+        ///
+        /// `AsyncResource.cancel` guards on its own private lock while
+        /// these guard on this instance, so a cancel arriving while a
+        /// platform callback was inside `complete` passed both checks:
+        /// the callback had already read `isDone()` as false, cancel then
+        /// finished, and `super.complete` -- which does not consult
+        /// `cancelled` -- ran the success callback anyway. The caller was
+        /// handed a value by a resource whose `isCancelled()` answers
+        /// true and whose `get()` throws the cancellation.
+        @Override
+        public synchronized boolean cancel(boolean mayInterruptIfRunning) {
+            if (isDone()) {
+                // Already settled, so there is nothing to cancel -- which
+                // is the same answer the superclass gives, arrived at
+                // without racing it.
+                return false;
+            }
+            return super.cancel(mayInterruptIfRunning);
+        }
+
         @Override
         public synchronized void complete(T value) {
             if (isDone()) {

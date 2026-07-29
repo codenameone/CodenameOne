@@ -54,6 +54,50 @@ class HealthReadPagingTest extends UITestBase {
      * at the first page -- returning the data the caller already had and
      * never reaching the remainder it asked for.</p>
      */
+    /**
+     * A cancelled one-shot stays cancelled.
+     *
+     * <p>{@code AsyncResource.cancel} guards on its own private lock
+     * while {@code OneShot} guards on the instance, so a cancel arriving
+     * while a platform callback was inside {@code complete} passed both
+     * checks and the success callback ran anyway -- handing the caller a
+     * value from a resource whose {@code isCancelled()} answers true and
+     * whose {@code get()} throws.</p>
+     *
+     * <p>The interleaving itself needs the callback suspended between its
+     * check and the superclass call, which a test cannot arrange. What
+     * this pins is the outcome either ordering must produce, and that
+     * cancellation is now decided under the same monitor as the other
+     * two terminal transitions.</p>
+     */
+    @Test
+    void aCancelledOneShotNeverDeliversAValue() {
+        HealthStore.OneShot<String> shot = new HealthStore.OneShot<String>();
+        final int[] delivered = new int[1];
+        shot.ready(new com.codename1.util.SuccessCallback<String>() {
+            public void onSucess(String value) {
+                delivered[0]++;
+            }
+        });
+
+        assertTrue(shot.cancel(true), "an unfinished one-shot cancels");
+        shot.complete("late");
+
+        assertEquals(0, delivered[0],
+                "a cancelled resource must not deliver a value");
+        assertTrue(shot.isCancelled(), "and it stays cancelled");
+    }
+
+    /** And a settled one-shot refuses the cancel rather than racing it. */
+    @Test
+    void aCompletedOneShotCannotBeCancelled() {
+        HealthStore.OneShot<String> shot = new HealthStore.OneShot<String>();
+        shot.complete("done");
+        assertFalse(shot.cancel(true),
+                "there is nothing left to cancel");
+        assertFalse(shot.isCancelled());
+    }
+
     @Test
     void aReadResumesFromTheSuppliedPageToken() throws Exception {
         FakeHealthStore store = new FakeHealthStore();
