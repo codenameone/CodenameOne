@@ -61,6 +61,10 @@ import com.codename1.util.AsyncResource;
 ///         .setLocationType(WorkoutLocationType.OUTDOOR))
 ///     .onResult((session, err) -> {
 ///         if (err != null) { Log.e(err); return; }
+///         // startSession() only builds the session; this starts the
+///         // clock and moves it to RUNNING, and until it is called
+///         // addSamples() and end() fail with SESSION_STATE.
+///         session.start();
 ///         if (!session.isLive()) {
 ///             status.setText("Recording - connect a strap for heart rate");
 ///         }

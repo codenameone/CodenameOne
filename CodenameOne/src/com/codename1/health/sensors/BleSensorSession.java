@@ -100,7 +100,7 @@ final class BleSensorSession extends SensorSession {
         }
         boolean needsListener;
         synchronized (reconnectLock) {
-            needsListener = getOptions().isAutoReconnect()
+            needsListener = options().isAutoReconnect()
                     && reconnectListener == null;
         }
         if (needsListener) {
@@ -128,7 +128,7 @@ final class BleSensorSession extends SensorSession {
 
     /// Re-runs discovery and subscription after an unexpected drop.
     void reconnect() {
-        if (!getOptions().isAutoReconnect()) {
+        if (!options().isAutoReconnect()) {
             return;
         }
         // The transition is the check. Reading the state first and then

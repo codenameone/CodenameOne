@@ -99,7 +99,13 @@ public class SensorSession {
             SensorSessionOptions options) {
         this.sensorId = sensorId;
         this.profile = profile;
-        this.options = options == null ? new SensorSessionOptions() : options;
+        // A snapshot. The builder is fluent and callers reuse one, and a
+        // session reads these values for as long as it runs -- so
+        // reconfiguring the builder afterwards rerouted a connected
+        // strap's readings into a different workout or started
+        // persisting them.
+        this.options = options == null
+                ? new SensorSessionOptions() : options.copy();
     }
 
     /// The stable identifier of the connected device -- see
@@ -114,7 +120,19 @@ public class SensorSession {
     }
 
     /// The options this session was created with.
+    ///
+    /// A copy, so that reconfiguring what this returns cannot change a
+    /// running session -- the same reason the session took a snapshot of
+    /// what it was given.
     public final SensorSessionOptions getOptions() {
+        return options.copy();
+    }
+
+    /// The session's own copy, which is not handed out.
+    ///
+    /// [#getOptions()] answers with a copy, and the session has no reason
+    /// to pay for one on a path that runs per notification.
+    final SensorSessionOptions options() {
         return options;
     }
 
@@ -524,7 +542,7 @@ public class SensorSession {
             // stopped-only check and left exactly the session nobody
             // holds a handle to retrying on a timer.
             if (!session.isTerminal()) {
-                session.scheduleFlush(session.getOptions()
+                session.scheduleFlush(session.options()
                         .getStoreBatchMillis());
             }
             session.fireError(asHealthException(error));

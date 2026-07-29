@@ -37,6 +37,27 @@ public final class SensorSessionOptions {
     /// Whether the session re-establishes a dropped link on its own.
     /// Defaults to `true`, which is almost always right -- chest straps
     /// drop out routinely as the wearer moves.
+    /// An independent copy of these options.
+    ///
+    /// A session takes one when it is constructed. The builder is fluent
+    /// and a caller can reuse a single instance for a second sensor, and
+    /// the session reads these values for as long as it runs -- so
+    /// reconfiguring the builder afterwards rerouted a strap's readings
+    /// into a different workout, started persisting them, or changed the
+    /// reconnect policy of a session already connected.
+    ///
+    /// The workout session is shared rather than copied: it is a live
+    /// object the caller is deliberately pointing at.
+    SensorSessionOptions copy() {
+        SensorSessionOptions out = new SensorSessionOptions();
+        out.autoReconnect = autoReconnect;
+        out.writeToStore = writeToStore;
+        out.storeBatchMillis = storeBatchMillis;
+        out.workoutSession = workoutSession;
+        out.staleSampleMillis = staleSampleMillis;
+        return out;
+    }
+
     public SensorSessionOptions setAutoReconnect(boolean autoReconnect) {
         this.autoReconnect = autoReconnect;
         return this;

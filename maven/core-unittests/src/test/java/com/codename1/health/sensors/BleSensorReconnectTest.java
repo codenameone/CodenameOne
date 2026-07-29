@@ -977,4 +977,43 @@ class BleSensorReconnectTest extends UITestBase {
         assertEquals(SensorSessionState.STOPPED, session.getState(),
                 "and it must leave the session stopped");
     }
+
+    /**
+     * A session keeps the options it was created with.
+     *
+     * <p>The builder is fluent and a caller can reuse one for a second
+     * strap, while the session reads these values for as long as it runs.
+     * Reconfiguring the builder afterwards rerouted a connected sensor's
+     * readings into a different workout, started persisting them, or
+     * changed the reconnect policy underneath it.</p>
+     */
+    @Test
+    void mutatingTheOptionsLaterDoesNotReconfigureTheSession() {
+        SensorSessionOptions options = new SensorSessionOptions()
+                .setAutoReconnect(true)
+                .setStoreBatchMillis(60000);
+        FakePeripheral p = new FakePeripheral();
+        BleSensorSession session = new BleSensorSession("fake",
+                HealthSensorProfile.HEART_RATE, options, p);
+        started.add(session);
+
+        // The same builder, reused for the next sensor.
+        options.setAutoReconnect(false)
+                .setWriteToStore(true)
+                .setStoreBatchMillis(10);
+
+        assertTrue(session.getOptions().isAutoReconnect(),
+                "the session must keep the reconnect policy it started"
+                        + " with");
+        assertFalse(session.getOptions().isWriteToStore(),
+                "and must not start persisting readings it was never"
+                        + " asked to persist");
+        assertEquals(60000, session.getOptions().getStoreBatchMillis());
+
+        // Nor through what the session hands back.
+        session.getOptions().setWriteToStore(true);
+        assertFalse(session.getOptions().isWriteToStore(),
+                "what getOptions() returns must not be the session's own"
+                        + " copy");
+    }
 }
