@@ -76,6 +76,28 @@ class ShieldApiTest {
         assertSame(ShieldStatus.NOT_INITIALIZED, ShieldStatus.forId(null));
     }
 
+    /**
+     * ShieldException carries the status id rather than the object, because
+     * IOException is serializable. getStatus() must still hand back the
+     * canonical constant, or identity checks like isTransient() silently stop
+     * working.
+     */
+    @Test
+    void exceptionStatusResolvesBackToTheCanonicalConstant() {
+        ShieldException e = new ShieldException(ShieldStatus.RATE_LIMITED, "slow down");
+        assertSame(ShieldStatus.RATE_LIMITED, e.getStatus());
+        assertTrue(e.getStatus().isTransient());
+
+        ShieldException pin = new ShieldException(ShieldStatus.PIN_MISMATCH, "bad chain");
+        assertSame(ShieldStatus.PIN_MISMATCH, pin.getStatus());
+        assertFalse(pin.getStatus().isTransient());
+    }
+
+    @Test
+    void exceptionStatusIsNeverNull() {
+        assertSame(ShieldStatus.NOT_INITIALIZED, new ShieldException(null, "x").getStatus());
+    }
+
     // --- ShieldToken ----------------------------------------------------
 
     @Test

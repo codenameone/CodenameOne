@@ -33,15 +33,23 @@ import java.io.IOException;
 /// rejected", and those deserve very different UX.
 public class ShieldException extends IOException {
 
-    private final ShieldStatus status;
+    /// The status identifier rather than the [ShieldStatus] itself.
+    ///
+    /// `IOException` is serializable, and holding a non-serializable field on a
+    /// serializable class is both a static-analysis error and a latent null after a
+    /// round trip -- which would break [#getStatus()]'s never-null contract at exactly
+    /// the moment someone is trying to work out why a request failed. A `String`
+    /// survives serialization, and [ShieldStatus#forId(String)] resolves it back to the
+    /// canonical constant, so identity comparisons still hold.
+    private final String statusId;
 
     public ShieldException(ShieldStatus status, String message) {
         super(message);
-        this.status = status == null ? ShieldStatus.NOT_INITIALIZED : status;
+        this.statusId = (status == null ? ShieldStatus.NOT_INITIALIZED : status).getId();
     }
 
     /// Why the operation failed. Never null.
     public ShieldStatus getStatus() {
-        return status;
+        return ShieldStatus.forId(statusId);
     }
 }
