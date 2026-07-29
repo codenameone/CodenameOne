@@ -81,6 +81,15 @@ public final class AppShield {
     private static final Vector listeners = new Vector();
     private static final Hashtable runtimeHosts = new Hashtable();
 
+    /// Response header a backend sets to say it rejected the *attestation token*, as opposed to
+    /// the user's own credentials.
+    ///
+    /// Without it a 401 or 403 is ambiguous: protected APIs normally carry ordinary user
+    /// authorization too, and treating every such response as an attestation rejection would make
+    /// a client re-attest through an entire login failure. Emit it only when the token itself was
+    /// the problem; the value is ignored.
+    public static final String REJECT_HEADER = "X-CN1-Attest-Reject";
+
     private AppShield() {
     }
 
@@ -224,7 +233,8 @@ public final class AppShield {
         if (request == null || !initialized) {
             return;
         }
-        String host = hostOf(request.getUrl());
+        String url = request.getUrl();
+        String host = hostOf(url);
         HostPolicy policy = policyFor(host);
         // Always clear first. A redirect reuses this request object with its
         // headers intact, so a protected endpoint with an open redirect would
@@ -234,27 +244,54 @@ public final class AppShield {
         if (!policy.isAttachToken()) {
             return;
         }
+        if (!isSecure(url)) {
+            // The token is a bearer credential. Sending it in plaintext -- after a
+            // downgrade redirect, or a mistyped scheme -- hands it to anyone on the
+            // path, and pinning cannot help because there is no certificate to pin.
+            Log.p("AppShield: refusing to attach a token to a plaintext URL for "
+                    + host + ". Use https for protected hosts.");
+            return;
+        }
         try {
             ShieldToken token = ShieldEngineRegistry.getEngine().fetchToken(null);
-            setStatus(token.getStatus());
-            if (token.isValid()) {
+            setStatus(token == null ? ShieldStatus.SERVICE_DOWN : token.getStatus());
+            if (token != null && token.isValid()) {
                 request.addRequestHeader(getConfig().getTokenHeader(), token.getValue());
                 return;
             }
-            failOrContinue(policy, new ShieldException(token.getStatus(),
+            failOrContinue(policy, new ShieldException(
+                    token == null ? ShieldStatus.SERVICE_DOWN : token.getStatus(),
                     "No valid attestation token for " + host));
         } catch (ShieldException e) {
             setStatus(e.getStatus());
             failOrContinue(policy, e);
+        } catch (Throwable t) {
+            // An engine is pluggable code that can throw anything. Letting an
+            // unchecked failure escape would block the request regardless of the
+            // host's failure mode, which is the opposite of fail-open.
+            Log.e(t);
+            setStatus(ShieldStatus.SERVICE_DOWN);
+            failOrContinue(policy, new ShieldException(ShieldStatus.SERVICE_DOWN,
+                    "Attestation engine failed for " + host));
         }
     }
 
+    /// True for an absolute https URL. Anything else -- http, or a relative URL we cannot
+    /// classify -- is not somewhere a bearer token belongs.
+    static boolean isSecure(String url) {
+        return url != null && url.toLowerCase().startsWith("https://");
+    }
+
     private static void failOrContinue(HostPolicy policy, ShieldException e) throws ShieldException {
-        if (policy.getFailureMode() == FailureMode.CLOSED) {
+        // A build with no engine must never block a request: that is the
+        // degradation contract this API documents, and a fail-closed host in an
+        // open-source or unentitled build would otherwise break outright.
+        if (policy.getFailureMode() == FailureMode.CLOSED && isProtected()) {
             throw e;
         }
         Log.p("AppShield: continuing without a token (" + e.getStatus().getId()
-                + "); host policy is fail-open.");
+                + "); " + (isProtected() ? "host policy is fail-open."
+                        : "no attestation engine is present, so nothing is enforced."));
     }
 
     /// The headers a protected URL should carry, for network paths that do not go through
@@ -273,8 +310,14 @@ public final class AppShield {
         if (!policyFor(hostOf(url)).isAttachToken()) {
             return out;
         }
+        if (!isSecure(url)) {
+            return out;
+        }
         ShieldToken token = getCachedToken();
-        if (token != null && token.isValid()) {
+        // isBoundTo(null) as well as isValid(): a token minted for one specific
+        // request must not be handed to an unrelated navigation, which is the
+        // whole reason binding exists.
+        if (token != null && token.isValid() && token.isBoundTo(null)) {
             out.put(getConfig().getTokenHeader(), token.getValue());
         }
         return out;

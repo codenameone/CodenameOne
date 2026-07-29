@@ -254,6 +254,16 @@ class ShieldApiTest {
         assertEquals(FailureMode.OPEN, HostPolicy.PROTECTED.getFailureMode());
     }
 
+    /** A bearer token has no business travelling in plaintext. */
+    @Test
+    void onlyHttpsUrlsAreConsideredSecure() {
+        assertTrue(AppShield.isSecure("https://api.example.com/x"));
+        assertTrue(AppShield.isSecure("HTTPS://api.example.com/x"));
+        assertFalse(AppShield.isSecure("http://api.example.com/x"));
+        assertFalse(AppShield.isSecure("/relative/path"));
+        assertFalse(AppShield.isSecure(null));
+    }
+
     // --- PinSet ---------------------------------------------------------
 
     private static PinSet pinSet(String host, String pin, long soft, long hard) {
@@ -320,6 +330,32 @@ class ShieldApiTest {
         assertTrue(set.isEnforcedFor("api.example.com"));
         assertFalse(set.isEnforcedFor("example.com"));
         assertNull(set.pinsFor("other.test"));
+    }
+
+    /**
+     * The set is reachable through the public AppShield.getPinSet(), so a caller
+     * that mutated it could silently switch enforcement off rather than fail
+     * visibly.
+     */
+    @Test
+    void pinSetCannotBeDisabledByMutatingWhatItReturns() {
+        Hashtable t = new Hashtable();
+        Vector v = new Vector();
+        v.addElement("AAA");
+        t.put("api.example.com", v);
+        PinSet set = new PinSet(t, 1, 0, 0);
+
+        // Mutating the table passed to the constructor must not reach inside.
+        v.removeAllElements();
+        t.clear();
+        assertTrue(set.isEnforcedFor("api.example.com"));
+        assertEquals(1, set.hostCount());
+
+        // Nor must mutating what pinsFor() hands back.
+        set.pinsFor("api.example.com").removeAllElements();
+        assertTrue(set.isEnforcedFor("api.example.com"));
+        assertFalse(set.matches("api.example.com", new String[] {"WRONG"}));
+        assertTrue(set.matches("api.example.com", new String[] {"AAA"}));
     }
 
     // --- ShieldSignals --------------------------------------------------

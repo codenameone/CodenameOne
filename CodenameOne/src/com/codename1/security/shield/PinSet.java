@@ -61,7 +61,11 @@ public final class PinSet {
     /// @param softExpiry local millis after which a refresh should be attempted, 0 for never
     /// @param hardExpiry local millis after which the set is discarded entirely, 0 for never
     public PinSet(Hashtable hostToPins, int version, long softExpiry, long hardExpiry) {
-        this.hostToPins = hostToPins == null ? new Hashtable() : hostToPins;
+        // Deep copy. The set is reachable through the public AppShield.getPinSet(),
+        // and a caller that cleared the backing vectors would leave every host
+        // looking unpinned -- which silently disables enforcement rather than
+        // failing visibly.
+        this.hostToPins = copyOf(hostToPins);
         this.version = version;
         this.softExpiry = softExpiry;
         this.hardExpiry = hardExpiry;
@@ -92,6 +96,11 @@ public final class PinSet {
         return pins != null && !pins.isEmpty();
     }
 
+    /// Number of hosts with at least one pin. Used by tests and diagnostics.
+    public int hostCount() {
+        return hostToPins.size();
+    }
+
     /// The pins registered for a host, honouring a leading `*.` wildcard, or null when the host is
     /// not pinned.
     public Vector pinsFor(String host) {
@@ -101,18 +110,42 @@ public final class PinSet {
         String h = host.toLowerCase();
         Object exact = hostToPins.get(h);
         if (exact != null) {
-            return (Vector) exact;
+            return copyOf((Vector) exact);
         }
         // Walk up the labels so a "*.example.com" entry covers "api.example.com".
         int dot = h.indexOf('.');
         while (dot >= 0 && dot < h.length() - 1) {
             Object wild = hostToPins.get("*." + h.substring(dot + 1));
             if (wild != null) {
-                return (Vector) wild;
+                return copyOf((Vector) wild);
             }
             dot = h.indexOf('.', dot + 1);
         }
         return null;
+    }
+
+    private static Hashtable copyOf(Hashtable in) {
+        Hashtable out = new Hashtable();
+        if (in == null) {
+            return out;
+        }
+        java.util.Enumeration keys = in.keys();
+        while (keys.hasMoreElements()) {
+            Object key = keys.nextElement();
+            Object value = in.get(key);
+            out.put(key, value instanceof Vector ? copyOf((Vector) value) : value);
+        }
+        return out;
+    }
+
+    private static Vector copyOf(Vector in) {
+        Vector out = new Vector();
+        if (in != null) {
+            for (int i = 0; i < in.size(); i++) {
+                out.addElement(in.elementAt(i));
+            }
+        }
+        return out;
     }
 
     /// True when at least one of the supplied chain digests matches a pin for the host.

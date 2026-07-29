@@ -68,11 +68,20 @@ public interface NetworkGuard {
     void checkCertificates(ConnectionRequest request,
             ConnectionRequest.SSLCertificate[] certificates) throws IOException;
 
+    /// Response header names this guard wants captured, or null for none.
+    ///
+    /// Asked once per response, while the connection is still open. The framework does not retain
+    /// arbitrary response headers, and by the time [#afterResponse] runs the connection has been
+    /// closed -- so anything a guard needs to see has to be named here first.
+    String[] interestingResponseHeaders();
+
     /// Called once the response code is known, including for failed requests.
     ///
     /// This is how a token layer learns its token was refused -- a 401 or 403 from a protected host
     /// usually means the cached token should be discarded before the next attempt. Must not throw;
     /// exceptions here are logged and swallowed so a telemetry problem cannot fail a request that
     /// otherwise succeeded.
-    void afterResponse(ConnectionRequest request, int responseCode);
+    /// @param headers values for the names returned by [#interestingResponseHeaders()], in the
+    ///        same order; an entry is null when the response did not carry that header
+    void afterResponse(ConnectionRequest request, int responseCode, String[] headers);
 }

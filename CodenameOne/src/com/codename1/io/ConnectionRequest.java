@@ -1193,6 +1193,7 @@ public class ConnectionRequest implements IOProgressListener {
                 Preferences.set("cn1Etag" + createRequestURL(), etag);
             }
             readHeaders(connection);
+            captureGuardHeaders(connection);
             contentLength = impl.getContentLength(connection);
             timeSinceLastUpdate = System.currentTimeMillis();
 
@@ -1334,6 +1335,36 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// - `java.io.IOException`: thrown on failure
     protected void readHeaders(Object connection) throws IOException {
+    }
+
+    /// Values of the headers the installed [NetworkGuard] asked for, captured while the connection
+    /// is still open because it is closed before `afterResponse` runs.
+    private String[] guardHeaders;
+
+    private void captureGuardHeaders(Object connection) {
+        NetworkGuard guard = NetworkManager.getNetworkGuard();
+        guardHeaders = null;
+        if (guard == null) {
+            return;
+        }
+        try {
+            String[] names = guard.interestingResponseHeaders();
+            if (names == null || names.length == 0) {
+                return;
+            }
+            String[] values = new String[names.length];
+            for (int i = 0; i < names.length; i++) {
+                values[i] = getHeader(connection, names[i]);
+            }
+            guardHeaders = values;
+        } catch (Throwable t) {
+            // Diagnostics for the guard must never fail the request.
+            Log.e(t);
+        }
+    }
+
+    String[] getGuardHeaders() {
+        return guardHeaders;
     }
 
     /// Allows reading the headers from the connection by calling the getHeader() method when a response that isn't 200 OK is sent.

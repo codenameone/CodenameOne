@@ -1171,7 +1171,7 @@ public final class NetworkManager {
                 NetworkGuard guard = networkGuard;
                 if (guard != null) {
                     try {
-                        guard.afterResponse(req, req.getResponseCode());
+                        guard.afterResponse(req, req.getResponseCode(), req.getGuardHeaders());
                     } catch (Throwable t) {
                         // A guard's bookkeeping must never turn a completed
                         // request into a failed one.

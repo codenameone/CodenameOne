@@ -52,18 +52,24 @@ public final class ShieldSignals {
             return;
         }
         synchronized (signals) {
+            boolean replaced = false;
             for (int i = 0; i < signals.size(); i++) {
                 if (((ShieldSignal) signals.elementAt(i)).getId().equals(signal.getId())) {
                     signals.setElementAt(signal, i);
-                    notifyListeners(signal);
-                    return;
+                    replaced = true;
+                    break;
                 }
             }
-            if (signals.size() >= MAX_SIGNALS) {
-                signals.removeElementAt(0);
+            if (!replaced) {
+                if (signals.size() >= MAX_SIGNALS) {
+                    signals.removeElementAt(0);
+                }
+                signals.addElement(signal);
             }
-            signals.addElement(signal);
         }
+        // Outside the lock on every path. Display.callSerially runs the task
+        // inline when the EDT is not up yet, so a listener that calls back into
+        // snapshot() would deadlock on the monitor we were still holding.
         notifyListeners(signal);
     }
 

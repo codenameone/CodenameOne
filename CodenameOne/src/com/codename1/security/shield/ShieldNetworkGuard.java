@@ -86,7 +86,11 @@ final class ShieldNetworkGuard implements NetworkGuard {
         }
     }
 
-    public void afterResponse(ConnectionRequest request, int responseCode) {
+    public String[] interestingResponseHeaders() {
+        return new String[] {AppShield.REJECT_HEADER};
+    }
+
+    public void afterResponse(ConnectionRequest request, int responseCode, String[] headers) {
         if (responseCode != 401 && responseCode != 403) {
             return;
         }
@@ -94,9 +98,15 @@ final class ShieldNetworkGuard implements NetworkGuard {
         if (host == null || !AppShield.policyFor(host).isAttachToken()) {
             return;
         }
-        // A protected host refusing the request usually means it refused the
-        // token. Dropping the cached one makes the next attempt re-attest rather
-        // than replay something already rejected.
+        // Only when the backend says it was the *token* it rejected. A protected
+        // API usually also carries ordinary user authorization, so an expired
+        // login or a plain permission denial is a 401/403 that has nothing to do
+        // with attestation -- re-attesting on every one of those would push a
+        // client into rate limiting precisely while it is already failing to log
+        // in.
+        if (headers == null || headers.length == 0 || headers[0] == null) {
+            return;
+        }
         AppShield.invalidateToken();
     }
 }

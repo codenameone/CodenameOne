@@ -119,6 +119,13 @@ final class IOSDeviceIntegrity {
     private long currentBackoff = MIN_BACKOFF_MILLIS;
     /** True while a generate-then-attest bootstrap is running. */
     private boolean bootstrapInFlight;
+    /**
+     * Bumped by every reset. A callback carrying an older generation belongs to a
+     * bootstrap that was abandoned, and acting on it would repopulate the key a
+     * reset just deleted -- racing whatever flow started afterwards to persist a
+     * different key.
+     */
+    private int generation;
     /** Callers that arrived mid-bootstrap and will assert once it completes. */
     private final java.util.Vector waitingForBootstrap = new java.util.Vector();
 
@@ -144,6 +151,8 @@ final class IOSDeviceIntegrity {
         synchronized (flowLock) {
             currentBackoff = MIN_BACKOFF_MILLIS;
             bootstrapInFlight = false;
+            // Any callback still outstanding now belongs to an abandoned flow.
+            generation++;
             failBootstrapWaiters("App Attest state was reset while a bootstrap was in flight");
         }
     }
@@ -278,6 +287,10 @@ final class IOSDeviceIntegrity {
         if (pending == null || instance == null) {
             return;
         }
+        if (isStale(pending)) {
+            fail(pending, "App Attest state was reset while this request was in flight");
+            return;
+        }
         if (keyId == null || keyId.length() == 0) {
             fail(pending, "App Attest key generation returned no identifier");
             return;
@@ -297,6 +310,10 @@ final class IOSDeviceIntegrity {
     public static void nativeAttestationReady(final int requestId, final String attestationB64) {
         PendingRequest pending = take(requestId);
         if (pending == null) {
+            return;
+        }
+        if (isStale(pending)) {
+            fail(pending, "App Attest state was reset while this request was in flight");
             return;
         }
         if (attestationB64 == null) {
@@ -409,11 +426,23 @@ final class IOSDeviceIntegrity {
     }
 
     private static int register(PendingRequest pending) {
+        if (instance != null) {
+            pending.generation = instance.generation;
+        }
         synchronized (REQUESTS) {
             int rid = nextRequestId++;
             REQUESTS.put(Integer.valueOf(rid), pending);
             return rid;
         }
+    }
+
+    /**
+     * True when this callback belongs to a flow a reset has since abandoned. Its
+     * results must be discarded rather than written back, or it would resurrect
+     * the key the reset deleted.
+     */
+    private static boolean isStale(PendingRequest pending) {
+        return instance != null && pending.generation != instance.generation;
     }
 
     private static PendingRequest take(int requestId) {
@@ -470,6 +499,9 @@ final class IOSDeviceIntegrity {
         final String keyId;
         String clientData;
         boolean retried;
+        /// Which reset generation this request was registered under. A callback
+        /// carrying an older one belongs to an abandoned flow.
+        int generation;
 
         PendingRequest(AsyncResource<String> result, String nonce, int op, String keyId) {
             this.result = result;
