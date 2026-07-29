@@ -74,9 +74,11 @@ public class WidgetTimeline {
 
     private SurfaceNode defaultContent;
     /// Per-family layout overrides. A map rather than a field per family: the catalog grows (the
-    /// watch accessory families joined the phone ones) and a switch per accessor did not.
+    /// watch accessory families joined the phone ones) and a switch per accessor did not. A plain
+    /// HashMap rather than an EnumMap -- the Codename One runtime has no EnumMap, and lookups here
+    /// are by key so the ordering an EnumMap would give buys nothing.
     private final Map<WidgetSize, SurfaceNode> overrides =
-            new java.util.EnumMap<WidgetSize, SurfaceNode>(WidgetSize.class);
+            new java.util.HashMap<WidgetSize, SurfaceNode>();
     private final List<Entry> entries = new ArrayList<Entry>();
     private int reloadPolicy = RELOAD_AT_END;
 
