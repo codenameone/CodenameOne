@@ -960,8 +960,8 @@ public class Sheet extends Container {
         if (contentPaneInsets == null) {
             return;
         }
-        for (int iter = 0; iter < contentPaneInsets.size(); iter++) {
-            contentPaneInsets.get(iter).restore();
+        for (ContentPaneInset inset : contentPaneInsets) {
+            inset.restore();
         }
         contentPaneInsets = null;
     }
@@ -972,8 +972,7 @@ public class Sheet extends Container {
         if (contentPaneInsets == null) {
             return null;
         }
-        for (int iter = 0; iter < contentPaneInsets.size(); iter++) {
-            ContentPaneInset inset = contentPaneInsets.get(iter);
+        for (ContentPaneInset inset : contentPaneInsets) {
             if (inset.style == style) { //NOPMD CompareObjectsWithEquals
                 return inset;
             }
@@ -1548,8 +1547,8 @@ public class Sheet extends Container {
 
         ContentPaneInset(Style style) {
             this.style = style;
-            for (int iter = 0; iter < SIDES.length; iter++) {
-                remember(SIDES[iter]);
+            for (int side : SIDES) {
+                remember(side);
             }
         }
 
@@ -1566,9 +1565,9 @@ public class Sheet extends Container {
             if (appliedPadding == null) {
                 return;
             }
-            for (int iter = 0; iter < SIDES.length; iter++) {
-                if (!isIntact(SIDES[iter])) {
-                    remember(SIDES[iter]);
+            for (int side : SIDES) {
+                if (!isIntact(side)) {
+                    remember(side);
                 }
             }
         }
@@ -1577,8 +1576,7 @@ public class Sheet extends Container {
         void recordApplied() {
             appliedPadding = new float[SIDES.length];
             appliedUnits = new byte[SIDES.length];
-            for (int iter = 0; iter < SIDES.length; iter++) {
-                int side = SIDES[iter];
+            for (int side : SIDES) {
                 appliedPadding[side] = style.getPaddingFloatValue(false, side);
                 appliedUnits[side] = unitOf(style, side);
             }
@@ -1593,8 +1591,8 @@ public class Sheet extends Container {
 
         /// True when any side still holds its inset, meaning there is something left to restore.
         boolean hasIntactSide() {
-            for (int iter = 0; iter < SIDES.length; iter++) {
-                if (isIntact(SIDES[iter])) {
+            for (int side : SIDES) {
+                if (isIntact(side)) {
                     return true;
                 }
             }
@@ -1604,8 +1602,7 @@ public class Sheet extends Container {
         /// Puts back the padding of every side that still holds its inset, leaving the sides that
         /// were changed since as they are.
         void restore() {
-            for (int iter = 0; iter < SIDES.length; iter++) {
-                int side = SIDES[iter];
+            for (int side : SIDES) {
                 if (isIntact(side)) {
                     setPaddingUnit(style, side, units[side]);
                     style.setPadding(side, padding[side]);
