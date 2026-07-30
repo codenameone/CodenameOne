@@ -285,20 +285,36 @@ public class HealthStore {
     /// queue exists to prevent, with the added twist that the caller who
     /// caused it had already stopped listening.
     ///
-    /// The timeout is armed on the port's resource, and starts here rather
-    /// than when the request arrived: a queued request has not shown
-    /// anything to anyone yet, and charging it for the time the sheet in
-    /// front of it spent on screen would fail it before it ever ran. When
-    /// it does fire the queue moves on, which is a guess -- the sheet may
-    /// still be on screen -- but the alternative is a lost platform
-    /// callback disabling authorization for the rest of the process.
+    /// The timeout bounds the *caller*, not the screen. It is armed on the
+    /// caller's resource, so a request that outlives its budget is answered
+    /// with [HealthError#TIMEOUT] while the flow in front of it keeps the
+    /// screen until the platform says it is done. Arming it on the flow
+    /// instead made the timeout release the queue, which is the same defect
+    /// one step removed: `waitingForResult` is cleared by the activity
+    /// result and by nothing else, so the next sheet launched beside a
+    /// permission activity that was still open and its listener was
+    /// silently dropped.
+    ///
+    /// That leaves the queue depending on the port to settle the flow, and
+    /// every port does, on every path. Android always receives an activity
+    /// result once the activity finishes -- `RESULT_CANCELED` at the least
+    /// -- and settles from the catch if the activity could not be started
+    /// at all; an unreadable grant list still resolves, since the sheet did
+    /// complete. iOS settles from the HealthKit completion handler. The
+    /// remaining way to strand the queue is the process dying, which resets
+    /// it anyway.
+    ///
+    /// The timeout starts here rather than when the request arrived: a
+    /// queued request has not shown anything to anyone yet, and charging it
+    /// for the time the sheet in front of it spent on screen would fail it
+    /// before it ever ran.
     private void startAuthorization(List<HealthAccess> access,
             AsyncResource<Boolean> out) {
         AsyncResource<Boolean> flow = new OneShot<Boolean>();
         // Authorization waits on a human reading a permission sheet, so
         // it gets its own much longer budget -- the operation timeout
         // would fail the request while the UI was still legitimately up.
-        armTimeout(flow, authorizationTimeout);
+        armTimeout(out, authorizationTimeout);
         // Registered before the port is asked, because a port that answers
         // inline would otherwise settle the resource before anything was
         // watching and leave the queue stalled with the flag still set.

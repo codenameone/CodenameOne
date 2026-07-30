@@ -428,10 +428,18 @@ public class WindowsImplementation extends CodenameOneImplementation {
     /// sensor layer is unaffected and works fully.
     @Override
     public com.codename1.health.Health getHealth() {
-        if (health == null) {
-            health = new com.codename1.impl.health.LocalHealth();
+        // Guarded because everything the store serializes is per-instance:
+        // the authorization queue, the subscription registry, drain
+        // coalescing and the persisted-cursor lock. Two threads racing this
+        // getter each got their own store, and two stores coordinate on
+        // nothing -- they would launch overlapping permission flows despite
+        // the queue inside each one being correct.
+        synchronized (WindowsImplementation.class) {
+            if (health == null) {
+                health = new com.codename1.impl.health.LocalHealth();
+            }
+            return health;
         }
-        return health;
     }
 
     // WinRT Geolocator-backed location. getCurrentLocation reports OUT_OF_SERVICE

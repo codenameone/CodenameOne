@@ -14958,10 +14958,18 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// stack and real hardware.
     @Override
     public com.codename1.health.Health getHealth() {
-        if (health == null) {
-            health = HealthSimulatorHooks.createSimulatedHealth();
+        // Guarded because everything the store serializes is per-instance:
+        // the authorization queue, the subscription registry, drain
+        // coalescing and the persisted-cursor lock. Two threads racing this
+        // getter each got their own store, and two stores coordinate on
+        // nothing -- they would launch overlapping permission flows despite
+        // the queue inside each one being correct.
+        synchronized (JavaSEPort.class) {
+            if (health == null) {
+                health = HealthSimulatorHooks.createSimulatedHealth();
+            }
+            return health;
         }
-        return health;
     }
 
     /**

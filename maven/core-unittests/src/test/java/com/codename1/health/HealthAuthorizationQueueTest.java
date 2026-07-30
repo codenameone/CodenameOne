@@ -198,35 +198,51 @@ class HealthAuthorizationQueueTest extends UITestBase {
     }
 
     /**
-     * The authorization timeout releases the screen too.
+     * A caller that times out is answered; the screen stays held.
      *
-     * <p>Keying the queue to the native flow raises the opposite risk: a
-     * platform callback that never arrives would hold the screen for the
-     * life of the process and disable authorization entirely. The timeout
-     * is armed on the flow rather than on the caller precisely so that it
-     * is the backstop for both.</p>
+     * <p>This asserted the opposite until the review caught it. Arming the
+     * timeout on the flow made the timeout itself release the queue, which is
+     * the original defect one step removed: {@code waitingForResult} is
+     * cleared by the activity result and by nothing else, so the next sheet
+     * launched beside a permission activity that was still open and had its
+     * listener silently dropped. The old test called that "a lost platform
+     * callback must not strand the screen" and was pinning the bug.</p>
+     *
+     * <p>The timeout now bounds the caller only. What releases the screen is
+     * the port settling the flow, which every port does on every path:
+     * Android always receives an activity result once the activity finishes
+     * and settles from the catch if it could not be started, and an
+     * unreadable grant list still resolves because the sheet did complete.
+     * The remaining way to strand the queue is the process dying, which
+     * resets it anyway.</p>
      */
     @Test
-    void aTimedOutFlowStillReleasesTheScreen() throws Exception {
+    void aTimedOutCallerIsAnsweredWhileTheScreenStaysHeld() throws Exception {
         FakeHealthStore store = new FakeHealthStore();
         store.setAuthorizationTimeoutForTest(120);
         store.holdAuthorization = true;
 
         AsyncResource<Boolean> first =
                 store.requestAuthorization(read(HealthDataType.STEPS));
-        store.requestAuthorization(read(HealthDataType.HEART_RATE));
-        assertEquals(1, store.authorizationsSeen.size());
+        AsyncResource<Boolean> second =
+                store.requestAuthorization(read(HealthDataType.HEART_RATE));
 
-        // The port never answers; only the timeout can move this along.
         long deadline = System.currentTimeMillis() + 5000L;
-        while (store.authorizationsSeen.size() < 2
-                && System.currentTimeMillis() < deadline) {
+        while (!first.isDone() && System.currentTimeMillis() < deadline) {
             Thread.sleep(20L);
         }
+        assertTrue(first.isDone(), "the caller must not wait past its budget");
+        assertEquals(1, store.authorizationsSeen.size(),
+                "the sheet is still on screen, so nothing else may launch");
+        assertFalse(second.isDone());
 
+        // The platform answers the flow the caller gave up on. Only now is
+        // the screen free.
+        store.heldAuthorizations.get(0).complete(Boolean.TRUE);
         assertEquals(2, store.authorizationsSeen.size(),
-                "a lost platform callback must not strand the screen");
-        assertTrue(first.isDone(), "and the caller is told it timed out");
+                "the queue moves when the native flow closes, not before");
+        store.heldAuthorizations.get(1).complete(Boolean.TRUE);
+        assertTrue(second.isDone());
     }
 
     /** With nothing queued, the next request runs immediately. */
