@@ -180,7 +180,11 @@ jobs:
       # try to delete it; the second deletion fails ("gpg ... exit code 2") and
       # marks the whole release red even though every artifact published.
       - name: Set up JDK 17 for the Game Builder editor
-        if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        # R2 counts as a reason to continue: the editors are resolved per-version, so a
+        # core release that reached R2 needs its editors there too, even if Central failed.
+        if: >-
+          always() && (steps.deploy.outcome == 'success' ||
+          steps.confirm.outcome == 'success' || steps.r2_core.outcome == 'success')
         uses: actions/setup-java@v5
         with:
           java-version: '17'
@@ -192,7 +196,9 @@ jobs:
       - name: Deploy Game Builder editor to Maven Central
         id: deploy_gamebuilder
         continue-on-error: true
-        if: always() && (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success')
+        if: >-
+          always() && (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success' ||
+          steps.r2_core.outcome == 'success')
         run: |
           export GPG_TTY=$(tty)
           cd scripts/gamebuilder
@@ -269,7 +275,9 @@ jobs:
       - name: Deploy Signing Wizard editor to Maven Central
         id: deploy_certificatewizard
         continue-on-error: true
-        if: always() && (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success')
+        if: >-
+          always() && (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success' ||
+          steps.r2_core.outcome == 'success')
         run: |
           export GPG_TTY=$(tty)
           cd scripts/certificatewizard
@@ -325,7 +333,9 @@ jobs:
       - name: Deploy Settings editor to Maven Central
         id: deploy_settings
         continue-on-error: true
-        if: always() && (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success')
+        if: >-
+          always() && (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success' ||
+          steps.r2_core.outcome == 'success')
         run: |
           export GPG_TTY=$(tty)
           cd scripts/settings
@@ -378,7 +388,14 @@ jobs:
       - name: Regenerate R2 metadata for the editors
         id: r2_editor_metadata
         continue-on-error: true
-        if: always() && steps.r2_core.outcome == 'success'
+        # Skipped when any editor upload failed: regen discovers a version from any key
+        # under <artifact>/<version>/, so running it after a partial copy would publish an
+        # incomplete editor as <latest>/<release>. The gate below still fails the job.
+        if: >-
+          always() && steps.r2_core.outcome == 'success' &&
+          steps.r2_gamebuilder.outcome != 'failure' &&
+          steps.r2_certificatewizard.outcome != 'failure' &&
+          steps.r2_settings.outcome != 'failure'
         run: python3 maven/scripts/r2/regen-maven-metadata.py
 
       - name: Fail when any publication did not complete

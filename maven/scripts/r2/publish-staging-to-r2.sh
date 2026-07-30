@@ -84,6 +84,17 @@ for dir in "$@"; do
                 --endpoint-url "$ENDPOINT" --query ETag --output text 2>"$head_err"); then
             :
         elif grep -qE '(404)|(Not Found)' "$head_err"; then
+            # The sidecar is absent, but an interrupted recursive copy can leave the
+            # artifact behind without it. Say so loudly rather than silently treating
+            # the whole coordinate as unpublished. A complete release always has both,
+            # so artifact-without-sidecar means the previous upload never finished and
+            # the version was never advertised in maven-metadata -- safe to finish.
+            artifact_key="${key%.sha1}"
+            if aws s3api head-object --bucket "$R2_BUCKET" --key "$artifact_key" \
+                    --endpoint-url "$ENDPOINT" >/dev/null 2>&1; then
+                echo "    NOTE: $artifact_key exists without its .sha1 -- completing an" \
+                     "interrupted upload"
+            fi
             continue
         else
             echo "ERROR: could not determine whether $key already exists." >&2
