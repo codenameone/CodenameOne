@@ -182,6 +182,18 @@ final class IOSDeviceIntegrity {
      * behaviour and bounded.</p>
      */
     private String attestAnsweredForKey;
+
+    /**
+     * Set when the keychain refused to delete part of a discarded identity.
+     *
+     * <p>Attestation refuses outright while it is set. The alternative is worse than a
+     * failing app: half an identity with no markers reads as a fresh key whose
+     * attestation never began, so every request would spend a rate-limited attempt on a
+     * key that is already attested and already rejected. Cleared by a reset that
+     * succeeds, and not persisted -- there is nowhere to persist it, since the failure
+     * being recorded is that persistence is not working.</p>
+     */
+    private boolean discardFailed;
     /** True while a generate-then-attest bootstrap is running. */
     private boolean bootstrapInFlight;
     /**
@@ -254,6 +266,15 @@ final class IOSDeviceIntegrity {
             attestAnsweredForKey = null;
         }
         if (!idGone || !stateGone) {
+            // The identity survives in part, and there may be nothing left to make it
+            // terminal: a successfully attested key has no start marker and no spent
+            // marker, by design, so the next request would read the retained key as
+            // never submitted and attest it again -- a rate-limited attempt on a key
+            // Apple has already attested, repeated per request. Nothing persisted can
+            // express "this key is finished" once the keychain is refusing writes, so
+            // the state is held in memory and requestToken refuses until a reset
+            // succeeds or the process restarts.
+            discardFailed = true;
             // The two deletions are not atomic, so a partial failure leaves half the
             // identity gone. Treating that as "untouched" would let a callback from the
             // rejected identity still pass its staleness check and act on inconsistent
@@ -337,6 +358,18 @@ final class IOSDeviceIntegrity {
             return r;
         }
         synchronized (flowLock) {
+            if (discardFailed) {
+                // A previous discard left half an identity behind because the keychain
+                // refused a deletion. Attesting from here spends a rate-limited attempt
+                // on a key that is already attested and already rejected, once per
+                // request, so the app is told plainly instead. resetAttestation() clears
+                // it if the keychain recovers.
+                r.error(new RuntimeException("App Attest could not discard a rejected key "
+                        + "and cannot safely generate another; call "
+                        + "DeviceIntegrity.resetAttestation() once the device's keychain "
+                        + "is writable again"));
+                return r;
+            }
             long retryAfter = Math.max(readRetryAfter(), retryAfterFallback);
             if (retryAfter > System.currentTimeMillis()) {
                 r.error(new RuntimeException("App Attest is backing off after a throttle; "
@@ -768,7 +801,23 @@ final class IOSDeviceIntegrity {
                     // one-shot limit still holds for the life of the process rather than
                     // letting every later request burn another key.
                     instance.recoverySpentInMemory = true;
-                    SecureStorage.getInstance().set(KEY_RECOVERY_SPENT, "1");
+                    if (!SecureStorage.getInstance().set(KEY_RECOVERY_SPENT, "1")) {
+                        // No replacement without the marker. The in-memory copy only
+                        // covers this process, and the replacement's own start marker
+                        // DOES persist -- so after a restart the next launch would find a
+                        // discarded-looking key with no record that a recovery had been
+                        // spent, and start another one. That is a rate-limited hardware
+                        // key per launch, caused by the very write that was meant to
+                        // bound it. Failing here costs this caller one request, and the
+                        // device is left with no key at all, so a later attempt starts
+                        // cleanly rather than compounding.
+                        instance.bootstrapInFlight = false;
+                        fail(pending, "App Attest could not record that its one-time "
+                                + "recovery had been used, so it was not attempted");
+                        instance.failBootstrapWaiters("App Attest could not record that "
+                                + "its one-time recovery had been used");
+                        return;
+                    }
                     PendingRequest retry = new PendingRequest(pending.result, pending.nonce,
                             PendingRequest.OP_GENERATE_KEY, null);
                     retry.retried = true;

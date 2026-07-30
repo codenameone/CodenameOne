@@ -8335,6 +8335,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         final JCheckBoxMenuItem supported = new JCheckBoxMenuItem("Attestation Supported",
                 pref.getBoolean("ShieldSim.supported", true));
         JavaSEShield.attestationSupported = supported.isSelected();
+        // A restored FALSE is a simulation left switched on, exactly like a restored
+        // checkbox elsewhere in this menu -- the action listener does not fire during
+        // construction, so without this the flag is set and no engine answers, and a
+        // fail-closed host is let through instead of exercising the unsupported-device
+        // rejection the setting exists to simulate. True is the default and arms nothing.
+        if (!supported.isSelected()) {
+            JavaSEShieldEngine.ensureRegistered();
+        }
         supported.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
