@@ -102,13 +102,27 @@ static NSDictionary *cn1hkTypeMap(void) {
                 HKQuantityTypeIdentifierBodyFatPercentage,
             @"body_mass_index": HKQuantityTypeIdentifierBodyMassIndex,
             @"height": HKQuantityTypeIdentifierHeight,
-            @"hydration": HKQuantityTypeIdentifierDietaryWater,
             @"dietary_energy": HKQuantityTypeIdentifierDietaryEnergyConsumed
         }];
+        // Dietary water arrived in iOS 9, a release later than everything
+        // above it. Missed the first time because the crash was reported
+        // against the iOS 11 identifiers and only those were guarded, so the
+        // literal still held one nil for a target below 9.
+        if (@available(iOS 9.0, *)) {
+            [m setObject:HKQuantityTypeIdentifierDietaryWater
+                  forKey:@"hydration"];
+        }
         // Resting heart rate, HRV and VO2 max arrived in iOS 11. Left out
         // rather than mapped to nil, so they report as unsupported on an
         // older OS -- which is the truth, and what the portable API is built
         // to express.
+        //
+        // Every identifier this file names has been checked against the
+        // release it shipped in, rather than the ones a crash report happened
+        // to mention: of the 21, seventeen are iOS 8, dietary water is iOS 9
+        // and these three are iOS 11. Anything added later needs the same
+        // check, because the failure is a hard exception at map construction
+        // rather than a missing entry.
         if (@available(iOS 11.0, *)) {
             [m setObject:HKQuantityTypeIdentifierRestingHeartRate
                   forKey:@"resting_heart_rate"];
