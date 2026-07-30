@@ -1,4 +1,29 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.designer.css;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -16,29 +41,13 @@ import java.util.Hashtable;
  */
 public class CSSDeviceFormFactorMediaQueryTest {
 
-    public static void main(String[] args) throws Exception {
-        installHeadlessImplementation();
-        testTvMediaCompilesToDeviceTvUiids();
-        testWatchMediaCompilesToDeviceWatchUiids();
+    @BeforeAll
+    static void installHeadlessImplementation() throws Exception {
+        HeadlessTestSupport.installHeadlessImplementation();
     }
 
-    /**
-     * CSSTheme.load touches Display / Util, which need a CodenameOneImplementation.
-     * Install the same minimal headless stub the no-cef CLI uses (see
-     * NoCefCSSCLI#installHeadlessImplementation) so this test runs standalone.
-     */
-    private static void installHeadlessImplementation() throws Exception {
-        HeadlessCssCompilerImplementation stub = new HeadlessCssCompilerImplementation();
-        Class<?> displayCls = Class.forName("com.codename1.ui.Display");
-        java.lang.reflect.Field implField = displayCls.getDeclaredField("impl");
-        implField.setAccessible(true);
-        if (implField.get(null) == null) {
-            implField.set(null, stub);
-        }
-        com.codename1.io.Util.setImplementation(stub);
-    }
-
-    private static void testTvMediaCompilesToDeviceTvUiids() throws Exception {
+    @Test
+    void testTvMediaCompilesToDeviceTvUiids() throws Exception {
         Path cssFile = Files.createTempFile("cn1-tv-media", ".css");
         Path resFile = Files.createTempFile("cn1-tv-media", ".res");
         try {
@@ -64,7 +73,8 @@ public class CSSDeviceFormFactorMediaQueryTest {
         }
     }
 
-    private static void testWatchMediaCompilesToDeviceWatchUiids() throws Exception {
+    @Test
+    void testWatchMediaCompilesToDeviceWatchUiids() throws Exception {
         Path cssFile = Files.createTempFile("cn1-watch-media", ".css");
         Path resFile = Files.createTempFile("cn1-watch-media", ".res");
         try {

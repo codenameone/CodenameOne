@@ -391,7 +391,10 @@ public class CN1CSSCLI {
         if (canonical1.equals(parent2)) {
             return true;
         }
-        return contains(directory2, parent2);
+        // Walk directory2 up towards directory1. This passed directory2 as the first
+        // argument, which dropped directory1 from the comparison after one level, so only
+        // a direct parent was ever detected: contains(/a, /a/b/c) answered false.
+        return contains(directory1, parent2);
     }
     
     /**
@@ -565,7 +568,10 @@ public class CN1CSSCLI {
     
     private static String getMergedFile(String inputPath) throws IOException {
         if (System.getProperty("cn1.cssMergeFile") != null) {
-            System.getProperty("cn1.cssMergeFile");
+            // Was a bare expression whose value was discarded, so the override was read
+            // and thrown away -- callers setting cn1.cssMergeFile silently got the
+            // derived path instead.
+            return System.getProperty("cn1.cssMergeFile");
         }
         File inputFile = new File(inputPath);
         if (isMavenProject(inputFile)) {

@@ -44,6 +44,28 @@
     </scm>
     <properties>
         <cn1.version>${project.version}</cn1.version>
+        <!--
+        The Resource Editor ("designer") is deprecated and frozen at its last
+        published release. It is still built from source, for local development and
+        so cn1:designer has something to run, but it and codenameone-javase-svg
+        (which exists only to give the editor Batik SVG support) are excluded from
+        publication - see <excludeArtifacts> on central-publishing-maven-plugin
+        below. Between them they were ~95MB of every ~213MB release, nearly all of
+        it shaded third-party bytes that never changed between versions.
+
+        CSS compilation, the one part of the editor that sat on every build's
+        critical path, moved to the thin codenameone-css-cli module.
+
+        The pinned version lives in ONE place: the cn1.designer.version @Parameter
+        default on AbstractCN1Mojo, which is what user projects resolve. Deliberately
+        not duplicated as a property here, so there is nothing for update-version.sh
+        to bump out of sync. maven/scripts/r2/seed-frozen-artifacts.sh reads it from
+        there rather than repeating it, and fails loudly if it cannot, so bumping the
+        pin cannot leave the seeding behind on an older version.
+        -->
+        <!-- Last published com.codenameone:sqlite-jdbc. See the dependencyManagement
+             entry below for why this is pinned rather than tracking the release. -->
+        <cn1.sqlite.jdbc.version>7.0.263</cn1.sqlite.jdbc.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
         <java-tests.version>11</java-tests.version>
@@ -71,6 +93,9 @@
         <module>sqlite-jdbc</module>
         <module>javase</module>
         <module>javase-svg</module>
+        <!-- Depends on javase (JavaSEPort/CN1Bootstrap for CEF rasterization),
+             so it has to come after it. -->
+        <module>css-cli</module>
         <module>android</module>
         <module>ios</module>
         <module>windows</module>
@@ -135,6 +160,11 @@
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-css-cli</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-svg-transcoder</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -143,10 +173,22 @@
                 <artifactId>codenameone-lottie-transcoder</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <!--
+            Pinned, not ${project.version}: this artifact is a shaded repackage of
+            org.xerial:sqlite-jdbc:${sqlite.jdbc.version} and its contents only change
+            when that upstream version or the shade config does, yet it was 13.5MB of
+            every release. It is excluded from publication (see excludeArtifacts), so
+            codenameone-javase must depend on the last *published* coordinate -
+            otherwise every released codenameone-javase pom would point at a
+            sqlite-jdbc version that was never uploaded.
+
+            Bump cn1.sqlite.jdbc.version by hand, and remove it from excludeArtifacts
+            for that one release, whenever the shaded content actually changes.
+            -->
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>sqlite-jdbc</artifactId>
-                <version>${project.version}</version>
+                <version>${cn1.sqlite.jdbc.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>
@@ -498,6 +540,27 @@
                 <configuration>
                     <publishingServerId>central</publishingServerId>
                     <autoPublish>true</autoPublish>
+                    <!--
+                    Artifacts that are still built and installed locally but are no
+                    longer published. This plugin runs with extensions=true, which
+                    clears maven-deploy-plugin's executions and takes over the deploy
+                    phase, so the per-module <maven.deploy.skip> properties are NOT
+                    enough on their own: PublishMojo filters purely on
+                    excludeArtifacts.contains(artifact.getArtifactId()). The module
+                    properties are kept for the plain maven-deploy-plugin path.
+
+                    Matching is on the bare artifactId, not groupId:artifactId.
+                    -->
+                    <excludeArtifacts>
+                        <!-- Deprecated Resource Editor, frozen at ${cn1.designer.version}. -->
+                        <excludeArtifact>codenameone-designer</excludeArtifact>
+                        <!-- Exists only to give the editor Batik SVG support. -->
+                        <excludeArtifact>codenameone-javase-svg</excludeArtifact>
+                        <!-- Shaded repackage of org.xerial:sqlite-jdbc; consumers are
+                             pinned to ${cn1.sqlite.jdbc.version}. Drop this entry for the
+                             one release that bumps it. -->
+                        <excludeArtifact>sqlite-jdbc</excludeArtifact>
+                    </excludeArtifacts>
                 </configuration>
             </plugin>
 

@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.impl.javase.util;
 
 import org.junit.jupiter.api.Test;
@@ -227,6 +249,37 @@ class MavenUtilsTest {
         Files.write(coreJar.toPath(), new byte[]{0x50, 0x4B, 0x05, 0x06});
 
         assertNull(MavenUtils.findDesignerJarInM2(coreJar));
+    }
+
+    @Test
+    void fallsBackToTheNewestDesignerWhenNoneMatchesTheCoreVersion(@TempDir Path tempDir) throws Exception {
+        // The Resource Editor is frozen, so its version stops tracking the core's. The
+        // Component Inspector's Edit Style action only needs *a* designer, and requiring an
+        // exact match would leave that action dead on every project past the frozen editor.
+        Path m2 = tempDir.resolve("m2/com/codenameone");
+        Path coreDir = Files.createDirectories(m2.resolve("codenameone-core/8.0.5"));
+        File coreJar = coreDir.resolve("codenameone-core-8.0.5.jar").toFile();
+        Files.write(coreJar.toPath(), new byte[]{0x50, 0x4B, 0x05, 0x06});
+
+        // Numeric ordering, not lexical: 7.0.263 must win over 7.0.9.
+        for (String v : new String[]{"7.0.9", "7.0.263"}) {
+            Path dir = Files.createDirectories(m2.resolve("codenameone-designer/" + v));
+            writeWrapperZip(dir.resolve("codenameone-designer-" + v + "-jar-with-dependencies.jar").toFile(),
+                    ("payload-" + v).getBytes("UTF-8"));
+        }
+
+        File resolved = MavenUtils.findDesignerJarInM2(coreJar);
+        assertNotNull(resolved, "Expected the resolver to fall back to an available designer");
+        assertArrayEquals("payload-7.0.263".getBytes("UTF-8"), Files.readAllBytes(resolved.toPath()),
+                "Expected the newest available designer, ordered numerically");
+    }
+
+    @Test
+    void comparesVersionSegmentsNumerically() {
+        assertTrue(MavenUtils.compareVersions("7.0.263", "7.0.9") > 0);
+        assertTrue(MavenUtils.compareVersions("7.0.9", "7.0.10") < 0);
+        assertTrue(MavenUtils.compareVersions("8.0", "7.0.263") > 0);
+        assertEquals(0, MavenUtils.compareVersions("7.0.263", "7.0.263"));
     }
 
     private static void writeWrapperZip(File wrapperZip, byte[] innerJarPayload) throws Exception {

@@ -1,4 +1,29 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.designer.css;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,12 +36,13 @@ import java.util.Hashtable;
  */
 public class CSSDarkModeMediaQueryTest {
 
-    public static void main(String[] args) throws Exception {
-        testDarkMediaCompilesToDarkUiids();
-        testAtMediaInsideHeaderCommentIsIgnored();
+    @BeforeAll
+    static void installHeadlessImplementation() throws Exception {
+        HeadlessTestSupport.installHeadlessImplementation();
     }
 
-    private static void testDarkMediaCompilesToDarkUiids() throws Exception {
+    @Test
+    void testDarkMediaCompilesToDarkUiids() throws Exception {
         Path cssFile = Files.createTempFile("cn1-dark-media", ".css");
         Path resFile = Files.createTempFile("cn1-dark-media", ".res");
         try {
@@ -29,14 +55,16 @@ public class CSSDarkModeMediaQueryTest {
 
             CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
             theme.resourceFile = resFile.toFile();
+            theme.res = new com.codename1.ui.util.EditableResourcesForCSS(resFile.toFile());
+            theme.res.setTheme("Theme", new Hashtable());
             theme.updateResources();
 
             Hashtable themeProps = theme.res.getTheme("Theme");
             assertEquals("111111", themeProps.get("Button.fgColor"), "Base style fgColor");
-            assertEquals("eeeeee", themeProps.get("$DarkButton.fgColor"), "Dark style fgColor");
+            assertEquals("EEEEEE", themeProps.get("$DarkButton.fgColor"), "Dark style fgColor");
             assertEquals("000000", themeProps.get("$DarkButton.bgColor"), "Dark style bgColor");
             assertEquals("255", themeProps.get("$DarkButton.transparency"), "Dark style transparency");
-            assertEquals("ff0000", themeProps.get("$DarkButton.sel#fgColor"), "Dark selected fgColor");
+            assertEquals("FF0000", themeProps.get("$DarkButton.sel#fgColor"), "Dark selected fgColor");
         } finally {
             deleteIfExists(cssFile);
             deleteIfExists(resFile);
@@ -50,7 +78,8 @@ public class CSSDarkModeMediaQueryTest {
      * treated the subsequent block's properties as dark selectors, and
      * ran the tokenizer off EOF later on.
      */
-    private static void testAtMediaInsideHeaderCommentIsIgnored() throws Exception {
+    @Test
+    void testAtMediaInsideHeaderCommentIsIgnored() throws Exception {
         Path cssFile = Files.createTempFile("cn1-dark-comment", ".css");
         Path resFile = Files.createTempFile("cn1-dark-comment", ".res");
         try {
@@ -64,11 +93,13 @@ public class CSSDarkModeMediaQueryTest {
 
             CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
             theme.resourceFile = resFile.toFile();
+            theme.res = new com.codename1.ui.util.EditableResourcesForCSS(resFile.toFile());
+            theme.res.setTheme("Theme", new Hashtable());
             theme.updateResources();
 
             Hashtable themeProps = theme.res.getTheme("Theme");
             assertEquals("111111", themeProps.get("Button.fgColor"), "Light Button fgColor survives comment");
-            assertEquals("eeeeee", themeProps.get("$DarkButton.fgColor"), "Real dark block still compiles");
+            assertEquals("EEEEEE", themeProps.get("$DarkButton.fgColor"), "Real dark block still compiles");
             assertEquals("true", themeProps.get("@tabsGridBool"), "#Constants block isn't mangled");
         } finally {
             deleteIfExists(cssFile);

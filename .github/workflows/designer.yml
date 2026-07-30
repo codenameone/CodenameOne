@@ -7,6 +7,7 @@ on:
     paths:
       - 'CodenameOneDesigner/**'
       - 'maven/css-compiler/**'
+      - 'maven/css-cli/**'
       - 'maven/designer/**'
       - '.github/workflows/designer.yml'
   pull_request:
@@ -15,6 +16,7 @@ on:
     paths:
       - 'CodenameOneDesigner/**'
       - 'maven/css-compiler/**'
+      - 'maven/css-cli/**'
       - 'maven/designer/**'
       - '.github/workflows/designer.yml'
 
@@ -83,26 +85,18 @@ jobs:
               -Dcn1.binaries="${CN1_BINARIES}" \
               -Dtest=SimpleXmlParserTest -Dsurefire.failIfNoSpecifiedTests=false test
 
-      - name: Verify designer CLI CSS compilation
+      - name: Verify CSS CLI compilation
         run: |
-          # The Maven-built jar-with-dependencies is a ZIP wrapper around the
-          # actual runnable designer_1.jar (see the antrun
-          # add-designer-jar-with-dependencies execution in maven/designer/pom.xml).
-          # Unpack and run the inner jar directly.
-          wrapped=$(ls maven/designer/target/codenameone-designer-*-jar-with-dependencies.jar | head -n1)
-          if [ -z "${wrapped}" ] || [ ! -f "${wrapped}" ]; then
-            echo "designer jar-with-dependencies not found" >&2
-            exit 1
-          fi
-          extract_dir="$(mktemp -d)"
-          unzip -q "${wrapped}" -d "${extract_dir}"
-          designer_jar="${extract_dir}/designer_1.jar"
-          if [ ! -f "${designer_jar}" ]; then
-            echo "designer_1.jar not found inside ${wrapped}" >&2
-            ls -la "${extract_dir}"
-            exit 1
-          fi
-          tmp_dir="CodenameOneDesigner/tmp-cli-test"
+          # CN1CSSCLI lives in the thin codenameone-css-cli module and is launched
+          # on a resolved classpath (see AbstractCN1Mojo.getCssCliClasspath and the
+          # simulator's CSSWatcher), not as a shaded `java -jar`. Exercise it the
+          # same way here.
+          cd maven
+          mvn -B -q -pl css-cli -Plocal-dev-javase \
+              -Dmdep.outputFile="$PWD/css-cli-cp.txt" dependency:build-classpath
+          cd ..
+          cp="maven/css-cli/target/classes:$(cat maven/css-cli-cp.txt)"
+          tmp_dir="$(mktemp -d)"
           css_file="$tmp_dir/test.css"
           l10n_dir="$tmp_dir/localization"
           output_file="$tmp_dir/output.res"
@@ -115,7 +109,7 @@ jobs:
           cat <<'EOF' > "$l10n_dir/Strings.properties"
           greeting=Hello from CLI
           EOF
-          xvfb-run -a java -Dcli=true -jar "${designer_jar}" \
+          xvfb-run -a java -Dcli=true -cp "$cp" com.codename1.designer.css.CN1CSSCLI \
             -css -stateless -input "$css_file" -output "$output_file" -localization "$l10n_dir"
           test -s "$output_file"
 
