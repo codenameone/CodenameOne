@@ -24,25 +24,35 @@ package com.codename1.ai;
 
 /// Token accounting returned by the provider. Any field that the
 /// provider didn't return is `-1`.
+/// Token counts reported for one provider operation. Providers may count
+/// tokens differently, so use these values for billing and diagnostics rather
+/// than comparing tokenizers across services.
 public final class Usage {
     private final int promptTokens;
     private final int completionTokens;
     private final int totalTokens;
 
+    /// Creates a usage record from provider counters.
+    /// @param promptTokens tokens consumed by request input
+    /// @param completionTokens tokens generated in the response
+    /// @param totalTokens provider-reported total token count
     public Usage(int promptTokens, int completionTokens, int totalTokens) {
         this.promptTokens = promptTokens;
         this.completionTokens = completionTokens;
         this.totalTokens = totalTokens;
     }
 
+    /// @return tokens consumed by request input
     public int getPromptTokens() {
         return promptTokens;
     }
 
+    /// @return tokens generated in the response
     public int getCompletionTokens() {
         return completionTokens;
     }
 
+    /// @return provider-reported total token count
     public int getTotalTokens() {
         return totalTokens;
     }

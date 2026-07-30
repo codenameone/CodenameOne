@@ -23,13 +23,17 @@
 package com.codename1.ai;
 
 /// A plain-text fragment of a [ChatMessage].
+/// Text content within a multimodal {@link ChatMessage}.
 public final class TextPart extends MessagePart {
     private final String text;
 
+    /// Creates a text part.
+    /// @param text text sent to or received from the model
     public TextPart(String text) {
         this.text = text == null ? "" : text;
     }
 
+    /// @return text carried by this part
     public String getText() {
         return text;
     }

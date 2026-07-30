@@ -2,10 +2,10 @@
 
 [[ai-and-speech-section,AI And Speech Section]]
 Codename One ships a portable LLM client, a streaming chat component,
-speech-to-text and text-to-speech APIs, and a family of cn1lib bridges
-that wire ML Kit into iOS and Android builds. All the public surface
-lives next to the rest of the framework: the simulator, the cloud
-builder, and your CI pipeline all run the same code.
+speech-to-text and text-to-speech APIs, built-in vision and language
+services, and a portable LiteRT inference API. The builders add native
+frameworks and dependencies when application bytecode references the
+corresponding entry point.
 
 This chapter introduces every piece in turn:
 
@@ -19,8 +19,12 @@ This chapter introduces every piece in turn:
 * `com.codename1.security.SecureStorage` non-prompting overloads --
   silent reads for secrets the network layer needs on every call, such
   as LLM API keys.
-* The `cn1-ai-mlkit-*` cn1libs -- ML Kit barcode, document, and face
-  detection bridges with the native build-time scanner already wired up.
+* `com.codename1.ai.vision` -- OCR, barcode, face, labeling, pose,
+  segmentation, document correction, and camera-frame pipelines.
+* `com.codename1.ai.inference` -- reusable LiteRT sessions for
+  `.tflite` models.
+* `com.codename1.ai.language` -- language identification, translation,
+  and smart reply.
 
 NOTE: Each async call in this chapter returns an
 `com.codename1.util.AsyncResource`. Use `.ready(...)` for the success
@@ -267,49 +271,222 @@ when the OS exposes them; `setVoiceId(...)` accepts any of those
 strings, or `null` to use the default voice for the configured
 language.
 
-=== ML Kit cn1libs
+=== On-device vision
 
-Three cn1libs ship with the framework today, each backed by ML Kit on
-both platforms. The build-time scanner picks up the `com.codename1.ai.*`
-class references in your code and injects the matching Pods, Swift
-Packages, Gradle dependencies, `Info.plist` usage strings, and Android
-permissions; you don't edit build hints by hand.
+The vision API accepts JPEG, PNG, NV21, or RGBA8888 data through
+`VisionImage`. `VisionImage.fromCameraFrame(frame)` is normally the
+best way to connect a camera because it copies the frame's
+callback-owned buffers and preserves the frame rotation before analysis
+becomes asynchronous. For an encoded gallery or file image whose pixels
+need an EXIF display rotation, use
+`VisionImage.encoded(bytes, rotationDegrees)`; the one-argument overload
+assumes the stored pixels are already upright and doesn't inspect EXIF
+metadata. Each analyzer returns stable Codename One result types. Bounds
+and points use normalized coordinates in the range 0 through 1.
+`VisionOptions.minimumConfidence(...)` clamps finite and infinite values to
+that range and rejects NaN.
 
-[cols="1,1,2", options="header"]
-|===
-| cn1lib | Public API | Provides
+Android uses ML Kit. iOS and Mac native builds default to Apple Vision
+and Core Image. iOS can select ML Kit explicitly:
 
-| `cn1-ai-mlkit-barcode` | `BarcodeScanner.scan(byte[])` | Decode QR,
-EAN, Code 128, and the other ML Kit-supported barcode formats from an
-image.
-| `cn1-ai-mlkit-docscan` | `DocumentScanner.scanToFile(byte[])` |
-Capture and crop document photos. On iOS this routes through `VisionKit`
-and on Android through the Google Play Services document scanner.
-| `cn1-ai-mlkit-face` | `FaceDetector.detect(byte[])` | Detect faces and
-return packed `int[]` bounding rectangles (four ints per face: x, y,
-width, height).
-|===
-
-==== Adding a cn1lib
-
-Add the dependency to `common/pom.xml` with `<type>pom</type>` so Maven
-pulls in the per-platform classifier jars:
-
-[source,xml]
+[source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/ai-and-speech.xml[tag=ai-and-speech-xml-001,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AiAndSpeechOnDeviceSnippet.java[tag=ai-and-speech-on-device-vision,indent=0]
 ----
 
-==== Example: Scanning a barcode
+On an iOS simulator, the Apple barcode backend uses Vision barcode
+request revision 1. Newer simulator runtimes can otherwise complete a
+barcode request without reporting valid QR codes. Physical devices use
+the latest revision supplied by the OS. Test newer symbologies such as
+Micro QR on a device, or select the matching ML Kit backend.
 
+Create and reuse an analyzer when processing a sequence. Call `close()`
+when the analyzer is no longer needed. Before showing a feature, call
+its `isSupported()` method: availability can depend on the target,
+linked backend, and OS version.
 
-==== Example: Face detection
+`VisionPipeline` attaches an analyzer to a `CameraSession` frame stream
+and keeps only the newest pending frame. Live OCR and pose detection
+therefore can't build an unbounded queue when inference is slower than
+the camera. While an analysis is busy, the pipeline reuses the pending
+buffer when newer same-sized frames replace it. Results and errors are
+delivered on the Codename One EDT.
 
+`CameraFrame.getRawBytes()` can be `null` even after requesting NV21 or
+RGBA8888 when a port can't expose that format. JPEG bytes remain available;
+`VisionImage.fromCameraFrame(...)` automatically selects that fallback.
 
-NOTE: ML Kit barcode and face detection ship as small Pods or Gradle
-dependencies that add a few megabytes to the binary. The document
-scanner depends on Google Play Services on Android; on devices without
-Play Services the call returns an error through `AsyncResource.except`.
+`DocumentScanner` currently performs still-image rectangle correction on
+Apple platforms. Google's Android document scanner is an interactive
+camera flow rather than an analyzer for an existing `VisionImage`, so the
+Android backend reports it as unsupported rather than launching a UI flow.
+
+==== Vision feature and dependency selection
+
+The Java package is always part of core. The builders scan the concrete
+analyzer classes and retain only the native adapter and dependency for
+each class the application actually uses:
+
+[cols="2,2,3",options="header"]
+|===
+| API | Android | Apple default / optional backend
+
+| `TextRecognizer`
+| ML Kit text recognition
+| Vision / `GoogleMLKit/TextRecognition`
+
+| `BarcodeScanner`
+| ML Kit barcode scanning
+| Vision / `GoogleMLKit/BarcodeScanning`
+
+| `FaceDetector`
+| ML Kit face detection
+| Vision / `GoogleMLKit/FaceDetection`
+
+| `ImageLabeler`
+| ML Kit image labeling
+| Vision / `GoogleMLKit/ImageLabeling`
+
+| `PoseDetector`
+| ML Kit pose detection
+| Vision / `GoogleMLKit/PoseDetection`
+
+| `SelfieSegmenter`
+| ML Kit selfie segmentation
+| Vision / `GoogleMLKit/SegmentationSelfie`
+
+| `DocumentScanner`
+| Unsupported for still images
+| Core Image perspective correction
+|===
+
+The optional iOS ML Kit pod is added only when both the analyzer and its
+feature-specific selector are referenced. For example,
+`VisionBackends.mlKitBarcodeScanning()` adds only the barcode pod.
+Current Google ML Kit iOS pods require iOS 15.5. Selecting one of these
+optional backends automatically raises the effective application and
+CocoaPods deployment target to 15.5 when the configured target is lower.
+Referencing one Android analyzer doesn't compile or package the other
+five adapters.
+
+=== Portable LiteRT inference
+
+`InferenceSession` loads `.tflite` data from bytes, a bundled resource,
+or a private file. Android uses LiteRT and can request NNAPI. iOS uses
+TensorFlow Lite Objective-C and may request the Core ML delegate. Both
+mobile implementations fall back to CPU unless
+`allowFallback(false)` is set. Android and iOS reject strict
+`Accelerator.NPU` sessions: NNAPI can mix delegated and CPU operations,
+and the Core ML delegate can schedule work across the Neural Engine, GPU,
+and CPU. Neither reports that the entire graph ran on the requested NPU.
+With fallback enabled, NPU selection is a best-effort accelerator
+preference.
+On iOS, strict `Accelerator.CORE_ML` sessions are also rejected because
+the delegate doesn't report whether unsupported model operations remained
+on LiteRT's CPU path.
+The JavaSE simulator and targets without
+a native LiteRT runtime, including Mac native, return `false` from
+`InferenceSession.isSupported()`.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AiAndSpeechOnDeviceSnippet.java[tag=ai-and-speech-on-device-inference,indent=0]
+----
+
+Open is asynchronous because model initialization can allocate native
+resources. A session is reusable and supports multiple named inputs,
+multiple outputs, and `resizeInput(...)`. A session serializes its mutable
+native interpreter: while `run(...)` is pending, another run, input resize,
+or input/output metadata query throws `IllegalStateException`. Tensor data is
+copied across the port boundary. Always close the session.
+
+Bundle small models as resources. For larger models use
+`ModelCache.fetch(url, cacheKey, sha256)`, which downloads over HTTPS,
+verifies the supplied SHA-256 digest, and reuses the app-private cached
+file. The initial URL must use HTTPS. Ports that expose redirect responses
+reject a redirect to HTTP and discard the temporary download. iOS follows
+redirects below the portable network layer, so iOS requires the SHA-256
+argument and rejects the unpinned two-argument overload. Supply the digest
+on every platform for every third-party or remotely mutable model.
+Interrupted downloads restart through a temporary `.download` file and are
+never promoted to the cache until verification succeeds. Concurrent calls for
+the same cache key and content identity share one download but receive
+independent asynchronous resources. Canceling one caller suppresses only that
+caller's notification; it doesn't cancel the shared download or the other
+callers. When a cache key already has an active download, a request with a
+conflicting URL or digest fails instead of sharing the temporary file.
+
+=== On-device language services
+
+`LanguageIdentifier`, `Translator`, and `SmartReply` share
+`LanguageOptions`. Its minimum-confidence threshold clamps to 0 through 1 and
+rejects NaN. Translation models are downloaded and cached by ML Kit when a
+language pair is first used. Android and iOS builders
+select `language-id`, `translate`, and `smart-reply` independently, so
+using language identification alone doesn't package the other two
+SDKs.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AiAndSpeechOnDeviceSnippet.java[tag=ai-and-speech-on-device-language,indent=0]
+----
+
+`LanguageBackends.auto()` selects ML Kit on Android and Apple's Natural
+Language framework for language identification on iOS. The Apple default
+keeps arm64 simulator builds native and adds no third-party dependency.
+`LanguageBackends.mlKitLanguageIdentification()` opts identification into
+the ML Kit iOS pod. iOS translation and Smart Reply are explicit opt-ins:
+use `LanguageBackends.mlKitTranslation()` or
+`LanguageBackends.mlKitSmartReply()` respectively. Merely referencing
+`Translator` or `SmartReply` doesn't add a pod or exclude the arm64
+simulator. Selecting one of those ML Kit backends requires the x86_64
+simulator slice and raises an iOS deployment target below 15.5.
+
+The static language methods are convenient for one operation and close their
+temporary backend after either success or failure. For repeated work, call
+`LanguageIdentifier.open(...)`, `Translator.open(...)`, or
+`SmartReply.open(...)`, reuse the returned feature session, and close it when
+the last pending operation completes. Reusable sessions retain backend state
+and, on Android, cache ML Kit clients and translation clients per language
+pair.
+Mac native and the other unsupported targets return `false` from the
+language service `isSupported()` checks. Completion and failure callbacks
+arrive on the EDT.
+
+=== Platform availability
+
+The public API and the unsupported fallback are present on every
+Codename One target. Vision has native implementations on Android, iOS,
+and Mac native (Mac Catalyst); Apple Vision is the default on Apple
+targets and Android uses ML Kit. Language services and LiteRT inference
+have native implementations on Android and iOS. JavaSE, JavaScript,
+native Windows, native Linux, watchOS, and tvOS report unsupported for
+these new APIs; Mac native reports unsupported for language and LiteRT.
+No target sends data to a cloud inference service. Large
+portable runtimes or model payloads for the remaining targets remain
+appropriate opt-in libraries.
+
+No build hints or cn1lib coordinates are required for the built-in
+mobile implementations. The local Maven plugin and BuildDaemon use the
+same `PlatformFeatureCatalog`, so local and cloud builds make the same
+dependency decisions.
+
+=== Migrating from the AI cn1libs
+
+The old `com.codename1.ai.mlkit.*` and `com.codename1.ai.tflite`
+packages aren't compatibility aliases. Remove those dependencies and
+move directly to `com.codename1.ai.vision`,
+`com.codename1.ai.language`, or `com.codename1.ai.inference`. Result
+coordinates are normalized floats rather than packed
+platform-specific integer arrays. `cn1-ai-whisper` and
+`cn1-ai-stablediffusion` remain cn1libs because their native payloads
+and models are intentionally large.
+
+Remove the retired cn1lib dependency before adding the built-in class.
+During migration, the builders deduplicate identical CocoaPods names and
+preserve an explicitly declared user version constraint. Removing the old
+library is still required because compatibility aliases would keep its old
+native-interface and packaging contracts alive.
 
 ==== Putting it all together
 

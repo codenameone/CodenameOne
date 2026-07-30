@@ -3635,14 +3635,59 @@ jvm.cC = function(value, className) {
 };
 // Array load / store helpers — factor the null+type+bounds checks
 // out of the ~3000 emitted array-access sites (~170 chars each).
+// Build a REAL Java throwable, not a raw JS Error.
+//
+// These used to `throw new Error("ArrayIndexOutOfBoundsException")`. The port is
+// memory safe either way -- the checks below always ran -- but a raw JS Error is
+// not a Java object, so _E()/_Ex() funnel it through
+// wrapRawJsErrorAsRuntimeException and it reaches the handler chain as a bare
+// java.lang.RuntimeException carrying the text as its message. RuntimeException
+// is not assignable to ArrayIndexOutOfBoundsException, so
+//
+//     try { return a[i]; } catch (ArrayIndexOutOfBoundsException e) { ... }
+//
+// never matched and the exception escaped the method meaning to handle it. Same
+// for a null array and NullPointerException. Throwing the typed object makes the
+// JS port agree with every other target.
+function cn1JavaArrayError(className, message) {
+  if (jvm.classes && jvm.classes[className]) {
+    try {
+      const ex = jvm.createException(className);
+      if (typeof ex.ctor === "function") {
+        const cr = ex.ctor(ex.object);
+        // The no-arg Throwable ctors do not yield; drive one step defensively so
+        // a generator-shaped ctor still runs rather than being silently skipped.
+        if (cr && typeof cr.next === "function") { cr.next(); }
+      }
+      // The message is a nicety; attaching it must never cost us the typed
+      // throwable. createJavaString needs java_lang_String to be defined, which
+      // it may not be during very early boot.
+      if (message != null) {
+        try {
+          ex.object[CN1_THROWABLE_MESSAGE] = createJavaString(String(message));
+        } catch (msgErr) {
+          void msgErr;
+        }
+      }
+      return ex.object;
+    } catch (buildErr) {
+      void buildErr;
+    }
+  }
+  // Class not defined yet (very early boot) or construction failed: fall back to
+  // the previous behaviour rather than masking the original fault.
+  return new Error(className + (message == null ? "" : (": " + message)));
+}
 jvm.aL = function(arr, idx) {
-  if (!arr || !arr.__array) throw new Error("Array expected: " + (arr == null ? "null" : (arr.__class || typeof arr)));
-  if (idx < 0 || idx >= arr.length) throw new Error("ArrayIndexOutOfBoundsException");
+  if (arr == null) throw cn1JavaArrayError("java_lang_NullPointerException", "null array");
+  if (!arr.__array) throw new Error("Array expected: " + (arr.__class || typeof arr));
+  if (idx < 0 || idx >= arr.length) throw cn1JavaArrayError("java_lang_ArrayIndexOutOfBoundsException", idx);
   return arr[idx];
 };
 jvm.aS = function(arr, idx, value) {
-  if (!arr || !arr.__array) throw new Error("Array expected: " + (arr == null ? "null" : (arr.__class || typeof arr)));
-  if (idx < 0 || idx >= arr.length) throw new Error("ArrayIndexOutOfBoundsException");
+  if (arr == null) throw cn1JavaArrayError("java_lang_NullPointerException", "null array");
+  if (!arr.__array) throw new Error("Array expected: " + (arr.__class || typeof arr));
+  if (idx < 0 || idx >= arr.length) throw cn1JavaArrayError("java_lang_ArrayIndexOutOfBoundsException", idx);
   arr[idx] = value;
 };
 // Allocate a size-N array initialised to null. Used at the top of

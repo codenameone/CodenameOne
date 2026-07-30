@@ -305,8 +305,15 @@ public final class SurfaceSerializer {
         if (img == null) {
             return null;
         }
+        if (!(img instanceof EncodedImage)) {
+            // Ahead of the try: the diagnostic is a hard stop, and the catch below deliberately
+            // swallows everything so a bad image degrades to a missing picture rather than a
+            // failed publish.
+            SurfaceDiagnostics.beforeRasterizingImageEncode();
+        }
         try {
             if (img instanceof EncodedImage) {
+                // The cheap path: the PNG bytes the image already holds, no native work at all.
                 return ((EncodedImage) img).getImageData();
             }
             ImageIO io = ImageIO.getImageIO();

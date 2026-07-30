@@ -6754,6 +6754,28 @@ JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_THREAD_S
     return JAVA_FALSE;
 }
 
+// See the contract in cn1_globals.h. throwException() longjmps when a handler is
+// found and returns when none is; the statement-form check macros have nothing to
+// bail with, so returning here would fall through into the out-of-bounds access.
+CN1_NORETURN void cn1ThrowArrayIndexOrDie(CODENAME_ONE_THREAD_STATE, int index) {
+    throwArrayIndexOutOfBoundsException(threadStateData, index);
+    // Unreachable while any handler is installed -- every Java thread root has one
+    // (Thread.runImpl). Reached only from a native callback that entered Java
+    // without a try block, where the alternative is committing the bad read.
+    fprintf(stderr, "FATAL: array index %d out of bounds with no exception handler installed\n", index);
+    fflush(stderr);
+    abort();
+}
+
+// Null counterpart of cn1ThrowArrayIndexOrDie -- same reasoning: falling through
+// would dereference the null array the check just rejected.
+CN1_NORETURN void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE) {
+    throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData));
+    fprintf(stderr, "FATAL: null array access with no exception handler installed\n");
+    fflush(stderr);
+    abort();
+}
+
 void** interfaceVtableGlobal = 0;
 
 void** initVtableForInterface() {

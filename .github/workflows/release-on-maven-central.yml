@@ -61,24 +61,30 @@ jobs:
           # "Deployment failed while publishing" even when the bundle was
           # actually accepted and published. As a safety net for that
           # false-positive case, poll Maven Central for the key artifacts:
-          # the codenameone-maven-plugin (proxy for the core release) plus
-          # both archetypes. Skipped when the deploy already reported
-          # success (the artifact may still be propagating from Sonatype
-          # Central to repo1; that propagation can take 30+ minutes and
-          # isn't worth blocking on).
+          # the codenameone-maven-plugin (proxy for the core release), its
+          # platform-feature-catalog dependency, and both archetypes. The
+          # catalog is a separate reactor artifact used by the local builders
+          # for built-in platform dependency selection, so confirming only the
+          # plugin could leave a released plugin with an unavailable runtime
+          # dependency. Skipped when the deploy already reported success (the
+          # artifacts may still be propagating from Sonatype Central to repo1;
+          # that propagation can take 30+ minutes and isn't worth blocking on).
           set +e
           for i in $(seq 1 90); do
             plugin_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/codenameone-maven-plugin/${GITHUB_REF_NAME}/codenameone-maven-plugin-${GITHUB_REF_NAME}.pom")
+            catalog_code=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://repo1.maven.org/maven2/com/codenameone/platform-feature-catalog/${GITHUB_REF_NAME}/platform-feature-catalog-${GITHUB_REF_NAME}.pom")
             app_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/cn1app-archetype/${GITHUB_REF_NAME}/cn1app-archetype-${GITHUB_REF_NAME}.pom")
             lib_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/cn1lib-archetype/${GITHUB_REF_NAME}/cn1lib-archetype-${GITHUB_REF_NAME}.pom")
-            if [ "$plugin_code" = "200" ] && [ "$app_code" = "200" ] && [ "$lib_code" = "200" ]; then
-              echo "Confirmed codenameone-maven-plugin + cn1{app,lib}-archetype ${GITHUB_REF_NAME} on Maven Central"
+            if [ "$plugin_code" = "200" ] && [ "$catalog_code" = "200" ] && \
+               [ "$app_code" = "200" ] && [ "$lib_code" = "200" ]; then
+              echo "Confirmed plugin + platform-feature-catalog + cn1{app,lib}-archetype ${GITHUB_REF_NAME} on Maven Central"
               exit 0
             fi
-            echo "[$i/90] Waiting on Maven Central (plugin=$plugin_code, cn1app=$app_code, cn1lib=$lib_code)"
+            echo "[$i/90] Waiting on Maven Central (plugin=$plugin_code, catalog=$catalog_code, cn1app=$app_code, cn1lib=$lib_code)"
             sleep 20
           done
           echo "Artifacts ${GITHUB_REF_NAME} did not appear on Maven Central within 30 minutes"

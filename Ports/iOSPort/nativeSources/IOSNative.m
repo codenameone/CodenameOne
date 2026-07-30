@@ -6727,6 +6727,14 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceName__(CN1_THREAD_STATE_MU
 #endif // !TARGET_OS_WATCH
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isSimulator___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_SIMULATOR
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceHardwareModel__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     // hw.machine is the hardware/marketing model identifier (e.g. "iPhone15,2").
     // On the simulator it is the host arch; we map that to a stable label so the
@@ -8118,7 +8126,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkLocationUsage___R_boolean(CN1
 }
 //native boolean checkMicrophoneUsage();
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkMicrophoneUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-#ifdef INCLUDE_MICROPHONE_USAGE
+#if defined(INCLUDE_MICROPHONE_USAGE) && !TARGET_OS_TV
     return JAVA_TRUE;
 #else
     return JAVA_FALSE;
@@ -8584,7 +8592,7 @@ void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(CN1_T
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioUnit___java_lang_String_int_float_float_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
     JAVA_OBJECT path, JAVA_INT audioChannels, JAVA_FLOAT sampleRate, JAVA_OBJECT sampleBuffer) {
-#ifdef INCLUDE_MICROPHONE_USAGE
+#if defined(INCLUDE_MICROPHONE_USAGE) && !TARGET_OS_TV && !TARGET_OS_WATCH
         __block CN1AudioUnit* recorder = nil;
          
         __block NSString *exStr = nil;
@@ -8674,7 +8682,7 @@ void com_codename1_impl_ios_IOSNative_destroyAudioUnit___long(CN1_THREAD_STATE_M
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String_java_lang_String_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  destinationFile, JAVA_OBJECT mimeType, JAVA_INT sampleRate, JAVA_INT bitRate, JAVA_INT channels, JAVA_INT maxDuration) {
-#ifdef INCLUDE_MICROPHONE_USAGE
+#if defined(INCLUDE_MICROPHONE_USAGE) && !TARGET_OS_TV
     __block AVAudioRecorder* recorder = nil;
      
     __block NSString *exStr = nil;

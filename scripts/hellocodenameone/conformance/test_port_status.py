@@ -16,9 +16,9 @@ class PortStatusTest(unittest.TestCase):
 
     def test_contract_covers_registered_tests_and_goldens(self):
         counts = port_status.validate(self.manifest)
-        self.assertEqual(167, counts["tests"])
+        self.assertEqual(170, counts["tests"])
         self.assertEqual(1, counts["performance_tests"])
-        self.assertGreaterEqual(counts["features"], 51)
+        self.assertGreaterEqual(counts["features"], 54)
         self.assertEqual(11, counts["ports"])
         self.assertEqual(20, counts["manual_features"])
         self.assertEqual(8, counts["deployment_platforms"])
@@ -27,6 +27,9 @@ class PortStatusTest(unittest.TestCase):
         features = {feature["id"]: feature["tests"] for feature in self.manifest["features"]}
         self.assertEqual(["ARApiTest", "MotionSensorDeviceTest"], features["ar-motion-sensors"])
         self.assertEqual(["CameraApiTest"], features["camera-access"])
+        self.assertEqual(["VisionOnDeviceApiTest"], features["on-device-vision"])
+        self.assertEqual(["LanguageOnDeviceApiTest"], features["on-device-language"])
+        self.assertEqual(["InferenceOnDeviceApiTest"], features["on-device-inference"])
         self.assertEqual(["CalendarApiTest"], features["calendar-integration"])
         self.assertEqual(["VideoIODecodedFramesScreenshotTest"], features["video-decoding"])
         self.assertEqual(["VideoIORoundTripTest"], features["video-round-trip"])
@@ -111,6 +114,43 @@ class PortStatusTest(unittest.TestCase):
         self.assertEqual("fail", report["tests"]["StringApiTest"]["status"])
         self.assertEqual(["suite-error"], report["tests"]["StringApiTest"]["reasons"])
 
+    def test_performance_skips_are_complete_and_preserve_reasons(self):
+        expected = self.manifest["performance_benchmarks"]
+        skipped = {"objectAllocation", "hashMapChurn", "stringBuilding"}
+        log_text = "\n".join(
+            [
+                *[
+                    (
+                        f"CN1SS:PERF:skipped id={benchmark} "
+                        "reason=ios-simulator-gc-footprint"
+                        if benchmark in skipped
+                        else (
+                            f"CN1SS:PERF:benchmark id={benchmark} "
+                            "duration_ns=12000000 checksum=42"
+                        )
+                    )
+                    for benchmark in expected
+                ],
+                "CN1SS:PERF:complete benchmark_version=1 checksum=42",
+            ]
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "suite.log"
+            log_path.write_text(log_text, encoding="utf-8")
+            performance = port_status.parse_performance([log_path], expected, None)
+
+        self.assertEqual("complete", performance["status"])
+        self.assertEqual([], performance["missing"])
+        self.assertEqual(
+            {
+                benchmark: "ios-simulator-gc-footprint"
+                for benchmark in expected
+                if benchmark in skipped
+            },
+            performance["skipped"],
+        )
+        self.assertNotIn("objectAllocation", performance["benchmarks"])
+
     def test_strict_report_errors_reject_failures_missing_tests_and_incomplete_suite(self):
         report = {
             "suite_finished": False,
@@ -182,6 +222,34 @@ class PortStatusTest(unittest.TestCase):
             report = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertFalse(report["suite_finished"])
             self.assertGreater(report["summary"]["not-run"], 0)
+
+    def test_validate_rejects_inconsistent_stored_report_summary(self):
+        original_directory = self.manifest["report_directory"]
+        with tempfile.TemporaryDirectory(dir=port_status.REPO_ROOT) as tmp:
+            report_root = Path(tmp)
+            for port in self.manifest["ports"]:
+                source = port_status.REPO_ROOT / original_directory / (
+                    port["id"] + ".json"
+                )
+                (report_root / source.name).write_text(
+                    source.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+            android_path = report_root / "android.json"
+            android = port_status.read_json(android_path)
+            android["summary"]["not-run"] += 1
+            android_path.write_text(
+                json.dumps(android, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            manifest = dict(self.manifest)
+            manifest["report_directory"] = str(
+                report_root.relative_to(port_status.REPO_ROOT)
+            )
+            with self.assertRaisesRegex(
+                port_status.ContractError,
+                "summary does not match its test results",
+            ):
+                port_status.validate(manifest)
 
 
 if __name__ == "__main__":

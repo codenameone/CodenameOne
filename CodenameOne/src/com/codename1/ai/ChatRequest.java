@@ -67,54 +67,68 @@ public final class ChatRequest {
         this.safetyFilter = b.safetyFilter;
     }
 
+    /// Starts an empty request builder. At least one message is required.
+    /// @return a new builder
     public static Builder builder() {
         return new Builder();
     }
 
+    /// @return requested provider model, or {@code null} for the client default
     public String getModel() {
         return model;
     }
 
+    /// @return immutable conversation messages in provider order
     public List<ChatMessage> getMessages() {
         return messages;
     }
 
+    /// @return sampling temperature, or {@code null} for the provider default
     public Float getTemperature() {
         return temperature;
     }
 
+    /// @return maximum generated tokens, or {@code null} for the provider default
     public Integer getMaxTokens() {
         return maxTokens;
     }
 
+    /// @return nucleus-sampling probability, or {@code null} when unspecified
     public Float getTopP() {
         return topP;
     }
 
+    /// @return immutable stop sequences; empty when none were requested
     public List<String> getStopSequences() {
         return stopSequences;
     }
 
+    /// @return deterministic sampling seed, or {@code null} when unspecified
     public Long getSeed() {
         return seed;
     }
 
+    /// @return requested text/JSON response format, or {@code null}
     public ResponseFormat getResponseFormat() {
         return responseFormat;
     }
 
+    /// @return immutable tools offered to the model
     public List<Tool> getTools() {
         return tools;
     }
 
+    /// @return tool-selection policy, or {@code null} for provider behavior
     public ToolChoice getToolChoice() {
         return toolChoice;
     }
 
+    /// @return immutable provider metadata attached to this request
     public Map<String, String> getMetadata() {
         return metadata;
     }
 
+    /// @return client-side preflight filter, or {@code null} when disabled
     public SafetyFilter getSafetyFilter() {
         return safetyFilter;
     }
@@ -138,6 +152,8 @@ public final class ChatRequest {
         return b;
     }
 
+    /// Mutable fluent builder for {@link ChatRequest}. Collection arguments
+    /// are copied when the immutable request is built.
     public static final class Builder {
         private String model;
         private List<ChatMessage> messages = new ArrayList<ChatMessage>();
@@ -155,72 +171,114 @@ public final class ChatRequest {
         Builder() {
         }
 
+        /// Selects a provider model.
+        /// @param model provider model id; {@code null} uses the client default
+        /// @return this builder
         public Builder model(String model) {
             this.model = model;
             return this;
         }
 
+        /// Replaces the conversation history.
+        /// @param messages messages in chronological order; {@code null} clears them
+        /// @return this builder
         public Builder messages(List<ChatMessage> messages) {
             this.messages = messages == null ? new ArrayList<ChatMessage>()
                     : new ArrayList<ChatMessage>(messages);
             return this;
         }
 
+        /// Appends one conversation message.
+        /// @param m message to append
+        /// @return this builder
         public Builder addMessage(ChatMessage m) {
             this.messages.add(m);
             return this;
         }
 
+        /// Sets sampling temperature.
+        /// @param t provider-supported temperature, or {@code null} to omit
+        /// @return this builder
         public Builder temperature(Float t) {
             this.temperature = t;
             return this;
         }
 
+        /// Limits response length.
+        /// @param n maximum generated token count, or {@code null} to omit
+        /// @return this builder
         public Builder maxTokens(Integer n) {
             this.maxTokens = n;
             return this;
         }
 
+        /// Sets nucleus sampling probability.
+        /// @param p provider-supported probability, or {@code null} to omit
+        /// @return this builder
         public Builder topP(Float p) {
             this.topP = p;
             return this;
         }
 
+        /// Sets sequences that terminate generation.
+        /// @param stops stop strings, or {@code null} for none
+        /// @return this builder
         public Builder stopSequences(List<String> stops) {
             this.stopSequences = stops;
             return this;
         }
 
+        /// Requests deterministic sampling where supported.
+        /// @param seed provider sampling seed, or {@code null} to omit
+        /// @return this builder
         public Builder seed(Long seed) {
             this.seed = seed;
             return this;
         }
 
+        /// Requests text or structured JSON output.
+        /// @param f desired format, or {@code null} for provider default
+        /// @return this builder
         public Builder responseFormat(ResponseFormat f) {
             this.responseFormat = f;
             return this;
         }
 
+        /// Replaces the callable tools advertised to the model.
+        /// @param tools tool definitions, or {@code null} for none
+        /// @return this builder
         public Builder tools(List<Tool> tools) {
             this.tools = tools;
             return this;
         }
 
+        /// Controls whether and which tool the model may call.
+        /// @param choice selection policy, or {@code null} for provider default
+        /// @return this builder
         public Builder toolChoice(ToolChoice choice) {
             this.toolChoice = choice;
             return this;
         }
 
+        /// Attaches provider-specific request metadata.
+        /// @param meta metadata copied into the request, or {@code null}
+        /// @return this builder
         public Builder metadata(Map<String, String> meta) {
             this.metadata = meta;
             return this;
         }
 
+        /// Installs a client-side filter evaluated before network submission.
+        /// @param f safety policy, or {@code null} to disable it
+        /// @return this builder
         public Builder safetyFilter(SafetyFilter f) {
             this.safetyFilter = f;
             return this;
         }
 
+        /// Validates and creates an immutable request.
+        /// @return completed request
+        /// @throws IllegalStateException when no messages were supplied
         public ChatRequest build() {
             if (messages.isEmpty()) {
                 throw new IllegalStateException("at least one message is required");

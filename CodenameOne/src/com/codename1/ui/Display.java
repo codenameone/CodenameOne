@@ -6278,6 +6278,27 @@ public final class Display extends CN1Constants {
         return impl.createARImpl();
     }
 
+    /// Creates a fresh backend for `com.codename1.ai.vision`.
+    ///
+    /// @hidden
+    public com.codename1.impl.VisionImpl getVisionBackend() {
+        return impl.createVisionImpl();
+    }
+
+    /// Creates a fresh backend for `com.codename1.ai.inference`.
+    ///
+    /// @hidden
+    public com.codename1.impl.InferenceImpl getInferenceBackend() {
+        return impl.createInferenceImpl();
+    }
+
+    /// Creates a fresh backend for `com.codename1.ai.language`.
+    ///
+    /// @hidden
+    public com.codename1.impl.LanguageImpl getLanguageBackend() {
+        return impl.createLanguageImpl();
+    }
+
     /// Indicates whether the native picker dialog is supported for the given type
     /// which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
     ///
