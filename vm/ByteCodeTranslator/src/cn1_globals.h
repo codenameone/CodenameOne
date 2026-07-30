@@ -1261,6 +1261,18 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 //
 // Gated by -DCN1_INLINE_ALLOC. OFF => CN1_FAST_NEW(X) is exactly __NEW_X.
 // =========================================================================
+// Low-memory backpressure pacing (issue #5482). After the OS reports memory
+// pressure (iOS didReceiveMemoryWarning -> lowMemoryMode) allocators are slowed
+// so the collector can catch up. The throttle parks a legacy-path allocation for
+// one millisecond, but at most ONCE PER THREAD PER WINDOW: an unconditional park
+// on every allocation caps a thread at ~1000 legacy allocations/second, which
+// turns an allocation-heavy load into an apparent hang. With the window, the
+// worst case a thread can lose is 1ms per window (about 10%), independent of how
+// fast it allocates. Parking for a collector that has actually stopped the world
+// (threadBlockedByGC) is a safepoint, not a throttle, and is never skipped.
+#ifndef CN1_LOW_MEMORY_PARK_INTERVAL_MS
+#define CN1_LOW_MEMORY_PARK_INTERVAL_MS 10
+#endif
 #ifndef CN1_BIBOP_PAGE_SIZE
 #define CN1_BIBOP_PAGE_SIZE (64*1024)
 #endif
@@ -2262,61 +2274,108 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     threadStateData->callStackOffset++;
 }
 
+// How SP is declared, and why it is a parameter rather than a fixed token.
+//
+// ParparVM compiles a try/catch into a setjmp region, so the edges leaving it
+// are abnormal ones. SP is modified all through that region -- every push and
+// pop moves it -- and it is read again after a longjmp lands in the catch.
+// C99 7.13.2.1p3 makes the value of a non-volatile automatic that was modified
+// since the setjmp *indeterminate* after a longjmp, so the old unqualified
+// declaration was undefined behaviour in every method that catches anything.
+//
+// It stayed invisible until a toolchain took it up: gcc on musl refuses the
+// translation unit outright with `internal compiler error: SSA corruption` --
+// "Unable to coalesce ssa_names 57 and 58 which are marked as MUST COALESCE,
+// SP_57(ab) and SP_58(ab), during RTL pass: expand" -- because two versions of
+// SP live across an abnormal edge must occupy one register and cannot. Any Java
+// method with a short-circuit condition inside a try was enough to trigger it,
+// which means app code, not just the framework.
+//
+// `volatile` goes on the POINTER, not the pointee: `struct elementStruct* volatile SP`
+// keeps SP itself in memory so longjmp cannot clobber it, while stack slot
+// accesses through it stay ordinary. Writing `volatile struct elementStruct* SP`
+// would instead make every operand-stack read and write volatile, which is a
+// different -- and expensive -- statement.
+//
+// Only frames that actually emit setjmp pay for it; BytecodeMethod picks the
+// _VSP variant using the same test it already uses to decide whether locals are
+// volatile.
+#define CN1_DECLARE_SP(spQualifier, spPosition) \
+    struct elementStruct* spQualifier SP = &stack[spPosition];
+
 // we need to zero out the values with memset otherwise we will run into a problem
 // when invoking release on pre-existing object which might be garbage
-#define DEFINE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
+#define DEFINE_METHOD_STACK_IMPL(spQualifier, stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition]; \
+    CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1InitMethodStackInline(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, classNameId, methodNameId); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 
-#define DEFINE_INSTANCE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
+#define DEFINE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_METHOD_STACK_IMPL(, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
+#define DEFINE_METHOD_STACK_VSP(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_METHOD_STACK_IMPL(volatile, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
+
+#define DEFINE_INSTANCE_METHOD_STACK_IMPL(spQualifier, stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition]; \
+    CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1InitMethodStackInline(threadStateData, __cn1ThisObject, stackSize, localsStackSize, classNameId, methodNameId); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 
-#define DEFINE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) \
+#define DEFINE_INSTANCE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_INSTANCE_METHOD_STACK_IMPL(, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
+#define DEFINE_INSTANCE_METHOD_STACK_VSP(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_INSTANCE_METHOD_STACK_IMPL(volatile, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
+
+#define DEFINE_METHOD_STACK_FAST_REF_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition]; \
+    CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, JAVA_TRUE); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 
-#define DEFINE_INSTANCE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) \
+#define DEFINE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_REF_IMPL(, stackSize, localsStackSize, spPosition)
+#define DEFINE_METHOD_STACK_FAST_REF_VSP(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_REF_IMPL(volatile, stackSize, localsStackSize, spPosition)
+
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition]; \
+    CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, __cn1ThisObject, stackSize, localsStackSize, JAVA_TRUE); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 
-#define DEFINE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) \
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(, stackSize, localsStackSize, spPosition)
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_REF_VSP(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(volatile, stackSize, localsStackSize, spPosition)
+
+#define DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition]; \
+    CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, JAVA_FALSE); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 
-#define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) \
+#define DEFINE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(, stackSize, localsStackSize, spPosition)
+#define DEFINE_METHOD_STACK_FAST_PRIMITIVE_VSP(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(volatile, stackSize, localsStackSize, spPosition)
+
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition]; \
+    CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, __cn1ThisObject, stackSize, localsStackSize, JAVA_FALSE); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
+
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(, stackSize, localsStackSize, spPosition)
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_VSP(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(volatile, stackSize, localsStackSize, spPosition)
 
 #define CN1_FAST_RETURN_RELEASE() \
     threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread; \
@@ -2331,11 +2390,14 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 // no callStackOffset bump. The method body (PUSH/POP/SP ops, arithmetic, calls)
 // is emitted byte-for-byte unchanged; it just operates on this local SP. Frame
 // elimination is GC-trivial here -- it changes nothing the collector sees.
-#define DEFINE_METHOD_STACK_FRAMELESS(stackSize, localsStackSize, spPosition) \
+#define DEFINE_METHOD_STACK_FRAMELESS_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     struct elementStruct cn1_frameless_frame[(localsStackSize) + (stackSize)]; \
     struct elementStruct* locals = &cn1_frameless_frame[0]; \
     struct elementStruct* stack = &cn1_frameless_frame[localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition];
+    CN1_DECLARE_SP(spQualifier, spPosition)
+
+#define DEFINE_METHOD_STACK_FRAMELESS(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FRAMELESS_IMPL(, stackSize, localsStackSize, spPosition)
+#define DEFINE_METHOD_STACK_FRAMELESS_VSP(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FRAMELESS_IMPL(volatile, stackSize, localsStackSize, spPosition)
 
 // Headroom (bytes) kept below the end of the native C stack: enough to detect the
 // overflow and still build + throw the StackOverflowError without overrunning.
