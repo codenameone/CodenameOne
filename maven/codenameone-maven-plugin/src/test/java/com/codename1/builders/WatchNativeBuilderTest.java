@@ -220,8 +220,12 @@ class WatchNativeBuilderTest {
         String bootstrap = read(new File(dir, "CN1WatchBootstrap.m"));
         assertTrue(bootstrap.contains("#if TARGET_OS_WATCH"));
         assertTrue(bootstrap.contains("cn1_watch_app_main"));
+        // The declared class reaches cn1_watch_bootstrap, but note what this does NOT assert: the
+        // runtime does not yet root the app at it (cn1_watch_runtime_start discards the argument and
+        // cn1_watch_app_main enters the phone's Stub.main). Rooting a second translation at watchMain
+        // is scoped separately; see the "What the watch app runs today" section of the guide.
         assertTrue(bootstrap.contains(WATCH_MAIN),
-                "The bootstrap starts the runtime at the declared watch lifecycle class");
+                "The declared watch lifecycle class is passed to the watch runtime");
     }
 
     // ------------------------------------------------------------------

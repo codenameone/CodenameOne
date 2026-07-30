@@ -274,6 +274,25 @@ tap input into the runtime.
 .Codename One UI rendered on the watchOS simulator via the Core Graphics backend
 image::img/wearables/apple-watch-simulator.png[Codename One running on the Apple Watch simulator,scaledwidth=30%]
 
+==== What the Watch App Runs Today
+[[watch-entry-point]]
+
+Two properties of the watchOS build are worth knowing before you plan around it,
+because neither is obvious from the setting you wrote.
+
+The watch target compiles the same translated application sources as the phone
+and starts the phone lifecycle class. On watchOS `codename1.watchMain` therefore
+selects and enables the watch build, but it doesn't yet root the watch app at a
+different entry point. Branch on `CN.isWatch()` to decide what the watch shows.
+On Wear OS the declared class *is* the watch launcher, so a project that keeps
+its watch screens behind that check behaves the same on both platforms -- which is
+the pattern to write today regardless.
+
+Submitting the companion pair to the App Store also needs an app icon for the
+watch app, which the generated project doesn't produce. Building, running and
+testing on the simulator and on a device don't require one; add an `AppIcon` set
+to the watch target before you archive for submission.
+
 ==== Supported and Unsupported APIs on watchOS
 [[watch-supported-apis]]
 
