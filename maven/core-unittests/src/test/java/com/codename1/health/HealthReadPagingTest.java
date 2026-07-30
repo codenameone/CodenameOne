@@ -22,6 +22,7 @@
  */
 package com.codename1.health;
 
+import com.codename1.impl.health.OneShot;
 import com.codename1.junit.UITestBase;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
@@ -45,16 +46,6 @@ import static org.junit.jupiter.api.Assertions.*;
 class HealthReadPagingTest extends UITestBase {
 
     /**
-     * A read resumed from a page token starts where the token points.
-     *
-     * <p>The documented continuation is to take
-     * {@code SamplePage.getNextPageToken()} off a page and hand it back
-     * through {@code SampleQuery.setPageToken()}. The paging copy dropped
-     * it and paging then seeded itself with null, so the read restarted
-     * at the first page -- returning the data the caller already had and
-     * never reaching the remainder it asked for.</p>
-     */
-    /**
      * A cancelled one-shot stays cancelled.
      *
      * <p>{@code AsyncResource.cancel} guards on its own private lock
@@ -72,7 +63,7 @@ class HealthReadPagingTest extends UITestBase {
      */
     @Test
     void aCancelledOneShotNeverDeliversAValue() {
-        HealthStore.OneShot<String> shot = new HealthStore.OneShot<String>();
+        OneShot<String> shot = new OneShot<String>();
         final int[] delivered = new int[1];
         shot.ready(new com.codename1.util.SuccessCallback<String>() {
             public void onSucess(String value) {
@@ -88,16 +79,79 @@ class HealthReadPagingTest extends UITestBase {
         assertTrue(shot.isCancelled(), "and it stays cancelled");
     }
 
+    /**
+     * Cancelling the resource a public read returned keeps it cancelled,
+     * even once the platform answers.
+     *
+     * <p>This is the case the one-shot guard existed for and did not
+     * cover: only the <em>internal</em> resource the port completes was a
+     * {@code OneShot}, while the resource handed back to the caller was a
+     * plain {@code AsyncResource}. So a caller who cancelled a read still
+     * had its success callback run when the platform answered afterwards,
+     * with a value it was not supposed to receive from a resource whose
+     * {@code get()} throws the cancellation.</p>
+     *
+     * <p>Unlike the two tests above, this one does distinguish the fix --
+     * the platform answer arrives strictly after the cancel, and that
+     * ordering alone was enough to deliver a value.</p>
+     */
+    @Test
+    void cancellingAReadStopsItDeliveringWhenThePlatformAnswers() {
+        FakeHealthStore store = new FakeHealthStore();
+        store.holdRead = true;
+
+        AsyncResource<SamplePage> read = store.readSamplePage(
+                new SampleQuery().addType(HealthDataType.STEPS)
+                        .setTimeRange(HealthTimeRange.between(0L, 10000L)));
+        final int[] delivered = new int[1];
+        read.ready(new com.codename1.util.SuccessCallback<SamplePage>() {
+            public void onSucess(SamplePage value) {
+                delivered[0]++;
+            }
+        });
+
+        assertTrue(read.cancel(true), "the caller cancels an unfinished read");
+        // The port answers anyway -- it is explicitly allowed to, and is
+        // never asked to notice that the caller lost interest.
+        List<HealthSample> late = new ArrayList<HealthSample>();
+        late.add(FakeHealthStore.sample(HealthDataType.STEPS, 0L, 1L, 7));
+        store.heldRead.complete(new SamplePage(late, null, false));
+
+        // The answer is post-processed on the shared worker before it
+        // reaches the caller, so asserting here would only assert that
+        // the hop had not landed yet. A second read drains it: the worker
+        // is serial, and if it started a fresh thread instead then the
+        // first task had already run to completion, because that is what
+        // retires the old one.
+        store.holdRead = false;
+        store.readSamplePage(new SampleQuery().addType(HealthDataType.STEPS)
+                .setTimeRange(HealthTimeRange.between(0L, 10000L))).get();
+
+        assertEquals(0, delivered[0],
+                "a cancelled read must not deliver a page");
+        assertTrue(read.isCancelled(), "and it stays cancelled");
+    }
+
     /** And a settled one-shot refuses the cancel rather than racing it. */
     @Test
     void aCompletedOneShotCannotBeCancelled() {
-        HealthStore.OneShot<String> shot = new HealthStore.OneShot<String>();
+        OneShot<String> shot = new OneShot<String>();
         shot.complete("done");
         assertFalse(shot.cancel(true),
                 "there is nothing left to cancel");
         assertFalse(shot.isCancelled());
     }
 
+    /**
+     * A read resumed from a page token starts where the token points.
+     *
+     * <p>The documented continuation is to take
+     * {@code SamplePage.getNextPageToken()} off a page and hand it back
+     * through {@code SampleQuery.setPageToken()}. The paging copy dropped
+     * it and paging then seeded itself with null, so the read restarted
+     * at the first page -- returning the data the caller already had and
+     * never reaching the remainder it asked for.</p>
+     */
     @Test
     void aReadResumesFromTheSuppliedPageToken() throws Exception {
         FakeHealthStore store = new FakeHealthStore();

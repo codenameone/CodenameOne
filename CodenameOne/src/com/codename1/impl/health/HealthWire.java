@@ -193,15 +193,32 @@ public final class HealthWire {
     /// identifier and provenance of `source`.
     ///
     /// For a reader that has to stop inside a record because the caller's
-    /// limit falls there. The piece keeps the original's identifier --
-    /// the measurements came from one record and there is nothing else to
-    /// call it -- and its stated span is the extent of what it actually
+    /// limit falls there, and for the writer that has to split a record
+    /// too large for one chunk. The piece keeps the original's identifier
+    /// -- the measurements came from one record and there is nothing else
+    /// to call it -- and its stated span is the extent of what it actually
     /// carries, so it never claims time it no longer covers.
+    ///
+    /// The span is the widest interval the retained points cover, not the
+    /// first start and the last end. [SeriesSample#create] orders
+    /// measurements by start, so the first start is the earliest, but
+    /// nothing orders the *ends*: a series may hold overlapping
+    /// measurements, and one long point followed by short ones is an
+    /// ordinary shape. Slicing `starts [0, 10, 20]` / `ends [100, 30, 40]`
+    /// after two points by first-and-last gave the span `0..30`, which the
+    /// factory then rejected because the point it opens with ends at 100
+    /// -- so the read threw instead of returning the page the caller asked
+    /// for.
     public static SeriesSample seriesOfPoints(SeriesSample source,
             long[] starts, long[] ends, double[] values) {
+        long spanStart = starts[0];
+        long spanEnd = ends[0];
+        for (int i = 1; i < starts.length; i++) {
+            spanStart = Math.min(spanStart, starts[i]);
+            spanEnd = Math.max(spanEnd, ends[i]);
+        }
         SeriesSample piece = SeriesSample.create(source.getType(),
-                starts[0], ends[ends.length - 1], starts, ends, values,
-                source.getUnit());
+                spanStart, spanEnd, starts, ends, values, source.getUnit());
         carryCommon(source, piece);
         return piece;
     }

@@ -656,6 +656,49 @@ class LocalHealthStoreTest extends UITestBase {
         assertEquals(3, ((SeriesSample) grouped.get(0)).size());
     }
 
+    /**
+     * A record holding overlapping measurements survives being cut by a
+     * limit.
+     *
+     * <p>A series is ordered by start and nothing orders the ends, so one
+     * long measurement followed by short ones is an ordinary shape. The
+     * reader built the cut record's span from the first start and the
+     * <em>last</em> end, which for this record is {@code base..base+30} --
+     * and {@code SeriesSample.create} then rejected the very first point
+     * it had been handed, because that one ends at {@code base+100}. The
+     * read threw from inside the callback and took the whole page with it,
+     * so a caller asking for two of these three points got an exception
+     * rather than a page.</p>
+     *
+     * <p>The span has to be the widest interval the retained points cover.
+     * The writer's slicer already computed it that way; the reader's did
+     * not, which is what keeping two of them cost.</p>
+     */
+    @Test
+    void aLimitCutsIntoARecordWhoseMeasurementsOverlap() {
+        long base = utc(2026, 1, 1, 9);
+        SeriesSample series = SeriesSample.create(HealthDataType.HEART_RATE,
+                base, base + 100,
+                new long[] { base, base + 10, base + 20 },
+                new long[] { base + 100, base + 30, base + 40 },
+                new double[] { 60, 62, 64 }, HealthUnit.COUNT_PER_MINUTE);
+        store.write(series).get();
+
+        List<HealthSample> read = store.readSamples(new SampleQuery()
+                .addType(HealthDataType.HEART_RATE)
+                .setTimeRange(HealthTimeRange.between(utc(2026, 1, 1, 0),
+                        utc(2026, 1, 2, 0)))
+                .setLimit(2)).get();
+
+        assertEquals(2, read.size(), "the limit took two of the three");
+        // The long opening measurement keeps its own extent, which is the
+        // one the discarded span rule could not accommodate.
+        assertEquals(base, read.get(0).getStartMillis());
+        assertEquals(base + 100, read.get(0).getEndMillis());
+        assertEquals(base + 10, read.get(1).getStartMillis());
+        assertEquals(base + 30, read.get(1).getEndMillis());
+    }
+
     @Test
     void sourceFilterExcludesOtherApps() {
         QuantitySample mine = QuantitySample.create(HealthDataType.BODY_MASS,

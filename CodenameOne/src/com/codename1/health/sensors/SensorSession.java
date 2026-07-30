@@ -44,6 +44,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.codename1.impl.health.OneShot;
 
 /// A live connection to one health sensor, decoding its notifications into
 /// health samples.
@@ -208,7 +209,7 @@ public class SensorSession {
     /// Fails with [HealthError#NOT_SUPPORTED] on other profiles and on
     /// straps that do not expose the control point.
     public AsyncResource<Boolean> resetEnergyExpended() {
-        AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        AsyncResource<Boolean> out = new OneShot<Boolean>();
         out.error(new HealthException(HealthError.NOT_SUPPORTED,
                 "this session does not support resetting energy expended"));
         return out;
@@ -231,7 +232,7 @@ public class SensorSession {
     /// Live glucose notifications are unaffected and work today.
     public AsyncResource<Integer> requestStoredRecords(
             GlucoseRecordFilter filter) {
-        AsyncResource<Integer> out = new AsyncResource<Integer>();
+        AsyncResource<Integer> out = new OneShot<Integer>();
         out.error(new HealthException(HealthError.NOT_SUPPORTED,
                 "replaying stored glucose records is not implemented in"
                         + " this release; live measurements still arrive"

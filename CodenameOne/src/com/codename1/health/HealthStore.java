@@ -25,6 +25,7 @@ package com.codename1.health;
 import com.codename1.io.Preferences;
 import com.codename1.ui.Display;
 import com.codename1.impl.health.HealthWire;
+import com.codename1.impl.health.OneShot;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
 import com.codename1.util.EasyThread;
@@ -308,7 +309,7 @@ public class HealthStore {
     /// *other* apps' data.
     public final AsyncResource<Boolean> hasAnyData(final HealthDataType type,
             HealthTimeRange range) {
-        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        final AsyncResource<Boolean> out = new OneShot<Boolean>();
         if (failIfUnsupported(out)) {
             return out;
         }
@@ -348,7 +349,7 @@ public class HealthStore {
     public final AsyncResource<List<HealthSample>> readSamples(
             final SampleQuery query) {
         final AsyncResource<List<HealthSample>> out =
-                new AsyncResource<List<HealthSample>>();
+                new OneShot<List<HealthSample>>();
         if (failIfUnsupported(out)) {
             return out;
         }
@@ -518,7 +519,7 @@ public class HealthStore {
     /// memory stays bounded regardless of how much history exists.
     public final AsyncResource<SamplePage> readSamplePage(
             final SampleQuery caller) {
-        final AsyncResource<SamplePage> out = new AsyncResource<SamplePage>();
+        final AsyncResource<SamplePage> out = new OneShot<SamplePage>();
         if (failIfUnsupported(out)) {
             return out;
         }
@@ -740,61 +741,6 @@ public class HealthStore {
     }
 
     /// Delivers the timeout failure on the EDT.
-    /// An [AsyncResource] that keeps the first outcome and ignores the
-    /// rest.
-    ///
-    /// Every operation here is armed with a timeout, and `AsyncResource`
-    /// itself allows a resource to be completed more than once -- so a
-    /// platform call that answered after its timeout had fired ran the
-    /// callbacks a second time. A write reported TIMEOUT and then
-    /// reported success; a caller that retried on the timeout had both
-    /// inserts commit, which is a duplicate record in the user's health
-    /// data. A late drain re-ran the gate and cleared the in-flight state
-    /// of whichever drain was running by then.
-    ///
-    /// The port is not asked to be careful about this. It gets one of
-    /// these and may answer whenever it likes; a late answer is dropped.
-    static final class OneShot<T> extends AsyncResource<T> {
-
-        /// Cancellation is a terminal transition like the other two, and
-        /// it has to share their monitor.
-        ///
-        /// `AsyncResource.cancel` guards on its own private lock while
-        /// these guard on this instance, so a cancel arriving while a
-        /// platform callback was inside `complete` passed both checks:
-        /// the callback had already read `isDone()` as false, cancel then
-        /// finished, and `super.complete` -- which does not consult
-        /// `cancelled` -- ran the success callback anyway. The caller was
-        /// handed a value by a resource whose `isCancelled()` answers
-        /// true and whose `get()` throws the cancellation.
-        @Override
-        public synchronized boolean cancel(boolean mayInterruptIfRunning) {
-            if (isDone()) {
-                // Already settled, so there is nothing to cancel -- which
-                // is the same answer the superclass gives, arrived at
-                // without racing it.
-                return false;
-            }
-            return super.cancel(mayInterruptIfRunning);
-        }
-
-        @Override
-        public synchronized void complete(T value) {
-            if (isDone()) {
-                return;
-            }
-            super.complete(value);
-        }
-
-        @Override
-        public synchronized void error(Throwable t) {
-            if (isDone()) {
-                return;
-            }
-            super.error(t);
-        }
-    }
-
     private static final class FailTimedOut implements Runnable {
         private final AsyncResource resource;
 
@@ -1543,7 +1489,7 @@ public class HealthStore {
     public final AsyncResource<HealthWriteResult> write(
             final List<HealthSample> samples) {
         final AsyncResource<HealthWriteResult> out =
-                new AsyncResource<HealthWriteResult>();
+                new OneShot<HealthWriteResult>();
         if (failIfUnsupported(out)) {
             return out;
         }
@@ -1618,26 +1564,14 @@ public class HealthStore {
             ends[i] = series.getSampleEndMillis(from + i);
             values[i] = series.getSampleValue(from + i, series.getUnit());
         }
-        // The span is the extent of the slice, not its first start and
-        // last end. Nothing documents the arrays as chronological, and on
-        // an unordered series those two are not the bounds -- the factory
-        // would reject the slice outright when the last point is the
-        // earliest, or accept a span that excludes points it contains.
-        long spanStart = starts[0];
-        long spanEnd = ends[0];
-        for (int i = 1; i < n; i++) {
-            spanStart = Math.min(spanStart, starts[i]);
-            spanEnd = Math.max(spanEnd, ends[i]);
-        }
-        SeriesSample part = SeriesSample.create(series.getType(), spanStart,
-                spanEnd, starts, ends, values, series.getUnit());
-        part.setId(series.getId());
-        part.setSource(series.getSource());
-        part.setRecordingMethod(series.getRecordingMethod());
-        for (Map.Entry<String, String> e : series.getMetadata().entrySet()) {
-            part.putMetadata(e.getKey(), e.getValue());
-        }
-        return part;
+        // Built where the reader's slicer is built. Both need the same
+        // span rule and the same provenance carried over, and keeping two
+        // copies of it meant only one of them got the fix: the writer
+        // derived the span from every retained point while the reader took
+        // the first start and the last end, so a record holding
+        // overlapping measurements sliced fine on the way in and threw on
+        // the way back out.
+        return HealthWire.seriesOfPoints(series, starts, ends, values);
     }
 
     /// How many platform records a sample becomes.
@@ -2108,7 +2042,7 @@ public class HealthStore {
     /// already running does not read the same change window a second
     /// time, it resolves alongside the one in flight.
     public final AsyncResource<Integer> drainChanges() {
-        AsyncResource<Integer> out = new AsyncResource<Integer>();
+        AsyncResource<Integer> out = new OneShot<Integer>();
         ensureSubscriptionsRestored();
         // A second drain would snapshot the same anchors and read the
         // same window, delivering every batch twice and letting two

@@ -29,6 +29,7 @@ import com.codename1.util.AsyncResource;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.codename1.impl.health.OneShot;
 
 /// Entry point for the Codename One health API -- reading and writing
 /// health data, watching it for changes, recording workouts, and streaming
@@ -201,7 +202,7 @@ public class Health {
     /// This is the right response to a query that came back empty when you
     /// expected data, since on iOS you cannot tell denial from absence.
     public AsyncResource<Boolean> openHealthSettings() {
-        AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        AsyncResource<Boolean> out = new OneShot<Boolean>();
         out.complete(Boolean.FALSE);
         return out;
     }
@@ -212,7 +213,7 @@ public class Health {
     /// [HealthAvailability#PROVIDER_UPDATE_REQUIRED]; resolves `false`
     /// elsewhere.
     public AsyncResource<Boolean> openProviderSetup() {
-        AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        AsyncResource<Boolean> out = new OneShot<Boolean>();
         out.complete(Boolean.FALSE);
         return out;
     }
