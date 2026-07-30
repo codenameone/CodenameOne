@@ -8446,7 +8446,17 @@ public class JavaSEPort extends CodenameOneImplementation {
         status.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
-                JOptionPane.showMessageDialog(canvas, JavaSEShield.describe(),
+                // The engine line matters: every toggle below the attestation section
+                // is read by the simulator engine, so "not registered" is the
+                // difference between a switch that acts and a switch that only shows.
+                JOptionPane.showMessageDialog(canvas, JavaSEShield.describe()
+                        + "Simulator engine: "
+                        + (com.codename1.security.shield.spi.ShieldEngineRegistry
+                                .isEngineRegistered()
+                            ? com.codename1.security.shield.spi.ShieldEngineRegistry
+                                    .getEngine().getName() + " (registered)"
+                            : "not registered -- switch on any toggle above to install it")
+                        + "\n",
                         "App Shield Simulation", JOptionPane.INFORMATION_MESSAGE);
             }
         });
@@ -8467,15 +8477,34 @@ public class JavaSEPort extends CodenameOneImplementation {
             final String prefKey, final ShieldToggleSink sink) {
         final JCheckBoxMenuItem item = new JCheckBoxMenuItem(label,
                 pref.getBoolean(prefKey, false));
-        sink.set(item.isSelected());
+        applyShieldToggle(sink, item.isSelected());
         item.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
-                sink.set(item.isSelected());
+                applyShieldToggle(sink, item.isSelected());
                 pref.putBoolean(prefKey, item.isSelected());
             }
         });
         return item;
+    }
+
+    /**
+     * Applies a shield toggle and, when it is being switched ON, makes sure the
+     * simulator engine is registered.
+     *
+     * <p>The token and pinning toggles are read by {@link JavaSEShieldEngine}, and with
+     * no engine registered the inert default answers instead -- so the switches set a
+     * field, the status dialog reported the field, and nothing behaved differently.
+     * Registration happens here rather than when the menu is built, because sealing the
+     * registry at startup would make every app run in the simulator report itself as
+     * protected. It also covers a toggle restored from preferences, since a developer
+     * who left one armed expects it to still be armed.</p>
+     */
+    private void applyShieldToggle(ShieldToggleSink sink, boolean value) {
+        sink.set(value);
+        if (value) {
+            JavaSEShieldEngine.ensureRegistered();
+        }
     }
 
     private JMenu installNfcSimulationMenu(JMenu simulateMenu, final Preferences pref) {

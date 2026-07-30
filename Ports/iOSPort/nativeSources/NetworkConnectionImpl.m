@@ -238,19 +238,23 @@ int connections = 0;
  */
 static BOOL cn1ReadDerTlv(const uint8_t* buf, NSUInteger len, NSUInteger off,
                           uint8_t* tag, NSUInteger* headerLen, NSUInteger* totalLen) {
-    if (off + 2 > len) {
+    // off is walked forward by the caller, so an off past the end must not be able to
+    // make `off + 2` wrap back into range before the comparison.
+    if (off > len || len - off < 2) {
         return NO;
     }
     *tag = buf[off];
     NSUInteger n = buf[off + 1];
     if (n < 0x80) {
         *headerLen = 2;
+        // n < 0x80 and len - off >= 2, so this cannot overflow; the range check below
+        // is what decides whether the TLV actually fits.
         *totalLen = 2 + n;
     } else {
         NSUInteger countBytes = n & 0x7f;
         // 0x80 is indefinite length, which DER forbids; more than 4 length bytes
         // would mean a certificate larger than anything we will ever be handed.
-        if (countBytes == 0 || countBytes > 4 || off + 2 + countBytes > len) {
+        if (countBytes == 0 || countBytes > 4 || len - off - 2 < countBytes) {
             return NO;
         }
         NSUInteger contentLen = 0;
@@ -258,6 +262,13 @@ static BOOL cn1ReadDerTlv(const uint8_t* buf, NSUInteger len, NSUInteger off,
             contentLen = (contentLen << 8) | buf[off + 2 + i];
         }
         *headerLen = 2 + countBytes;
+        // Checked against what is actually left rather than by forming the sum first.
+        // A crafted length wraps NSUInteger, `off + *totalLen <= len` then passes, and
+        // the caller hands the wrapped value to CC_SHA256, which reads past the buffer.
+        // The certificate comes off the wire, so it is attacker-shaped by definition.
+        if (contentLen > len - off - *headerLen) {
+            return NO;
+        }
         *totalLen = *headerLen + contentLen;
     }
     return off + *totalLen <= len;

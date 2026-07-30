@@ -168,6 +168,20 @@ final class IOSDeviceIntegrity {
     /// Mirrors [#KEY_RECOVERY_SPENT] in memory, so a refused keychain write still bounds the
     /// one-shot recovery for the life of the process rather than letting it repeat per request.
     private boolean recoverySpentInMemory;
+
+    /**
+     * The key whose attestation Apple has already answered, when the keychain refused to
+     * drop its start marker.
+     *
+     * <p>The marker means "submitted, outcome unknown", and clearing it is what stops the
+     * next request discarding a perfectly good key. A refused removal therefore puts the
+     * device straight back into burning one rate-limited hardware key per request -- the
+     * failure the clearing was added to prevent, reached through the storage layer
+     * instead. Held in memory so at least the life of this process is covered; a restart
+     * still reads the marker and discards the key once, which is the pre-existing
+     * behaviour and bounded.</p>
+     */
+    private String attestAnsweredForKey;
     /** True while a generate-then-attest bootstrap is running. */
     private boolean bootstrapInFlight;
     /**
@@ -229,6 +243,7 @@ final class IOSDeviceIntegrity {
         store.remove(KEY_ATTEST_STARTED);
         store.remove(KEY_RECOVERY_SPENT);
         recoverySpentInMemory = false;
+        attestAnsweredForKey = null;
         if (!idGone || !stateGone) {
             // The two deletions are not atomic, so a partial failure leaves half the
             // identity gone. Treating that as "untouched" would let a callback from the
@@ -363,7 +378,8 @@ final class IOSDeviceIntegrity {
                 }
                 bootstrapInFlight = true;
                 if (keyId != null && keyId.length() > 0
-                        && store.get(KEY_ATTEST_STARTED) == null) {
+                        && (store.get(KEY_ATTEST_STARTED) == null
+                            || keyId.equals(attestAnsweredForKey))) {
                     // A key exists but attestation was never started for it -- the
                     // previous attempt died between generating and submitting. Attest
                     // that key rather than burning another.
@@ -388,6 +404,8 @@ final class IOSDeviceIntegrity {
                     store.remove(KEY_ID);
                     store.remove(KEY_STATE);
                     store.remove(KEY_ATTEST_STARTED);
+                    // The discarded key is the one the in-memory marker named.
+                    attestAnsweredForKey = null;
                     PendingRequest fresh = new PendingRequest(r, nonce,
                             PendingRequest.OP_GENERATE_KEY, null);
                     int rid = register(fresh);
@@ -551,6 +569,7 @@ final class IOSDeviceIntegrity {
                 store.remove(KEY_ID);
                 store.remove(KEY_STATE);
                 store.remove(KEY_ATTEST_STARTED);
+                instance.attestAnsweredForKey = null;
                 instance.bootstrapInFlight = false;
                 fail(pending, "App Attest could not store its key identifier");
                 instance.failBootstrapWaiters(
@@ -634,6 +653,8 @@ final class IOSDeviceIntegrity {
             // marker would refuse a future replacement when iOS legitimately invalidates
             // THIS key, and every later assertion would fail until the app reset by hand.
             store.remove(KEY_ATTEST_STARTED);
+            // Attested, so there is no interrupted attestation left to remember.
+            instance.attestAnsweredForKey = null;
             // The in-memory copy is cleared unconditionally, but the persisted marker is
             // only forgotten once the keychain confirms the deletion. A stale marker
             // would refuse the one-shot replacement the next time iOS legitimately
@@ -781,9 +802,16 @@ final class IOSDeviceIntegrity {
                     // keeping the marker costs a fresh hardware key per request with
                     // nothing bounding it.
                     //
-                    // A failed removal leaves the marker in place, which is the
-                    // conservative state this branch used to reach anyway.
-                    SecureStorage.getInstance().remove(KEY_ATTEST_STARTED);
+                    // The removal is checked. If the keychain refuses it, the marker
+                    // stays and the next request reads it as an unknown outcome -- back
+                    // to discarding a reusable key and generating another, which is the
+                    // whole failure this clearing exists to prevent. Remembering the
+                    // answered key in memory covers the life of this process; a restart
+                    // still reads the marker and discards once, which is where this
+                    // branch started and is bounded.
+                    if (!SecureStorage.getInstance().remove(KEY_ATTEST_STARTED)) {
+                        instance.attestAnsweredForKey = pending.keyId;
+                    }
                 }
                 if (pending.op != PendingRequest.OP_ASSERT) {
                     // Still the same acquisition: releasing here and reacquiring would
