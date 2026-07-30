@@ -43,6 +43,47 @@ class SleepAndIdentityGuardsTest {
     }
 
     /**
+     * An unclassified span is not time asleep.
+     *
+     * <p>The rollup asked "is this not one of the awake stages?", which swept
+     * in {@code UNKNOWN} -- defined by the enum as a span the source did not
+     * classify. A session carrying one unclassified ten-minute interval
+     * therefore reported ten minutes of sleep, turning information the
+     * platform declined to give into a concrete health measurement.</p>
+     *
+     * <p>It counts towards neither side now. {@code hasStageDetail()} is what
+     * tells a caller the breakdown is unavailable.</p>
+     */
+    @Test
+    void anUnclassifiedSpanIsNotCountedAsSleep() {
+        List<SleepStageInterval> supplied =
+                new ArrayList<SleepStageInterval>();
+        supplied.add(stage(SleepStage.UNKNOWN, 0, 600000));
+
+        SleepSample sleep = SleepSample.create(START, START + 600000,
+                supplied);
+
+        assertEquals(0, sleep.getAsleepDurationMillis(),
+                "an unclassified span must not become a sleep measurement");
+    }
+
+    /** And a real asleep stage beside it still counts. */
+    @Test
+    void anUnclassifiedSpanDoesNotHideTheStagesAroundIt() {
+        List<SleepStageInterval> supplied =
+                new ArrayList<SleepStageInterval>();
+        supplied.add(stage(SleepStage.UNKNOWN, 0, 1000));
+        supplied.add(stage(SleepStage.DEEP, 1000, 3000));
+        supplied.add(stage(SleepStage.AWAKE, 3000, 4000));
+
+        SleepSample sleep = SleepSample.create(START, START + 4000,
+                supplied);
+
+        assertEquals(2000, sleep.getAsleepDurationMillis(),
+                "only the classified asleep span counts");
+    }
+
+    /**
      * A null in the supplied list was skipped by validation and then
      * copied in anyway, so it sat in the session waiting for the first
      * accessor that walked the stages to dereference it.

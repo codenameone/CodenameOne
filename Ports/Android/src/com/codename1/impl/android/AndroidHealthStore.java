@@ -196,7 +196,16 @@ class AndroidHealthStore extends HealthStore {
         // record class for it and every read of it is refused -- and the
         // readable-but-unwritable series types answered about a write they
         // could never perform.
-        if (write ? !isWritable(type) : !isTypeSupported(type)) {
+        // Deletable counts on the write side, matching the rule
+        // requestAuthorization applies. Health Connect authorizes a delete
+        // with the write permission, and power, speed and the two cadences
+        // are deletable here without being writable, so answering
+        // NOT_SUPPORTED for them left an app able to *request* the grant
+        // and unable to ever see it reported -- which reads as a failed
+        // request, so it asks again, or gives up and disables the delete
+        // path this store advertises.
+        if (write ? (!isWritable(type) && !isDeletable(type))
+                : !isTypeSupported(type)) {
             return HealthAuthorizationStatus.NOT_SUPPORTED;
         }
         refreshGrants();

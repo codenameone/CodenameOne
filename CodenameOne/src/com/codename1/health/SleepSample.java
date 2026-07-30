@@ -178,8 +178,16 @@ public final class SleepSample extends SessionSample {
                 new ArrayList<SleepStageInterval>();
         for (SleepStageInterval iv : stages) {
             SleepStage s = iv.getStage();
-            if (s != SleepStage.AWAKE && s != SleepStage.AWAKE_IN_BED
-                    && s != SleepStage.OUT_OF_BED) {
+            // Named, not "anything that is not awake". The negative form
+            // swept in UNKNOWN, which the enum defines as a span the source
+            // did not classify -- so a session carrying one ten-minute
+            // unclassified interval reported ten minutes of sleep, turning
+            // missing information into a measurement. A reading this API
+            // will not make up: an unclassified span counts towards neither
+            // side, and hasStageDetail() is what tells a caller the
+            // breakdown is unavailable.
+            if (s == SleepStage.ASLEEP_UNSPECIFIED || s == SleepStage.LIGHT
+                    || s == SleepStage.DEEP || s == SleepStage.REM) {
                 asleep.add(iv);
             }
         }

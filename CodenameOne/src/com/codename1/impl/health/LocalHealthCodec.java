@@ -469,13 +469,28 @@ final class LocalHealthCodec {
     // ------------------------------------------------------------------
 
     /// Escapes every separator this format uses, plus the escape character
-    /// itself. A null becomes the empty string and reads back as null,
-    /// which is why an empty string cannot be stored as a title -- it is
-    /// indistinguishable from not having one, and no caller can tell the
-    /// difference either.
+    /// itself.
+    ///
+    /// An empty string is written as the sentinel `\e` rather than as
+    /// nothing, because null and empty used to encode identically and read
+    /// back as null. The public setters distinguish them -- `putMetadata`
+    /// treats a null value as a removal and an empty value as a stored
+    /// presence marker -- so a restart quietly deleted keys an app had set
+    /// to "", and emptied titles, notes, food names and source fields came
+    /// back as null.
+    ///
+    /// The sentinel is on empty rather than on null so that data already
+    /// persisted keeps its meaning: an old record wrote nothing for null,
+    /// and nothing still reads as null.
+    ///
+    /// `\e` is unambiguous because a real backslash is doubled on the way
+    /// in, so no escaped value can produce it.
     private static String esc(String s) {
-        if (s == null || s.length() == 0) {
+        if (s == null) {
             return "";
+        }
+        if (s.length() == 0) {
+            return "\\e";
         }
         StringBuilder sb = new StringBuilder(s.length() + 8);
         for (int i = 0; i < s.length(); i++) {
@@ -496,6 +511,9 @@ final class LocalHealthCodec {
     private static String unesc(String s) {
         if (s == null || s.length() == 0) {
             return null;
+        }
+        if ("\\e".equals(s)) {
+            return "";
         }
         StringBuilder sb = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) {

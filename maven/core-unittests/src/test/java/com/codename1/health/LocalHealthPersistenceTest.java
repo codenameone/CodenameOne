@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -384,6 +385,42 @@ class LocalHealthPersistenceTest extends UITestBase {
                         T0 + 2 * MINUTE))).get().size(),
                 "the record must come back when the delete cannot be"
                         + " persisted");
+    }
+
+    /**
+     * An empty string survives a restart, and stays distinct from null.
+     *
+     * <p>They used to encode identically -- both wrote nothing, and nothing
+     * read back as null -- so a key deliberately set to "" was deleted on
+     * restore rather than restored empty. {@code putMetadata} treats a null
+     * value as a removal and an empty value as a stored presence marker, and
+     * the setters and getters for titles, notes and source fields draw the
+     * same distinction, so collapsing the two changed data behind the app's
+     * back.</p>
+     */
+    @Test
+    void anEmptyStringSurvivesPersistenceAndStaysDistinctFromNull()
+            throws Exception {
+        StoredHealthStore store = new StoredHealthStore();
+        QuantitySample s = QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(10, HealthUnit.COUNT), 1000L, 2000L);
+        s.putMetadata("marker", "");
+        s.putMetadata("named", "value");
+        store.write(one(s)).get();
+
+        StoredHealthStore reopened = new StoredHealthStore();
+        List<HealthSample> back = reopened.readSamples(new SampleQuery()
+                .addType(HealthDataType.STEPS)
+                .setTimeRange(HealthTimeRange.between(0L, 10_000L))).get();
+        assertEquals(1, back.size());
+
+        Map<String, String> meta = back.get(0).getMetadata();
+        assertTrue(meta.containsKey("marker"),
+                "an empty value is a stored marker, not a removal");
+        assertEquals("", meta.get("marker"));
+        assertEquals("value", meta.get("named"));
+        assertFalse(meta.containsKey("absent"),
+                "and a key never set stays absent");
     }
 
     private static Throwable errorOf(AsyncResource<?> r) {
