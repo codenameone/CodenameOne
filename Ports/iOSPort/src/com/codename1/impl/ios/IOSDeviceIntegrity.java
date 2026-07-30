@@ -783,7 +783,16 @@ final class IOSDeviceIntegrity {
                             Long.toString(deadline));
                     instance.currentBackoff = Math.min(backoff * 2, MAX_BACKOFF_MILLIS);
                 }
-                if (pending.op == PendingRequest.OP_ATTEST) {
+                if (pending.op == PendingRequest.OP_ATTEST
+                        && errorCode != DC_ERROR_INVALID_KEY) {
+                    // invalidKey is excluded. Reaching here with it means the reset
+                    // branch above declined -- the one-shot recovery is already spent --
+                    // so this key is known bad and known unreplaceable. Clearing the
+                    // marker would make the next request read it as a reusable key with
+                    // an unstarted attestation and submit it to Apple again, once per
+                    // request, instead of reporting the exhausted recovery the caller
+                    // needs to see. Terminal has to stay terminal.
+                    //
                     // The marker means "submitted, outcome unknown", and the
                     // interrupted-attestation branch answers an unknown outcome by
                     // discarding the key, because a spent one-time attestation cannot be
