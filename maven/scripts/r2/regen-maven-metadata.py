@@ -42,6 +42,13 @@ ARCHETYPES = {
 
 REPO_URL = "https://repo.codenameone.com/maven2"
 
+# Written by publish-staging-to-r2.sh into each <artifact>/<version>/ only once that
+# whole directory has been uploaded. A version without it is an interrupted upload and
+# must never be advertised. Skipping metadata on the run that failed is not enough:
+# every later run rebuilds metadata from the same bucket listing, so without this the
+# next successful release would discover the abandoned version and publish it.
+UPLOAD_COMPLETE_MARKER = "_cn1-upload-complete"
+
 
 def aws(*args, capture=True):
     env = dict(os.environ)
@@ -100,17 +107,28 @@ class ComparableVersion:
 
 
 def discover(keys, group_path):
-    """key list -> {artifactId: sorted [versions]} (releases only)."""
-    artifacts = {}
+    """key list -> {artifactId: sorted [versions]}, releases whose upload completed."""
+    complete = set()
+    seen = set()
     base = "%s/%s/" % (PREFIX, group_path)
     for key in keys:
         rest = key[len(base):]
         bits = rest.split("/")
         if len(bits) < 3:
             continue  # group-level file, not <artifact>/<version>/<file>
-        artifact, version = bits[0], bits[1]
+        artifact, version, name = bits[0], bits[1], bits[-1]
         if version.endswith("-SNAPSHOT"):
             continue
+        seen.add((artifact, version))
+        if name == UPLOAD_COMPLETE_MARKER:
+            complete.add((artifact, version))
+
+    for artifact, version in sorted(seen - complete):
+        print("    skipping %s:%s -- no %s marker, upload never finished"
+              % (artifact, version, UPLOAD_COMPLETE_MARKER))
+
+    artifacts = {}
+    for artifact, version in complete:
         artifacts.setdefault(artifact, set()).add(version)
     return {a: sorted(v, key=ComparableVersion) for a, v in artifacts.items()}
 

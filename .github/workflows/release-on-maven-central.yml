@@ -382,12 +382,22 @@ jobs:
           # Assert here rather than earlier: metadata is what makes a version discoverable,
           # so it is published only once every artifact for it is in place.
           meta="${R2_BASE_URL}/com/codenameone/codenameone-core/maven-metadata.xml?cb=${GITHUB_RUN_ID}"
-          if ! curl -s "$meta" | grep -q "<release>${GITHUB_REF_NAME}</release>"; then
-            echo "maven-metadata.xml does not list ${GITHUB_REF_NAME} as <release>" >&2
-            curl -s "$meta" >&2
+          body=$(curl -s "$meta")
+          # Assert discoverability, not primacy. Re-running an older tag to repair it is
+          # legitimate, and metadata correctly keeps the newer version as <release>; that
+          # is a successful repair, not a failure. <release> is only checked when this tag
+          # really is the newest.
+          if ! echo "$body" | grep -q "<version>${GITHUB_REF_NAME}</version>"; then
+            echo "maven-metadata.xml does not list ${GITHUB_REF_NAME} in <versions>" >&2
+            echo "$body" >&2
             exit 1
           fi
-          echo "ok: maven-metadata.xml <release> is ${GITHUB_REF_NAME}"
+          newest=$(echo "$body" | sed -n 's:.*<release>\(.*\)</release>.*:\1:p')
+          if [ "$newest" = "${GITHUB_REF_NAME}" ]; then
+            echo "ok: maven-metadata.xml <release> is ${GITHUB_REF_NAME}"
+          else
+            echo "ok: ${GITHUB_REF_NAME} is listed; <release> remains $newest (newer tag already published)"
+          fi
 
       - name: Fail when any publication did not complete
         # Every publish step runs with continue-on-error so that one destination
