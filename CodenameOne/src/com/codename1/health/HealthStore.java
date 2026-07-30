@@ -224,12 +224,112 @@ public class HealthStore {
                     "requestAuthorization needs at least one access");
             return out;
         }
+        // One sheet at a time. Two flows overlapping is not a race the
+        // ports can win: on Android the permission screen is an activity
+        // result, and CodenameOneActivity.setIntentResultListener returns
+        // without installing the second listener once waitingForResult is
+        // set -- silently, while AndroidNativeUtil.startActivityForResult
+        // goes on to launch the activity regardless. So the first flow's
+        // listener took whichever result came back first and the second
+        // request sat unresolved until its authorization timeout, minutes
+        // later, having shown the user a sheet whose answer went nowhere.
+        //
+        // Serialized here rather than in the port because this class
+        // promises the ports do not think about threading, and any port
+        // whose permission UI has one result slot has the same problem.
+        // Queued rather than coalesced: two callers may ask for different
+        // access, and resolving the second from the first's outcome would
+        // report a flow that never requested its types as complete.
+        synchronized (authLock) {
+            if (authInFlight) {
+                pendingAuth.add(new PendingAuth(deduped, out));
+                return out;
+            }
+            authInFlight = true;
+        }
+        startAuthorization(deduped, out);
+        return out;
+    }
+
+    /// Guards [#authInFlight] and [#pendingAuth].
+    private final Object authLock = new Object();
+
+    /// Whether a permission flow is on screen.
+    private boolean authInFlight;
+
+    /// Requests that arrived while one was on screen, in order.
+    private final List<PendingAuth> pendingAuth = new ArrayList<PendingAuth>();
+
+    /// An authorization request waiting for the screen.
+    private static final class PendingAuth {
+
+        private final List<HealthAccess> access;
+        private final AsyncResource<Boolean> out;
+
+        PendingAuth(List<HealthAccess> access, AsyncResource<Boolean> out) {
+            this.access = access;
+            this.out = out;
+        }
+    }
+
+    /// Launches one flow and arms the hand-off to whatever is queued
+    /// behind it.
+    ///
+    /// The timeout starts here rather than when the request arrived: a
+    /// queued request has not shown anything to anyone yet, and charging
+    /// it for the time the sheet in front of it spent on screen would
+    /// fail it before it ever ran.
+    private void startAuthorization(List<HealthAccess> access,
+            AsyncResource<Boolean> out) {
         // Authorization waits on a human reading a permission sheet, so
         // it gets its own much longer budget -- the operation timeout
         // would fail the request while the UI was still legitimately up.
         armTimeout(out, authorizationTimeout);
-        doRequestAuthorization(deduped, out);
-        return out;
+        // Registered before the port is asked, because a port that answers
+        // inline would otherwise settle the resource before anything was
+        // watching and leave the queue stalled with the flag still set.
+        out.onResult(new NextAuthorization(this));
+        doRequestAuthorization(access, out);
+    }
+
+    /// Starts the next queued flow, however the one before it ended.
+    ///
+    /// Named rather than anonymous so it carries no synthetic reference to
+    /// the enclosing store (SpotBugs `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class NextAuthorization
+            implements AsyncResult<Boolean> {
+
+        private final HealthStore store;
+
+        NextAuthorization(HealthStore store) {
+            this.store = store;
+        }
+
+        @Override
+        public void onReady(Boolean value, Throwable err) {
+            store.startNextAuthorization();
+        }
+    }
+
+    /// Hands the screen to the next queued request, or releases it.
+    private void startNextAuthorization() {
+        PendingAuth next;
+        for (;;) {
+            synchronized (authLock) {
+                if (pendingAuth.isEmpty()) {
+                    authInFlight = false;
+                    return;
+                }
+                next = pendingAuth.remove(0);
+            }
+            // A caller that cancelled while waiting never gets a sheet.
+            // Looping rather than launching keeps a queue of abandoned
+            // requests from leaving the flag set with nothing running.
+            if (!next.out.isDone()) {
+                startAuthorization(next.access, next.out);
+                return;
+            }
+        }
     }
 
     /// This app's write authorization for `type`. Truthful on both

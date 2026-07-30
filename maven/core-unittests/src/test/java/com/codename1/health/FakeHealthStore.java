@@ -76,9 +76,29 @@ public class FakeHealthStore extends HealthStore {
     /** The resource a held read is waiting on. */
     public AsyncResource<SamplePage> heldRead;
 
+    /** When set, doRequestAuthorization keeps the resource. */
+    public boolean holdAuthorization;
+    /** The resources held authorization flows are waiting on, in order. */
+    public final List<AsyncResource<Boolean>> heldAuthorizations =
+            new ArrayList<AsyncResource<Boolean>>();
+    /** Access lists the port was asked to authorize, in order. */
+    public final List<List<HealthAccess>> authorizationsSeen =
+            new ArrayList<List<HealthAccess>>();
+
     /** Shortens the per-operation safety timeout for a test. */
     public void setOperationTimeoutForTest(int millis) {
         setOperationTimeout(millis);
+    }
+
+    @Override
+    protected synchronized void doRequestAuthorization(
+            List<HealthAccess> access, AsyncResource<Boolean> out) {
+        authorizationsSeen.add(access);
+        if (holdAuthorization) {
+            heldAuthorizations.add(out);
+            return;
+        }
+        out.complete(Boolean.TRUE);
     }
 
     @Override
