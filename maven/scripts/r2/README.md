@@ -101,6 +101,15 @@ publishing one against a core that is absent leaves a permanently unresolvable a
 The release workflow passes `-DskipPublishing` in that case; staging still happens, so the
 R2 upload is unaffected.
 
+**Known limitation: tag bursts can lose a release.** The workflow serialises on a single
+`concurrency` group so the metadata read-modify-write cannot interleave. GitHub allows one
+running and one pending member per group, and a third queued run *replaces* the pending one
+even with `cancel-in-progress: false` — so if three tags are pushed while a release is
+running, the middle tag is silently cancelled and never published. Push release tags one at
+a time, and treat the presence of `_cn1-releases/<version>/complete` as the check that a tag
+actually published. A proper fix is external FIFO dispatch, or a reconciliation job that
+compares git tags against release markers; neither is in this change.
+
 **Cloudflare caches 404s.** A Cache Rule sets Status Code TTL 400-599 to no-store, because
 otherwise a probe for a not-yet-published artifact caches the negative and the artifact stays
 invisible until it expires. CI polls also append a cache-busting query parameter, so a

@@ -30,6 +30,17 @@ import java.net.URL;
 @Mojo(name = "update")
 public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
 
+    /** Where releases are published now. Asked first. */
+    private static final String R2_METADATA_URL =
+            "https://repo.codenameone.com/maven2/com/codenameone/codenameone-maven-plugin/maven-metadata.xml";
+
+    /** Where releases were published before the migration. Fallback only. */
+    private static final String MAVEN_CENTRAL_METADATA_URL =
+            "https://repo1.maven.org/maven2/com/codenameone/codenameone-maven-plugin/maven-metadata.xml";
+
+    @Parameter(property = "cn1.metadataUrl", defaultValue = R2_METADATA_URL)
+    private String metadataUrl;
+
 
     @Parameter(property="newVersion", defaultValue = "")
     private String newVersion;
@@ -55,7 +66,7 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
 
         if ("LATEST".equals(newVersion)) {
             try {
-                newVersion = findLatestVersionOnMavenCentral();
+                newVersion = findLatestVersion();
             } catch (Exception ex) {
                 getLog().error("Failed to find latest version from Maven central", ex);
             }
@@ -166,16 +177,43 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
  
     }
 
-    private String findLatestVersionOnMavenCentral() throws IOException, XmlPullParserException {
-        URL mavenMetadata = new URL("https://repo1.maven.org/maven2/com/codenameone/codenameone-maven-plugin/maven-metadata.xml");
-        MetadataXpp3Reader reader = new MetadataXpp3Reader();
-        try (Reader input = new InputStreamReader(mavenMetadata.openStream(), "UTF-8")) {
-            Metadata metadata = reader.read(input, false);
-            return metadata.getVersioning().getLatest();
+    /**
+     * Codename One publishes to its own repository, and during the migration to that
+     * repository also to Maven Central. R2 is therefore asked first: once Central stops
+     * receiving releases, it would otherwise keep reporting the last version published
+     * there and `cn1:update` would never see a newer one. Central remains the fallback so
+     * this keeps working against versions released before the move, and if R2 is
+     * unreachable.
+     *
+     * Override the primary source with -Dcn1.metadataUrl=... to point at a mirror.
+     */
+    private String findLatestVersion() throws IOException, XmlPullParserException {
+        IOException primaryFailure;
+        try {
+            return readLatestVersion(metadataUrl);
+        } catch (IOException ex) {
+            primaryFailure = ex;
+            getLog().debug("Could not read " + metadataUrl + ", falling back to Maven Central", ex);
         }
+        try {
+            return readLatestVersion(MAVEN_CENTRAL_METADATA_URL);
+        } catch (IOException fallbackFailure) {
+            // Report the primary failure: it is the one that matters, and the fallback
+            // failing too usually just means the machine is offline.
+            throw primaryFailure;
+        }
+    }
 
-
-
+    private String readLatestVersion(String url) throws IOException, XmlPullParserException {
+        MetadataXpp3Reader reader = new MetadataXpp3Reader();
+        try (Reader input = new InputStreamReader(new URL(url).openStream(), "UTF-8")) {
+            Metadata metadata = reader.read(input, false);
+            String latest = metadata.getVersioning().getLatest();
+            if (latest == null || latest.trim().isEmpty()) {
+                throw new IOException("No <latest> version in " + url);
+            }
+            return latest;
+        }
     }
     
 }

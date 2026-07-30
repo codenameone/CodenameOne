@@ -116,6 +116,13 @@ def list_keys(bucket, group_path):
             return keys
 
 
+def right_is_greater(part):
+    """Mirror of the run-out rule for the other side: the shorter version is greater
+    when the longer one continues with a qualifier, and lesser when it continues with
+    a number."""
+    return part[0] != 0
+
+
 @functools.total_ordering
 class ComparableVersion:
     """Maven-ish version ordering: numeric segments compare numerically, so
@@ -135,7 +142,18 @@ class ComparableVersion:
                 for p in self.parts]
 
     def __lt__(self, other):
-        return self._key() < other._key()
+        left, right = self._key(), other._key()
+        for i in range(max(len(left), len(right))):
+            if i >= len(left):
+                # Ran out on the left. Maven treats a qualifier as *below* the
+                # release it qualifies, so 7.0.259-rc1 < 7.0.259, while a further
+                # numeric segment is above it, so 7.0 < 7.0.1.
+                return right[i][0] == 0
+            if i >= len(right):
+                return right_is_greater(left[i])
+            if left[i] != right[i]:
+                return left[i] < right[i]
+        return False
 
     def __eq__(self, other):
         return self._key() == other._key()
