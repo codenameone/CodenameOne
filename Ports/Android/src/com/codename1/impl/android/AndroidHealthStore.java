@@ -40,6 +40,7 @@ import com.codename1.health.HealthSubscription;
 import com.codename1.health.HealthWriteResult;
 import com.codename1.health.SampleQuery;
 import com.codename1.health.SamplePage;
+import com.codename1.io.Preferences;
 import com.codename1.impl.health.HealthChangePage;
 import com.codename1.impl.health.HealthWire;
 import com.codename1.util.AsyncResource;
@@ -68,6 +69,24 @@ class AndroidHealthStore extends HealthStore {
     /// True once the delegate has answered, so an empty set can be told
     /// apart from "nothing granted".
     private boolean grantsLoaded;
+
+    /// Accesses this app has actually presented a sheet for, across
+    /// launches.
+    ///
+    /// Health Connect reports what is granted; it does not report what was
+    /// ever asked. Without that second fact, absent-from-the-snapshot had to
+    /// stand for both "never requested" and "refused", and it was being read
+    /// as the second -- so on a fresh install every permission answered
+    /// DENIED, telling the app the user refused access they were never
+    /// offered. Permission-gated UI then accuses the user or skips the
+    /// first-request explanation it exists to show.
+    ///
+    /// Persisted, because it has to outlive the process for the mirror error
+    /// not to appear: a refusal that reverted to NOT_DETERMINED on the next
+    /// launch would be just as wrong in the other direction.
+    private static final String ASKED_KEY = "cn1$health$asked";
+
+    private Set<String> asked;
     private boolean grantsRequested;
 
     private HealthConnectDelegate delegate() {
@@ -187,9 +206,17 @@ class AndroidHealthStore extends HealthStore {
                 // would be a guess; NOT_DETERMINED is the honest state.
                 return HealthAuthorizationStatus.NOT_DETERMINED;
             }
-            return granted.contains((write ? "w:" : "r:") + type.getId())
-                    ? HealthAuthorizationStatus.AUTHORIZED
-                    : HealthAuthorizationStatus.DENIED;
+            String token = (write ? "w:" : "r:") + type.getId();
+            if (granted.contains(token)) {
+                return HealthAuthorizationStatus.AUTHORIZED;
+            }
+            // Absent from the snapshot means one of two things, and DENIED is
+            // documented as an explicit refusal. Only a sheet this app has
+            // actually presented turns absence into a refusal; otherwise the
+            // user has simply never been asked.
+            return askedTokens().contains(token)
+                    ? HealthAuthorizationStatus.DENIED
+                    : HealthAuthorizationStatus.NOT_DETERMINED;
         }
     }
 
@@ -263,6 +290,49 @@ class AndroidHealthStore extends HealthStore {
                 }
             });
         }
+    }
+
+    /// The tokens a sheet has been presented for, loaded once per process.
+    private Set<String> askedTokens() {
+        synchronized (granted) {
+            if (asked == null) {
+                asked = new HashSet<String>();
+                String stored = Preferences.get(ASKED_KEY, "");
+                String[] parts = stored.split(",");
+                for (int i = 0; i < parts.length; i++) {
+                    String t = parts[i].trim();
+                    if (t.length() > 0) {
+                        asked.add(t);
+                    }
+                }
+            }
+            return asked;
+        }
+    }
+
+    /// Records that a sheet was presented for `access`, and persists it.
+    ///
+    /// Called when a flow completes rather than when it launches. A sheet the
+    /// user dismissed without deciding leaves the permission
+    /// NOT_DETERMINED, which is what happened -- they were shown the choice
+    /// and did not make it. A flow that never reached the user at all, because
+    /// the activity could not start, records nothing.
+    private void rememberAsked(List<HealthAccess> access) {
+        StringBuilder csv = new StringBuilder();
+        synchronized (granted) {
+            Set<String> set = askedTokens();
+            for (int i = 0; i < access.size(); i++) {
+                HealthAccess a = access.get(i);
+                set.add((a.isWrite() ? "w:" : "r:") + a.getType().getId());
+            }
+            for (String t : set) {
+                if (csv.length() > 0) {
+                    csv.append(',');
+                }
+                csv.append(t);
+            }
+        }
+        Preferences.set(ASKED_KEY, csv.toString());
     }
 
     private void rememberGrants(String csv) {
@@ -426,6 +496,12 @@ class AndroidHealthStore extends HealthStore {
                             // as DENIED after a second, unrelated
                             // authorization -- so re-read the full set
                             // from Health Connect instead.
+                            // The sheet was presented and answered, so
+                            // anything still absent from the refreshed
+                            // snapshot is a refusal rather than a permission
+                            // nobody has been asked about. Recorded before the
+                            // refresh so the two facts land together.
+                            rememberAsked(access);
                             d.parsePermissionResult(resultCode, data);
                             clearGrantsRequest();
                             synchronized (granted) {

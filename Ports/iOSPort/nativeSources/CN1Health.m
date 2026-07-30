@@ -76,7 +76,14 @@ static NSDictionary *cn1hkTypeMap(void) {
     static NSDictionary *map = nil;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        map = [@{
+        // Built mutable, and the iOS 11 identifiers are added only where
+        // they exist. A dictionary literal raises NSInvalidArgumentException
+        // on a nil value, so an app with a deployment target below 11 running
+        // on iOS 8-10 crashed the first time anything touched the type map --
+        // which includes a plain capability check, before any health data was
+        // requested at all.
+        NSMutableDictionary *m = [NSMutableDictionary dictionary];
+        [m addEntriesFromDictionary:@{
             @"steps": HKQuantityTypeIdentifierStepCount,
             @"distance_walking_running":
                 HKQuantityTypeIdentifierDistanceWalkingRunning,
@@ -85,13 +92,9 @@ static NSDictionary *cn1hkTypeMap(void) {
             @"active_energy": HKQuantityTypeIdentifierActiveEnergyBurned,
             @"basal_energy": HKQuantityTypeIdentifierBasalEnergyBurned,
             @"heart_rate": HKQuantityTypeIdentifierHeartRate,
-            @"resting_heart_rate": HKQuantityTypeIdentifierRestingHeartRate,
-            @"heart_rate_variability_sdnn":
-                HKQuantityTypeIdentifierHeartRateVariabilitySDNN,
             @"oxygen_saturation": HKQuantityTypeIdentifierOxygenSaturation,
             @"respiratory_rate": HKQuantityTypeIdentifierRespiratoryRate,
             @"body_temperature": HKQuantityTypeIdentifierBodyTemperature,
-            @"vo2_max": HKQuantityTypeIdentifierVO2Max,
             @"blood_glucose": HKQuantityTypeIdentifierBloodGlucose,
             @"body_mass": HKQuantityTypeIdentifierBodyMass,
             @"lean_body_mass": HKQuantityTypeIdentifierLeanBodyMass,
@@ -101,7 +104,19 @@ static NSDictionary *cn1hkTypeMap(void) {
             @"height": HKQuantityTypeIdentifierHeight,
             @"hydration": HKQuantityTypeIdentifierDietaryWater,
             @"dietary_energy": HKQuantityTypeIdentifierDietaryEnergyConsumed
-        } retain];
+        }];
+        // Resting heart rate, HRV and VO2 max arrived in iOS 11. Left out
+        // rather than mapped to nil, so they report as unsupported on an
+        // older OS -- which is the truth, and what the portable API is built
+        // to express.
+        if (@available(iOS 11.0, *)) {
+            [m setObject:HKQuantityTypeIdentifierRestingHeartRate
+                  forKey:@"resting_heart_rate"];
+            [m setObject:HKQuantityTypeIdentifierHeartRateVariabilitySDNN
+                  forKey:@"heart_rate_variability_sdnn"];
+            [m setObject:HKQuantityTypeIdentifierVO2Max forKey:@"vo2_max"];
+        }
+        map = [[NSDictionary dictionaryWithDictionary:m] retain];
     });
     return map;
 }
@@ -278,9 +293,11 @@ com_codename1_impl_ios_IOSNative_hkIsTypeSupported___java_lang_String_R_boolean(
     // The map is the authority. Deriving support from the portable type's
     // canonical unit instead would advertise types HealthKit has never
     // heard of, and the failure would surface only at query time.
+    // Resolved, not just looked up. A mapped identifier that this OS does
+    // not know still yields a nil HKQuantityType, and reporting it as
+    // supported moved the failure to query time.
     NSString *portableId = toNSString(threadStateData, typeId);
-    return [cn1hkTypeMap() objectForKey:portableId] != nil
-            ? JAVA_TRUE : JAVA_FALSE;
+    return cn1hkQuantityType(portableId) != nil ? JAVA_TRUE : JAVA_FALSE;
 }
 
 JAVA_INT

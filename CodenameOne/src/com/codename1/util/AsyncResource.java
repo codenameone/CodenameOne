@@ -224,6 +224,28 @@ public class AsyncResource<V> extends Observable {
     /// #### Returns
     ///
     /// True if the resource loading was cancelled.  False if the loading was already done.
+    ///
+    /// Cancellation notifies observers, which is how a waiter learns the
+    /// resource became terminal. It used to call `setChanged()` and stop there,
+    /// leaving the flag set with nothing notified: a thread inside [#get()]
+    /// adds an observer, checks `isDone()`, and then waits, so a cancel
+    /// landing after that check woke nobody and the waiter blocked forever on
+    /// a resource that had already finished.
+    ///
+    /// It deliberately does **not** run the callbacks registered through
+    /// [#ready(SuccessCallback)] or [#except(SuccessCallback)]. Cancelling
+    /// means the caller has stopped listening, and publishing to it anyway
+    /// would contradict a contract the rest of the framework is built on and
+    /// tests -- see the AI language and vision suites, which assert that a
+    /// cancelled operation delivers neither a value nor an error even when the
+    /// backend answers afterwards. Observers are the internal wake mechanism
+    /// for `get()` and `waitFor()`; they are not the application's callbacks.
+    ///
+    /// One consequence worth knowing: cleanup wired through
+    /// [#onResult(AsyncResult)] does not run on cancellation either. Anything
+    /// that must be released has to be released by whoever owns it. A
+    /// per-operation timeout timer, for instance, survives until its deadline
+    /// and then retires itself on finding the resource already done.
     public boolean cancel(boolean mayInterruptIfRunning) {
         boolean changed = false;
         synchronized (lock) {
@@ -239,6 +261,7 @@ public class AsyncResource<V> extends Observable {
         }
         if (changed) {
             setChanged();
+            notifyObservers();
         }
         return true;
     }
