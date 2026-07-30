@@ -109,7 +109,11 @@ jobs:
           set -euo pipefail
           dir="${{ steps.build-android-app.outputs.gradle_project_dir }}"
           echo "Gradle project: $dir"
-          find "$dir" -name 'CN1HealthConnectBridge.kt' | grep -q . \
+          # Same pipefail/SIGPIPE hazard as the dexdump check below, and this
+          # one fires more readily: `grep -q .` matches the very first line, so
+          # find is almost always killed before it exits cleanly.
+          bridges="$(find "$dir" -name 'CN1HealthConnectBridge.kt')"
+          [ -n "$bridges" ] \
             || { echo "::error::Health Connect bridge not copied into project"; exit 1; }
           grep -Rqs --include='build.gradle*' "androidx.health.connect:connect-client" "$dir" \
             || { echo "::error::connect-client dependency not injected"; exit 1; }
@@ -140,8 +144,22 @@ jobs:
           dexdump="$(find "$ANDROID_HOME/build-tools" -name dexdump | sort | tail -1)"
           found=0
           for dex in "$work"/*.dex; do
-            if "$dexdump" -f "$dex" 2>/dev/null \
-                | grep -q "Lcom/codename1/health/CN1HealthConnectBridge;"; then
+            # Captured before it is searched, not piped into grep. With pipefail
+            # set, `grep -q` exits at the first match and SIGPIPEs dexdump
+            # (status 141), and the pipeline status was then read as "class
+            # absent" -- so a dex that did contain the bridge failed the build.
+            # Whether it fired depended on where the descriptor sat in the dump:
+            # early enough to short-circuit grep and it failed, late enough that
+            # grep drained the output and it passed. Same fix as
+            # identity-stack.yml's bundle listing.
+            dump="$("$dexdump" -f "$dex" 2>/dev/null || true)"
+            # A here-string, not a pipe. Piping the captured dump into grep -q
+            # just moves the SIGPIPE onto whatever feeds it -- verified: grep
+            # short-circuits, the writer dies with 141, and pipefail reports the
+            # class as absent all over again. identity-stack.yml uses <<< for the
+            # same reason.
+            if grep -qF "Lcom/codename1/health/CN1HealthConnectBridge;" \
+                <<<"$dump"; then
               found=1
               break
             fi
