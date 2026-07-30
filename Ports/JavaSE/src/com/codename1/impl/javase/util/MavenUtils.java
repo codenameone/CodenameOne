@@ -1,7 +1,24 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.impl.javase.util;
 
@@ -74,17 +91,17 @@ public class MavenUtils {
     
     /**
      * Locate the codenameone-designer:jar-with-dependencies jar inside the local
-     * Maven (~/.m2) repository, using the version of the codenameone-core jar that
-     * is currently loaded into this JVM. Returns null if the running framework is
-     * not loaded from m2 (e.g. running from a build directory) or if the matching
-     * designer jar has not been resolved yet.
+     * Maven (~/.m2) repository, starting from the codenameone-core jar currently
+     * loaded into this JVM. Returns null if the running framework is not loaded from
+     * m2 (e.g. running from a build directory) or if no designer has been fetched.
      *
-     * <p>The Maven plugin declares codenameone-designer as a plugin dependency, so
-     * any plugin invocation (cn1:run, mvn compile when bound to the css goal, etc.)
-     * implicitly fetches the matching designer jar into m2. This lookup lets the
-     * simulator runtime use that exact version even when codename1.designer.jar
-     * isn't passed as a system property -- avoiding a stale ~/.codenameone/designer_1.jar
-     * fallback.
+     * <p>The Resource Editor is deprecated and frozen, so it is no longer a plugin
+     * dependency and its version no longer tracks the framework's: an ordinary build
+     * does not pull ~43MB of Swing editor it will never open. It reaches m2 on demand,
+     * through the cn1:designer goal. This lookup therefore prefers a designer matching
+     * the core version and otherwise falls back to the newest one present, so the
+     * Component Inspector's Edit Style action keeps working wherever one has been
+     * fetched -- rather than requiring a match that can no longer occur.
      */
     public static File findDesignerJarInM2() {
         try {
