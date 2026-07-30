@@ -15,6 +15,12 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # The four Central confirmation polls each cover the documented 30-minute
+    # propagation window, and each fires only when its own deploy reported failure,
+    # so the worst case is ~2h of polling on top of the build. Bounded explicitly
+    # rather than inheriting the 6h default, so a wedged release fails in a shift
+    # rather than overnight.
+    timeout-minutes: 240
 
     env:
       # Cloudflare R2, the repository Codename One is migrating to. These are deliberately
@@ -260,22 +266,26 @@ jobs:
           steps.deploy_gamebuilder.outcome == 'failure'
         continue-on-error: true
         run: |
-          # Informational only: the editor bundle was accepted by Sonatype
-          # Central in the step above (which would have failed otherwise).
-          # Propagation to repo1 can take 30+ minutes, so this is a best-effort
-          # sanity poll, not a gate.
+          # A gate, not a sanity poll: it runs only when the deploy above reported
+          # failure, and its verdict is what the final gate trusts to tell a genuine
+          # failure apart from central-publishing reporting failure for a bundle it
+          # accepted. It therefore has to cover the whole documented propagation
+          # window, 90 x 20s = 30 minutes, matching the core poll. At the previous
+          # 5 minutes an accepted-but-slow bundle was reported as a failed
+          # publication, and a rerun could not repair that because Central rejects
+          # the already-published immutable version.
           set +e
           url="https://repo1.maven.org/maven2/com/codenameone/codenameone-gamebuilder/${GITHUB_REF_NAME}/codenameone-gamebuilder-${GITHUB_REF_NAME}.jar"
-          for i in $(seq 1 15); do
+          for i in $(seq 1 90); do
             code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
             if [ "$code" = "200" ]; then
               echo "Confirmed codenameone-gamebuilder ${GITHUB_REF_NAME} on Maven Central"
               exit 0
             fi
-            echo "[$i/15] Waiting on Maven Central for codenameone-gamebuilder (code=$code)"
+            echo "[$i/90] Waiting on Maven Central for codenameone-gamebuilder (code=$code)"
             sleep 20
           done
-          echo "codenameone-gamebuilder ${GITHUB_REF_NAME} never appeared on Maven Central." >&2
+          echo "codenameone-gamebuilder ${GITHUB_REF_NAME} never appeared on Maven Central within 30 minutes." >&2
           exit 1
 
       # --- Signing Wizard editor ---------------------------------------------
@@ -347,16 +357,16 @@ jobs:
         run: |
           set +e
           url="https://repo1.maven.org/maven2/com/codenameone/codenameone-certificatewizard/${GITHUB_REF_NAME}/codenameone-certificatewizard-${GITHUB_REF_NAME}.jar"
-          for i in $(seq 1 15); do
+          for i in $(seq 1 90); do
             code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
             if [ "$code" = "200" ]; then
               echo "Confirmed codenameone-certificatewizard ${GITHUB_REF_NAME} on Maven Central"
               exit 0
             fi
-            echo "[$i/15] Waiting on Maven Central for codenameone-certificatewizard (code=$code)"
+            echo "[$i/90] Waiting on Maven Central for codenameone-certificatewizard (code=$code)"
             sleep 20
           done
-          echo "codenameone-certificatewizard ${GITHUB_REF_NAME} never appeared on Maven Central." >&2
+          echo "codenameone-certificatewizard ${GITHUB_REF_NAME} never appeared on Maven Central within 30 minutes." >&2
           exit 1
 
       # --- Settings editor ----------------------------------------------------
@@ -425,16 +435,16 @@ jobs:
         run: |
           set +e
           url="https://repo1.maven.org/maven2/com/codenameone/codenameone-settings/${GITHUB_REF_NAME}/codenameone-settings-${GITHUB_REF_NAME}.jar"
-          for i in $(seq 1 15); do
+          for i in $(seq 1 90); do
             code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
             if [ "$code" = "200" ]; then
               echo "Confirmed codenameone-settings ${GITHUB_REF_NAME} on Maven Central"
               exit 0
             fi
-            echo "[$i/15] Waiting on Maven Central for codenameone-settings (code=$code)"
+            echo "[$i/90] Waiting on Maven Central for codenameone-settings (code=$code)"
             sleep 20
           done
-          echo "codenameone-settings ${GITHUB_REF_NAME} never appeared on Maven Central." >&2
+          echo "codenameone-settings ${GITHUB_REF_NAME} never appeared on Maven Central within 30 minutes." >&2
           exit 1
 
       - name: Mark the R2 release complete
