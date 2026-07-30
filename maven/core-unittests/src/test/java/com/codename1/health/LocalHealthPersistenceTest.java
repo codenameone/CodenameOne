@@ -496,6 +496,42 @@ class LocalHealthPersistenceTest extends UITestBase {
                 "the current format must not be mistaken for a newer one");
     }
 
+    /**
+     * One unreadable record under a header this build knows still refuses
+     * writes.
+     *
+     * <p>The narrower guards checked the header and stopped there.
+     * {@code decodeOne} answers null for a line it cannot parse -- an
+     * additive sample shape or a data type from a newer build -- and the
+     * decode loop simply carried on, so the store looked completely read.
+     * The next write then re-encoded the partial list and removed that
+     * record for good.</p>
+     */
+    @Test
+    void oneUndecodableRecordRefusesWritesEvenUnderAKnownHeader()
+            throws Exception {
+        // A real header, one good record, one line this build cannot parse.
+        StoredHealthStore seed = new StoredHealthStore();
+        seed.write(one(QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(1, HealthUnit.COUNT), 0L, 60_000L))).get();
+        String good = (String) Storage.getInstance()
+                .readObject("cn1$health$local");
+        assertNotNull(good);
+        Storage.getInstance().writeObject("cn1$health$local",
+                good + "Q\tfrom_a_newer_build\tnot\tparseable\n");
+
+        StoredHealthStore store = new StoredHealthStore();
+        assertNotNull(errorOf(store.write(one(QuantitySample.create(
+                HealthDataType.STEPS, new HealthQuantity(2, HealthUnit.COUNT),
+                60_000L, 120_000L)))),
+                "a write must fail while part of the store is unreadable");
+
+        String after = (String) Storage.getInstance()
+                .readObject("cn1$health$local");
+        assertTrue(after.indexOf("from_a_newer_build") > 0,
+                "and the record this build cannot read must survive");
+    }
+
     private static Throwable errorOf(AsyncResource<?> r) {
         // Settled first. Results are delivered on the EDT on every backend
         // now, so an off-EDT caller sees the error queued rather than already

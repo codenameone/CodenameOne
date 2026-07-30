@@ -277,22 +277,6 @@ final class LocalHealthCodec {
     // decoding
     // ------------------------------------------------------------------
 
-    /// Whether `blob` is a format this build can read.
-    ///
-    /// Separate from [#decode(String)] because decode answers an empty list
-    /// for both "nothing stored" and "stored by a version I do not
-    /// understand", and the caller has to tell those apart: the first is a
-    /// fresh store, the second is history that a downgrade must not
-    /// overwrite. Empty and null are supported -- there is nothing there to
-    /// misread.
-    static boolean isSupportedFormat(String blob) {
-        if (blob == null || blob.length() == 0) {
-            return true;
-        }
-        List<String> lines = split(blob, '\n');
-        return !lines.isEmpty() && VERSION.equals(lines.get(0));
-    }
-
     static List<HealthSample> decode(String blob) {
         List<HealthSample> out = new ArrayList<HealthSample>();
         if (blob == null || blob.length() == 0) {
@@ -313,6 +297,58 @@ final class LocalHealthCodec {
             }
         }
         return out;
+    }
+
+    /// What a decode produced, and whether it produced all of it.
+    ///
+    /// The second half is the point. A blob under a header this build knows
+    /// can still hold a line it cannot read -- a sample shape or a data type
+    /// added by a newer build -- and `decodeOne` answers null for it, so the
+    /// loop above simply carries on. The caller cannot tell that from a
+    /// clean read, and the store it then writes back is missing that record
+    /// permanently.
+    static final class Decoded {
+
+        /// The samples that could be read.
+        final List<HealthSample> samples;
+
+        /// False when the header was unrecognised or any line was dropped.
+        final boolean complete;
+
+        Decoded(List<HealthSample> samples, boolean complete) {
+            this.samples = samples;
+            this.complete = complete;
+        }
+    }
+
+    /// Decodes `blob`, reporting whether everything in it was understood.
+    ///
+    /// Answers the question a caller needs before it may write: not "what
+    /// did I get" but "did I get all of it". Anything short of all of it
+    /// means a write would drop what was missed.
+    static Decoded decodeChecked(String blob) {
+        List<HealthSample> out = new ArrayList<HealthSample>();
+        if (blob == null || blob.length() == 0) {
+            return new Decoded(out, true);
+        }
+        List<String> lines = split(blob, '\n');
+        if (lines.isEmpty() || !VERSION.equals(lines.get(0))) {
+            return new Decoded(out, false);
+        }
+        boolean complete = true;
+        for (int i = 1; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (line.length() == 0) {
+                continue;
+            }
+            HealthSample s = decodeOne(line);
+            if (s == null) {
+                complete = false;
+            } else {
+                out.add(s);
+            }
+        }
+        return new Decoded(out, complete);
     }
 
     private static HealthSample decodeOne(String line) {

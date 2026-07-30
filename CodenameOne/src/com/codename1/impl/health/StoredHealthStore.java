@@ -107,16 +107,23 @@ public class StoredHealthStore extends LocalHealthStore {
         } catch (RuntimeException ex) {
             Log.p("CN1 Health: could not read the local store (" + ex + ")");
         }
-        if (blob != null && !LocalHealthCodec.isSupportedFormat(blob)) {
-            // Readable bytes in a format this build does not know -- the
-            // shape a downgrade leaves behind. decode answers an empty list
-            // for it, exactly as it does for an empty store, so without this
-            // the store looked fresh and the next write replaced history
-            // that a re-upgrade could still have read.
+        LocalHealthCodec.Decoded decoded =
+                LocalHealthCodec.decodeChecked(blob);
+        if (!decoded.complete) {
+            // Anything this build could not read, at any granularity: a
+            // header from a newer version, or a single line under a header
+            // it does know -- an additive sample shape or a data type added
+            // later. Either way part of the store is invisible here, and a
+            // write would re-encode what is visible and drop the rest.
+            //
+            // Stated as the rule rather than as the cases: if the store
+            // cannot be read in full, it cannot be written. Every narrower
+            // version of this guard left another route into "looks
+            // complete, is not".
             unreadable = true;
-            Log.p("CN1 Health: the local store was written by a newer"
-                    + " version and cannot be read here; writes are refused"
-                    + " so it is not overwritten");
+            Log.p("CN1 Health: the local store could not be read in full;"
+                    + " writes are refused so the parts this build cannot"
+                    + " read are not overwritten");
         }
         if (had && blob == null) {
             // There is history here and this process cannot see it. Reads
@@ -131,8 +138,7 @@ public class StoredHealthStore extends LocalHealthStore {
                     + " writes are refused so the existing data is not"
                     + " overwritten");
         }
-        List<HealthSample> restored = LocalHealthCodec.decode(blob);
-        for (HealthSample s : restored) {
+        for (HealthSample s : decoded.samples) {
             addSampleDirect(s);
         }
         lastGood = blob;
