@@ -503,6 +503,20 @@ class JavaSEWearableBridge implements WearableBridge {
                 }
                 try {
                     WearableConnection.deliverDataChanged(deliveryPath(f.getName()), readFully(f));
+                    if (isTransfer(f.getName())) {
+                        // A transfer is one-shot, so the delivered file goes. Leaving it would make
+                        // every restart of the receiving simulator replay it -- primeSeenData()
+                        // deliberately records nothing so that offline values DO replay, and without
+                        // this a transfer would be caught by the same rule. Distinct path/name pairs
+                        // would also pile up in the shared directory indefinitely.
+                        //
+                        // Unlike the device ports there is exactly one peer here, so consuming the
+                        // file cannot deprive a second watch of it.
+                        f.delete();
+                        synchronized (seenData) {
+                            seenData.remove(f.getName());
+                        }
+                    }
                 } catch (IOException stillBeingWritten) {
                     // Re-reported on the next pass once the writer has finished.
                     synchronized (seenData) {

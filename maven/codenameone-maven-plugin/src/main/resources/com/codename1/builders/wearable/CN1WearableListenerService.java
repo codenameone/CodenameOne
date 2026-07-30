@@ -169,13 +169,19 @@ public class CN1WearableListenerService extends WearableListenerService {
                 }
                 CN1WearableBridge.Transfer transfer =
                         CN1WearableBridge.decodeTransfer(this, event.getDataItem());
-                if (transfer.payload != null) {
+                if (transfer.payload != null
+                        && CN1WearableBridge.claimTransfer(uri, CN1WearableBridge.sequenceOf(
+                                CN1WearableBridge.valueOrTransferMap(event.getDataItem())))) {
                     // On the path the sender passed to transferFile, not the filename-suffixed
                     // storage path this item happens to live at: a listener routes on what it asked
                     // for. The decoded payload carries the same path internally.
+                    //
+                    // A transfer is one-shot, so a re-sync of the same item must not deliver twice --
+                    // but the duplicate is suppressed locally rather than by deleting the item. The
+                    // item belongs to the sender, and deleting it here would propagate: with two
+                    // watches paired to one phone, the first to connect would consume the file and
+                    // the second would get the tombstone.
                     WearableConnection.deliverDataChanged(transfer.logicalPath, transfer.payload);
-                    // One-shot: drop the item so it is not handed out again on the next connection.
-                    CN1WearableBridge.consumeTransfer(this, uri);
                 }
                 // An unreadable asset delivers nothing now; decodeTransfer has scheduled a re-read,
                 // which beats handing the listener DataMap bytes dressed up as a payload.

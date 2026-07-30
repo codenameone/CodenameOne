@@ -78,12 +78,17 @@ public class CN1WearableBridge implements WearableBridge {
     /** The publication order of a value or transfer, so the newer of two items wins. */
     private static final String SEQUENCE_KEY = "cn1.seq";
     /**
-     * Transfers live under their own top-level prefix, not under {@link #PATH_PREFIX}. Sharing the
-     * prefix made the two APIs collide: {@code transferFile("/inbox", "photo.png", ...)} built the
-     * same DataItem URI as {@code putData("/inbox/photo.png")}, so each could silently overwrite the
-     * other. A distinct namespace makes them independent, which is what the API promises.
+     * Transfers live under their own prefix, not under {@link #PATH_PREFIX}. Sharing the prefix made
+     * the two APIs collide: {@code transferFile("/inbox", "photo.png", ...)} built the same DataItem
+     * URI as {@code putData("/inbox/photo.png")}, so each could silently overwrite the other.
+     *
+     * <p>The trailing slash is what makes the namespace unambiguous rather than merely different.
+     * {@link #encode} escapes {@code '/'}, so a replicated value's path is {@code /cn1} followed by
+     * characters that never include a slash -- meaning no value can ever match {@code /cn1x/}. Without
+     * the delimiter, {@code putData("xstatus")} would produce {@code /cn1xstatus} and be misread as a
+     * transfer, its value dropped by the listener and hidden from {@code getDataPaths()}.
      */
-    private static final String TRANSFER_PREFIX = "/cn1x";
+    private static final String TRANSFER_PREFIX = "/cn1x/";
     /** How long a blocking Data Layer call may take before we give up and answer "not available". */
     private static final long TIMEOUT_SECONDS = 5;
     /**
@@ -859,11 +864,20 @@ public class CN1WearableBridge implements WearableBridge {
         scheduleTransferRetry(context, uri, 1);
     }
 
+    /**
+     * Retries run on their own timer, not on {@link #replyTimer}. A retry blocks on
+     * {@code Tasks.await} and then reads the whole asset stream, and the reply timer is a single
+     * thread that also owns every pending 30-second reply deadline -- a slow or large asset would
+     * delay those deadlines, so a request that timed out would be reported late or not at all.
+     */
+    private static final java.util.Timer transferTimer =
+            new java.util.Timer("cn1-wearable-transfers", true);
+
     private static void scheduleTransferRetry(final Context context, final Uri uri, final int attempt) {
         if (uri == null || attempt > TRANSFER_RETRIES) {
             return;
         }
-        replyTimer.schedule(new java.util.TimerTask() {
+        transferTimer.schedule(new java.util.TimerTask() {
             public void run() {
                 try {
                     DataItemBuffer items = Tasks.await(
@@ -873,9 +887,9 @@ public class CN1WearableBridge implements WearableBridge {
                         for (DataItem item : items) {
                             Transfer t = decodeTransferOnce(context, item);
                             if (t.payload != null) {
-                                WearableConnection.deliverDataChanged(t.logicalPath, t.payload);
-                                // Same one-shot rule as the first-attempt path.
-                                consumeTransfer(context, uri);
+                                if (claimTransfer(uri, sequenceOf(valueOrTransferMap(item)))) {
+                                    WearableConnection.deliverDataChanged(t.logicalPath, t.payload);
+                                }
                                 return;
                             }
                         }
@@ -928,6 +942,8 @@ public class CN1WearableBridge implements WearableBridge {
     /// @param fileName the file's name
     /// @return the DataItem path
     static String transferPath(String path, String fileName) {
+        // Republishing the same path and name lands on the same URI and therefore replaces the
+        // previous item, which is what bounds a sender's transfer storage.
         return TRANSFER_PREFIX + encode(path + "/" + fileName);
     }
 
@@ -985,30 +1001,44 @@ public class CN1WearableBridge implements WearableBridge {
     ///
     /// @param map a value or transfer DataMap
     /// @return the publication stamp
+    /// The DataMap of a value or a transfer, whichever this item is, or null when it is neither.
+    ///
+    /// @param item a received or queried data item
+    /// @return the item's DataMap, or null
+    static DataMap valueOrTransferMap(DataItem item) {
+        try {
+            return DataMapItem.fromDataItem(item).getDataMap();
+        } catch (Throwable notADataMap) {
+            return null;
+        }
+    }
+
     static long sequenceOf(DataMap map) {
         return map == null ? Long.MIN_VALUE : map.getLong(SEQUENCE_KEY, Long.MIN_VALUE);
     }
 
     /**
-     * Deletes a transfer's DataItem once its bytes have been delivered.
+     * Records that a transfer has been handed to the app, so a re-sync of the same item does not
+     * deliver the same one-shot file twice.
      *
-     * <p>A transfer is one-shot, but a DataItem is a persistent value: left in place it keeps
-     * occupying Data Layer storage and is handed out again whenever another node connects or the app
-     * is reinstalled, so the receiver sees the same file arrive repeatedly.
+     * <p>Deliberately NOT a delete. A DataItem belongs to the node that published it, and deleting it
+     * from a receiver propagates the deletion to every other node: with two watches paired to one
+     * phone, the first to connect would consume the item and the second would receive the tombstone
+     * instead of the file. Suppressing the duplicate locally keeps the Data Layer's own multi-peer
+     * replication intact, which is the property that makes a transfer reach every watch at all.
      *
-     * @param context any context
+     * <p>The sender bounds the storage instead -- see {@link #transferFile}, where republishing the
+     * same path and name replaces the item rather than adding one.
+     *
      * @param uri the delivered transfer's item Uri
+     * @param sequence the transfer's publication stamp
+     * @return true when this is the first delivery of that transfer
      */
-    static void consumeTransfer(Context context, Uri uri) {
+    static boolean claimTransfer(Uri uri, long sequence) {
         if (uri == null) {
-            return;
+            return true;
         }
-        try {
-            Wearable.getDataClient(context.getApplicationContext()).deleteDataItems(uri);
-        } catch (Throwable unavailable) {
-            // Nothing to do: the worst case is the file arriving again, which the sequence check
-            // below already suppresses for this process.
-        }
+        return isNewerThanDelivered("\u0000xfer:" + uri.getPath(), sequence);
     }
 
     /**

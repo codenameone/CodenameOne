@@ -326,8 +326,16 @@ the same iOS build -- declare the watch main class and build for iOS.
 
 A Wear OS app is a regular Android app. The Codename One Android port renders the
 UI with the same pipeline it uses on phones, so no special rendering backend is
-required. The same `codename1.watchMain` that builds the Apple Watch app builds
-the Wear OS app, so a project targets both wearables from one declaration.
+required. The same `codename1.watchMain` declaration drives both platforms.
+
+What it produces differs, though, and that difference is worth stating precisely.
+Set `codename1.watchStandalone` and the Android build *is* the watch app: one APK
+that installs and runs on the watch. Leave it unset and the Android build stays a
+phone build -- a companion Wear APK alongside the phone APK isn't generated yet,
+so on Android the companion configuration currently gives you the phone app and
+the wearable link, not a second artifact. The build logs this rather than leaving
+you to discover it. On Apple the companion case does produce and embed the watch
+app, which is why the two platforms have a section each.
 
 A standalone Wear app declares the watch hardware feature in the manifest:
 
