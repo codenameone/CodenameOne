@@ -357,6 +357,51 @@ def parse_spotbugs() -> Tuple[Dict[str, AnalysisReport], bool, Optional[str]]:
     return {}, True, error_message
 
 
+def _required_spotbugs_projects() -> List[str]:
+    env_value = os.environ.get("QUALITY_REPORT_REQUIRED_SPOTBUGS") or ""
+    return [item.strip() for item in env_value.split(os.pathsep) if item.strip()]
+
+
+def _enforce_spotbugs_gate(reports: Dict[str, AnalysisReport]) -> None:
+    """Fail the build on any SpotBugs finding in any analysed project.
+
+    This gate deliberately has no allow-list of patterns. An allow-list only
+    ever catches the patterns somebody already thought to add, so the first
+    time SpotBugs reports a brand new pattern the build stays green and the
+    finding lands on master. Intentional exceptions belong in the project's
+    spotbugs-exclude.xml instead, scoped to the class or method they apply to
+    and with a comment explaining why - that keeps the report itself at zero.
+    """
+    required = _required_spotbugs_projects()
+    missing = [label for label in required if label not in reports]
+    if missing:
+        print(
+            "\n❌ Build failed because SpotBugs produced no report for: "
+            + ", ".join(sorted(missing))
+        )
+        print(
+            "  A missing report means the analysis never ran; that would let "
+            "findings through unnoticed."
+        )
+        exit(1)
+    violations: List[Tuple[str, Finding]] = []
+    for label in sorted(reports):
+        for finding in reports[label].findings:
+            violations.append((label, finding))
+    if not violations:
+        return
+    print(f"\n❌ Build failed due to {len(violations)} SpotBugs finding(s):")
+    for label, finding in violations:
+        rule = finding.rule or "unknown"
+        print(f"  - {rule}: {label} {finding.location} - {finding.message}")
+    print(
+        "\nFix the finding, or - if it is intentional - add a narrowly scoped "
+        "<Match> for it to that project's spotbugs-exclude.xml with a comment "
+        "explaining why."
+    )
+    exit(1)
+
+
 def parse_pmd() -> Optional[AnalysisReport]:
     report_path: Optional[Path] = None
     for target_dir in TARGET_DIRS:
@@ -809,174 +854,14 @@ def main() -> None:
     if not generate_html_only:
         REPORT_PATH.write_text(report + "\n", encoding="utf-8")
 
+    if generate_html_only:
+        # The HTML pass runs before the report and the PR comment are produced;
+        # gating here would hide the very findings we want the comment to show.
+        return
+
     # Enforce quality gates
     spotbugs_reports, _, _ = parse_spotbugs()
-    if spotbugs_reports:
-        cross_project_rules = {
-            "DE_MIGHT_IGNORE",
-            "BC_IMPOSSIBLE_CAST",
-            "DM_DEFAULT_ENCODING"
-        }
-        cross_project_violations: List[Tuple[str, Finding]] = []
-        for label, report in spotbugs_reports.items():
-            for finding in report.findings:
-                if finding.rule in cross_project_rules:
-                    cross_project_violations.append((label, finding))
-        if cross_project_violations:
-            print(
-                "\n❌ Build failed due to forbidden SpotBugs violations across projects:"
-            )
-            for label, finding in cross_project_violations:
-                location = finding.location
-                print(
-                    f"  - {finding.rule}: {label} {location} - {finding.message}"
-                )
-            exit(1)
-    spotbugs = spotbugs_reports.get("core-unittests")
-    if spotbugs:
-        forbidden_rules = {
-            "DE_MIGHT_IGNORE",
-            "NP_ALWAYS_NULL",
-            "NP_NULL_PARAM_DEREF",
-            "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE",
-            "RCN_REDUNDANT_NULLCHECK_OF_NULL_VALUE",
-            "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR",
-            "SF_SWITCH_NO_DEFAULT",
-            "DM_DEFAULT_ENCODING",
-            "EQ_CHECK_FOR_OPERAND_NOT_COMPATIBLE_WITH_THIS",
-            "IA_AMBIGUOUS_INVOCATION_OF_INHERITED_OR_OUTER_METHOD",
-            "LI_LAZY_INIT_STATIC",
-            "RpC_REPEATED_CONDITIONAL_TEST",
-            "NS_NON_SHORT_CIRCUIT",
-            "ES_COMPARING_PARAMETER_STRING_WITH_EQ",
-            "FE_FLOATING_POINT_EQUALITY",
-            "FE_TEST_IF_EQUAL_TO_NOT_A_NUMBER",
-            "ICAST_IDIV_CAST_TO_DOUBLE",
-            "ICAST_QUESTIONABLE_UNSIGNED_RIGHT_SHIFT",
-            "SA_FIELD_SELF_ASSIGNMENT",
-            "UC_USELESS_CONDITION",
-            "UC_USELESS_OBJECT",
-            "UCF_USELESS_CONTROL_FLOW",
-            "EC_UNRELATED_TYPES",
-            "EQ_ALWAYS_FALSE",
-            "SBSC_USE_STRINGBUFFER_CONCATENATION",
-            "SIC_INNER_SHOULD_BE_STATIC",
-            "EQ_DOESNT_OVERRIDE_EQUALS",
-            "CO_COMPARETO_INCORRECT_FLOATING",
-            "DL_SYNCHRONIZATION_ON_SHARED_CONSTANT",
-            "SSD_DO_NOT_USE_INSTANCE_LOCK_ON_SHARED_STATIC_DATA",
-            "DLS_DEAD_LOCAL_STORE",
-            "DLS_DEAD_LOCAL_STORE_OF_NULL",
-            "DM_NUMBER_CTOR",
-            "DMI_INVOKING_TOSTRING_ON_ARRAY",
-            "EC_NULL_ARG",
-            "EC_UNRELATED_TYPES_USING_POINTER_EQUALITY",
-            "EQ_GETCLASS_AND_CLASS_CONSTANT",
-            "EQ_UNUSUAL",
-            "ES_COMPARING_STRINGS_WITH_EQ",
-            "FI_EMPTY",
-            "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD",
-            "DM_GC",
-            "CN_IMPLEMENTS_CLONE_BUT_NOT_CLONEABLE",
-            "BC_UNCONFIRMED_CAST",
-            "BC_UNCONFIRMED_CAST_OF_RETURN_VALUE",
-            "CN_IDIOM_NO_SUPER_CALL",
-            "DM_BOOLEAN_CTOR",
-            "DM_FP_NUMBER_CTOR",
-            "DM_EXIT",
-            "DC_DOUBLECHECK",
-            "DB_DUPLICATE_SWITCH_CLAUSES",
-            "EI_EXPOSE_REP", 
-            "EI_EXPOSE_REP2",
-            "EI_EXPOSE_STATIC_REP2",
-            "EQ_COMPARETO_USE_OBJECT_EQUALS",
-            "MS_EXPOSE_REP",
-            "NM_CONFUSING",
-            "NM_FIELD_NAMING_CONVENTION",
-            "NM_METHOD_NAMING_CONVENTION",
-            "NN_NAKED_NOTIFY",
-            "NO_NOTIFY_NOT_NOTIFYALL",
-            "NP_LOAD_OF_KNOWN_NULL_VALUE",
-            "NP_BOOLEAN_RETURN_NULL",
-            "RC_REF_COMPARISON_BAD_PRACTICE_BOOLEAN",
-            "OS_OPEN_STREAM",
-            "OS_OPEN_STREAM_EXCEPTION_PATH",
-            "OBL_UNSATISFIED_OBLIGATION_EXCEPTION_EDGE",
-            "RV_RETURN_VALUE_IGNORED_BAD_PRACTICE",
-            "REFLC_REFLECTION_MAY_INCREASE_ACCESSIBILITY_OF_CLASS",
-            "REC_CATCH_EXCEPTION",
-            "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
-            "RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT",
-            "INT_VACUOUS_COMPARISON",
-            "DM_STRING_TOSTRING",
-            "HE_HASHCODE_USE_OBJECT_EQUALS",
-            "IM_BAD_CHECK_FOR_ODD",
-            "IM_AVERAGE_COMPUTATION_COULD_OVERFLOW",
-            "INT_VACUOUS_BIT_OPERATION",
-            "ICAST_INT_2_LONG_AS_INSTANT",
-            "ICAST_INT_CAST_TO_FLOAT_PASSED_TO_ROUND",
-            "IT_NO_SUCH_ELEMENT",
-            "FL_FLOATS_AS_LOOP_COUNTERS",
-            "UI_INHERITANCE_UNSAFE_GETRESOURCE",
-            "IS2_INCONSISTENT_SYNC",
-            "RR_NOT_CHECKED",
-            "URF_UNREAD_FIELD",
-            "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD",
-            "UR_UNINIT_READ",
-            "UUF_UNUSED_FIELD",
-            "UWF_NULL_FIELD",
-            "UW_UNCOND_WAIT",
-            "LI_LAZY_INIT_UPDATE_STATIC",
-            "SIC_INNER_SHOULD_BE_STATIC_ANON",
-            "SS_SHOULD_BE_STATIC",
-            "UPM_UNCALLED_PRIVATE_METHOD",
-            "RV_RETURN_VALUE_IGNORED_INFERRED",
-            "RV_CHECK_FOR_POSITIVE_INDEXOF",
-            "SF_SWITCH_FALLTHROUGH",
-            "SIC_INNER_SHOULD_BE_STATIC_NEEDS_THIS",
-            "SA_FIELD_DOUBLE_ASSIGNMENT",
-            "SA_FIELD_SELF_COMPARISON",
-            "SR_NOT_CHECKED",
-            "SWL_SLEEP_WITH_LOCK_HELD",
-            "UC_USELESS_CONDITION_TYPE",
-            "BX_UNBOXING_IMMEDIATELY_REBOXED"
-        }
-
-        def _is_exempt(f: Finding) -> bool:
-            loc = f.path or f.location or ""
-            if f.rule == "SA_FIELD_SELF_ASSIGNMENT" and "InfBlocks.java" in loc:
-                return True
-            if f.rule == "SF_SWITCH_FALLTHROUGH" and "InfBlocks.java" in loc:
-                return True
-            if f.rule == "SF_SWITCH_FALLTHROUGH" and "InfCodes.java" in loc:
-                return True
-            if f.rule == "SF_SWITCH_FALLTHROUGH" and "Inflate.java" in loc:
-                return True
-            if f.rule == "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" and "TarEntry.java" in loc:
-                return True
-            if f.rule == "URF_UNREAD_FIELD" and "GridBagLayoutInfo" in loc:
-                return True
-            if f.rule == "NN_NAKED_NOTIFY" and "Display.java" in loc:
-                return True
-            if f.rule == "ICAST_QUESTIONABLE_UNSIGNED_RIGHT_SHIFT" and "Deflate.java" in loc:
-                return True
-            return False
-
-
-        # Apply the same forbidden_rules to every SpotBugs report (android,
-        # ios, codenameone-maven-plugin, ...) -- not just core-unittests --
-        # so a quality regression in a port is caught in CI just as quickly
-        # as one in core.
-        all_violations: List[Tuple[str, Finding]] = []
-        for label, report in spotbugs_reports.items():
-            for f in report.findings:
-                if f.rule in forbidden_rules and not _is_exempt(f):
-                    all_violations.append((label, f))
-        if all_violations:
-            print("\n❌ Build failed due to forbidden SpotBugs violations:")
-            for label, v in all_violations:
-                print(f"  - {v.rule}: {label} {v.location} - {v.message}")
-            exit(1)
+    _enforce_spotbugs_gate(spotbugs_reports)
 
     pmd = parse_pmd()
     if pmd:

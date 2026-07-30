@@ -312,10 +312,11 @@ public final class IOSVisionImpl extends VisionImpl {
             return out;
         }
         Map source = (Map) value;
-        for (Object key : source.keySet()) {
-            Object point = source.get(key);
+        for (Object entryObject : source.entrySet()) {
+            Map.Entry entry = (Map.Entry) entryObject;
+            Object point = entry.getValue();
             if (point instanceof Map) {
-                out.put(String.valueOf(key), new VisionPoint(
+                out.put(String.valueOf(entry.getKey()), new VisionPoint(
                         number((Map) point, "x"),
                         number((Map) point, "y")));
             }

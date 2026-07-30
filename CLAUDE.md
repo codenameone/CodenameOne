@@ -170,6 +170,35 @@ To use locally-built version, edit the generated `pom.xml`:
 - **Main JAVA_HOME (for building the framework)**: Must be JDK 8
 - **Runtime JDK for simulator / desktop run**: JDK 11 through 25 is supported. The Codename One Maven plugin checks this on entry to `cn1:run` and `cn1:debug` and aborts with a friendly error when an older JDK is in use. The build-time goals (`generate-desktop-app-wrapper`, `prepare-simulator-classpath`, the `executable-jar` profile) are not gated -- they still work on JDK 8 because they only generate icons / classpath metadata.
 
+### Static Analysis Gates
+
+PR CI (`.github/workflows/pr.yml`, Java 8 leg) runs SpotBugs over
+`core-unittests`, `android`, `ios`, `ByteCodeTranslator` and
+`codenameone-maven-plugin`, then enforces the result in
+`.github/scripts/generate-quality-report.py`.
+
+- **SpotBugs is a zero-findings gate.** *Any* finding of *any* pattern in *any*
+  of those projects fails the build, and a project that produces no SpotBugs
+  report at all fails it too (see `QUALITY_REPORT_REQUIRED_SPOTBUGS`). There is
+  no per-pattern allow-list, so a pattern nobody anticipated still fails.
+- **Record intentional exceptions in the project's `spotbugs-exclude.xml`**
+  (`maven/core-unittests/`, `Ports/Android/`, `Ports/iOSPort/`,
+  `vm/ByteCodeTranslator/`, `maven/codenameone-maven-plugin/`), scoped to the
+  class or method it applies to and with a comment explaining why. Keep the
+  generated report at zero rather than tolerating known noise.
+- PMD and Checkstyle still gate on their own lists in the same script.
+
+To reproduce the SpotBugs gate locally:
+
+```bash
+source tools/env.sh   # JDK 8
+cd maven && mvn -B -DskipTests=true -Pcompile-android \
+  -pl android,ios,codenameone-maven-plugin -am verify
+mvn -B -DskipTests=true -f ../vm/ByteCodeTranslator/pom.xml verify
+```
+
+Findings land in each module's `target/spotbugsXml.xml`.
+
 ### Working with Native Code
 
 Platform-specific native code locations:
