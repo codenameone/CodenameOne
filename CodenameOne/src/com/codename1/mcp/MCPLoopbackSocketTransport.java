@@ -118,6 +118,16 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
             }
             active = this;
         }
+        // Reopening the same instance has to start a session, not resume a closed one.
+        // close() sets this permanently and nothing cleared it, so a stop()/start() pair
+        // over one transport -- which the server explicitly supports, and which is how a
+        // caller that keeps a single transport around restarts -- opened successfully and
+        // then had its first readMessage() return null immediately, shutting the restarted
+        // server straight back down. Cleared here rather than in close(), because a
+        // transport that has been closed and not reopened must keep refusing reads.
+        synchronized (lock) {
+            closed = false;
+        }
         try {
             listening = Socket.listenLoopback(port, Connection.class);
         } catch (RuntimeException ex) {
@@ -346,6 +356,14 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
     }
 
     private boolean isClosed() {
+        synchronized (lock) {
+            return closed;
+        }
+    }
+
+    /// Test seam: has this transport been closed and not reopened? Package-private
+    /// because the reopen semantics are otherwise only observable through a real socket.
+    boolean isClosedForTest() {
         synchronized (lock) {
             return closed;
         }

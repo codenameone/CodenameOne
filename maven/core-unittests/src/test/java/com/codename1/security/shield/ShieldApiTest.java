@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -389,6 +390,24 @@ class ShieldApiTest {
     void severityIsClampedToTheDocumentedRange() {
         assertEquals(100, new ShieldSignal("x", 5000, null).getSeverity());
         assertEquals(0, new ShieldSignal("x", -5, null).getSeverity());
+    }
+
+    @Test
+    void contentTypeIsRefusedAsTheTokenHeader() {
+        // ConnectionRequest.addRequestHeader special-cases Content-Type into the
+        // request's own content type rather than the header map, so the token would
+        // replace the media type AND survive removeRequestHeader -- which means it
+        // follows a redirect off a protected host and is handed to whatever is there.
+        assertThrows(IllegalArgumentException.class,
+                () -> new ShieldConfig().tokenHeader("Content-Type"));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ShieldConfig().tokenHeader("content-TYPE"),
+                "the check has to be case-insensitive, like the header itself");
+
+        // Everything else still works, including the default.
+        assertEquals("X-Mine", new ShieldConfig().tokenHeader("X-Mine").getTokenHeader());
+        assertEquals(ShieldConfig.DEFAULT_TOKEN_HEADER,
+                new ShieldConfig().getTokenHeader());
     }
 
     // --- guard composition ----------------------------------------------

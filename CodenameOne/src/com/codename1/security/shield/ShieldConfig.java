@@ -68,8 +68,23 @@ public final class ShieldConfig {
 
     /// Overrides the header used to carry the token. Change this only if it collides with
     /// something already in use on your backend.
+    ///
+    /// `Content-Type` is refused. [com.codename1.io.ConnectionRequest#addRequestHeader]
+    /// special-cases that name into the request's own content type rather than the header
+    /// map, so the token would replace the request's media type and -- because the removal
+    /// path only clears the map -- would survive a redirect to an unprotected host and be
+    /// handed to it. A leak with no symptom on the way there.
+    ///
+    /// @throws IllegalArgumentException if the name cannot carry a token safely
     public ShieldConfig tokenHeader(String name) {
         if (name != null && name.length() > 0) {
+            if ("content-type".equals(ShieldHosts.normalize(name))) {
+                throw new IllegalArgumentException("Content-Type cannot carry the "
+                        + "attestation token: it is not stored as an ordinary header, so it "
+                        + "cannot be cleared when a request redirects off a protected host, "
+                        + "and the token would follow the redirect. Use a header of your "
+                        + "own, or leave the default " + DEFAULT_TOKEN_HEADER + ".");
+            }
             this.tokenHeader = name;
         }
         return this;
