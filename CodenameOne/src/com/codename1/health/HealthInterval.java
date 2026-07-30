@@ -39,12 +39,9 @@ import java.time.ZoneId;
 /// splits `aggregateGroupByDuration` from `aggregateGroupByPeriod`, and
 /// HealthKit takes `DateComponents` -- so this API keeps it too.
 ///
-/// Calendar-based intervals require an explicit [TimeZone]. Nothing here
-/// reads the JVM default, because a server-side default of UTC would put a
-/// user's evening walk into the wrong day.
-///
-/// The zone is captured by reference and must not be modified afterwards
-/// -- see [#getTimeZone()], which explains why a copy is not taken.
+/// Calendar-based intervals require an explicit [java.time.ZoneId]. Nothing
+/// here reads the JVM default, because a server-side default of UTC would put
+/// a user's evening walk into the wrong day.
 public final class HealthInterval {
 
     private final long fixedMillis;
@@ -139,23 +136,17 @@ public final class HealthInterval {
         return fixedMillis;
     }
 
-    /// The time zone calendar boundaries are computed in, or null for a
+    /// The zone calendar boundaries are computed in, or null for a
     /// fixed-duration interval.
     ///
-    /// The caller's own instance, not a copy. `java.util.TimeZone` is
-    /// mutable in principle -- `SimpleTimeZone` has setters -- so an
-    /// interval built from one and then reconfigured moves its bucket
-    /// boundaries, and the same samples fall into different days. The
-    /// framework cannot defend against that here: the compile target is
-    /// the CLDC 1.1 subset, where `TimeZone` does not expose a public
-    /// `clone()` and `getTimeZone(getID())` answers GMT for an id it does
-    /// not recognise -- which would silently discard the rules of the
-    /// very zone that needs defending.
-    ///
-    /// So it is a contract rather than a guarantee: pass a zone you do
-    /// not go on to modify. `TimeZone.getTimeZone("Europe/Berlin")` and
-    /// `TimeZone.getDefault()` are both fine; a `SimpleTimeZone` you keep
-    /// a reference to and reconfigure is not.
+    /// A [java.time.ZoneId] rather than a `java.util.TimeZone`, and immutable,
+    /// so it can be handed out as-is. The mutable type needed a caveat instead
+    /// of an answer: an interval built from a `SimpleTimeZone` that was later
+    /// reconfigured moved its bucket boundaries, putting the same samples in
+    /// different days, and the compile target could not defend against it --
+    /// the CLDC 1.1 subset exposes no public `TimeZone.clone()`, and
+    /// `getTimeZone(getID())` answers GMT for an unrecognised id, which would
+    /// have silently discarded the rules of the very zone being protected.
     public ZoneId getZone() {
         return zone;
     }

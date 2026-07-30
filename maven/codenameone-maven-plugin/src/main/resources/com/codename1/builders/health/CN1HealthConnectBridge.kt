@@ -1277,7 +1277,19 @@ class CN1HealthConnectBridge(private val context: Context)
                     // record crossing the transition with the start
                     // side's offset at its end.
                     endZoneOffset = rules.getOffset(hrEnd),
-                    samples = listOf(HeartRateRecord.Sample(time = instantOf(token, start, end),
+                    // The record's own start, not instantOf(start, end).
+                    // instantOf refuses unequal endpoints, which is correct
+                    // for the types with no interval form -- but heart rate
+                    // has one, and an average over a minute is a shape this
+                    // bridge advertises as writable. Passing the endpoints
+                    // there threw before anything was inserted, so every
+                    // interval heart-rate write failed while the type
+                    // reported itself writable. Health Connect only requires
+                    // the contained sample to fall inside the record, and the
+                    // start does -- for the interval shape and for the
+                    // instantaneous one the synthetic end-plus-one-
+                    // millisecond above covers.
+                    samples = listOf(HeartRateRecord.Sample(time = start,
                         beatsPerMinute = wholeCount(token, value))),
                     metadata = meta)
             }

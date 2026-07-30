@@ -56,6 +56,7 @@ import com.codename1.health.nutrition.*;
 import com.codename1.health.sensors.*;
 import com.codename1.health.workout.*;
 import com.codename1.util.AsyncResource;
+import java.time.ZoneId;
 
 class HealthJava004Snippet {
 
@@ -87,10 +88,10 @@ class HealthJava004Snippet {
         AggregateQuery query = new AggregateQuery()
                 .addType(HealthDataType.STEPS)
                 .addMetric(AggregateMetric.TOTAL)
-                .setTimeRange(HealthTimeRange.calendarDays(7, TimeZone.getDefault()))
+                .setTimeRange(HealthTimeRange.calendarDays(7, ZoneId.systemDefault()))
                 // Calendar days, not a fixed 24 hours: a day is 23 or 25 hours
                 // across a daylight-saving transition.
-                .setBucket(HealthInterval.calendarDays(1, TimeZone.getDefault()));
+                .setBucket(HealthInterval.calendarDays(1, ZoneId.systemDefault()));
 
         Health.getInstance().getStore().aggregate(query)
                 .onResult((buckets, err) -> {

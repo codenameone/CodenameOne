@@ -95,6 +95,45 @@ class HealthOpenRangePinningTest extends UITestBase {
                 "the buckets must span exactly the range the port was given");
     }
 
+    /**
+     * A read never returns more than its limit, even when the port
+     * overshoots and still has a token.
+     *
+     * <p>A port may budget per type rather than per query -- the Health
+     * Connect bridge does, because a top-N has to be correct within each type
+     * before the types are merged -- so a limit of two over two types comes
+     * back as four with a continuation token attached. The accumulation used
+     * to trim only when the token was null, so that reply was handed to the
+     * caller whole: the documented query-wide limit broken by a factor of the
+     * number of types asked for.</p>
+     *
+     * <p>Trimming is safe here specifically because {@code readSamples}
+     * returns a {@code List} and never hands the token back. Nothing can
+     * resume, so nothing is stranded by the cut. {@code readSamplePage} is
+     * left alone for the opposite reason.</p>
+     */
+    @Test
+    void aReadIsTrimmedToItsLimitEvenWithATokenOutstanding() throws Exception {
+        FakeHealthStore store = new FakeHealthStore();
+        List<HealthSample> over = new ArrayList<HealthSample>();
+        for (int i = 0; i < 4; i++) {
+            over.add(FakeHealthStore.sample(HealthDataType.STEPS,
+                    i * 10L, i * 10L + 5L, i));
+        }
+        // Oversized and still carrying a continuation, which is exactly the
+        // shape a per-type budget produces.
+        store.pages.add(new SamplePage(over, "more", true));
+
+        List<HealthSample> read = store.readSamples(new SampleQuery()
+                .addType(HealthDataType.STEPS)
+                .addType(HealthDataType.BODY_MASS)
+                .setTimeRange(HealthTimeRange.between(0L, 10_000L))
+                .setLimit(2)).get();
+
+        assertEquals(2, read.size(),
+                "the query-wide limit has to hold whatever the port sent");
+    }
+
     /** Every page of a paged read shares the one closed range. */
     @Test
     void everyPageOfAReadSharesOneClosedRange() throws Exception {

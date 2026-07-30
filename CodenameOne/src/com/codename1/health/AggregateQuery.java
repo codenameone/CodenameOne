@@ -32,8 +32,8 @@ import java.util.List;
 /// AggregateQuery q = new AggregateQuery()
 ///         .addType(HealthDataType.STEPS)
 ///         .addMetric(AggregateMetric.TOTAL)
-///         .setTimeRange(HealthTimeRange.calendarDays(7, TimeZone.getDefault()))
-///         .setBucket(HealthInterval.calendarDays(1, TimeZone.getDefault()));
+///         .setTimeRange(HealthTimeRange.calendarDays(7, ZoneId.systemDefault()))
+///         .setBucket(HealthInterval.calendarDays(1, ZoneId.systemDefault()));
 /// ```
 ///
 /// #### Overlapping sources are counted twice, on every platform
@@ -119,7 +119,7 @@ public final class AggregateQuery {
     /// Splits the range into buckets of this width. Leave unset for a
     /// single bucket covering the whole range.
     ///
-    /// Prefer [HealthInterval#calendarDays(int,java.util.TimeZone)] over a
+    /// Prefer [HealthInterval#calendarDays(int,java.time.ZoneId)] over a
     /// fixed 24-hour width whenever the buckets are labelled with dates in
     /// your UI -- see [HealthInterval].
     public AggregateQuery setBucket(HealthInterval bucket) {

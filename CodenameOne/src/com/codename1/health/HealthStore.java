@@ -206,14 +206,25 @@ public class HealthStore {
                                 + " is not available on this platform");
                 return out;
             }
-            if (a.isWrite() && !isWritable(a.getType())) {
-                // Presenting a write permission this store can never use
-                // asks the user to grant something for nothing, and the
-                // flow resolves successfully while every later write is
-                // rejected locally.
+            if (a.isWrite() && !isWritable(a.getType())
+                    && !isDeletable(a.getType())) {
+                // Deletable counts, because on Health Connect the write
+                // permission is what authorizes a delete. Power, speed and
+                // the two cadences are deletable there without being
+                // writable -- the bridge has a record class for them but no
+                // single-value write form -- so refusing write
+                // authorization for them locked an app out of the delete
+                // path this store advertises: the permission could never be
+                // asked for, and every delete then failed for want of it.
+                //
+                // Presenting a write permission this store can use for
+                // neither is still refused. That asks the user to grant
+                // something for nothing, and the flow resolves successfully
+                // while every later write is rejected locally.
                 fail(out, HealthError.TYPE_NOT_SUPPORTED,
                         a.getType().getId()
-                                + " cannot be written on this platform");
+                                + " can be neither written nor deleted on"
+                                + " this platform");
                 return out;
             }
             if (!deduped.contains(a)) {
@@ -632,22 +643,35 @@ public class HealthStore {
                         collected.addAll(page.getSamples());
                         String next = page.getNextPageToken();
                         if (next == null || collected.size() >= limit) {
-                            // Trim only when this is genuinely the end.
-                            // Trimming a page that has a continuation
-                            // token would discard samples the token
-                            // resumes past, losing them for good; the
-                            // caller asked for a limit, not for a hole.
+                            // Trimmed whether or not a token remains,
+                            // because this method never hands one back. It
+                            // returns a List, so there is no continuation
+                            // for the caller to resume from and nothing a
+                            // trim could strand -- the samples beyond the
+                            // limit were never going to be reachable
+                            // through this call. Leaving them in was the
+                            // documented query-wide limit being broken
+                            // instead, and by the number of types asked
+                            // for: a port that budgets per type, as the
+                            // Health Connect bridge does to keep a top-N
+                            // correct within each one, answers a limit of a
+                            // hundred over two types with two hundred.
                             //
-                            // And never inside a record. One series record
-                            // flattens into many samples sharing an id, so
-                            // cutting through it drops measurements that no
-                            // token and no repeat of this same query would
-                            // bring back -- a heart-rate record holding
-                            // more points than the limit would come back
-                            // permanently docked. Whole records only: the
-                            // last one is either kept entire, overshooting
-                            // the limit, or dropped entire.
-                            if (next == null && collected.size() > limit) {
+                            // readSamplePage is deliberately not changed to
+                            // match. Its caller does get the token, so there
+                            // a trim would discard samples the token resumes
+                            // past, and the overshoot is the lesser harm.
+                            //
+                            // Never inside a record either way. One series
+                            // record flattens into many samples sharing an
+                            // id, so cutting through it drops measurements
+                            // that no token and no repeat of this query
+                            // would bring back -- a heart-rate record
+                            // holding more points than the limit would come
+                            // back permanently docked. Whole records only:
+                            // the last is either kept entire, overshooting,
+                            // or dropped entire.
+                            if (collected.size() > limit) {
                                 trimToRecordBoundary(collected, limit);
                             }
                             out.complete(collected);

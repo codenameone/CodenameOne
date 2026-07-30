@@ -217,6 +217,24 @@ public class HealthBridgeTokenTableTest {
      * average makes of it, so the same data behaved differently here
      * than on iOS or in the local store.</p>
      */
+    /// The `HeartRateRecord(...)` construction inside `body`, or "" when the
+    /// branch has moved and this test needs revisiting.
+    private String heartRateRecord(String body) {
+        int at = body.indexOf("HeartRateRecord(startTime");
+        if (at < 0) {
+            return "";
+        }
+        int end = body.indexOf("metadata = meta)", at);
+        return end < 0 ? body.substring(at) : body.substring(at, end);
+    }
+
+    /// `body` with the heart-rate record removed, which is the region the
+    /// instantaneous rule applies to.
+    private String withoutHeartRateRecord(String body) {
+        String hr = heartRateRecord(body);
+        return hr.isEmpty() ? body : body.replace(hr, "");
+    }
+
     @Test
     public void anInstantRecordRefusesAnInterval() throws Exception {
         String src = source();
@@ -225,11 +243,27 @@ public class HealthBridgeTokenTableTest {
         String body = src.substring(start,
                 src.indexOf("\n    }", src.indexOf("resting_heart_rate",
                         start)));
+        // Heart rate is cut out before the ban is applied, and only heart
+        // rate. It is the one type in this region with a real interval form
+        // -- HeartRateRecord carries startTime and endTime, and an average
+        // over a minute is a shape the bridge advertises as writable -- so
+        // its *contained* sample needs an instant inside the record rather
+        // than the endpoint check the instantaneous types need. Running the
+        // blanket ban over it made the correct code fail this test, which is
+        // the guard being too wide rather than the code being wrong.
+        String instantaneous = withoutHeartRateRecord(body);
         assertTrue("no instantaneous branch may take the start and drop"
-                + " the end: " + body,
-                body.indexOf("time = start") < 0);
+                + " the end: " + instantaneous,
+                instantaneous.indexOf("time = start") < 0);
         assertTrue("they go through the check that refuses a span",
-                body.indexOf("instantOf(token, start, end)") > 0);
+                instantaneous.indexOf("instantOf(token, start, end)") > 0);
+        // And the exception has to stay an exception: the record keeps the
+        // interval it was given, and its sample sits inside it.
+        String hr = heartRateRecord(body);
+        assertTrue("the heart-rate record must keep its interval: " + hr,
+                hr.indexOf("endTime = hrEnd") > 0);
+        assertTrue("and its sample must sit inside that record: " + hr,
+                hr.indexOf("Sample(time = start") > 0);
         assertTrue("and the refusal names the token so the caller knows"
                 + " which sample it was",
                 src.indexOf("Health Connect stores '\" + token + \"'") > 0
