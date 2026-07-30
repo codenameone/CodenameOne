@@ -277,6 +277,22 @@ final class LocalHealthCodec {
     // decoding
     // ------------------------------------------------------------------
 
+    /// Whether `blob` is a format this build can read.
+    ///
+    /// Separate from [#decode(String)] because decode answers an empty list
+    /// for both "nothing stored" and "stored by a version I do not
+    /// understand", and the caller has to tell those apart: the first is a
+    /// fresh store, the second is history that a downgrade must not
+    /// overwrite. Empty and null are supported -- there is nothing there to
+    /// misread.
+    static boolean isSupportedFormat(String blob) {
+        if (blob == null || blob.length() == 0) {
+            return true;
+        }
+        List<String> lines = split(blob, '\n');
+        return !lines.isEmpty() && VERSION.equals(lines.get(0));
+    }
+
     static List<HealthSample> decode(String blob) {
         List<HealthSample> out = new ArrayList<HealthSample>();
         if (blob == null || blob.length() == 0) {

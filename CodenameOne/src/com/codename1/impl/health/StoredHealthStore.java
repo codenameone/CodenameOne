@@ -107,6 +107,17 @@ public class StoredHealthStore extends LocalHealthStore {
         } catch (RuntimeException ex) {
             Log.p("CN1 Health: could not read the local store (" + ex + ")");
         }
+        if (blob != null && !LocalHealthCodec.isSupportedFormat(blob)) {
+            // Readable bytes in a format this build does not know -- the
+            // shape a downgrade leaves behind. decode answers an empty list
+            // for it, exactly as it does for an empty store, so without this
+            // the store looked fresh and the next write replaced history
+            // that a re-upgrade could still have read.
+            unreadable = true;
+            Log.p("CN1 Health: the local store was written by a newer"
+                    + " version and cannot be read here; writes are refused"
+                    + " so it is not overwritten");
+        }
         if (had && blob == null) {
             // There is history here and this process cannot see it. Reads
             // answer from an empty store, which is unavoidable, but writing

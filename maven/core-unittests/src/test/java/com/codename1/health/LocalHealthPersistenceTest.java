@@ -455,6 +455,47 @@ class LocalHealthPersistenceTest extends UITestBase {
                 "and the unreadable entry must still be there");
     }
 
+    /**
+     * A store written by a newer version is not an empty one.
+     *
+     * <p>{@code decode} answers an empty list both for "nothing stored" and
+     * for "stored under a header I do not recognise", so a downgrade -- a
+     * user moving back to an older build -- read as a fresh store. The next
+     * write then replaced history that a re-upgrade could still have read,
+     * with a v1 blob containing only that session's samples.</p>
+     */
+    @Test
+    void aStoreFromANewerVersionRefusesWritesRatherThanReplacingItself()
+            throws Exception {
+        Storage.getInstance().writeObject("cn1$health$local",
+                "cn1health/2\nsomething this build cannot parse\n");
+
+        StoredHealthStore store = new StoredHealthStore();
+        QuantitySample s = QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(10, HealthUnit.COUNT), 1000L, 2000L);
+
+        assertNotNull(errorOf(store.write(one(s))),
+                "a write must fail while the format is unreadable");
+        Object still = Storage.getInstance().readObject("cn1$health$local");
+        assertTrue(still instanceof String
+                        && ((String) still).startsWith("cn1health/2"),
+                "and the newer-format entry must survive intact");
+    }
+
+    /** A store this build did write stays writable. */
+    @Test
+    void aStoreInTheCurrentFormatIsStillWritable() throws Exception {
+        StoredHealthStore first = new StoredHealthStore();
+        first.write(one(QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(1, HealthUnit.COUNT), 0L, 60_000L))).get();
+
+        StoredHealthStore reopened = new StoredHealthStore();
+        assertNull(errorOf(reopened.write(one(QuantitySample.create(
+                HealthDataType.STEPS, new HealthQuantity(2, HealthUnit.COUNT),
+                60_000L, 120_000L)))),
+                "the current format must not be mistaken for a newer one");
+    }
+
     private static Throwable errorOf(AsyncResource<?> r) {
         // Settled first. Results are delivered on the EDT on every backend
         // now, so an off-EDT caller sees the error queued rather than already
