@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.developerguide.surfaces;
 
 import com.codename1.surfaces.LiveActivity;
@@ -17,7 +39,7 @@ import com.codename1.surfaces.WidgetKind;
 import com.codename1.surfaces.WidgetSize;
 import com.codename1.surfaces.WidgetTimeline;
 import com.codename1.ui.Dialog;
-import com.codename1.ui.Image;
+import com.codename1.ui.EncodedImage;
 import com.codename1.util.Callback;
 
 import java.util.Calendar;
@@ -34,7 +56,10 @@ public class SurfacesSnippets {
     private static final int ACCENT_COLOR = 0xff6a1b9a;
 
     private LiveActivity activity;
-    private Image courierAvatar;
+    // An EncodedImage already holds the PNG bytes a surface ships, so publishing just hands them
+    // over. Any other Image is rasterized at publish time, and on iOS that encode blocks the
+    // caller on the platform UI thread -- fine off the EDT, a freeze on it.
+    private EncodedImage courierAvatar;
 
     public void registerKinds() {
         // tag::registerKind[]
