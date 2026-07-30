@@ -80,6 +80,9 @@ def aws_with_retry(*args, attempts=4):
                   % (attempt, attempts, delay))
             time.sleep(delay)
             delay *= 2
+    # Unreachable: the loop either returns or re-raises on the final attempt. Explicit
+    # so the function never falls through to an implicit None.
+    raise RuntimeError("retries exhausted without returning or raising")
 
 
 def aws(*args, capture=True):

@@ -425,12 +425,15 @@ jobs:
       - name: Mark the R2 release complete
         id: r2_mark_complete
         continue-on-error: true
-        # Only now, once the core reactor and all three editors are up. This is what
-        # makes the tag discoverable: regen refuses to advertise a version without it,
-        # on this run and on every future one. Same condition as the regeneration below,
-        # so a tag is never advertised without having been marked.
+        # Only now, once the core reactor and all three editors are up AND the core
+        # artifacts have been observed on R2. This is what makes the tag discoverable:
+        # regen refuses to advertise a version without it, on this run and every future
+        # one. r2_core_confirm is what verifies the expected artifacts are actually
+        # present rather than merely that an upload command exited 0, so marking without
+        # it would let a truncated publish become discoverable.
         if: >-
           always() && steps.r2_core.outcome == 'success' &&
+          steps.r2_core_confirm.outcome == 'success' &&
           steps.r2_gamebuilder.outcome != 'failure' &&
           steps.r2_certificatewizard.outcome != 'failure' &&
           steps.r2_settings.outcome != 'failure'
@@ -443,10 +446,7 @@ jobs:
         # under <artifact>/<version>/, so running it after a partial copy would publish an
         # incomplete editor as <latest>/<release>. The gate below still fails the job.
         if: >-
-          always() && steps.r2_core.outcome == 'success' &&
-          steps.r2_gamebuilder.outcome != 'failure' &&
-          steps.r2_certificatewizard.outcome != 'failure' &&
-          steps.r2_settings.outcome != 'failure'
+          always() && steps.r2_mark_complete.outcome == 'success'
         run: |
           python3 maven/scripts/r2/regen-maven-metadata.py
           # Assert here rather than earlier: metadata is what makes a version discoverable,
