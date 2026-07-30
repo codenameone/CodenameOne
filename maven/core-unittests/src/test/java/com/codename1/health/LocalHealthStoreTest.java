@@ -732,6 +732,10 @@ class LocalHealthStoreTest extends UITestBase {
      * synchronously, so the error can be read without waiting.
      */
     private static Throwable errorOf(com.codename1.util.AsyncResource<?> r) {
+        // Settled first. Results are delivered on the EDT on every backend
+        // now, so an off-EDT caller sees the error queued rather than already
+        // attached, and reading it without waiting found nothing.
+        HealthAwait.settled(r);
         final Throwable[] err = new Throwable[1];
         r.except(new com.codename1.util.SuccessCallback<Throwable>() {
             public void onSucess(Throwable t) {

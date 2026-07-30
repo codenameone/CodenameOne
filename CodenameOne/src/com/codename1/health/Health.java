@@ -84,25 +84,17 @@ import com.codename1.impl.health.OneShot;
 /// [HealthBackgroundListener] -- always arrive on the EDT. A background
 /// delivery may run with no visible UI, after the OS relaunched your app.
 ///
-/// Results of the operations you start arrive on the EDT **on iOS and
-/// Android**. Both ports marshal every platform answer onto it, and the
-/// shared post-processing of a large read hops back to it when it is
-/// done, so a query started from a worker thread still calls you back on
-/// the EDT there.
+/// Results of the operations you start arrive on the EDT, on every
+/// platform. Both mobile ports marshal every platform answer onto it, the
+/// shared post-processing of a large read hands back to it when it is done,
+/// and the local-backed stores -- desktop, the simulator, JavaScript -- do
+/// the same rather than answering on whichever thread happened to ask.
 ///
-/// **The local-backed ports do not carry that guarantee.** On desktop,
-/// the simulator and JavaScript the store is local rather than
-/// platform-backed, and a result is delivered on the very thread that
-/// asked for it -- so a query started off the EDT resolves off the EDT.
-/// Touch components from those callbacks through
-/// `Display.getInstance().callSerially(...)`, or start the operation from
-/// the EDT in the first place, which is the usual case and where the
-/// distinction never arises.
-///
-/// The asymmetry is a gap rather than a design, and it is written down
-/// here so that nobody has to discover it from a repaint glitch. Code
-/// written for the local ports is correct everywhere; code written for
-/// the mobile guarantee alone is not.
+/// So a read started from a worker thread calls you back on the EDT
+/// everywhere, and a callback may touch components directly. This was once
+/// true only on iOS and Android, with the local stores answering inline; code
+/// written against the mobile behaviour then glitched on the desktop. It is
+/// one contract now.
 ///
 /// #### Platform support
 ///

@@ -25,6 +25,7 @@ package com.codename1.health;
 import com.codename1.io.Preferences;
 import com.codename1.ui.Display;
 import com.codename1.impl.health.HealthWire;
+import com.codename1.impl.health.EdtResult;
 import com.codename1.impl.health.OneShot;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
@@ -185,7 +186,7 @@ public class HealthStore {
     /// [HealthError#USER_CANCELED].
     public final AsyncResource<Boolean> requestAuthorization(
             HealthAccess... access) {
-        AsyncResource<Boolean> out = new OneShot<Boolean>();
+        AsyncResource<Boolean> out = new EdtResult<Boolean>();
         if (failIfUnsupported(out)) {
             return out;
         }
@@ -418,7 +419,7 @@ public class HealthStore {
     public final AsyncResource<HealthRequestStatus>
             getAuthorizationRequestStatus(HealthAccess... access) {
         AsyncResource<HealthRequestStatus> out =
-                new OneShot<HealthRequestStatus>();
+                new EdtResult<HealthRequestStatus>();
         if (!isSupported()) {
             out.complete(HealthRequestStatus.UNKNOWN);
             return out;
@@ -451,7 +452,7 @@ public class HealthStore {
     /// *other* apps' data.
     public final AsyncResource<Boolean> hasAnyData(final HealthDataType type,
             HealthTimeRange range) {
-        final AsyncResource<Boolean> out = new OneShot<Boolean>();
+        final AsyncResource<Boolean> out = new EdtResult<Boolean>();
         if (failIfUnsupported(out)) {
             return out;
         }
@@ -491,7 +492,7 @@ public class HealthStore {
     public final AsyncResource<List<HealthSample>> readSamples(
             final SampleQuery query) {
         final AsyncResource<List<HealthSample>> out =
-                new OneShot<List<HealthSample>>();
+                new EdtResult<List<HealthSample>>();
         if (failIfUnsupported(out)) {
             return out;
         }
@@ -526,7 +527,17 @@ public class HealthStore {
     /// its builder says by the time they run.
     private static AggregateQuery snapshot(AggregateQuery query) {
         AggregateQuery copy = new AggregateQuery()
-                .setTimeRange(query.getTimeRange())
+                // Closed here, once. An open-ended range resolves "now"
+                // wherever it is used, and an aggregate uses it three times:
+                // computing the bucket boundaries, reading the samples in the
+                // fallback, and rolling them up. Left open, those three read
+                // the clock independently, so an aggregate that crossed a
+                // bucket boundary while it ran could read samples no bucket
+                // covered, or roll up against a different effective range than
+                // the boundaries were built from. resolve() is a no-op on a
+                // closed range, so pinning here makes every later call agree
+                // rather than needing them all to be found and changed.
+                .setTimeRange(resolved(query.getTimeRange()))
                 .setBucket(query.getBucket())
                 .setUnit(query.getUnit());
         for (HealthDataType type : query.getTypes()) {
@@ -556,10 +567,30 @@ public class HealthStore {
         return copy;
     }
 
+    /// A closed form of `range`, or null when there is none.
+    ///
+    /// The one place the clock is read for a query's window. Everything
+    /// downstream calls `resolve` again and gets the same answer back, because
+    /// resolving a closed range returns it unchanged.
+    private static HealthTimeRange resolved(HealthTimeRange range) {
+        return range == null ? null
+                : range.resolve(System.currentTimeMillis());
+    }
+
     /// A shallow copy of `query` that paging may mutate freely.
     private static SampleQuery copyForPaging(SampleQuery query) {
         SampleQuery copy = new SampleQuery()
-                .setTimeRange(query.getTimeRange())
+                // Closed here, which covers both ways in: readSamples copies
+                // once before paging, and readSamplePage copies through
+                // snapshot. Idempotent, because resolving an already-closed
+                // range returns it unchanged -- so the first copy fixes the
+                // window and every later page inherits it rather than reading
+                // the clock again. A test that asserted the two pages of one
+                // read describe the same window is what showed this needed to
+                // be here: pinning only in snapshot left readSamples paging
+                // with an open range, and its pages closed it two
+                // milliseconds apart.
+                .setTimeRange(resolved(query.getTimeRange()))
                 .setLimit(query.getLimit())
                 .setSortDescending(query.isSortDescending())
                 .setUnit(query.getUnit())
@@ -590,7 +621,7 @@ public class HealthStore {
         // and could not be trimmed because the page still carried a
         // token.
         query.setLimit(Math.max(1, limit - collected.size()));
-        readSamplePage(query).onResult(
+        readPage(query, new OneShot<SamplePage>()).onResult(
                 new AsyncResult<SamplePage>() {
                     @Override
                     public void onReady(SamplePage page, Throwable err) {
@@ -661,7 +692,21 @@ public class HealthStore {
     /// memory stays bounded regardless of how much history exists.
     public final AsyncResource<SamplePage> readSamplePage(
             final SampleQuery caller) {
-        final AsyncResource<SamplePage> out = new OneShot<SamplePage>();
+        return readPage(caller, new EdtResult<SamplePage>());
+    }
+
+    /// One page, into a resource the caller supplies.
+    ///
+    /// Split from [#readSamplePage(SampleQuery)] so the paging loop can read
+    /// into a plain resource instead of an EDT-delivered one. Paging through
+    /// the public method put the continuation on the EDT: each page's
+    /// completion hopped there, and the request for the next page plus the
+    /// accumulation between pages then ran on the event loop -- which is the
+    /// thing this class already went to the trouble of moving off it. Only the
+    /// answer handed to the caller needs the EDT; the machinery that produces
+    /// it does not.
+    private AsyncResource<SamplePage> readPage(final SampleQuery caller,
+            final AsyncResource<SamplePage> out) {
         if (failIfUnsupported(out)) {
             return out;
         }
@@ -691,8 +736,7 @@ public class HealthStore {
                 // they do not. A hundred-thousand-point heart-rate page
                 // froze rendering for exactly as long as it took to
                 // convert.
-                postProcessOnWorker(page, query, out,
-                        Display.getInstance().isEdt());
+                postProcessOnWorker(page, query, out);
             }
         });
         armTimeout(raw);
@@ -738,9 +782,8 @@ public class HealthStore {
 
     /// Post-processes off the EDT and completes back on it.
     private void postProcessOnWorker(final SamplePage page,
-            final SampleQuery query, final AsyncResource<SamplePage> out,
-            final boolean wasEdt) {
-        acquireWorker().run(new PostProcess(this, page, query, out, wasEdt));
+            final SampleQuery query, final AsyncResource<SamplePage> out) {
+        acquireWorker().run(new PostProcess(this, page, query, out));
     }
 
     /// Named rather than anonymous so the hop carries no synthetic
@@ -752,15 +795,13 @@ public class HealthStore {
         private final SamplePage page;
         private final SampleQuery query;
         private final AsyncResource<SamplePage> out;
-        private final boolean wasEdt;
 
         PostProcess(HealthStore store, SamplePage page, SampleQuery query,
-                AsyncResource<SamplePage> out, boolean wasEdt) {
+                AsyncResource<SamplePage> out) {
             this.store = store;
             this.page = page;
             this.query = query;
             this.out = out;
-            this.wasEdt = wasEdt;
         }
 
         @Override
@@ -777,30 +818,26 @@ public class HealthStore {
                 // runs inline it is what starts the next page, and
                 // releasing first would retire the thread and start
                 // another one for every page of a long read.
-                completeBack(wasEdt, out, done, failed);
+                completeBack(out, done, failed);
             } finally {
                 releaseWorker();
             }
         }
     }
 
-    /// Hands a result back on the thread it would have arrived on had
-    /// the work been done inline.
+    /// Hands a result back to the caller.
     ///
-    /// `wasEdt` is captured where the raw platform result landed, not
-    /// here -- here is always the worker. Both mobile ports complete on
-    /// the EDT and their callers rely on it, so those hop back; a store
-    /// that completes on a background thread of its own keeps doing that
-    /// rather than acquiring a dependency on the event loop being pumped.
-    private static <T> void completeBack(final boolean wasEdt,
-            final AsyncResource<T> out, final T value,
-            final Throwable failed) {
-        Runnable finish = new CompleteOnEdt<T>(out, value, failed);
-        if (wasEdt) {
-            Display.getInstance().callSerially(finish);
-        } else {
-            finish.run();
-        }
+    /// There is no thread decision left here. This used to take a `wasEdt`
+    /// captured where the raw platform result landed and hop only when the
+    /// port had completed on the EDT -- which made the delivery thread a
+    /// property of the backend: the mobile ports got the EDT, a local-backed
+    /// store handed the result to whichever thread had called. The same app
+    /// code updating a label from a read callback therefore worked on a phone
+    /// and glitched on the desktop. [EdtResult] now owns that, so every
+    /// caller-facing result lands on the EDT wherever it came from.
+    private static <T> void completeBack(final AsyncResource<T> out,
+            final T value, final Throwable failed) {
+        new CompleteOnEdt<T>(out, value, failed).run();
     }
 
     /// The [#completeBack] body, named for the same SpotBugs reason.
@@ -1232,7 +1269,7 @@ public class HealthStore {
     public final AsyncResource<List<AggregateResult>> aggregate(
             AggregateQuery query) {
         AsyncResource<List<AggregateResult>> out =
-                new OneShot<List<AggregateResult>>();
+                new EdtResult<List<AggregateResult>>();
         if (failIfUnsupported(out)) {
             return out;
         }
@@ -1631,7 +1668,7 @@ public class HealthStore {
     public final AsyncResource<HealthWriteResult> write(
             final List<HealthSample> samples) {
         final AsyncResource<HealthWriteResult> out =
-                new OneShot<HealthWriteResult>();
+                new EdtResult<HealthWriteResult>();
         if (failIfUnsupported(out)) {
             return out;
         }
@@ -1864,7 +1901,7 @@ public class HealthStore {
 
     /// Deletes samples this app wrote. See [HealthDeleteRequest].
     public final AsyncResource<Integer> delete(HealthDeleteRequest request) {
-        AsyncResource<Integer> out = new OneShot<Integer>();
+        AsyncResource<Integer> out = new EdtResult<Integer>();
         if (failIfUnsupported(out)) {
             return out;
         }
@@ -2184,7 +2221,7 @@ public class HealthStore {
     /// already running does not read the same change window a second
     /// time, it resolves alongside the one in flight.
     public final AsyncResource<Integer> drainChanges() {
-        AsyncResource<Integer> out = new OneShot<Integer>();
+        AsyncResource<Integer> out = new EdtResult<Integer>();
         ensureSubscriptionsRestored();
         // A second drain would snapshot the same anchors and read the
         // same window, delivering every batch twice and letting two
@@ -3033,8 +3070,7 @@ public class HealthStore {
                 // arithmetic over every sample, and the reads that feed
                 // it deliberately lift their page limit.
                 acquireWorker().run(new RollUp(store, query, boundaries,
-                        collected, out,
-                        Display.getInstance().isEdt()));
+                        collected, out));
                 return;
             }
             SampleQuery q = new SampleQuery()
@@ -3077,17 +3113,15 @@ public class HealthStore {
         private final long[] boundaries;
         private final List<HealthSample> collected;
         private final AsyncResource<List<AggregateResult>> out;
-        private final boolean wasEdt;
 
         RollUp(HealthStore store, AggregateQuery query, long[] boundaries,
                 List<HealthSample> collected,
-                AsyncResource<List<AggregateResult>> out, boolean wasEdt) {
+                AsyncResource<List<AggregateResult>> out) {
             this.store = store;
             this.query = query;
             this.boundaries = boundaries;
             this.collected = collected;
             this.out = out;
-            this.wasEdt = wasEdt;
         }
 
         @Override
@@ -3104,7 +3138,7 @@ public class HealthStore {
                 // runs inline it is what starts the next page, and
                 // releasing first would retire the thread and start
                 // another one for every page of a long read.
-                completeBack(wasEdt, out, done, failed);
+                completeBack(out, done, failed);
             } finally {
                 releaseWorker();
             }

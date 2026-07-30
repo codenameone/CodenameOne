@@ -71,10 +71,11 @@ class HealthAuthorizationQueueTest extends UITestBase {
         assertSame(HealthDataType.HEART_RATE,
                 store.authorizationsSeen.get(1).get(0).getType(),
                 "and it asks for its own access, not the first request's");
-        assertTrue(first.isDone());
+        assertTrue(HealthAwait.settled(first).isDone());
 
         store.heldAuthorizations.get(1).complete(Boolean.TRUE);
-        assertTrue(second.isDone(), "both callers are answered");
+        assertTrue(HealthAwait.settled(second).isDone(),
+                "both callers are answered");
     }
 
     /**
@@ -98,7 +99,7 @@ class HealthAuthorizationQueueTest extends UITestBase {
         assertEquals(2, store.authorizationsSeen.size(),
                 "a dismissal must not strand the queue");
         store.heldAuthorizations.get(1).complete(Boolean.TRUE);
-        assertTrue(second.isDone());
+        assertTrue(HealthAwait.settled(second).isDone());
     }
 
     /**
@@ -125,7 +126,7 @@ class HealthAuthorizationQueueTest extends UITestBase {
                 store.authorizationsSeen.get(1).get(0).getType(),
                 "the queue skips to the one still waiting");
         store.heldAuthorizations.get(1).complete(Boolean.TRUE);
-        assertTrue(third.isDone());
+        assertTrue(HealthAwait.settled(third).isDone());
     }
 
     /**
@@ -166,7 +167,7 @@ class HealthAuthorizationQueueTest extends UITestBase {
                 store.authorizationsSeen.get(1).get(0).getType());
 
         store.heldAuthorizations.get(1).complete(Boolean.TRUE);
-        assertTrue(second.isDone());
+        assertTrue(HealthAwait.settled(second).isDone());
     }
 
     /**
@@ -242,7 +243,7 @@ class HealthAuthorizationQueueTest extends UITestBase {
         assertEquals(2, store.authorizationsSeen.size(),
                 "the queue moves when the native flow closes, not before");
         store.heldAuthorizations.get(1).complete(Boolean.TRUE);
-        assertTrue(second.isDone());
+        assertTrue(HealthAwait.settled(second).isDone());
     }
 
     /** With nothing queued, the next request runs immediately. */

@@ -53,7 +53,11 @@ import com.codename1.util.AsyncResource;
 ///
 /// It is public because those places span four packages and both mobile
 /// ports; nothing outside the implementation needs it.
-public final class OneShot<T> extends AsyncResource<T> {
+/// Not final: [EdtResult] extends it to add the EDT hand-off that every
+/// caller-facing result needs. Internal resources -- the one a port completes,
+/// the one a permission flow runs on -- stay plain, because the base class
+/// does its own threading around them.
+public class OneShot<T> extends AsyncResource<T> {
 
     /// Cancellation is a terminal transition like the other two, and
     /// it has to share their monitor.

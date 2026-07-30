@@ -151,7 +151,7 @@ public class LocalHealthStore extends HealthStore {
     protected void doRequestAuthorization(
             List<com.codename1.health.HealthAccess> access,
             AsyncResource<Boolean> out) {
-        completeInline(out, Boolean.TRUE);
+        deliver(out, Boolean.TRUE);
     }
 
     // ------------------------------------------------------------------
@@ -232,7 +232,7 @@ public class LocalHealthStore extends HealthStore {
         matched = page;
         // Everything is in memory, so a single page always satisfies the
         // query; there is no continuation token to hand back.
-        completeInline(out, new SamplePage(matched, null, truncated));
+        deliver(out, new SamplePage(matched, null, truncated));
     }
 
     /// How many samples `s` becomes once the shared layer is done with
@@ -337,25 +337,24 @@ public class LocalHealthStore extends HealthStore {
         return true;
     }
 
-    /// Completes inline, on the calling thread.
+    /// Hands a result to the caller.
     ///
-    /// **This does not match the mobile ports, and that is a known gap.**
-    /// `IOSHealth` marshals through `Display.callSerially` and
-    /// `AndroidHealthStore` through `AndroidHealth.onEdt`, so on a phone
-    /// every callback does arrive on the EDT as
-    /// [com.codename1.health.Health] promises. Here it arrives on whichever
-    /// thread called.
+    /// Named for what it does rather than where it runs, because it no longer
+    /// decides that. The resource these operations complete is an
+    /// [EdtResult], so the delivery lands on the EDT whichever thread gets
+    /// here -- matching the mobile ports instead of answering on whoever
+    /// called, which is what made the same app code work on a phone and
+    /// glitch on the desktop.
     ///
-    /// Marshalling this store the same way is written and reverted: moving
-    /// the completion onto the EDT makes the whole result chain --
-    /// paging, unit normalization, series flattening -- run there too, and
-    /// anything those throw escapes the EDT runnable instead of failing
-    /// the resource, so the caller waits forever. That is a real defect in
-    /// the completion path rather than in the hop, and it wants fixing
-    /// first. Until then, inline delivery is the behaviour that cannot
-    /// hang, and the developer guide says so rather than promising the
-    /// EDT everywhere.
-    private static void completeInline(AsyncResource out, Object value) {
+    /// An earlier attempt at this was written and reverted, and the reason it
+    /// failed no longer applies: it hopped the *port's* completion onto the
+    /// EDT, which dragged paging, unit normalization and series flattening
+    /// there too, and a throw in any of those escaped the queued runnable
+    /// instead of failing the resource, so the caller waited forever. The hop
+    /// now happens at delivery rather than around the processing: the heavy
+    /// work stays on the shared worker, where `PostProcess` catches
+    /// `Throwable` and errors the resource with it.
+    private static void deliver(AsyncResource out, Object value) {
         out.complete(value);
     }
 
@@ -401,7 +400,7 @@ public class LocalHealthStore extends HealthStore {
                 }
             }
         }
-        completeInline(out, aggregateSamples(query, boundaries, snapshot));
+        deliver(out, aggregateSamples(query, boundaries, snapshot));
     }
 
 
@@ -464,7 +463,7 @@ public class LocalHealthStore extends HealthStore {
             failStorage(out);
             return;
         }
-        completeInline(out, result);
+        deliver(out, result);
     }
 
     /// Fails an operation that could not be made durable.
@@ -527,7 +526,7 @@ public class LocalHealthStore extends HealthStore {
             failStorage(out);
             return;
         }
-        completeInline(out, Integer.valueOf(removed));
+        deliver(out, Integer.valueOf(removed));
     }
 
     // ------------------------------------------------------------------

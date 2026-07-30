@@ -144,7 +144,7 @@ class HealthFallbackTest extends UITestBase {
         AsyncResource<HealthRequestStatus> r =
                 store.getAuthorizationRequestStatus(
                         HealthAccess.read(HealthDataType.STEPS));
-        assertTrue(r.isDone());
+        HealthAwait.settled(r);
         assertEquals(HealthRequestStatus.UNKNOWN, r.get());
     }
 
@@ -157,7 +157,7 @@ class HealthFallbackTest extends UITestBase {
     void fallbackDrainChangesResolvesZero() {
         AsyncResource<Integer> r =
                 Health.getInstance().getStore().drainChanges();
-        assertTrue(r.isDone());
+        HealthAwait.settled(r);
         assertEquals(Integer.valueOf(0), r.get());
     }
 
@@ -185,8 +185,11 @@ class HealthFallbackTest extends UITestBase {
 
     private static void assertFailedWith(HealthError expected,
             AsyncResource<?> result) {
-        assertTrue(result.isDone(),
-                "fallback operations must fail immediately, not hang");
+        // Settled rather than "already done": results are delivered on the
+        // EDT on every backend now, so an off-EDT caller gets the failure
+        // queued rather than inline. The point of the assertion is that a
+        // fallback fails instead of hanging, which this still checks.
+        HealthAwait.settled(result);
         Throwable err = errorOf(result);
         assertNotNull(err, "expected " + expected + " but the call succeeded");
         assertTrue(err instanceof HealthException,

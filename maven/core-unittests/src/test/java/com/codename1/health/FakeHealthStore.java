@@ -48,6 +48,12 @@ public class FakeHealthStore extends HealthStore {
     /// two threads and loses or misplaces entries. That is a race in the
     /// fake, and it reads exactly like a race in the code under test --
     /// which is how it presented.
+    /** Aggregate queries the port was handed, in order. */
+    public final List<AggregateQuery> aggregatesSeen =
+            new ArrayList<AggregateQuery>();
+    /** Bucket boundaries handed alongside each aggregate query. */
+    public final List<long[]> aggregateBoundsSeen = new ArrayList<long[]>();
+
     public final List<SampleQuery> queriesSeen =
             java.util.Collections.synchronizedList(
                     new ArrayList<SampleQuery>());
@@ -142,6 +148,14 @@ public class FakeHealthStore extends HealthStore {
     @Override
     public int getMaxWriteBatchSize() {
         return maxWriteBatch;
+    }
+
+    @Override
+    protected synchronized void doAggregate(AggregateQuery query,
+            long[] boundaries, AsyncResource<List<AggregateResult>> out) {
+        aggregatesSeen.add(query);
+        aggregateBoundsSeen.add(boundaries);
+        out.complete(new ArrayList<AggregateResult>());
     }
 
     @Override
