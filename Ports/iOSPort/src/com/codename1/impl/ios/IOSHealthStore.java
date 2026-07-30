@@ -149,16 +149,27 @@ class IOSHealthStore extends HealthStore {
         }
     }
 
-    /// Always UNKNOWN, and deliberately so.
+    /// UNKNOWN for anything this port can actually read, and deliberately
+    /// so.
     ///
     /// HealthKit does not expose read authorization at all, because an app
     /// able to distinguish "denied" from "no data" could infer that a user
-    /// is hiding a pregnancy or a prescription. Returning anything else
-    /// here would be inventing an answer.
+    /// is hiding a pregnancy or a prescription. Returning anything else for
+    /// a readable type would be inventing an answer.
+    ///
+    /// Capability is a different question and has a real answer, which is
+    /// why it is asked first -- the same order the write side uses. A type
+    /// this bridge has no mapping for cannot be read at any authorization
+    /// state, and its read fails with `TYPE_NOT_SUPPORTED`; answering
+    /// UNKNOWN for it dressed a definite "never" as the privacy silence
+    /// above, so an app waiting for data that could not arrive had nothing
+    /// to distinguish the two.
     public HealthAuthorizationStatus getReadAuthorizationStatus(
             HealthDataType type) {
-        return isSupported() ? HealthAuthorizationStatus.UNKNOWN
-                : HealthAuthorizationStatus.NOT_SUPPORTED;
+        if (!isSupported() || !isTypeSupported(type)) {
+            return HealthAuthorizationStatus.NOT_SUPPORTED;
+        }
+        return HealthAuthorizationStatus.UNKNOWN;
     }
 
     static HealthException toException(int code, String message) {

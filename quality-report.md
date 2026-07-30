@@ -2,7 +2,7 @@
 
 ### Test & Coverage
 - ✅ **Tests:** 5079 total, 0 failed, 1 skipped
-- 📊 **Line coverage:** 58.77%
+- 📊 **Line coverage:** 58.76%
   - **Lowest covered classes**
     - `com.codename1.gaming.level.GameSceneView` – 0.00%
     - `com.codename1.crash.CrashProtection` – 0.00%
