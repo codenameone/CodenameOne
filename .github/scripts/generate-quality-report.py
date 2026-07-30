@@ -4,6 +4,7 @@ from __future__ import annotations
 import html
 import os
 import shutil
+import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -334,7 +335,17 @@ def _parse_spotbugs_report(report_path: Path) -> AnalysisReport:
     return AnalysisReport(totals=severities, findings=findings)
 
 
-def parse_spotbugs() -> Tuple[Dict[str, AnalysisReport], bool, Optional[str]]:
+def parse_spotbugs() -> Tuple[
+    Dict[str, AnalysisReport], bool, Optional[str], Dict[str, str]
+]:
+    """Parse every SpotBugs report found under the target directories.
+
+    Returns the per-project reports, whether any report file existed at all, a
+    summary error for the markdown, and the per-project parse errors. The
+    per-project errors are reported separately because a report that parsed and
+    a report that failed to parse can occur in the same run, and the gate has
+    to fail on the latter instead of silently checking only the former.
+    """
     report_paths: Dict[str, Path] = {}
     for target_dir in TARGET_DIRS:
         for candidate in ("spotbugsXml.xml", "spotbugs.xml"):
@@ -343,18 +354,22 @@ def parse_spotbugs() -> Tuple[Dict[str, AnalysisReport], bool, Optional[str]]:
                 report_paths[_spotbugs_project_label(target_dir)] = path
                 break
     if not report_paths:
-        return {}, False, None
+        return {}, False, None, {}
     reports: Dict[str, AnalysisReport] = {}
-    errors: List[str] = []
+    errors: Dict[str, str] = {}
     for label, report_path in report_paths.items():
         try:
             reports[label] = _parse_spotbugs_report(report_path)
         except ET.ParseError as error:
-            errors.append(f"unable to parse {report_path.name}: {error}")
+            errors[label] = f"unable to parse {report_path.name}: {error}"
     if reports:
-        return reports, True, None
-    error_message = errors[0] if errors else "unable to parse SpotBugs report"
-    return {}, True, error_message
+        return reports, True, None, errors
+    error_message = (
+        next(iter(errors.values()))
+        if errors
+        else "unable to parse SpotBugs report"
+    )
+    return {}, True, error_message, errors
 
 
 def _required_spotbugs_projects() -> List[str]:
@@ -362,7 +377,10 @@ def _required_spotbugs_projects() -> List[str]:
     return [item.strip() for item in env_value.split(os.pathsep) if item.strip()]
 
 
-def _enforce_spotbugs_gate(reports: Dict[str, AnalysisReport]) -> None:
+def _enforce_spotbugs_gate(
+    reports: Dict[str, AnalysisReport],
+    parse_errors: Dict[str, str],
+) -> None:
     """Fail the build on any SpotBugs finding in any analysed project.
 
     This gate deliberately has no allow-list of patterns. An allow-list only
@@ -372,6 +390,15 @@ def _enforce_spotbugs_gate(reports: Dict[str, AnalysisReport]) -> None:
     spotbugs-exclude.xml instead, scoped to the class or method they apply to
     and with a comment explaining why - that keeps the report itself at zero.
     """
+    if parse_errors:
+        print("\n❌ Build failed because a SpotBugs report could not be parsed:")
+        for label in sorted(parse_errors):
+            print(f"  - {label}: {parse_errors[label]}")
+        print(
+            "  An unparseable report cannot be checked for findings, so it "
+            "fails rather than counting as clean."
+        )
+        sys.exit(1)
     required = _required_spotbugs_projects()
     missing = [label for label in required if label not in reports]
     if missing:
@@ -383,7 +410,7 @@ def _enforce_spotbugs_gate(reports: Dict[str, AnalysisReport]) -> None:
             "  A missing report means the analysis never ran; that would let "
             "findings through unnoticed."
         )
-        exit(1)
+        sys.exit(1)
     violations: List[Tuple[str, Finding]] = []
     for label in sorted(reports):
         for finding in reports[label].findings:
@@ -399,7 +426,7 @@ def _enforce_spotbugs_gate(reports: Dict[str, AnalysisReport]) -> None:
         "<Match> for it to that project's spotbugs-exclude.xml with a comment "
         "explaining why."
     )
-    exit(1)
+    sys.exit(1)
 
 
 def parse_pmd() -> Optional[AnalysisReport]:
@@ -754,7 +781,7 @@ def build_report(
 
     tests = parse_surefire()
     coverage, class_entries = parse_jacoco()
-    spotbugs_reports, spotbugs_generated, spotbugs_error = parse_spotbugs()
+    spotbugs_reports, spotbugs_generated, spotbugs_error, _ = parse_spotbugs()
     pmd = parse_pmd()
     checkstyle = parse_checkstyle()
     benchmark_report = parse_benchmark()
@@ -860,8 +887,8 @@ def main() -> None:
         return
 
     # Enforce quality gates
-    spotbugs_reports, _, _ = parse_spotbugs()
-    _enforce_spotbugs_gate(spotbugs_reports)
+    spotbugs_reports, _, _, spotbugs_parse_errors = parse_spotbugs()
+    _enforce_spotbugs_gate(spotbugs_reports, spotbugs_parse_errors)
 
     pmd = parse_pmd()
     if pmd:
@@ -921,7 +948,7 @@ def main() -> None:
             print("\n❌ Build failed due to forbidden PMD violations:")
             for v in violations:
                 print(f"  - {v.rule}: {v.location} - {v.message}")
-            exit(1)
+            sys.exit(1)
 
     checkstyle = parse_checkstyle()
     if checkstyle:
@@ -931,7 +958,7 @@ def main() -> None:
             for v in violations:
                 rule = v.rule or "unknown"
                 print(f"  - {rule}: {v.location} - {v.message}")
-            exit(1)
+            sys.exit(1)
 
 
 if __name__ == "__main__":
