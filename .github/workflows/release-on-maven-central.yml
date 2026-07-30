@@ -125,12 +125,6 @@ jobs:
           echo "Artifacts ${GITHUB_REF_NAME} did not appear on Maven Central within 30 minutes"
           exit 1
 
-      - name: Fail when release did not complete
-        if: steps.deploy.outcome != 'success' && steps.confirm.outcome != 'success'
-        run: |
-          echo "Release failed: deploy reported failure and the artifacts never appeared on Maven Central."
-          exit 1
-
       - name: Regenerate R2 metadata and archetype catalog
         id: r2_core_metadata
         continue-on-error: true
@@ -416,6 +410,12 @@ jobs:
           [ "${{ steps.r2_settings.outcome }}" = "failure" ] && fail "Settings -> R2"
           [ "${{ steps.r2_editor_metadata.outcome }}" = "failure" ] && fail "R2 metadata regeneration (editors)"
           if [ "${{ vars.CN1_DUAL_PUBLISH }}" = "true" ]; then
+            # The core Central deploy is allowed to false-negative; the confirm poll is its
+            # second opinion. Only both failing means the release did not reach Central.
+            if [ "${{ steps.deploy.outcome }}" != "success" ] \
+               && [ "${{ steps.confirm.outcome }}" != "success" ]; then
+              fail "core reactor -> Maven Central"
+            fi
             [ "${{ steps.deploy_gamebuilder.outcome }}" = "failure" ] && fail "Game Builder -> Maven Central"
             [ "${{ steps.deploy_certificatewizard.outcome }}" = "failure" ] && fail "Signing Wizard -> Maven Central"
             [ "${{ steps.deploy_settings.outcome }}" = "failure" ] && fail "Settings -> Maven Central"
