@@ -619,11 +619,20 @@ class WatchNativeBuilder {
         // ships with an empty resources phase, so without this the watch app
         // can't find the native theme (falls back to the default look), the app
         // theme, or any bundled image/font -> wrong styling + missing images.
-        // Copying the iOS app-icon PNGs along too is harmless (the watch uses its
-        // own Info.plist icon set; the extra files are just ignored).
+        // Copying the iOS app-icon PNGs along too is harmless -- they are simply
+        // ignored, because watchOS takes its icon from an asset catalog
+        // (ASSETCATALOG_COMPILER_APPICON_NAME), not from Info.plist keys.
         // Skip iOS-only UI / icon assets: the asset catalog's AppIcon set has no
         // watch-applicable content (build error), and storyboards/xibs are the
         // iOS UI. The CN1 runtime resources (.res/.ttf/data) are what we need.
+        //
+        // Consequence, and it is deliberate rather than overlooked: the watch app
+        // therefore ships with no app icon. That does not affect building, running
+        // or testing -- only archiving for App Store submission, which Apple
+        // rejects without one. Generating a watch AppIcon catalog belongs with the
+        // watchOS widget-extension target, where there is a real archive to verify
+        // it against; until then the developer guide tells the reader to add an
+        // AppIcon set to the watch target before submitting.
         s.append("res_skip = %w[.xcassets .storyboard .xib]\n")
                 .append("app_target.resources_build_phase.files.to_a.each do |bf|\n")
                 .append("  ref = bf.file_ref\n")
