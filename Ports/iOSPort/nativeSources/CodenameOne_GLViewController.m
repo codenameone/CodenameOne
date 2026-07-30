@@ -237,7 +237,7 @@ extern void stringEdit(int finished, int cursorPos, NSString* text);
 // important, this must stay as NO for the iphone builder to work properly during translation
 BOOL vkbAlwaysOpen = NO;
 BOOL viewDidAppearRepaint = YES;
-JAVA_BOOLEAN lowMemoryMode = 0;
+_Atomic JAVA_BOOLEAN lowMemoryMode = 0;
 
 static CGAffineTransform currentMutableTransform;
 static BOOL currentMutableTransformSet = NO;

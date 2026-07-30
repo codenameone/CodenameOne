@@ -171,9 +171,9 @@ static JAVA_BOOLEAN GC_THRESHOLDS_INITIALIZED = JAVA_FALSE;
 
 int currentGcMarkValue = 1;
 #if defined(__APPLE__) && defined(__OBJC__)
-extern JAVA_BOOLEAN lowMemoryMode;
+extern _Atomic JAVA_BOOLEAN lowMemoryMode;
 #else
-JAVA_BOOLEAN lowMemoryMode = JAVA_FALSE;
+_Atomic JAVA_BOOLEAN lowMemoryMode = JAVA_FALSE;
 #endif
 
 static JAVA_BOOLEAN isEdt(long threadId) {
@@ -242,17 +242,27 @@ static long cn1_available_memory(void)
 // either fire on every allocation or stop firing for hours.
 static JAVA_LONG cn1MonotonicMillis(void) {
 #ifdef _WIN32
-    /* clock_gettime / CLOCK_MONOTONIC are absent from the MSVC / clang-cl target;
-       gettimeofday is supplied by cn1_win_compat, as in java_lang_System_nanoTime. */
-    struct timeval time;
-    gettimeofday(&time, NULL);
-    return (((JAVA_LONG)time.tv_sec) * 1000LL) + (((JAVA_LONG)time.tv_usec) / 1000LL);
+    /* clock_gettime / CLOCK_MONOTONIC are absent from the MSVC / clang-cl target.
+       gettimeofday would compile, but it is the WALL clock: an NTP step or a user
+       clock change would either suppress the throttle for the length of the jump
+       or park on every allocation until the clock caught up. cn1_win_compat's
+       cn1_monotonic_micros is QueryPerformanceCounter-backed, i.e. actually
+       monotonic. */
+    return (JAVA_LONG)(cn1_monotonic_micros() / 1000LL);
 #else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (((JAVA_LONG)ts.tv_sec) * 1000LL) + (((JAVA_LONG)ts.tv_nsec) / 1000000LL);
 #endif
 }
+
+// Monotonic-millisecond stamp of this thread's last low-memory throttle park,
+// which bounds the throttle to one park per CN1_LOW_MEMORY_PARK_INTERVAL_MS
+// instead of one per allocation. __thread rather than a ThreadLocalData field:
+// zero-initialized per thread with no malloc'd-not-zeroed trap to remember, and
+// it leaves the struct layout (and therefore every generated translation unit's
+// codegen) untouched.
+static __thread JAVA_LONG cn1LowMemoryParkStampMs = 0;
 
 // Low-memory throttle accounting, reported by CN1_LOG_LOWMEM_PARKS at exit and
 // asserted on by LowMemoryThrottleIntegrationTest: a regression that restores the
@@ -4846,7 +4856,11 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
                 cn1LastNamSetter ? cn1LastNamSetter : "(cleared)");
         }
     }
-    if(lowMemoryMode && !threadStateData->nativeAllocationMode) {
+    // Relaxed: this gate is read on every legacy allocation and the flag carries
+    // no ordering relationship -- a raise seen one allocation late costs nothing,
+    // and a seq_cst load here would put an acquire barrier on the hot path.
+    if(atomic_load_explicit(&lowMemoryMode, memory_order_relaxed)
+            && !threadStateData->nativeAllocationMode) {
         // Backpressure after an OS memory warning, PACED (issue #5482). This used
         // to park 1ms on every legacy allocation, which is not backpressure but a
         // hard ceiling of ~1000 legacy allocations/second per thread -- three
@@ -4864,8 +4878,8 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
         JAVA_BOOLEAN throttle = JAVA_FALSE;
         if(!blockedByGc) {
             JAVA_LONG nowMs = cn1MonotonicMillis();
-            if(nowMs - threadStateData->lowMemoryParkStampMs >= CN1_LOW_MEMORY_PARK_INTERVAL_MS) {
-                threadStateData->lowMemoryParkStampMs = nowMs;
+            if(nowMs - cn1LowMemoryParkStampMs >= CN1_LOW_MEMORY_PARK_INTERVAL_MS) {
+                cn1LowMemoryParkStampMs = nowMs;
                 throttle = JAVA_TRUE;
             }
         }

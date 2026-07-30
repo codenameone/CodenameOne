@@ -1053,14 +1053,6 @@ struct ThreadLocalData {
     JAVA_INT heapAllocationSize;
     JAVA_INT threadHeapTotalSize;
 
-    // Monotonic-millisecond stamp of this thread's last low-memory throttle park,
-    // which bounds the post-memory-warning throttle to one park per
-    // CN1_LOW_MEMORY_PARK_INTERVAL_MS instead of one per allocation. Initialized
-    // explicitly in getThreadLocalData: ThreadLocalData is malloc'd, not zeroed,
-    // and garbage here would either skip the throttle for ~25 days of stamps or
-    // park on every allocation until the clock catches up.
-    JAVA_LONG lowMemoryParkStampMs;
-
 #ifdef CN1_NURSERY
     // Thread-local young-generation ("nursery") bump allocator. Small objects are
     // bump-allocated here and NEVER enter allObjectsInHeap; a thread-local minor
