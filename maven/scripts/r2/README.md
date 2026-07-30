@@ -33,6 +33,11 @@ Where the tree lands:
 | out-of-reactor editor | `scripts/<editor>/target/central-staging` |
 | **SNAPSHOT builds** | `target/central-deferred` (different directory, and it contains `maven-metadata-central-staging.xml` files) |
 
+### `mark-release-complete.sh <version>`
+
+Marks a tag fully published. Run it only once every upload for that tag has succeeded;
+see the completeness rule below for why this is per release rather than per directory.
+
 ### `regen-maven-metadata.py [--dry-run]`
 
 Rebuilds every `maven-metadata.xml` from the bucket's own key listing, plus the group-level
@@ -118,8 +123,13 @@ export R2_ACCOUNT_ID=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_BUCKET
 mvn -s /tmp/central-dummy-settings.xml -DskipPublishing=true deploy
 
 bash maven/scripts/r2/publish-staging-to-r2.sh maven/target/central-staging
+# ...repeat for each scripts/<editor>/target/central-staging, then:
+bash maven/scripts/r2/mark-release-complete.sh <version>
 python3 maven/scripts/r2/regen-maven-metadata.py
 ```
+
+The order matters: nothing uploaded is discoverable until the release is marked, and
+`regen-maven-metadata.py` silently ignores an unmarked version rather than failing.
 
 `aws` CLI is used rather than rclone: it is preinstalled on GitHub runners, and `aws s3 cp`
 cannot delete. R2 needs `AWS_REQUEST_CHECKSUM_CALCULATION=when_required` with recent
