@@ -77,6 +77,20 @@ which matters because each run rebuilds metadata from the same bucket listing â€
 only the run that failed would let the next tag advertise the abandoned one. Re-running
 the release uploads what is missing, marks it, and it then appears normally.
 
+**A requested staging tree that is missing or empty is a failure, not a no-op.** Skipping
+it would report success for a component whose build never produced anything, let the
+workflow's object check pass against artifacts left by an earlier partial upload, and let
+the release be marked complete without that component.
+
+**Metadata checksum sets cannot be written atomically.** A set is a body plus four
+checksum objects, and object storage has no multi-object atomic write, so a failure
+part-way leaves a body and checksums that disagree. That is mitigated rather than solved:
+uploads retry with backoff, checksums are written before the body so an interrupted run
+still serves the previous parseable metadata, `regen-maven-metadata.py` is idempotent so a
+re-run repairs the set, and the 60s TTL means the window is short. Both Maven's default
+`checksumPolicy` and the one in Codename One's generated poms are `warn`, so a consumer
+hitting the window is warned rather than broken.
+
 **Metadata is written last, on purpose.** It is what makes a version discoverable, so a
 failed release leaves its artifacts orphaned but invisible â€” the recoverable direction.
 Advertised-but-incomplete cannot be undone.

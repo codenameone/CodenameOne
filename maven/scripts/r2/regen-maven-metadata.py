@@ -25,6 +25,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import datetime, timezone
 from xml.sax.saxutils import escape
 
@@ -54,6 +55,31 @@ REPO_URL = "https://repo.codenameone.com/maven2"
 # rebuilds metadata from the same bucket listing and would advertise the abandoned tag.
 RELEASES_PSEUDO_ARTIFACT = "_cn1-releases"
 RELEASE_MARKER = "complete"
+
+
+def aws_with_retry(*args, attempts=4):
+    """aws() with bounded backoff.
+
+    A metadata set is a body plus four checksum objects, and object storage has no
+    multi-object atomic write: if one upload fails after another succeeded, the public
+    repository briefly holds a body and checksums that disagree. That cannot be designed
+    away here, so it is made unlikely and self-healing instead -- transient failures are
+    retried, a failure that survives them fails the release loudly, and this script is
+    idempotent so a re-run repairs the set. maven-metadata.xml is served with a 60s TTL,
+    and both Maven's default checksumPolicy and the one in Codename One's generated poms
+    are `warn`, so a consumer hitting the window is warned rather than broken.
+    """
+    delay = 2
+    for attempt in range(1, attempts + 1):
+        try:
+            return aws(*args, capture=False)
+        except subprocess.CalledProcessError:
+            if attempt == attempts:
+                raise
+            print("    upload failed (attempt %d/%d), retrying in %ds"
+                  % (attempt, attempts, delay))
+            time.sleep(delay)
+            delay *= 2
 
 
 def aws(*args, capture=True):
@@ -219,17 +245,19 @@ def put(bucket, key, body, dry_run, cache_seconds=60):
         return
     cache = "public, max-age=%d, must-revalidate" % cache_seconds
     with tempfile.TemporaryDirectory() as tmp:
+        # Checksums first, body last: if the run dies mid-set the body is still the
+        # previous one, so the metadata that is served remains parseable.
         for name, content, ctype in [
-            (os.path.basename(key), body, "text/xml"),
-        ] + [(os.path.basename(key) + "." + ext, digest, "text/plain")
-             for ext, digest in digests.items()]:
+            (os.path.basename(key) + "." + ext, digest, "text/plain")
+            for ext, digest in digests.items()
+        ] + [(os.path.basename(key), body, "text/xml")]:
             path = os.path.join(tmp, name)
             with open(path, "w") as handle:
                 handle.write(content)
-            aws("s3", "cp", path,
-                "s3://%s/%s" % (bucket, os.path.dirname(key) + "/" + name),
-                "--cache-control", cache, "--content-type", ctype,
-                "--only-show-errors", capture=False)
+            aws_with_retry("s3", "cp", path,
+                           "s3://%s/%s" % (bucket, os.path.dirname(key) + "/" + name),
+                           "--cache-control", cache, "--content-type", ctype,
+                           "--only-show-errors")
     print("    wrote %s + 4 checksums" % key)
 
 

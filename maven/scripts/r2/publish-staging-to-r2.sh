@@ -45,9 +45,13 @@ IMMUTABLE='public, max-age=31536000, immutable'
 uploaded=0
 
 for dir in "$@"; do
+    # A caller asks for a specific staging tree, so its absence means the build that
+    # should have produced it failed. Skipping would report success, let the workflow's
+    # object check pass against artifacts left by an earlier partial upload, and let the
+    # release be marked complete without this component.
     if [ ! -d "$dir" ]; then
-        echo "==> skipping $dir (not a directory)"
-        continue
+        echo "ERROR: staging tree $dir does not exist -- the build that produces it failed." >&2
+        exit 1
     fi
 
     # Bookkeeping that must never reach the repository. Releases stage clean,
@@ -63,8 +67,8 @@ for dir in "$@"; do
                 -o -name '.index' \) -delete
 
     if [ -z "$(find "$dir" -type f -print -quit)" ]; then
-        echo "==> skipping $dir (empty after cleanup)"
-        continue
+        echo "ERROR: staging tree $dir holds nothing to publish." >&2
+        exit 1
     fi
 
     # Compare only the .sha1 sidecars, never the artifacts themselves. An object's
