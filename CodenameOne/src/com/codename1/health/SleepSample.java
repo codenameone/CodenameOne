@@ -152,17 +152,26 @@ public final class SleepSample extends SessionSample {
     /// [#hasStageDetail()] is kept and is exactly
     /// `getStageSupport() == SleepStageSupport.STAGED`.
     public SleepStageSupport getStageSupport() {
-        if (stages.isEmpty()) {
-            return SleepStageSupport.NONE;
-        }
+        boolean anyRecognised = false;
         for (SleepStageInterval iv : stages) {
             SleepStage s = iv.getStage();
             if (s == SleepStage.LIGHT || s == SleepStage.CORE
                     || s == SleepStage.DEEP || s == SleepStage.REM) {
                 return SleepStageSupport.STAGED;
             }
+            // UNKNOWN is not a classification, so a session made only of
+            // unknown spans supports nothing -- the same mistake the asleep
+            // roll-up made by asking "is this not awake?" instead of naming
+            // the stages it counts, repeated here by falling through to
+            // ASLEEP_AWAKE. That tier promises a usable binary breakdown, so
+            // reporting it for a session that has none puts a caller in front
+            // of a chart with nothing to draw.
+            if (s != SleepStage.UNKNOWN) {
+                anyRecognised = true;
+            }
         }
-        return SleepStageSupport.ASLEEP_AWAKE;
+        return anyRecognised ? SleepStageSupport.ASLEEP_AWAKE
+                : SleepStageSupport.NONE;
     }
 
     public boolean hasStageDetail() {

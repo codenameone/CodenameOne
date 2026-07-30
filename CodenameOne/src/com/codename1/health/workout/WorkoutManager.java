@@ -144,8 +144,17 @@ public class WorkoutManager {
         WorkoutSession s;
         synchronized (sessionLock) {
             s = activeSession;
+            if (s != null && !isRunning(s)) {
+                // Dropped, not just hidden. Reporting null while still
+                // holding the reference kept a finished session -- its
+                // recording, its listeners and its statistics -- reachable
+                // through this manager until another was started, which for
+                // an app that runs one workout is the life of the process.
+                activeSession = null;
+                s = null;
+            }
         }
-        return s != null && isRunning(s) ? s : null;
+        return s;
     }
 
     private static boolean isRunning(WorkoutSession s) {

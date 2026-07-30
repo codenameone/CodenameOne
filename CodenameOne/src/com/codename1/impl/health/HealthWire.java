@@ -921,10 +921,47 @@ public final class HealthWire {
         return s == null || s.length() == 0 ? null : s;
     }
 
+    /// Escapes `s` for a JSON string literal.
+    ///
+    /// Backslash and quote are not the whole set. JSON forbids every
+    /// character below U+0020 in a string, so a source filter or a delete
+    /// identifier carrying a newline or a tab produced a document that is not
+    /// JSON at all -- and Android's `JSONObject(requestJson)` rejects the
+    /// whole request before it reaches Health Connect, so the read or delete
+    /// fails rather than merely mis-matching.
+    ///
+    /// The named escapes where JSON has them, and the six-character
+    /// backslash-u form for the rest, which covers the controls that have
+    /// no shorter spelling.
     private static String escape(String s) {
         if (s == null) {
             return "";
         }
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+        StringBuilder sb = new StringBuilder(s.length() + 8);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '\\': sb.append("\\\\"); break;
+                case '"':  sb.append("\\\""); break;
+                case '\b': sb.append("\\b"); break;
+                case '\f': sb.append("\\f"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default:
+                    if (c < 0x20) {
+                        sb.append("\\u");
+                        String hex = Integer.toHexString(c);
+                        for (int p = hex.length(); p < 4; p++) {
+                            sb.append('0');
+                        }
+                        sb.append(hex);
+                    } else {
+                        sb.append(c);
+                    }
+                    break;
+            }
+        }
+        return sb.toString();
     }
 }

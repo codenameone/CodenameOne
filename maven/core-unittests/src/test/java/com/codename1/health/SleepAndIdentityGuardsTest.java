@@ -104,6 +104,44 @@ class SleepAndIdentityGuardsTest {
                 "and the old boolean still means exactly STAGED");
     }
 
+    /**
+     * A session made only of unclassified spans supports nothing.
+     *
+     * <p>{@code ASLEEP_AWAKE} promises a usable binary breakdown, and
+     * {@code UNKNOWN} means the source supplied no classification -- so
+     * falling through to that tier put a caller in front of a chart with
+     * nothing to draw. It is the same mistake the asleep roll-up made by
+     * asking "is this not awake?" rather than naming the stages it counts,
+     * made again in the method written to replace that boolean.</p>
+     */
+    @Test
+    void aSessionOfOnlyUnknownSpansSupportsNoStages() {
+        List<SleepStageInterval> unknownOnly =
+                new ArrayList<SleepStageInterval>();
+        unknownOnly.add(stage(SleepStage.UNKNOWN, 0, 1000));
+        unknownOnly.add(stage(SleepStage.UNKNOWN, 1000, 2000));
+
+        SleepSample sleep = SleepSample.create(START, START + 2000,
+                unknownOnly);
+
+        assertEquals(SleepStageSupport.NONE, sleep.getStageSupport(),
+                "unclassified spans are not a binary breakdown");
+        assertFalse(sleep.hasStageDetail());
+    }
+
+    /** One recognised span alongside them is enough to make it binary. */
+    @Test
+    void oneRecognisedSpanBesideUnknownsIsAsleepAwake() {
+        List<SleepStageInterval> mixed = new ArrayList<SleepStageInterval>();
+        mixed.add(stage(SleepStage.UNKNOWN, 0, 1000));
+        mixed.add(stage(SleepStage.ASLEEP_UNSPECIFIED, 1000, 2000));
+
+        SleepSample sleep = SleepSample.create(START, START + 2000, mixed);
+
+        assertEquals(SleepStageSupport.ASLEEP_AWAKE,
+                sleep.getStageSupport());
+    }
+
     /** The platform's own value is carried through untouched. */
     @Test
     void thePlatformStageCodeIsPreserved() {

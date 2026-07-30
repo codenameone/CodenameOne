@@ -158,6 +158,16 @@ final class RecordedWorkoutSession extends WorkoutSession {
         if (rejected.length() > 0) {
             workout.putMetadata(SAMPLES_NOT_PERSISTED, rejected.toString());
         }
+        // Released once they have been rolled up and queued for the write.
+        // discard() already did this; ending did not, so a long heart-rate
+        // workout kept every copied sample alive for as long as anything
+        // held the session -- and the manager holds it until another one
+        // starts, which for an app with a single workout is the rest of the
+        // process. The samples are in toWrite by now and the statistics are
+        // computed, so nothing here reads the list again.
+        synchronized (collected) {
+            collected.clear();
+        }
 
         if (!store.isSupported() || toWrite.isEmpty()) {
             // Nowhere to persist it, but the record itself is still real
