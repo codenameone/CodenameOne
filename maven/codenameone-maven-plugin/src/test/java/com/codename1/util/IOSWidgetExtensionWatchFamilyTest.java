@@ -33,32 +33,52 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// A watch complication is a WidgetKit widget in an accessory family, so the surfaces watch families
-/// have to reach the generated widget bundle as those families. The awkward one is
-/// `.accessoryCorner`: it exists only on watchOS, so naming it unguarded would fail to compile the
-/// iOS extension even though that code would never run.
+/// map onto those families -- but only in a watch target. The generated extension is the iOS one, so
+/// a complication must not surface there: a kind that asked for a complication and got an iPhone
+/// lock-screen or home-screen widget is a wrong surface in front of the user, not an approximation.
 class IOSWidgetExtensionWatchFamilyTest {
 
     @Test
-    void watchFamiliesBecomeAccessoryFamilies() throws IOException {
+    void watchOnlyKindIsNotEmittedIntoTheIosExtension() throws IOException {
         String bundle = bundleFor("watchCircular", "watchRectangular", "watchInline");
 
-        assertTrue(bundle.contains(".accessoryCircular"));
-        assertTrue(bundle.contains(".accessoryRectangular"));
-        assertTrue(bundle.contains(".accessoryInline"));
-        assertFalse(bundle.contains("#if os(watchOS)"),
-                "No watch-only family was declared, so no platform guard is needed");
+        // No struct, and therefore nothing in the bundle body: there is no watchOS extension target
+        // to host it yet, and the iOS one has no matching surface.
+        assertFalse(bundle.contains("CN1Widget_steps"),
+                "A kind declaring only complication families has no surface in the iOS extension");
+        assertFalse(bundle.contains("accessory"));
+        assertFalse(bundle.contains(".systemSmall"),
+                "Falling back to the home-screen sizes would ship a widget the manifest never asked for");
     }
 
     @Test
-    void cornerFamilyIsGuardedToWatchOS() throws IOException {
-        String bundle = bundleFor("watchCircular", "watchCorner");
+    void mixedKindKeepsOnlyItsPhoneFamilies() throws IOException {
+        String bundle = bundleFor("small", "lockscreen", "watchCircular", "watchCorner");
 
-        assertTrue(bundle.contains("#if os(watchOS)"),
-                "accessoryCorner exists only on watchOS and must be declared behind a guard");
-        assertTrue(bundle.contains(".accessoryCorner"));
-        // The #else arm keeps the iOS extension compiling with the families it does have.
-        assertTrue(bundle.contains("#else"));
-        assertTrue(bundle.contains("#endif"));
+        // It does have a phone surface, so it is emitted -- with the families that exist there.
+        assertTrue(bundle.contains("CN1Widget_steps"));
+        assertTrue(bundle.contains(".systemSmall"));
+        assertTrue(bundle.contains(".accessoryRectangular"),
+                "lockscreen is an iOS family in its own right");
+        assertFalse(bundle.contains(".accessoryCircular"),
+                "watchCircular is a complication family and does not belong to the iOS target");
+        assertFalse(bundle.contains(".accessoryCorner"));
+        assertFalse(bundle.contains("#if os(watchOS)"),
+                "Nothing watch-only reaches the iOS target, so no platform guard is needed");
+    }
+
+    @Test
+    void watchOnlyDetectionSeparatesTheTwoCases() {
+        assertTrue(IOSWidgetExtensionBuilder.isWatchOnly(
+                new IOSWidgetExtensionBuilder.Kind("steps")
+                        .setIosFamilies(Arrays.asList("watchCircular", "watchCorner"))));
+        assertFalse(IOSWidgetExtensionBuilder.isWatchOnly(
+                new IOSWidgetExtensionBuilder.Kind("steps")
+                        .setIosFamilies(Arrays.asList("small", "watchCircular"))),
+                "A kind with a phone family still has a surface in the iOS extension");
+        assertFalse(IOSWidgetExtensionBuilder.isWatchOnly(
+                new IOSWidgetExtensionBuilder.Kind("steps")
+                        .setIosFamilies(Arrays.asList("small"))));
     }
 
     @Test

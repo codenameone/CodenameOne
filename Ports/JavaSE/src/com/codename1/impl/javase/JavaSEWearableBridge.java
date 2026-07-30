@@ -139,11 +139,52 @@ class JavaSEWearableBridge implements WearableBridge {
         }
         try {
             writeFrame(out, FRAME_MESSAGE, path, payload, replyToken);
+            if (replyToken != 0) {
+                // The write succeeding is not the answer arriving. If the peer quits before
+                // replying, or never registers a listener for this path, nothing else would ever
+                // complete the handler -- and the API promises it runs exactly once.
+                scheduleReplyTimeout(replyToken);
+            }
         } catch (IOException err) {
             dropPeer();
             if (replyToken != 0) {
                 WearableConnection.deliverReply(replyToken, null, "Link lost: " + err);
             }
+        }
+    }
+
+    /** How long an accepted request may go unanswered before the handler is failed. */
+    private static final int REPLY_TIMEOUT_MILLIS = 30000;
+    /** One timer for every deadline in the process, as on the device ports. */
+    private static final java.util.Timer replyTimer =
+            new java.util.Timer("cn1-wearable-sim-replies", true);
+    private static final Map<Integer, java.util.TimerTask> replyTimeouts =
+            new HashMap<Integer, java.util.TimerTask>();
+
+    private static void scheduleReplyTimeout(final int replyToken) {
+        java.util.TimerTask task = new java.util.TimerTask() {
+            public void run() {
+                synchronized (replyTimeouts) {
+                    replyTimeouts.remove(Integer.valueOf(replyToken));
+                }
+                WearableConnection.deliverReply(replyToken, null,
+                        "The peer did not answer within " + (REPLY_TIMEOUT_MILLIS / 1000)
+                                + " seconds");
+            }
+        };
+        synchronized (replyTimeouts) {
+            replyTimeouts.put(Integer.valueOf(replyToken), task);
+        }
+        replyTimer.schedule(task, REPLY_TIMEOUT_MILLIS);
+    }
+
+    private static void cancelReplyTimeout(int replyToken) {
+        java.util.TimerTask task;
+        synchronized (replyTimeouts) {
+            task = replyTimeouts.remove(Integer.valueOf(replyToken));
+        }
+        if (task != null) {
+            task.cancel();
         }
     }
 
@@ -162,7 +203,10 @@ class JavaSEWearableBridge implements WearableBridge {
     // --- replicated data ----------------------------------------------------
 
     public void putData(String path, byte[] payload) {
-        File f = dataFile(path);
+        writeValue(dataFile(path), payload, path);
+    }
+
+    private void writeValue(File f, byte[] payload, String path) {
         try {
             f.getParentFile().mkdirs();
             // Write-then-rename: the peer polls this directory every 500ms, and writing in place
@@ -181,9 +225,15 @@ class JavaSEWearableBridge implements WearableBridge {
                     throw new IOException("could not replace " + f);
                 }
             }
+            // Give every replacement a strictly increasing stamp. The watcher detects a change by
+            // comparing lastModified(), and two writes to the same path inside the file system's
+            // timestamp granularity would otherwise be indistinguishable -- the second value would
+            // sit on disk and never be delivered.
+            long stamp = nextStamp(f);
+            f.setLastModified(stamp);
             // Our own write must not come back to us as a peer change.
             synchronized (seenData) {
-                seenData.put(f.getName(), Long.valueOf(f.lastModified()));
+                seenData.put(f.getName(), Long.valueOf(stamp));
             }
         } catch (IOException err) {
             com.codename1.io.Log.p("Wearable simulator: failed to publish " + path + ": " + err);
@@ -218,7 +268,9 @@ class JavaSEWearableBridge implements WearableBridge {
         }
         List<String> out = new ArrayList<String>();
         for (File f : files) {
-            if (f.isFile() && !f.getName().endsWith(".tmp")) {
+            // A transfer is not a readable replicated path -- getData() on its storage name is not
+            // part of the API -- so it is left out, matching the device ports.
+            if (f.isFile() && !f.getName().endsWith(".tmp") && !isTransfer(f.getName())) {
                 out.add(decodePath(f.getName()));
             }
         }
@@ -234,7 +286,29 @@ class JavaSEWearableBridge implements WearableBridge {
         WearableMessage wrapper = new WearableMessage(path)
                 .put("name", fileName)
                 .put("contents", contents == null ? new byte[0] : contents);
-        putData(path + "/" + fileName, wrapper.toByteArray());
+        // Two files sent to the same logical path must not overwrite each other, so the file name is
+        // part of the storage name -- but it must not become the *delivered* path: a listener routes
+        // on the path the sender passed to transferFile. The marker keeps the two recoverable, and
+        // is a character encodePath can never emit.
+        writeValue(new File(dataDir, encodePath(path) + TRANSFER_MARKER + encodePath(fileName)),
+                wrapper.toByteArray(), path);
+    }
+
+    /**
+     * Separates the logical path from the file name in a transfer's storage name. Uppercase, which
+     * {@link #encodePath} never produces, so it cannot occur inside either half.
+     */
+    private static final String TRANSFER_MARKER = "X";
+
+    /// The path a stored value is delivered on: for a transfer, the path its sender passed to
+    /// {@code transferFile} rather than the filename-suffixed name it is stored under.
+    private static String deliveryPath(String storageName) {
+        int marker = storageName.indexOf(TRANSFER_MARKER);
+        return decodePath(marker < 0 ? storageName : storageName.substring(0, marker));
+    }
+
+    private static boolean isTransfer(String storageName) {
+        return storageName.indexOf(TRANSFER_MARKER) >= 0;
     }
 
     // --- rendezvous ---------------------------------------------------------
@@ -325,6 +399,7 @@ class JavaSEWearableBridge implements WearableBridge {
                         WearableConnection.deliverMessage(path, payload, token);
                         break;
                     case FRAME_REPLY:
+                        cancelReplyTimeout(token);
                         WearableConnection.deliverReply(token, payload, null);
                         break;
                     default:
@@ -427,7 +502,7 @@ class JavaSEWearableBridge implements WearableBridge {
                     seenData.put(f.getName(), Long.valueOf(stamp));
                 }
                 try {
-                    WearableConnection.deliverDataChanged(decodePath(f.getName()), readFully(f));
+                    WearableConnection.deliverDataChanged(deliveryPath(f.getName()), readFully(f));
                 } catch (IOException stillBeingWritten) {
                     // Re-reported on the next pass once the writer has finished.
                     synchronized (seenData) {
@@ -440,7 +515,7 @@ class JavaSEWearableBridge implements WearableBridge {
             synchronized (seenData) {
                 seenData.remove(name);
             }
-            WearableConnection.deliverDataRemoved(decodePath(name));
+            WearableConnection.deliverDataRemoved(deliveryPath(name));
         }
     }
 
@@ -449,6 +524,20 @@ class JavaSEWearableBridge implements WearableBridge {
     private File dataFile(String path) {
         return new File(dataDir, encodePath(path));
     }
+
+    /**
+     * A modification stamp strictly newer than the one this file already carries, and than any this
+     * process has written for it. The file system's own granularity can be as coarse as a second, so
+     * "now" is not on its own enough to mark a value as new.
+     */
+    private static synchronized long nextStamp(File f) {
+        long now = System.currentTimeMillis();
+        long floor = Math.max(f.lastModified(), lastStamp);
+        lastStamp = now > floor ? now : floor + 1;
+        return lastStamp;
+    }
+
+    private static long lastStamp;
 
     /// Paths are URL-ish (`/workout/start`) and must survive a round trip through a file name on a
     /// case-insensitive file system, so everything outside a conservative set is percent-escaped.

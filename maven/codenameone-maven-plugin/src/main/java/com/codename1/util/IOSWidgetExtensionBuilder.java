@@ -388,6 +388,9 @@ public class IOSWidgetExtensionBuilder {
         sb.append("struct CN1WidgetBundle: WidgetBundle {\n");
         sb.append("    var body: some Widget {\n");
         for (Kind kind : kinds) {
+            if (isWatchOnly(kind)) {
+                continue;
+            }
             sb.append("        ").append(structName(kind)).append("()\n");
         }
         if (liveActivitiesEnabled) {
@@ -396,6 +399,13 @@ public class IOSWidgetExtensionBuilder {
         sb.append("    }\n");
         sb.append("}\n");
         for (Kind kind : kinds) {
+            if (isWatchOnly(kind)) {
+                // Nothing to host it: the generated extension target is the iOS one, so a kind that
+                // declares only complication families has no surface here. Emitting it anyway would
+                // fall through to the default home-screen sizes and ship an iPhone widget the
+                // manifest never asked for.
+                continue;
+            }
             sb.append("\n");
             sb.append("struct ").append(structName(kind)).append(": Widget {\n");
             sb.append("    var body: some WidgetConfiguration {\n");
@@ -407,7 +417,7 @@ public class IOSWidgetExtensionBuilder {
             // platform guard rather than in the shared list -- naming the symbol on iOS would not
             // compile even in code that never runs.
             String shared = familiesSwift(kind, false);
-            String watchOnly = watchOnlyFamiliesSwift(kind);
+            String watchOnly = watchOnlyFamiliesSwift(kind, false);
             if (watchOnly.length() == 0) {
                 sb.append("                families: [").append(shared).append("])\n");
             } else {
@@ -453,7 +463,14 @@ public class IOSWidgetExtensionBuilder {
     }
 
     /// The families that exist only on watchOS, emitted behind an os(watchOS) guard.
-    private static String watchOnlyFamiliesSwift(Kind kind) {
+    ///
+    /// Like the other watch families this is confined to a watch target: the corner complication has
+    /// no iOS surface, so emitting it -- and the platform guard that carries it -- into the iOS
+    /// extension would advertise something the manifest never asked for.
+    private static String watchOnlyFamiliesSwift(Kind kind, boolean watchTarget) {
+        if (!watchTarget) {
+            return "";
+        }
         List<String> families = kind.getIosFamilies();
         if (families != null && families.contains("watchCorner")) {
             return ".accessoryCorner";
@@ -481,6 +498,13 @@ public class IOSWidgetExtensionBuilder {
         // family, which is why they map here rather than through an API of their own.
         // watchRectangular shares .accessoryRectangular with the lock screen -- the Swift renderer
         // picks the more specific published layout when both exist.
+        //
+        // They belong to the watch flavour of the extension only. Mapping them into the iOS target
+        // would put a complication in front of the user as an iPhone lock-screen widget, which is
+        // not the surface the manifest asked for.
+        if (family.startsWith("watch") && !watchTarget) {
+            return null;
+        }
         if ("watchCircular".equals(family)) {
             return ".accessoryCircular";
         }
@@ -503,6 +527,25 @@ public class IOSWidgetExtensionBuilder {
     ///
     /// @param kind the kind to inspect
     /// @return true if the kind offers a complication
+    /// True when a kind declares complication families and nothing else, so the iOS extension has no
+    /// surface to offer it. Distinct from {@link #hasWatchFamily}, which is true for a kind that
+    /// offers both a phone widget and a complication.
+    ///
+    /// @param kind the kind to inspect
+    /// @return true if every declared family is a watch family
+    public static boolean isWatchOnly(Kind kind) {
+        List<String> families = kind.getIosFamilies();
+        if (families == null || families.isEmpty()) {
+            return false;
+        }
+        for (String family : families) {
+            if (family != null && !family.startsWith("watch")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public static boolean hasWatchFamily(Kind kind) {
         List<String> families = kind.getIosFamilies();
         if (families == null) {

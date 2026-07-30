@@ -394,7 +394,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public com.codename1.wearable.spi.WearableBridge getWearableBridge() {
         if (wearableBridge == null) {
-            File home = new File(System.getProperty("user.home") + File.separator + getAppHomeDir());
+            // Deliberately the *shared* home, not this process's sandbox: the two halves have
+            // separate storage (see watchSandbox) but must rendezvous in one directory, which is the
+            // desktop stand-in for a transport the OS would provide.
+            File home = new File(System.getProperty("user.home") + File.separator
+                    + getSharedHomeDir());
             wearableBridge = new JavaSEWearableBridge(home, isWatchCompanionProcess(),
                     getWatchMainClass() != null);
         }
@@ -721,7 +725,29 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static final String WATCH_COMPANION_SKIN = "/AppleWatch45mm.skin";
     private static final String DEFAULT_SKINS = DEFAULT_SKIN+";";
     private static String appHomeDir = ".cn1";
-    
+    /// The app home both halves of a simulated pair resolve to, without the watch suffix below. The
+    /// watch gets its own storage sandbox, but the two still have to meet somewhere to exchange data.
+    private static String sharedHomeDir = ".cn1";
+
+    static {
+        appHomeDir = watchSandbox(appHomeDir);
+    }
+
+    /// The storage sandbox for this process. On a device the phone app and the watch app are two apps
+    /// with two containers: `Storage`, the databases and `FileSystemStorage` are per-app, and there is
+    /// no shared container. Letting the two simulator processes share one home would hide exactly the
+    /// bugs this pairing exists to surface -- a watch reading a value only the phone ever wrote, or
+    /// either side overwriting the other's state -- so the watch half is given its own.
+    ///
+    /// @param base the project's app home directory name or path
+    /// @return the same value on the phone side, a sibling on the watch side
+    private static String watchSandbox(String base) {
+        if (base == null || !"watch".equals(System.getProperty("cn1.wearable.side"))) {
+            return base;
+        }
+        return base + "-watch";
+    }
+
     /**
      * Allowed video extensions for the gallery.
      */
@@ -822,7 +848,16 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @param aAppHomeDir the appHomeDir to set
      */
     public static void setAppHomeDir(String aAppHomeDir) {
-        appHomeDir = aAppHomeDir;
+        sharedHomeDir = aAppHomeDir;
+        appHomeDir = watchSandbox(aAppHomeDir);
+    }
+
+    /// The app home shared by both halves of a simulated pair, which is where the wearable bridge
+    /// rendezvous lives. Distinct from {@link #getAppHomeDir()}, which is this process's own sandbox.
+    ///
+    /// @return the unsuffixed app home directory
+    static String getSharedHomeDir() {
+        return sharedHomeDir;
     }
     protected TestRecorder testRecorder;
     private Hashtable contacts;

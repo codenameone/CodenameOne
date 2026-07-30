@@ -150,6 +150,55 @@ class WatchNativeBuilderTest {
     }
 
     // ------------------------------------------------------------------
+    // Bundle versions
+    // ------------------------------------------------------------------
+
+    /// Apple rejects an archive whose embedded watch app disagrees with its container on either
+    /// version key, and companion mode embeds by default -- so a hardcoded "1" here would fail
+    /// distribution for every project that sets a version at all.
+    @Test
+    void watchVersionsFollowThePhone(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+
+        String plist = writeInfoPlist(req, tmp);
+
+        assertTrue(plist.contains("<key>CFBundleShortVersionString</key>\n    <string>2.5</string>"),
+                "The marketing version is the project's, not a placeholder: " + plist);
+        assertTrue(plist.contains("<key>CFBundleVersion</key>\n    <string>2.5</string>"),
+                "CFBundleVersion defaults to the same value the phone plist uses: " + plist);
+        assertFalse(plist.contains("<key>CFBundleVersion</key>\n    <string>1</string>"));
+    }
+
+    @Test
+    void explicitBundleVersionOverrideIsHonoured(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.bundleVersion", "417");
+
+        String plist = writeInfoPlist(req, tmp);
+
+        assertTrue(plist.contains("<key>CFBundleVersion</key>\n    <string>417</string>"),
+                "ios.bundleVersion drives both halves of the pair: " + plist);
+        assertTrue(plist.contains("<key>CFBundleShortVersionString</key>\n    <string>2.5</string>"),
+                "The override is the build number only, as on the phone: " + plist);
+    }
+
+    /// The phone reformats its version when ios.twoDigitVersion is set, so the watch has to apply the
+    /// same transformation or the two disagree digit for digit.
+    @Test
+    void twoDigitVersionMatchesThePhoneReformatting(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.twoDigitVersion", "true");
+
+        String plist = writeInfoPlist(req, tmp);
+
+        assertTrue(plist.contains("<string>2.50</string>"),
+                "2.5 becomes 2.50 exactly as IPhoneBuilder derives it: " + plist);
+    }
+
+    // ------------------------------------------------------------------
     // Generated entry point
     // ------------------------------------------------------------------
 

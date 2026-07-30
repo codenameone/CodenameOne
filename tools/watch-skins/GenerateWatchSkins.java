@@ -141,7 +141,12 @@ public class GenerateWatchSkins {
         // face loses far more than a rounded rectangle does -- inscribing a rectangle in a circle
         // costs about 15% a side -- and getting this wrong in the simulator is precisely the bug
         // that only shows up on real hardware.
+        // Inscribing a rectangle in a circle costs on BOTH axes, so a circular face insets its width
+        // as well as its height. Reporting the full display width on a round watch is what lets a
+        // layout that correctly honours the safe area still put content in the clipped left and right
+        // corners.
         int inset = Math.round(m.dh * (m.circular ? 0.15f : 0.06f));
+        int insetX = m.circular ? Math.round(m.dw * 0.15f) : 0;
         StringBuilder p = new StringBuilder();
         p.append("# ").append(m.label).append(" - Codename One simulator skin (placeholder art)\n");
         p.append("touch=true\n");
@@ -165,14 +170,14 @@ public class GenerateWatchSkins {
         p.append("displayY=").append(displayY).append('\n');
         p.append("displayWidth=").append(m.dw).append('\n');
         p.append("displayHeight=").append(m.dh).append('\n');
-        p.append("safePortraitX=0\n");
+        p.append("safePortraitX=").append(insetX).append('\n');
         p.append("safePortraitY=").append(inset).append('\n');
-        p.append("safePortraitWidth=").append(m.dw).append('\n');
+        p.append("safePortraitWidth=").append(m.dw - insetX * 2).append('\n');
         p.append("safePortraitHeight=").append(m.dh - inset * 2).append('\n');
         p.append("safeLandscapeX=").append(inset).append('\n');
-        p.append("safeLandscapeY=0\n");
+        p.append("safeLandscapeY=").append(insetX).append('\n');
         p.append("safeLandscapeWidth=").append(m.dh - inset * 2).append('\n');
-        p.append("safeLandscapeHeight=").append(m.dw).append('\n');
+        p.append("safeLandscapeHeight=").append(m.dw - insetX * 2).append('\n');
 
         File out = new File(outDir, m.file);
         ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(out));

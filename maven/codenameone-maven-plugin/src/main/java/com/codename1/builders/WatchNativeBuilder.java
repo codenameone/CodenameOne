@@ -388,6 +388,37 @@ class WatchNativeBuilder {
      * WKCompanionAppBundleIdentifier} to the iOS app so the pair installs
      * together.
      */
+    /**
+     * The marketing version the containing app will carry, reproducing {@code IPhoneBuilder}'s own
+     * derivation: the project version, reformatted to two decimal places when
+     * {@code ios.twoDigitVersion} asks for it. The watch app has to agree with the phone digit for
+     * digit, so this cannot simply read {@code request.getVersion()}.
+     *
+     * @param request the build request
+     * @return the version string, never null
+     */
+    static String shortVersion(BuildRequest request) {
+        String version = request.getVersion();
+        if (version == null || version.length() == 0) {
+            return "1.0";
+        }
+        if (!"true".equals(request.getArg("ios.twoDigitVersion", "false"))) {
+            return version;
+        }
+        try {
+            int intVersion = Math.round(100 * Float.parseFloat(version));
+            int lsb = intVersion % 100;
+            String out = "" + (intVersion / 100) + ".";
+            if (lsb == 0) {
+                return out + "00";
+            }
+            return out + (lsb < 10 ? "0" + lsb : "" + lsb);
+        } catch (NumberFormatException notANumber) {
+            // The phone builder swallows this too and keeps the raw string.
+            return version;
+        }
+    }
+
     void writeWatchInfoPlist(BuildRequest request, File appSrcDir) throws IOException {
         appSrcDir.mkdirs();
         StringBuilder sb = new StringBuilder();
@@ -400,9 +431,13 @@ class WatchNativeBuilder {
         plistString(sb, "CFBundleIdentifier", "$(PRODUCT_BUNDLE_IDENTIFIER)");
         plistString(sb, "CFBundleName", "$(PRODUCT_NAME)");
         plistString(sb, "CFBundlePackageType", "$(PRODUCT_BUNDLE_PACKAGE_TYPE)");
-        plistString(sb, "CFBundleShortVersionString",
-                request.getVersion() == null ? "1.0" : request.getVersion());
-        plistString(sb, "CFBundleVersion", "1");
+        // Apple's validation compares the embedded watch app's versions against the containing app's
+        // and rejects the archive when they differ, so both keys are derived exactly the way the
+        // phone derives them -- including the ios.twoDigitVersion reformatting and the
+        // ios.bundleVersion override -- rather than being pinned to a constant.
+        plistString(sb, "CFBundleShortVersionString", shortVersion(request));
+        plistString(sb, "CFBundleVersion",
+                request.getArg("ios.bundleVersion", shortVersion(request)));
         // Modern single-target watch app marker.
         sb.append("    <key>WKApplication</key>\n    <true/>\n");
         if (!isStandalone()) {

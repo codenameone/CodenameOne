@@ -32,6 +32,38 @@ static NSString *const kPathKey = @"cn1.path";
 static NSString *const kBodyKey = @"cn1.body";
 static NSString *const kTokenKey = @"cn1.token";
 static NSString *const kReplyKey = @"cn1.reply";
+/// Reserved key holding a path-to-sequence map inside the application context, so two halves that
+/// publish the same path can be ordered. Never a caller's path: it is filtered out of dataPaths and
+/// of received-context delivery.
+static NSString *const kSeqKey = @"cn1.seq";
+
+/// A monotonic publication stamp. Wall-clock millis order correctly against the peer's stamps (both
+/// devices are time-synced far more tightly than a context replication takes), and the counter
+/// breaks ties between two publishes inside the same millisecond on this device.
+static int64_t cn1WearableNextSequence(void) {
+    static int64_t last = 0;
+    static dispatch_once_t once;
+    static NSLock *lock = nil;
+    dispatch_once(&once, ^{
+        lock = [[NSLock alloc] init];
+    });
+    [lock lock];
+    int64_t now = (int64_t) ([[NSDate date] timeIntervalSince1970] * 1000.0);
+    last = now > last ? now : last + 1;
+    int64_t result = last;
+    [lock unlock];
+    return result;
+}
+
+/// The stamp a context recorded for a path, or 0 when it predates stamping.
+static int64_t cn1WearableSequenceFor(NSDictionary *ctx, NSString *path) {
+    id seq = ctx[kSeqKey];
+    if (![seq isKindOfClass:[NSDictionary class]]) {
+        return 0;
+    }
+    id value = ((NSDictionary *) seq)[path];
+    return [value isKindOfClass:[NSNumber class]] ? [value longLongValue] : 0;
+}
 
 
 /// Builds the WearableMessage wire form for a received file: a two-entry payload carrying "name"
@@ -201,6 +233,16 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         ctx = [[NSMutableDictionary alloc] init];
     }
     ctx[path] = (payload == nil ? [NSData data] : payload);
+    // Stamp the publication so a reader can tell our value from a newer one the peer sent. The
+    // stamps ride in a reserved sub-dictionary of the same context, which is the only channel
+    // WatchConnectivity gives us -- the context is replaced wholesale on every publish.
+    NSMutableDictionary *seq = [ctx[kSeqKey] mutableCopy];
+    if (seq == nil) {
+        seq = [[NSMutableDictionary alloc] init];
+    }
+    seq[path] = @(cn1WearableNextSequence());
+    ctx[kSeqKey] = seq;
+    [seq release];
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
     if (err != nil) {
@@ -215,9 +257,22 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         return nil;
     }
     // Our own published values live in applicationContext; values the peer published arrive in
-    // receivedApplicationContext. A reader wants whichever exists, most-recent-wins on our side.
-    NSData *mine = [s applicationContext][path];
-    return mine != nil ? mine : [s receivedApplicationContext][path];
+    // receivedApplicationContext. Both halves may publish the same path, so "whichever exists" is
+    // not enough: preferring ours unconditionally would keep answering with a stale local value
+    // after a newer one arrived from the peer, contradicting the single-latest-value contract. Each
+    // publish stamps its path, so the two stamps decide.
+    NSDictionary *localCtx = [s applicationContext];
+    NSDictionary *peerCtx = [s receivedApplicationContext];
+    NSData *mine = localCtx[path];
+    NSData *theirs = peerCtx[path];
+    if (mine == nil) {
+        return theirs;
+    }
+    if (theirs == nil) {
+        return mine;
+    }
+    return cn1WearableSequenceFor(localCtx, path) >= cn1WearableSequenceFor(peerCtx, path)
+            ? mine : theirs;
 }
 
 - (void)removeData:(NSString *)path {
@@ -234,6 +289,17 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         return;
     }
     [ctx removeObjectForKey:path];
+    // Drop the path's stamp with it, or the map grows for the life of the app.
+    NSMutableDictionary *seq = [ctx[kSeqKey] mutableCopy];
+    if (seq != nil) {
+        [seq removeObjectForKey:path];
+        if (seq.count == 0) {
+            [ctx removeObjectForKey:kSeqKey];
+        } else {
+            ctx[kSeqKey] = seq;
+        }
+        [seq release];
+    }
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
     [ctx release];
@@ -246,6 +312,8 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     }
     NSMutableSet *paths = [NSMutableSet setWithArray:[s applicationContext].allKeys];
     [paths addObjectsFromArray:[s receivedApplicationContext].allKeys];
+    // The stamp map is bookkeeping, not a path an app published.
+    [paths removeObject:kSeqKey];
     return paths.allObjects;
 }
 
@@ -254,11 +322,27 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     if (s == nil || contents == nil) {
         return;
     }
-    NSString *dir = NSTemporaryDirectory();
+    // A per-transfer directory, because the system reads the staged file asynchronously and on its
+    // own schedule. Staging by name alone means two transfers of the same name -- or of the unnamed
+    // default -- overwrite each other's bytes while WatchConnectivity is still reading the first,
+    // corrupting one transfer or both. The directory carries the uniqueness so the file keeps the
+    // caller's name, which is what the receiver reads back out of lastPathComponent.
+    NSString *dir = [NSTemporaryDirectory() stringByAppendingPathComponent:
+            [NSString stringWithFormat:@"cn1-wearable-%@", [[NSUUID UUID] UUIDString]]];
+    NSError *dirErr = nil;
+    if (![[NSFileManager defaultManager] createDirectoryAtPath:dir
+                                  withIntermediateDirectories:YES
+                                                   attributes:nil
+                                                        error:&dirErr]) {
+        NSLog(@"[cn1.wearable] could not stage a transfer directory: %@",
+              dirErr.localizedDescription);
+        return;
+    }
     NSString *file = [dir stringByAppendingPathComponent:
             (name.length > 0 ? name : @"cn1-wearable-transfer")];
     if (![contents writeToFile:file atomically:YES]) {
         NSLog(@"[cn1.wearable] could not stage %@ for transfer", file);
+        [[NSFileManager defaultManager] removeItemAtPath:dir error:nil];
         return;
     }
     [s transferFile:[NSURL fileURLWithPath:file]
@@ -343,7 +427,10 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         }
     }
     [_lastReceivedKeys release];
-    _lastReceivedKeys = [[NSSet setWithArray:applicationContext.allKeys] retain];
+    NSMutableSet *keys = [NSMutableSet setWithArray:applicationContext.allKeys];
+    // Not a path: if the peer's stamp map ever emptied we would report a removal for it.
+    [keys removeObject:kSeqKey];
+    _lastReceivedKeys = [keys retain];
 }
 
 - (void)session:(WCSession *)session didReceiveFile:(WCSessionFile *)file {

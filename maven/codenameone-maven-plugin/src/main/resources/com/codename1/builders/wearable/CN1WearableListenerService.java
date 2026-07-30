@@ -44,19 +44,24 @@ public class CN1WearableListenerService extends WearableListenerService {
     /**
      * The service has to be exported for Play services to bind it, and there is no binding
      * permission that would narrow that to Play services alone. So rather than trust the caller,
-     * every event is checked against the nodes the Data Layer actually reports: a crafted intent
-     * from another app on the device carries a source node that is not one of them and is dropped.
+     * every event is checked against the nodes the Data Layer has actually reported: a crafted intent
+     * from another app on the device carries a source node that was never among them and is dropped.
+     *
+     * <p>The check is against a recent snapshot rather than a fresh query, so a peer that drops off
+     * between Play services queueing the callback and the check running does not cost us a message
+     * the Data Layer already accepted -- see {@code CN1WearableBridge.isKnownNode}.
      */
     private boolean isFromAKnownNode(String sourceNodeId) {
-        if (sourceNodeId == null || sourceNodeId.length() == 0) {
-            return false;
-        }
-        for (String id : CN1WearableBridge.connectedNodeIds(this)) {
-            if (sourceNodeId.equals(id)) {
-                return true;
-            }
-        }
-        return false;
+        return CN1WearableBridge.isKnownNode(this, sourceNodeId);
+    }
+
+    /**
+     * The node that published a data item. The Data Layer puts it in the item's Uri authority
+     * ({@code wear://<nodeId>/<path>}), which is the same provenance {@code onMessageReceived} gets
+     * from the message event -- and this service is exported, so it is checked the same way.
+     */
+    private boolean isFromAKnownHost(android.net.Uri uri) {
+        return uri != null && isFromAKnownNode(uri.getHost());
     }
 
     /**
@@ -94,7 +99,11 @@ public class CN1WearableListenerService extends WearableListenerService {
             // An answer to a request we sent. The token rides in the path.
             String token = path.substring(CN1WearableBridge.replyPath().length());
             try {
-                WearableConnection.deliverReply(Integer.parseInt(token), event.getData(), null);
+                int replyToken = Integer.parseInt(token);
+                // A real answer arrived, so the deadline that would have failed this request is no
+                // longer needed; leaving it scheduled holds a task per request for the full timeout.
+                CN1WearableBridge.cancelReplyTimeout(replyToken);
+                WearableConnection.deliverReply(replyToken, event.getData(), null);
             } catch (NumberFormatException malformed) {
                 // Not ours, or a peer running a different build.
             }
@@ -114,16 +123,20 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // keyed to the node that asked; two watches can otherwise pick the same number.
                 int localToken = CN1WearableBridge.rememberRequestOrigin(
                         peerToken, event.getSourceNodeId());
+                // Past the delimiter, not onto it: the encoded application path escapes its own
+                // slashes, so this one belongs to the wire format and is not part of the app's path.
                 WearableConnection.deliverMessage(
-                        CN1WearableBridge.decode(rest.substring(slash)), event.getData(), localToken);
+                        CN1WearableBridge.decode(rest.substring(slash + 1)),
+                        event.getData(), localToken);
             } catch (NumberFormatException malformed) {
                 // Not ours.
             }
             return;
         }
-        if (path.startsWith(CN1WearableBridge.messagePath())) {
+        if (path.startsWith(CN1WearableBridge.messagePath() + "/")) {
             WearableConnection.deliverMessage(
-                    CN1WearableBridge.decode(path.substring(CN1WearableBridge.messagePath().length())),
+                    CN1WearableBridge.decode(
+                            path.substring(CN1WearableBridge.messagePath().length() + 1)),
                     event.getData(), 0);
         }
     }
@@ -133,7 +146,8 @@ public class CN1WearableListenerService extends WearableListenerService {
         ensureAppRunning();
         for (DataEvent event : events) {
             String path = event.getDataItem().getUri().getPath();
-            if (path == null || !path.startsWith(CN1WearableBridge.pathPrefix())) {
+            if (path == null || !path.startsWith(CN1WearableBridge.pathPrefix())
+                    || !isFromAKnownHost(event.getDataItem().getUri())) {
                 continue;
             }
             String appPath = CN1WearableBridge.decode(
@@ -149,13 +163,22 @@ public class CN1WearableListenerService extends WearableListenerService {
                     CN1WearableBridge.decodeTransfer(this, event.getDataItem());
             if (transfer.isTransfer) {
                 if (transfer.payload != null) {
-                    WearableConnection.deliverDataChanged(appPath, transfer.payload);
+                    // On the path the sender passed to transferFile, not the filename-suffixed
+                    // storage path this item happens to live at: a listener routes on what it asked
+                    // for. The decoded payload carries the same path internally.
+                    WearableConnection.deliverDataChanged(transfer.logicalPath, transfer.payload);
                 }
-                // An unreadable asset delivers nothing: the item stays published and the next sync
-                // brings it, which beats handing the listener DataMap bytes as a payload.
+                // An unreadable asset delivers nothing now; decodeTransfer has scheduled a re-read,
+                // which beats handing the listener DataMap bytes dressed up as a payload.
                 continue;
             }
-            WearableConnection.deliverDataChanged(appPath, event.getDataItem().getData());
+            com.google.android.gms.wearable.DataMap value =
+                    CN1WearableBridge.valueMap(event.getDataItem());
+            if (value == null) {
+                // Under our prefix but not written by this API -- nothing to deliver.
+                continue;
+            }
+            WearableConnection.deliverDataChanged(appPath, CN1WearableBridge.payloadOf(value));
         }
     }
 
@@ -169,11 +192,13 @@ public class CN1WearableListenerService extends WearableListenerService {
 
     @Override
     public void onPeerConnected(com.google.android.gms.wearable.Node peer) {
-        WearableConnection.notifyStateChanged();
+        // Correct the bridge's node cache before listeners run: one that responds by calling
+        // isReachable() must not be told about a peer the cache has not heard of yet.
+        CN1WearableBridge.peerChanged(peer, true);
     }
 
     @Override
     public void onPeerDisconnected(com.google.android.gms.wearable.Node peer) {
-        WearableConnection.notifyStateChanged();
+        CN1WearableBridge.peerChanged(peer, false);
     }
 }

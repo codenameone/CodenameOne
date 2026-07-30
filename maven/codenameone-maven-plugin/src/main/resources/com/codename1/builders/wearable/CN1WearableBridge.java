@@ -75,6 +75,8 @@ public class CN1WearableBridge implements WearableBridge {
     private static final String PATH_PREFIX = "/cn1";
     /** The key the payload bytes live under inside a DataItem. */
     private static final String PAYLOAD_KEY = "cn1.payload";
+    /** The publication order of a value or transfer, so the newer of two items wins. */
+    private static final String SEQUENCE_KEY = "cn1.seq";
     /** How long a blocking Data Layer call may take before we give up and answer "not available". */
     private static final long TIMEOUT_SECONDS = 5;
     /**
@@ -119,11 +121,43 @@ public class CN1WearableBridge implements WearableBridge {
 
     public boolean isPaired() {
         // Pairing, not reachability: a paired watch that is switched off or out of range reports no
-        // connected node, and the API promises these are different questions.
+        // connected node, and the API promises these are different questions. The capability query
+        // behind bondedNodeIds() uses FILTER_ALL, so it still lists a paired peer that is currently
+        // disconnected, which is as close to "paired" as the Data Layer gets. A paired watch that
+        // has never run this app is invisible to both queries because Android exposes no such list.
         return !connectedNodes().isEmpty() || !bondedNodeIds().isEmpty();
     }
 
-    /// Ids of the nodes the Data Layer currently reports, for the listener service's caller check.
+    /// Whether an event's source node may be trusted, for the listener service's caller check.
+    ///
+    /// A fresh blocking query would be the strictest answer and is also the wrong one: a peer that
+    /// disconnects between Play services queueing the callback and this check completing -- or a
+    /// query that transiently fails -- would make us discard a message the Data Layer already
+    /// validated and delivered. So the test is membership of a *recent* snapshot: nodes seen
+    /// connected in the last few minutes, plus this device itself (our own published data is echoed
+    /// back to us with the local node as its host). A forged intent from another app on the device
+    /// still carries a node id that was never in that snapshot.
+    ///
+    /// @param context any context; the Data Layer clients are cheap to obtain
+    /// @param sourceNodeId the node the event claims to come from
+    /// @return true when the id belongs to a node we have seen
+    static boolean isKnownNode(Context context, String sourceNodeId) {
+        if (sourceNodeId == null || sourceNodeId.length() == 0) {
+            return false;
+        }
+        if (recentlySeen(sourceNodeId) || sourceNodeId.equals(localNodeId(context))) {
+            return true;
+        }
+        // Nothing remembered yet -- this is the cold-start case, where the service process was
+        // created to deliver the very first event. Now a blocking query is both safe (we are on a
+        // Play services callback thread, never the EDT) and necessary.
+        for (String id : connectedNodeIds(context)) {
+            rememberNode(id);
+        }
+        return recentlySeen(sourceNodeId);
+    }
+
+    /// Ids of the nodes the Data Layer currently reports. Blocking; never call on the EDT.
     ///
     /// @param context any context; the Data Layer clients are cheap to obtain
     /// @return the connected node ids, never null
@@ -142,16 +176,69 @@ public class CN1WearableBridge implements WearableBridge {
         return out;
     }
 
+    /**
+     * Node ids seen connected recently, and when. A message may legitimately arrive from a node that
+     * has just dropped off the connected list, so trust outlives the connection by a wide margin.
+     */
+    private static final Map<String, Long> recentNodes = new HashMap<String, Long>();
+    /** How long a node stays trusted after it was last seen. */
+    private static final long RECENT_NODE_MILLIS = 10 * 60 * 1000L;
+    private static volatile String localNode;
+
+    private static void rememberNode(String id) {
+        if (id == null || id.length() == 0) {
+            return;
+        }
+        synchronized (recentNodes) {
+            recentNodes.put(id, Long.valueOf(System.currentTimeMillis()));
+        }
+    }
+
+    private static boolean recentlySeen(String id) {
+        synchronized (recentNodes) {
+            Long seen = recentNodes.get(id);
+            if (seen == null) {
+                return false;
+            }
+            if (System.currentTimeMillis() - seen.longValue() > RECENT_NODE_MILLIS) {
+                recentNodes.remove(id);
+                return false;
+            }
+            return true;
+        }
+    }
+
+    /// This device's own node id, cached: the Data Layer echoes our own published values back to us
+    /// with the local node as the DataItem host, and dropping those would break putData locally.
+    private static String localNodeId(Context context) {
+        String known = localNode;
+        if (known != null) {
+            return known;
+        }
+        try {
+            known = Tasks.await(
+                    Wearable.getNodeClient(context.getApplicationContext()).getLocalNode(),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS).getId();
+            localNode = known;
+        } catch (Throwable unavailable) {
+            return null;
+        }
+        return known;
+    }
+
     /// Nodes the Data Layer knows about whether or not they are currently connected.
     private List<String> bondedNodeIds() {
+        if (bondedStamp != 0 && System.currentTimeMillis() - bondedStamp <= NODE_CACHE_MILLIS) {
+            // Honour the cache lifetime on every thread. Refreshing on each EDT call would make a
+            // state listener that calls isPaired() or isReachable() start another refresh, whose
+            // completion notifies listeners again -- a self-sustaining loop.
+            return cachedBonded;
+        }
         if (com.codename1.ui.CN.isEdt()) {
             // Never block the EDT -- but the cache has to be filled by someone, or an installed
             // companion is reported absent forever. Kick off a refresh and answer with what is
-            // known so far; listeners are notified when it lands.
+            // known so far; listeners are notified only when the answer actually changed.
             refreshBondedAsync();
-            return cachedBonded;
-        }
-        if (bondedStamp != 0 && System.currentTimeMillis() - bondedStamp <= NODE_CACHE_MILLIS) {
             return cachedBonded;
         }
         List<String> out = new ArrayList<String>();
@@ -185,8 +272,53 @@ public class CN1WearableBridge implements WearableBridge {
         for (Node n : info.getNodes()) {
             out.add(n.getId());
         }
+        boolean changed = !sameIds(b.cachedBonded, out);
         b.cachedBonded = out;
         b.bondedStamp = System.currentTimeMillis();
+        if (changed) {
+            WearableConnection.notifyStateChanged();
+        }
+    }
+
+    /// Order-insensitive comparison of two node-id lists, so a refresh that returns the same set does
+    /// not fire a state change (and cannot become a feedback loop through a listener).
+    private static boolean sameIds(List<String> a, List<String> b) {
+        if (a == null || b == null) {
+            return a == b;
+        }
+        return a.size() == b.size() && a.containsAll(b);
+    }
+
+    /// A peer connected or disconnected. The caches have to be corrected *before* listeners run,
+    /// otherwise a listener that responds by calling isReachable() sees the node it was just told
+    /// about as still present (or still absent) for the rest of the cache lifetime.
+    static void peerChanged(Node peer, boolean connected) {
+        CN1WearableBridge b = current;
+        if (peer != null && connected) {
+            rememberNode(peer.getId());
+        }
+        if (b == null) {
+            WearableConnection.notifyStateChanged();
+            return;
+        }
+        List<Node> updated = new ArrayList<Node>(b.cachedNodes);
+        if (peer != null) {
+            for (int i = updated.size() - 1; i >= 0; i--) {
+                if (peer.getId().equals(updated.get(i).getId())) {
+                    updated.remove(i);
+                }
+            }
+            if (connected) {
+                updated.add(peer);
+            }
+        }
+        b.cachedNodes = updated;
+        // Keep the stamp: this is a push from Play services, which is more current than any query
+        // we could make, so there is nothing to re-ask. A zero stamp would also make the next
+        // sendMessage() defer needlessly.
+        b.cachedNodesStamp = System.currentTimeMillis();
+        // A disconnect can also mean the capability set shrank; let that refresh on its own clock.
+        WearableConnection.notifyStateChanged();
     }
 
     /// The live bridge, so the listener service can push state into it. The service and the bridge
@@ -207,17 +339,24 @@ public class CN1WearableBridge implements WearableBridge {
                                 out.add(n.getId());
                             }
                         }
+                        boolean changed = !sameIds(cachedBonded, out);
                         cachedBonded = out;
                         bondedStamp = System.currentTimeMillis();
                         refreshingBonded = false;
-                        WearableConnection.notifyStateChanged();
+                        if (changed) {
+                            WearableConnection.notifyStateChanged();
+                        }
                     }
                 });
     }
 
     public boolean isReachable() {
+        // "Reachable" promises the peer app can receive a message, so a connected watch that does
+        // not run this app must not qualify: getConnectedNodes() lists physical devices, and only
+        // the capability set says which of them installed the counterpart.
+        List<String> withApp = bondedNodeIds();
         for (Node n : connectedNodes()) {
-            if (n.isNearby()) {
+            if (n.isNearby() && withApp.contains(n.getId())) {
                 return true;
             }
         }
@@ -267,6 +406,7 @@ public class CN1WearableBridge implements WearableBridge {
             cachedNodes = new ArrayList<Node>();
         }
         cachedNodesStamp = System.currentTimeMillis();
+        rememberAll(cachedNodes);
     }
 
     private void refreshNodesAsync() {
@@ -277,29 +417,52 @@ public class CN1WearableBridge implements WearableBridge {
         nodeClient.getConnectedNodes().addOnCompleteListener(
                 new com.google.android.gms.tasks.OnCompleteListener<List<Node>>() {
                     public void onComplete(com.google.android.gms.tasks.Task<List<Node>> task) {
-                        cachedNodes = task.isSuccessful() && task.getResult() != null
+                        List<Node> fresh = task.isSuccessful() && task.getResult() != null
                                 ? task.getResult() : new ArrayList<Node>();
+                        boolean changed = !sameIds(idsOf(cachedNodes), idsOf(fresh));
+                        cachedNodes = fresh;
                         cachedNodesStamp = System.currentTimeMillis();
                         refreshingNodes = false;
-                        // Reachability may have changed; let listeners re-query.
-                        WearableConnection.notifyStateChanged();
+                        rememberAll(fresh);
+                        // Reachability may have changed; let listeners re-query. Only on an actual
+                        // change, or a listener that re-queries here would refresh forever.
+                        if (changed) {
+                            WearableConnection.notifyStateChanged();
+                        }
                     }
                 });
+    }
+
+    private static void rememberAll(List<Node> nodes) {
+        for (Node n : nodes) {
+            rememberNode(n.getId());
+        }
+    }
+
+    private static List<String> idsOf(List<Node> nodes) {
+        List<String> out = new ArrayList<String>();
+        for (Node n : nodes) {
+            out.add(n.getId());
+        }
+        return out;
     }
 
     // --- messages -----------------------------------------------------------
 
     public void sendMessage(final String path, final byte[] payload, final int replyToken) {
-        if (cachedNodesStamp == 0) {
-            // Nothing has been discovered yet. Sending now would fan out to an empty list and
-            // report "no nearby device" while a watch is sitting right there, so wait for the
-            // first refresh instead of trusting a cache that has never been filled.
+        if (System.currentTimeMillis() - cachedNodesStamp > NODE_CACHE_MILLIS) {
+            // The cache is empty or stale. Sending now would fan out to a list that predates the
+            // current connection state and report "no nearby device" while a watch is sitting right
+            // there, so resolve the node list first -- a send is not a state query, and it is worth
+            // one round trip to address it correctly. (connectedNodes() would only *start* an async
+            // refresh on the EDT and then fan out to the stale list anyway.)
             nodeClient.getConnectedNodes().addOnCompleteListener(
                     new com.google.android.gms.tasks.OnCompleteListener<List<Node>>() {
                         public void onComplete(com.google.android.gms.tasks.Task<List<Node>> task) {
                             cachedNodes = task.isSuccessful() && task.getResult() != null
                                     ? task.getResult() : new ArrayList<Node>();
                             cachedNodesStamp = System.currentTimeMillis();
+                            rememberAll(cachedNodes);
                             fanOut(path, payload, replyToken);
                         }
                     });
@@ -319,10 +482,11 @@ public class CN1WearableBridge implements WearableBridge {
             }
             // The peer needs both the CN1 path and, when an answer is wanted, the token to answer
             // with. Both ride in the Data Layer path so the payload stays exactly the app's bytes.
-            // The '/' after the token is the delimiter the listener splits on; a CN1 path is only
-            // conventionally slash-prefixed, so add one rather than assuming it.
+            // encode() escapes '/' as well, so the encoded app path is a single segment containing no
+            // delimiter: the '/' inserted here is unambiguously the separator, and a relative app
+            // path like "steps" survives instead of arriving as "/steps".
             String wire = (replyToken == 0 ? MESSAGE_PATH : REQUEST_PATH + replyToken)
-                    + slashPrefixed(encode(path));
+                    + "/" + encode(path);
             tasks.add(messageClient.sendMessage(n.getId(), wire, payload));
             sentToAnyone = true;
         }
@@ -419,32 +583,74 @@ public class CN1WearableBridge implements WearableBridge {
     private static final int REPLY_TIMEOUT_MILLIS = 30000;
 
     /**
+     * One daemon timer for every reply deadline in the process. A Timer per request would start a
+     * thread per request, and a burst of sends would hold all of them for the full timeout.
+     */
+    private static final java.util.Timer replyTimer = new java.util.Timer("cn1-wearable-replies", true);
+    private static final Map<Integer, java.util.TimerTask> replyTimeouts =
+            new HashMap<Integer, java.util.TimerTask>();
+
+    /**
      * Fails a pending request that is never answered. {@code deliverReply} removes the token on the
-     * first call, so a real answer arriving first makes this a no-op.
+     * first call, so a real answer arriving first makes this a no-op even if the task still runs;
+     * {@link #cancelReplyTimeout} additionally stops it being scheduled at all.
      */
     private void scheduleReplyTimeout(final int replyToken) {
-        new java.util.Timer(true).schedule(new java.util.TimerTask() {
+        java.util.TimerTask task = new java.util.TimerTask() {
             public void run() {
+                synchronized (replyTimeouts) {
+                    replyTimeouts.remove(Integer.valueOf(replyToken));
+                }
                 WearableConnection.deliverReply(replyToken, null,
                         "The peer did not answer within " + (REPLY_TIMEOUT_MILLIS / 1000)
                                 + " seconds");
             }
-        }, REPLY_TIMEOUT_MILLIS);
+        };
+        synchronized (replyTimeouts) {
+            replyTimeouts.put(Integer.valueOf(replyToken), task);
+        }
+        replyTimer.schedule(task, REPLY_TIMEOUT_MILLIS);
     }
 
-    private static String slashPrefixed(String path) {
-        return path.startsWith("/") ? path : "/" + path;
+    /// Cancels the timeout for a request that has just been answered for real, so a burst of
+    /// requests does not keep one scheduled task per request alive for the full timeout.
+    static void cancelReplyTimeout(int replyToken) {
+        java.util.TimerTask task;
+        synchronized (replyTimeouts) {
+            task = replyTimeouts.remove(Integer.valueOf(replyToken));
+        }
+        if (task != null) {
+            task.cancel();
+        }
     }
 
     // --- replicated data ----------------------------------------------------
 
     public void putData(String path, byte[] payload) {
-        PutDataRequest req = PutDataRequest.create(dataPath(path));
-        req.setData(payload == null ? new byte[0] : payload);
+        // The payload travels inside a DataMap rather than as the item's raw data so it can be
+        // stamped with a publication sequence. Both halves of a pair may publish the same logical
+        // path, which the Data Layer stores as two items under two node authorities; without an
+        // ordering stamp a reader has no way to tell which of them is the newer value.
+        PutDataMapRequest req = PutDataMapRequest.create(dataPath(path));
+        req.getDataMap().putByteArray(PAYLOAD_KEY, payload == null ? new byte[0] : payload);
+        req.getDataMap().putLong(SEQUENCE_KEY, nextSequence());
         // Urgent: without it the system may sit on the change for minutes, which reads as "my watch
         // never updated" even though the API did its job.
-        dataClient.putDataItem(req.setUrgent());
+        dataClient.putDataItem(req.asPutDataRequest().setUrgent());
     }
+
+    /**
+     * A monotonic publication stamp. Wall-clock millis order correctly against the peer's stamps
+     * (both devices' clocks are network-synced within far less than a replication round trip), and
+     * the counter breaks ties between two puts inside the same millisecond on this device.
+     */
+    private static synchronized long nextSequence() {
+        long now = System.currentTimeMillis();
+        lastSequence = now > lastSequence ? now : lastSequence + 1;
+        return lastSequence;
+    }
+
+    private static long lastSequence;
 
     public byte[] getData(String path) {
         try {
@@ -454,14 +660,50 @@ public class CN1WearableBridge implements WearableBridge {
             DataItemBuffer items = Tasks.await(dataClient.getDataItems(uri),
                     TIMEOUT_SECONDS, TimeUnit.SECONDS);
             try {
-                if (items.getCount() == 0) {
-                    return null;
+                byte[] best = null;
+                long bestSeq = Long.MIN_VALUE;
+                for (DataItem item : items) {
+                    DataMap map = valueMap(item);
+                    if (map == null) {
+                        continue;
+                    }
+                    long seq = map.getLong(SEQUENCE_KEY, Long.MIN_VALUE);
+                    if (best == null || seq > bestSeq) {
+                        best = map.getByteArray(PAYLOAD_KEY);
+                        bestSeq = seq;
+                    }
                 }
-                return items.get(0).getData();
+                return best;
             } finally {
                 items.release();
             }
         } catch (Throwable unavailable) {
+            return null;
+        }
+    }
+
+    /**
+     * The DataMap of an ordinary published value, or null when the item is not one -- a file transfer
+     * (which carries an Asset instead of a payload) or something not written by this API at all.
+     * This is what keeps transfers out of {@link #getDataPaths()} and out of {@link #getData}.
+     *
+     * @param item a received or queried data item
+     * @return the value's DataMap, or null
+     */
+    /// The payload bytes out of a value's DataMap, never null.
+    ///
+    /// @param value a map obtained from {@link #valueMap}
+    /// @return the published bytes
+    static byte[] payloadOf(DataMap value) {
+        byte[] payload = value.getByteArray(PAYLOAD_KEY);
+        return payload == null ? new byte[0] : payload;
+    }
+
+    static DataMap valueMap(DataItem item) {
+        try {
+            DataMap map = DataMapItem.fromDataItem(item).getDataMap();
+            return map.containsKey(PAYLOAD_KEY) ? map : null;
+        } catch (Throwable notADataMap) {
             return null;
         }
     }
@@ -479,8 +721,17 @@ public class CN1WearableBridge implements WearableBridge {
                 List<String> out = new ArrayList<String>();
                 for (DataItem item : items) {
                     String p = item.getUri().getPath();
-                    if (p != null && p.startsWith(PATH_PREFIX)) {
-                        out.add(decode(p.substring(PATH_PREFIX.length())));
+                    if (p == null || !p.startsWith(PATH_PREFIX) || valueMap(item) == null) {
+                        // Not ours, or a file transfer: a transfer's storage path is namespaced and
+                        // filename-suffixed, and getData() on it would answer with DataMap metadata
+                        // rather than a payload, so it is not a readable replicated path.
+                        continue;
+                    }
+                    // Both halves may publish the same logical path, giving two items under two node
+                    // authorities; the API contract is one path per value.
+                    String logical = decode(p.substring(PATH_PREFIX.length()));
+                    if (!out.contains(logical)) {
+                        out.add(logical);
                     }
                 }
                 return out.toArray(new String[out.size()]);
@@ -504,6 +755,11 @@ public class CN1WearableBridge implements WearableBridge {
         // The DataItem path is namespaced and filename-suffixed, so the caller's own path has to
         // travel with the payload -- a listener routes on the path it was given, not on ours.
         req.getDataMap().putString("cn1.path", path);
+        // A file transfer is a one-shot operation, but a DataItem is a *value*: sending the same
+        // bytes to the same name twice would produce an identical item, which the Data Layer treats
+        // as unchanged and never reports, silently dropping the second transfer. The sequence stamp
+        // makes every invocation a real change.
+        req.getDataMap().putLong(SEQUENCE_KEY, nextSequence());
         req.getDataMap().putAsset("asset", Asset.createFromBytes(body));
         dataClient.putDataItem(req.asPutDataRequest().setUrgent());
     }
@@ -517,6 +773,15 @@ public class CN1WearableBridge implements WearableBridge {
      * @return the encoded payload, or null
      */
     static Transfer decodeTransfer(Context context, DataItem item) {
+        Transfer t = decodeTransferOnce(context, item);
+        if (t == Transfer.UNREADABLE) {
+            scheduleTransferRetry(context, item.getUri());
+        }
+        return t;
+    }
+
+    /// One attempt, with no retry scheduling -- the form the retry itself uses.
+    private static Transfer decodeTransferOnce(Context context, DataItem item) {
         DataMap map;
         Asset asset;
         try {
@@ -539,18 +804,64 @@ public class CN1WearableBridge implements WearableBridge {
                 out.write(buf, 0, n);
             }
             in.close();
-            // On the caller's own path, not the namespaced DataItem one.
+            // The caller's own path, not the namespaced DataItem one; returned alongside the payload
+            // because the delivery path routes on the path it is given, which would otherwise be the
+            // filename-suffixed storage path.
             String logical = map.getString("cn1.path", item.getUri().getPath());
-            return Transfer.of(new WearableMessage(logical)
+            return Transfer.of(logical, new WearableMessage(logical)
                     .put("name", map.getString("name", "file"))
                     .put("contents", out.toByteArray())
                     .toByteArray());
         } catch (Throwable assetUnreadable) {
-            // A transient download failure. Forwarding DataItem.getData() here would hand the
-            // listener DataMap metadata dressed up as a payload, so say nothing instead: the item
-            // stays published and the next sync delivers it.
+            // A transient download failure -- typically getFdForAsset timing out while the system
+            // is still streaming the bytes. Forwarding DataItem.getData() here would hand the
+            // listener DataMap metadata dressed up as a payload, so retry instead: keeping the item
+            // published is not by itself enough, because an unchanged item produces no further
+            // callback and the transfer would be lost for good.
             return Transfer.UNREADABLE;
         }
+    }
+
+    /** How many times, and how far apart, an unreadable asset is re-fetched before giving up. */
+    private static final int TRANSFER_RETRIES = 4;
+    private static final long TRANSFER_RETRY_MILLIS = 3000;
+
+    /**
+     * Re-reads a transfer whose asset could not be resolved, on the shared timer. Each attempt goes
+     * back to the Data Layer for the item, so a transfer that was still streaming lands as soon as
+     * it is complete; after the last attempt the transfer is genuinely dropped.
+     */
+    private static void scheduleTransferRetry(final Context context, final Uri uri) {
+        scheduleTransferRetry(context, uri, 1);
+    }
+
+    private static void scheduleTransferRetry(final Context context, final Uri uri, final int attempt) {
+        if (uri == null || attempt > TRANSFER_RETRIES) {
+            return;
+        }
+        replyTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                try {
+                    DataItemBuffer items = Tasks.await(
+                            Wearable.getDataClient(context.getApplicationContext()).getDataItems(uri),
+                            TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    try {
+                        for (DataItem item : items) {
+                            Transfer t = decodeTransferOnce(context, item);
+                            if (t.payload != null) {
+                                WearableConnection.deliverDataChanged(t.logicalPath, t.payload);
+                                return;
+                            }
+                        }
+                    } finally {
+                        items.release();
+                    }
+                    scheduleTransferRetry(context, uri, attempt + 1);
+                } catch (Throwable stillUnavailable) {
+                    scheduleTransferRetry(context, uri, attempt + 1);
+                }
+            }
+        }, TRANSFER_RETRY_MILLIS * attempt);
     }
 
     /**
@@ -558,19 +869,22 @@ public class CN1WearableBridge implements WearableBridge {
      * transfer, or a transfer whose asset could not be read this time.
      */
     static final class Transfer {
-        static final Transfer NOT_A_TRANSFER = new Transfer(null, false);
-        static final Transfer UNREADABLE = new Transfer(null, true);
+        static final Transfer NOT_A_TRANSFER = new Transfer(null, null, false);
+        static final Transfer UNREADABLE = new Transfer(null, null, true);
 
         final byte[] payload;
+        /** The path the sender passed to {@code transferFile}, which is what listeners route on. */
+        final String logicalPath;
         final boolean isTransfer;
 
-        private Transfer(byte[] payload, boolean isTransfer) {
+        private Transfer(String logicalPath, byte[] payload, boolean isTransfer) {
+            this.logicalPath = logicalPath;
             this.payload = payload;
             this.isTransfer = isTransfer;
         }
 
-        static Transfer of(byte[] payload) {
-            return new Transfer(payload, true);
+        static Transfer of(String logicalPath, byte[] payload) {
+            return new Transfer(logicalPath, payload, true);
         }
     }
 
@@ -583,6 +897,11 @@ public class CN1WearableBridge implements WearableBridge {
     /**
      * Data Layer paths allow a restricted character set and are matched by prefix, so a Codename One
      * path is percent-escaped into it and unescaped on the way back.
+     *
+     * <p>{@code '/'} is escaped along with everything else, which is what makes an encoded path a
+     * single segment carrying no delimiter of its own. A request's wire form can then separate its
+     * reply token from the application path with a literal slash, and an application path is
+     * reproduced exactly -- whether or not the app gave it a leading slash.
      */
     static String encode(String path) {
         if (path == null) {
@@ -592,7 +911,7 @@ public class CN1WearableBridge implements WearableBridge {
         for (int i = 0; i < path.length(); i++) {
             char c = path.charAt(i);
             if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-                    || (c >= '0' && c <= '9') || c == '/' || c == '-' || c == '_') {
+                    || (c >= '0' && c <= '9') || c == '-' || c == '_') {
                 sb.append(c);
             } else {
                 sb.append('%').append(Integer.toHexString(0x10000 | c).substring(1));
