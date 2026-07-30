@@ -373,12 +373,18 @@ public class SimulatedHealthStore extends LocalHealthStore {
         for (HealthSample sample : samples) {
             HealthAuthorizationStatus status =
                     getWriteAuthorizationStatus(sample.getType());
-            // NOT_DETERMINED fails too. A write before the user has been
-            // asked is refused by both platforms, and letting it succeed
-            // here would let an app ship having never exercised its own
-            // authorization flow.
-            if (status == HealthAuthorizationStatus.DENIED
-                    || status == HealthAuthorizationStatus.NOT_DETERMINED) {
+            // Only AUTHORIZED passes. Listing the statuses that fail let
+            // RESTRICTED, UNKNOWN and NOT_SUPPORTED through, so a test could
+            // script "this device blocks writes" and watch the write succeed
+            // -- the simulator agreeing with a permission model no real
+            // provider implements, which is worse than not simulating it,
+            // because the app ships having passed.
+            //
+            // NOT_DETERMINED is among the refusals for the same reason it
+            // always was: a write before the user has been asked is refused
+            // by both platforms, and letting it through lets an app ship
+            // without ever exercising its own authorization flow.
+            if (status != HealthAuthorizationStatus.AUTHORIZED) {
                 out.error(new HealthException(HealthError.UNAUTHORIZED,
                         "write access to " + sample.getType().getId()
                                 + " is " + status));
@@ -402,8 +408,8 @@ public class SimulatedHealthStore extends LocalHealthStore {
         for (int i = 0; i < types.size(); i++) {
             HealthAuthorizationStatus status =
                     getWriteAuthorizationStatus(types.get(i));
-            if (status == HealthAuthorizationStatus.DENIED
-                    || status == HealthAuthorizationStatus.NOT_DETERMINED) {
+            // Same rule as the write above: only AUTHORIZED may mutate.
+            if (status != HealthAuthorizationStatus.AUTHORIZED) {
                 out.error(new HealthException(HealthError.UNAUTHORIZED,
                         "write access to " + types.get(i).getId()
                                 + " is " + status));

@@ -26,7 +26,6 @@ import com.codename1.health.HealthSample;
 import com.codename1.io.Log;
 import com.codename1.io.Storage;
 
-import java.util.List;
 
 /// The local store, kept across restarts.
 ///

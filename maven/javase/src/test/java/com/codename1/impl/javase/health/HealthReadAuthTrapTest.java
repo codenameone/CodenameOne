@@ -26,6 +26,7 @@ import com.codename1.health.HealthAuthorizationStatus;
 import com.codename1.health.HealthDataType;
 import com.codename1.health.HealthError;
 import com.codename1.health.HealthException;
+import com.codename1.health.HealthDeleteRequest;
 import com.codename1.health.HealthQuantity;
 import com.codename1.health.HealthSample;
 import com.codename1.health.HealthTimeRange;
@@ -71,6 +72,51 @@ class HealthReadAuthTrapTest {
         return new SampleQuery().addType(HealthDataType.HEART_RATE)
                 .setTimeRange(HealthTimeRange.between(1_767_000_000_000L,
                         1_768_000_000_000L));
+    }
+
+    /**
+     * Every status that is not AUTHORIZED refuses a write and a delete.
+     *
+     * <p>The guard listed the statuses that fail -- DENIED and
+     * NOT_DETERMINED -- so RESTRICTED, UNKNOWN and NOT_SUPPORTED fell
+     * through and mutated the store. A test could script "this device blocks
+     * writes" and watch the write succeed, which is worse than not
+     * simulating the case at all: the app ships having passed a check that
+     * agrees with no real provider.</p>
+     */
+    @Test
+    void onlyAuthorizedMayWriteOrDelete() {
+        HealthAuthorizationStatus[] refused = {
+            HealthAuthorizationStatus.DENIED,
+            HealthAuthorizationStatus.NOT_DETERMINED,
+            HealthAuthorizationStatus.RESTRICTED,
+            HealthAuthorizationStatus.UNKNOWN,
+            HealthAuthorizationStatus.NOT_SUPPORTED,
+        };
+        for (HealthAuthorizationStatus status : refused) {
+            store.setWritePermission(HealthDataType.BODY_MASS, status);
+
+            assertNotNull(errorOf(store.write(oneWeight())),
+                    "a write must fail while write access is " + status);
+            assertNotNull(errorOf(store.delete(
+                    HealthDeleteRequest.byRange(HealthDataType.BODY_MASS,
+                            HealthTimeRange.between(0L, 10_000L)))),
+                    "a delete must fail while write access is " + status);
+        }
+
+        // And the one status that does allow it still does.
+        store.setWritePermission(HealthDataType.BODY_MASS,
+                HealthAuthorizationStatus.AUTHORIZED);
+        assertNull(errorOf(store.write(oneWeight())),
+                "AUTHORIZED must still be able to write");
+    }
+
+    private static java.util.List<HealthSample> oneWeight() {
+        java.util.List<HealthSample> out =
+                new java.util.ArrayList<HealthSample>();
+        out.add(QuantitySample.create(HealthDataType.BODY_MASS,
+                new HealthQuantity(70, HealthUnit.KILOGRAM), 1000L));
+        return out;
     }
 
     /// Waits for `r` to settle, and returns it.
