@@ -146,6 +146,14 @@ class HealthAbstractionsTest {
         assertEquals("GMT", HealthTimeRange.zoneIdToTz("Z"));
         assertEquals("Europe/Berlin",
                 HealthTimeRange.zoneIdToTz("Europe/Berlin"));
+        // The prefixed forms a standard java.time runtime keeps as-is.
+        // TimeZone knows none of them and answers GMT for all three.
+        assertEquals("GMT+02:00", HealthTimeRange.zoneIdToTz("UTC+02:00"));
+        assertEquals("GMT-05:00", HealthTimeRange.zoneIdToTz("UT-05:00"));
+        assertEquals("GMT+01:00", HealthTimeRange.zoneIdToTz("GMT+01:00"));
+        // And the bare names are zones in their own right, not prefixes.
+        assertEquals("UTC", HealthTimeRange.zoneIdToTz("UTC"));
+        assertEquals("UT", HealthTimeRange.zoneIdToTz("UT"));
     }
 
     /**

@@ -85,11 +85,19 @@ public class StoredHealthStore extends LocalHealthStore {
         // all. Restoring empty on the second is right; on the first it wiped
         // the user's history, because the next write replaced the same key
         // with only the samples this session happened to add.
-        boolean had = false;
+        // Unknown counts as "there might be something there". A backend that
+        // throws on the existence check leaves us unable to tell an empty
+        // store from a full one, and readObject cannot settle it either --
+        // it runs the same check internally, catches the same failure and
+        // answers null. Treating that as confirmed absence meant a storage
+        // layer that recovered before the next write let that write replace
+        // an entry we had never managed to look at.
+        boolean had = true;
         try {
             had = Storage.getInstance().exists(KEY);
         } catch (RuntimeException ex) {
-            Log.p("CN1 Health: could not check the local store (" + ex + ")");
+            Log.p("CN1 Health: could not check whether the local store"
+                    + " exists, assuming it does (" + ex + ")");
         }
         try {
             Object stored = Storage.getInstance().readObject(KEY);

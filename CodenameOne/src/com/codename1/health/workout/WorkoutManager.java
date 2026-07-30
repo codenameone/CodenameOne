@@ -134,6 +134,7 @@ public class WorkoutManager {
                     configuration == null ? new WorkoutConfiguration()
                             : configuration);
             activeSession = session;
+            session.setManager(this);
         }
         out.complete(session);
         return out;
@@ -155,6 +156,21 @@ public class WorkoutManager {
             }
         }
         return s;
+    }
+
+    /// Drops `session` if it is the one being held.
+    ///
+    /// Called by the session itself when it reaches a terminal state. The
+    /// identity test matters: a session that ended after another had already
+    /// been started must not clear the newer one.
+    final void releaseIfCurrent(WorkoutSession session) {
+        synchronized (sessionLock) {
+            if (activeSession == session) { //NOPMD CompareObjectsWithEquals
+                // Identity, not equality: the question is whether this is the
+                // instance being held, not whether an equal one is.
+                activeSession = null;
+            }
+        }
     }
 
     private static boolean isRunning(WorkoutSession s) {

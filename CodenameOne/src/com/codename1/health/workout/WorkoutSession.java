@@ -95,6 +95,15 @@ public abstract class WorkoutSession {
     /// is two steps with the other thread able to run between them -- and
     /// on a field neither side synchronizes, the sensor thread is not
     /// obliged to observe the transition at all.
+    /// The manager that handed this session out, so a terminal transition
+    /// can release it there rather than leaving it to be noticed later.
+    private WorkoutManager manager;
+
+    /// Called by [WorkoutManager] as it hands the session to a caller.
+    final void setManager(WorkoutManager manager) {
+        this.manager = manager;
+    }
+
     private final Object stateLock = new Object();
 
     private WorkoutSessionState state = WorkoutSessionState.NOT_STARTED;
@@ -627,11 +636,15 @@ public abstract class WorkoutSession {
     /// Moves to a new state and notifies listeners. Ports call this for
     /// transitions the platform initiated.
     protected final void setState(WorkoutSessionState newState) {
+        boolean terminal;
         synchronized (stateLock) {
             if (newState == null || newState == state) {
                 return;
             }
             state = newState;
+            terminal = newState == WorkoutSessionState.STOPPED
+                    || newState == WorkoutSessionState.ENDED
+                    || newState == WorkoutSessionState.FAILED;
             // Published under the lock, so listeners are told about the
             // transitions in the order they happened. Enqueued outside
             // it, a transition that had already released the lock could
@@ -646,6 +659,19 @@ public abstract class WorkoutSession {
             if (snapshot != null) {
                 Display.getInstance().callSerially(
                         makeStateRunnable(this, snapshot, newState));
+            }
+        }
+    
+        // Told, rather than waiting to be asked. The manager used to drop a
+        // finished session only when getActiveSession() next ran, so an app
+        // that ended its one workout and released its own reference left the
+        // session -- its listeners, events and statistics -- reachable
+        // through the singleton for the rest of the process. Nothing was
+        // going to call the getter again.
+        if (terminal) {
+            WorkoutManager owner = manager;
+            if (owner != null) {
+                owner.releaseIfCurrent(this);
             }
         }
     }

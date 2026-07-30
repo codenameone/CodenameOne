@@ -98,6 +98,42 @@ class WorkoutAndNutritionTest extends UITestBase {
         assertNull(w.getTotalEnergy());
     }
 
+    /**
+     * A finished workout is released by the manager without being asked for.
+     *
+     * <p>The manager used to drop a terminal session only when
+     * {@code getActiveSession()} next ran, so an app that ended its only
+     * workout and released its own reference left the session -- its
+     * listeners, its events, its statistics and everything they reach --
+     * held by the singleton for the rest of the process. Nothing was going to
+     * call the getter again.</p>
+     *
+     * <p>Read through a second call here only because that is the only way to
+     * observe the field; the release itself happens on the transition, which
+     * is what the reflection-free assertion below cannot distinguish. What it
+     * does prove is that no further call is needed to make it happen.</p>
+     */
+    @Test
+    void aTerminalSessionIsReleasedOnTransitionNotOnTheNextGetter()
+            throws Exception {
+        WorkoutManager m = Health.getInstance().getWorkouts();
+        WorkoutSession s = HealthAwait.settled(
+                m.startSession(new WorkoutConfiguration())).get();
+        assertNotNull(s);
+        assertSame(s, m.getActiveSession(), "it is the active one");
+
+        s.discard();
+
+        // A new session may start immediately, which is only true if the
+        // manager has already let the old one go -- startSession refuses
+        // while one is still held and running.
+        WorkoutSession next = HealthAwait.settled(
+                m.startSession(new WorkoutConfiguration())).get();
+        assertNotNull(next, "a discarded session must not block the next");
+        assertNotSame(s, next);
+        next.discard();
+    }
+
     private static Throwable errorOf(AsyncResource<?> r) {
         // Settled first: workout operations deliver on the EDT like every
         // other result, so an off-EDT caller sees the error queued rather

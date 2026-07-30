@@ -218,7 +218,30 @@ public final class HealthTimeRange {
         if (c == '+' || c == '-') {
             return "GMT" + zoneId;
         }
+        // The prefixed spellings too. A standard java.time runtime keeps
+        // ZoneId.of("UTC+02:00") and ZoneId.of("UT-05:00") with those ids
+        // rather than normalising them to a bare offset, and TimeZone knows
+        // neither -- it answers GMT for both, silently, which is the same
+        // wrong-local-midnight this method exists to prevent.
+        //
+        // GMT+02:00 is already the form TimeZone wants, so it passes through
+        // the final return along with the named zones.
+        if (startsWithOffset(zoneId, "UTC")) {
+            return "GMT" + zoneId.substring(3);
+        }
+        if (startsWithOffset(zoneId, "UT")) {
+            return "GMT" + zoneId.substring(2);
+        }
         return zoneId;
+    }
+
+    /// Whether `zoneId` is `prefix` followed by a signed offset.
+    private static boolean startsWithOffset(String zoneId, String prefix) {
+        if (!zoneId.startsWith(prefix) || zoneId.length() <= prefix.length()) {
+            return false;
+        }
+        char next = zoneId.charAt(prefix.length());
+        return next == '+' || next == '-';
     }
 
     /// Reads a calendar's instant.
