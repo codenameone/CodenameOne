@@ -2251,7 +2251,20 @@ public class AndroidGradleBuilder extends Executor {
 
         String headphonesVars = "";
         String headphonesOnResume = "";
-        if (request.getArg("android.headphoneCallback", "false").equals("true")) {
+        // The generated glue calls headphonesConnected()/headphonesDisconnected() on the lifecycle
+        // instance, so it only compiles when that class declares them -- which the phone main class
+        // does because the developer added them to enable the hint. In a standalone watch build the
+        // lifecycle is the watch class instead, and there is no phone app whose author agreed to
+        // implement a headphone callback, so emitting the glue would simply fail to compile.
+        // ACTION_HEADSET_PLUG on a watch is not a meaningful event either.
+        boolean headphonesApplicable = appLifecycleClass(request).equals(request.getMainClass());
+        if (request.getArg("android.headphoneCallback", "false").equals("true")
+                && !headphonesApplicable) {
+            debug("Ignoring android.headphoneCallback: this is a standalone watch build, whose "
+                    + "lifecycle class is " + appLifecycleClass(request));
+        }
+        if (request.getArg("android.headphoneCallback", "false").equals("true")
+                && headphonesApplicable) {
             headphonesVars = "    HeadSetReceiver myHeadphoneReceiver;\n\n"
                     + "    public static void headphonesConnected() {\n"
                     + "        i.headphonesConnected();"

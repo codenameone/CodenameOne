@@ -241,6 +241,16 @@ public class IOSWidgetExtensionBuilder {
             throw new IllegalStateException("surfaces.json declares neither widget kinds nor "
                     + "liveActivities: there is nothing to generate");
         }
+        if (!hasIosSurface()) {
+            // Every kind is a watch-only complication and there is no live activity, so nothing would
+            // reach the bundle body -- and a WidgetBundle whose body holds no Widget expression does
+            // not compile. Callers are expected to check hasIosSurface() and skip the extension
+            // entirely; reaching here means that check was missed, and failing loudly beats emitting
+            // Swift that breaks the whole iOS build.
+            throw new IllegalStateException("the iOS widget extension would be empty: every kind "
+                    + "declares only watch complication families. Check hasIosSurface() before "
+                    + "generating the extension");
+        }
         // WidgetBundleBuilder composes at most 10 widgets per bundle body; keeping the
         // generator single-bundle is simpler and 9 kinds is far beyond practical use.
         if (kinds.size() > (liveActivitiesEnabled ? 9 : 10)) {
@@ -533,6 +543,24 @@ public class IOSWidgetExtensionBuilder {
     ///
     /// @param kind the kind to inspect
     /// @return true if every declared family is a watch family
+    /// Whether the iOS widget extension would host anything at all: at least one kind with an iOS
+    /// family, or live activities. False means the extension should not be generated -- a project may
+    /// legitimately declare only watch complications, and that should produce no iOS surface rather
+    /// than a build failure.
+    ///
+    /// @return true if there is something for the iOS extension to show
+    public boolean hasIosSurface() {
+        if (liveActivitiesEnabled) {
+            return true;
+        }
+        for (Kind kind : kinds) {
+            if (!isWatchOnly(kind)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean isWatchOnly(Kind kind) {
         List<String> families = kind.getIosFamilies();
         if (families == null || families.isEmpty()) {

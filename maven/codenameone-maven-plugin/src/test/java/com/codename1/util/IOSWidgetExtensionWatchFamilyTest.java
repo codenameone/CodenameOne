@@ -29,7 +29,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
 
+import org.junit.jupiter.api.function.Executable;
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// A watch complication is a WidgetKit widget in an accessory family, so the surfaces watch families
@@ -38,17 +41,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// lock-screen or home-screen widget is a wrong surface in front of the user, not an approximation.
 class IOSWidgetExtensionWatchFamilyTest {
 
+    /// A project declaring only complications is legitimate -- it just has no iOS surface until the
+    /// watchOS extension target exists. The extension must therefore not be generated at all: an
+    /// emitted-but-empty `WidgetBundle` body does not compile, and falling back to the home-screen
+    /// sizes would ship a widget the manifest never asked for.
     @Test
-    void watchOnlyKindIsNotEmittedIntoTheIosExtension() throws IOException {
-        String bundle = bundleFor("watchCircular", "watchRectangular", "watchInline");
+    void watchOnlyProjectHasNoIosSurface() {
+        IOSWidgetExtensionBuilder b = builderFor("watchCircular", "watchRectangular", "watchInline");
 
-        // No struct, and therefore nothing in the bundle body: there is no watchOS extension target
-        // to host it yet, and the iOS one has no matching surface.
-        assertFalse(bundle.contains("CN1Widget_steps"),
-                "A kind declaring only complication families has no surface in the iOS extension");
-        assertFalse(bundle.contains("accessory"));
-        assertFalse(bundle.contains(".systemSmall"),
-                "Falling back to the home-screen sizes would ship a widget the manifest never asked for");
+        assertFalse(b.hasIosSurface(),
+                "Only complication families were declared, so there is nothing for iOS to host");
+    }
+
+    /// And if a caller ignores that and generates anyway, it fails loudly here rather than emitting
+    /// Swift that breaks the whole iOS build.
+    @Test
+    void generatingAnEmptyBundleIsRefused() {
+        IOSWidgetExtensionBuilder b = builderFor("watchCircular");
+
+        assertThrows(IllegalStateException.class, new Executable() {
+            public void execute() throws Throwable {
+                b.buildFileMap();
+            }
+        });
     }
 
     @Test
@@ -105,14 +120,17 @@ class IOSWidgetExtensionWatchFamilyTest {
     // Helper
     // ------------------------------------------------------------------
 
-    private static String bundleFor(String... families) throws IOException {
-        IOSWidgetExtensionBuilder b = new IOSWidgetExtensionBuilder()
+    private static IOSWidgetExtensionBuilder builderFor(String... families) {
+        return new IOSWidgetExtensionBuilder()
                 .setHostBundleId("com.mycompany.myapp")
                 .setAppGroupId("group.com.mycompany.myapp")
                 .addKind(new IOSWidgetExtensionBuilder.Kind("steps")
                         .setName("Steps")
                         .setIosFamilies(Arrays.asList(families)));
-        Map<String, byte[]> files = b.buildFileMap();
+    }
+
+    private static String bundleFor(String... families) throws IOException {
+        Map<String, byte[]> files = builderFor(families).buildFileMap();
         for (Map.Entry<String, byte[]> e : files.entrySet()) {
             if (e.getKey().endsWith("CN1WidgetBundle.swift")) {
                 return new String(e.getValue(), StandardCharsets.UTF_8);

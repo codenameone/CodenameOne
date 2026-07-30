@@ -158,10 +158,25 @@ public class CN1WearableBridge implements WearableBridge {
         // Nothing remembered yet -- this is the cold-start case, where the service process was
         // created to deliver the very first event. Now a blocking query is both safe (we are on a
         // Play services callback thread, never the EDT) and necessary.
-        for (String id : connectedNodeIds(context)) {
+        List<String> connected = connectedNodeIds(context);
+        for (String id : connected) {
             rememberNode(id);
         }
-        return recentlySeen(sourceNodeId);
+        if (recentlySeen(sourceNodeId)) {
+            return true;
+        }
+        if (connected.isEmpty()) {
+            // The query established nothing at all: the sender disconnected while we were starting,
+            // or Play services could not answer. Rejecting here would discard the very first event
+            // of a cold start -- the case this service exists for -- on no evidence. Play services
+            // delivered it, which is the only provenance available, so trust it and remember the
+            // node; a forged intent from another app is still rejected on every later event, once
+            // there is a real snapshot to test against.
+            rememberNode(sourceNodeId);
+            return true;
+        }
+        // A populated snapshot that does not contain the sender is real evidence against it.
+        return false;
     }
 
     /// Ids of the nodes the Data Layer currently reports. Blocking; never call on the EDT.

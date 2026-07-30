@@ -4408,6 +4408,15 @@ public class IPhoneBuilder extends Executor {
         for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
             widgetBuilder.addKind(kind);
         }
+        if (!widgetBuilder.hasIosSurface()) {
+            // Every declared kind is a watch complication and there is no live activity, so the iOS
+            // extension would host nothing -- and a WidgetBundle with an empty body does not compile.
+            // Declaring only complications is legitimate; it simply produces no iOS surface until the
+            // watchOS extension target exists, so skip the extension instead of failing the build.
+            log("Skipping the WidgetKit extension target: surfaces.json declares only watch "
+                    + "complication families, which the iOS extension cannot host");
+            return;
+        }
         String extensionName = widgetBuilder.getExtensionName();
         File extensionDir = new File(distDir, extensionName);
         IOSWalletExtensionBuilder.writeFileMap(widgetBuilder.buildFileMap(), extensionDir);
