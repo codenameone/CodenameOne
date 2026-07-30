@@ -117,7 +117,21 @@ public class MavenUtils {
                 return null;
             }
             String version = versionDir.getName();
-            File designerVersionDir = new File(codenameoneGroupDir, "codenameone-designer" + File.separator + version);
+            File designerRoot = new File(codenameoneGroupDir, "codenameone-designer");
+            File designerVersionDir = new File(designerRoot, version);
+            if (!designerVersionDir.isDirectory()) {
+                // The Resource Editor is deprecated and frozen, so its version no longer
+                // tracks the framework's. Fall back to whatever build of it is present,
+                // newest first: the Component Inspector's Edit Style action only needs
+                // *a* designer, and forcing an exact match would make that action dead on
+                // every project whose core version moved past the frozen editor.
+                File newest = newestDesignerVersionDir(designerRoot);
+                if (newest == null) {
+                    return null;
+                }
+                designerVersionDir = newest;
+                version = newest.getName();
+            }
             // The published jar-with-dependencies artifact is *not* directly runnable:
             // maven/designer/pom.xml's antrun step renames the shaded jar to
             // designer_1.jar and re-zips it, so this file is a zip wrapper containing
@@ -141,6 +155,53 @@ public class MavenUtils {
             // Best-effort lookup. Any unexpected layout means we can't resolve via m2.
         }
         return null;
+    }
+
+    /**
+     * Newest {@code codenameone-designer/<version>} directory that actually holds the
+     * wrapper artifact, or null when none does. Versions are ordered by numeric segment
+     * so 7.0.9 sorts below 7.0.10.
+     */
+    private static File newestDesignerVersionDir(File designerRoot) {
+        File[] versionDirs = designerRoot.listFiles();
+        if (versionDirs == null) {
+            return null;
+        }
+        File best = null;
+        for (File candidate : versionDirs) {
+            if (!candidate.isDirectory()) {
+                continue;
+            }
+            File wrapper = new File(candidate,
+                    "codenameone-designer-" + candidate.getName() + "-jar-with-dependencies.jar");
+            if (!wrapper.isFile()) {
+                continue;
+            }
+            if (best == null || compareVersions(candidate.getName(), best.getName()) > 0) {
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    /** Compares dotted versions segment by segment, numerically where both segments are numeric. */
+    static int compareVersions(String left, String right) {
+        String[] l = left.split("[.-]");
+        String[] r = right.split("[.-]");
+        for (int i = 0; i < Math.max(l.length, r.length); i++) {
+            String a = i < l.length ? l[i] : "";
+            String b = i < r.length ? r[i] : "";
+            int result;
+            if (a.matches("\\d+") && b.matches("\\d+")) {
+                result = Long.compare(Long.parseLong(a), Long.parseLong(b));
+            } else {
+                result = a.compareTo(b);
+            }
+            if (result != 0) {
+                return result;
+            }
+        }
+        return 0;
     }
 
     private static final String INNER_JAR_NAME = "designer_1.jar";

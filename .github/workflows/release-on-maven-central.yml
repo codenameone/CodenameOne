@@ -125,12 +125,6 @@ jobs:
           echo "Artifacts ${GITHUB_REF_NAME} did not appear on Maven Central within 30 minutes"
           exit 1
 
-      - name: Regenerate R2 metadata and archetype catalog
-        id: r2_core_metadata
-        continue-on-error: true
-        if: always() && steps.r2_core.outcome == 'success'
-        run: python3 maven/scripts/r2/regen-maven-metadata.py
-
       - name: Confirm artifacts on R2
         id: r2_core_confirm
         continue-on-error: true
@@ -151,13 +145,6 @@ jobs:
             fi
             echo "ok: $artifact ${GITHUB_REF_NAME}"
           done
-          meta="${R2_BASE_URL}/com/codenameone/codenameone-core/maven-metadata.xml?cb=${GITHUB_RUN_ID}"
-          if ! curl -s "$meta" | grep -q "<release>${GITHUB_REF_NAME}</release>"; then
-            echo "maven-metadata.xml does not list ${GITHUB_REF_NAME} as <release>" >&2
-            curl -s "$meta" >&2
-            exit 1
-          fi
-          echo "ok: maven-metadata.xml <release> is ${GITHUB_REF_NAME}"
 
       # --- Game Builder editor -------------------------------------------------
       # The cn1:gamebuilder goal resolves
@@ -379,8 +366,8 @@ jobs:
           done
           echo "codenameone-settings ${GITHUB_REF_NAME} not visible on repo1 yet; it may still be propagating from Sonatype Central."
 
-      - name: Regenerate R2 metadata for the editors
-        id: r2_editor_metadata
+      - name: Regenerate R2 metadata and archetype catalog
+        id: r2_metadata
         continue-on-error: true
         # Skipped when any editor upload failed: regen discovers a version from any key
         # under <artifact>/<version>/, so running it after a partial copy would publish an
@@ -390,7 +377,17 @@ jobs:
           steps.r2_gamebuilder.outcome != 'failure' &&
           steps.r2_certificatewizard.outcome != 'failure' &&
           steps.r2_settings.outcome != 'failure'
-        run: python3 maven/scripts/r2/regen-maven-metadata.py
+        run: |
+          python3 maven/scripts/r2/regen-maven-metadata.py
+          # Assert here rather than earlier: metadata is what makes a version discoverable,
+          # so it is published only once every artifact for it is in place.
+          meta="${R2_BASE_URL}/com/codenameone/codenameone-core/maven-metadata.xml?cb=${GITHUB_RUN_ID}"
+          if ! curl -s "$meta" | grep -q "<release>${GITHUB_REF_NAME}</release>"; then
+            echo "maven-metadata.xml does not list ${GITHUB_REF_NAME} as <release>" >&2
+            curl -s "$meta" >&2
+            exit 1
+          fi
+          echo "ok: maven-metadata.xml <release> is ${GITHUB_REF_NAME}"
 
       - name: Fail when any publication did not complete
         # Every publish step runs with continue-on-error so that one destination
@@ -403,12 +400,11 @@ jobs:
           fail() { echo "  FAILED: $1"; status=1; }
           echo "Publication outcomes:"
           [ "${{ steps.r2_core.outcome }}" = "failure" ] && fail "core reactor -> R2"
-          [ "${{ steps.r2_core_metadata.outcome }}" = "failure" ] && fail "R2 metadata regeneration"
           [ "${{ steps.r2_core_confirm.outcome }}" = "failure" ] && fail "core artifacts missing on R2"
           [ "${{ steps.r2_gamebuilder.outcome }}" = "failure" ] && fail "Game Builder -> R2"
           [ "${{ steps.r2_certificatewizard.outcome }}" = "failure" ] && fail "Signing Wizard -> R2"
           [ "${{ steps.r2_settings.outcome }}" = "failure" ] && fail "Settings -> R2"
-          [ "${{ steps.r2_editor_metadata.outcome }}" = "failure" ] && fail "R2 metadata regeneration (editors)"
+          [ "${{ steps.r2_metadata.outcome }}" = "failure" ] && fail "R2 metadata regeneration"
           if [ "${{ vars.CN1_DUAL_PUBLISH }}" = "true" ]; then
             # The core Central deploy is allowed to false-negative; the confirm poll is its
             # second opinion. Only both failing means the release did not reach Central.
