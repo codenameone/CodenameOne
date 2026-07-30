@@ -156,10 +156,14 @@
             <artifactId>codenameone-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Version deliberately omitted so the pinned ${cn1.sqlite.jdbc.version} in the
+             parent's dependencyManagement applies. sqlite-jdbc is frozen and excluded from
+             publication; an explicit ${project.version} here would override the pin and
+             make every released codenameone-javase pom request a sqlite-jdbc that was
+             never uploaded. -->
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>sqlite-jdbc</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.jhlabs</groupId>

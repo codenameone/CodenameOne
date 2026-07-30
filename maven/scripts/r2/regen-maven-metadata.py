@@ -17,6 +17,7 @@ R2_BUCKET.
 """
 
 import argparse
+import functools
 import hashlib
 import json
 import os
@@ -73,6 +74,7 @@ def list_keys(bucket, group_path):
             return keys
 
 
+@functools.total_ordering
 class ComparableVersion:
     """Maven-ish version ordering: numeric segments compare numerically, so
     7.0.9 < 7.0.10 rather than sorting lexically."""
@@ -158,9 +160,10 @@ def archetype_catalog_xml(group_id, artifacts):
     removed, and a URL is rejected. The resolver looks for the repository with
     id `archetype` (falling back to `central`) and fetches
     <repoUrl>/archetype-catalog.xml."""
+    namespace = ("http://maven.apache.org/plugins/maven-archetype-plugin"
+                 "/archetype-catalog/1.0.0")
     lines = ['<?xml version="1.0" encoding="UTF-8"?>',
-             '<archetype-catalog xmlns="http://maven.apache.org/plugins/'
-             'maven-archetype-plugin/archetype-catalog/1.0.0">',
+             '<archetype-catalog xmlns="%s">' % namespace,
              "  <archetypes>"]
     for artifact_id, description in sorted(ARCHETYPES.items()):
         versions = artifacts.get(artifact_id)

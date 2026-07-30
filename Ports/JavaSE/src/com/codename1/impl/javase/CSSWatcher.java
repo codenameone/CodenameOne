@@ -351,11 +351,14 @@ public class CSSWatcher implements Runnable {
                             + "If CSS compilation fails, launch the simulator via the Maven cn1:run goal.");
                 }
             }
+            // JVM options must precede -jar, and the jar path must follow it
+            // immediately. The pre-existing ordering put -Dcli=true where the
+            // jar belongs, so the JVM treated that as the jar name.
             pb = new ProcessBuilder(
                     javaBin.getAbsolutePath(),
-                    "-jar", "-Dcli=true",
+                    "-Dcli=true",
                     "-Dparent.port=" + pulseSocket.getLocalPort(),
-                    designerJar.getAbsolutePath(),
+                    "-jar", designerJar.getAbsolutePath(),
                     "-css"
             );
         }

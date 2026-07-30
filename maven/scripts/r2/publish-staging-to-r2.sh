@@ -67,6 +67,11 @@ for dir in "$@"; do
         continue
     fi
 
+    # Compare only the .sha1 sidecars, never the artifacts themselves. An object's
+    # ETag equals its MD5 only for single-part uploads, and `aws s3 cp` switches to
+    # multipart above 8MB -- so ETag-vs-MD5 on a jar would report every large
+    # artifact as a conflict when a tag is retried. The sidecars are 40 bytes, so
+    # always single-part, and each one uniquely identifies its artifact's content.
     echo "==> checking $dir for conflicting objects"
     conflicts=0
     while IFS= read -r file; do
@@ -76,10 +81,10 @@ for dir in "$@"; do
         [ -z "$remote_etag" ] && continue
         local_md5=$(md5 -q "$file" 2>/dev/null || md5sum "$file" | cut -d' ' -f1)
         if [ "${remote_etag//\"/}" != "$local_md5" ]; then
-            echo "    CONFLICT: $key already exists with different content"
+            echo "    CONFLICT: ${key%.sha1} already exists with different content"
             conflicts=$((conflicts + 1))
         fi
-    done < <(find "$dir" -type f)
+    done < <(find "$dir" -type f -name '*.sha1')
 
     if [ "$conflicts" -gt 0 ] && [ "${R2_ALLOW_OVERWRITE:-0}" != "1" ]; then
         echo "ERROR: $conflicts object(s) would be overwritten with different bytes." >&2

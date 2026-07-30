@@ -130,9 +130,12 @@ SEEN_EXCLUSIONS="$(mktemp -t cn1-copyright-exclusions.XXXXXX)"
 HEADER_FILE="$(mktemp -t cn1-copyright-header.XXXXXX)"
 BASE_FILE="$(mktemp -t cn1-copyright-base.XXXXXX)"
 BASE_HEADER_FILE="$(mktemp -t cn1-copyright-base-header.XXXXXX)"
-trap 'rm -f "$PATHS_FILE" "$NEW_FILES" "$SEEN_EXCLUSIONS" "$HEADER_FILE" "$BASE_FILE" "$BASE_HEADER_FILE"' EXIT
+# new path -> path the file had in the base revision, for renames
+RENAMES_FILE="$(mktemp -t cn1-copyright-renames.XXXXXX)"
+trap 'rm -f "$PATHS_FILE" "$NEW_FILES" "$SEEN_EXCLUSIONS" "$HEADER_FILE" "$BASE_FILE" "$BASE_HEADER_FILE" "$RENAMES_FILE"' EXIT
 : > "$PATHS_FILE"
 : > "$NEW_FILES"
+: > "$RENAMES_FILE"
 REFERENCE=''
 
 POSITIONAL=()
@@ -195,6 +198,11 @@ case "$MODE" in
     fi
     git diff --name-only --diff-filter=AMR "$BASE" "$HEAD" -- > "$PATHS_FILE"
     git diff --name-only --diff-filter=A "$BASE" "$HEAD" -- > "$NEW_FILES"
+    # Moving a file must not force it to be relicensed: record <new>\t<old> for
+    # renames so the Oracle-header check below can look the file up at the path
+    # it actually had in the base revision.
+    git diff --name-status --diff-filter=R -M "$BASE" "$HEAD" -- \
+      | awk -F '\t' 'NF == 3 { print $3 "\t" $2 }' > "$RENAMES_FILE"
     REFERENCE="$BASE"
     ;;
   all)
@@ -252,7 +260,9 @@ while IFS= read -r path; do
       failed=$((failed + 1))
     elif [[ "$kind" == oracle && -n "$REFERENCE" ]]; then
       base_kind=''
-      if ! git show "$REFERENCE:$path" > "$BASE_FILE" 2>/dev/null \
+      base_path="$(awk -F '\t' -v p="$path" '$1 == p { print $2; exit }' "$RENAMES_FILE")"
+      [[ -n "$base_path" ]] || base_path="$path"
+      if ! git show "$REFERENCE:$base_path" > "$BASE_FILE" 2>/dev/null \
           || ! base_kind="$(header_kind "$BASE_FILE" "$BASE_HEADER_FILE")" \
           || [[ "$base_kind" != oracle ]]; then
         echo "$path: the Oracle header is only allowed when the base version already used it" >&2

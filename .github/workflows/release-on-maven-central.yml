@@ -183,6 +183,8 @@ jobs:
           server-password: MAVEN_PASSWORD
 
       - name: Deploy Game Builder editor to Maven Central
+        id: deploy_gamebuilder
+        continue-on-error: true
         if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
         run: |
           export GPG_TTY=$(tty)
@@ -212,11 +214,13 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
       - name: Publish Game Builder editor to R2
-        if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        # always(): central-publishing stages before it uploads, so the tree exists
+        # even when the Central deploy above failed -- which is precisely the case
+        # R2 is here to survive. Metadata is regenerated once, after all three.
+        if: always() && steps.deploy_gamebuilder.conclusion != 'skipped'
         run: |
           # Each editor is its own reactor, so it stages into its own target dir.
           bash maven/scripts/r2/publish-staging-to-r2.sh scripts/gamebuilder/target/central-staging
-          python3 maven/scripts/r2/regen-maven-metadata.py
           url="${R2_BASE_URL}/com/codenameone/codenameone-gamebuilder/${GITHUB_REF_NAME}/codenameone-gamebuilder-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}"
           code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
           [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-gamebuilder (HTTP $code)" >&2; exit 1; }
@@ -252,6 +256,8 @@ jobs:
       # scripts/certificatewizard and uses the generated OpenAPI client for the
       # Apple signing service.
       - name: Deploy Signing Wizard editor to Maven Central
+        id: deploy_certificatewizard
+        continue-on-error: true
         if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
         run: |
           export GPG_TTY=$(tty)
@@ -267,11 +273,13 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
       - name: Publish Signing Wizard editor to R2
-        if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        # always(): central-publishing stages before it uploads, so the tree exists
+        # even when the Central deploy above failed -- which is precisely the case
+        # R2 is here to survive. Metadata is regenerated once, after all three.
+        if: always() && steps.deploy_certificatewizard.conclusion != 'skipped'
         run: |
           # Each editor is its own reactor, so it stages into its own target dir.
           bash maven/scripts/r2/publish-staging-to-r2.sh scripts/certificatewizard/target/central-staging
-          python3 maven/scripts/r2/regen-maven-metadata.py
           url="${R2_BASE_URL}/com/codenameone/codenameone-certificatewizard/${GITHUB_REF_NAME}/codenameone-certificatewizard-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}"
           code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
           [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-certificatewizard (HTTP $code)" >&2; exit 1; }
@@ -300,6 +308,8 @@ jobs:
       # The cn1:settings goal resolves the standalone Java-17 Settings editor
       # and its runtime dependencies from Maven Central.
       - name: Deploy Settings editor to Maven Central
+        id: deploy_settings
+        continue-on-error: true
         if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
         run: |
           export GPG_TTY=$(tty)
@@ -315,11 +325,13 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
       - name: Publish Settings editor to R2
-        if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        # always(): central-publishing stages before it uploads, so the tree exists
+        # even when the Central deploy above failed -- which is precisely the case
+        # R2 is here to survive. Metadata is regenerated once, after all three.
+        if: always() && steps.deploy_settings.conclusion != 'skipped'
         run: |
           # Each editor is its own reactor, so it stages into its own target dir.
           bash maven/scripts/r2/publish-staging-to-r2.sh scripts/settings/target/central-staging
-          python3 maven/scripts/r2/regen-maven-metadata.py
           url="${R2_BASE_URL}/com/codenameone/codenameone-settings/${GITHUB_REF_NAME}/codenameone-settings-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}"
           code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
           [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-settings (HTTP $code)" >&2; exit 1; }
@@ -343,3 +355,22 @@ jobs:
             sleep 20
           done
           echo "codenameone-settings ${GITHUB_REF_NAME} not visible on repo1 yet; it may still be propagating from Sonatype Central."
+
+      - name: Regenerate R2 metadata for the editors
+        if: always() && steps.r2_core.outcome == 'success'
+        run: python3 maven/scripts/r2/regen-maven-metadata.py
+
+      - name: Fail when an editor release did not complete
+        # The editor deploys run with continue-on-error so their staging trees can
+        # reach R2 first; the job must still go red if Central rejected one.
+        if: >-
+          always() && vars.CN1_DUAL_PUBLISH == 'true' &&
+          (steps.deploy_gamebuilder.outcome == 'failure' ||
+           steps.deploy_certificatewizard.outcome == 'failure' ||
+           steps.deploy_settings.outcome == 'failure')
+        run: |
+          echo "One or more editor deploys failed to publish to Maven Central:"
+          echo "  gamebuilder=${{ steps.deploy_gamebuilder.outcome }}"
+          echo "  certificatewizard=${{ steps.deploy_certificatewizard.outcome }}"
+          echo "  settings=${{ steps.deploy_settings.outcome }}"
+          exit 1
