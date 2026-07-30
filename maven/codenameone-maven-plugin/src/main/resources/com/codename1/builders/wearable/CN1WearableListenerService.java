@@ -83,8 +83,14 @@ public class CN1WearableListenerService extends WearableListenerService {
                 startActivity(launch);
             }
         } catch (Throwable notPermitted) {
-            // Background activity starts are restricted on newer Android; the delivery stays queued
-            // and is replayed the next time the user opens the app.
+            // Background activity starts are restricted on newer Android. The delivery stays in the
+            // in-memory queue and is replayed if the app opens while this process is still alive.
+            //
+            // That is a convenience, not a durability guarantee, and the two transports differ on
+            // purpose: replicated data and file transfers are durable in the Data Layer itself -- the
+            // item stays published and the next connection re-delivers it -- whereas a live message
+            // is best-effort by contract and needs both apps awake, which is what isReachable() and
+            // the sender's reply timeout exist to tell it.
         }
     }
 
