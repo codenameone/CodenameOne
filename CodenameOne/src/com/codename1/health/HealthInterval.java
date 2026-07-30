@@ -24,7 +24,8 @@ package com.codename1.health;
 
 import java.util.Calendar;
 import java.util.Date;
-import java.util.TimeZone;
+import java.time.Duration;
+import java.time.ZoneId;
 
 /// The bucket width of an [AggregateQuery] -- "per hour", "per calendar
 /// day", "per calendar month".
@@ -49,15 +50,15 @@ public final class HealthInterval {
     private final long fixedMillis;
     private final int calendarField;
     private final int calendarAmount;
-    private final TimeZone timeZone;
+    private final ZoneId zone;
     private final int firstDayOfWeek;
 
     private HealthInterval(long fixedMillis, int calendarField,
-            int calendarAmount, TimeZone timeZone, int firstDayOfWeek) {
+            int calendarAmount, ZoneId zone, int firstDayOfWeek) {
         this.fixedMillis = fixedMillis;
         this.calendarField = calendarField;
         this.calendarAmount = calendarAmount;
-        this.timeZone = timeZone;
+        this.zone = zone;
         this.firstDayOfWeek = firstDayOfWeek;
     }
 
@@ -86,44 +87,44 @@ public final class HealthInterval {
         return millis(hours * 3600000L);
     }
 
-    /// Calendar days in `tz`, aligned to local midnight. Correct across
+    /// Calendar days in `zone`, aligned to local midnight. Correct across
     /// daylight-saving transitions.
-    public static HealthInterval calendarDays(int days, TimeZone tz) {
+    public static HealthInterval calendarDays(int days, ZoneId zone) {
         requirePositive(days, "days");
-        requireZone(tz);
-        return new HealthInterval(0, Calendar.DAY_OF_MONTH, days, tz, 0);
+        requireZone(zone);
+        return new HealthInterval(0, Calendar.DAY_OF_MONTH, days, zone, 0);
     }
 
-    /// Calendar weeks in `tz`, aligned to `firstDayOfWeek` (a
+    /// Calendar weeks in `zone`, aligned to `firstDayOfWeek` (a
     /// `java.util.Calendar` day constant such as `Calendar.MONDAY`).
     /// The first day of the week is explicit because it differs by locale
     /// and silently guessing it shifts every bucket boundary.
-    public static HealthInterval calendarWeeks(int weeks, TimeZone tz,
+    public static HealthInterval calendarWeeks(int weeks, ZoneId zone,
             int firstDayOfWeek) {
         requirePositive(weeks, "weeks");
-        requireZone(tz);
+        requireZone(zone);
         if (firstDayOfWeek < Calendar.SUNDAY
                 || firstDayOfWeek > Calendar.SATURDAY) {
             throw new IllegalArgumentException(
                     "firstDayOfWeek must be a java.util.Calendar day"
                             + " constant, got " + firstDayOfWeek);
         }
-        return new HealthInterval(0, Calendar.WEEK_OF_YEAR, weeks, tz,
+        return new HealthInterval(0, Calendar.WEEK_OF_YEAR, weeks, zone,
                 firstDayOfWeek);
     }
 
-    /// Calendar months in `tz`, aligned to local midnight on the first of
+    /// Calendar months in `zone`, aligned to local midnight on the first of
     /// the month.
-    public static HealthInterval calendarMonths(int months, TimeZone tz) {
+    public static HealthInterval calendarMonths(int months, ZoneId zone) {
         requirePositive(months, "months");
-        requireZone(tz);
-        return new HealthInterval(0, Calendar.MONTH, months, tz, 0);
+        requireZone(zone);
+        return new HealthInterval(0, Calendar.MONTH, months, zone, 0);
     }
 
-    private static void requireZone(TimeZone tz) {
-        if (tz == null) {
+    private static void requireZone(ZoneId zone) {
+        if (zone == null) {
             throw new IllegalArgumentException(
-                    "a calendar-based interval requires an explicit TimeZone");
+                    "a calendar-based interval requires an explicit ZoneId");
         }
     }
 
@@ -155,8 +156,25 @@ public final class HealthInterval {
     /// not go on to modify. `TimeZone.getTimeZone("Europe/Berlin")` and
     /// `TimeZone.getDefault()` are both fine; a `SimpleTimeZone` you keep
     /// a reference to and reconfigure is not.
-    public TimeZone getTimeZone() {
-        return timeZone;
+    public ZoneId getZone() {
+        return zone;
+    }
+
+    /// This interval as a [Duration], or **null** when it is calendar-based.
+    ///
+    /// A calendar day is 23, 24 or 25 hours depending on the transition it
+    /// spans, so a calendar interval has no fixed length and saying otherwise
+    /// would be the drift this API takes an explicit zone to avoid.
+    public Duration getDuration() {
+        return isCalendarBased() ? null : Duration.ofMillis(fixedMillis);
+    }
+
+    /// An interval of `length`.
+    public static HealthInterval of(Duration length) {
+        if (length == null) {
+            throw new IllegalArgumentException("a length is required");
+        }
+        return millis(length.toMillis());
     }
 
     /// The start of the bucket that contains `millis`. For a fixed
@@ -169,7 +187,7 @@ public final class HealthInterval {
             long floored = delta - floorMod(delta, fixedMillis);
             return anchorMillis + floored;
         }
-        Calendar c = Calendar.getInstance(timeZone);
+        Calendar c = HealthTimeRange.calendarIn(zone);
         c.setTime(new Date(millis));
         if (calendarField == Calendar.MONTH) {
             c.set(Calendar.DAY_OF_MONTH, 1);
@@ -197,7 +215,7 @@ public final class HealthInterval {
         if (!isCalendarBased()) {
             return bucketStartMillis + fixedMillis;
         }
-        Calendar c = Calendar.getInstance(timeZone);
+        Calendar c = HealthTimeRange.calendarIn(zone);
         c.setTime(new Date(bucketStartMillis));
         if (calendarField == Calendar.WEEK_OF_YEAR) {
             c.add(Calendar.DAY_OF_MONTH, 7 * calendarAmount);
@@ -219,6 +237,6 @@ public final class HealthInterval {
         }
         String field = calendarField == Calendar.MONTH ? "month"
                 : calendarField == Calendar.WEEK_OF_YEAR ? "week" : "day";
-        return calendarAmount + " " + field + "(s) in " + timeZone.getID();
+        return calendarAmount + " " + field + "(s) in " + zone.getId();
     }
 }

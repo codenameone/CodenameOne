@@ -4,7 +4,7 @@ Codename One ships a cross-platform health API under `com.codename1.health` that
 
 `Health.getInstance()` is the single entry point and never returns `null`: ports without health support return a fallback whose operations fail fast with `HealthError.NOT_SUPPORTED`, so calling code needs no platform-specific `if`.
 
-Every callback -- `AsyncResource` results, sensor samples, workout events, change batches -- is delivered on the EDT, on every platform. That includes the local-backed ports: the simulator, desktop and JavaScript stores hand results back on the EDT rather than on whichever thread called, so a read started from a worker thread can update the UI from its callback directly, with no `callSerially` of your own. A background change delivery may arrive with no visible UI, after the OS relaunched your app, but it is still on the EDT.
+Every callback -- `AsyncResource` results, sensor samples, workout events, change batches -- is delivered on the EDT, on every platform. That includes the local-backed ports: the simulator, desktop and JavaScript stores hand results back on the EDT rather than on whichever thread called, so a read started from a worker thread can update the UI from its callback directly, with no `callSerially` of your own. A background change delivery may arrive with no visible UI, after the OS relaunched your app, but it's still on the EDT.
 
 [options="header"]
 |===

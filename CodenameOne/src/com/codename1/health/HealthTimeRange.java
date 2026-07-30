@@ -23,6 +23,9 @@
 package com.codename1.health;
 
 import java.util.Calendar;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.TimeZone;
 
 /// A half-open span of time, `[start, end)`, in epoch milliseconds UTC.
@@ -89,28 +92,28 @@ public final class HealthTimeRange {
 
     /// The last `days` times 24 hours, ending now. This is a rolling
     /// window, **not** a calendar span -- for "the last seven calendar
-    /// days" use [#calendarDays(int,TimeZone)].
+    /// days" use [#calendarDays(int,ZoneId)].
     public static HealthTimeRange lastDays(int days) {
         return lastMillis(days * 86400000L);
     }
 
-    /// Today, from local midnight to now, in `tz`.
-    public static HealthTimeRange today(TimeZone tz) {
-        Calendar c = Calendar.getInstance(tz);
+    /// Today, from local midnight to now, in `zone`.
+    public static HealthTimeRange today(ZoneId zone) {
+        Calendar c = calendarIn(zone);
         long now = millisOf(c);
         startOfDay(c);
         return new HealthTimeRange(millisOf(c), now, false);
     }
 
-    /// The last `count` calendar days in `tz`, from local midnight at the
+    /// The last `count` calendar days in `zone`, from local midnight at the
     /// start of the first day through now. Correct across daylight-saving
     /// transitions, where a day is 23 or 25 hours.
-    public static HealthTimeRange calendarDays(int count, TimeZone tz) {
+    public static HealthTimeRange calendarDays(int count, ZoneId zone) {
         if (count < 1) {
             throw new IllegalArgumentException(
                     "calendarDays requires a positive count, got " + count);
         }
-        Calendar c = Calendar.getInstance(tz);
+        Calendar c = calendarIn(zone);
         long now = millisOf(c);
         startOfDay(c);
         c.add(Calendar.DAY_OF_MONTH, -(count - 1));
@@ -121,6 +124,72 @@ public final class HealthTimeRange {
     /// wall clock at the moment the query executes.
     public static HealthTimeRange since(long startMillis) {
         return new HealthTimeRange(startMillis, Long.MAX_VALUE, true);
+    }
+
+    /// Everything from `start` onwards.
+    public static HealthTimeRange since(Instant start) {
+        return since(requireInstant(start, "start").toEpochMilli());
+    }
+
+    /// The window between two instants.
+    public static HealthTimeRange between(Instant start, Instant end) {
+        return between(requireInstant(start, "start").toEpochMilli(),
+                requireInstant(end, "end").toEpochMilli());
+    }
+
+    /// The instant `at`, with no duration.
+    public static HealthTimeRange at(Instant at) {
+        return at(requireInstant(at, "at").toEpochMilli());
+    }
+
+    /// The last `window`, ending now.
+    public static HealthTimeRange last(Duration window) {
+        if (window == null) {
+            throw new IllegalArgumentException("a window is required");
+        }
+        return lastMillis(window.toMillis());
+    }
+
+    /// The start of this range.
+    public Instant getStart() {
+        return Instant.ofEpochMilli(startMillis);
+    }
+
+    /// The end of this range, or **null** while it is still open-ended --
+    /// there is no instant to name until [#resolve(long)] picks one.
+    public Instant getEnd() {
+        return openEnded ? null : Instant.ofEpochMilli(endMillis);
+    }
+
+    /// How long this range covers, or **null** while it is open-ended.
+    public Duration getDuration() {
+        return openEnded ? null
+                : Duration.ofMillis(endMillis - startMillis);
+    }
+
+    private static Instant requireInstant(Instant value, String name) {
+        if (value == null) {
+            throw new IllegalArgumentException(name + " is required");
+        }
+        return value;
+    }
+
+    /// A calendar in `zone`.
+    ///
+    /// `ZoneId` is the type this API speaks, because it is immutable and
+    /// because [com.codename1.calendar] already speaks it; `TimeZone` is
+    /// mutable in principle -- `SimpleTimeZone` has setters -- which is why
+    /// holding one meant reasoning about defensive copies that the CLDC 1.1
+    /// subset cannot make cleanly. The bucket arithmetic below is still
+    /// `Calendar`, which is correct across daylight-saving transitions and
+    /// well covered, so the zone is handed over by id rather than the
+    /// arithmetic being rewritten.
+    static Calendar calendarIn(ZoneId zone) {
+        if (zone == null) {
+            throw new IllegalArgumentException(
+                    "a calendar-based range requires an explicit ZoneId");
+        }
+        return Calendar.getInstance(TimeZone.getTimeZone(zone.getId()));
     }
 
     /// Reads a calendar's instant.

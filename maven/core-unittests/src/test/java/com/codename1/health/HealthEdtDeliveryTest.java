@@ -103,7 +103,8 @@ class HealthEdtDeliveryTest extends UITestBase {
 
     @Test
     void aReadDeliversOnTheEdt() {
-        final LocalHealthStore store = new LocalHealthStore();
+        final FakeHealthStore store = new FakeHealthStore();
+        store.holdRead = true;
         final Landing<List<HealthSample>> landing =
                 new Landing<List<HealthSample>>();
         assertDeliveredOnEdt(landing, new Runnable() {
@@ -112,13 +113,16 @@ class HealthEdtDeliveryTest extends UITestBase {
                         .addType(HealthDataType.STEPS)
                         .setTimeRange(HealthTimeRange.between(0L, 1000L)))
                         .onResult(landing);
+                store.heldRead.complete(new SamplePage(
+                        new ArrayList<HealthSample>(), null, false));
             }
         });
     }
 
     @Test
     void aPagedReadDeliversOnTheEdt() {
-        final LocalHealthStore store = new LocalHealthStore();
+        final FakeHealthStore store = new FakeHealthStore();
+        store.holdRead = true;
         final Landing<SamplePage> landing = new Landing<SamplePage>();
         assertDeliveredOnEdt(landing, new Runnable() {
             public void run() {
@@ -126,13 +130,16 @@ class HealthEdtDeliveryTest extends UITestBase {
                         .addType(HealthDataType.STEPS)
                         .setTimeRange(HealthTimeRange.between(0L, 1000L)))
                         .onResult(landing);
+                store.heldRead.complete(new SamplePage(
+                        new ArrayList<HealthSample>(), null, false));
             }
         });
     }
 
     @Test
     void aWriteDeliversOnTheEdt() {
-        final LocalHealthStore store = new LocalHealthStore();
+        final FakeHealthStore store = new FakeHealthStore();
+        store.holdWrite = true;
         final Landing<HealthWriteResult> landing =
                 new Landing<HealthWriteResult>();
         final List<HealthSample> samples = new ArrayList<HealthSample>();
@@ -141,13 +148,27 @@ class HealthEdtDeliveryTest extends UITestBase {
         assertDeliveredOnEdt(landing, new Runnable() {
             public void run() {
                 store.write(samples).onResult(landing);
+                store.lateWrite.complete(new HealthWriteResult());
             }
         });
     }
 
+    /**
+     * A port that answers off the EDT still reaches the caller on it.
+     *
+     * <p>Held open deliberately. The other tests here start an operation and
+     * attach the listener afterwards, which is fine while the store is slower
+     * than the attach -- but it is a race, and it is the race that made this
+     * very test fail on CI and pass locally: when the EDT delivered first, the
+     * resource was already settled and {@code onResult} then fired inline on
+     * the attaching thread, recording "not the EDT" for a delivery that had in
+     * fact happened there. Holding the port's completion until the listener is
+     * attached removes the ordering question entirely.</p>
+     */
     @Test
     void anAggregateDeliversOnTheEdt() {
-        final LocalHealthStore store = new LocalHealthStore();
+        final FakeHealthStore store = new FakeHealthStore();
+        store.holdAggregate = true;
         final Landing<List<AggregateResult>> landing =
                 new Landing<List<AggregateResult>>();
         assertDeliveredOnEdt(landing, new Runnable() {
@@ -157,13 +178,17 @@ class HealthEdtDeliveryTest extends UITestBase {
                         .addMetric(AggregateMetric.TOTAL)
                         .setTimeRange(HealthTimeRange.between(0L, 1000L)))
                         .onResult(landing);
+                // Attached; now let the port answer, from this worker thread.
+                store.heldAggregate.complete(
+                        new ArrayList<AggregateResult>());
             }
         });
     }
 
     @Test
     void aDeleteDeliversOnTheEdt() {
-        final LocalHealthStore store = new LocalHealthStore();
+        final FakeHealthStore store = new FakeHealthStore();
+        store.holdDelete = true;
         final Landing<Integer> landing = new Landing<Integer>();
         assertDeliveredOnEdt(landing, new Runnable() {
             public void run() {
@@ -171,6 +196,7 @@ class HealthEdtDeliveryTest extends UITestBase {
                         HealthDataType.STEPS,
                         HealthTimeRange.between(0L, 1000L)))
                         .onResult(landing);
+                store.heldDelete.complete(Integer.valueOf(0));
             }
         });
     }

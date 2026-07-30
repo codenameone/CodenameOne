@@ -26,6 +26,7 @@ import com.codename1.junit.UITestBase;
 import com.codename1.util.AsyncResource;
 import org.junit.jupiter.api.Test;
 
+import java.time.ZoneId;
 import java.util.TimeZone;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -109,9 +110,9 @@ class HealthFallbackTest extends UITestBase {
                 .addType(HealthDataType.STEPS)
                 .addMetric(AggregateMetric.TOTAL)
                 .setTimeRange(HealthTimeRange.calendarDays(7,
-                        TimeZone.getTimeZone("UTC")))
+                        ZoneId.of("UTC")))
                 .setBucket(HealthInterval.calendarDays(1,
-                        TimeZone.getTimeZone("UTC")));
+                        ZoneId.of("UTC")));
         assertFailedWith(HealthError.NOT_SUPPORTED, store.aggregate(q));
     }
 

@@ -150,11 +150,35 @@ public class FakeHealthStore extends HealthStore {
         return maxWriteBatch;
     }
 
+    /** When set, doDelete keeps the resource instead of answering. */
+    public boolean holdDelete;
+    /** The resource a held delete is waiting on. */
+    public AsyncResource<Integer> heldDelete;
+
+    @Override
+    protected synchronized void doDelete(HealthDeleteRequest request,
+            AsyncResource<Integer> out) {
+        if (holdDelete) {
+            heldDelete = out;
+            return;
+        }
+        out.complete(Integer.valueOf(0));
+    }
+
+    /** When set, doAggregate keeps the resource instead of answering. */
+    public boolean holdAggregate;
+    /** The resource a held aggregate is waiting on. */
+    public AsyncResource<List<AggregateResult>> heldAggregate;
+
     @Override
     protected synchronized void doAggregate(AggregateQuery query,
             long[] boundaries, AsyncResource<List<AggregateResult>> out) {
         aggregatesSeen.add(query);
         aggregateBoundsSeen.add(boundaries);
+        if (holdAggregate) {
+            heldAggregate = out;
+            return;
+        }
         out.complete(new ArrayList<AggregateResult>());
     }
 

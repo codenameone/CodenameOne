@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import java.time.ZoneId;
 import java.util.TimeZone;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -43,8 +44,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class LocalHealthStoreTest extends UITestBase {
 
     private static final TimeZone UTC = TimeZone.getTimeZone("UTC");
+    private static final ZoneId UTC_ZONE = ZoneId.of("UTC");
     private static final TimeZone LA =
             TimeZone.getTimeZone("America/Los_Angeles");
+    private static final ZoneId LA_ZONE =
+            ZoneId.of("America/Los_Angeles");
 
     private LocalHealthStore store;
 
@@ -172,7 +176,7 @@ class LocalHealthStoreTest extends UITestBase {
                 .addMetric(AggregateMetric.TOTAL)
                 .setTimeRange(HealthTimeRange.between(utc(2026, 1, 1, 0),
                         utc(2026, 1, 3, 0)))
-                .setBucket(HealthInterval.calendarDays(1, UTC))).get();
+                .setBucket(HealthInterval.calendarDays(1, UTC_ZONE))).get();
 
         assertEquals(2, buckets.size());
         assertEquals(1500, buckets.get(0)
@@ -198,7 +202,7 @@ class LocalHealthStoreTest extends UITestBase {
                 .addMetric(AggregateMetric.TOTAL)
                 .setTimeRange(HealthTimeRange.between(utc(2026, 1, 1, 0),
                         utc(2026, 1, 3, 0)))
-                .setBucket(HealthInterval.calendarDays(1, UTC))).get();
+                .setBucket(HealthInterval.calendarDays(1, UTC_ZONE))).get();
 
         assertEquals(2, buckets.size());
         assertNotNull(buckets.get(0)
@@ -228,7 +232,7 @@ class LocalHealthStoreTest extends UITestBase {
         assertEquals(23 * 3600000L, nextDayStart - dayStart,
                 "2026-03-08 in Los Angeles is a 23-hour day");
 
-        HealthInterval day = HealthInterval.calendarDays(1, LA);
+        HealthInterval day = HealthInterval.calendarDays(1, LA_ZONE);
         assertEquals(nextDayStart, day.nextBoundary(dayStart),
                 "the bucket boundary must follow the calendar, not a fixed"
                         + " 24 hours");

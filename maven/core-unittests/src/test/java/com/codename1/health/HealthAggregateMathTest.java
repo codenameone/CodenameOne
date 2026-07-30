@@ -345,7 +345,7 @@ class HealthAggregateMathTest {
                 .addMetric(AggregateMetric.COUNT)
                 .setTimeRange(HealthTimeRange.between(NOON, NOON + HOUR))
                 .setBucket(HealthInterval.calendarDays(1,
-                        java.util.TimeZone.getTimeZone("UTC")))).get();
+                        java.time.ZoneId.of("UTC")))).get();
 
         assertEquals(60.0, value(b.get(0), HealthDataType.HEART_RATE,
                 AggregateMetric.MAXIMUM), 1e-9,

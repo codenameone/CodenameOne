@@ -42,7 +42,7 @@ import com.codename1.health.sensors.HeartRateMeasurement;
 import com.codename1.testing.AbstractTest;
 
 import java.util.List;
-import java.util.TimeZone;
+import java.time.ZoneId;
 
 /**
  * On-device conformance for the health API, run on every port.
@@ -172,7 +172,7 @@ public class HealthConformanceTest extends AbstractTest {
      * implementations the translators provide.
      */
     private boolean aggregateBucketsTileTheRange() {
-        TimeZone utc = TimeZone.getTimeZone("UTC");
+        ZoneId utc = ZoneId.of("UTC");
         HealthInterval day = HealthInterval.calendarDays(1, utc);
         long start = 1767225600000L; // 2026-01-01T00:00:00Z
         long next = day.nextBoundary(start);

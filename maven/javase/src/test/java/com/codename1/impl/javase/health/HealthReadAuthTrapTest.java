@@ -73,7 +73,27 @@ class HealthReadAuthTrapTest {
                         1_768_000_000_000L));
     }
 
+    /// Waits for `r` to settle, and returns it.
+    ///
+    /// Results are delivered on the EDT on every backend, so a test running
+    /// off it sees the outcome queued rather than already attached. The
+    /// assertions here are unchanged; they just have to be made after the
+    /// delivery instead of before it.
+    private static <T> AsyncResource<T> settled(AsyncResource<T> r) {
+        long deadline = System.currentTimeMillis() + 10_000L;
+        while (!r.isDone() && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(5L);
+            } catch (InterruptedException ex) {
+                break;
+            }
+        }
+        assertTrue(r.isDone(), "the operation must settle rather than hang");
+        return r;
+    }
+
     private static Throwable errorOf(AsyncResource<?> r) {
+        settled(r);
         final Throwable[] err = new Throwable[1];
         r.except(new SuccessCallback<Throwable>() {
             public void onSucess(Throwable t) {
@@ -335,18 +355,18 @@ class HealthReadAuthTrapTest {
     @Test
     void everyRejectionResolvesOnTheCallingThread() {
         store.setAvailable(false);
-        assertTrue(store.readSamples(heartRateQuery()).isDone(),
+        assertTrue(settled(store.readSamples(heartRateQuery())).isDone(),
                 "an unsupported store must answer before returning");
 
         store.setAvailable(true);
         store.setReadPermission(HealthDataType.HEART_RATE,
                 SimulatedHealthStore.ReadAuthScript.GRANTED);
-        assertTrue(store.readSamples(new SampleQuery()).isDone(),
+        assertTrue(settled(store.readSamples(new SampleQuery())).isDone(),
                 "a rejected query must answer before returning");
 
         store.failNext("query", HealthError.DATABASE_INACCESSIBLE,
                 "device locked");
-        assertTrue(store.readSamples(heartRateQuery()).isDone(),
+        assertTrue(settled(store.readSamples(heartRateQuery())).isDone(),
                 "a backend failure must answer before returning");
     }
 
