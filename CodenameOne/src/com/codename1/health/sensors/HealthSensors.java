@@ -38,7 +38,7 @@ import com.codename1.util.AsyncResource;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import com.codename1.impl.health.OneShot;
+import com.codename1.impl.health.EdtResult;
 
 /// Discovers and streams from standard Bluetooth SIG health sensors --
 /// heart-rate straps, power meters, speed and cadence sensors, foot pods,
@@ -231,7 +231,7 @@ public class HealthSensors {
             HealthSensorProfile profile, SensorSessionOptions options) {
         if (sensor == null) {
             AsyncResource<SensorSession> out =
-                    new OneShot<SensorSession>();
+                    new EdtResult<SensorSession>();
             out.error(new HealthException(HealthError.INVALID_ARGUMENT,
                     "connect needs a sensor"));
             return out;
@@ -250,7 +250,7 @@ public class HealthSensors {
             final HealthSensorProfile profile,
             final SensorSessionOptions options) {
         final AsyncResource<SensorSession> out =
-                new OneShot<SensorSession>();
+                new EdtResult<SensorSession>();
         if (sensorId == null || profile == null) {
             out.error(new HealthException(HealthError.INVALID_ARGUMENT,
                     "connect needs a sensor id and a profile"));

@@ -39,7 +39,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import com.codename1.impl.health.OneShot;
+import com.codename1.impl.health.EdtResult;
 
 /// A workout being recorded.
 ///
@@ -146,7 +146,7 @@ public abstract class WorkoutSession {
     /// Warms up sensors ahead of [#start()], for apps that show a
     /// countdown. Optional; `start()` works without it.
     public final AsyncResource<Boolean> prepare() {
-        AsyncResource<Boolean> out = new OneShot<Boolean>();
+        AsyncResource<Boolean> out = new EdtResult<Boolean>();
         synchronized (stateLock) {
             if (!requireState(out, WorkoutSessionState.NOT_STARTED,
                     "prepare")) {
@@ -160,7 +160,7 @@ public abstract class WorkoutSession {
 
     /// Starts recording.
     public final AsyncResource<Boolean> start() {
-        AsyncResource<Boolean> out = new OneShot<Boolean>();
+        AsyncResource<Boolean> out = new EdtResult<Boolean>();
         synchronized (stateLock) {
             if (state != WorkoutSessionState.NOT_STARTED
                     && state != WorkoutSessionState.PREPARING) {
@@ -178,7 +178,7 @@ public abstract class WorkoutSession {
 
     /// Pauses recording. The elapsed clock stops.
     public final AsyncResource<Boolean> pause() {
-        AsyncResource<Boolean> out = new OneShot<Boolean>();
+        AsyncResource<Boolean> out = new EdtResult<Boolean>();
         synchronized (stateLock) {
             if (!requireState(out, WorkoutSessionState.RUNNING, "pause")) {
                 return out;
@@ -194,7 +194,7 @@ public abstract class WorkoutSession {
 
     /// Resumes after a pause.
     public final AsyncResource<Boolean> resume() {
-        AsyncResource<Boolean> out = new OneShot<Boolean>();
+        AsyncResource<Boolean> out = new EdtResult<Boolean>();
         long resumedAt;
         synchronized (stateLock) {
             if (!requireState(out, WorkoutSessionState.PAUSED, "resume")) {
@@ -213,7 +213,7 @@ public abstract class WorkoutSession {
     /// Ends the workout and writes it to the health store, resolving with
     /// the persisted record.
     public final AsyncResource<WorkoutSample> end() {
-        AsyncResource<WorkoutSample> out = new OneShot<WorkoutSample>();
+        AsyncResource<WorkoutSample> out = new EdtResult<WorkoutSample>();
         // The whole claim under one lock, so a sample being accepted on a
         // sensor thread is either already in what doEnd is about to
         // snapshot or is refused. Checked separately, a reading could pass
@@ -303,7 +303,7 @@ public abstract class WorkoutSession {
     /// Feeds samples into the workout. On a recorded session this is the
     /// only way anything is collected.
     public final AsyncResource<Boolean> addSamples(List<HealthSample> samples) {
-        AsyncResource<Boolean> out = new OneShot<Boolean>();
+        AsyncResource<Boolean> out = new EdtResult<Boolean>();
         // Held across the acceptance, not just the check. end() claims its
         // transition under this same lock before doEnd takes any snapshot,
         // so a reading arriving from a sensor thread either lands in the
@@ -405,7 +405,7 @@ public abstract class WorkoutSession {
 
     /// Records an event -- a lap, a marker, a segment boundary.
     public final AsyncResource<Boolean> addEvent(WorkoutEvent event) {
-        AsyncResource<Boolean> out = new OneShot<Boolean>();
+        AsyncResource<Boolean> out = new EdtResult<Boolean>();
         if (event == null) {
             out.complete(Boolean.FALSE);
             return out;

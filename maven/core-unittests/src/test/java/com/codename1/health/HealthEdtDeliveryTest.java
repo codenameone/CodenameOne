@@ -29,6 +29,9 @@ import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -208,6 +211,105 @@ class HealthEdtDeliveryTest extends UITestBase {
      * that settles inline; the port facades do the same thing through the
      * same resource type.</p>
      */
+    /**
+     * Every public health resource is an EDT-delivering one.
+     *
+     * <p>Written as a source scan rather than as one test per operation
+     * because the defect kept coming back in a new place: the store's nine
+     * resources moved to {@link com.codename1.impl.health.EdtResult} first,
+     * then the facade's two openers were found still inline, then the
+     * workout and sensor operations. Each round fixed the sites that had been
+     * pointed at. This asserts the property over the whole surface, so the
+     * next public resource that settles inline fails here rather than in
+     * review.</p>
+     *
+     * <p>The internal resources stay plain on purpose and are listed by the
+     * method that owns them: the base class does its own threading around
+     * those, and hopping them would put the paging loop and the write
+     * chunking back on the event loop.</p>
+     */
+    @Test
+    void everyPublicHealthResourceDeliversOnTheEdt() throws Exception {
+        // Owner method -> how many plain OneShots it is allowed to create.
+        Map<String, Integer> allowedInternal = new HashMap<String, Integer>();
+        allowedInternal.put("startAuthorization", 1);
+        allowedInternal.put("readPageInto", 1);
+        allowedInternal.put("readPage", 1);
+        allowedInternal.put("writeChunk", 1);
+        allowedInternal.put("drainChanges", 1);
+
+        List<String> offenders = new ArrayList<String>();
+        for (File f : healthSources(new File("../../CodenameOne/src/com/"
+                + "codename1/health"))) {
+            String src = read(f);
+            String[] lines = src.split("\n");
+            for (int i = 0; i < lines.length; i++) {
+                if (lines[i].indexOf("new OneShot<") < 0) {
+                    continue;
+                }
+                String owner = enclosingMethod(lines, i);
+                if (!allowedInternal.containsKey(owner)) {
+                    offenders.add(f.getName() + ":" + (i + 1)
+                            + " in " + owner);
+                }
+            }
+        }
+        assertTrue(offenders.isEmpty(),
+                "these create a plain OneShot outside the methods allowed to"
+                        + " own an internal one; a caller-facing result must"
+                        + " be an EdtResult: " + offenders);
+    }
+
+    private static List<File> healthSources(File dir) {
+        List<File> out = new ArrayList<File>();
+        File[] kids = dir.listFiles();
+        if (kids == null) {
+            return out;
+        }
+        for (File k : kids) {
+            if (k.isDirectory()) {
+                out.addAll(healthSources(k));
+            } else if (k.getName().endsWith(".java")) {
+                out.add(k);
+            }
+        }
+        return out;
+    }
+
+    private static String read(File f) throws Exception {
+        java.io.InputStream in = new java.io.FileInputStream(f);
+        try {
+            java.io.ByteArrayOutputStream bo =
+                    new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int r;
+            while ((r = in.read(buf)) > 0) {
+                bo.write(buf, 0, r);
+            }
+            return new String(bo.toByteArray(), "UTF-8");
+        } finally {
+            in.close();
+        }
+    }
+
+    /** The nearest declaration above `at`, by name. */
+    private static String enclosingMethod(String[] lines, int at) {
+        for (int i = at; i >= 0; i--) {
+            String l = lines[i];
+            if (l.startsWith("    public ") || l.startsWith("    private ")
+                    || l.startsWith("    protected ")
+                    || l.startsWith("    final ")) {
+                int paren = l.indexOf('(');
+                if (paren > 0) {
+                    String head = l.substring(0, paren);
+                    int sp = head.lastIndexOf(' ');
+                    return sp > 0 ? head.substring(sp + 1) : head.trim();
+                }
+            }
+        }
+        return "<unknown>";
+    }
+
     @Test
     void aFacadeActionDeliversOnTheEdt() {
         final Landing<Boolean> landing = new Landing<Boolean>();

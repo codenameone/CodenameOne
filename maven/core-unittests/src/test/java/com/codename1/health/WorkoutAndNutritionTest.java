@@ -99,6 +99,10 @@ class WorkoutAndNutritionTest extends UITestBase {
     }
 
     private static Throwable errorOf(AsyncResource<?> r) {
+        // Settled first: workout operations deliver on the EDT like every
+        // other result, so an off-EDT caller sees the error queued rather
+        // than already attached.
+        HealthAwait.settled(r);
         final Throwable[] err = new Throwable[1];
         r.except(new SuccessCallback<Throwable>() {
             public void onSucess(Throwable t) {

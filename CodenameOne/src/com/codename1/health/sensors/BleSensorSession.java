@@ -36,7 +36,7 @@ import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
 
 import java.util.List;
-import com.codename1.impl.health.OneShot;
+import com.codename1.impl.health.EdtResult;
 
 /// The GATT transport behind [SensorSession]: connects, discovers the
 /// profile's service, subscribes to its measurement characteristic and
@@ -684,7 +684,7 @@ final class BleSensorSession extends SensorSession {
     @Override
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public AsyncResource<Boolean> resetEnergyExpended() {
-        AsyncResource<Boolean> out = new OneShot<Boolean>();
+        AsyncResource<Boolean> out = new EdtResult<Boolean>();
         if (getProfile() != HealthSensorProfile.HEART_RATE) {
             out.error(new HealthException(HealthError.NOT_SUPPORTED,
                     "energy expended applies to the heart rate profile"));

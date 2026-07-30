@@ -25,7 +25,7 @@ package com.codename1.health.workout;
 import com.codename1.health.HealthError;
 import com.codename1.health.HealthException;
 import com.codename1.util.AsyncResource;
-import com.codename1.impl.health.OneShot;
+import com.codename1.impl.health.EdtResult;
 
 /// Starts and tracks workout recordings.
 ///
@@ -113,7 +113,7 @@ public class WorkoutManager {
     public final AsyncResource<WorkoutSession> startSession(
             WorkoutConfiguration configuration) {
         AsyncResource<WorkoutSession> out =
-                new OneShot<WorkoutSession>();
+                new EdtResult<WorkoutSession>();
         WorkoutSession session;
         // The check, the creation and the assignment as one step. Read
         // and then written, two callers both found nothing running and
