@@ -8124,6 +8124,22 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkLocationUsage___R_boolean(CN1
     return JAVA_FALSE;
 #endif
 }
+//native boolean checkHealthShareUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkHealthShareUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_HEALTHSHARE_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+//native boolean checkHealthUpdateUsage();
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkHealthUpdateUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef INCLUDE_HEALTHUPDATE_USAGE
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
 //native boolean checkMicrophoneUsage();
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkMicrophoneUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 #if defined(INCLUDE_MICROPHONE_USAGE) && !TARGET_OS_TV

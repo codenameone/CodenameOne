@@ -386,6 +386,63 @@ public final class PlatformFeatureCatalog {
                          "Communicates with nearby Bluetooth accessories.")
                 .description("Cross-platform Bluetooth (BLE central/peripheral, L2CAP, classic RFCOMM)"));
 
+        // First-class health data (com.codename1.health.*): HealthKit on
+        // iOS, Health Connect on Android.
+        //
+        // NOTE the two deliberate omissions, both of which a future
+        // maintainer will be tempted to "fix" because every neighbouring
+        // entry has them:
+        //
+        //  - NO iosPlist defaults. Unlike camera or bluetooth we do NOT
+        //    inject placeholder NSHealth*UsageDescription strings. Apple
+        //    reviews health privacy copy against what the app actually
+        //    does, so a generic placeholder is precisely what gets an app
+        //    rejected -- it would not even achieve the "keeps the build
+        //    working" goal it was added for. IPhoneBuilder fails the build
+        //    with an actionable message instead.
+        //  - NO androidPermissions. Health Connect permissions are
+        //    per-data-type and the type an app uses is a field reference,
+        //    which the class scanner cannot see (Executor.visitFieldInsn is
+        //    an empty override). They come from the android.health.read /
+        //    android.health.write build hints via HealthManifestFragments.
+        //  - NO androidGradle either, and this one is subtle. Entries match
+        //    with startsWith, so this prefix ALSO matches
+        //    com/codename1/health/sensors/ -- there is no way to say
+        //    "except that subpackage". The sensor layer is pure
+        //    com.codename1.bluetooth.le and needs no androidx.health at
+        //    all, so putting the dependency here would add Health Connect
+        //    (and, on the Play side, a health-permissions review) to an app
+        //    that only reads a heart-rate strap. AndroidGradleBuilder adds
+        //    it instead, gated on the scanner having seen health classes
+        //    OUTSIDE the sensors subpackage.
+        //
+        // The HealthKit framework linkage and the CN1_INCLUDE_HEALTH define
+        // flip likewise happen in IPhoneBuilder, gated the same way;
+        // iosFrameworks here is documentation-only, matching the bluetooth
+        // entry above.
+        e.add(new Entry("com/codename1/health/")
+                .iosFrameworks("HealthKit")
+                .description("Cross-platform health data (samples, aggregates, background observers, workouts)"));
+
+        // The health sensor layer talks to standard GATT devices over
+        // com.codename1.bluetooth.le, so it needs the Bluetooth privacy
+        // string whether or not the app also uses a health store. This
+        // entry is additive on top of the one above and is safe for both
+        // cases, unlike anything HealthKit- or Health-Connect-specific.
+        e.add(new Entry("com/codename1/health/sensors/")
+                .iosFrameworks("CoreBluetooth")
+                .iosPlist("NSBluetoothAlwaysUsageDescription",
+                         "Communicates with nearby heart rate and fitness sensors.")
+                // The iOS 12 key as well, exactly as the Bluetooth entry
+                // above carries it. NSBluetoothAlwaysUsageDescription
+                // arrived in iOS 13, and iOS 12 checks the older key
+                // before letting CoreBluetooth start -- so a sensor-only
+                // app naming this facade rather than com.codename1.bluetooth
+                // was terminated on the supported floor.
+                .iosPlist("NSBluetoothPeripheralUsageDescription",
+                         "Communicates with nearby heart rate and fitness sensors.")
+                .description("Bluetooth health sensors (heart rate, power, cadence, scales, cuffs, glucose)"));
+
         // On-device Stable Diffusion: bundled Core ML model on iOS,
         // ONNX runtime on Android. Flag the >2 GB upload concern so
         // the cloud build server can abort early with a helpful

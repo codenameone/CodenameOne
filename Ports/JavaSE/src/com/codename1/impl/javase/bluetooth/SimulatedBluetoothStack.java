@@ -27,6 +27,9 @@ import com.codename1.bluetooth.BluetoothUuid;
 import com.codename1.bluetooth.gatt.GattStatus;
 import com.codename1.bluetooth.le.server.GattLocalCharacteristic;
 import com.codename1.bluetooth.le.server.GattLocalService;
+import com.codename1.impl.javase.simulator.AutoScheduler;
+import com.codename1.impl.javase.simulator.ManualScheduler;
+import com.codename1.impl.javase.simulator.SimScheduler;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;

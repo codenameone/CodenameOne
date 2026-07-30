@@ -149,6 +149,8 @@ include::Near-Field-Communication.asciidoc[]
 
 include::Bluetooth.asciidoc[]
 
+include::Health.asciidoc[]
+
 include::Printing.asciidoc[]
 
 include::Network-Connectivity.asciidoc[]
