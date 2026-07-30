@@ -94,6 +94,14 @@ class JavaSEShieldEngineTest {
                 "a registered host must be enforced or the mismatch switch does nothing");
         assertFalse(pins.isEnforcedFor("unregistered.example.com"),
                 "a host the app never registered must be left alone");
+        // Wildcards too. Registering by pattern is the common way to do it, and
+        // PinSet.isEnforcedFor() resolves a concrete host against a "*." entry -- so
+        // dropping them left those apps with nothing enforced and the force switch
+        // doing nothing.
+        assertTrue(pins.isEnforcedFor("api.wild.example.com"),
+                "a host covered by a registered wildcard must be enforced too");
+        assertFalse(pins.isEnforcedFor("wild.example.com"),
+                "but the apex is not covered by its own wildcard");
     }
 
     @Test

@@ -190,10 +190,14 @@ public final class JavaSEShieldEngine implements ShieldEngine {
             java.util.Enumeration hosts = config.protectedHosts();
             while (hosts.hasMoreElements()) {
                 String host = (String) hosts.nextElement();
-                if (host == null || host.startsWith("*.")) {
-                    // A wildcard is a policy pattern, not a host a chain is served for.
+                if (host == null) {
                     continue;
                 }
+                // Wildcards included. PinSet.isEnforcedFor() resolves "api.example.com"
+                // against a "*.example.com" entry, so skipping them left every app that
+                // registers its hosts by pattern -- which is the common way to do it --
+                // with nothing enforced and the force switch doing nothing, which is the
+                // whole failure this engine exists to remove.
                 Vector pins = new Vector();
                 pins.addElement(SIMULATED_PIN);
                 hostToPins.put(host, pins);

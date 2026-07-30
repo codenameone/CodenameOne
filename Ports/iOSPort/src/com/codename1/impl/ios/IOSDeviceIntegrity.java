@@ -240,10 +240,19 @@ final class IOSDeviceIntegrity {
         boolean stateGone = store.remove(KEY_STATE);
         store.remove(KEY_RETRY_AFTER);
         store.remove(KEY_PENDING_SINCE);
-        store.remove(KEY_ATTEST_STARTED);
-        store.remove(KEY_RECOVERY_SPENT);
-        recoverySpentInMemory = false;
-        attestAnsweredForKey = null;
+        // The markers that make a surviving key terminal are cleared only once the key
+        // itself is confirmed gone. Clearing them first meant a keychain that deleted
+        // KEY_STATE and refused KEY_ID left a known-invalid key behind with no state and
+        // no start marker -- which the next request reads as a freshly generated key
+        // whose attestation never began, and submits to Apple. Every request after it
+        // does the same, against a rate limit, with the one-shot recovery marker also
+        // gone so nothing stops the loop.
+        if (idGone && stateGone) {
+            store.remove(KEY_ATTEST_STARTED);
+            store.remove(KEY_RECOVERY_SPENT);
+            recoverySpentInMemory = false;
+            attestAnsweredForKey = null;
+        }
         if (!idGone || !stateGone) {
             // The two deletions are not atomic, so a partial failure leaves half the
             // identity gone. Treating that as "untouched" would let a callback from the
