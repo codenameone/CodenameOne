@@ -1,36 +1,36 @@
 {
-  "commit": "ad2c1952cc6ce1a3f96a6373801f4012f917b3e6",
-  "generated_at": "2026-07-29T22:38:56Z",
+  "commit": "f89cee8d0d9aa0c7200064b8d9100e9ccd09db7d",
+  "generated_at": "2026-07-30T03:06:38Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 416543000
+        "duration_ns": 329128000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 179941000
+        "duration_ns": 148401000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 212284000
+        "duration_ns": 169616000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 131602000
+        "duration_ns": 107204000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 505680000
+        "duration_ns": 416112000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 440498000
+        "duration_ns": 331783000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 874062000
+        "duration_ns": 687648000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,7 +44,7 @@
     "suite_checksum": 0
   },
   "port": "tvos",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30476901663",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30506325968",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
