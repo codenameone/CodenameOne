@@ -111,14 +111,17 @@ XCODE_BUILD_CMD=(
   xcodebuild
   "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH"
   -scheme "$SCHEME"
-  -sdk iphoneos
+  # No -sdk: -destination already picks iOS, and -sdk would override SDKROOT for
+  # every target including an embedded watch app, building it against the iOS SDK.
   -configuration Release
   -destination 'generic/platform=iOS'
   -destination-timeout 120
   -derivedDataPath "$DERIVED_DATA_DIR"
-  "ARCHS=arm64"
+  # Scoped per-SDK: the watch device ABI is arm64_32, so an unscoped ARCHS=arm64
+  # cannot build the watch target a companion project embeds.
+  "ARCHS[sdk=iphoneos*]=arm64"
   "ONLY_ACTIVE_ARCH=NO"
-  "EXCLUDED_ARCHS=armv7 armv7s"
+  "EXCLUDED_ARCHS[sdk=iphoneos*]=armv7 armv7s"
   "CODE_SIGN_IDENTITY="
   "CODE_SIGNING_REQUIRED=NO"
   "CODE_SIGNING_ALLOWED=NO"

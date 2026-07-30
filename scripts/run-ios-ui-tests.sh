@@ -642,11 +642,15 @@ BUILD_LOG="$ARTIFACTS_DIR/xcodebuild-build.log"
 
 ri_log "Building simulator app with xcodebuild"
 COMPILE_START=$(date +%s)
+# No -sdk here on purpose. -destination already determines the platform, and -sdk
+# overrides SDKROOT for *every* target in the scheme -- including the watch app a
+# companion project embeds, which would then be compiled against the iOS SDK
+# (TARGET_OS_WATCH becomes 0, the Metal backend activates, and the sources the
+# watch slice excludes go missing at link time).
 XCODE_BUILD_CMD=(
   "$XCODEBUILD"
   "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH"
   -scheme "$SCHEME"
-  -sdk iphonesimulator
   -configuration Debug
   -destination "$BUILD_DESTINATION"
   -destination-timeout 120
@@ -654,10 +658,12 @@ XCODE_BUILD_CMD=(
 )
 if [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ]; then
   ri_log "Forcing simulator ARCHS=$BUILD_ARCH for generic build destination"
+  # Scoped to the simulator SDK for the same reason: an unscoped ARCHS would also
+  # be forced on the watch target, whose device ABI is arm64_32.
   XCODE_BUILD_CMD+=(
-    "ARCHS=$BUILD_ARCH"
+    "ARCHS[sdk=iphonesimulator*]=$BUILD_ARCH"
     "ONLY_ACTIVE_ARCH=YES"
-    "EXCLUDED_ARCHS=armv7 armv7s"
+    "EXCLUDED_ARCHS[sdk=iphonesimulator*]=armv7 armv7s"
   )
 fi
 # Optimize the translated C (Xcode's Debug config defaults to -O0). With -O0 the
