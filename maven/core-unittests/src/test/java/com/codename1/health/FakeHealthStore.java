@@ -90,6 +90,11 @@ public class FakeHealthStore extends HealthStore {
         setOperationTimeout(millis);
     }
 
+    /** Shortens the authorization safety timeout for a test. */
+    public void setAuthorizationTimeoutForTest(int millis) {
+        setAuthorizationTimeout(millis);
+    }
+
     @Override
     protected synchronized void doRequestAuthorization(
             List<HealthAccess> access, AsyncResource<Boolean> out) {

@@ -275,38 +275,64 @@ public class HealthStore {
     /// Launches one flow and arms the hand-off to whatever is queued
     /// behind it.
     ///
-    /// The timeout starts here rather than when the request arrived: a
-    /// queued request has not shown anything to anyone yet, and charging
-    /// it for the time the sheet in front of it spent on screen would
-    /// fail it before it ever ran.
+    /// The port gets a resource of its own rather than the caller's. What
+    /// releases the screen has to be the native flow closing, and the
+    /// caller's resource settles on three different events: the port
+    /// answering, the caller cancelling, and the timeout firing. On the
+    /// last two the permission sheet is still up and Android still has
+    /// `waitingForResult` set, so releasing the queue there launched a
+    /// second activity beside the first -- recreating the overlap this
+    /// queue exists to prevent, with the added twist that the caller who
+    /// caused it had already stopped listening.
+    ///
+    /// The timeout is armed on the port's resource, and starts here rather
+    /// than when the request arrived: a queued request has not shown
+    /// anything to anyone yet, and charging it for the time the sheet in
+    /// front of it spent on screen would fail it before it ever ran. When
+    /// it does fire the queue moves on, which is a guess -- the sheet may
+    /// still be on screen -- but the alternative is a lost platform
+    /// callback disabling authorization for the rest of the process.
     private void startAuthorization(List<HealthAccess> access,
             AsyncResource<Boolean> out) {
+        AsyncResource<Boolean> flow = new OneShot<Boolean>();
         // Authorization waits on a human reading a permission sheet, so
         // it gets its own much longer budget -- the operation timeout
         // would fail the request while the UI was still legitimately up.
-        armTimeout(out, authorizationTimeout);
+        armTimeout(flow, authorizationTimeout);
         // Registered before the port is asked, because a port that answers
         // inline would otherwise settle the resource before anything was
         // watching and leave the queue stalled with the flag still set.
-        out.onResult(new NextAuthorization(this));
-        doRequestAuthorization(access, out);
+        flow.onResult(new AuthorizationFlowDone(this, out));
+        doRequestAuthorization(access, flow);
     }
 
-    /// Starts the next queued flow, however the one before it ended.
+    /// Settles the caller and then hands the screen on, once the native
+    /// flow has actually closed.
     ///
     /// Named rather than anonymous so it carries no synthetic reference to
     /// the enclosing store (SpotBugs `SIC_INNER_SHOULD_BE_STATIC_ANON`).
-    private static final class NextAuthorization
+    private static final class AuthorizationFlowDone
             implements AsyncResult<Boolean> {
 
         private final HealthStore store;
+        private final AsyncResource<Boolean> out;
 
-        NextAuthorization(HealthStore store) {
+        AuthorizationFlowDone(HealthStore store, AsyncResource<Boolean> out) {
             this.store = store;
+            this.out = out;
         }
 
         @Override
         public void onReady(Boolean value, Throwable err) {
+            // A caller that cancelled or timed out is already settled, and
+            // OneShot drops this -- the point of forwarding anyway is that
+            // the port does not know which of those happened and should not
+            // have to.
+            if (err != null) {
+                out.error(err);
+            } else {
+                out.complete(value);
+            }
             store.startNextAuthorization();
         }
     }
@@ -2899,6 +2925,17 @@ public class HealthStore {
     /// The current per-operation safety timeout.
     protected final int getOperationTimeout() {
         return operationTimeout;
+    }
+
+    /// Sets the authorization safety timeout in milliseconds.
+    ///
+    /// Separate from the operation timeout because this one is waiting on a
+    /// person rather than on a platform call, so it is far longer by
+    /// default. It also bounds how long a queued authorization can wait:
+    /// the screen is released when the active flow settles, and this is
+    /// what guarantees that happens.
+    protected final void setAuthorizationTimeout(int millis) {
+        this.authorizationTimeout = millis;
     }
 
     // ==================================================================
