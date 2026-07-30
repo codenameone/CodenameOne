@@ -4264,7 +4264,17 @@ public class IPhoneBuilder extends Executor {
                 // minSdkVersion raised to 26, cutting off the API 21-25
                 // devices the BLE-only flow is documented to support.
                 || "com/codename1/health/HealthException".equals(cls)
-                || "com/codename1/health/HealthError".equals(cls);
+                || "com/codename1/health/HealthError".equals(cls)
+                // Same exemption as the Android scanner, for the same
+                // reason. A BLE-only listener branching on
+                // getType().getKind(), or asking a unit for its dimension,
+                // makes a direct enum reference -- and here the cost is
+                // HealthKit linked and CN1_INCLUDE_HEALTH enabled for an app
+                // that never opens the store, which on iOS also means the
+                // HealthKit entitlement and the privacy usage strings the
+                // build demands with it.
+                || "com/codename1/health/HealthDataKind".equals(cls)
+                || "com/codename1/health/HealthUnitDimension".equals(cls);
     }
 
     public File getXcodeProjectDir() {

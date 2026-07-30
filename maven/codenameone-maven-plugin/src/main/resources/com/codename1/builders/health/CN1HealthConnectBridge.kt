@@ -837,49 +837,19 @@ class CN1HealthConnectBridge(private val context: Context)
             // Series records hold many samples in one record and the
             // portable layer flattens by default, so emit one line per
             // sample rather than per record.
-            // Read back as the inverse of the write. A heart-rate record
-            // holding a single sample came from an interval write -- an
-            // average over a minute, the shape this bridge advertises -- and
-            // its span lives on the record, because Health Connect gives a
-            // contained sample only an instant. Emitting that instant lost
-            // the interval: the sample round-tripped as a point, and the
-            // shared aggregate fallback then weighted a one-minute average
-            // as 1 millisecond instead of 60000, disagreeing with the local
-            // and iOS stores for the same data.
-            //
-            // A span of exactly one millisecond is the synthetic end the
-            // write gives an instantaneous sample, so it stays a point. A
-            // genuine one-millisecond interval is indistinguishable from it
-            // and is treated as instantaneous, which costs nothing any
-            // caller can measure.
-            is HeartRateRecord -> {
-                // Ours, and only ours. The span rule below is the inverse of
-                // *this* bridge's write, so it may only be applied to records
-                // this app wrote. A third-party record holding one
-                // instantaneous sample inside a longer window is an ordinary
-                // shape -- a watch app's own record layout -- and widening it
-                // would invent an interval: the shared aggregator would then
-                // duration-weight a point as though it were an average, and a
-                // range query could match it on time the sample never covered.
-                val mine = record.metadata.dataOrigin.packageName ==
-                    context.packageName
-                val single = mine && record.samples.size == 1
-                val span = record.endTime.toEpochMilli() -
-                    record.startTime.toEpochMilli()
-                ordered(record.samples, ascending).forEach {
-                    if (inWindow(window, it.time.toEpochMilli())) {
-                        if (single && span > 1L) {
-                            line(sb, record.metadata.id, token,
-                                record.startTime.toEpochMilli(),
-                                record.endTime.toEpochMilli(),
-                                it.beatsPerMinute.toDouble(), "count/min",
-                                originOf(record), record)
-                        } else {
-                            sample(sb, record, token, it.time.toEpochMilli(),
-                                it.beatsPerMinute.toDouble(), "count/min")
-                        }
-                        written++
-                    }
+            // Every contained sample is a point, because that is what
+            // Health Connect stores. The heuristic that used to widen a
+            // single-sample record back into an interval is gone with the
+            // write that needed it: it could not tell our records from
+            // another app's without a provenance check, and it dropped
+            // intervals whose contained sample fell outside a query window
+            // the record itself overlapped. Both were symptoms of reading
+            // back a shape the platform never had.
+            is HeartRateRecord -> ordered(record.samples, ascending).forEach {
+                if (inWindow(window, it.time.toEpochMilli())) {
+                    sample(sb, record, token, it.time.toEpochMilli(),
+                        it.beatsPerMinute.toDouble(), "count/min")
+                    written++
                 }
             }
 
@@ -1304,8 +1274,30 @@ class CN1HealthConnectBridge(private val context: Context)
             // without a span of its own every ordinary Android heart-rate
             // write threw before it reached the insert.
             "heart_rate" -> {
-                val hrEnd = if (end.isAfter(start)) end
-                    else start.plusMillis(1)
+                // Refused rather than encoded. Health Connect stores heart
+                // rate as a series of instants; there is no native shape for
+                // "an average over this minute", and the record's own
+                // start/end is a container for its samples, not a span the
+                // value applies across.
+                //
+                // Encoding one anyway -- a single sample at the start of a
+                // wider record -- was a private convention. Every other
+                // Health Connect client reads that as one instantaneous
+                // reading, and only this bridge's own read knew to widen it
+                // back, which then had to guess which records were ours and
+                // mis-handled overlapping windows. Two bugs downstream of a
+                // representation the platform does not have.
+                //
+                // So the caller is told, rather than the data being quietly
+                // reshaped into something that means a different thing.
+                if (end.isAfter(start)) {
+                    throw IllegalArgumentException(
+                        "Health Connect stores '" + token + "' at a single"
+                            + " instant; an interval average cannot be"
+                            + " represented and would be read back by other"
+                            + " apps as one instantaneous reading")
+                }
+                val hrEnd = start.plusMillis(1)
                 HeartRateRecord(startTime = start, endTime = hrEnd,
                     startZoneOffset = zone,
                     // From the end this record actually uses, not from
@@ -1315,19 +1307,14 @@ class CN1HealthConnectBridge(private val context: Context)
                     // record crossing the transition with the start
                     // side's offset at its end.
                     endZoneOffset = rules.getOffset(hrEnd),
-                    // The record's own start, not instantOf(start, end).
-                    // instantOf refuses unequal endpoints, which is correct
-                    // for the types with no interval form -- but heart rate
-                    // has one, and an average over a minute is a shape this
-                    // bridge advertises as writable. Passing the endpoints
-                    // there threw before anything was inserted, so every
-                    // interval heart-rate write failed while the type
-                    // reported itself writable. Health Connect only requires
-                    // the contained sample to fall inside the record, and the
-                    // start does -- for the interval shape and for the
-                    // instantaneous one the synthetic end-plus-one-
-                    // millisecond above covers.
-                    samples = listOf(HeartRateRecord.Sample(time = start,
+                    // Through the same endpoint check as every other
+                    // instantaneous type. The interval case is refused
+                    // above, so start and end are equal by the time this
+                    // runs and instantOf cannot throw -- heart rate is not
+                    // an exception to the rule any more, which is what
+                    // stopped it needing one in the guard test.
+                    samples = listOf(HeartRateRecord.Sample(
+                        time = instantOf(token, start, end),
                         beatsPerMinute = wholeCount(token, value))),
                     metadata = meta)
             }

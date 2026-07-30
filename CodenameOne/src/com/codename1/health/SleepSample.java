@@ -91,7 +91,10 @@ public final class SleepSample extends SessionSample {
                 // ignored one.
                 if (interval != null) {
                     requireInsideSession(interval, startMillis, endMillis);
-                    copy.add(interval);
+                    // The interval itself, not just the list. Its platform
+                    // code is mutable, so retaining the caller's instance
+                    // left a handle onto a stored record.
+                    copy.add(new SleepStageInterval(interval));
                 }
             }
         }
@@ -108,7 +111,7 @@ public final class SleepSample extends SessionSample {
     public void addStage(SleepStageInterval interval) {
         if (interval != null) {
             requireInsideSession(interval, getStartMillis(), getEndMillis());
-            stages.add(interval);
+            stages.add(new SleepStageInterval(interval));
         }
     }
 

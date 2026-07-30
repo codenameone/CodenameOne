@@ -29,6 +29,20 @@ public final class SleepStageInterval {
     private final long startMillis;
     private final long endMillis;
 
+    /// A copy of `other`, carrying its platform code.
+    ///
+    /// Exists because the platform code is mutable, which is what made the
+    /// shallow list copies visible: [SleepSample#create] and
+    /// `HealthWire.copyOf` copied the list and kept the elements, so a caller
+    /// holding an interval it had written -- or one handed back by a read --
+    /// could change a stored record by setting a code on it, with no write
+    /// and no persistence. The list being unmodifiable stopped the shape of
+    /// the session changing and not the contents of its parts.
+    public SleepStageInterval(SleepStageInterval other) {
+        this(other.getStage(), other.getStartMillis(), other.getEndMillis());
+        this.platformCode = other.getPlatformCode();
+    }
+
     /// The platform's own value for this span, or [#NO_PLATFORM_CODE].
     ///
     /// The fidelity escape hatch. A portable [SleepStage] is a

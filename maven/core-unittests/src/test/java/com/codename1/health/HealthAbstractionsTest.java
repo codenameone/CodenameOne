@@ -113,6 +113,90 @@ class HealthAbstractionsTest {
         assertNull(fixed.getZone(), "a fixed interval needs no zone");
     }
 
+    /**
+     * A fixed-offset zone buckets at that offset, not at GMT.
+     *
+     * <p>{@code ZoneId.of("+02:00")} has the id {@code +02:00}, and
+     * {@code TimeZone.getTimeZone("+02:00")} does not recognise that form --
+     * it falls back to GMT silently. Every calendar bucket then aligned two
+     * hours early and samples landed in the wrong local day, which is exactly
+     * the drift an explicit zone is required to prevent.</p>
+     */
+    @Test
+    void aFixedOffsetZoneAlignsBucketsAtThatOffset() {
+        HealthInterval plusTwo =
+                HealthInterval.calendarDays(1, ZoneId.of("+02:00"));
+        HealthInterval utc = HealthInterval.calendarDays(1, ZoneId.of("UTC"));
+
+        long noonUtc = 1767268800000L; // 2026-01-01T12:00:00Z
+        long startPlusTwo = plusTwo.bucketStart(noonUtc, noonUtc);
+        long startUtc = utc.bucketStart(noonUtc, noonUtc);
+
+        assertNotEquals(startUtc, startPlusTwo,
+                "a +02:00 day must not start where the UTC day starts");
+        assertEquals(2 * 3600_000L, startUtc - startPlusTwo,
+                "it starts two hours earlier in absolute time");
+    }
+
+    /** And the offset spelling survives the round trip through the zone id. */
+    @Test
+    void offsetZoneIdsAreTranslatedForTheCalendar() {
+        assertEquals("GMT+02:00", HealthTimeRange.zoneIdToTz("+02:00"));
+        assertEquals("GMT-05:30", HealthTimeRange.zoneIdToTz("-05:30"));
+        assertEquals("GMT", HealthTimeRange.zoneIdToTz("Z"));
+        assertEquals("Europe/Berlin",
+                HealthTimeRange.zoneIdToTz("Europe/Berlin"));
+    }
+
+    /**
+     * A duration too large for the millis field it feeds is refused.
+     *
+     * <p>Past {@code Integer.MAX_VALUE} milliseconds -- about 24.9 days --
+     * the narrowing wrapped negative, and negative does not mean "very long"
+     * to any of these: the scan timeout reads it as disabled and leaves an
+     * expensive BLE scan running, and the batch and staleness windows read it
+     * as zero.</p>
+     */
+    @Test
+    void anOutOfRangeDurationIsRefusedRatherThanWrapped() {
+        try {
+            new com.codename1.health.sensors.SensorScanSettings()
+                    .setTimeout(Duration.ofDays(30));
+            fail("a timeout beyond the int range must be refused");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("milliseconds"));
+        }
+        // And a workable one still goes through.
+        assertEquals(30_000,
+                new com.codename1.health.sensors.SensorScanSettings()
+                        .setTimeout(Duration.ofSeconds(30))
+                        .getTimeoutMillis());
+    }
+
+    /**
+     * A stage interval retained by the caller cannot rewrite a stored record.
+     *
+     * <p>The platform code is mutable, which exposed the shallow element
+     * copies: the list was copied and the intervals were not, so setting a
+     * code on an interval you had written changed the session that was
+     * stored -- with no write and no persistence update.</p>
+     */
+    @Test
+    void aRetainedStageIntervalCannotMutateTheStoredSession() {
+        SleepStageInterval mine =
+                new SleepStageInterval(SleepStage.DEEP, 0L, 1000L);
+        java.util.List<SleepStageInterval> supplied =
+                new java.util.ArrayList<SleepStageInterval>();
+        supplied.add(mine);
+
+        SleepSample sleep = SleepSample.create(0L, 1000L, supplied);
+        mine.setPlatformCode(42);
+
+        assertEquals(SleepStageInterval.NO_PLATFORM_CODE,
+                sleep.getStages().get(0).getPlatformCode(),
+                "the session must not see a change made after the write");
+    }
+
     @Test
     void durationsAreAcceptedWhereMillisWere() {
         SampleQuery q = new SampleQuery()

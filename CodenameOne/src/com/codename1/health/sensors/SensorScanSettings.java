@@ -66,6 +66,18 @@ public final class SensorScanSettings {
         if (value == null) {
             throw new IllegalArgumentException("a duration is required");
         }
+        // Range-checked before the narrowing. A duration beyond
+        // Integer.MAX_VALUE milliseconds -- about 24.9 days -- wrapped
+        // negative, and a negative here does not mean "very long": the scan
+        // timeout reads it as disabled and leaves an expensive BLE scan
+        // running, and the batch and staleness windows read it as zero and
+        // flush every sample or treat every cached one as stale.
+        if (value.toMillis() > Integer.MAX_VALUE || value.toMillis() < 0) {
+            throw new IllegalArgumentException(
+                    "a duration here must be between zero and "
+                            + Integer.MAX_VALUE + " milliseconds, got "
+                            + value.toMillis());
+        }
         return setTimeoutMillis((int) value.toMillis());
     }
 

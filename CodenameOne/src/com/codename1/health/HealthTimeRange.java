@@ -189,7 +189,36 @@ public final class HealthTimeRange {
             throw new IllegalArgumentException(
                     "a calendar-based range requires an explicit ZoneId");
         }
-        return Calendar.getInstance(TimeZone.getTimeZone(zone.getId()));
+        return Calendar.getInstance(TimeZone.getTimeZone(zoneIdToTz(
+                zone.getId())));
+    }
+
+    /// A `TimeZone` id for `zoneId`.
+    ///
+    /// A fixed-offset zone -- `ZoneOffset.ofHours(2)`, or
+    /// `ZoneId.of("+02:00")` -- has the id `+02:00`, and
+    /// `TimeZone.getTimeZone("+02:00")` does not recognise that form: it
+    /// falls back to GMT and says nothing. Every calendar bucket then aligned
+    /// two hours early and samples landed in the wrong local day, which is
+    /// precisely the drift this API takes an explicit zone to avoid.
+    ///
+    /// The offset forms are translated to the `GMT+02:00` spelling
+    /// `TimeZone` does understand; `Z` is GMT. Named zones pass through, and
+    /// those `TimeZone` resolves correctly. Same rule as the CLDC
+    /// `ZoneId.toTimeZone()`, which is package-private in `java.time` and so
+    /// cannot be called from here.
+    static String zoneIdToTz(String zoneId) {
+        if (zoneId == null || zoneId.length() == 0) {
+            return "GMT";
+        }
+        if ("Z".equals(zoneId)) {
+            return "GMT";
+        }
+        char c = zoneId.charAt(0);
+        if (c == '+' || c == '-') {
+            return "GMT" + zoneId;
+        }
+        return zoneId;
     }
 
     /// Reads a calendar's instant.
