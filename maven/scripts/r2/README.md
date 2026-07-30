@@ -58,6 +58,24 @@ whose bytes differ, and exits non-zero. Re-cut under a new version rather than s
 **Never generate `maven-metadata.xml` in a build.** The upload script deletes any it finds
 in the staging tree. Only `regen-maven-metadata.py` writes it.
 
+**A version is only real once it is marked complete.** `publish-staging-to-r2.sh` writes
+`_cn1-upload-complete` into each `<artifact>/<version>/` after that directory's copy
+succeeds, and `regen-maven-metadata.py` will not advertise a version without it. This is
+what stops an interrupted upload from being discovered and published by some *later*
+release — skipping metadata on the run that failed protects only that run, because every
+subsequent run rebuilds metadata from the same bucket listing. Re-running the upload
+completes the directory, writes the marker, and the version then appears normally.
+
+**Metadata is written last, on purpose.** It is what makes a version discoverable, so a
+failed release leaves its artifacts orphaned but invisible — the recoverable direction.
+Advertised-but-incomplete cannot be undone.
+
+**Do not publish an editor to Central when the core release did not get there.** The
+editors declare core/plugin at their own version, and Central releases are immutable, so
+publishing one against a core that is absent leaves a permanently unresolvable artifact.
+The release workflow passes `-DskipPublishing` in that case; staging still happens, so the
+R2 upload is unaffected.
+
 **Cloudflare caches 404s.** A Cache Rule sets Status Code TTL 400-599 to no-store, because
 otherwise a probe for a not-yet-published artifact caches the negative and the artifact stays
 invisible until it expires. CI polls also append a cache-busting query parameter, so a

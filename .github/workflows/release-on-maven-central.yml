@@ -182,6 +182,20 @@ jobs:
           steps.r2_core.outcome == 'success')
         run: |
           export GPG_TTY=$(tty)
+          # Do not publish this editor to Central unless the core release actually
+          # reached Central. The editor declares core/plugin at this same version, so
+          # publishing it against a core that is not there leaves an immutable Central
+          # release whose dependencies cannot resolve. skipPublishing still stages the
+          # artifacts, so the R2 upload that follows is unaffected.
+          skip_publishing=true
+          if [ "${{ vars.CN1_DUAL_PUBLISH }}" = "true" ] \
+             && { [ "${{ steps.deploy.outcome }}" = "success" ] \
+                  || [ "${{ steps.confirm.outcome }}" = "success" ]; }; then
+            skip_publishing=false
+          else
+            echo "Core release did not reach Central (or dual publish is off):"
+            echo "staging this editor for R2 only."
+          fi
           cd scripts/gamebuilder
           # The core/javase/plugin just released are already in the local repo
           # from the deploy above (install runs before the Central upload).
@@ -198,6 +212,7 @@ jobs:
           # (codenameone-gamebuilder) silently drops out of the reactor and only
           # the parent + common modules would be published.
           xvfb-run -a mvn -Pexecutable-jar -Pgamebuilder-central deploy \
+            -DskipPublishing=$skip_publishing \
             -Dcodename1.platform=javase \
             -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE \
             -Dcn1.version=$GITHUB_REF_NAME -Dcn1.plugin.version=$GITHUB_REF_NAME \
@@ -261,8 +276,23 @@ jobs:
           steps.r2_core.outcome == 'success')
         run: |
           export GPG_TTY=$(tty)
+          # Do not publish this editor to Central unless the core release actually
+          # reached Central. The editor declares core/plugin at this same version, so
+          # publishing it against a core that is not there leaves an immutable Central
+          # release whose dependencies cannot resolve. skipPublishing still stages the
+          # artifacts, so the R2 upload that follows is unaffected.
+          skip_publishing=true
+          if [ "${{ vars.CN1_DUAL_PUBLISH }}" = "true" ] \
+             && { [ "${{ steps.deploy.outcome }}" = "success" ] \
+                  || [ "${{ steps.confirm.outcome }}" = "success" ]; }; then
+            skip_publishing=false
+          else
+            echo "Core release did not reach Central (or dual publish is off):"
+            echo "staging this editor for R2 only."
+          fi
           cd scripts/certificatewizard
           xvfb-run -a mvn -Pexecutable-jar -Pcertificatewizard-central deploy \
+            -DskipPublishing=$skip_publishing \
             -Dcodename1.platform=javase \
             -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE \
             -Dcn1.version=$GITHUB_REF_NAME -Dcn1.plugin.version=$GITHUB_REF_NAME \
@@ -319,8 +349,23 @@ jobs:
           steps.r2_core.outcome == 'success')
         run: |
           export GPG_TTY=$(tty)
+          # Do not publish this editor to Central unless the core release actually
+          # reached Central. The editor declares core/plugin at this same version, so
+          # publishing it against a core that is not there leaves an immutable Central
+          # release whose dependencies cannot resolve. skipPublishing still stages the
+          # artifacts, so the R2 upload that follows is unaffected.
+          skip_publishing=true
+          if [ "${{ vars.CN1_DUAL_PUBLISH }}" = "true" ] \
+             && { [ "${{ steps.deploy.outcome }}" = "success" ] \
+                  || [ "${{ steps.confirm.outcome }}" = "success" ]; }; then
+            skip_publishing=false
+          else
+            echo "Core release did not reach Central (or dual publish is off):"
+            echo "staging this editor for R2 only."
+          fi
           cd scripts/settings
           xvfb-run -a mvn -Pexecutable-jar -Psettings-central deploy \
+            -DskipPublishing=$skip_publishing \
             -Dcodename1.platform=javase \
             -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE \
             -Dcn1.version=$GITHUB_REF_NAME -Dcn1.plugin.version=$GITHUB_REF_NAME \
