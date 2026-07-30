@@ -32,6 +32,8 @@ import org.apache.maven.model.jdom.etl.ModelETL;
 import org.apache.maven.model.jdom.etl.ModelETLRequest;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import java.util.List;
+import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.codehaus.plexus.util.FileUtils;
@@ -195,16 +197,29 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
     }
 
     /**
-     * Codename One publishes to its own repository, and during the migration to that
-     * repository also to Maven Central. R2 is therefore asked first: once Central stops
-     * receiving releases, it would otherwise keep reporting the last version published
-     * there and `cn1:update` would never see a newer one. Central remains the fallback so
-     * this keeps working against versions released before the move, and if R2 is
-     * unreachable.
+     * Finds the newest version this project could actually build against.
+     *
+     * Codename One publishes to its own repository, and during the migration also to
+     * Maven Central. Asking the Codename One repository first is what lets cn1:update
+     * see releases made after Central stops receiving them. But discovery must not run
+     * ahead of resolution: a project whose pom does not declare that repository cannot
+     * resolve a version that exists only there, so offering it would write an
+     * unbuildable version into cn1.version and cn1.plugin.version. Such a project is
+     * therefore only offered what Central can serve.
+     *
+     * This corrects itself: generated projects gain the repository as part of the
+     * migration, and from then on they discover from it too.
      *
      * Override the primary source with -Dcn1.metadataUrl=... to point at a mirror.
      */
     private String findLatestVersion() throws IOException, XmlPullParserException {
+        if (!projectCanResolveFrom(metadataUrl)) {
+            getLog().info("This project does not declare " + repositoryHost(metadataUrl)
+                    + " in <repositories>/<pluginRepositories>, so only versions available "
+                    + "from Maven Central are offered. Add that repository to see newer "
+                    + "releases.");
+            return readLatestVersion(MAVEN_CENTRAL_METADATA_URL);
+        }
         IOException primaryFailure;
         try {
             return readLatestVersion(metadataUrl);
@@ -219,6 +234,49 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
             // failing too usually just means the machine is offline.
             throw primaryFailure;
         }
+    }
+
+    /** Host of a metadata URL, for both the containment test and the message. */
+    private static String repositoryHost(String url) {
+        try {
+            return new URL(url).getHost();
+        } catch (IOException ex) {
+            return url;
+        }
+    }
+
+    /**
+     * Whether the project declares a repository on the same host as the given metadata
+     * URL, for either dependencies or plugins. Both matter: the framework artifacts come
+     * from &lt;repositories&gt; and codenameone-maven-plugin from &lt;pluginRepositories&gt;,
+     * so a version is only usable when both can be reached.
+     */
+    private boolean projectCanResolveFrom(String url) {
+        return canResolveFrom(url,
+                project.getRemoteArtifactRepositories(),
+                project.getPluginArtifactRepositories());
+    }
+
+    /** Pure form of {@link #projectCanResolveFrom(String)}, so it can be tested directly. */
+    static boolean canResolveFrom(String url,
+                                  List<ArtifactRepository> dependencyRepositories,
+                                  List<ArtifactRepository> pluginRepositories) {
+        String host = repositoryHost(url);
+        return declaresHost(dependencyRepositories, host)
+                && declaresHost(pluginRepositories, host);
+    }
+
+    private static boolean declaresHost(List<ArtifactRepository> repositories, String host) {
+        if (repositories == null) {
+            return false;
+        }
+        for (ArtifactRepository repository : repositories) {
+            if (repository != null && repository.getUrl() != null
+                    && repository.getUrl().contains(host)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String readLatestVersion(String url) throws IOException, XmlPullParserException {
