@@ -837,11 +837,39 @@ class CN1HealthConnectBridge(private val context: Context)
             // Series records hold many samples in one record and the
             // portable layer flattens by default, so emit one line per
             // sample rather than per record.
-            is HeartRateRecord -> ordered(record.samples, ascending).forEach {
-                if (inWindow(window, it.time.toEpochMilli())) {
-                    sample(sb, record, token, it.time.toEpochMilli(),
-                        it.beatsPerMinute.toDouble(), "count/min")
-                    written++
+            // Read back as the inverse of the write. A heart-rate record
+            // holding a single sample came from an interval write -- an
+            // average over a minute, the shape this bridge advertises -- and
+            // its span lives on the record, because Health Connect gives a
+            // contained sample only an instant. Emitting that instant lost
+            // the interval: the sample round-tripped as a point, and the
+            // shared aggregate fallback then weighted a one-minute average
+            // as 1 millisecond instead of 60000, disagreeing with the local
+            // and iOS stores for the same data.
+            //
+            // A span of exactly one millisecond is the synthetic end the
+            // write gives an instantaneous sample, so it stays a point. A
+            // genuine one-millisecond interval is indistinguishable from it
+            // and is treated as instantaneous, which costs nothing any
+            // caller can measure.
+            is HeartRateRecord -> {
+                val single = record.samples.size == 1
+                val span = record.endTime.toEpochMilli() -
+                    record.startTime.toEpochMilli()
+                ordered(record.samples, ascending).forEach {
+                    if (inWindow(window, it.time.toEpochMilli())) {
+                        if (single && span > 1L) {
+                            line(sb, record.metadata.id, token,
+                                record.startTime.toEpochMilli(),
+                                record.endTime.toEpochMilli(),
+                                it.beatsPerMinute.toDouble(), "count/min",
+                                originOf(record), record)
+                        } else {
+                            sample(sb, record, token, it.time.toEpochMilli(),
+                                it.beatsPerMinute.toDouble(), "count/min")
+                        }
+                        written++
+                    }
                 }
             }
 

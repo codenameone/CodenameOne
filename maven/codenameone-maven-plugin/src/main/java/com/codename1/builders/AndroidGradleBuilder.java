@@ -6850,7 +6850,18 @@ public class AndroidGradleBuilder extends Executor {
                 // minSdkVersion raised to 26, cutting off the API 21-25
                 // devices the BLE-only flow is documented to support.
                 || "com/codename1/health/HealthException".equals(cls)
-                || "com/codename1/health/HealthError".equals(cls);
+                || "com/codename1/health/HealthError".equals(cls)
+                // And the enums a sensor callback reads off the sample it
+                // was just handed. Branching on getType().getKind(), or
+                // asking a unit for its dimension before converting, is
+                // ordinary BLE-only code -- and a direct enum reference is
+                // exactly what the scanner records, so those apps were read
+                // as touching the store too. Same cost as above: Health
+                // Connect bundled for an app that never opens it, and
+                // minSdkVersion raised to 26 away from the API 21-25 range
+                // the BLE-only flow is documented to support.
+                || "com/codename1/health/HealthDataKind".equals(cls)
+                || "com/codename1/health/HealthUnitDimension".equals(cls);
     }
 
     static int compareVersions(String v1, String v2) {
