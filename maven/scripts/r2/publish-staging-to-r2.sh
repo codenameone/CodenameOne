@@ -74,17 +74,30 @@ for dir in "$@"; do
     # always single-part, and each one uniquely identifies its artifact's content.
     echo "==> checking $dir for conflicting objects"
     conflicts=0
+    head_err=$(mktemp)
     while IFS= read -r file; do
         key="maven2/${file#"$dir"/}"
-        remote_etag=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$key" \
-            --endpoint-url "$ENDPOINT" --query ETag --output text 2>/dev/null || true)
-        [ -z "$remote_etag" ] && continue
+        # Only a confirmed 404 means "not published yet". Throttling, auth and
+        # transient endpoint errors must abort: treating them as absent would let
+        # the copy below silently overwrite an immutable released artifact.
+        if remote_etag=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$key" \
+                --endpoint-url "$ENDPOINT" --query ETag --output text 2>"$head_err"); then
+            :
+        elif grep -qE '(404)|(Not Found)' "$head_err"; then
+            continue
+        else
+            echo "ERROR: could not determine whether $key already exists." >&2
+            cat "$head_err" >&2
+            rm -f "$head_err"
+            exit 1
+        fi
         local_md5=$(md5 -q "$file" 2>/dev/null || md5sum "$file" | cut -d' ' -f1)
         if [ "${remote_etag//\"/}" != "$local_md5" ]; then
             echo "    CONFLICT: ${key%.sha1} already exists with different content"
             conflicts=$((conflicts + 1))
         fi
     done < <(find "$dir" -type f -name '*.sha1')
+    rm -f "$head_err"
 
     if [ "$conflicts" -gt 0 ] && [ "${R2_ALLOW_OVERWRITE:-0}" != "1" ]; then
         echo "ERROR: $conflicts object(s) would be overwritten with different bytes." >&2

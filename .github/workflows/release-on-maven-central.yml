@@ -75,6 +75,9 @@ jobs:
       # Central step failed -- R2 is strictly more reliable than Central here.
       - name: Publish core reactor to R2
         id: r2_core
+        # Non-fatal so a Cloudflare outage cannot skip the Central steps that follow;
+        # the final gate below turns any R2 failure into a red job.
+        continue-on-error: true
         if: always()
         run: |
           staging=maven/target/central-staging
@@ -129,11 +132,15 @@ jobs:
           exit 1
 
       - name: Regenerate R2 metadata and archetype catalog
-        if: steps.r2_core.outcome == 'success'
+        id: r2_core_metadata
+        continue-on-error: true
+        if: always() && steps.r2_core.outcome == 'success'
         run: python3 maven/scripts/r2/regen-maven-metadata.py
 
       - name: Confirm artifacts on R2
-        if: steps.r2_core.outcome == 'success'
+        id: r2_core_confirm
+        continue-on-error: true
+        if: always() && steps.r2_core.outcome == 'success'
         run: |
           # Cache-busting query parameter is deliberate: Cloudflare caches 404s on the R2
           # custom domain, so a poll that runs a moment too early would cache the negative
@@ -185,7 +192,7 @@ jobs:
       - name: Deploy Game Builder editor to Maven Central
         id: deploy_gamebuilder
         continue-on-error: true
-        if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        if: always() && (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success')
         run: |
           export GPG_TTY=$(tty)
           cd scripts/gamebuilder
@@ -214,6 +221,10 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
       - name: Publish Game Builder editor to R2
+        id: r2_gamebuilder
+        # Non-fatal for the same reason as the core upload: one editor's R2 failure
+        # must not skip the remaining editors' Central deploys.
+        continue-on-error: true
         # always(): central-publishing stages before it uploads, so the tree exists
         # even when the Central deploy above failed -- which is precisely the case
         # R2 is here to survive. Metadata is regenerated once, after all three.
@@ -258,7 +269,7 @@ jobs:
       - name: Deploy Signing Wizard editor to Maven Central
         id: deploy_certificatewizard
         continue-on-error: true
-        if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        if: always() && (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success')
         run: |
           export GPG_TTY=$(tty)
           cd scripts/certificatewizard
@@ -273,6 +284,10 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
       - name: Publish Signing Wizard editor to R2
+        id: r2_certificatewizard
+        # Non-fatal for the same reason as the core upload: one editor's R2 failure
+        # must not skip the remaining editors' Central deploys.
+        continue-on-error: true
         # always(): central-publishing stages before it uploads, so the tree exists
         # even when the Central deploy above failed -- which is precisely the case
         # R2 is here to survive. Metadata is regenerated once, after all three.
@@ -310,7 +325,7 @@ jobs:
       - name: Deploy Settings editor to Maven Central
         id: deploy_settings
         continue-on-error: true
-        if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        if: always() && (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success')
         run: |
           export GPG_TTY=$(tty)
           cd scripts/settings
@@ -325,6 +340,10 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
       - name: Publish Settings editor to R2
+        id: r2_settings
+        # Non-fatal for the same reason as the core upload: one editor's R2 failure
+        # must not skip the remaining editors' Central deploys.
+        continue-on-error: true
         # always(): central-publishing stages before it uploads, so the tree exists
         # even when the Central deploy above failed -- which is precisely the case
         # R2 is here to survive. Metadata is regenerated once, after all three.
@@ -357,20 +376,32 @@ jobs:
           echo "codenameone-settings ${GITHUB_REF_NAME} not visible on repo1 yet; it may still be propagating from Sonatype Central."
 
       - name: Regenerate R2 metadata for the editors
+        id: r2_editor_metadata
+        continue-on-error: true
         if: always() && steps.r2_core.outcome == 'success'
         run: python3 maven/scripts/r2/regen-maven-metadata.py
 
-      - name: Fail when an editor release did not complete
-        # The editor deploys run with continue-on-error so their staging trees can
-        # reach R2 first; the job must still go red if Central rejected one.
-        if: >-
-          always() && vars.CN1_DUAL_PUBLISH == 'true' &&
-          (steps.deploy_gamebuilder.outcome == 'failure' ||
-           steps.deploy_certificatewizard.outcome == 'failure' ||
-           steps.deploy_settings.outcome == 'failure')
+      - name: Fail when any publication did not complete
+        # Every publish step runs with continue-on-error so that one destination
+        # failing cannot skip the others -- a Central outage must not cost us the R2
+        # upload, and an R2 outage must not leave a partial Central editor release.
+        # That means the job's real verdict is decided here, once, at the end.
+        if: always()
         run: |
-          echo "One or more editor deploys failed to publish to Maven Central:"
-          echo "  gamebuilder=${{ steps.deploy_gamebuilder.outcome }}"
-          echo "  certificatewizard=${{ steps.deploy_certificatewizard.outcome }}"
-          echo "  settings=${{ steps.deploy_settings.outcome }}"
-          exit 1
+          status=0
+          fail() { echo "  FAILED: $1"; status=1; }
+          echo "Publication outcomes:"
+          [ "${{ steps.r2_core.outcome }}" = "failure" ] && fail "core reactor -> R2"
+          [ "${{ steps.r2_core_metadata.outcome }}" = "failure" ] && fail "R2 metadata regeneration"
+          [ "${{ steps.r2_core_confirm.outcome }}" = "failure" ] && fail "core artifacts missing on R2"
+          [ "${{ steps.r2_gamebuilder.outcome }}" = "failure" ] && fail "Game Builder -> R2"
+          [ "${{ steps.r2_certificatewizard.outcome }}" = "failure" ] && fail "Signing Wizard -> R2"
+          [ "${{ steps.r2_settings.outcome }}" = "failure" ] && fail "Settings -> R2"
+          [ "${{ steps.r2_editor_metadata.outcome }}" = "failure" ] && fail "R2 metadata regeneration (editors)"
+          if [ "${{ vars.CN1_DUAL_PUBLISH }}" = "true" ]; then
+            [ "${{ steps.deploy_gamebuilder.outcome }}" = "failure" ] && fail "Game Builder -> Maven Central"
+            [ "${{ steps.deploy_certificatewizard.outcome }}" = "failure" ] && fail "Signing Wizard -> Maven Central"
+            [ "${{ steps.deploy_settings.outcome }}" = "failure" ] && fail "Settings -> Maven Central"
+          fi
+          [ "$status" = "0" ] && echo "  all publications succeeded"
+          exit $status
