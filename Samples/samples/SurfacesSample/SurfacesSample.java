@@ -44,6 +44,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -98,6 +99,7 @@ public class SurfacesSample implements BackgroundFetch {
     private float activityProgress;
     private Label installedLabel;
     private Label activityLabel;
+    private EncodedImage courierAvatar;
 
     public void init(Object context) {
         theme = UIManager.initFirstTheme("/theme");
@@ -291,7 +293,7 @@ public class SurfacesSample implements BackgroundFetch {
         params.put("orderId", "CN1-12345");
         return new SurfaceColumn().setSpacing(6).setPadding(12)
                 .add(new SurfaceRow().setSpacing(10)
-                        .add(new SurfaceImage(createCourierAvatar())
+                        .add(new SurfaceImage(courierAvatar())
                                 .setSize(40, 40).setCornerRadius(20))
                         .add(new SurfaceColumn().setSpacing(2).setWeight(1)
                                 .add(new SurfaceText("${status}")
@@ -323,7 +325,7 @@ public class SurfacesSample implements BackgroundFetch {
         activityProgress = 0.25f;
         LiveActivityDescriptor descriptor = new LiveActivityDescriptor("delivery")
                 .setContent(buildDeliveryLayout())
-                .setCompactLeading(new SurfaceImage(createCourierAvatar())
+                .setCompactLeading(new SurfaceImage(courierAvatar())
                         .setSize(24, 24).setCornerRadius(12))
                 .setCompactTrailing(new SurfaceDynamicText(
                         SurfaceDynamicText.STYLE_TIMER_DOWN, "eta")
@@ -388,16 +390,32 @@ public class SurfacesSample implements BackgroundFetch {
     }
 
     /**
-     * A small generated mutable image used as the courier avatar. Generated images exercise the
-     * serializer's PNG encoding path; a real app would typically ship a bundled EncodedImage.
+     * The courier avatar, generated once and cached as an EncodedImage.
+     *
+     * <p>Surfaces ship art as PNG bytes. An EncodedImage already holds those bytes, so publishing
+     * just hands them over; any other Image has to be rasterized at publish time, and on iOS that
+     * encode blocks the calling thread on the platform UI thread while the pixels come back off
+     * the GPU. Doing it on the EDT therefore freezes a device while looking instant in the
+     * simulator, which is why the simulator diagnostics reject it outright.
+     *
+     * <p>Drawing into a mutable image is EDT work and encoding it is not, so this generates on the
+     * caller's thread and encodes inside invokeAndBlock. A real app usually skips all of this and
+     * ships a bundled EncodedImage.create("/courier.png").
      */
-    private Image createCourierAvatar() {
-        Image avatar = Image.createImage(40, 40, ACCENT_COLOR);
-        Graphics g = avatar.getGraphics();
-        g.setColor(0xffffff);
-        g.fillArc(10, 6, 20, 20, 0, 360);
-        g.fillArc(6, 28, 28, 18, 0, 360);
-        return avatar;
+    private EncodedImage courierAvatar() {
+        if (courierAvatar == null) {
+            final Image avatar = Image.createImage(40, 40, ACCENT_COLOR);
+            Graphics g = avatar.getGraphics();
+            g.setColor(0xffffff);
+            g.fillArc(10, 6, 20, 20, 0, 360);
+            g.fillArc(6, 28, 28, 18, 0, 360);
+            if (CN.isEdt()) {
+                CN.invokeAndBlock(() -> courierAvatar = EncodedImage.createFromImage(avatar, false));
+            } else {
+                courierAvatar = EncodedImage.createFromImage(avatar, false);
+            }
+        }
+        return courierAvatar;
     }
 
     private Map<String, Object> deliveryState(String status, long eta, float progress) {

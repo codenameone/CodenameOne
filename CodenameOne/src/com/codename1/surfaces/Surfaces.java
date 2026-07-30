@@ -96,13 +96,19 @@ public final class Surfaces {
         if (kind == null) {
             return;
         }
-        for (WidgetKind k : registeredKinds) {
-            if (k.getId().equals(kind.getId())) {
-                registeredKinds.remove(k);
-                break;
+        // The whole API is callable from any thread, so a registration racing a publish (or
+        // another registration) must not leave a reader walking a list that is being mutated
+        // underneath it. Every touch of registeredKinds holds this lock, and readers copy out
+        // rather than iterate the live list.
+        synchronized (registeredKinds) {
+            for (WidgetKind k : registeredKinds) {
+                if (k.getId().equals(kind.getId())) {
+                    registeredKinds.remove(k);
+                    break;
+                }
             }
+            registeredKinds.add(kind);
         }
-        registeredKinds.add(kind);
         SurfaceBridge b = bridgeInternal();
         if (b != null) {
             b.registerWidgetKind(SurfaceSerializer.serializeKind(kind));
@@ -111,7 +117,47 @@ public final class Surfaces {
 
     /// Returns the widget kinds registered so far.
     public static List<WidgetKind> getRegisteredKinds() {
-        return new ArrayList<WidgetKind>(registeredKinds);
+        synchronized (registeredKinds) {
+            return new ArrayList<WidgetKind>(registeredKinds);
+        }
+    }
+
+    static boolean isKindRegistered(String kindId) {
+        synchronized (registeredKinds) {
+            for (WidgetKind k : registeredKinds) {
+                if (k.getId().equals(kindId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// Overrides whether the simulator-only surface diagnostics run. They are on in the simulator
+    /// and off everywhere else, which is almost always what you want: they catch usage that works
+    /// in the simulator but stalls or silently does nothing on a device (rasterizing a surface
+    /// image on the EDT, publishing to a kind that was never registered, republishing far past the
+    /// platform's reload budget), and they cost nothing in a shipped build because they never run
+    /// there. Diagnostics that are certain to misbehave on a device throw `IllegalStateException`;
+    /// the rest log a one-time warning.
+    ///
+    /// Pass null to restore the default behaviour. Turning them off is a last resort for a case a
+    /// check gets wrong -- please report it if you hit one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`: true to force diagnostics on, false to force them off, null for the default
+    public static void setDiagnosticsEnabled(Boolean enabled) {
+        SurfaceDiagnostics.setEnabled(enabled);
+    }
+
+    /// Returns true when the simulator-only surface diagnostics are currently active.
+    ///
+    /// #### Returns
+    ///
+    /// true when diagnostics run for this process
+    public static boolean isDiagnosticsEnabled() {
+        return SurfaceDiagnostics.enabled();
     }
 
     /// Publishes a widget kind's content, atomically replacing any previously published timeline
@@ -125,16 +171,26 @@ public final class Surfaces {
     /// callbacks while the app UI is not running (on Android the fetch runs in a background
     /// service with no Activity at all). Publishing is data-only: the timeline is serialized,
     /// persisted where the platform renderer can reach it and the renderer is poked
-    /// asynchronously; no step blocks on the EDT or the platform UI thread. Implementing
-    /// background fetch and re-publishing there is the intended way to keep widgets fresh; see
-    /// the `com.codename1.surfaces.spi` package documentation for the per-platform background
-    /// update story.
+    /// asynchronously. Implementing background fetch and re-publishing there is the intended way
+    /// to keep widgets fresh; see the `com.codename1.surfaces.spi` package documentation for the
+    /// per-platform background update story.
+    ///
+    /// A background thread is the RIGHT thread, not merely a permitted one. On a device this
+    /// writes the payload into the shared container and makes a synchronous native call, and any
+    /// `SurfaceImage` holding an `Image` that is not an `EncodedImage` is rasterized here -- on
+    /// iOS that encode blocks the caller on the platform UI thread while the pixels are read back
+    /// off the GPU. Publishing on the EDT therefore stalls the UI on hardware while looking
+    /// instantaneous in the simulator. Pass `EncodedImage`s and publish off the EDT; the simulator
+    /// diagnostics flag both mistakes (see [#setDiagnosticsEnabled(Boolean)]).
     ///
     /// #### Parameters
     ///
     /// - `kindId`: the widget kind id
     /// - `timeline`: the content to publish
     public static void publish(String kindId, WidgetTimeline timeline) {
+        SurfaceDiagnostics.requireRegisteredKind(kindId);
+        SurfaceDiagnostics.offEdtPreferred("Surfaces.publish");
+        SurfaceDiagnostics.noteRepublish("kind:" + kindId, "widget kind \"" + kindId + "\"");
         SurfaceBridge b = bridgeInternal();
         if (b == null || !b.areWidgetsSupported()) {
             return;
@@ -273,7 +329,10 @@ public final class Surfaces {
             actionHandler = null;
             pendingActions.clear();
         }
-        registeredKinds.clear();
+        synchronized (registeredKinds) {
+            registeredKinds.clear();
+        }
+        SurfaceDiagnostics.reset();
     }
 
     private static void deliver(final SurfaceActionHandler h, final SurfaceActionEvent evt) {
