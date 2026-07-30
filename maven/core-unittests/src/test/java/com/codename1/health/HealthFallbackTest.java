@@ -173,14 +173,18 @@ class HealthFallbackTest extends UITestBase {
 
     @Test
     void fallbackOpenersResolveFalseRatherThanFailing() {
+        // Settled rather than already-done: the facade openers deliver on
+        // the EDT like every other result, so an off-EDT caller sees the
+        // answer queued. What this test is about is that they resolve false
+        // instead of failing, which is unchanged.
         AsyncResource<Boolean> settings =
                 Health.getInstance().openHealthSettings();
-        assertTrue(settings.isDone());
+        HealthAwait.settled(settings);
         assertEquals(Boolean.FALSE, settings.get());
 
         AsyncResource<Boolean> setup =
                 Health.getInstance().openProviderSetup();
-        assertTrue(setup.isDone());
+        HealthAwait.settled(setup);
         assertEquals(Boolean.FALSE, setup.get());
     }
 

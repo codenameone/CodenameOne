@@ -80,6 +80,13 @@ class HealthEdtDeliveryTest extends UITestBase {
      */
     private <T> void assertDeliveredOnEdt(final Landing<T> landing,
             final Runnable op) {
+        assertDeliveredOnEdt(landing, op, false);
+    }
+
+    /// `mayFail` for the operations whose fallback answer is an error: what
+    /// is under test is the thread it arrives on, not the outcome.
+    private <T> void assertDeliveredOnEdt(final Landing<T> landing,
+            final Runnable op, final boolean mayFail) {
         CN.invokeAndBlock(new Runnable() {
             public void run() {
                 assertFalse(CN.isEdt(), "the operation must start off the EDT");
@@ -96,7 +103,9 @@ class HealthEdtDeliveryTest extends UITestBase {
             }
         });
         assertTrue(landing.arrived.get(), "the callback must arrive");
-        assertFalse(landing.failed.get(), "and must not be an error");
+        if (!mayFail) {
+            assertFalse(landing.failed.get(), "and must not be an error");
+        }
         assertTrue(landing.onEdt.get(),
                 "a result must arrive on the EDT on every backend");
     }
@@ -183,6 +192,30 @@ class HealthEdtDeliveryTest extends UITestBase {
                         new ArrayList<AggregateResult>());
             }
         });
+    }
+
+    /**
+     * The facade's own actions deliver on the EDT too.
+     *
+     * <p>These were missed when the store's results were moved onto
+     * {@code EdtResult}: {@code openHealthSettings} and
+     * {@code openProviderSetup} settle synchronously before the method
+     * returns, so a callback attached afterwards ran immediately on whatever
+     * thread called -- and a caller doing UI work in it, which is the whole
+     * point of "did the settings screen open?", raced rendering.</p>
+     *
+     * <p>The fallback facade is the one under test here because it is the one
+     * that settles inline; the port facades do the same thing through the
+     * same resource type.</p>
+     */
+    @Test
+    void aFacadeActionDeliversOnTheEdt() {
+        final Landing<Boolean> landing = new Landing<Boolean>();
+        assertDeliveredOnEdt(landing, new Runnable() {
+            public void run() {
+                Health.getInstance().openHealthSettings().onResult(landing);
+            }
+        }, true);
     }
 
     @Test

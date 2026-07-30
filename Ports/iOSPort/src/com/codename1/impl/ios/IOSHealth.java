@@ -34,7 +34,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import com.codename1.impl.health.OneShot;
+import com.codename1.impl.health.EdtResult;
 
 /// The HealthKit-backed health entry point.
 ///
@@ -113,7 +113,7 @@ public final class IOSHealth extends Health {
     }
 
     public AsyncResource<Boolean> openHealthSettings() {
-        AsyncResource<Boolean> out = new OneShot<Boolean>();
+        AsyncResource<Boolean> out = new EdtResult<Boolean>();
         // iOS has no deep link to an app's Health permissions; the closest
         // is the app's own Settings page. Reporting false rather than
         // opening something misleading lets the caller say so.

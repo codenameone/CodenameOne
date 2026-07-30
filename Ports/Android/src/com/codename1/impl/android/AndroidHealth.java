@@ -30,7 +30,7 @@ import com.codename1.health.HealthAvailability;
 import com.codename1.health.HealthStore;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
-import com.codename1.impl.health.OneShot;
+import com.codename1.impl.health.EdtResult;
 
 /// The Android health entry point, backed by Health Connect through the
 /// injected [HealthConnectDelegate].
@@ -68,7 +68,7 @@ class AndroidHealth extends Health {
 
     /// Opens Health Connect's own permission screen for this app.
     public AsyncResource<Boolean> openHealthSettings() {
-        AsyncResource<Boolean> out = new OneShot<Boolean>();
+        AsyncResource<Boolean> out = new EdtResult<Boolean>();
         try {
             Intent i = new Intent(
                     "androidx.health.ACTION_HEALTH_CONNECT_SETTINGS");
@@ -87,7 +87,7 @@ class AndroidHealth extends Health {
     /// listing land on the provider's setup flow rather than a bare app
     /// page.
     public AsyncResource<Boolean> openProviderSetup() {
-        AsyncResource<Boolean> out = new OneShot<Boolean>();
+        AsyncResource<Boolean> out = new EdtResult<Boolean>();
         HealthConnectDelegate d = AndroidHealthSupport.getDelegate();
         String pkg = d == null ? "com.google.android.apps.healthdata"
                 : d.providerPackageName();

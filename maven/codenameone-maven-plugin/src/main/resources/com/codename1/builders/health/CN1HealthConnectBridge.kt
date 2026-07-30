@@ -853,7 +853,17 @@ class CN1HealthConnectBridge(private val context: Context)
             // and is treated as instantaneous, which costs nothing any
             // caller can measure.
             is HeartRateRecord -> {
-                val single = record.samples.size == 1
+                // Ours, and only ours. The span rule below is the inverse of
+                // *this* bridge's write, so it may only be applied to records
+                // this app wrote. A third-party record holding one
+                // instantaneous sample inside a longer window is an ordinary
+                // shape -- a watch app's own record layout -- and widening it
+                // would invent an interval: the shared aggregator would then
+                // duration-weight a point as though it were an average, and a
+                // range query could match it on time the sample never covered.
+                val mine = record.metadata.dataOrigin.packageName ==
+                    context.packageName
+                val single = mine && record.samples.size == 1
                 val span = record.endTime.toEpochMilli() -
                     record.startTime.toEpochMilli()
                 ordered(record.samples, ascending).forEach {
