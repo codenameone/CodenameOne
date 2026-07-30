@@ -196,14 +196,26 @@ public class MCPServer {
     /// - superseded, and the replacement holds this same transport: leave it alone. It is
     ///   the live server's transport now, and the replacement thread will close it.
     ///
-    /// @return true when the caller owns the close of `t`
-    private synchronized boolean releaseIfCurrent(MCPTransport t, int generation) {
+    /// The close happens here, under the monitor, rather than being reported back to a
+    /// caller that closes afterwards. Deciding and then closing outside the lock leaves
+    /// the very gap this method exists to remove: a reader reaching EOF clears `running`,
+    /// a restart over the same transport lands in the gap, and the close then lands on
+    /// the replacement's transport.
+    private synchronized void releaseAndCloseIfCurrent(MCPTransport t, int generation) {
+        boolean mine;
         if (startGeneration == generation
                 && transport == t) { // NOPMD identity: is this still our transport?
             running = false;
-            return true;
+            mine = true;
+        } else {
+            mine = transport != t; // NOPMD identity: reused by the replacement, or orphaned?
         }
-        return transport != t; // NOPMD identity: reused by the replacement, or orphaned?
+        if (mine) {
+            // Closing under the monitor matches stop(), which is synchronized and closes
+            // the same way. A transport's close() releases a socket; it does not call
+            // back into the server, so there is nothing here to deadlock against.
+            t.close();
+        }
     }
 
     private void runLoop(MCPTransport t, int generation) {
@@ -228,9 +240,7 @@ public class MCPServer {
             } catch (Throwable logErr) {
                 System.err.println("[cn1.mcp] transport open failed: " + ex);
             }
-            if (releaseIfCurrent(t, generation)) {
-                t.close();
-            }
+            releaseAndCloseIfCurrent(t, generation);
             return;
         }
         if (!isCurrent(t, generation)) {
@@ -238,9 +248,7 @@ public class MCPServer {
             // flight. Undo the registration this thread just took -- unless the server
             // moved on by restarting over this very transport, in which case it is not
             // ours to undo.
-            if (releaseIfCurrent(t, generation)) {
-                t.close();
-            }
+            releaseAndCloseIfCurrent(t, generation);
             return;
         }
         while (isCurrent(t, generation)) {
@@ -265,9 +273,7 @@ public class MCPServer {
                 }
             }
         }
-        if (releaseIfCurrent(t, generation)) {
-            t.close();
-        }
+        releaseAndCloseIfCurrent(t, generation);
     }
 
     /// Handles one inbound JSON-RPC message and returns the response line, or null
