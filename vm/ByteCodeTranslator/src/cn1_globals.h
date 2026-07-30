@@ -1261,6 +1261,18 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 //
 // Gated by -DCN1_INLINE_ALLOC. OFF => CN1_FAST_NEW(X) is exactly __NEW_X.
 // =========================================================================
+// Low-memory backpressure pacing (issue #5482). After the OS reports memory
+// pressure (iOS didReceiveMemoryWarning -> lowMemoryMode) allocators are slowed
+// so the collector can catch up. The throttle parks a legacy-path allocation for
+// one millisecond, but at most ONCE PER THREAD PER WINDOW: an unconditional park
+// on every allocation caps a thread at ~1000 legacy allocations/second, which
+// turns an allocation-heavy load into an apparent hang. With the window, the
+// worst case a thread can lose is 1ms per window (about 10%), independent of how
+// fast it allocates. Parking for a collector that has actually stopped the world
+// (threadBlockedByGC) is a safepoint, not a throttle, and is never skipped.
+#ifndef CN1_LOW_MEMORY_PARK_INTERVAL_MS
+#define CN1_LOW_MEMORY_PARK_INTERVAL_MS 10
+#endif
 #ifndef CN1_BIBOP_PAGE_SIZE
 #define CN1_BIBOP_PAGE_SIZE (64*1024)
 #endif
