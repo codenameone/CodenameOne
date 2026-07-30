@@ -62,6 +62,83 @@ class HealthWireTest {
         assertEquals(2000L, s.getEndMillis());
     }
 
+    /**
+     * A caller-set identifier cannot inject lines or shift fields into a
+     * write payload.
+     *
+     * <p>{@code setId} documents that an identifier set on a sample you
+     * are about to write has no effect, and both bridges do read the type
+     * from field 1 and never look at field 0 -- but the encoder emitted it
+     * anyway, unescaped, as the first field of a tab-separated,
+     * newline-terminated line. An identifier holding a newline plus six
+     * valid fields therefore appended a second record to the batch: data
+     * written into the user's health store that the app never asked for.
+     * A tab shifted every field left instead, so the type token was parsed
+     * as a timestamp.</p>
+     *
+     * <p>Both are asserted through the decoder, which splits the payload
+     * the same way the bridges do.</p>
+     */
+    /**
+     * The series encoder's free-text fields cannot end the line early.
+     *
+     * <p>Nothing in the framework calls {@code appendSeries} today -- both
+     * ports build series lines natively -- so this is a latent hazard
+     * rather than a live one, which is exactly why it is worth closing
+     * before a port adopts the method.</p>
+     *
+     * <p>What the separators cost, measured rather than assumed: reverting
+     * the sanitiser makes this assert 1 and get <em>0</em>. The newline
+     * ends the line where the device name sits, so the record's own trailing
+     * fields and every one of its measurements land on a line of their own,
+     * and the legitimate series decodes as nothing at all. Whether the
+     * orphaned remainder also decodes as a sample of its own depends on its
+     * shape; here it does not, and this test does not claim it would.</p>
+     */
+    @Test
+    void aSeriesLineSurvivesSeparatorsInItsProvenanceFields() {
+        SeriesSample series = heartRate(10_000L, 2);
+        StringBuilder sb = new StringBuilder();
+        HealthWire.appendSeries(sb, series, "com.example.app",
+                "Name\twith\ttabs",
+                "Device\n1000\tsteps\t0\t0\t99\tcount\tMANUAL");
+
+        SamplePage page = HealthWire.decodeSamplePage(sb.toString());
+        assertEquals(1, page.size(),
+                "provenance text must not be able to add a sample");
+        assertSame(HealthDataType.HEART_RATE,
+                page.getSamples().get(0).getType());
+    }
+
+    @Test
+    void aCallerIdentifierCannotForgeAnExtraRecordOnWrite() {
+        QuantitySample forged = steps(1000L, 2000L, 250);
+        // A newline, then a line the decoder accepts in full.
+        forged.setId("x\n\tbody_mass\t9000\t9000\t999.0\tkg\tMANUAL");
+        List<HealthSample> out = new ArrayList<HealthSample>();
+        out.add(forged);
+
+        SamplePage page = HealthWire.decodeSamplePage(
+                HealthWire.encodeSamples(out));
+        assertEquals(1, page.size(),
+                "the identifier must not be able to add a record");
+        QuantitySample only = (QuantitySample) page.getSamples().get(0);
+        assertSame(HealthDataType.STEPS, only.getType());
+        assertEquals(250, only.getValue(HealthUnit.COUNT), 1e-9);
+
+        // And a bare tab must not shift the type out of field 1.
+        QuantitySample shifted = steps(1000L, 2000L, 250);
+        shifted.setId("a\tb");
+        out.clear();
+        out.add(shifted);
+        page = HealthWire.decodeSamplePage(
+                HealthWire.encodeSamples(out));
+        assertEquals(1, page.size());
+        assertSame(HealthDataType.STEPS,
+                page.getSamples().get(0).getType());
+        assertEquals(1000L, page.getSamples().get(0).getStartMillis());
+    }
+
     @Test
     void instantaneousSamplesRoundTrip() {
         List<HealthSample> out = new ArrayList<HealthSample>();

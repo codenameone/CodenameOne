@@ -76,6 +76,14 @@ import java.util.Map;
 /// and unit symbols cause the line to be skipped rather than failing the
 /// whole page, so a platform that gains a new record type does not break
 /// an older app.
+///
+/// Nothing escapes a field, which is affordable only because nothing
+/// caller-supplied is emitted into one. Going the other way the platform
+/// is the source, and each port sanitises its own text before it reaches
+/// a payload; going this way the identifier field is written empty, since
+/// it is the one field a caller could set. See [#appendSample] for what
+/// emitting it cost. Caller text does cross in the request encoders, and
+/// those are JSON and escape it.
 public final class HealthWire {
 
     private static final char FIELD = '\t';
@@ -346,9 +354,27 @@ public final class HealthWire {
         return sb.toString();
     }
 
+    /// One write line. The identifier field is deliberately left empty.
+    ///
+    /// [HealthSample#setId(String)] states that setting an identifier on a
+    /// sample you are about to write has no effect, and both bridges do
+    /// read the type from field 1 and never look at field 0 -- so emitting
+    /// the caller's identifier bought nothing and cost the integrity of the
+    /// format. It is the only caller-controlled string on this line: the
+    /// type id, the unit symbol and the recording method are interned
+    /// framework values and the rest are numbers. The request encoders
+    /// carry caller text too, but those are JSON and escape it.
+    ///
+    /// An identifier holding a newline appended a whole extra line, and
+    /// where the remainder parsed as six fields the bridge inserted a
+    /// second record -- data in the user's health store that the app never
+    /// asked to write. A tab shifted every field left, so field 1 became
+    /// the rest of the identifier and the type token was parsed as a
+    /// timestamp, failing the batch or, with an unlucky identifier,
+    /// recording the value against the wrong type and time.
     private static void appendSample(StringBuilder sb, QuantitySample q) {
         HealthUnit unit = q.getQuantity().getUnit();
-        sb.append(nullToEmpty(q.getId())).append(FIELD)
+        sb.append(FIELD)
           .append(q.getType().getId()).append(FIELD)
           .append(q.getStartMillis()).append(FIELD)
           .append(q.getEndMillis()).append(FIELD)
@@ -441,15 +467,15 @@ public final class HealthWire {
     public static void appendSeries(StringBuilder sb, SeriesSample series,
             String sourceBundleId, String sourceName, String deviceName) {
         sb.append(SERIES_MARKER)
-          .append(nullToEmpty(series.getId())).append(FIELD)
+          .append(wireText(series.getId())).append(FIELD)
           .append(series.getType().getId()).append(FIELD)
           .append(series.getStartMillis()).append(FIELD)
           .append(series.getEndMillis()).append(FIELD)
           .append(series.size()).append(FIELD)
           .append(series.getUnit().getSymbol()).append(FIELD)
-          .append(nullToEmpty(sourceBundleId)).append(FIELD)
-          .append(nullToEmpty(sourceName)).append(FIELD)
-          .append(nullToEmpty(deviceName)).append(FIELD)
+          .append(wireText(sourceBundleId)).append(FIELD)
+          .append(wireText(sourceName)).append(FIELD)
+          .append(wireText(deviceName)).append(FIELD)
           .append(series.getRecordingMethod().name()).append(FIELD);
         for (int i = 0; i < series.size(); i++) {
             if (i > 0) {
@@ -860,6 +886,31 @@ public final class HealthWire {
             start = idx + 1;
         }
         return parts.toArray(new String[parts.size()]);
+    }
+
+    /// `s` with the two characters that structure this format turned into
+    /// spaces, and null as empty.
+    ///
+    /// For the four free-text fields of a series line: the identifier and
+    /// the three provenance strings. Nothing in the framework calls
+    /// [#appendSeries] today -- both ports build their series lines
+    /// natively, where iOS sanitises with `cn1hkText()` and Health Connect
+    /// supplies only a UUID and a package name, neither of which can hold
+    /// a tab or a newline. But the method is reachable, and an encoder
+    /// whose safety depends on who calls it is a trap for the port that
+    /// adopts it: one newline in a device name ends the line where that
+    /// name sits, so the record's remaining fields and all of its
+    /// measurements land on a line of their own and the series decodes as
+    /// nothing at all -- and a remainder of the right shape would decode as
+    /// a sample the platform never reported.
+    ///
+    /// Spaces rather than an escape, matching the native side, so one
+    /// decoder handles every producer.
+    private static String wireText(String s) {
+        if (s == null) {
+            return "";
+        }
+        return s.replace(FIELD, ' ').replace(LINE, ' ');
     }
 
     private static String nullToEmpty(String s) {
