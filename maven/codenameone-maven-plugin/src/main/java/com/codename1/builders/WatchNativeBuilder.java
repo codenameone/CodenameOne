@@ -474,7 +474,12 @@ class WatchNativeBuilder {
                 .append("  base = File.basename(ref.path)\n")
                 .append("  next if excluded.include?(base)\n")
                 .append("  unless watch_target.source_build_phase.files_references.include?(ref)\n")
-                .append("    watch_target.source_build_phase.add_file_reference(ref)\n")
+                .append("    added = watch_target.source_build_phase.add_file_reference(ref)\n")
+                // Carry the per-file COMPILER_FLAGS across, not just the reference. A cn1lib source
+                // that requires ARC is compiled with -fobjc-arc on the iOS target while the port
+                // itself builds with ARC off; copying the reference alone dropped that flag and the
+                // watch slice failed with "requires ARC (-fobjc-arc)".
+                .append("    added.settings = bf.settings.dup if added && bf.settings\n")
                 .append("  end\n")
                 .append("end\n")
                 // Add the generated watch entry point (SwiftUI @main shell +
