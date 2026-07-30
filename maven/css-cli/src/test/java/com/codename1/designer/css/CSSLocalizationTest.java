@@ -1,6 +1,7 @@
 package com.codename1.designer.css;
 
 import com.codename1.ui.util.EditableResources;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,15 +23,8 @@ import java.util.TreeSet;
  */
 public class CSSLocalizationTest {
 
-    public static void main(String[] args) throws Exception {
-        testLoadLocalizationBundles();
-        testApplyLocalizationBundles();
-        testLoadLocalizationBundlesUtf8();
-        testLoadLocalizationBundlesLatin1Fallback();
-        testLoadLocalizationBundlesUnicodeEscape();
-    }
-
-    private static void testLoadLocalizationBundlesUtf8() throws Exception {
+    @Test
+    void testLoadLocalizationBundlesUtf8() throws Exception {
         Path tempDir = Files.createTempDirectory("cn1-css-localization-utf8");
         try {
             Path localizationRoot = Files.createDirectory(tempDir.resolve("l10n"));
@@ -49,7 +43,8 @@ public class CSSLocalizationTest {
         }
     }
 
-    private static void testLoadLocalizationBundlesLatin1Fallback() throws Exception {
+    @Test
+    void testLoadLocalizationBundlesLatin1Fallback() throws Exception {
         Path tempDir = Files.createTempDirectory("cn1-css-localization-latin1");
         try {
             Path localizationRoot = Files.createDirectory(tempDir.resolve("l10n"));
@@ -68,7 +63,8 @@ public class CSSLocalizationTest {
         }
     }
 
-    private static void testLoadLocalizationBundlesUnicodeEscape() throws Exception {
+    @Test
+    void testLoadLocalizationBundlesUnicodeEscape() throws Exception {
         Path tempDir = Files.createTempDirectory("cn1-css-localization-uesc");
         try {
             Path localizationRoot = Files.createDirectory(tempDir.resolve("l10n"));
@@ -86,7 +82,8 @@ public class CSSLocalizationTest {
         }
     }
 
-    private static void testLoadLocalizationBundles() throws Exception {
+    @Test
+    void testLoadLocalizationBundles() throws Exception {
         Path tempDir = Files.createTempDirectory("cn1-css-localization");
         try {
             Path localizationRoot = Files.createDirectory(tempDir.resolve("l10n"));
@@ -127,7 +124,8 @@ public class CSSLocalizationTest {
         }
     }
 
-    private static void testApplyLocalizationBundles() throws Exception {
+    @Test
+    void testApplyLocalizationBundles() throws Exception {
         Map<String, Map<String, Map<String, String>>> bundles = new LinkedHashMap<>();
         Map<String, Map<String, String>> messages = new LinkedHashMap<>();
         messages.put("", stringMap("greeting", "Hello"));

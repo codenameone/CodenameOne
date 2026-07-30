@@ -285,17 +285,19 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
 
 
 
-        // Run the CSS compiler which is contained inside the codenameone-designer jar.
-        // NOTE: The codenameone-designer.jar is a dependency of the codenameone-maven-plugin as
-        // zip file (which is the designer jar with all dependencies).  We use this jar
-        // rather than the central designer_1.jar located in the user's home directory to make it
-        // easier to pin to a particular version.
+        // Run the CSS compiler CLI. It lives in com.codenameone:codenameone-css-cli, a thin
+        // module that is a dependency of the codenameone-maven-plugin, so the version is
+        // pinned to the plugin rather than picked up from the designer_1.jar in the user's
+        // home directory. We launch it on a resolved classpath instead of `java -jar`
+        // against the designer's shaded artifact -- the CLI needs codenameone-javase for
+        // CEF rasterization, but nothing needs a 43MB shaded copy of it.
         // The Java task is created via createJava() (overridden in this class to use INFO log
         // level) so subprocess output -- including stack traces from CN1CSSCLI failures --
         // shows up in normal mvn output instead of being hidden at DEBUG.
         Java java = createJava();
         java.setDir(getCN1ProjectDir());
-        java.setJar(getDesignerJar());
+        java.setClasspath(new org.apache.tools.ant.types.Path(antProject, getCssCliClasspath()));
+        java.setClassname(CSS_CLI_MAIN_CLASS);
         java.setFork(true);
         java.setFailonerror(true);
         java.createJvmarg().setValue("-Dcli=true");

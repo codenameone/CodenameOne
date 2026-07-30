@@ -95,5 +95,6 @@
   </build>
   <properties>
     <sqlite.jdbc.version>3.46.1.0</sqlite.jdbc.version>
+    <maven.deploy.skip>true</maven.deploy.skip>
   </properties>
 </project>

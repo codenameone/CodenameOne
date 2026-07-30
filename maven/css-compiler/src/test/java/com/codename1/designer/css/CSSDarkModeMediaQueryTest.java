@@ -1,5 +1,8 @@
 package com.codename1.designer.css;
 
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -11,12 +14,13 @@ import java.util.Hashtable;
  */
 public class CSSDarkModeMediaQueryTest {
 
-    public static void main(String[] args) throws Exception {
-        testDarkMediaCompilesToDarkUiids();
-        testAtMediaInsideHeaderCommentIsIgnored();
+    @BeforeAll
+    static void installHeadlessImplementation() throws Exception {
+        HeadlessTestSupport.installHeadlessImplementation();
     }
 
-    private static void testDarkMediaCompilesToDarkUiids() throws Exception {
+    @Test
+    void testDarkMediaCompilesToDarkUiids() throws Exception {
         Path cssFile = Files.createTempFile("cn1-dark-media", ".css");
         Path resFile = Files.createTempFile("cn1-dark-media", ".res");
         try {
@@ -29,14 +33,16 @@ public class CSSDarkModeMediaQueryTest {
 
             CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
             theme.resourceFile = resFile.toFile();
+            theme.res = new com.codename1.ui.util.EditableResourcesForCSS(resFile.toFile());
+            theme.res.setTheme("Theme", new Hashtable());
             theme.updateResources();
 
             Hashtable themeProps = theme.res.getTheme("Theme");
             assertEquals("111111", themeProps.get("Button.fgColor"), "Base style fgColor");
-            assertEquals("eeeeee", themeProps.get("$DarkButton.fgColor"), "Dark style fgColor");
+            assertEquals("EEEEEE", themeProps.get("$DarkButton.fgColor"), "Dark style fgColor");
             assertEquals("000000", themeProps.get("$DarkButton.bgColor"), "Dark style bgColor");
             assertEquals("255", themeProps.get("$DarkButton.transparency"), "Dark style transparency");
-            assertEquals("ff0000", themeProps.get("$DarkButton.sel#fgColor"), "Dark selected fgColor");
+            assertEquals("FF0000", themeProps.get("$DarkButton.sel#fgColor"), "Dark selected fgColor");
         } finally {
             deleteIfExists(cssFile);
             deleteIfExists(resFile);
@@ -50,7 +56,8 @@ public class CSSDarkModeMediaQueryTest {
      * treated the subsequent block's properties as dark selectors, and
      * ran the tokenizer off EOF later on.
      */
-    private static void testAtMediaInsideHeaderCommentIsIgnored() throws Exception {
+    @Test
+    void testAtMediaInsideHeaderCommentIsIgnored() throws Exception {
         Path cssFile = Files.createTempFile("cn1-dark-comment", ".css");
         Path resFile = Files.createTempFile("cn1-dark-comment", ".res");
         try {
@@ -64,11 +71,13 @@ public class CSSDarkModeMediaQueryTest {
 
             CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
             theme.resourceFile = resFile.toFile();
+            theme.res = new com.codename1.ui.util.EditableResourcesForCSS(resFile.toFile());
+            theme.res.setTheme("Theme", new Hashtable());
             theme.updateResources();
 
             Hashtable themeProps = theme.res.getTheme("Theme");
             assertEquals("111111", themeProps.get("Button.fgColor"), "Light Button fgColor survives comment");
-            assertEquals("eeeeee", themeProps.get("$DarkButton.fgColor"), "Real dark block still compiles");
+            assertEquals("EEEEEE", themeProps.get("$DarkButton.fgColor"), "Real dark block still compiles");
             assertEquals("true", themeProps.get("@tabsGridBool"), "#Constants block isn't mangled");
         } finally {
             deleteIfExists(cssFile);

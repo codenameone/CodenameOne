@@ -1,5 +1,8 @@
 package com.codename1.designer.css;
 
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -16,29 +19,13 @@ import java.util.Hashtable;
  */
 public class CSSDeviceFormFactorMediaQueryTest {
 
-    public static void main(String[] args) throws Exception {
-        installHeadlessImplementation();
-        testTvMediaCompilesToDeviceTvUiids();
-        testWatchMediaCompilesToDeviceWatchUiids();
+    @BeforeAll
+    static void installHeadlessImplementation() throws Exception {
+        HeadlessTestSupport.installHeadlessImplementation();
     }
 
-    /**
-     * CSSTheme.load touches Display / Util, which need a CodenameOneImplementation.
-     * Install the same minimal headless stub the no-cef CLI uses (see
-     * NoCefCSSCLI#installHeadlessImplementation) so this test runs standalone.
-     */
-    private static void installHeadlessImplementation() throws Exception {
-        HeadlessCssCompilerImplementation stub = new HeadlessCssCompilerImplementation();
-        Class<?> displayCls = Class.forName("com.codename1.ui.Display");
-        java.lang.reflect.Field implField = displayCls.getDeclaredField("impl");
-        implField.setAccessible(true);
-        if (implField.get(null) == null) {
-            implField.set(null, stub);
-        }
-        com.codename1.io.Util.setImplementation(stub);
-    }
-
-    private static void testTvMediaCompilesToDeviceTvUiids() throws Exception {
+    @Test
+    void testTvMediaCompilesToDeviceTvUiids() throws Exception {
         Path cssFile = Files.createTempFile("cn1-tv-media", ".css");
         Path resFile = Files.createTempFile("cn1-tv-media", ".res");
         try {
@@ -64,7 +51,8 @@ public class CSSDeviceFormFactorMediaQueryTest {
         }
     }
 
-    private static void testWatchMediaCompilesToDeviceWatchUiids() throws Exception {
+    @Test
+    void testWatchMediaCompilesToDeviceWatchUiids() throws Exception {
         Path cssFile = Files.createTempFile("cn1-watch-media", ".css");
         Path resFile = Files.createTempFile("cn1-watch-media", ".res");
         try {

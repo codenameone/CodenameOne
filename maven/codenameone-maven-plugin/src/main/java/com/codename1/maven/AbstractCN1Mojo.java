@@ -66,6 +66,19 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     protected static final String JAVA_RUNTIME_ARTIFACT_ID = "java-runtime";
     protected static final String ARTIFACT_ID="codenameone-maven-plugin";
 
+    /**
+     * Main class of the headless CSS compiler CLI, resolved via
+     * {@link #getCssCliClasspath()}. Kept here so the mojo and the simulator's
+     * CSSWatcher agree on one spelling.
+     */
+    protected static final String CSS_CLI_MAIN_CLASS = "com.codename1.designer.css.CN1CSSCLI";
+
+    /**
+     * simulator.properties key carrying {@link #getCssCliClasspath()} through to the
+     * simulator, where CSSWatcher forks the CSS compiler for live reload.
+     */
+    protected static final String CSS_CLI_CLASSPATH_PROPERTY = "cn1.css.cli.classpath";
+
 
     @Component
     protected MavenProjectHelper projectHelper;
@@ -99,6 +112,14 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     
     @Parameter(required = true, readonly = true, defaultValue = "${project.remoteArtifactRepositories}")
     protected List<MavenArtifactRepository> remoteRepositories;
+
+    /**
+     * Version of the deprecated Resource Editor that {@code cn1:designer} resolves.
+     * It is frozen rather than tracking the framework version, so it does not follow
+     * ${cn1.version}. Override with -Dcn1.designer.version to run a different build.
+     */
+    @Parameter(property = "cn1.designer.version", defaultValue = "7.0.263")
+    protected String designerVersion;
     
     protected Properties properties;
 
@@ -916,24 +937,92 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
 
     /**
-     * Get the designer jar from the dependencies.  This is equivalent to the designer_1.jar located in
-     * the user's home directory, but this is retrieved from maven dependencies (the codenameone-designer project
-     * is a dependency of the codenameone-maven-plugin project).
+     * Builds the classpath for the headless CSS compiler CLI
+     * (com.codenameone:codenameone-css-cli, main class
+     * {@link #CSS_CLI_MAIN_CLASS}), resolved transitively so it picks up
+     * codenameone-css-compiler, codenameone-javase and their dependencies.
      *
-     * This is the jar that contains the CSS compiler used by the {@link CompileCSSMojo}.
+     * <p>CSS compilation used to run {@code java -jar} against the
+     * codenameone-designer jar-with-dependencies, a ~43MB shaded artifact that
+     * bundled the whole Swing resource editor just to reach CN1CSSCLI. The CLI
+     * now lives in its own thin module, so we resolve it as an ordinary
+     * dependency and launch it with {@code -cp} instead. Nothing has to publish
+     * a shaded copy of the JavaSE port.</p>
+     *
+     * @return classpath string suitable for {@code java -cp} / Ant's {@code createClasspath}.
+     * @throws MojoExecutionException if the CLI could not be resolved. This might occur if
+     * calling this method before dependencies have been resolved.
+     */
+    protected String getCssCliClasspath() throws MojoExecutionException {
+        Artifact artifact = getArtifact("com.codenameone", "codenameone-css-cli");
+        if (artifact == null) {
+            throw new MojoExecutionException("Could not find the Codename One CSS compiler CLI "
+                    + "(com.codenameone:codenameone-css-cli). It ships as a dependency of the "
+                    + "codenameone-maven-plugin, so this usually means the plugin's own dependencies "
+                    + "have not been resolved yet.");
+        }
+        List<File> files = new ArrayList<File>();
+        addCssCliJar(files, artifact);
+        ArtifactResolutionResult result = repositorySystem.resolve(new ArtifactResolutionRequest()
+                .setLocalRepository(localRepository)
+                .setRemoteRepositories(new ArrayList<>(remoteRepositories))
+                .setResolveTransitively(true)
+                .setArtifact(artifact));
+        if (result != null && result.getArtifacts() != null) {
+            for (Artifact resolved : result.getArtifacts()) {
+                addCssCliJar(files, resolved);
+            }
+        }
+        if (files.isEmpty()) {
+            throw new MojoExecutionException("Resolved com.codenameone:codenameone-css-cli but it "
+                    + "produced an empty classpath.");
+        }
+        StringBuilder classpath = new StringBuilder();
+        for (File file : files) {
+            if (classpath.length() > 0) {
+                classpath.append(File.pathSeparator);
+            }
+            classpath.append(file.getAbsolutePath());
+        }
+        return classpath.toString();
+    }
+
+    private static void addCssCliJar(List<File> files, Artifact artifact) {
+        if (artifact == null || artifact.getFile() == null || !"jar".equals(artifact.getType())) {
+            return;
+        }
+        File file = artifact.getFile().getAbsoluteFile();
+        if (!file.exists() || files.contains(file)) {
+            return;
+        }
+        files.add(file);
+    }
+
+    /**
+     * Get the designer jar, equivalent to the designer_1.jar in the user's home directory
+     * but resolved through Maven so the version is explicit.
+     *
+     * <p>The Resource Editor is deprecated and frozen at {@link #designerVersion}, so it is
+     * resolved <em>on demand</em> rather than declared as a plugin dependency: only
+     * {@code cn1:designer} needs it, and an ordinary build should not download ~43MB of
+     * Swing editor. CSS compilation, which used to come along for the ride, moved to
+     * {@link #getCssCliClasspath()}.</p>
      *
      * @return The Codename One designer jar with all dependencies.
-     * @throws MojoExecutionException If the designer jar could not be found.  This might occur if calling this
-     * method before dependencies have been resolved.
+     * @throws MojoExecutionException If the designer jar could not be resolved.
      */
     protected File getDesignerJar() throws MojoExecutionException{
         Artifact artifact = getArtifact("com.codenameone", "codenameone-designer", "jar-with-dependencies");
         if (artifact == null) {
-            throw new MojoExecutionException("Could not find designer jar");
+            artifact = repositorySystem.createArtifactWithClassifier(
+                    "com.codenameone", "codenameone-designer", designerVersion, "jar", "jar-with-dependencies");
         }
         File file = findArtifactFile(artifact);
         if (file == null) {
-            throw new MojoExecutionException("Could not find designer jar");
+            throw new MojoExecutionException("Could not resolve the Codename One Resource Editor "
+                    + "(com.codenameone:codenameone-designer:" + designerVersion + ":jar-with-dependencies).\n"
+                    + "The editor is deprecated and frozen at that version; override it with "
+                    + "-Dcn1.designer.version=<version> if you need a different one.");
         }
 
         File extracted = new File(file.getParentFile(), file.getName()+"-extracted");

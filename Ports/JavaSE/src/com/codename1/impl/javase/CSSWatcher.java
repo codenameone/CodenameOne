@@ -58,6 +58,16 @@ public class CSSWatcher implements Runnable {
     private final Thread shutdownHook;
     private static final int MIN_DESIGNER_VERSION=6;
 
+    /**
+     * Classpath of the headless CSS compiler CLI, published by the Maven plugin's
+     * PrepareSimulatorClasspathMojo into target/codenameone/simulator.properties and
+     * loaded into the System properties by {@link Simulator}. Kept in sync with
+     * AbstractCN1Mojo.CSS_CLI_CLASSPATH_PROPERTY / CSS_CLI_MAIN_CLASS -- the port
+     * cannot see the plugin's constants.
+     */
+    private static final String CSS_CLI_CLASSPATH_PROPERTY = "cn1.css.cli.classpath";
+    private static final String CSS_CLI_MAIN_CLASS = "com.codename1.designer.css.CN1CSSCLI";
+
     private final String themePrefix;
 
     public CSSWatcher() {
@@ -295,36 +305,60 @@ public class CSSWatcher implements Runnable {
             overrideOutputs = prefixInputs(themePrefix, overrideOutputs);
             destFile = new File(overrideOutputs);
         }
-        File userHome = new File(System.getProperty("user.home"));
-        File cn1Home = new File(userHome, ".codenameone");
-        File designerJar = new File(cn1Home, "designer_1.jar");
-        if (System.getProperty("codename1.designer.jar", null) != null) {
-            designerJar = new File(System.getProperty("codename1.designer.jar", null));
+        // Preferred path: PrepareSimulatorClasspathMojo resolves the thin
+        // codenameone-css-cli module plus its dependencies and hands the classpath
+        // over through simulator.properties, which Simulator.java loads into the
+        // System properties. Launching CN1CSSCLI with -cp means neither the plugin
+        // nor the simulator needs the designer's 43MB shaded jar to compile CSS.
+        String cssCliClasspath = System.getProperty(CSS_CLI_CLASSPATH_PROPERTY, null);
+        ProcessBuilder pb;
+        if (cssCliClasspath != null && !cssCliClasspath.trim().isEmpty()) {
+            pb = new ProcessBuilder(
+                    javaBin.getAbsolutePath(),
+                    "-Dcli=true",
+                    "-Dparent.port=" + pulseSocket.getLocalPort(),
+                    "-cp", cssCliClasspath,
+                    CSS_CLI_MAIN_CLASS,
+                    "-css"
+            );
         } else {
-            // The Maven plugin declares codenameone-designer as a plugin dependency, so any
-            // CN1 mojo invocation has already pulled the version-pinned designer jar into m2.
-            // Prefer that over ~/.codenameone/designer_1.jar (which is managed by UpdateCodenameOne
-            // and routinely lags behind the plugin version, producing confusing CSS failures).
-            File m2Designer = com.codename1.impl.javase.util.MavenUtils.findDesignerJarInM2();
-            if (m2Designer != null) {
-                designerJar = m2Designer;
-            } else if (designerJar.exists()) {
-                System.err.println("[CSSWatcher] Warning: codename1.designer.jar system property is not set "
-                        + "and no version-pinned designer was found in the local Maven repository; "
-                        + "falling back to " + designerJar.getAbsolutePath() + ". This file is "
-                        + "managed by UpdateCodenameOne and may be older than the CN1 plugin in use. "
-                        + "If CSS compilation fails, launch the simulator via the Maven cn1:run goal "
-                        + "(which both fetches the right designer into m2 and pins it via -Dcodename1.designer.jar).");
+            // Fallback for projects generated against an older plugin, whose
+            // javase/pom.xml only forwards -Dcodename1.designer.jar.
+            File userHome = new File(System.getProperty("user.home"));
+            File cn1Home = new File(userHome, ".codenameone");
+            File designerJar = new File(cn1Home, "designer_1.jar");
+            // Generated javase/pom.xml files forward -Dcodename1.designer.jar
+            // unconditionally, so with the property undefined this arrives blank (or as
+            // a literal unexpanded ${...}). Treat anything that isn't a real file as unset.
+            String designerJarProperty = System.getProperty("codename1.designer.jar", null);
+            if (designerJarProperty != null && !designerJarProperty.trim().isEmpty()
+                    && !designerJarProperty.contains("${")) {
+                designerJar = new File(designerJarProperty);
+            } else {
+                // Any CN1 mojo invocation pulls the version-pinned designer jar into m2.
+                // Prefer that over ~/.codenameone/designer_1.jar (which is managed by
+                // UpdateCodenameOne and routinely lags behind the plugin version,
+                // producing confusing CSS failures).
+                File m2Designer = com.codename1.impl.javase.util.MavenUtils.findDesignerJarInM2();
+                if (m2Designer != null) {
+                    designerJar = m2Designer;
+                } else if (designerJar.exists()) {
+                    System.err.println("[CSSWatcher] Warning: neither " + CSS_CLI_CLASSPATH_PROPERTY
+                            + " nor codename1.designer.jar is set, and no version-pinned designer was "
+                            + "found in the local Maven repository; falling back to "
+                            + designerJar.getAbsolutePath() + ". This file is managed by "
+                            + "UpdateCodenameOne and may be older than the CN1 plugin in use. "
+                            + "If CSS compilation fails, launch the simulator via the Maven cn1:run goal.");
+                }
             }
+            pb = new ProcessBuilder(
+                    javaBin.getAbsolutePath(),
+                    "-jar", "-Dcli=true",
+                    "-Dparent.port=" + pulseSocket.getLocalPort(),
+                    designerJar.getAbsolutePath(),
+                    "-css"
+            );
         }
-        //List<String> args = new ArrayList<String>();
-        ProcessBuilder pb = new ProcessBuilder(
-                javaBin.getAbsolutePath(),
-                "-jar", "-Dcli=true", 
-                "-Dparent.port="+pulseSocket.getLocalPort(), 
-                designerJar.getAbsolutePath(), 
-                "-css"    
-        );
         List<String> args = pb.command();
         if (overrideInputs != null) {
             args.add("-input");

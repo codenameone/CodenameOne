@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <!--
+    Headless CSS compiler CLI. Holds CN1CSSCLI, the driver that the
+    codenameone-maven-plugin (CompileCSSMojo) and the simulator's CSSWatcher
+    fork to turn a project's CSS into theme.res.
+
+    This used to live in CodenameOneDesigner and was reached by running the
+    43MB codenameone-designer jar-with-dependencies, which dragged the whole
+    Swing resource editor (swingx, appframework, batik) into a headless build.
+    CN1CSSCLI referenced no other Designer class, so it moved here unchanged.
+
+    Unlike codenameone-css-compiler, which is deliberately core+flute+sac only
+    and rejects any rule needing browser rasterization (see NoCefCSSCLI and
+    CSSTheme.strictNoCef), this module depends on codenameone-javase for
+    JavaSEPort / CN1Bootstrap, so it can rasterize box-shadow, gradients and
+    friends through CEF. It is published as a plain thin jar: consumers resolve
+    it transitively and launch it with `java -cp`, so nothing has to ship a
+    shaded copy of the JavaSE port.
+    -->
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-css-cli</artifactId>
+    <version>8.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>codenameone-css-cli</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-css-compiler</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-javase</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

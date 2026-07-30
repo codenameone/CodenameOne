@@ -1,13 +1,29 @@
 # This workflow will build a Java project with Maven, and cache/restore any dependencies to improve the workflow execution time
 # For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-maven
 
-name: Release on Maven Central
+name: Release
 on:
   push:
     tags: '*'
+
+# The R2 metadata regeneration is a read-modify-write over the bucket listing, so two
+# releases must never overlap.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    env:
+      # Cloudflare R2, the repository Codename One is migrating to. These are deliberately
+      # not the CLOUDFLARE_* secrets -- those belong to the Pages website deploy.
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+      R2_BASE_URL: https://repo.codenameone.com/maven2
 
     steps:
       - uses: actions/checkout@v6
@@ -52,9 +68,25 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
+      # --- Cloudflare R2 -------------------------------------------------------
+      # central-publishing-maven-plugin stages every module into
+      # maven/target/central-staging (standard Maven layout, all four checksums,
+      # .asc signatures) BEFORE it uploads to Central, so this runs even when the
+      # Central step failed -- R2 is strictly more reliable than Central here.
+      - name: Publish core reactor to R2
+        id: r2_core
+        if: always()
+        run: |
+          staging=maven/target/central-staging
+          if [ ! -d "$staging" ]; then
+            echo "No staging tree at $staging -- the build failed before packaging." >&2
+            exit 1
+          fi
+          bash maven/scripts/r2/publish-staging-to-r2.sh "$staging"
+
       - name: Confirm artifacts on Maven Central (only after deploy failure)
         id: confirm
-        if: steps.deploy.outcome == 'failure'
+        if: steps.deploy.outcome == 'failure' && vars.CN1_DUAL_PUBLISH == 'true'
         continue-on-error: true
         run: |
           # central-publishing-maven-plugin occasionally reports
@@ -74,7 +106,7 @@ jobs:
             plugin_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/codenameone-maven-plugin/${GITHUB_REF_NAME}/codenameone-maven-plugin-${GITHUB_REF_NAME}.pom")
             catalog_code=$(curl -s -o /dev/null -w "%{http_code}" \
-              "https://repo1.maven.org/maven2/com/codenameone/platform-feature-catalog/${GITHUB_REF_NAME}/platform-feature-catalog-${GITHUB_REF_NAME}.pom")
+              "https://repo1.maven.org/maven2/com/codenameone/codenameone-platform-feature-catalog/${GITHUB_REF_NAME}/codenameone-platform-feature-catalog-${GITHUB_REF_NAME}.pom")
             app_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/cn1app-archetype/${GITHUB_REF_NAME}/cn1app-archetype-${GITHUB_REF_NAME}.pom")
             lib_code=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -95,6 +127,36 @@ jobs:
         run: |
           echo "Release failed: deploy reported failure and the artifacts never appeared on Maven Central."
           exit 1
+
+      - name: Regenerate R2 metadata and archetype catalog
+        if: steps.r2_core.outcome == 'success'
+        run: python3 maven/scripts/r2/regen-maven-metadata.py
+
+      - name: Confirm artifacts on R2
+        if: steps.r2_core.outcome == 'success'
+        run: |
+          # Cache-busting query parameter is deliberate: Cloudflare caches 404s on the R2
+          # custom domain, so a poll that runs a moment too early would cache the negative
+          # and keep seeing it. A Cache Rule sets Status Code TTL 400-599 to no-store, but
+          # this keeps the release green even if that rule is ever removed.
+          set -e
+          for artifact in codenameone-core codenameone-maven-plugin codenameone-platform-feature-catalog \
+                          cn1app-archetype cn1lib-archetype; do
+            url="${R2_BASE_URL}/com/codenameone/${artifact}/${GITHUB_REF_NAME}/${artifact}-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}"
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+            if [ "$code" != "200" ]; then
+              echo "MISSING on R2: $artifact ${GITHUB_REF_NAME} (HTTP $code)" >&2
+              exit 1
+            fi
+            echo "ok: $artifact ${GITHUB_REF_NAME}"
+          done
+          meta="${R2_BASE_URL}/com/codenameone/codenameone-core/maven-metadata.xml?cb=${GITHUB_RUN_ID}"
+          if ! curl -s "$meta" | grep -q "<release>${GITHUB_REF_NAME}</release>"; then
+            echo "maven-metadata.xml does not list ${GITHUB_REF_NAME} as <release>" >&2
+            curl -s "$meta" >&2
+            exit 1
+          fi
+          echo "ok: maven-metadata.xml <release> is ${GITHUB_REF_NAME}"
 
       # --- Game Builder editor -------------------------------------------------
       # The cn1:gamebuilder goal resolves
@@ -149,8 +211,21 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
-      - name: Confirm Game Builder editor on Maven Central
+      - name: Publish Game Builder editor to R2
         if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        run: |
+          # Each editor is its own reactor, so it stages into its own target dir.
+          bash maven/scripts/r2/publish-staging-to-r2.sh scripts/gamebuilder/target/central-staging
+          python3 maven/scripts/r2/regen-maven-metadata.py
+          url="${R2_BASE_URL}/com/codenameone/codenameone-gamebuilder/${GITHUB_REF_NAME}/codenameone-gamebuilder-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}"
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+          [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-gamebuilder (HTTP $code)" >&2; exit 1; }
+          echo "ok: codenameone-gamebuilder ${GITHUB_REF_NAME} on R2"
+
+      - name: Confirm Game Builder editor on Maven Central
+        if: >-
+          vars.CN1_DUAL_PUBLISH == 'true' &&
+          (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success')
         continue-on-error: true
         run: |
           # Informational only: the editor bundle was accepted by Sonatype
@@ -191,8 +266,21 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
-      - name: Confirm Signing Wizard editor on Maven Central
+      - name: Publish Signing Wizard editor to R2
         if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        run: |
+          # Each editor is its own reactor, so it stages into its own target dir.
+          bash maven/scripts/r2/publish-staging-to-r2.sh scripts/certificatewizard/target/central-staging
+          python3 maven/scripts/r2/regen-maven-metadata.py
+          url="${R2_BASE_URL}/com/codenameone/codenameone-certificatewizard/${GITHUB_REF_NAME}/codenameone-certificatewizard-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}"
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+          [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-certificatewizard (HTTP $code)" >&2; exit 1; }
+          echo "ok: codenameone-certificatewizard ${GITHUB_REF_NAME} on R2"
+
+      - name: Confirm Signing Wizard editor on Maven Central
+        if: >-
+          vars.CN1_DUAL_PUBLISH == 'true' &&
+          (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success')
         continue-on-error: true
         run: |
           set +e
@@ -226,8 +314,21 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
-      - name: Confirm Settings editor on Maven Central
+      - name: Publish Settings editor to R2
         if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        run: |
+          # Each editor is its own reactor, so it stages into its own target dir.
+          bash maven/scripts/r2/publish-staging-to-r2.sh scripts/settings/target/central-staging
+          python3 maven/scripts/r2/regen-maven-metadata.py
+          url="${R2_BASE_URL}/com/codenameone/codenameone-settings/${GITHUB_REF_NAME}/codenameone-settings-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}"
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+          [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-settings (HTTP $code)" >&2; exit 1; }
+          echo "ok: codenameone-settings ${GITHUB_REF_NAME} on R2"
+
+      - name: Confirm Settings editor on Maven Central
+        if: >-
+          vars.CN1_DUAL_PUBLISH == 'true' &&
+          (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success')
         continue-on-error: true
         run: |
           set +e

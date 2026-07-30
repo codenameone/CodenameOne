@@ -9,6 +9,16 @@
     <name>sqlite-jdbc</name>
     <properties>
         <sqlite.jdbc.version>3.46.1.0</sqlite.jdbc.version>
+        <!--
+        Frozen: this module just shades org.xerial:sqlite-jdbc, so it only changes
+        when sqlite.jdbc.version or the shade config does, yet it was 13.5MB of every
+        release. Consumers resolve the last published build via
+        ${cn1.sqlite.jdbc.version} in the parent. To release a new one, bump that
+        property and drop sqlite-jdbc from <excludeArtifacts> in the parent pom for
+        that release (this property alone does not stop publication - the
+        central-publishing plugin takes over the deploy phase and ignores it).
+        -->
+        <maven.deploy.skip>true</maven.deploy.skip>
     </properties>
     <parent>
         <groupId>com.codenameone</groupId>
