@@ -423,6 +423,38 @@ class LocalHealthPersistenceTest extends UITestBase {
                 "and a key never set stays absent");
     }
 
+    /**
+     * An unreadable store is not an empty one, and must not be overwritten.
+     *
+     * <p>{@code Storage.readObject} catches its own failures and answers
+     * null, so a corrupt or briefly unreadable entry is indistinguishable
+     * from no entry. Restoring empty is right for the second and catastrophic
+     * for the first: the next write replaced the same key with only the
+     * samples that session had added, so a transient read failure permanently
+     * deleted the user's history.</p>
+     *
+     * <p>The entry is left intact and writes are refused, which
+     * {@code persist()} already surfaces to the caller by failing and rolling
+     * the change back.</p>
+     */
+    @Test
+    void anUnreadableStoreRefusesWritesRatherThanReplacingItself()
+            throws Exception {
+        // Something present under the key that the codec cannot decode into
+        // a blob -- readObject answers null for it, exists() answers true.
+        Storage.getInstance().writeObject("cn1$health$local",
+                Integer.valueOf(7));
+
+        StoredHealthStore store = new StoredHealthStore();
+        QuantitySample s = QuantitySample.create(HealthDataType.STEPS,
+                new HealthQuantity(10, HealthUnit.COUNT), 1000L, 2000L);
+
+        assertNotNull(errorOf(store.write(one(s))),
+                "a write must fail while the store cannot be read");
+        assertTrue(Storage.getInstance().exists("cn1$health$local"),
+                "and the unreadable entry must still be there");
+    }
+
     private static Throwable errorOf(AsyncResource<?> r) {
         // Settled first. Results are delivered on the EDT on every backend
         // now, so an off-EDT caller sees the error queued rather than already

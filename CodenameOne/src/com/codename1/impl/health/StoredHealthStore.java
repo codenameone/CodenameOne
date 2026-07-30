@@ -72,19 +72,45 @@ public class StoredHealthStore extends LocalHealthStore {
         restore();
     }
 
+    /// Set when the entry exists but this process could not read it.
+    ///
+    /// Writing while it is set would replace history the store cannot see.
+    private boolean unreadable;
+
     private void restore() {
         String blob = null;
+        // Asked before the read, because Storage.readObject cannot tell us
+        // afterwards: it catches its own failures and answers null, so a
+        // corrupt or briefly unreadable entry looks exactly like no entry at
+        // all. Restoring empty on the second is right; on the first it wiped
+        // the user's history, because the next write replaced the same key
+        // with only the samples this session happened to add.
+        boolean had = false;
+        try {
+            had = Storage.getInstance().exists(KEY);
+        } catch (RuntimeException ex) {
+            Log.p("CN1 Health: could not check the local store (" + ex + ")");
+        }
         try {
             Object stored = Storage.getInstance().readObject(KEY);
             if (stored instanceof String) {
                 blob = (String) stored;
             }
         } catch (RuntimeException ex) {
-            // A store that cannot be read is an empty one. Failing
-            // construction here would take the whole Health facade down
-            // with it, which is a worse answer than starting fresh.
-            Log.p("CN1 Health: could not read the local store, starting"
-                    + " empty (" + ex + ")");
+            Log.p("CN1 Health: could not read the local store (" + ex + ")");
+        }
+        if (had && blob == null) {
+            // There is history here and this process cannot see it. Reads
+            // answer from an empty store, which is unavoidable, but writing
+            // is refused so the unreadable entry is left intact for a later
+            // launch -- or for whatever tool the user has to recover it.
+            // persist() already fails the write and rolls the change back,
+            // so the caller is told rather than being handed a success that
+            // destroyed data.
+            unreadable = true;
+            Log.p("CN1 Health: the local store exists but could not be read;"
+                    + " writes are refused so the existing data is not"
+                    + " overwritten");
         }
         List<HealthSample> restored = LocalHealthCodec.decode(blob);
         for (HealthSample s : restored) {
@@ -100,6 +126,9 @@ public class StoredHealthStore extends LocalHealthStore {
     protected boolean persist() {
         if (!loaded) {
             return true;
+        }
+        if (unreadable) {
+            return false;
         }
         String blob = null;
         try {
