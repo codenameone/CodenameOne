@@ -156,5 +156,18 @@
          Maven along with CN1CSSCLI: the first now lives in maven/css-cli and
          the other two in maven/css-compiler, where surefire actually runs them.
          This Ant target invoked them as bare main() classes and was not wired
-         into CI, so they were effectively never exercised. -->
+         into CI, so they were effectively never exercised.
+
+         NOTE: this Ant build of the Designer does not currently compile, and did
+         not before those moves either. The CSS engine (CSSTheme, ResourcesMutator,
+         EditableResources, ...) lives only in maven/css-compiler, which is absent
+         from javac.classpath in nbproject/project.properties, while sources here
+         still reference it. Nothing exercises this path: CI builds the Designer
+         through maven/designer, and the BuildDaemon's invocations of
+         CodenameOne/build.xml's `release` target -- the only caller of this file --
+         are commented out.
+
+         So: build the Designer with `mvn -pl designer -am` from maven/. If this Ant
+         build is ever wanted again it needs maven/css-compiler and maven/css-cli
+         added to javac.classpath, not just the classes that moved most recently. -->
 </project>
