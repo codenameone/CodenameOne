@@ -148,7 +148,7 @@ jobs:
           set -e
           for artifact in codenameone-core codenameone-maven-plugin codenameone-platform-feature-catalog \
                           cn1app-archetype cn1lib-archetype; do
-            url="${R2_BASE_URL}/com/codenameone/${artifact}/${GITHUB_REF_NAME}/${artifact}-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}"
+            url="${R2_BASE_URL}/com/codenameone/${artifact}/${GITHUB_REF_NAME}/${artifact}-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
             code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
             if [ "$code" != "200" ]; then
               echo "MISSING on R2: $artifact ${GITHUB_REF_NAME} (HTTP $code)" >&2
@@ -245,7 +245,7 @@ jobs:
         run: |
           # Each editor is its own reactor, so it stages into its own target dir.
           bash maven/scripts/r2/publish-staging-to-r2.sh scripts/gamebuilder/target/central-staging
-          url="${R2_BASE_URL}/com/codenameone/codenameone-gamebuilder/${GITHUB_REF_NAME}/codenameone-gamebuilder-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}"
+          url="${R2_BASE_URL}/com/codenameone/codenameone-gamebuilder/${GITHUB_REF_NAME}/codenameone-gamebuilder-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
           [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-gamebuilder (HTTP $code)" >&2; exit 1; }
           echo "ok: codenameone-gamebuilder ${GITHUB_REF_NAME} on R2"
@@ -325,7 +325,7 @@ jobs:
         run: |
           # Each editor is its own reactor, so it stages into its own target dir.
           bash maven/scripts/r2/publish-staging-to-r2.sh scripts/certificatewizard/target/central-staging
-          url="${R2_BASE_URL}/com/codenameone/codenameone-certificatewizard/${GITHUB_REF_NAME}/codenameone-certificatewizard-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}"
+          url="${R2_BASE_URL}/com/codenameone/codenameone-certificatewizard/${GITHUB_REF_NAME}/codenameone-certificatewizard-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
           [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-certificatewizard (HTTP $code)" >&2; exit 1; }
           echo "ok: codenameone-certificatewizard ${GITHUB_REF_NAME} on R2"
@@ -398,7 +398,7 @@ jobs:
         run: |
           # Each editor is its own reactor, so it stages into its own target dir.
           bash maven/scripts/r2/publish-staging-to-r2.sh scripts/settings/target/central-staging
-          url="${R2_BASE_URL}/com/codenameone/codenameone-settings/${GITHUB_REF_NAME}/codenameone-settings-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}"
+          url="${R2_BASE_URL}/com/codenameone/codenameone-settings/${GITHUB_REF_NAME}/codenameone-settings-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
           [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-settings (HTTP $code)" >&2; exit 1; }
           echo "ok: codenameone-settings ${GITHUB_REF_NAME} on R2"
@@ -431,12 +431,16 @@ jobs:
         # one. r2_core_confirm is what verifies the expected artifacts are actually
         # present rather than merely that an upload command exited 0, so marking without
         # it would let a truncated publish become discoverable.
+        #
+        # Every check is == 'success', never != 'failure': a cancelled or timed-out job
+        # leaves outcome 'cancelled', which satisfies != 'failure' and would have marked
+        # a release whose upload was interrupted mid-flight.
         if: >-
           always() && steps.r2_core.outcome == 'success' &&
           steps.r2_core_confirm.outcome == 'success' &&
-          steps.r2_gamebuilder.outcome != 'failure' &&
-          steps.r2_certificatewizard.outcome != 'failure' &&
-          steps.r2_settings.outcome != 'failure'
+          steps.r2_gamebuilder.outcome == 'success' &&
+          steps.r2_certificatewizard.outcome == 'success' &&
+          steps.r2_settings.outcome == 'success'
         run: bash maven/scripts/r2/mark-release-complete.sh "${GITHUB_REF_NAME}"
 
       - name: Regenerate R2 metadata and archetype catalog
@@ -451,7 +455,7 @@ jobs:
           python3 maven/scripts/r2/regen-maven-metadata.py
           # Assert here rather than earlier: metadata is what makes a version discoverable,
           # so it is published only once every artifact for it is in place.
-          meta="${R2_BASE_URL}/com/codenameone/codenameone-core/maven-metadata.xml?cb=${GITHUB_RUN_ID}"
+          meta="${R2_BASE_URL}/com/codenameone/codenameone-core/maven-metadata.xml?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           body=$(curl -s "$meta")
           # Assert discoverability, not primacy. Re-running an older tag to repair it is
           # legitimate, and metadata correctly keeps the newer version as <release>; that
@@ -478,14 +482,18 @@ jobs:
         run: |
           status=0
           fail() { echo "  FAILED: $1"; status=1; }
+          # Anything that is neither success nor a legitimate skip counts as failure.
+          # A cancelled or timed-out step reports 'cancelled', which an == "failure"
+          # test would wave through -- the same flaw the marker condition had.
+          bad() { [ "$1" != "success" ] && [ "$1" != "skipped" ]; }
           echo "Publication outcomes:"
-          [ "${{ steps.r2_core.outcome }}" = "failure" ] && fail "core reactor -> R2"
-          [ "${{ steps.r2_core_confirm.outcome }}" = "failure" ] && fail "core artifacts missing on R2"
-          [ "${{ steps.r2_gamebuilder.outcome }}" = "failure" ] && fail "Game Builder -> R2"
-          [ "${{ steps.r2_certificatewizard.outcome }}" = "failure" ] && fail "Signing Wizard -> R2"
-          [ "${{ steps.r2_settings.outcome }}" = "failure" ] && fail "Settings -> R2"
-          [ "${{ steps.r2_mark_complete.outcome }}" = "failure" ] && fail "marking the R2 release complete"
-          [ "${{ steps.r2_metadata.outcome }}" = "failure" ] && fail "R2 metadata regeneration"
+          bad "${{ steps.r2_core.outcome }}" && fail "core reactor -> R2"
+          bad "${{ steps.r2_core_confirm.outcome }}" && fail "core artifacts missing on R2"
+          bad "${{ steps.r2_gamebuilder.outcome }}" && fail "Game Builder -> R2"
+          bad "${{ steps.r2_certificatewizard.outcome }}" && fail "Signing Wizard -> R2"
+          bad "${{ steps.r2_settings.outcome }}" && fail "Settings -> R2"
+          bad "${{ steps.r2_mark_complete.outcome }}" && fail "marking the R2 release complete"
+          bad "${{ steps.r2_metadata.outcome }}" && fail "R2 metadata regeneration"
           if [ "${{ vars.CN1_DUAL_PUBLISH }}" = "true" ]; then
             # The core Central deploy is allowed to false-negative; the confirm poll is its
             # second opinion. Only both failing means the release did not reach Central.
@@ -493,9 +501,9 @@ jobs:
                && [ "${{ steps.confirm.outcome }}" != "success" ]; then
               fail "core reactor -> Maven Central"
             fi
-            [ "${{ steps.deploy_gamebuilder.outcome }}" = "failure" ] && fail "Game Builder -> Maven Central"
-            [ "${{ steps.deploy_certificatewizard.outcome }}" = "failure" ] && fail "Signing Wizard -> Maven Central"
-            [ "${{ steps.deploy_settings.outcome }}" = "failure" ] && fail "Settings -> Maven Central"
+            bad "${{ steps.deploy_gamebuilder.outcome }}" && fail "Game Builder -> Maven Central"
+            bad "${{ steps.deploy_certificatewizard.outcome }}" && fail "Signing Wizard -> Maven Central"
+            bad "${{ steps.deploy_settings.outcome }}" && fail "Settings -> Maven Central"
           fi
           [ "$status" = "0" ] && echo "  all publications succeeded"
           exit $status
