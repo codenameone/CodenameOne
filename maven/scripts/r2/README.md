@@ -33,6 +33,24 @@ Where the tree lands:
 | out-of-reactor editor | `scripts/<editor>/target/central-staging` |
 | **SNAPSHOT builds** | `target/central-deferred` (different directory, and it contains `maven-metadata-central-staging.xml` files) |
 
+### `seed-frozen-artifacts.sh [<artifactId>:<version> ...]`
+
+Copies the frozen artifacts from Maven Central into R2, once. Some artifacts stopped
+being published because their content does not change per release, and consumers are
+pinned to the last version that *was* published — which lives only on Central. That is
+not history that can be left behind: `codenameone-javase` declares
+`com.codenameone:sqlite-jdbc:<pinned>`, and `codenameone-javase` is itself a runtime
+dependency of `codenameone-maven-plugin`, so ordinary plugin resolution reaches it. An
+R2 consumer could not resolve a release precisely when Central is throttled — the case
+this migration exists to survive.
+
+**Run this before flipping `CN1_DUAL_PUBLISH` to false.** It verifies every file against
+its `.sha1` from Central before uploading, and is idempotent.
+
+Seeded artifacts deliberately carry no release marker: they are resolved by exact pinned
+version rather than discovered, so `regen-maven-metadata.py` knows them as frozen and
+generates their metadata from what is present.
+
 ### `mark-release-complete.sh <version>`
 
 Marks a tag fully published. Run it only once every upload for that tag has succeeded;

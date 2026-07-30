@@ -251,9 +251,13 @@ jobs:
           echo "ok: codenameone-gamebuilder ${GITHUB_REF_NAME} on R2"
 
       - name: Confirm Game Builder editor on Maven Central
+        id: confirm_gamebuilder
+        # Runs only to second-guess a failed deploy: central-publishing
+        # reports "Deployment failed while publishing" for bundles it actually accepted,
+        # and Central releases are immutable so a rerun cannot repair that.
         if: >-
-          vars.CN1_DUAL_PUBLISH == 'true' &&
-          (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success')
+          always() && vars.CN1_DUAL_PUBLISH == 'true' &&
+          steps.deploy_gamebuilder.outcome == 'failure'
         continue-on-error: true
         run: |
           # Informational only: the editor bundle was accepted by Sonatype
@@ -271,7 +275,8 @@ jobs:
             echo "[$i/15] Waiting on Maven Central for codenameone-gamebuilder (code=$code)"
             sleep 20
           done
-          echo "codenameone-gamebuilder ${GITHUB_REF_NAME} not visible on repo1 yet; it may still be propagating from Sonatype Central."
+          echo "codenameone-gamebuilder ${GITHUB_REF_NAME} never appeared on Maven Central." >&2
+          exit 1
 
       # --- Signing Wizard editor ---------------------------------------------
       # The cn1:certificatewizard goal resolves
@@ -331,9 +336,13 @@ jobs:
           echo "ok: codenameone-certificatewizard ${GITHUB_REF_NAME} on R2"
 
       - name: Confirm Signing Wizard editor on Maven Central
+        id: confirm_certificatewizard
+        # Runs only to second-guess a failed deploy: central-publishing
+        # reports "Deployment failed while publishing" for bundles it actually accepted,
+        # and Central releases are immutable so a rerun cannot repair that.
         if: >-
-          vars.CN1_DUAL_PUBLISH == 'true' &&
-          (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success')
+          always() && vars.CN1_DUAL_PUBLISH == 'true' &&
+          steps.deploy_certificatewizard.outcome == 'failure'
         continue-on-error: true
         run: |
           set +e
@@ -347,7 +356,8 @@ jobs:
             echo "[$i/15] Waiting on Maven Central for codenameone-certificatewizard (code=$code)"
             sleep 20
           done
-          echo "codenameone-certificatewizard ${GITHUB_REF_NAME} not visible on repo1 yet; it may still be propagating from Sonatype Central."
+          echo "codenameone-certificatewizard ${GITHUB_REF_NAME} never appeared on Maven Central." >&2
+          exit 1
 
       # --- Settings editor ----------------------------------------------------
       # The cn1:settings goal resolves the standalone Java-17 Settings editor
@@ -404,9 +414,13 @@ jobs:
           echo "ok: codenameone-settings ${GITHUB_REF_NAME} on R2"
 
       - name: Confirm Settings editor on Maven Central
+        id: confirm_settings
+        # Runs only to second-guess a failed deploy: central-publishing
+        # reports "Deployment failed while publishing" for bundles it actually accepted,
+        # and Central releases are immutable so a rerun cannot repair that.
         if: >-
-          vars.CN1_DUAL_PUBLISH == 'true' &&
-          (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success')
+          always() && vars.CN1_DUAL_PUBLISH == 'true' &&
+          steps.deploy_settings.outcome == 'failure'
         continue-on-error: true
         run: |
           set +e
@@ -420,7 +434,8 @@ jobs:
             echo "[$i/15] Waiting on Maven Central for codenameone-settings (code=$code)"
             sleep 20
           done
-          echo "codenameone-settings ${GITHUB_REF_NAME} not visible on repo1 yet; it may still be propagating from Sonatype Central."
+          echo "codenameone-settings ${GITHUB_REF_NAME} never appeared on Maven Central." >&2
+          exit 1
 
       - name: Mark the R2 release complete
         id: r2_mark_complete
@@ -501,9 +516,18 @@ jobs:
                && [ "${{ steps.confirm.outcome }}" != "success" ]; then
               fail "core reactor -> Maven Central"
             fi
-            bad "${{ steps.deploy_gamebuilder.outcome }}" && fail "Game Builder -> Maven Central"
-            bad "${{ steps.deploy_certificatewizard.outcome }}" && fail "Signing Wizard -> Maven Central"
-            bad "${{ steps.deploy_settings.outcome }}" && fail "Settings -> Maven Central"
+            if bad "${{ steps.deploy_gamebuilder.outcome }}" \
+               && [ "${{ steps.confirm_gamebuilder.outcome }}" != "success" ]; then
+              fail "Game Builder -> Maven Central"
+            fi
+            if bad "${{ steps.deploy_certificatewizard.outcome }}" \
+               && [ "${{ steps.confirm_certificatewizard.outcome }}" != "success" ]; then
+              fail "Signing Wizard -> Maven Central"
+            fi
+            if bad "${{ steps.deploy_settings.outcome }}" \
+               && [ "${{ steps.confirm_settings.outcome }}" != "success" ]; then
+              fail "Settings -> Maven Central"
+            fi
           fi
           [ "$status" = "0" ] && echo "  all publications succeeded"
           exit $status

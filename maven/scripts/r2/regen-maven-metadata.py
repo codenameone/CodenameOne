@@ -53,6 +53,12 @@ REPO_URL = "https://repo.codenameone.com/maven2"
 #
 # Skipping metadata on the run that failed is also not enough, because every later run
 # rebuilds metadata from the same bucket listing and would advertise the abandoned tag.
+# Artifacts that stopped being published because their content does not change per
+# release. They are seeded into R2 once by seed-frozen-artifacts.sh and are resolved by
+# exact pinned version, not discovered, so they carry no release marker -- requiring one
+# would leave them permanently invisible and reported as incomplete on every run.
+FROZEN_ARTIFACTS = {"sqlite-jdbc", "codenameone-designer", "codenameone-javase-svg"}
+
 RELEASES_PSEUDO_ARTIFACT = "_cn1-releases"
 RELEASE_MARKER = "complete"
 
@@ -178,13 +184,20 @@ def discover(keys, group_path):
             continue
         found.setdefault(artifact, set()).add(version)
 
-    incomplete = sorted({v for versions in found.values() for v in versions} - released)
-    for version in incomplete:
+    tracked = {v for artifact, versions in found.items() if artifact not in FROZEN_ARTIFACTS
+               for v in versions}
+    for version in sorted(tracked - released):
         print("    skipping %s -- release not marked complete, so some artifact for it "
               "never finished uploading" % version)
 
-    return {a: sorted(v & released, key=ComparableVersion)
-            for a, v in found.items() if v & released}
+    result = {}
+    for artifact, versions in found.items():
+        # Frozen artifacts were seeded deliberately and completely; everything else is
+        # only advertised once its release was marked complete.
+        usable = versions if artifact in FROZEN_ARTIFACTS else versions & released
+        if usable:
+            result[artifact] = sorted(usable, key=ComparableVersion)
+    return result
 
 
 def metadata_xml(group_id, artifact_id, versions, stamp):
