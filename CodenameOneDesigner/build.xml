@@ -164,7 +164,7 @@
          from javac.classpath in nbproject/project.properties, while sources here
          still reference it. Nothing exercises this path: CI builds the Designer
          through maven/designer, and the BuildDaemon's invocations of
-         CodenameOne/build.xml's `release` target -- the only caller of this file --
+         CodenameOne/build.xml's `release` target (the only caller of this file)
          are commented out.
 
          So: build the Designer with `mvn -pl designer -am` from maven/. If this Ant
