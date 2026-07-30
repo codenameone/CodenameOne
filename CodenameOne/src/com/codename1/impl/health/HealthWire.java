@@ -906,15 +906,15 @@ public final class HealthWire {
     ///
     /// Spaces rather than an escape, matching the native side, so one
     /// decoder handles every producer.
+    ///
+    /// This subsumed the old `nullToEmpty`, which had no callers left once
+    /// the four series fields moved here and the write line stopped
+    /// emitting an identifier.
     private static String wireText(String s) {
         if (s == null) {
             return "";
         }
         return s.replace(FIELD, ' ').replace(LINE, ' ');
-    }
-
-    private static String nullToEmpty(String s) {
-        return s == null ? "" : s;
     }
 
     private static String emptyToNull(String s) {
