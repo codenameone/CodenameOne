@@ -8340,6 +8340,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             public void actionPerformed(ActionEvent ae) {
                 JavaSEShield.attestationSupported = supported.isSelected();
                 pref.putBoolean("ShieldSim.supported", supported.isSelected());
+                // Unchecking this is a simulation like any other -- "this platform has no
+                // attestation" is an outcome an app has to handle -- so it arms the
+                // engine as well.
+                JavaSEShieldEngine.ensureRegistered();
             }
         });
         shieldMenu.add(supported);
@@ -8353,6 +8357,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (outcome.name().equals(storedOutcome)) {
                 item.setSelected(true);
                 JavaSEShield.attestOutcome = outcome;
+                // Restored non-default state arms the engine too, for the same reason a
+                // restored checkbox does: a developer who left FAIL_REJECTED selected
+                // expects the next run to fail, and without an engine registered
+                // AppShield asks the inert default and reports UNPROTECTED instead.
+                if (outcome != JavaSEShield.AttestOutcome.PASS) {
+                    JavaSEShieldEngine.ensureRegistered();
+                }
             }
             outcomeGroup.add(item);
             item.addActionListener(new ActionListener() {
@@ -8360,6 +8371,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void actionPerformed(ActionEvent ae) {
                     JavaSEShield.attestOutcome = outcome;
                     pref.put("ShieldSim.outcome", outcome.name());
+                    // Selecting any outcome registers the engine, PASS included: PASS is
+                    // "hand out a simulated token", which the inert default does not do
+                    // either. Only the untouched menu leaves the simulator alone.
+                    JavaSEShieldEngine.ensureRegistered();
                 }
             });
             outcomeMenu.add(item);
@@ -8425,13 +8440,31 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }));
 
         // The one branch that is otherwise effectively untestable.
-        shieldMenu.add(shieldToggle(pref, "Force Pin Mismatch On Next Request",
-                "ShieldSim.pinMismatch", new ShieldToggleSink() {
+        final JCheckBoxMenuItem pinMismatch = shieldToggle(pref,
+                "Force Pin Mismatch On Next Request", "ShieldSim.pinMismatch",
+                new ShieldToggleSink() {
                     @Override
                     public void set(boolean v) {
                         JavaSEShield.forcePinMismatch = v;
                     }
-                }));
+                });
+        // It is a one-shot, so when the engine spends it the menu and the stored
+        // preference have to follow. Otherwise the checkbox says a mismatch is armed
+        // when it is not, the next click disarms instead of arming, and the next launch
+        // restores a mismatch that already fired.
+        JavaSEShield.onForcePinMismatchConsumed = new Runnable() {
+            @Override
+            public void run() {
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        pinMismatch.setSelected(false);
+                        pref.putBoolean("ShieldSim.pinMismatch", false);
+                    }
+                });
+            }
+        };
+        shieldMenu.add(pinMismatch);
         shieldMenu.add(shieldToggle(pref, "Fail Pin Fetch", "ShieldSim.pinFetchFail",
                 new ShieldToggleSink() {
                     @Override

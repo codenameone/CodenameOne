@@ -169,8 +169,11 @@ public final class JavaSEShieldEngine implements ShieldEngine {
         }
         // One shot, because the switch is labelled "on next request". Leaving it armed
         // would fail every subsequent request too, and a developer testing a recovery
-        // path would be testing a permanently broken app instead.
-        JavaSEShield.forcePinMismatch = false;
+        // path would be testing a permanently broken app instead. Through
+        // consumeForcePinMismatch so the menu and the stored preference disarm with the
+        // flag -- clearing the field alone left the checkbox claiming it was still armed
+        // and re-armed it on the next launch.
+        JavaSEShield.consumeForcePinMismatch();
         return false;
     }
 

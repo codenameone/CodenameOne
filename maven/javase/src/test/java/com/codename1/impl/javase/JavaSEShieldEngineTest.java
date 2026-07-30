@@ -85,6 +85,27 @@ class JavaSEShieldEngineTest {
     }
 
     @Test
+    void spendingTheForcedMismatchTellsTheMenuToDisarm() {
+        // The engine clearing its own field is not enough: the checkbox and the stored
+        // preference live in the port, so without a notification the menu claims a
+        // mismatch is still armed, the next click disarms instead of arming, and the
+        // next launch restores one that already fired.
+        final int[] notified = {0};
+        JavaSEShield.onForcePinMismatchConsumed = new Runnable() {
+            public void run() {
+                notified[0]++;
+            }
+        };
+        JavaSEShield.forcePinMismatch = true;
+
+        engine.verifyPins("api.example.com", new String[0], new String[0]);
+        assertEquals(1, notified[0], "the menu has to be told the one-shot was spent");
+
+        engine.verifyPins("api.example.com", new String[0], new String[0]);
+        assertEquals(1, notified[0], "and only when there was something to spend");
+    }
+
+    @Test
     void registeredHostsAreEnforcedSoTheMismatchHasSomethingToActOn() {
         // Without pins for the host, ShieldNetworkGuard never asks verifyPins() at all --
         // PinSet.isEnforcedFor() is false for a host with no pins. So a pin set that

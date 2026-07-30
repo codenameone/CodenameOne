@@ -98,6 +98,27 @@ public final class JavaSEShield {
     /** Simulate being unable to fetch a pin set. Must never fail a request. */
     public static boolean failPinFetch;
 
+    /**
+     * Notified when the one-shot forced mismatch is spent, so the menu can disarm too.
+     *
+     * <p>Without it the engine cleared its own flag and the checkbox and the stored
+     * preference stayed true: the menu claimed a mismatch was still armed, the next click
+     * disarmed it instead of scheduling another, and restarting the simulator re-armed
+     * one that had already fired. A control that reports a state it does not cause is
+     * the failure this whole engine exists to remove, so it must not reappear in the
+     * engine's own bookkeeping.</p>
+     */
+    public static Runnable onForcePinMismatchConsumed;
+
+    /** Clears the forced mismatch and lets the menu know, so the two cannot disagree. */
+    static void consumeForcePinMismatch() {
+        forcePinMismatch = false;
+        Runnable r = onForcePinMismatchConsumed;
+        if (r != null) {
+            r.run();
+        }
+    }
+
     /** True when the window is displaying a screen marked secure. */
     public static boolean secureScreen;
 
@@ -145,6 +166,7 @@ public final class JavaSEShield {
         forcePinMismatch = false;
         failPinFetch = false;
         secureScreen = false;
+        onForcePinMismatchConsumed = null;
     }
 
     /** A human-readable dump for the menu's status dialog. */
