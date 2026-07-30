@@ -1636,6 +1636,10 @@ struct ThreadLocalData* getThreadLocalData() {
         memset(i->pendingHeapAllocations, 0, PER_THREAD_ALLOCATION_COUNT * sizeof(void *));
         i->heapAllocationSize = 0;
         i->threadHeapTotalSize = PER_THREAD_ALLOCATION_COUNT;
+        // ThreadLocalData is malloc'd, NOT zeroed: garbage in the low-memory park
+        // stamp would mis-pace the throttle on every new thread (see
+        // CN1_LOW_MEMORY_PARK_INTERVAL_MS).
+        i->lowMemoryParkStampMs = 0;
         // ThreadLocalData is malloc'd, NOT zeroed. bibopBytesLocal feeds the GC
         // trigger/pacing accounting (CN1_BIBOP_FLUSH_BYTES adds it into the global
         // counters); garbage here means a spurious immediate GC + hard-cap park, or
