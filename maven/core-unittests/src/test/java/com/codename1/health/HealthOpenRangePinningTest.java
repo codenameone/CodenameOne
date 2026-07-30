@@ -23,6 +23,7 @@
 package com.codename1.health;
 
 import com.codename1.junit.UITestBase;
+import com.codename1.util.AsyncResource;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -132,6 +133,72 @@ class HealthOpenRangePinningTest extends UITestBase {
 
         assertEquals(2, read.size(),
                 "the query-wide limit has to hold whatever the port sent");
+    }
+
+    /**
+     * Asking for de-duplication where it does not exist fails loudly.
+     *
+     * <p>The alternative is the quiet wrongness this API is written to avoid:
+     * ordinary-looking totals that are wrong by however many devices recorded
+     * the same activity. A caller who asked for overlapping sources to be
+     * counted once, and silently got them counted twice, has no way to tell.
+     * The probe exists so the refusal is avoidable.</p>
+     */
+    @Test
+    void askingForDeduplicationWhereItIsUnsupportedFails() throws Exception {
+        FakeHealthStore store = new FakeHealthStore();
+        assertFalse(store.isSourceDeduplicationSupported(),
+                "the shared rollup cannot de-duplicate");
+
+        AsyncResource<List<AggregateResult>> res = store.aggregate(
+                new AggregateQuery()
+                        .addType(HealthDataType.STEPS)
+                        .addMetric(AggregateMetric.TOTAL)
+                        .setTimeRange(HealthTimeRange.between(0L, 1000L))
+                        .setDeduplicateSources(true));
+        HealthAwait.settled(res);
+
+        assertEquals(0, store.aggregatesSeen.size(),
+                "the port must not be asked to do what it cannot");
+        Throwable err = null;
+        try {
+            res.get();
+        } catch (Throwable t) {
+            err = t;
+        }
+        assertNotNull(err, "the aggregate must fail rather than answer");
+    }
+
+    /** And the plain aggregate is unaffected. */
+    @Test
+    void anAggregateWithoutDeduplicationStillRuns() {
+        FakeHealthStore store = new FakeHealthStore();
+        store.aggregate(new AggregateQuery()
+                .addType(HealthDataType.STEPS)
+                .addMetric(AggregateMetric.TOTAL)
+                .setTimeRange(HealthTimeRange.between(0L, 1000L)));
+        assertEquals(1, store.aggregatesSeen.size());
+        assertFalse(store.aggregatesSeen.get(0).isDeduplicateSources());
+    }
+
+    /** A store that can de-duplicate is asked to, and the flag survives. */
+    @Test
+    void aCapableStoreReceivesTheDeduplicationRequest() {
+        FakeHealthStore store = new FakeHealthStore() {
+            @Override
+            public boolean isSourceDeduplicationSupported() {
+                return true;
+            }
+        };
+        store.aggregate(new AggregateQuery()
+                .addType(HealthDataType.STEPS)
+                .addMetric(AggregateMetric.TOTAL)
+                .setTimeRange(HealthTimeRange.between(0L, 1000L))
+                .setDeduplicateSources(true));
+
+        assertEquals(1, store.aggregatesSeen.size());
+        assertTrue(store.aggregatesSeen.get(0).isDeduplicateSources(),
+                "the snapshot must carry the request to the port");
     }
 
     /** Every page of a paged read shares the one closed range. */

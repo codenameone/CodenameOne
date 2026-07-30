@@ -193,6 +193,24 @@ public final class SampleQuery {
     /// because the grouping is the shape the port will need, and a
     /// setting that silently did nothing without saying so is what this
     /// note exists to prevent.
+
+    /// The gap that separates two sleep sessions.
+    ///
+    /// The [Duration] form of [#setSleepSessionGapMillis(long)], which is the type the rest of
+    /// the framework speaks; the millis form stays for the ports and the
+    /// wire format.
+    public SampleQuery setSleepSessionGap(java.time.Duration value) {
+        if (value == null) {
+            throw new IllegalArgumentException("a duration is required");
+        }
+        return setSleepSessionGapMillis((long) value.toMillis());
+    }
+
+    /// The gap that separates two sleep sessions, as a [Duration].
+    public java.time.Duration getSleepSessionGap() {
+        return java.time.Duration.ofMillis(getSleepSessionGapMillis());
+    }
+
     public SampleQuery setSleepSessionGapMillis(long gapMillis) {
         this.sleepSessionGapMillis = gapMillis;
         return this;

@@ -29,6 +29,32 @@ public final class SleepStageInterval {
     private final long startMillis;
     private final long endMillis;
 
+    /// The platform's own value for this span, or [#NO_PLATFORM_CODE].
+    ///
+    /// The fidelity escape hatch. A portable [SleepStage] is a
+    /// lowest-common-denominator of two vendors' vocabularies, and an app
+    /// that needs exactly what HealthKit or Health Connect said -- to match
+    /// another tool, or to handle a value this build predates -- would
+    /// otherwise have to give up the portable API entirely to get it.
+    private int platformCode = NO_PLATFORM_CODE;
+
+    /// Returned by [#getPlatformCode()] when the port did not record one.
+    public static final int NO_PLATFORM_CODE = -1;
+
+    /// The raw platform value, or [#NO_PLATFORM_CODE].
+    ///
+    /// `HKCategoryValueSleepAnalysis` on iOS, the Health Connect stage
+    /// constant on Android. Meaningless across platforms by design: read it
+    /// only after checking which one you are on.
+    public int getPlatformCode() {
+        return platformCode;
+    }
+
+    /// Records the platform's own value. Called by ports while reading.
+    public void setPlatformCode(int platformCode) {
+        this.platformCode = platformCode;
+    }
+
     /// Creates a stage interval.
     ///
     /// #### Throws

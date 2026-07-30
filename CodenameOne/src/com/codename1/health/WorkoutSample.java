@@ -187,6 +187,22 @@ public final class WorkoutSample extends SessionSample {
         this.activeDurationMillis = activeDurationMillis;
     }
 
+    /// The active portion of this workout, as a [java.time.Duration].
+    ///
+    /// The millis pair stays for the ports and the wire format; this is the
+    /// type the rest of the framework speaks.
+    public java.time.Duration getActiveDuration() {
+        return java.time.Duration.ofMillis(getActiveDurationMillis());
+    }
+
+    /// Sets the active portion of this workout.
+    public void setActiveDuration(java.time.Duration active) {
+        if (active == null) {
+            throw new IllegalArgumentException("a duration is required");
+        }
+        setActiveDurationMillis(active.toMillis());
+    }
+
     @Override
     public String toString() {
         return "WorkoutSample[" + activityType + " " + getStartMillis()

@@ -138,16 +138,32 @@ public final class SleepSample extends SessionSample {
     /// only [SleepStage#ASLEEP_UNSPECIFIED], [SleepStage#AWAKE_IN_BED] and
     /// [SleepStage#UNKNOWN], because none of those tell you anything a
     /// hypnogram could show.
-    public boolean hasStageDetail() {
-        for (SleepStageInterval stage : stages) {
-            SleepStage s = stage.getStage();
-            if (s == SleepStage.LIGHT || s == SleepStage.DEEP
-                    || s == SleepStage.REM || s == SleepStage.AWAKE
-                    || s == SleepStage.OUT_OF_BED) {
-                return true;
+    /// How much stage detail this session carries.
+    ///
+    /// Three answers rather than the boolean [#hasStageDetail()], because
+    /// "has stages" collapses two cases an app has to draw differently: a
+    /// session that knows only asleep-versus-awake, and one carrying a real
+    /// hypnogram. Branch on this before building the UI rather than
+    /// discovering it from an empty chart.
+    ///
+    /// [#hasStageDetail()] is kept and is exactly
+    /// `getStageSupport() == SleepStageSupport.STAGED`.
+    public SleepStageSupport getStageSupport() {
+        if (stages.isEmpty()) {
+            return SleepStageSupport.NONE;
+        }
+        for (SleepStageInterval iv : stages) {
+            SleepStage s = iv.getStage();
+            if (s == SleepStage.LIGHT || s == SleepStage.CORE
+                    || s == SleepStage.DEEP || s == SleepStage.REM) {
+                return SleepStageSupport.STAGED;
             }
         }
-        return false;
+        return SleepStageSupport.ASLEEP_AWAKE;
+    }
+
+    public boolean hasStageDetail() {
+        return getStageSupport() == SleepStageSupport.STAGED;
     }
 
     /// The total time in `stage` -- the time actually covered by its
@@ -187,11 +203,20 @@ public final class SleepSample extends SessionSample {
             // side, and hasStageDetail() is what tells a caller the
             // breakdown is unavailable.
             if (s == SleepStage.ASLEEP_UNSPECIFIED || s == SleepStage.LIGHT
-                    || s == SleepStage.DEEP || s == SleepStage.REM) {
+                    || s == SleepStage.CORE || s == SleepStage.DEEP
+                    || s == SleepStage.REM) {
                 asleep.add(iv);
             }
         }
         return coveredMillis(asleep);
+    }
+
+    /// Time asleep in this session, as a [java.time.Duration].
+    ///
+    /// The millis form stays for the ports and the wire format; this is the
+    /// type the rest of the framework speaks.
+    public java.time.Duration getAsleepDuration() {
+        return java.time.Duration.ofMillis(getAsleepDurationMillis());
     }
 
     /// Time actually covered by a set of spans, counting an overlap once.

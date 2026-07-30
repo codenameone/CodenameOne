@@ -48,13 +48,26 @@ public enum SleepStage {
     /// iOS 16.
     ASLEEP_UNSPECIFIED,
 
-    /// Light sleep. Mapped from HealthKit's `asleepCore`.
+    /// Light sleep, as Health Connect classifies it -- the N1 and N2
+    /// stages.
     ///
-    /// This mapping is an **approximation**: Apple's "core" is that
-    /// vendor's own classification and is not clinically identical to the
-    /// N1+N2 light-sleep stages the Health Connect value denotes. Treat it
-    /// as indicative rather than diagnostic.
+    /// HealthKit does not report this. Its nearest value is `asleepCore`,
+    /// which arrives as [#CORE] rather than being folded in here.
     LIGHT,
+
+    /// Apple's "core" sleep, from HealthKit `asleepCore` (iOS 16+).
+    ///
+    /// Its own value rather than a synonym for [#LIGHT]. This used to be
+    /// mapped there with the approximation written into the javadoc, and a
+    /// documented approximation is still a value the caller cannot tell
+    /// from a real one: an app drawing a hypnogram, or comparing a night on
+    /// iOS with a night on Android, was handed Apple's classification
+    /// labelled as the clinical one.
+    ///
+    /// Apple's core is a vendor classification and is not clinically
+    /// identical to N1+N2. If your reading of the two is the same, treat
+    /// them the same; the API will not do it for you.
+    CORE,
 
     /// Deep sleep. HealthKit `asleepDeep`, iOS 16+.
     DEEP,

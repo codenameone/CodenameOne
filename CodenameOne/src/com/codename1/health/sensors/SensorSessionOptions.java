@@ -115,6 +115,24 @@ public final class SensorSessionOptions {
     /// How long samples are batched before being written to the store.
     /// Defaults to one minute. Writing every notification individually
     /// would mean a store round trip per second per sensor.
+
+    /// How long samples are batched before a store write.
+    ///
+    /// The [Duration] form of [#setStoreBatchMillis(int)], which is the type the rest of
+    /// the framework speaks; the millis form stays for the ports and the
+    /// wire format.
+    public SensorSessionOptions setStoreBatch(java.time.Duration value) {
+        if (value == null) {
+            throw new IllegalArgumentException("a duration is required");
+        }
+        return setStoreBatchMillis((int) value.toMillis());
+    }
+
+    /// How long samples are batched before a store write, as a [Duration].
+    public java.time.Duration getStoreBatch() {
+        return java.time.Duration.ofMillis(getStoreBatchMillis());
+    }
+
     public SensorSessionOptions setStoreBatchMillis(int storeBatchMillis) {
         this.storeBatchMillis = storeBatchMillis;
         return this;
@@ -148,6 +166,24 @@ public final class SensorSessionOptions {
     /// Past this age `getLatest` returns null rather than a stale value,
     /// so a UI bound to it shows a dash instead of silently displaying the
     /// heart rate from before the strap fell off.
+
+    /// How old a sample may be before it is dropped.
+    ///
+    /// The [Duration] form of [#setStaleSampleMillis(int)], which is the type the rest of
+    /// the framework speaks; the millis form stays for the ports and the
+    /// wire format.
+    public SensorSessionOptions setStaleSample(java.time.Duration value) {
+        if (value == null) {
+            throw new IllegalArgumentException("a duration is required");
+        }
+        return setStaleSampleMillis((int) value.toMillis());
+    }
+
+    /// How old a sample may be before it is dropped, as a [Duration].
+    public java.time.Duration getStaleSample() {
+        return java.time.Duration.ofMillis(getStaleSampleMillis());
+    }
+
     public SensorSessionOptions setStaleSampleMillis(int staleSampleMillis) {
         this.staleSampleMillis = staleSampleMillis;
         return this;

@@ -25,6 +25,8 @@ package com.codename1.health;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.time.Duration;
+import java.time.Instant;
 
 /// The base of every health record: what it measures and when.
 ///
@@ -107,6 +109,29 @@ public abstract class HealthSample {
     /// sample.
     public final long getEndMillis() {
         return endMillis;
+    }
+
+    /// When this sample starts.
+    ///
+    /// The millis accessors stay, and are what the ports and the wire format
+    /// use: a series can hold tens of thousands of measurements and an
+    /// `Instant` per point is an allocation per point. For a single sample
+    /// this is the type the rest of the framework speaks --
+    /// [com.codename1.calendar] included -- so it is what the public API
+    /// hands out.
+    public final Instant getStart() {
+        return Instant.ofEpochMilli(getStartMillis());
+    }
+
+    /// When this sample ends. Equal to [#getStart()] for an instantaneous
+    /// sample.
+    public final Instant getEnd() {
+        return Instant.ofEpochMilli(getEndMillis());
+    }
+
+    /// How long this sample covers. Zero for an instantaneous sample.
+    public final Duration getDuration() {
+        return Duration.ofMillis(getEndMillis() - getStartMillis());
     }
 
     /// `true` when this sample marks a moment rather than a span.

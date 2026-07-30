@@ -175,7 +175,12 @@ final class LocalHealthCodec {
                 SleepStageInterval iv = stages.get(i);
                 sb.append(iv.getStage().name()).append(PART)
                         .append(iv.getStartMillis()).append(PART)
-                        .append(iv.getEndMillis());
+                        .append(iv.getEndMillis()).append(PART)
+                        // Fourth part, appended rather than inserted, so a
+                        // record written before this existed still parses --
+                        // the reader accepts three parts and leaves the code
+                        // unset.
+                        .append(iv.getPlatformCode());
             }
             return;
         }
@@ -351,11 +356,15 @@ final class LocalHealthCodec {
             applySessionText(sleep, f);
             for (String item : split(f.get(14), ITEM)) {
                 List<String> p = split(item, PART);
-                if (p.size() == 3) {
-                    sleep.addStage(new SleepStageInterval(
+                if (p.size() >= 3) {
+                    SleepStageInterval iv = new SleepStageInterval(
                             SleepStage.valueOf(p.get(0)),
                             Long.parseLong(p.get(1)),
-                            Long.parseLong(p.get(2))));
+                            Long.parseLong(p.get(2)));
+                    if (p.size() > 3) {
+                        iv.setPlatformCode(Integer.parseInt(p.get(3)));
+                    }
+                    sleep.addStage(iv);
                 }
             }
             return sleep;

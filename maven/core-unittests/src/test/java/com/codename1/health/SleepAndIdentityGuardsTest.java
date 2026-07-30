@@ -43,6 +43,78 @@ class SleepAndIdentityGuardsTest {
     }
 
     /**
+     * Apple's core sleep is its own value, not a synonym for light.
+     *
+     * <p>It used to be mapped onto {@link SleepStage#LIGHT} with the
+     * approximation written into the javadoc -- but a documented
+     * approximation is still a value the caller cannot tell from a real one.
+     * An app drawing a hypnogram, or comparing a night on iOS against a night
+     * on Android, was handed Apple's vendor classification labelled as the
+     * clinical N1+N2 stage.</p>
+     */
+    @Test
+    void coreSleepIsItsOwnStageAndStillCountsAsAsleep() {
+        List<SleepStageInterval> supplied =
+                new ArrayList<SleepStageInterval>();
+        supplied.add(stage(SleepStage.CORE, 0, 3000));
+        supplied.add(stage(SleepStage.LIGHT, 3000, 4000));
+
+        SleepSample sleep = SleepSample.create(START, START + 4000, supplied);
+
+        assertEquals(3000, sleep.getDurationMillis(SleepStage.CORE),
+                "core is reported as core");
+        assertEquals(1000, sleep.getDurationMillis(SleepStage.LIGHT),
+                "and does not leak into light");
+        assertEquals(4000, sleep.getAsleepDurationMillis(),
+                "both are time asleep");
+    }
+
+    /**
+     * The stage tier is a queryable fact, not something to infer.
+     *
+     * <p>{@code hasStageDetail()} collapsed two cases an app has to draw
+     * differently: a session that knows only asleep-versus-awake, and one
+     * carrying a real hypnogram. Both answered false or true on the same
+     * boolean depending on which stages happened to be present.</p>
+     */
+    @Test
+    void theStageTierDistinguishesNoDetailFromAsleepAwakeFromStaged() {
+        SleepSample none = SleepSample.create(START, START + 1000,
+                new ArrayList<SleepStageInterval>());
+        assertEquals(SleepStageSupport.NONE, none.getStageSupport());
+        assertFalse(none.hasStageDetail());
+
+        List<SleepStageInterval> coarse =
+                new ArrayList<SleepStageInterval>();
+        coarse.add(stage(SleepStage.ASLEEP_UNSPECIFIED, 0, 1000));
+        coarse.add(stage(SleepStage.AWAKE, 1000, 2000));
+        SleepSample binary = SleepSample.create(START, START + 2000, coarse);
+        assertEquals(SleepStageSupport.ASLEEP_AWAKE,
+                binary.getStageSupport(),
+                "asleep-versus-awake is not a hypnogram");
+        assertFalse(binary.hasStageDetail());
+
+        List<SleepStageInterval> hypnogram =
+                new ArrayList<SleepStageInterval>();
+        hypnogram.add(stage(SleepStage.REM, 0, 1000));
+        SleepSample staged = SleepSample.create(START, START + 1000,
+                hypnogram);
+        assertEquals(SleepStageSupport.STAGED, staged.getStageSupport());
+        assertTrue(staged.hasStageDetail(),
+                "and the old boolean still means exactly STAGED");
+    }
+
+    /** The platform's own value is carried through untouched. */
+    @Test
+    void thePlatformStageCodeIsPreserved() {
+        SleepStageInterval iv = stage(SleepStage.CORE, 0, 1000);
+        assertEquals(SleepStageInterval.NO_PLATFORM_CODE,
+                iv.getPlatformCode(), "unset by default");
+        iv.setPlatformCode(3);
+        assertEquals(3, iv.getPlatformCode());
+    }
+
+    /**
      * An unclassified span is not time asleep.
      *
      * <p>The rollup asked "is this not one of the awake stages?", which swept

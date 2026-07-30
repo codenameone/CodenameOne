@@ -135,6 +135,25 @@ public class HealthStore {
 
     /// Whether samples of `type` can be deleted. Both platforms restrict
     /// deletion to data this app wrote.
+    /// Whether this store can de-duplicate overlapping sources when it
+    /// aggregates.
+    ///
+    /// False everywhere by default, and the honest answer for most stores:
+    /// the shared rollup computes every metric from raw samples, so a phone
+    /// and a watch that both recorded one walk contribute it twice.
+    ///
+    /// HealthKit's statistics engine does de-duplicate, which is a real
+    /// capability this API refused to expose while it levelled the two
+    /// platforms down to the behaviour of the weaker one. A store that
+    /// overrides this to true honours
+    /// [AggregateQuery#setDeduplicateSources(boolean)]; one that does not
+    /// rejects the request rather than quietly ignoring it, so an app can
+    /// tell the difference between "de-duplicated" and "counted twice"
+    /// instead of comparing totals and guessing.
+    public boolean isSourceDeduplicationSupported() {
+        return false;
+    }
+
     public boolean isDeletable(HealthDataType type) {
         return false;
     }
@@ -550,7 +569,12 @@ public class HealthStore {
                 // rather than needing them all to be found and changed.
                 .setTimeRange(resolved(query.getTimeRange()))
                 .setBucket(query.getBucket())
-                .setUnit(query.getUnit());
+                .setUnit(query.getUnit())
+                // Carried like every other criterion. A snapshot that
+                // dropped it would hand the port a query asking for the
+                // plain rollup after the caller had asked for de-duplication
+                // and passed the check for it.
+                .setDeduplicateSources(query.isDeduplicateSources());
         for (HealthDataType type : query.getTypes()) {
             copy.addType(type);
         }
@@ -1302,6 +1326,19 @@ public class HealthStore {
             requireSupportedTypes(query.getTypes());
         } catch (HealthException ex) {
             out.error(ex);
+            return out;
+        }
+        if (query.isDeduplicateSources()
+                && !isSourceDeduplicationSupported()) {
+            // Refused rather than ignored. Returning double-counted numbers
+            // to a caller who asked for them to be de-duplicated is the
+            // quiet wrongness this API exists to avoid -- the totals look
+            // ordinary and are wrong by however many devices recorded the
+            // same activity. The probe is there so this is avoidable.
+            fail(out, HealthError.NOT_SUPPORTED,
+                    "this platform cannot de-duplicate overlapping sources;"
+                            + " check isSourceDeduplicationSupported()"
+                            + " before asking for it");
             return out;
         }
         // Snapshotted for the same reason readSamplePage is: the

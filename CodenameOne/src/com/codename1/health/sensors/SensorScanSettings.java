@@ -56,6 +56,24 @@ public final class SensorScanSettings {
     /// most expensive things an app can do to a phone's battery, and both
     /// platforms throttle or silently stop an app that scans
     /// indefinitely.
+
+    /// How long to scan before giving up.
+    ///
+    /// The [Duration] form of [#setTimeoutMillis(int)], which is the type the rest of
+    /// the framework speaks; the millis form stays for the ports and the
+    /// wire format.
+    public SensorScanSettings setTimeout(java.time.Duration value) {
+        if (value == null) {
+            throw new IllegalArgumentException("a duration is required");
+        }
+        return setTimeoutMillis((int) value.toMillis());
+    }
+
+    /// How long to scan before giving up, as a [Duration].
+    public java.time.Duration getTimeout() {
+        return java.time.Duration.ofMillis(getTimeoutMillis());
+    }
+
     public SensorScanSettings setTimeoutMillis(int timeoutMillis) {
         this.timeoutMillis = timeoutMillis;
         return this;

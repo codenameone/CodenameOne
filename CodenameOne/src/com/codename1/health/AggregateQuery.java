@@ -93,6 +93,29 @@ public final class AggregateQuery {
 
     /// Restricts the summary to one writing app -- see the double-counting
     /// warning on this class.
+    /// Asks the platform to de-duplicate overlapping sources.
+    ///
+    /// Off by default, because the shared rollup cannot do it and most
+    /// stores therefore cannot honour it. Check
+    /// [HealthStore#isSourceDeduplicationSupported()] first: asking a store
+    /// that cannot fails the aggregate with [HealthError#NOT_SUPPORTED]
+    /// rather than silently returning the double-counted answer.
+    ///
+    /// Where it is honoured -- HealthKit, whose statistics engine does this
+    /// natively -- a walk recorded by both a phone and a watch is counted
+    /// once instead of twice.
+    public AggregateQuery setDeduplicateSources(boolean deduplicate) {
+        this.deduplicateSources = deduplicate;
+        return this;
+    }
+
+    /// Whether this query asked for source de-duplication.
+    public boolean isDeduplicateSources() {
+        return deduplicateSources;
+    }
+
+    private boolean deduplicateSources;
+
     public AggregateQuery addSource(String bundleId) {
         if (bundleId != null && !sources.contains(bundleId)) {
             sources.add(bundleId);
