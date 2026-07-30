@@ -59,7 +59,9 @@
         The pinned version lives in ONE place: the cn1.designer.version @Parameter
         default on AbstractCN1Mojo, which is what user projects resolve. Deliberately
         not duplicated as a property here, so there is nothing for update-version.sh
-        to bump out of sync.
+        to bump out of sync. maven/scripts/r2/seed-frozen-artifacts.sh reads it from
+        there rather than repeating it, and fails loudly if it cannot, so bumping the
+        pin cannot leave the seeding behind on an older version.
         -->
         <!-- Last published com.codenameone:sqlite-jdbc. See the dependencyManagement
              entry below for why this is pinned rather than tracking the release. -->

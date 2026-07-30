@@ -25,12 +25,38 @@ set -euo pipefail
 : "${R2_SECRET_ACCESS_KEY:?R2_SECRET_ACCESS_KEY is required}"
 : "${R2_BUCKET:?R2_BUCKET is required}"
 
-# Keep in sync with <cn1.sqlite.jdbc.version> in maven/pom.xml and the
-# cn1.designer.version @Parameter default in AbstractCN1Mojo.
+# Versions are read from where they are actually declared rather than repeated here.
+# Duplicating them would mean a bump could seed the wrong artifact -- the pin would move
+# and the seeding would not, silently, with no build failure to catch it.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+
+read_pinned() {
+    local description="$1" file="$2" pattern="$3"
+    local value
+    # `|` as the delimiter, not `/`: the XML pattern contains a closing tag.
+    value=$(sed -nE "s|.*${pattern}.*|\1|p" "$file" | head -n1)
+    if [ -z "$value" ]; then
+        echo "ERROR: could not read the ${description} from ${file}." >&2
+        echo "It has moved or been renamed; update this script rather than hardcoding it." >&2
+        exit 1
+    fi
+    printf '%s' "$value"
+}
+
+SQLITE_VERSION=$(read_pinned "pinned sqlite-jdbc version" \
+    "${REPO_ROOT}/maven/pom.xml" \
+    "<cn1\\.sqlite\\.jdbc\\.version>([^<]+)</cn1\\.sqlite\\.jdbc\\.version>")
+
+# The designer pin lives only on the mojo parameter, deliberately: see the comment in
+# maven/pom.xml explaining why it is not also a Maven property.
+DESIGNER_VERSION=$(read_pinned "pinned designer version" \
+    "${REPO_ROOT}/maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/AbstractCN1Mojo.java" \
+    "cn1\\.designer\\.version\", defaultValue = \"([^\"]+)\"")
+
 DEFAULT_COORDINATES=(
-    "sqlite-jdbc:7.0.263"
-    "codenameone-designer:7.0.263"
-    "codenameone-javase-svg:7.0.263"
+    "sqlite-jdbc:${SQLITE_VERSION}"
+    "codenameone-designer:${DESIGNER_VERSION}"
+    "codenameone-javase-svg:${DESIGNER_VERSION}"
 )
 
 coordinates=("$@")
