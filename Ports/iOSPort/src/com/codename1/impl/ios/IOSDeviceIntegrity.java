@@ -660,7 +660,19 @@ final class IOSDeviceIntegrity {
         if (pending == null) {
             return;
         }
+        if (assertionB64 == null) {
+            fail(pending, "App Attest assertion returned no data");
+            return;
+        }
         if (instance != null) {
+            // ONE acquisition covering the staleness check and everything it guards, for
+            // the reason spelled out on nativeAttestError. Split in two, a reset landing
+            // between them let this callback clear the throttle state belonging to the
+            // replacement generation: if that replacement had already recorded a
+            // serverUnavailable, its deadline was erased here while succeed() went on to
+            // reject this token as stale anyway -- so the next request went straight back
+            // at a service Apple had just told us to stay away from, which is how an app
+            // gets its whole attestation budget suspended.
             synchronized (instance.flowLock) {
                 if (isStale(pending)) {
                     // A reset landed while this assertion was in flight -- typically
@@ -671,14 +683,6 @@ final class IOSDeviceIntegrity {
                             "App Attest state was reset while this request was in flight");
                     return;
                 }
-            }
-        }
-        if (assertionB64 == null) {
-            fail(pending, "App Attest assertion returned no data");
-            return;
-        }
-        if (instance != null) {
-            synchronized (instance.flowLock) {
                 // A working assertion means Apple is answering again, so the throttle
                 // sequence starts over. Without this the doubling only ever accumulated:
                 // outages separated by months of successful requests would compound
