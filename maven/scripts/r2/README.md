@@ -58,13 +58,19 @@ whose bytes differ, and exits non-zero. Re-cut under a new version rather than s
 **Never generate `maven-metadata.xml` in a build.** The upload script deletes any it finds
 in the staging tree. Only `regen-maven-metadata.py` writes it.
 
-**A version is only real once it is marked complete.** `publish-staging-to-r2.sh` writes
-`_cn1-upload-complete` into each `<artifact>/<version>/` after that directory's copy
-succeeds, and `regen-maven-metadata.py` will not advertise a version without it. This is
-what stops an interrupted upload from being discovered and published by some *later*
-release — skipping metadata on the run that failed protects only that run, because every
-subsequent run rebuilds metadata from the same bucket listing. Re-running the upload
-completes the directory, writes the marker, and the version then appears normally.
+**A release is only real once it is marked complete, and completeness is per release,
+not per directory.** Everything a tag publishes shares one version, and the plugin
+resolves its editors at its own version — so advertising `codenameone-core:7.0.x` while
+`codenameone-gamebuilder:7.0.x` is missing hands a consumer a plugin whose
+`cn1:gamebuilder` goal cannot resolve. A per-directory marker cannot express that: the
+core directory is complete in exactly the case that matters.
+
+`mark-release-complete.sh` writes `com/codenameone/_cn1-releases/<version>/complete` only
+once the core reactor *and* all three editors are up, and `regen-maven-metadata.py` will
+not advertise any artifact at a version lacking it. That holds on every future run too,
+which matters because each run rebuilds metadata from the same bucket listing — gating
+only the run that failed would let the next tag advertise the abandoned one. Re-running
+the release uploads what is missing, marks it, and it then appears normally.
 
 **Metadata is written last, on purpose.** It is what makes a version discoverable, so a
 failed release leaves its artifacts orphaned but invisible — the recoverable direction.

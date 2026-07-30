@@ -41,11 +41,6 @@ export AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
 
 ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 IMMUTABLE='public, max-age=31536000, immutable'
-# Written into each <artifact>/<version>/ only after its whole directory is up.
-# regen-maven-metadata.py will not advertise a version that lacks it. Keep the two
-# in sync; the name is deliberately not a Maven artifact pattern so no resolver
-# will ever request it.
-MARKER_NAME='_cn1-upload-complete'
 
 uploaded=0
 
@@ -134,25 +129,8 @@ for dir in "$@"; do
     uploaded=$((uploaded + n))
     echo "    uploaded $n files"
 
-    # Mark each version complete, only now that its whole directory is up.
-    # regen-maven-metadata.py refuses to advertise a version without this marker,
-    # which is what stops an interrupted upload from being discovered and published
-    # by some *later* release: skipping metadata on the failed run protects only that
-    # run, because every subsequent run rebuilds metadata from the same bucket listing.
-    marker=$(mktemp)
-    printf 'uploaded-by=publish-staging-to-r2.sh\n' > "$marker"
-    # Every directory that actually holds files is a <artifact>/<version> directory
-    # in Maven layout, so this is the exact set of versions this tree published.
-    find "$dir" -type f -exec dirname {} \; | sort -u | while IFS= read -r versionDir; do
-        key="maven2/${versionDir#"$dir"/}/${MARKER_NAME}"
-        aws s3 cp "$marker" "s3://${R2_BUCKET}/${key}" \
-            --endpoint-url "$ENDPOINT" \
-            --cache-control "$IMMUTABLE" \
-            --content-type "text/plain" \
-            --only-show-errors
-        echo "    marked complete: ${versionDir#"$dir"/}"
-    done
-    rm -f "$marker"
 done
 
+# Uploading is not publishing: nothing here is discoverable until
+# mark-release-complete.sh runs, once every upload for the tag has succeeded.
 echo "==> done, $uploaded file(s) uploaded to s3://${R2_BUCKET}/maven2"

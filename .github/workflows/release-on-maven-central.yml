@@ -411,6 +411,20 @@ jobs:
           done
           echo "codenameone-settings ${GITHUB_REF_NAME} not visible on repo1 yet; it may still be propagating from Sonatype Central."
 
+      - name: Mark the R2 release complete
+        id: r2_mark_complete
+        continue-on-error: true
+        # Only now, once the core reactor and all three editors are up. This is what
+        # makes the tag discoverable: regen refuses to advertise a version without it,
+        # on this run and on every future one. Same condition as the regeneration below,
+        # so a tag is never advertised without having been marked.
+        if: >-
+          always() && steps.r2_core.outcome == 'success' &&
+          steps.r2_gamebuilder.outcome != 'failure' &&
+          steps.r2_certificatewizard.outcome != 'failure' &&
+          steps.r2_settings.outcome != 'failure'
+        run: bash maven/scripts/r2/mark-release-complete.sh "${GITHUB_REF_NAME}"
+
       - name: Regenerate R2 metadata and archetype catalog
         id: r2_metadata
         continue-on-error: true
@@ -459,6 +473,7 @@ jobs:
           [ "${{ steps.r2_gamebuilder.outcome }}" = "failure" ] && fail "Game Builder -> R2"
           [ "${{ steps.r2_certificatewizard.outcome }}" = "failure" ] && fail "Signing Wizard -> R2"
           [ "${{ steps.r2_settings.outcome }}" = "failure" ] && fail "Settings -> R2"
+          [ "${{ steps.r2_mark_complete.outcome }}" = "failure" ] && fail "marking the R2 release complete"
           [ "${{ steps.r2_metadata.outcome }}" = "failure" ] && fail "R2 metadata regeneration"
           if [ "${{ vars.CN1_DUAL_PUBLISH }}" = "true" ]; then
             # The core Central deploy is allowed to false-negative; the confirm poll is its

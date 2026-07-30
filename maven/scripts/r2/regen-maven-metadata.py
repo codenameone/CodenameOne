@@ -42,12 +42,18 @@ ARCHETYPES = {
 
 REPO_URL = "https://repo.codenameone.com/maven2"
 
-# Written by publish-staging-to-r2.sh into each <artifact>/<version>/ only once that
-# whole directory has been uploaded. A version without it is an interrupted upload and
-# must never be advertised. Skipping metadata on the run that failed is not enough:
-# every later run rebuilds metadata from the same bucket listing, so without this the
-# next successful release would discover the abandoned version and publish it.
-UPLOAD_COMPLETE_MARKER = "_cn1-upload-complete"
+# Written by mark-release-complete.sh once every upload for a tag has succeeded.
+#
+# Completeness is per release, not per directory. Everything a tag publishes shares one
+# version and the plugin resolves its editors at its own version, so advertising core
+# 7.0.x while codenameone-gamebuilder 7.0.x is missing hands a consumer a plugin whose
+# cn1:gamebuilder goal cannot resolve. Per-directory markers could not express that:
+# the core directory is complete in exactly the case that matters.
+#
+# Skipping metadata on the run that failed is also not enough, because every later run
+# rebuilds metadata from the same bucket listing and would advertise the abandoned tag.
+RELEASES_PSEUDO_ARTIFACT = "_cn1-releases"
+RELEASE_MARKER = "complete"
 
 
 def aws(*args, capture=True):
@@ -107,9 +113,9 @@ class ComparableVersion:
 
 
 def discover(keys, group_path):
-    """key list -> {artifactId: sorted [versions]}, releases whose upload completed."""
-    complete = set()
-    seen = set()
+    """key list -> {artifactId: sorted [versions]}, for releases marked complete."""
+    released = set()
+    found = {}
     base = "%s/%s/" % (PREFIX, group_path)
     for key in keys:
         rest = key[len(base):]
@@ -117,20 +123,21 @@ def discover(keys, group_path):
         if len(bits) < 3:
             continue  # group-level file, not <artifact>/<version>/<file>
         artifact, version, name = bits[0], bits[1], bits[-1]
+        if artifact == RELEASES_PSEUDO_ARTIFACT:
+            if name == RELEASE_MARKER:
+                released.add(version)
+            continue
         if version.endswith("-SNAPSHOT"):
             continue
-        seen.add((artifact, version))
-        if name == UPLOAD_COMPLETE_MARKER:
-            complete.add((artifact, version))
+        found.setdefault(artifact, set()).add(version)
 
-    for artifact, version in sorted(seen - complete):
-        print("    skipping %s:%s -- no %s marker, upload never finished"
-              % (artifact, version, UPLOAD_COMPLETE_MARKER))
+    incomplete = sorted({v for versions in found.values() for v in versions} - released)
+    for version in incomplete:
+        print("    skipping %s -- release not marked complete, so some artifact for it "
+              "never finished uploading" % version)
 
-    artifacts = {}
-    for artifact, version in complete:
-        artifacts.setdefault(artifact, set()).add(version)
-    return {a: sorted(v, key=ComparableVersion) for a, v in artifacts.items()}
+    return {a: sorted(v & released, key=ComparableVersion)
+            for a, v in found.items() if v & released}
 
 
 def metadata_xml(group_id, artifact_id, versions, stamp):
