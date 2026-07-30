@@ -77,6 +77,13 @@ public class CN1WearableBridge implements WearableBridge {
     private static final String PAYLOAD_KEY = "cn1.payload";
     /** The publication order of a value or transfer, so the newer of two items wins. */
     private static final String SEQUENCE_KEY = "cn1.seq";
+    /**
+     * Transfers live under their own top-level prefix, not under {@link #PATH_PREFIX}. Sharing the
+     * prefix made the two APIs collide: {@code transferFile("/inbox", "photo.png", ...)} built the
+     * same DataItem URI as {@code putData("/inbox/photo.png")}, so each could silently overwrite the
+     * other. A distinct namespace makes them independent, which is what the API promises.
+     */
+    private static final String TRANSFER_PREFIX = "/cn1x";
     /** How long a blocking Data Layer call may take before we give up and answer "not available". */
     private static final long TIMEOUT_SECONDS = 5;
     /**
@@ -721,10 +728,12 @@ public class CN1WearableBridge implements WearableBridge {
                 List<String> out = new ArrayList<String>();
                 for (DataItem item : items) {
                     String p = item.getUri().getPath();
-                    if (p == null || !p.startsWith(PATH_PREFIX) || valueMap(item) == null) {
-                        // Not ours, or a file transfer: a transfer's storage path is namespaced and
-                        // filename-suffixed, and getData() on it would answer with DataMap metadata
-                        // rather than a payload, so it is not a readable replicated path.
+                    if (p == null || isTransferPath(p) || !p.startsWith(PATH_PREFIX)
+                            || valueMap(item) == null) {
+                        // Not ours, or a file transfer. A transfer lives in its own namespace and
+                        // getData() on its storage path would answer with DataMap metadata rather
+                        // than a payload, so it is not a readable replicated path. (The prefix test
+                        // is explicit because the transfer prefix extends the value prefix.)
                         continue;
                     }
                     // Both halves may publish the same logical path, giving two items under two node
@@ -750,7 +759,7 @@ public class CN1WearableBridge implements WearableBridge {
         // WearableMessage rather than raw bytes.
         String fileName = name == null ? "file" : name;
         byte[] body = contents == null ? new byte[0] : contents;
-        PutDataMapRequest req = PutDataMapRequest.create(dataPath(path + "/" + fileName));
+        PutDataMapRequest req = PutDataMapRequest.create(transferPath(path, fileName));
         req.getDataMap().putString("name", fileName);
         // The DataItem path is namespaced and filename-suffixed, so the caller's own path has to
         // travel with the payload -- a listener routes on the path it was given, not on ours.
@@ -850,6 +859,8 @@ public class CN1WearableBridge implements WearableBridge {
                             Transfer t = decodeTransferOnce(context, item);
                             if (t.payload != null) {
                                 WearableConnection.deliverDataChanged(t.logicalPath, t.payload);
+                                // Same one-shot rule as the first-attempt path.
+                                consumeTransfer(context, uri);
                                 return;
                             }
                         }
@@ -892,6 +903,97 @@ public class CN1WearableBridge implements WearableBridge {
 
     static String dataPath(String path) {
         return PATH_PREFIX + encode(path);
+    }
+
+    /// The DataItem path a file transfer is stored at: its own namespace, and suffixed with the file
+    /// name so two files sent to one logical path do not overwrite each other. The logical path
+    /// travels in the DataMap, because this is not it.
+    ///
+    /// @param path the path the sender passed to transferFile
+    /// @param fileName the file's name
+    /// @return the DataItem path
+    static String transferPath(String path, String fileName) {
+        return TRANSFER_PREFIX + encode(path + "/" + fileName);
+    }
+
+    /// True when a DataItem path belongs to the transfer namespace.
+    ///
+    /// @param path a DataItem path
+    /// @return true for a transfer item
+    static boolean isTransferPath(String path) {
+        return path != null && path.startsWith(TRANSFER_PREFIX);
+    }
+
+    static String transferPrefix() {
+        return TRANSFER_PREFIX;
+    }
+
+    /**
+     * Whether a received item is newer than the last thing delivered for its logical path.
+     *
+     * <p>Both nodes may publish the same path, which the Data Layer stores as two items under two
+     * authorities. A reconnect can then hand us the older one after the newer, and forwarding it
+     * would walk a listener-driven UI back to stale state while an immediate {@code getData()} still
+     * returned the newer value -- the listener and the getter disagreeing about the same path.
+     *
+     * @param path the logical path
+     * @param sequence the item's publication stamp
+     * @return true when the event should be delivered
+     */
+    static boolean isNewerThanDelivered(String path, long sequence) {
+        synchronized (deliveredSequences) {
+            Long previous = deliveredSequences.get(path);
+            if (previous != null && sequence <= previous.longValue()) {
+                return false;
+            }
+            deliveredSequences.put(path, Long.valueOf(sequence));
+            return true;
+        }
+    }
+
+    /**
+     * Forgets a path's delivery stamp, so a value republished after a removal is delivered even if
+     * the publisher's clock produced a lower stamp than the removed value carried.
+     *
+     * @param path the logical path
+     */
+    static void forgetDeliveredSequence(String path) {
+        synchronized (deliveredSequences) {
+            deliveredSequences.remove(path);
+        }
+    }
+
+    private static final Map<String, Long> deliveredSequences = new HashMap<String, Long>();
+
+    /// The stamp an item was published at, or {@code Long.MIN_VALUE} for an item that predates
+    /// stamping (which then always counts as older than anything stamped).
+    ///
+    /// @param map a value or transfer DataMap
+    /// @return the publication stamp
+    static long sequenceOf(DataMap map) {
+        return map == null ? Long.MIN_VALUE : map.getLong(SEQUENCE_KEY, Long.MIN_VALUE);
+    }
+
+    /**
+     * Deletes a transfer's DataItem once its bytes have been delivered.
+     *
+     * <p>A transfer is one-shot, but a DataItem is a persistent value: left in place it keeps
+     * occupying Data Layer storage and is handed out again whenever another node connects or the app
+     * is reinstalled, so the receiver sees the same file arrive repeatedly.
+     *
+     * @param context any context
+     * @param uri the delivered transfer's item Uri
+     */
+    static void consumeTransfer(Context context, Uri uri) {
+        if (uri == null) {
+            return;
+        }
+        try {
+            Wearable.getDataClient(context.getApplicationContext()).deleteDataItems(uri);
+        } catch (Throwable unavailable) {
+            // Nothing to do: the worst case is the file arriving again, which the sequence check
+            // below already suppresses for this process.
+        }
     }
 
     /**

@@ -151,37 +151,56 @@ public class CN1WearableListenerService extends WearableListenerService {
     public void onDataChanged(DataEventBuffer events) {
         ensureAppRunning();
         for (DataEvent event : events) {
-            String path = event.getDataItem().getUri().getPath();
-            if (path == null || !path.startsWith(CN1WearableBridge.pathPrefix())
-                    || !isFromAKnownHost(event.getDataItem().getUri())) {
+            android.net.Uri uri = event.getDataItem().getUri();
+            String path = uri.getPath();
+            boolean transferItem = CN1WearableBridge.isTransferPath(path);
+            if (path == null || !isFromAKnownHost(uri)
+                    || (!transferItem && !path.startsWith(CN1WearableBridge.pathPrefix()))) {
                 continue;
             }
-            String appPath = CN1WearableBridge.decode(
-                    path.substring(CN1WearableBridge.pathPrefix().length()));
-            if (event.getType() == DataEvent.TYPE_DELETED) {
-                WearableConnection.deliverDataRemoved(appPath);
-                continue;
-            }
-            // A file transfer arrives as a DataMap carrying an Asset rather than an inline payload.
-            // Turn it back into the WearableMessage the receiver expects; this callback already
-            // runs off the main thread, so resolving the asset here is fine.
-            CN1WearableBridge.Transfer transfer =
-                    CN1WearableBridge.decodeTransfer(this, event.getDataItem());
-            if (transfer.isTransfer) {
+            if (transferItem) {
+                // A file transfer arrives as a DataMap carrying an Asset rather than an inline
+                // payload. Turn it back into the WearableMessage the receiver expects; this callback
+                // already runs off the main thread, so resolving the asset here is fine.
+                if (event.getType() == DataEvent.TYPE_DELETED) {
+                    // Our own consumeTransfer, or the sender clearing up. Not an app-visible removal:
+                    // the logical path may well still hold a replicated value.
+                    continue;
+                }
+                CN1WearableBridge.Transfer transfer =
+                        CN1WearableBridge.decodeTransfer(this, event.getDataItem());
                 if (transfer.payload != null) {
                     // On the path the sender passed to transferFile, not the filename-suffixed
                     // storage path this item happens to live at: a listener routes on what it asked
                     // for. The decoded payload carries the same path internally.
                     WearableConnection.deliverDataChanged(transfer.logicalPath, transfer.payload);
+                    // One-shot: drop the item so it is not handed out again on the next connection.
+                    CN1WearableBridge.consumeTransfer(this, uri);
                 }
                 // An unreadable asset delivers nothing now; decodeTransfer has scheduled a re-read,
                 // which beats handing the listener DataMap bytes dressed up as a payload.
+                continue;
+            }
+            String appPath = CN1WearableBridge.decode(
+                    path.substring(CN1WearableBridge.pathPrefix().length()));
+            if (event.getType() == DataEvent.TYPE_DELETED) {
+                // Forget the ordering stamp too, or a value republished at this path with a lower
+                // stamp than the removed one carried would be filtered out as "older".
+                CN1WearableBridge.forgetDeliveredSequence(appPath);
+                WearableConnection.deliverDataRemoved(appPath);
                 continue;
             }
             com.google.android.gms.wearable.DataMap value =
                     CN1WearableBridge.valueMap(event.getDataItem());
             if (value == null) {
                 // Under our prefix but not written by this API -- nothing to deliver.
+                continue;
+            }
+            if (!CN1WearableBridge.isNewerThanDelivered(
+                    appPath, CN1WearableBridge.sequenceOf(value))) {
+                // An older item arriving after a newer one, which a reconnect can do when both nodes
+                // publish this path. getData() would return the newer value, so delivering this would
+                // make the listener and the getter disagree.
                 continue;
             }
             WearableConnection.deliverDataChanged(appPath, CN1WearableBridge.payloadOf(value));

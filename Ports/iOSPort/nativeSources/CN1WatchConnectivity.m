@@ -32,10 +32,21 @@ static NSString *const kPathKey = @"cn1.path";
 static NSString *const kBodyKey = @"cn1.body";
 static NSString *const kTokenKey = @"cn1.token";
 static NSString *const kReplyKey = @"cn1.reply";
-/// Reserved key holding a path-to-sequence map inside the application context, so two halves that
-/// publish the same path can be ordered. Never a caller's path: it is filtered out of dataPaths and
-/// of received-context delivery.
-static NSString *const kSeqKey = @"cn1.seq";
+/// The application context is a flat dictionary shared with the peer, and it has to hold both the
+/// published values and the bookkeeping that orders them. Reserving a top-level key for the
+/// bookkeeping would collide with an application that publishes a path of the same name -- and since
+/// values are NSData and the bookkeeping is a dictionary, that collision is an unrecognized-selector
+/// crash rather than a wrong answer.
+///
+/// So every application path is prefixed instead. The namespaces are then disjoint by construction:
+/// no caller's path can land on a metadata key, whatever it is called.
+///
+/// - `v.<path>` the published bytes
+/// - `s.<path>` the sequence the bytes were published at
+/// - `t.<path>` the sequence a removal happened at (a tombstone, with no `v.` entry)
+static NSString *const kValuePrefix = @"v.";
+static NSString *const kStampPrefix = @"s.";
+static NSString *const kTombPrefix = @"t.";
 
 /// A monotonic publication stamp. Wall-clock millis order correctly against the peer's stamps (both
 /// devices are time-synced far more tightly than a context replication takes), and the counter
@@ -55,14 +66,85 @@ static int64_t cn1WearableNextSequence(void) {
     return result;
 }
 
-/// The stamp a context recorded for a path, or 0 when it predates stamping.
-static int64_t cn1WearableSequenceFor(NSDictionary *ctx, NSString *path) {
-    id seq = ctx[kSeqKey];
-    if (![seq isKindOfClass:[NSDictionary class]]) {
-        return 0;
+static NSString *cn1WearableValueKey(NSString *path) {
+    return [kValuePrefix stringByAppendingString:path];
+}
+
+static NSString *cn1WearableStampKey(NSString *path) {
+    return [kStampPrefix stringByAppendingString:path];
+}
+
+static NSString *cn1WearableTombKey(NSString *path) {
+    return [kTombPrefix stringByAppendingString:path];
+}
+
+/// One side's knowledge of a path: the bytes (nil when removed or absent), the sequence it happened
+/// at, and whether the newest thing that side knows is a removal.
+typedef struct {
+    NSData *data;
+    int64_t stamp;
+    BOOL known;
+    BOOL removed;
+} CN1WearableEntry;
+
+static CN1WearableEntry cn1WearableEntryFor(NSDictionary *ctx, NSString *path) {
+    CN1WearableEntry e;
+    e.data = nil;
+    e.stamp = 0;
+    e.known = NO;
+    e.removed = NO;
+    if (ctx == nil) {
+        return e;
     }
-    id value = ((NSDictionary *) seq)[path];
-    return [value isKindOfClass:[NSNumber class]] ? [value longLongValue] : 0;
+    id value = ctx[cn1WearableValueKey(path)];
+    id stamp = ctx[cn1WearableStampKey(path)];
+    id tomb = ctx[cn1WearableTombKey(path)];
+    if ([value isKindOfClass:[NSData class]]) {
+        e.data = value;
+        e.known = YES;
+        e.stamp = [stamp isKindOfClass:[NSNumber class]] ? [stamp longLongValue] : 0;
+    }
+    if ([tomb isKindOfClass:[NSNumber class]]) {
+        int64_t t = [tomb longLongValue];
+        // A removal published after the value wins over it -- that is the whole point of keeping the
+        // tombstone rather than deleting the entry outright.
+        if (!e.known || t > e.stamp) {
+            e.data = nil;
+            e.stamp = t;
+            e.known = YES;
+            e.removed = YES;
+        }
+    }
+    return e;
+}
+
+/// Which side's knowledge of a path is authoritative. Ours wins ties, which only happens when both
+/// sides predate stamping or published inside the same millisecond.
+static BOOL cn1WearableLocalWins(CN1WearableEntry mine, CN1WearableEntry theirs) {
+    if (!theirs.known) {
+        return YES;
+    }
+    if (!mine.known) {
+        return NO;
+    }
+    return mine.stamp >= theirs.stamp;
+}
+
+/// Every application path either side knows about, removals included.
+static NSSet *cn1WearableAllPaths(NSDictionary *local, NSDictionary *peer) {
+    NSMutableSet *out = [NSMutableSet set];
+    NSArray *contexts = @[(local == nil ? @{} : local), (peer == nil ? @{} : peer)];
+    for (NSDictionary *ctx in contexts) {
+        for (NSString *key in ctx) {
+            if (![key isKindOfClass:[NSString class]]) {
+                continue;
+            }
+            if ([key hasPrefix:kValuePrefix] || [key hasPrefix:kTombPrefix]) {
+                [out addObject:[key substringFromIndex:kValuePrefix.length]];
+            }
+        }
+    }
+    return out;
 }
 
 
@@ -232,17 +314,11 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     if (ctx == nil) {
         ctx = [[NSMutableDictionary alloc] init];
     }
-    ctx[path] = (payload == nil ? [NSData data] : payload);
-    // Stamp the publication so a reader can tell our value from a newer one the peer sent. The
-    // stamps ride in a reserved sub-dictionary of the same context, which is the only channel
-    // WatchConnectivity gives us -- the context is replaced wholesale on every publish.
-    NSMutableDictionary *seq = [ctx[kSeqKey] mutableCopy];
-    if (seq == nil) {
-        seq = [[NSMutableDictionary alloc] init];
-    }
-    seq[path] = @(cn1WearableNextSequence());
-    ctx[kSeqKey] = seq;
-    [seq release];
+    // Stamp the publication so a reader can tell our value from a newer one the peer sent, and drop
+    // any tombstone: republishing a removed path brings it back.
+    ctx[cn1WearableValueKey(path)] = (payload == nil ? [NSData data] : payload);
+    ctx[cn1WearableStampKey(path)] = @(cn1WearableNextSequence());
+    [ctx removeObjectForKey:cn1WearableTombKey(path)];
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
     if (err != nil) {
@@ -260,19 +336,12 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // receivedApplicationContext. Both halves may publish the same path, so "whichever exists" is
     // not enough: preferring ours unconditionally would keep answering with a stale local value
     // after a newer one arrived from the peer, contradicting the single-latest-value contract. Each
-    // publish stamps its path, so the two stamps decide.
-    NSDictionary *localCtx = [s applicationContext];
-    NSDictionary *peerCtx = [s receivedApplicationContext];
-    NSData *mine = localCtx[path];
-    NSData *theirs = peerCtx[path];
-    if (mine == nil) {
-        return theirs;
-    }
-    if (theirs == nil) {
-        return mine;
-    }
-    return cn1WearableSequenceFor(localCtx, path) >= cn1WearableSequenceFor(peerCtx, path)
-            ? mine : theirs;
+    // publish stamps its path, so the two stamps decide -- and a removal carries a stamp too, so it
+    // can outrank the other side's older value instead of that value resurfacing.
+    CN1WearableEntry mine = cn1WearableEntryFor([s applicationContext], path);
+    CN1WearableEntry theirs = cn1WearableEntryFor([s receivedApplicationContext], path);
+    CN1WearableEntry winner = cn1WearableLocalWins(mine, theirs) ? mine : theirs;
+    return winner.removed ? nil : winner.data;
 }
 
 - (void)removeData:(NSString *)path {
@@ -282,24 +351,14 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     }
     NSMutableDictionary *ctx = [[s applicationContext] mutableCopy];
     if (ctx == nil) {
-        return;
+        ctx = [[NSMutableDictionary alloc] init];
     }
-    if (ctx[path] == nil) {
-        [ctx release];
-        return;
-    }
-    [ctx removeObjectForKey:path];
-    // Drop the path's stamp with it, or the map grows for the life of the app.
-    NSMutableDictionary *seq = [ctx[kSeqKey] mutableCopy];
-    if (seq != nil) {
-        [seq removeObjectForKey:path];
-        if (seq.count == 0) {
-            [ctx removeObjectForKey:kSeqKey];
-        } else {
-            ctx[kSeqKey] = seq;
-        }
-        [seq release];
-    }
+    // The value goes, but a stamped tombstone stays. Deleting the entry outright would let the
+    // peer's older value for the same path win the next comparison, so a removal on the newer
+    // publisher would resurrect data instead of clearing it.
+    [ctx removeObjectForKey:cn1WearableValueKey(path)];
+    [ctx removeObjectForKey:cn1WearableStampKey(path)];
+    ctx[cn1WearableTombKey(path)] = @(cn1WearableNextSequence());
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
     [ctx release];
@@ -310,11 +369,19 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     if (s == nil) {
         return @[];
     }
-    NSMutableSet *paths = [NSMutableSet setWithArray:[s applicationContext].allKeys];
-    [paths addObjectsFromArray:[s receivedApplicationContext].allKeys];
-    // The stamp map is bookkeeping, not a path an app published.
-    [paths removeObject:kSeqKey];
-    return paths.allObjects;
+    NSDictionary *localCtx = [s applicationContext];
+    NSDictionary *peerCtx = [s receivedApplicationContext];
+    NSMutableArray *out = [NSMutableArray array];
+    for (NSString *path in cn1WearableAllPaths(localCtx, peerCtx)) {
+        CN1WearableEntry mine = cn1WearableEntryFor(localCtx, path);
+        CN1WearableEntry theirs = cn1WearableEntryFor(peerCtx, path);
+        CN1WearableEntry winner = cn1WearableLocalWins(mine, theirs) ? mine : theirs;
+        // A tombstone is a path that was removed, not a path that has a value.
+        if (!winner.removed) {
+            [out addObject:path];
+        }
+    }
+    return out;
 }
 
 - (void)transferFile:(NSString *)path name:(NSString *)name contents:(NSData *)contents {
@@ -349,7 +416,32 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
            metadata:@{kPathKey: (path == nil ? @"" : path)}];
 }
 
+/// Deletes a staging directory once WatchConnectivity is done with it. The system owns the file until
+/// the transfer finishes, so this can only happen from the completion delegate -- and it has to
+/// happen there, or every transfer leaves a full copy of its payload in the container until the OS
+/// decides to purge the temporary directory.
+- (void)cn1CleanupStagedTransfer:(WCSessionFileTransfer *)transfer {
+    NSURL *url = transfer.file.fileURL;
+    if (url == nil) {
+        return;
+    }
+    NSString *dir = [url.path stringByDeletingLastPathComponent];
+    // Only ever our own staging directories, never a caller's file.
+    if ([[dir lastPathComponent] hasPrefix:@"cn1-wearable-"]) {
+        [[NSFileManager defaultManager] removeItemAtPath:dir error:nil];
+    }
+}
+
 // --- WCSessionDelegate ---------------------------------------------------
+
+- (void)session:(WCSession *)session
+        didFinishFileTransfer:(WCSessionFileTransfer *)fileTransfer
+                        error:(NSError *)error {
+    if (error != nil) {
+        NSLog(@"[cn1.wearable] file transfer failed: %@", error.localizedDescription);
+    }
+    [self cn1CleanupStagedTransfer:fileTransfer];
+}
 
 - (void)session:(WCSession *)session
         activationDidCompleteWithState:(WCSessionActivationState)activationState
@@ -412,25 +504,45 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
 
 - (void)session:(WCSession *)session
         didReceiveApplicationContext:(NSDictionary<NSString *, id> *)applicationContext {
-    // The peer replaces its whole context on every publish, so a removal shows up as a key that has
-    // simply stopped being there. Report what is present, then whatever disappeared since last
-    // time -- otherwise removeData on one side is invisible on the other.
-    for (NSString *path in applicationContext) {
-        NSData *body = applicationContext[path];
-        if ([body isKindOfClass:[NSData class]]) {
-            cn1_wearable_deliverDataChanged(path.UTF8String, body.bytes, (int) body.length);
+    // The peer replaces its whole context on every publish. Two things follow.
+    //
+    // First, a path the peer removed either carries a tombstone or has simply stopped being there,
+    // and both have to reach the listener -- otherwise removeData on one side is invisible on the
+    // other.
+    //
+    // Second, and this is the subtle one: a context that arrives after a reconnect can be OLDER than
+    // what this side has already published. Delivering it unconditionally would walk a listener-driven
+    // UI back to stale state while an immediate getData() still returned the newer local value -- the
+    // listener and the getter disagreeing about the same path. So every path is compared against the
+    // local entry first, and only a peer entry that actually wins is delivered.
+    NSDictionary *localCtx = [session applicationContext];
+    NSMutableSet *seen = [NSMutableSet set];
+    for (NSString *path in cn1WearableAllPaths(nil, applicationContext)) {
+        [seen addObject:path];
+        CN1WearableEntry theirs = cn1WearableEntryFor(applicationContext, path);
+        CN1WearableEntry mine = cn1WearableEntryFor(localCtx, path);
+        if (cn1WearableLocalWins(mine, theirs)) {
+            continue;
+        }
+        if (theirs.removed) {
+            cn1_wearable_deliverDataRemoved(path.UTF8String);
+        } else if (theirs.data != nil) {
+            cn1_wearable_deliverDataChanged(path.UTF8String, theirs.data.bytes,
+                                            (int) theirs.data.length);
         }
     }
     for (NSString *gone in _lastReceivedKeys) {
-        if (applicationContext[gone] == nil) {
-            cn1_wearable_deliverDataRemoved(gone.UTF8String);
+        if (![seen containsObject:gone]) {
+            // Dropped out of the peer's context without a tombstone -- an older peer build, or a
+            // context rebuilt from scratch. Treat it as the removal it is.
+            CN1WearableEntry mine = cn1WearableEntryFor(localCtx, gone);
+            if (!mine.known || mine.removed) {
+                cn1_wearable_deliverDataRemoved(gone.UTF8String);
+            }
         }
     }
     [_lastReceivedKeys release];
-    NSMutableSet *keys = [NSMutableSet setWithArray:applicationContext.allKeys];
-    // Not a path: if the peer's stamp map ever emptied we would report a removal for it.
-    [keys removeObject:kSeqKey];
-    _lastReceivedKeys = [keys retain];
+    _lastReceivedKeys = [seen retain];
 }
 
 - (void)session:(WCSession *)session didReceiveFile:(WCSessionFile *)file {

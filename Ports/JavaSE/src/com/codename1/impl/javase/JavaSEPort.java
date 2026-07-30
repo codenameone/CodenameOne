@@ -397,8 +397,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             // Deliberately the *shared* home, not this process's sandbox: the two halves have
             // separate storage (see watchSandbox) but must rendezvous in one directory, which is the
             // desktop stand-in for a transport the OS would provide.
-            File home = new File(System.getProperty("user.home") + File.separator
-                    + getSharedHomeDir());
+            //
+            // setAppHomeDir() is called with an absolute path in some flows (CNPanelUtil passes
+            // getAbsolutePath()), so prefixing user.home unconditionally would build a path like
+            // "$HOME//abs/path" and the two processes would never find each other.
+            File configured = new File(getSharedHomeDir());
+            File home = configured.isAbsolute() ? configured
+                    : new File(System.getProperty("user.home"), getSharedHomeDir());
             wearableBridge = new JavaSEWearableBridge(home, isWatchCompanionProcess(),
                     getWatchMainClass() != null);
         }
