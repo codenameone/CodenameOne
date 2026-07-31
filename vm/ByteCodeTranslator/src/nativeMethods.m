@@ -2603,6 +2603,70 @@ static void cn1_with_timezone(const char* zoneId, void (*func)(void*), void* ctx
     pthread_mutex_unlock(&cn1_timezone_mutex);
 }
 
+/*
+ * Windows named-zone support.
+ *
+ * The POSIX path below sets TZ and reads tm_gmtoff back. Neither half works
+ * here: the Microsoft C runtime only understands the "EST5EDT" form of TZ, not
+ * an IANA identifier, and its struct tm carries no GMT offset at all -- so
+ * every named zone resolved to an offset of zero and, for instance,
+ * America/New_York reported UTC. Windows ships ICU (icu.dll, Windows 10 1703
+ * and later), whose calendar speaks IANA identifiers directly and knows the
+ * daylight rules for the instant being asked about.
+ *
+ * cn1WinZoneOffsetMillis answers the total offset (zone + daylight) at an
+ * instant, or reports failure so the caller can fall back.
+ */
+#ifdef _WIN32
+#include <icu.h>
+
+static int cn1WinZoneOffsetMillis(const char* zoneId, long long millis, int* offsetOut, int* dstOut) {
+    UErrorCode status = U_ZERO_ERROR;
+    UChar zone[128];
+    UCalendar* cal;
+    int32_t zoneOffset, dstOffset;
+    if (zoneId == 0 || zoneId[0] == 0) {
+        return 0;
+    }
+    u_strFromUTF8(zone, (int32_t) (sizeof(zone) / sizeof(zone[0])), NULL, zoneId, -1, &status);
+    if (U_FAILURE(status)) {
+        return 0;
+    }
+    cal = ucal_open(zone, -1, "en_US", UCAL_GREGORIAN, &status);
+    if (U_FAILURE(status) || cal == 0) {
+        return 0;
+    }
+    ucal_setMillis(cal, (UDate) millis, &status);
+    zoneOffset = ucal_get(cal, UCAL_ZONE_OFFSET, &status);
+    dstOffset = ucal_get(cal, UCAL_DST_OFFSET, &status);
+    ucal_close(cal);
+    if (U_FAILURE(status)) {
+        return 0;
+    }
+    if (offsetOut != 0) {
+        *offsetOut = (int) (zoneOffset + dstOffset);
+    }
+    if (dstOut != 0) {
+        *dstOut = dstOffset != 0;
+    }
+    return 1;
+}
+
+/* Milliseconds since the epoch for a set of UTC calendar fields. */
+static long long cn1WinUtcMillis(int year, int month, int day, int millisOfDay) {
+    struct tm utc;
+    memset(&utc, 0, sizeof(utc));
+    utc.tm_year = year - 1900;
+    utc.tm_mon = month - 1;
+    utc.tm_mday = day;
+    utc.tm_hour = millisOfDay / 3600000;
+    utc.tm_min = (millisOfDay / 60000) % 60;
+    utc.tm_sec = (millisOfDay / 1000) % 60;
+    utc.tm_isdst = 0;
+    return (long long) timegm(&utc) * 1000LL;
+}
+#endif
+
 typedef struct {
     int year;
     int month;
@@ -2709,6 +2773,15 @@ JAVA_OBJECT java_util_TimeZone_getTimezoneId___R_java_lang_String(CODENAME_ONE_T
 JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name, JAVA_INT year, JAVA_INT month, JAVA_INT day, JAVA_INT timeOfDayMillis) {
     const char* buffer = stringToUTF8(threadStateData, name);
     cn1_timezone_offset_ctx ctx;
+#ifdef _WIN32
+    {
+        int offset = 0;
+        if (cn1WinZoneOffsetMillis(buffer, cn1WinUtcMillis(year, month, day, timeOfDayMillis),
+                                   &offset, 0)) {
+            return offset;
+        }
+    }
+#endif
     ctx.year = year;
     ctx.month = month;
     ctx.day = day;
@@ -2721,6 +2794,25 @@ JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int
 JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
     const char* buffer = stringToUTF8(threadStateData, name);
     cn1_timezone_raw_ctx ctx;
+#ifdef _WIN32
+    {
+        /* The raw offset is the standard-time one: sample both solstices and
+         * take whichever is not in daylight saving (either hemisphere). */
+        int januaryOffset = 0, januaryDst = 0, julyOffset = 0, julyDst = 0;
+        if (cn1WinZoneOffsetMillis(buffer, cn1WinUtcMillis(2024, 1, 1, 43200000),
+                                   &januaryOffset, &januaryDst) &&
+            cn1WinZoneOffsetMillis(buffer, cn1WinUtcMillis(2024, 7, 1, 43200000),
+                                   &julyOffset, &julyDst)) {
+            if (!januaryDst) {
+                return januaryOffset;
+            }
+            if (!julyDst) {
+                return julyOffset;
+            }
+            return januaryOffset < julyOffset ? januaryOffset : julyOffset;
+        }
+    }
+#endif
     ctx.januaryOffset = 0;
     ctx.januaryIsDst = 0;
     ctx.julyOffset = 0;
@@ -2738,6 +2830,14 @@ JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String_R_int(CODENA
 JAVA_BOOLEAN java_util_TimeZone_isTimezoneDST___java_lang_String_long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name, JAVA_LONG millis) {
     const char* buffer = stringToUTF8(threadStateData, name);
     cn1_timezone_dst_ctx ctx;
+#ifdef _WIN32
+    {
+        int dst = 0;
+        if (cn1WinZoneOffsetMillis(buffer, (long long) millis, 0, &dst)) {
+            return dst ? JAVA_TRUE : JAVA_FALSE;
+        }
+    }
+#endif
     ctx.millis = millis;
     ctx.result = JAVA_FALSE;
     cn1_with_timezone(buffer, cn1_compute_timezone_dst, &ctx);
