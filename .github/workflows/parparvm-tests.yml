@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/parparvm-tests.yml'
+      - 'scripts/ci/retry.sh'
       - 'vm/**'
       - 'Ports/JavaScriptPort/**'
       - '!vm/**/README.md'
@@ -13,6 +14,7 @@ on:
     branches: [ master, main ]
     paths:
       - '.github/workflows/parparvm-tests.yml'
+      - 'scripts/ci/retry.sh'
       - 'vm/**'
       - 'Ports/JavaScriptPort/**'
       - '!vm/**/README.md'
@@ -99,12 +101,11 @@ jobs:
 
       - name: Run ParparVM JVM tests
         working-directory: vm
-        # Maven Central intermittently serves 403 from the runner CDN edge and
-        # Maven treats it as a permanent resolution failure (killed this job at
-        # dependency download, before any test ran). Retry with a pause; a real
-        # build/test failure fails identically on every attempt.
+        # Maven Central intermittently serves 403/429 from the runner CDN edge
+        # and Maven treats it as a permanent resolution failure (killed this job
+        # at dependency download, before any test ran). See scripts/ci/retry.sh.
         run: |
-          retry() { local i; for i in 1 2 3; do "$@" && return 0; [ $i -lt 3 ] && { echo "attempt $i failed; retrying in 30s (possible transient Maven Central 403/5xx)"; sleep 30; }; done; return 1; }
+          retry() { bash ../scripts/ci/retry.sh "$@"; }
           retry mvn -B clean package -pl JavaAPI -am -DskipTests
           retry mvn -B test -pl tests -am -DexcludedGroups=benchmark
         env:
@@ -226,9 +227,12 @@ jobs:
           cache: 'maven'
 
       - name: Build release jars
+        # This job runs once per published release, so a transient Maven Central
+        # 403/429 here silently ships a release without its ParparVM jars (that
+        # is what happened to 7.0.264). Retry, as the vm-tests job already does.
         run: |
-          mvn -B -f vm/JavaAPI/pom.xml package
-          mvn -B -f vm/ByteCodeTranslator/pom.xml package
+          bash scripts/ci/retry.sh mvn -B -f vm/JavaAPI/pom.xml package
+          bash scripts/ci/retry.sh mvn -B -f vm/ByteCodeTranslator/pom.xml package
 
       - name: Verify release jars
         run: |
