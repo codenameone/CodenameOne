@@ -2389,7 +2389,8 @@ public class LinuxImplementation extends CodenameOneImplementation {
                 // legitimately empty file, so callers could not tell a missing
                 // file from an empty one -- the exact defect issue #1502
                 // reported against iOS.
-                throw new FileNotFoundException("No such file: " + path);
+                throw new FileNotFoundException("No such file: " + path
+                        + " (" + LinuxNative.lastIoError() + ")");
             }
             return new LinuxInputStream(h, false);
         }
@@ -2403,7 +2404,8 @@ public class LinuxImplementation extends CodenameOneImplementation {
     private long openForWrite(String path, boolean append) throws IOException {
         long h = LinuxNative.fileOpenWrite(path, append);
         if (h == 0) {
-            throw new IOException("Unable to open " + path + " for writing");
+            throw new IOException("Unable to open " + path + " for writing ("
+                    + LinuxNative.lastIoError() + ")");
         }
         return h;
     }
@@ -2619,7 +2621,8 @@ public class LinuxImplementation extends CodenameOneImplementation {
         String path = storagePath(name);
         long h = LinuxNative.fileOpenRead(path);
         if (h == 0) {
-            throw new FileNotFoundException("No such storage entry: " + name);
+            throw new FileNotFoundException("No such storage entry: " + name
+                    + " (" + LinuxNative.lastIoError() + ")");
         }
         return new LinuxInputStream(h, false);
     }
@@ -2649,6 +2652,13 @@ public class LinuxImplementation extends CodenameOneImplementation {
      * is exactly why a recorded "tmpaudio.wav" came back as file:///null/tmpaudio.wav
      * and would not play). Use the same writable per-user directory that Storage and
      * capturePhoto already rely on.
+     *
+     * The result carries the {@code file://} scheme, as it does on Android and
+     * iOS. {@link com.codename1.io.File} treats any path without that scheme as
+     * relative to the app home and prepends the home to it, so returning a bare
+     * path made {@code new File(fs.getAppHomePath() + "x")} resolve to the home
+     * directory joined to itself -- every write through that class landed on a
+     * path that could not exist.
      */
     @Override
     public String getAppHomePath() {
@@ -2659,7 +2669,12 @@ public class LinuxImplementation extends CodenameOneImplementation {
         if (!dir.endsWith("/")) {
             dir += "/";
         }
-        return dir;
+        return "file://" + dir;
+    }
+
+    @Override
+    public String toNativePath(String path) {
+        return stripFileUrl(path);
     }
 
     @Override

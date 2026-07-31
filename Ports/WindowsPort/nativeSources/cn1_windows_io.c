@@ -82,6 +82,18 @@ static JAVA_OBJECT cn1WinWideToJavaString(CODENAME_ONE_THREAD_STATE, const WCHAR
 
 /* ------------------------------------------------------------------- files */
 
+/* Reason the last open failed. The port reports "could not open X" from Java,
+ * where the thread's last-error value is long gone; without this the only way
+ * to tell a missing directory from a sharing violation was another CI run. */
+static DWORD cn1WinLastIoError;
+
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_lastIoError___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
+    char buffer[256];
+    _snprintf(buffer, sizeof(buffer), "Windows error %lu", (unsigned long) cn1WinLastIoError);
+    buffer[sizeof(buffer) - 1] = 0;
+    return newStringFromCString(threadStateData, buffer);
+}
+
 JAVA_LONG com_codename1_impl_windows_WindowsNative_fileOpenRead___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
     UINT32 len = 0;
     WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);
@@ -93,6 +105,7 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_fileOpenRead___java_lang_Stri
                     OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     free(path);
     if (h == INVALID_HANDLE_VALUE) {
+        cn1WinLastIoError = GetLastError();
         return 0;
     }
     return (JAVA_LONG)(intptr_t)h;
@@ -119,6 +132,7 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_fileOpenWrite___java_lang_Str
     }
     free(path);
     if (h == INVALID_HANDLE_VALUE) {
+        cn1WinLastIoError = GetLastError();
         return 0;
     }
     return (JAVA_LONG)(intptr_t)h;

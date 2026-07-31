@@ -2402,7 +2402,8 @@ public class WindowsImplementation extends CodenameOneImplementation {
                 // legitimately empty file, so callers could not tell a missing
                 // file from an empty one -- the exact defect issue #1502
                 // reported against iOS.
-                throw new FileNotFoundException("No such file: " + path);
+                throw new FileNotFoundException("No such file: " + path
+                        + " (" + WindowsNative.lastIoError() + ")");
             }
             return new WindowsInputStream(h, false);
         }
@@ -2416,7 +2417,8 @@ public class WindowsImplementation extends CodenameOneImplementation {
     private long openForWrite(String path, boolean append) throws IOException {
         long h = WindowsNative.fileOpenWrite(path, append);
         if (h == 0) {
-            throw new IOException("Unable to open " + path + " for writing");
+            throw new IOException("Unable to open " + path + " for writing ("
+                    + WindowsNative.lastIoError() + ")");
         }
         return h;
     }
@@ -2629,7 +2631,8 @@ public class WindowsImplementation extends CodenameOneImplementation {
         String path = storagePath(name);
         long h = WindowsNative.fileOpenRead(path);
         if (h == 0) {
-            throw new FileNotFoundException("No such storage entry: " + name);
+            throw new FileNotFoundException("No such storage entry: " + name
+                    + " (" + WindowsNative.lastIoError() + ")");
         }
         return new WindowsInputStream(h, false);
     }
@@ -2647,6 +2650,36 @@ public class WindowsImplementation extends CodenameOneImplementation {
     @Override
     public String[] listFilesystemRoots() {
         return WindowsNative.fileRoots();
+    }
+
+    /**
+     * Anchors the app home at the per-user storage directory, with the
+     * {@code file://} scheme Android, iOS and the Linux port also use.
+     *
+     * The inherited implementation builds {@code listFilesystemRoots()[0] +
+     * AppName}, which here is a drive root plus an app name that is literally
+     * "null" when neither the AppName property nor a package name is set --
+     * every path it produced pointed at an unwritable {@code C:\null\}. The
+     * scheme matters as well: {@link com.codename1.io.File} prepends the app
+     * home to any path that lacks it, so a bare path made
+     * {@code new File(fs.getAppHomePath() + "x")} resolve to the home
+     * directory joined to itself.
+     */
+    @Override
+    public String getAppHomePath() {
+        String dir = WindowsNative.storageDir();
+        if (dir == null || dir.length() == 0) {
+            dir = ".";
+        }
+        if (!dir.endsWith("\\") && !dir.endsWith("/")) {
+            dir += getFileSystemSeparator();
+        }
+        return "file://" + dir;
+    }
+
+    @Override
+    public String toNativePath(String path) {
+        return stripFileUrl(path);
     }
 
     @Override

@@ -388,6 +388,9 @@ public final class LinuxNative {
 
     public static native long fileOpenWrite(String path, boolean append);
 
+    /** Why the most recent open failed, for the exception the port raises. */
+    public static native String lastIoError();
+
     public static native int fileRead(long handle, byte[] buffer, int offset, int length);
 
     public static native int fileWrite(long handle, byte[] buffer, int offset, int length);

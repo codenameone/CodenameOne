@@ -153,15 +153,35 @@ static const char* cn1JStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s) {
 
 /* ------------------------------------------------------------ file io */
 
+/* Reason the last open failed. The port reports "could not open X" from Java,
+ * where errno is long gone; without this the only way to tell a missing
+ * directory from a permission problem was another CI round trip. */
+static char cn1LastIoError[512];
+
+static void cn1RecordIoError(const char* path) {
+    snprintf(cn1LastIoError, sizeof(cn1LastIoError), "%s", strerror(errno));
+    (void) path;
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_lastIoError___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
+    return newStringFromCString(threadStateData, cn1LastIoError[0] ? cn1LastIoError : "unknown error");
+}
+
 JAVA_LONG com_codename1_impl_linux_LinuxNative_fileOpenRead___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
     const char* p = cn1JStr(threadStateData, path);
     FILE* f = p ? fopen(p, "rb") : 0;
+    if (f == 0) {
+        cn1RecordIoError(p);
+    }
     return (JAVA_LONG) (intptr_t) f;
 }
 
 JAVA_LONG com_codename1_impl_linux_LinuxNative_fileOpenWrite___java_lang_String_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_BOOLEAN append) {
     const char* p = cn1JStr(threadStateData, path);
     FILE* f = p ? fopen(p, append ? "ab" : "wb") : 0;
+    if (f == 0) {
+        cn1RecordIoError(p);
+    }
     return (JAVA_LONG) (intptr_t) f;
 }
 
@@ -291,6 +311,30 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_fileList___java_lang_String_R_j
 /* The per-user app storage directory ($XDG_DATA_HOME/codenameone, else
  * ~/.local/share/codenameone), created on first use. Backs Storage + the
  * FileSystemStorage app-home. */
+/* Creates every missing component of an absolute path. mkdir(2) only creates
+ * the leaf, so a home without an existing ~/.local/share -- which is the state
+ * of a fresh CI runner or a freshly created account -- left the storage
+ * directory absent. Every write into it then failed at fopen(), which the port
+ * used to swallow: Storage entries and files written through
+ * FileSystemStorage were silently discarded. */
+static void cn1MkdirParents(const char* path) {
+    char work[4096];
+    char* p;
+    size_t len = strlen(path);
+    if (len == 0 || len >= sizeof(work)) {
+        return;
+    }
+    memcpy(work, path, len + 1);
+    for (p = work + 1; *p; p++) {
+        if (*p == '/') {
+            *p = 0;
+            mkdir(work, 0755);
+            *p = '/';
+        }
+    }
+    mkdir(work, 0755);
+}
+
 static const char* cn1StorageDir(void) {
     static char dir[4096];
     if (dir[0] == 0) {
@@ -304,9 +348,8 @@ static const char* cn1StorageDir(void) {
         } else {
             snprintf(share, sizeof(share), "/tmp");
         }
-        mkdir(share, 0755);
         snprintf(dir, sizeof(dir), "%s/codenameone", share);
-        mkdir(dir, 0755);
+        cn1MkdirParents(dir);
     }
     return dir;
 }
