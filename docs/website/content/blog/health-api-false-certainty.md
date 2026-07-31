@@ -32,8 +32,13 @@ The packages are divided by the boundary they touch:
 
 ```java
 Health health = Health.getInstance();
-if (health.getAvailability() != HealthAvailability.AVAILABLE) {
+HealthAvailability availability = health.getAvailability();
+if (availability == HealthAvailability.PROVIDER_NOT_INSTALLED
+        || availability == HealthAvailability.PROVIDER_UPDATE_REQUIRED) {
     health.openProviderSetup();
+    return;
+}
+if (availability == HealthAvailability.NOT_SUPPORTED) {
     return;
 }
 
