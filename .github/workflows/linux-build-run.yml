@@ -219,6 +219,12 @@ jobs:
           # Full app stdout/stderr -- the only evidence when the suite wedges
           # mid-run (uploaded with the screenshot artifact below).
           CN1_APP_LOG_TEE: ${{ github.workspace }}/artifacts/linux-port/raw/app-output.log
+          # Wait for the suite's own completion marker instead of stopping when
+          # screenshots go quiet. The stabilization exit fired while DesktopMode,
+          # the VideoIO grid, the VR scene and the 360 panorama were still queued
+          # behind the slow non-rendering API tail, so the suite was force-killed
+          # and every trailing test was published as "never run".
+          CN1_REQUIRE_SUITE: '1'
           # Build the native ELF (and the demo) against an old glibc for portability.
           CN1_CC: /usr/local/bin/cn1-zig-cc
           # After the suite runs, the capture test relinks the same objects into a
@@ -320,6 +326,7 @@ jobs:
             -v "$GITHUB_WORKSPACE":/cn1 -w /cn1 \
             -e CN1_SHOT_OUTPUT_DIR=/cn1/artifacts/linux-port/raw-musl \
             -e CN1_APP_LOG_TEE=/cn1/artifacts/linux-port/raw-musl/app-output.log \
+            -e CN1_REQUIRE_SUITE=1 \
             -e LIBGL_ALWAYS_SOFTWARE=1 \
             docker.io/library/alpine:3.20 sh -ec '
               sed -i "s|^#\(.*/community\)|\1|" /etc/apk/repositories

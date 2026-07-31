@@ -180,7 +180,9 @@ function validate() {
             fail(`a cell claims a documented skip the errata do not cover: ${cell}`);
         }
     }
-    if (countMatches(page, /<sup class="cn1-port-status__note"/g) < notedCells.length) {
+    // The production build minifies, which drops the quotes around attribute
+    // values, so match the class without assuming them.
+    if (countMatches(page, /<sup\b[^>]*\bcn1-port-status__note\b/g) < notedCells.length) {
         fail("documented-skip cells must carry a visible note marker");
     }
 

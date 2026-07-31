@@ -1356,7 +1356,19 @@ public final class Character implements Comparable<Character>{
             return ASCII_TYPES[codePoint];
         }
         // Above ASCII this runtime carries no category table, so answer from
-        // the primitives it does implement instead of failing the call.
+        // the primitives it does implement instead of failing the call. The
+        // code points isWhitespace() knows about individually are named here:
+        // they are not all separators, and the two that are come from
+        // different categories.
+        if (codePoint == 0x2028) {
+            return LINE_SEPARATOR;
+        }
+        if (codePoint == 0x2029) {
+            return PARAGRAPH_SEPARATOR;
+        }
+        if (codePoint == 0x180E) {
+            return FORMAT;
+        }
         if (isLowerCase(codePoint)) {
             return LOWERCASE_LETTER;
         }

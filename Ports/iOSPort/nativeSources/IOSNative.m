@@ -10017,8 +10017,16 @@ JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int
     [comps setDay:day];
     [comps setYear:year];
     [comps setMonth:month];
-    [comps setMinute:timeOfDayMillis/60000];
-    NSCalendar* cal = [NSCalendar currentCalendar];
+    [comps setHour:timeOfDayMillis/3600000];
+    [comps setMinute:(timeOfDayMillis/60000)%60];
+    [comps setSecond:(timeOfDayMillis/1000)%60];
+    // The caller passes UTC fields -- the POSIX implementation of this native
+    // resolves them with timegm() -- so build the date in UTC too. Reading them
+    // in the device's own zone (currentCalendar) moved the instant by the
+    // device offset, which lands on the wrong side of a transition when the
+    // requested zone changes offset within that window.
+    NSCalendar* cal = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
+    [cal setTimeZone:[NSTimeZone timeZoneWithAbbreviation:@"UTC"]];
     NSDate *date = [cal dateFromComponents:comps];
     JAVA_INT result = [tzone secondsFromGMTForDate:date] * 1000;
     [comps release];

@@ -99,6 +99,14 @@ while IFS= read -r workflow; do
       echo "Ignoring ${report}: it names no port." >&2
       continue
     fi
+    # Publish only what the website will actually serve. A report built against
+    # an older contract passes the freshness check below but is rejected by the
+    # sync, which would leave the public column on its stale fallback while
+    # this sweep reported success.
+    if ! python3 "${SCRIPT_DIR}/port_status.py" accept --port "${port}" --report "${report}"; then
+      echo "Not publishing the ${port} report from run ${run_id}: it is not usable by the website." >&2
+      continue
+    fi
     generated="$(jq -r '.generated_at // empty' "${report}")"
     current=""
     if gh api "repos/${GITHUB_REPOSITORY}/contents/ports/${port}.json?ref=${DATA_BRANCH}" \
@@ -126,6 +134,13 @@ while IFS= read -r port; do
   if ! gh api "repos/${GITHUB_REPOSITORY}/contents/ports/${port}.json?ref=${DATA_BRANCH}" \
       --jq '.content' 2>/dev/null | base64 --decode > "${tmp_dir}/check.json" 2>/dev/null; then
     problems+=("${port}: no published report")
+    continue
+  fi
+  # Freshness alone is not enough: a published report the website rejects
+  # leaves the column on its checked-in fallback, which is the state this
+  # sweep exists to detect.
+  if ! python3 "${SCRIPT_DIR}/port_status.py" accept --port "${port}" --report "${tmp_dir}/check.json" >/dev/null; then
+    problems+=("${port}: published report is not usable by the website")
     continue
   fi
   generated="$(jq -r '.generated_at // empty' "${tmp_dir}/check.json" 2>/dev/null || true)"
