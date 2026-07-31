@@ -194,6 +194,20 @@ public class IOSWidgetExtensionBuilder {
      */
     public Map<String, byte[]> buildFileMap() throws IOException {
         validate();
+        if (!hasIosSurface()) {
+            // Every declared kind is a watch complication and there is no live activity, so nothing
+            // would reach the bundle body -- and a WidgetBundle whose body holds no Widget expression
+            // does not compile. Callers check hasIosSurface() and skip the extension; reaching here
+            // means that check was missed, and failing loudly beats emitting Swift that breaks the
+            // whole iOS build.
+            //
+            // Deliberately here rather than in validate(): the APP-target glue is still wanted when
+            // the app publishes surfaces that only a watch can show, so buildAppTargetFileMap() must
+            // not be blocked by this.
+            throw new IllegalStateException("the iOS widget extension would be empty: every kind "
+                    + "declares only watch complication families. Check hasIosSurface() before "
+                    + "generating the extension");
+        }
         LinkedHashMap<String, byte[]> map = new LinkedHashMap<String, byte[]>();
         map.put("Info.plist", utf8(buildInfoPlist()));
         map.put(extensionName + ".entitlements", utf8(buildEntitlements()));
@@ -240,16 +254,6 @@ public class IOSWidgetExtensionBuilder {
         if (kinds.isEmpty() && !liveActivitiesEnabled) {
             throw new IllegalStateException("surfaces.json declares neither widget kinds nor "
                     + "liveActivities: there is nothing to generate");
-        }
-        if (!hasIosSurface()) {
-            // Every kind is a watch-only complication and there is no live activity, so nothing would
-            // reach the bundle body -- and a WidgetBundle whose body holds no Widget expression does
-            // not compile. Callers are expected to check hasIosSurface() and skip the extension
-            // entirely; reaching here means that check was missed, and failing loudly beats emitting
-            // Swift that breaks the whole iOS build.
-            throw new IllegalStateException("the iOS widget extension would be empty: every kind "
-                    + "declares only watch complication families. Check hasIosSurface() before "
-                    + "generating the extension");
         }
         // WidgetBundleBuilder composes at most 10 widgets per bundle body; keeping the
         // generator single-bundle is simpler and 9 kinds is far beyond practical use.

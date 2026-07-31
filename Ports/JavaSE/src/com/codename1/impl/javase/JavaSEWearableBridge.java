@@ -211,7 +211,12 @@ class JavaSEWearableBridge implements WearableBridge {
             f.getParentFile().mkdirs();
             // Write-then-rename: the peer polls this directory every 500ms, and writing in place
             // would let it read a truncated payload mid-write and report a malformed value.
-            File tmp = new File(f.getParentFile(), f.getName() + ".tmp");
+            //
+            // The staging name is unique per writer, not per path. The phone and the watch are two
+            // JVMs sharing this directory, and both may publish the same path at once: a shared
+            // "<path>.tmp" lets each truncate the other's staging file, and the delete-then-rename
+            // fallback below can then destroy the winner's file outright.
+            File tmp = new File(f.getParentFile(), f.getName() + stagingSuffix());
             FileOutputStream out = new FileOutputStream(tmp);
             try {
                 out.write(payload == null ? new byte[0] : payload);
@@ -290,9 +295,25 @@ class JavaSEWearableBridge implements WearableBridge {
         // part of the storage name -- but it must not become the *delivered* path: a listener routes
         // on the path the sender passed to transferFile. The marker keeps the two recoverable, and
         // is a character encodePath can never emit.
-        writeValue(new File(dataDir, encodePath(path) + TRANSFER_MARKER + encodePath(fileName)),
+        //
+        // The sequence is what makes each transfer its own file. A transfer is one-shot, so sending
+        // twice to the same path and name before the 500ms watcher has consumed the first -- or at
+        // any time while the peer is offline -- must queue two deliveries, not silently replace one
+        // with the other. (A replicated value is the opposite: putData deliberately overwrites.)
+        writeValue(new File(dataDir, encodePath(path) + TRANSFER_MARKER + encodePath(fileName)
+                        + TRANSFER_MARKER + Long.toHexString(nextTransferSequence())),
                 wrapper.toByteArray(), path);
     }
+
+    /** Distinguishes successive transfers so neither overwrites the other on disk. */
+    private static synchronized long nextTransferSequence() {
+        long now = System.currentTimeMillis();
+        lastTransferSequence = now > lastTransferSequence ? now : lastTransferSequence + 1;
+        return lastTransferSequence;
+    }
+
+    private static long lastTransferSequence;
+
 
     /**
      * Separates the logical path from the file name in a transfer's storage name. Uppercase, which
@@ -544,6 +565,20 @@ class JavaSEWearableBridge implements WearableBridge {
      * process has written for it. The file system's own granularity can be as coarse as a second, so
      * "now" is not on its own enough to mark a value as new.
      */
+    /**
+     * A staging-file suffix unique to this process and call. Still ends in {@code .tmp} so the
+     * watcher's existing skip rule keeps ignoring staging files.
+     */
+    private static synchronized String stagingSuffix() {
+        return "." + PROCESS_TAG + "." + (stagingCounter++) + ".tmp";
+    }
+
+    private static int stagingCounter;
+    /** Identifies this JVM among the pair; the two sides share a directory but not a process. */
+    private static final String PROCESS_TAG =
+            Integer.toHexString(java.lang.management.ManagementFactory.getRuntimeMXBean()
+                    .getName().hashCode());
+
     private static synchronized long nextStamp(File f) {
         long now = System.currentTimeMillis();
         long floor = Math.max(f.lastModified(), lastStamp);

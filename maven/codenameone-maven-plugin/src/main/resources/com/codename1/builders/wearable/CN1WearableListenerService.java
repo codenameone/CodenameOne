@@ -193,7 +193,16 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // Forget the ordering stamp too, or a value republished at this path with a lower
                 // stamp than the removed one carried would be filtered out as "older".
                 CN1WearableBridge.forgetDeliveredSequence(appPath);
-                WearableConnection.deliverDataRemoved(appPath);
+                // One authority's item going away does not mean the path is gone: both nodes may
+                // have published it, and the other item can still be there. Reporting a removal on
+                // the strength of this event alone would tell the listener the value disappeared
+                // while getData(path) still returned it. Ask what is left and report that instead.
+                byte[] remaining = CN1WearableBridge.currentValue(this, appPath);
+                if (remaining != null) {
+                    WearableConnection.deliverDataChanged(appPath, remaining);
+                } else {
+                    WearableConnection.deliverDataRemoved(appPath);
+                }
                 continue;
             }
             com.google.android.gms.wearable.DataMap value =
@@ -217,8 +226,11 @@ public class CN1WearableListenerService extends WearableListenerService {
     public void onCapabilityChanged(com.google.android.gms.wearable.CapabilityInfo info) {
         // The companion was installed or removed while the device stayed connected. Nothing else
         // would notice: the capability cache would keep answering with the previous result.
+        //
+        // capabilityChanged() notifies listeners itself, and only when the set actually changed, so
+        // there is deliberately no second notifyStateChanged() here -- it would deliver the same
+        // state change twice, and would fire even when nothing changed.
         CN1WearableBridge.capabilityChanged(info);
-        WearableConnection.notifyStateChanged();
     }
 
     @Override

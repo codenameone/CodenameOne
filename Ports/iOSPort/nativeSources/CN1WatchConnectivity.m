@@ -130,6 +130,55 @@ static BOOL cn1WearableLocalWins(CN1WearableEntry mine, CN1WearableEntry theirs)
     return mine.stamp >= theirs.stamp;
 }
 
+/// How long a tombstone is kept before it is dropped, and the ceiling on how many are kept at all.
+///
+/// A tombstone has to outlive the window in which the peer might still be holding the value it
+/// supersedes -- otherwise dropping it lets that older value win again and the removal undoes
+/// itself. But WatchConnectivity replaces the whole context on every publish and rejects one that
+/// grows too large, so an app that creates and removes changing paths would eventually be unable to
+/// publish at all. A day is far longer than any plausible replication delay and keeps the context
+/// bounded; the count cap is the backstop for an app that churns paths faster than that.
+static const int64_t kCN1TombstoneTTLMillis = 24 * 60 * 60 * 1000LL;
+static const NSUInteger kCN1MaxTombstones = 256;
+
+/// Drops tombstones that have outlived their purpose, oldest first.
+static void cn1WearablePruneTombstones(NSMutableDictionary *ctx) {
+    NSMutableArray *tombKeys = [NSMutableArray array];
+    for (NSString *key in ctx.allKeys) {
+        if ([key isKindOfClass:[NSString class]] && [key hasPrefix:kTombPrefix]) {
+            [tombKeys addObject:key];
+        }
+    }
+    int64_t now = (int64_t) ([[NSDate date] timeIntervalSince1970] * 1000.0);
+    for (NSString *key in tombKeys) {
+        id stamp = ctx[key];
+        if (![stamp isKindOfClass:[NSNumber class]]
+                || now - [stamp longLongValue] > kCN1TombstoneTTLMillis) {
+            [ctx removeObjectForKey:key];
+        }
+    }
+    if (ctx.count <= kCN1MaxTombstones) {
+        return;
+    }
+    NSMutableArray *remaining = [NSMutableArray array];
+    for (NSString *key in ctx.allKeys) {
+        if ([key isKindOfClass:[NSString class]] && [key hasPrefix:kTombPrefix]) {
+            [remaining addObject:key];
+        }
+    }
+    if (remaining.count <= kCN1MaxTombstones) {
+        return;
+    }
+    [remaining sortUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
+        int64_t sa = [ctx[a] isKindOfClass:[NSNumber class]] ? [ctx[a] longLongValue] : 0;
+        int64_t sb = [ctx[b] isKindOfClass:[NSNumber class]] ? [ctx[b] longLongValue] : 0;
+        return sa < sb ? NSOrderedAscending : (sa > sb ? NSOrderedDescending : NSOrderedSame);
+    }];
+    for (NSUInteger i = 0; i + kCN1MaxTombstones < remaining.count; i++) {
+        [ctx removeObjectForKey:remaining[i]];
+    }
+}
+
 /// Every application path either side knows about, removals included.
 static NSSet *cn1WearableAllPaths(NSDictionary *local, NSDictionary *peer) {
     NSMutableSet *out = [NSMutableSet set];
@@ -359,6 +408,7 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     [ctx removeObjectForKey:cn1WearableValueKey(path)];
     [ctx removeObjectForKey:cn1WearableStampKey(path)];
     ctx[cn1WearableTombKey(path)] = @(cn1WearableNextSequence());
+    cn1WearablePruneTombstones(ctx);
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
     [ctx release];

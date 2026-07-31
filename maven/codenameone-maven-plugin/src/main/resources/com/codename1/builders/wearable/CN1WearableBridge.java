@@ -293,6 +293,12 @@ public class CN1WearableBridge implements WearableBridge {
     static void capabilityChanged(CapabilityInfo info) {
         CN1WearableBridge b = current;
         if (b == null || info == null) {
+            // No bridge to update the cache on, but listeners are held by WearableConnection rather
+            // than by the bridge, so the state change still has to reach them -- this is the only
+            // notification for it, the caller does not send a second one.
+            if (info != null) {
+                WearableConnection.notifyStateChanged();
+            }
             return;
         }
         List<String> out = new ArrayList<String>();
@@ -444,8 +450,16 @@ public class CN1WearableBridge implements WearableBridge {
         nodeClient.getConnectedNodes().addOnCompleteListener(
                 new com.google.android.gms.tasks.OnCompleteListener<List<Node>>() {
                     public void onComplete(com.google.android.gms.tasks.Task<List<Node>> task) {
-                        List<Node> fresh = task.isSuccessful() && task.getResult() != null
-                                ? task.getResult() : new ArrayList<Node>();
+                        if (!task.isSuccessful() || task.getResult() == null) {
+                            // A transient Play services failure is not evidence that every peer
+                            // vanished. Replacing a good snapshot with an empty list would make
+                            // isReachable() and getConnectedNodes() report a disconnected pair for a
+                            // full cache lifetime, and fire a spurious state change with it. Keep
+                            // what we had; the next call retries.
+                            refreshingNodes = false;
+                            return;
+                        }
+                        List<Node> fresh = task.getResult();
                         boolean changed = !sameIds(idsOf(cachedNodes), idsOf(fresh));
                         cachedNodes = fresh;
                         cachedNodesStamp = System.currentTimeMillis();
@@ -996,6 +1010,50 @@ public class CN1WearableBridge implements WearableBridge {
 
     private static final Map<String, Long> deliveredSequences = new HashMap<String, Long>();
 
+    /**
+     * The value a path still resolves to, or null when nothing is left under it.
+     *
+     * <p>Used when one authority's DataItem is deleted: both nodes may have published the path, so a
+     * deletion event is not on its own evidence that the value is gone. Answering from a fresh query
+     * keeps the listener and {@code getData} telling the same story.
+     *
+     * @param context any context
+     * @param path the application path
+     * @return the winning payload, or null when the path is genuinely empty
+     */
+    static byte[] currentValue(Context context, String path) {
+        CN1WearableBridge b = current;
+        if (b != null) {
+            return b.getData(path);
+        }
+        try {
+            Uri uri = new Uri.Builder().scheme("wear").authority("*").path(dataPath(path)).build();
+            DataItemBuffer items = Tasks.await(
+                    Wearable.getDataClient(context.getApplicationContext()).getDataItems(uri),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            try {
+                byte[] best = null;
+                long bestSeq = Long.MIN_VALUE;
+                for (DataItem item : items) {
+                    DataMap map = valueMap(item);
+                    if (map == null) {
+                        continue;
+                    }
+                    long seq = sequenceOf(map);
+                    if (best == null || seq > bestSeq) {
+                        best = payloadOf(map);
+                        bestSeq = seq;
+                    }
+                }
+                return best;
+            } finally {
+                items.release();
+            }
+        } catch (Throwable unavailable) {
+            return null;
+        }
+    }
+
     /// The stamp an item was published at, or {@code Long.MIN_VALUE} for an item that predates
     /// stamping (which then always counts as older than anything stamped).
     ///
@@ -1038,7 +1096,11 @@ public class CN1WearableBridge implements WearableBridge {
         if (uri == null) {
             return true;
         }
-        return isNewerThanDelivered("\u0000xfer:" + uri.getPath(), sequence);
+        // Keyed by the publishing node as well as the path. Two devices may transfer the same
+        // logical path and file name; their items differ only in the Uri authority, so dropping it
+        // would treat the two as one stream and discard the second sender's file whenever its
+        // sequence did not happen to exceed the first's.
+        return isNewerThanDelivered("\u0000xfer:" + uri.getHost() + ":" + uri.getPath(), sequence);
     }
 
     /**

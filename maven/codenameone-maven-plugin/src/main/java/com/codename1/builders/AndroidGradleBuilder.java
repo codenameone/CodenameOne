@@ -1304,7 +1304,20 @@ public class AndroidGradleBuilder extends Executor {
         String wearApplicationMetaData = "";
         String watchMain = request.getArg("watchMain", "").trim();
         boolean watchStandalone = "true".equals(request.getArg("watchStandalone", "false"));
-        if (watchMain.length() > 0 && watchStandalone) {
+        // The retired android.wear / android.wear.standalone hints still have to work. A project
+        // configured against them predates codename1.watchMain and declares neither of the new
+        // settings, so keying only on those would silently drop the watch hardware feature, the API
+        // 23 floor and the standalone marker from a manifest that used to have them -- turning a
+        // working Wear app into a phone APK with no error. android.wear alone implied standalone,
+        // which is why it maps to the standalone branch.
+        boolean legacyWear = "true".equals(request.getArg("android.wear", "false"))
+                || "true".equals(request.getArg("android.wear.standalone", "false"));
+        if (legacyWear) {
+            log("[wearable] android.wear is superseded by codename1.watchMain plus "
+                    + "codename1.watchStandalone; still honoured, but the new settings also build "
+                    + "the Apple Watch app from the same declaration.");
+        }
+        if ((watchMain.length() > 0 && watchStandalone) || legacyWear) {
             // Wear OS 2.0 (the standalone-app baseline) is API 23.
             minSDK = maxInt("23", minSDK);
             if (!xPermissions.contains("android.hardware.type.watch")) {
