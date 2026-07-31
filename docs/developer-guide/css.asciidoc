@@ -608,20 +608,12 @@ A relative `src` URL is resolved against the directory that holds the CSS file. 
 
 [source,css]
 ----
-@font-face {
-    font-family: "MyFont";
-    src: url(MyFont-Regular.ttf);
-}
-
-@font-face {
-    font-family: "MyFont Bold";
-    src: url(fonts/MyFont-Bold.ttf);
-}
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-044,indent=0]
 ----
 
 ===== Family names, weights and styles
 
-A `font-family` name that contains spaces must be quoted, both in the `@font-face` rule and wherever you reference it. An unquoted name is parsed as a list of separate identifiers, so `font-family: MyFont Bold` registers the family as `MyFont` and collides with your regular weight.
+A `font-family` name that contains spaces must be quoted, both in the `@font-face` rule and wherever you reference it. An unquoted name is parsed as a list of separate identifiers, so `font-family: GuideDemoFont Bold` registers the family as `GuideDemoFont` and collides with your regular weight.
 
 `font-weight` and `font-style` select between the built-in `native:` fonts, but they have no effect once `font-family` resolves to a `@font-face` rule. Declare one `@font-face` per weight and style you need, each with its own family name, as in the example above, then reference the right family from each UIID.
 
@@ -629,8 +621,7 @@ To change the base font of an entire theme, set `font-family` on the special `De
 
 [source,css]
 ----
-Default { font-family: "MyFont"; }
-Title { font-family: "MyFont Bold"; }
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-045,indent=0]
 ----
 
 ===== Remote and GitHub-hosted fonts

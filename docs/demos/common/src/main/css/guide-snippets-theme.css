@@ -419,6 +419,34 @@ MyLabel {
 }
 /* end::css-css-029[] */
 
+/* A relative src URL resolves against the directory holding this CSS file, so
+   GuideRootFont.ttf sits beside it and GuideDemoFont-Bold.ttf sits in res/.
+   Both forms compile, which is the point the guide makes with this snippet. */
+/* tag::css-css-044[] */
+@font-face {
+    font-family: "GuideRootFont";
+    src: url(GuideRootFont.ttf);
+}
+
+@font-face {
+    font-family: "GuideDemoFont Bold";
+    src: url(res/GuideDemoFont-Bold.ttf);
+}
+/* end::css-css-044[] */
+
+/* Both families come from the snippet above, so this fixture also proves the
+   root-level font actually resolves and ships: a @font-face is only copied to
+   the build output when some style references it. */
+/* tag::css-css-045[] */
+Default {
+    font-family: "GuideRootFont";
+}
+
+Title {
+    font-family: "GuideDemoFont Bold";
+}
+/* end::css-css-045[] */
+
 /* tag::css-css-030[] */
 @font-face {
     font-family: "GuideDownloadedFont";
