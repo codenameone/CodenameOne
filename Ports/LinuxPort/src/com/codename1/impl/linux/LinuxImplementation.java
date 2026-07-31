@@ -2755,19 +2755,38 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public void secureRandomBytes(byte[] out) {
-        if (out != null && out.length > 0) {
-            LinuxNative.secureRandomBytes(out);
+        // Fail loudly: KeyGenerator hands this buffer straight back as key
+        // material, so a quiet return after the platform RNG failed would mint
+        // a predictable key.
+        if (out != null && out.length > 0 && !LinuxNative.secureRandomBytes(out)) {
+            throw new RuntimeException("secure random failed: " + LinuxNative.lastCryptoError());
+        }
+    }
+
+    /// Rejects an initialization vector the mode cannot use. A GCM nonce that
+    /// is absent repeats across messages under one key, and a short CBC IV is
+    /// read as a whole block by the platform library.
+    private static void checkIv(String transformation, byte[] iv) {
+        String mode = transformation == null ? "" : transformation;
+        if (mode.indexOf("/GCM/") >= 0) {
+            if (iv == null || iv.length == 0) {
+                throw new RuntimeException("AES-GCM requires a nonce");
+            }
+        } else if (mode.indexOf("/ECB/") < 0 && (iv == null || iv.length != 16)) {
+            throw new RuntimeException("AES-CBC requires a 16 byte initialization vector");
         }
     }
 
     @Override
     public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
+        checkIv(transformation, iv);
         return cryptoResult(LinuxNative.aesCrypt(transformation, true, key, iv, aad, plaintext),
                 "AES encrypt");
     }
 
     @Override
     public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
+        checkIv(transformation, iv);
         return cryptoResult(LinuxNative.aesCrypt(transformation, false, key, iv, aad, ciphertext),
                 "AES decrypt");
     }

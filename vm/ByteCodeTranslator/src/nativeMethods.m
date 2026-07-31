@@ -2796,18 +2796,34 @@ JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String_R_int(CODENA
     cn1_timezone_raw_ctx ctx;
 #ifdef _WIN32
     {
-        /* The raw offset is the standard-time one: sample both solstices and
-         * take whichever is not in daylight saving (either hemisphere). */
+        /* The raw offset is the current standard-time one. Sample both
+         * solstices of the current year rather than a fixed past year: a zone
+         * whose base offset changes (Asia/Almaty moved from UTC+6 to UTC+5
+         * during 2024, with neither sample flagged as daylight saving) would
+         * otherwise report its retired offset forever. When neither sample is
+         * in daylight saving they can still differ, so prefer the later one --
+         * that is the rule in force now. */
         int januaryOffset = 0, januaryDst = 0, julyOffset = 0, julyDst = 0;
-        if (cn1WinZoneOffsetMillis(buffer, cn1WinUtcMillis(2024, 1, 1, 43200000),
+        time_t nowSeconds = time(NULL);
+        struct tm nowUtc;
+        int currentYear = 2024;
+#ifdef _WIN32
+        if (gmtime_s(&nowUtc, &nowSeconds) == 0) {
+            currentYear = nowUtc.tm_year + 1900;
+        }
+#endif
+        if (cn1WinZoneOffsetMillis(buffer, cn1WinUtcMillis(currentYear, 1, 1, 43200000),
                                    &januaryOffset, &januaryDst) &&
-            cn1WinZoneOffsetMillis(buffer, cn1WinUtcMillis(2024, 7, 1, 43200000),
+            cn1WinZoneOffsetMillis(buffer, cn1WinUtcMillis(currentYear, 7, 1, 43200000),
                                    &julyOffset, &julyDst)) {
-            if (!januaryDst) {
-                return januaryOffset;
+            if (!januaryDst && !julyDst) {
+                return julyOffset;
             }
             if (!julyDst) {
                 return julyOffset;
+            }
+            if (!januaryDst) {
+                return januaryOffset;
             }
             return januaryOffset < julyOffset ? januaryOffset : julyOffset;
         }

@@ -254,11 +254,15 @@ public abstract class TimeZone{
         String minutePart = "0";
         String secondPart = "0";
         if (colon < 0) {
-            // The colon-less forms are hh, hhmm and hhmmss.
-            if (digits.length() == 4 || digits.length() == 6) {
-                hourPart = digits.substring(0, 2);
-                minutePart = digits.substring(2, 4);
-                secondPart = digits.length() == 6 ? digits.substring(4, 6) : "0";
+            // The colon-less forms are h, hh, hmm, hhmm and hhmmss: the last two
+            // digits are always the minutes once there are more than two, so a
+            // one-digit hour ("GMT+012" is UTC+00:12) splits the same way.
+            int length = digits.length();
+            if (length == 3 || length == 4 || length == 6) {
+                int hourDigits = length == 6 ? 2 : length - 2;
+                hourPart = digits.substring(0, hourDigits);
+                minutePart = digits.substring(hourDigits, hourDigits + 2);
+                secondPart = length == 6 ? digits.substring(4, 6) : "0";
             }
         } else {
             int secondColon = rest.indexOf(':');

@@ -611,6 +611,17 @@ def publishable_report_problems(
     generated_at = report.get("generated_at")
     if not isinstance(generated_at, str) or not generated_at:
         malformed.append("report has no generated_at timestamp")
+    else:
+        # Anything unparseable ("unknown") would sail through publication and
+        # then break both the freshness sweep and the page's own time
+        # rendering, so classify it as unusable here instead.
+        try:
+            stamp = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+        except ValueError:
+            malformed.append(f"generated_at {generated_at!r} is not a timestamp")
+        else:
+            if stamp.tzinfo is None:
+                malformed.append(f"generated_at {generated_at!r} has no time zone")
 
     mapped = test_to_feature(manifest)
     tests = report.get("tests")

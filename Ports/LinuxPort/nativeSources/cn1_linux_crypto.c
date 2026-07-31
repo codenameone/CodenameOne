@@ -81,16 +81,21 @@ static const unsigned char* cn1Bytes(JAVA_OBJECT array, int* length) {
 
 /* ------------------------------------------------------------ random */
 
-JAVA_VOID com_codename1_impl_linux_LinuxNative_secureRandomBytes___byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT out) {
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_secureRandomBytes___byte_1ARRAY_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT out) {
     int length = 0;
     unsigned char* data = (unsigned char*) cn1Bytes(out, &length);
     if (data == 0 || length <= 0) {
-        return;
+        return JAVA_TRUE;
     }
     if (RAND_bytes(data, length) != 1) {
+        // Report the failure rather than leaving the buffer as it stands:
+        // KeyGenerator hands this straight back as key material, so a quiet
+        // return would mint a predictable key.
         cn1CryptoFail("secure random");
         memset(data, 0, (size_t) length);
+        return JAVA_FALSE;
     }
+    return JAVA_TRUE;
 }
 
 /* ------------------------------------------------------------ AES */
@@ -120,6 +125,7 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_aesCrypt___java_lang_String_boo
     const unsigned char* aad = cn1Bytes(aadArray, &aadLength);
     const unsigned char* data = cn1Bytes(dataArray, &dataLength);
     int gcm = strstr(mode, "/GCM/") != 0;
+    int ecb = strstr(mode, "/ECB/") != 0;
     int padded = strstr(mode, "NoPadding") == 0;
     const EVP_CIPHER* cipher = cn1AesCipher(mode, keyLength);
     EVP_CIPHER_CTX* ctx = 0;
@@ -131,6 +137,17 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_aesCrypt___java_lang_String_boo
 
     if (cipher == 0) {
         cn1CryptoFail("unsupported AES key length");
+        return JAVA_NULL;
+    }
+    // OpenSSL would otherwise silently keep the context's zeroed default IV for
+    // a missing GCM nonce -- repeating a nonce under one key destroys GCM --
+    // and read a whole block past a short CBC IV.
+    if (gcm && ivLength <= 0) {
+        cn1CryptoFail("AES-GCM requires a nonce");
+        return JAVA_NULL;
+    }
+    if (!gcm && !ecb && ivLength != 16) {
+        cn1CryptoFail("AES-CBC requires a 16 byte initialization vector");
         return JAVA_NULL;
     }
     if (gcm && !encrypt) {
@@ -238,9 +255,14 @@ static EVP_PKEY* cn1PrivateKey(const unsigned char* der, int length) {
 static int cn1ApplyRsaPadding(EVP_PKEY_CTX* ctx, const char* transformation) {
     if (strstr(transformation, "OAEP") != 0) {
         const EVP_MD* md = strstr(transformation, "SHA-1") != 0 ? EVP_sha1() : EVP_sha256();
+        // The mask function stays on SHA-1 even when the OAEP digest is
+        // SHA-256. That is what the JCE providers behind the JavaSE and
+        // Android ports do for this transformation name, and ciphertext has to
+        // stay readable across ports; naming the digest for both halves would
+        // make anything sealed here undecryptable there.
         if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0 ||
             EVP_PKEY_CTX_set_rsa_oaep_md(ctx, md) <= 0 ||
-            EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, md) <= 0) {
+            EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, EVP_sha1()) <= 0) {
             return 0;
         }
         return 1;

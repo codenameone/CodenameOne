@@ -391,7 +391,13 @@ namespace UWPApp
             int minutes = timeOfDayMillis / 1000 / 60 - hours * 60;
             int seconds = timeOfDayMillis / 1000 - (hours * 60 * 60) - (minutes * 60);
             int millis = timeOfDayMillis % 1000;
-            return (int)TimeZoneInfo.FindSystemTimeZoneById(name).GetUtcOffset(new DateTime(year, month, day, hours, minutes, seconds, DateTimeKind.Local)).TotalMilliseconds;
+            // The caller passes UTC fields -- the POSIX implementation of this
+            // native resolves them with timegm and the JavaScript one with
+            // Date.UTC -- so read them as UTC here too. DateTimeKind.Local
+            // shifted the instant by the host offset, which lands on the wrong
+            // side of a transition when the requested zone changes offset
+            // inside that window.
+            return (int)TimeZoneInfo.FindSystemTimeZoneById(name).GetUtcOffset(new DateTime(year, month, day, hours, minutes, seconds, DateTimeKind.Utc)).TotalMilliseconds;
 
         }
         public override int getTimezoneRawOffset(string name)

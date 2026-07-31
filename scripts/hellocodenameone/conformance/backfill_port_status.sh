@@ -80,12 +80,29 @@ while IFS= read -r workflow; do
   run_id=""
   download_dir="${tmp_dir}/${workflow}"
   mkdir -p "${download_dir}"
-  # A run that died before the suite reported uploads no artifact at all, and
-  # artifacts expire; walk back until one of the recent runs still has reports.
+  # Merge across candidate runs rather than stopping at the first with any
+  # artifact: a failed matrix run can upload the report for one leg only, and
+  # the other ports that workflow owns would then never be considered.
+  owned="$(jq -r --arg workflow "${workflow}" '.ports[] | select(.workflow == $workflow) | .id' "${MANIFEST}")"
   for candidate in ${candidates}; do
-    if gh run download "${candidate}" --pattern 'port-status-*' --dir "${download_dir}" >/dev/null 2>&1; then
-      run_id="${candidate}"
+    missing=0
+    for port in ${owned}; do
+      if [ ! -f "${download_dir}/covered-${port}" ]; then
+        missing=1
+      fi
+    done
+    if [ "${missing}" -eq 0 ]; then
       break
+    fi
+    if gh run download "${candidate}" --pattern 'port-status-*' --dir "${download_dir}/run-${candidate}" >/dev/null 2>&1; then
+      run_id="${candidate}"
+      while IFS= read -r downloaded; do
+        found="$(jq -r '.port // empty' "${downloaded}" 2>/dev/null || true)"
+        if [ -n "${found}" ] && [ ! -f "${download_dir}/covered-${found}" ]; then
+          cp "${downloaded}" "${download_dir}/port-status-${found}.json"
+          : > "${download_dir}/covered-${found}"
+        fi
+      done < <(find "${download_dir}/run-${candidate}" -type f -name 'port-status-*.json' | sort)
     fi
   done
   if [ -z "${run_id}" ]; then
@@ -120,7 +137,7 @@ while IFS= read -r workflow; do
     echo "Publishing ${port} from run ${run_id} of ${workflow} (${generated})."
     PORT_STATUS_PUBLISH=1 "${SCRIPT_DIR}/publish_port_status.sh" "${report}"
     published=$((published + 1))
-  done < <(find "${download_dir}" -type f -name 'port-status-*.json' | sort)
+  done < <(find "${download_dir}" -maxdepth 1 -type f -name 'port-status-*.json' | sort)
 done < <(jq -r '[.ports[].workflow] | unique | .[]' "${MANIFEST}")
 
 echo "Port status sweep: published ${published} report(s), ${skipped} already current."
@@ -144,7 +161,10 @@ while IFS= read -r port; do
     continue
   fi
   generated="$(jq -r '.generated_at // empty' "${tmp_dir}/check.json" 2>/dev/null || true)"
-  age_days="$(python3 - "${generated}" <<'PY'
+    # Compare elapsed seconds, not whole days: the page marks a report stale the
+  # moment its exact age passes the window, so flooring to days would keep this
+  # green for almost another day after the column had already gone stale.
+  age_seconds="$(python3 - "${generated}" <<'AGE'
 import sys
 from datetime import datetime, timezone
 
@@ -154,13 +174,15 @@ try:
 except ValueError:
     print(-1)
 else:
-    print(int((datetime.now(timezone.utc) - stamp).total_seconds() // 86400))
-PY
+    print(-1 if stamp.tzinfo is None
+          else int((datetime.now(timezone.utc) - stamp).total_seconds()))
+AGE
 )"
-  if [ "${age_days}" -lt 0 ]; then
+  stale_seconds=$((stale_days * 86400))
+  if [ "${age_seconds}" -lt 0 ]; then
     problems+=("${port}: unreadable generated_at ${generated:-<missing>}")
-  elif [ "${age_days}" -gt "${stale_days}" ]; then
-    problems+=("${port}: last report is ${age_days} days old (limit ${stale_days})")
+  elif [ "${age_seconds}" -gt "${stale_seconds}" ]; then
+    problems+=("${port}: last report is $((age_seconds / 3600)) hours old (limit ${stale_days} days)")
   fi
 done < <(jq -r '.ports[].id' "${MANIFEST}")
 

@@ -40,6 +40,7 @@
 #include <windows.h>
 #include <bcrypt.h>
 #include <wincrypt.h>
+#include <ncrypt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -95,18 +96,23 @@ static unsigned char* cn1Bytes(JAVA_OBJECT array, int* length) {
 
 /* ------------------------------------------------------------ random */
 
-JAVA_VOID com_codename1_impl_windows_WindowsNative_secureRandomBytes___byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT out) {
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_secureRandomBytes___byte_1ARRAY_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT out) {
     int length = 0;
     unsigned char* data = cn1Bytes(out, &length);
     NTSTATUS status;
     if (data == 0 || length <= 0) {
-        return;
+        return JAVA_TRUE;
     }
     status = BCryptGenRandom(NULL, data, (ULONG) length, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
     if (status != STATUS_SUCCESS) {
+        /* Report the failure rather than leaving the buffer as it stands:
+         * KeyGenerator hands this straight back as key material, so a quiet
+         * return would mint a predictable key. */
         cn1CryptoFail("secure random", status);
         memset(data, 0, (size_t) length);
+        return JAVA_FALSE;
     }
+    return JAVA_TRUE;
 }
 
 /* ------------------------------------------------------------ AES */
@@ -134,6 +140,17 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_aesCrypt___java_lang_String
     BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO auth;
     unsigned char tag[CN1_GCM_TAG_BYTES];
 
+    /* A missing GCM nonce would otherwise repeat across messages under one
+     * key, which destroys the mode, and a short CBC IV is read as a whole
+     * block. */
+    if (gcm && ivLength <= 0) {
+        cn1CryptoFail("AES-GCM requires a nonce", 0);
+        return JAVA_NULL;
+    }
+    if (!gcm && !ecb && ivLength != 16) {
+        cn1CryptoFail("AES-CBC requires a 16 byte initialization vector", 0);
+        return JAVA_NULL;
+    }
     if (gcm && !encrypt) {
         if (dataLength < CN1_GCM_TAG_BYTES) {
             cn1CryptoFail("AES-GCM input is shorter than its authentication tag", 0);
@@ -275,53 +292,67 @@ static BCRYPT_KEY_HANDLE cn1PublicKey(const unsigned char* der, int length) {
     return key;
 }
 
-static BCRYPT_KEY_HANDLE cn1PrivateKey(const unsigned char* der, int length, BCRYPT_ALG_HANDLE* algOut) {
-    CRYPT_PRIVATE_KEY_INFO* info = 0;
-    DWORD infoLength = 0;
-    BCRYPT_RSAKEY_BLOB* blob = 0;
-    DWORD blobLength = 0;
-    BCRYPT_ALG_HANDLE alg = NULL;
-    BCRYPT_KEY_HANDLE key = NULL;
-    NTSTATUS status;
-    const unsigned char* pkcs1 = der;
-    DWORD pkcs1Length = (DWORD) length;
+/* Imports a PKCS#8 private key of either supported kind.
+ *
+ * The earlier version always decoded CNG_RSA_PRIVATE_KEY_BLOB, so an EC key
+ * failed to import and ECDSA signing could never work. NCrypt takes PKCS#8
+ * directly and reads the algorithm out of the key itself, which covers RSA and
+ * EC with one path; *isEc reports which arrived so the caller can pick the
+ * matching padding.
+ */
+static NCRYPT_KEY_HANDLE cn1PrivateKey(const unsigned char* der, int length, int* isEc) {
+    NCRYPT_PROV_HANDLE provider = 0;
+    NCRYPT_KEY_HANDLE key = 0;
+    SECURITY_STATUS status;
+    WCHAR algorithm[64];
+    DWORD algorithmBytes = 0;
 
-    *algOut = NULL;
-    /* PKCS#8 wraps the PKCS#1 RSAPrivateKey; tolerate a bare PKCS#1 too. */
-    if (CryptDecodeObjectEx(X509_ASN_ENCODING, PKCS_PRIVATE_KEY_INFO, der, (DWORD) length,
-                            CRYPT_DECODE_ALLOC_FLAG, NULL, &info, &infoLength)) {
-        pkcs1 = info->PrivateKey.pbData;
-        pkcs1Length = info->PrivateKey.cbData;
+    if (isEc != 0) {
+        *isEc = 0;
     }
-    if (!CryptDecodeObjectEx(X509_ASN_ENCODING, CNG_RSA_PRIVATE_KEY_BLOB, pkcs1, pkcs1Length,
-                             CRYPT_DECODE_ALLOC_FLAG, NULL, &blob, &blobLength)) {
-        cn1CryptoFailLast("private key is not PKCS#8 DER");
-        if (info != 0) {
-            LocalFree(info);
-        }
-        return NULL;
+    status = NCryptOpenStorageProvider(&provider, MS_KEY_STORAGE_PROVIDER, 0);
+    if (status != ERROR_SUCCESS) {
+        cn1CryptoFail("key storage provider", (NTSTATUS) status);
+        return 0;
     }
-    status = BCryptOpenAlgorithmProvider(&alg, BCRYPT_RSA_ALGORITHM, NULL, 0);
-    if (status == STATUS_SUCCESS) {
-        /* The decoder emits either form depending on which primes it recovered. */
-        LPCWSTR blobType = blob->Magic == BCRYPT_RSAFULLPRIVATE_MAGIC
-                ? BCRYPT_RSAFULLPRIVATE_BLOB : BCRYPT_RSAPRIVATE_BLOB;
-        status = BCryptImportKeyPair(alg, NULL, blobType, &key, (PUCHAR) blob, blobLength, 0);
-        if (status != STATUS_SUCCESS) {
-            cn1CryptoFail("private key import", status);
-            BCryptCloseAlgorithmProvider(alg, 0);
-            alg = NULL;
-            key = NULL;
-        }
+    status = NCryptImportKey(provider, 0, NCRYPT_PKCS8_PRIVATE_KEY_BLOB, NULL, &key,
+                             (PBYTE) der, (DWORD) length, NCRYPT_DO_NOT_FINALIZE_FLAG);
+    if (status != ERROR_SUCCESS) {
+        /* Retry without the no-finalize hint: ephemeral keys import directly. */
+        status = NCryptImportKey(provider, 0, NCRYPT_PKCS8_PRIVATE_KEY_BLOB, NULL, &key,
+                                 (PBYTE) der, (DWORD) length, 0);
     } else {
-        cn1CryptoFail("RSA provider", status);
+        status = NCryptFinalizeKey(key, 0);
     }
-    LocalFree(blob);
-    if (info != 0) {
+    NCryptFreeObject(provider);
+    if (status != ERROR_SUCCESS || key == 0) {
+        cn1CryptoFail("private key is not PKCS#8 DER", (NTSTATUS) status);
+        if (key != 0) {
+            NCryptFreeObject(key);
+        }
+        return 0;
+    }
+    if (isEc != 0 &&
+        NCryptGetProperty(key, NCRYPT_ALGORITHM_GROUP_PROPERTY, (PBYTE) algorithm,
+                          sizeof(algorithm), &algorithmBytes, 0) == ERROR_SUCCESS) {
+        *isEc = wcscmp(algorithm, NCRYPT_ECDSA_ALGORITHM_GROUP) == 0
+                || wcscmp(algorithm, NCRYPT_ECDH_ALGORITHM_GROUP) == 0;
+    }
+    return key;
+}
+
+/* True when an X.509 SubjectPublicKeyInfo carries an elliptic-curve key. */
+static int cn1PublicKeyIsEc(const unsigned char* der, int length) {
+    CERT_PUBLIC_KEY_INFO* info = 0;
+    DWORD infoLength = 0;
+    int isEc = 0;
+    if (CryptDecodeObjectEx(X509_ASN_ENCODING, X509_PUBLIC_KEY_INFO, der, (DWORD) length,
+                            CRYPT_DECODE_ALLOC_FLAG, NULL, &info, &infoLength)) {
+        isEc = info->Algorithm.pszObjId != 0
+                && strcmp(info->Algorithm.pszObjId, szOID_ECC_PUBLIC_KEY) == 0;
         LocalFree(info);
     }
-    *algOut = alg;
-    return key;
+    return isEc;
 }
 
 static LPCWSTR cn1DigestAlgorithm(const char* algorithm) {
@@ -375,9 +406,8 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_rsaCrypt___java_lang_String
     int keyLength = 0, dataLength = 0;
     unsigned char* keyDer = cn1Bytes(keyArray, &keyLength);
     unsigned char* data = cn1Bytes(dataArray, &dataLength);
-    BCRYPT_ALG_HANDLE alg = NULL;
-    BCRYPT_KEY_HANDLE key = encrypt ? cn1PublicKey(keyDer, keyLength)
-                                    : cn1PrivateKey(keyDer, keyLength, &alg);
+    BCRYPT_KEY_HANDLE publicKey = encrypt ? cn1PublicKey(keyDer, keyLength) : NULL;
+    NCRYPT_KEY_HANDLE privateKey = encrypt ? 0 : cn1PrivateKey(keyDer, keyLength, 0);
     BCRYPT_OAEP_PADDING_INFO oaep;
     int oaepMode = strstr(mode, "OAEP") != 0;
     void* padding = 0;
@@ -387,19 +417,24 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_rsaCrypt___java_lang_String
     NTSTATUS status;
     JAVA_OBJECT result = JAVA_NULL;
 
-    if (key == NULL) {
+    if (encrypt ? (publicKey == NULL) : (privateKey == 0)) {
         return JAVA_NULL;
     }
     if (oaepMode) {
         memset(&oaep, 0, sizeof(oaep));
-        oaep.pszAlgId = strstr(mode, "SHA-1") != 0 ? BCRYPT_SHA1_ALGORITHM : BCRYPT_SHA256_ALGORITHM;
+        /* CNG derives the mask function from this same digest, and the JCE
+         * providers behind the JavaSE and Android ports mask with SHA-1 for
+         * this transformation name. Naming SHA-256 here would make ciphertext
+         * sealed on those ports undecryptable, so keep the SHA-1 mask. */
+        oaep.pszAlgId = BCRYPT_SHA1_ALGORITHM;
         oaep.pbLabel = NULL;
         oaep.cbLabel = 0;
         padding = &oaep;
     }
     status = encrypt
-            ? BCryptEncrypt(key, data, (ULONG) dataLength, padding, NULL, 0, NULL, 0, &outLength, flags)
-            : BCryptDecrypt(key, data, (ULONG) dataLength, padding, NULL, 0, NULL, 0, &outLength, flags);
+            ? BCryptEncrypt(publicKey, data, (ULONG) dataLength, padding, NULL, 0, NULL, 0, &outLength, flags)
+            : (NTSTATUS) NCryptDecrypt(privateKey, (PBYTE) data, (DWORD) dataLength, padding,
+                                       NULL, 0, (DWORD*) &outLength, flags);
     if (status != STATUS_SUCCESS) {
         cn1CryptoFail("RSA size", status);
         goto done;
@@ -410,8 +445,9 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_rsaCrypt___java_lang_String
         goto done;
     }
     status = encrypt
-            ? BCryptEncrypt(key, data, (ULONG) dataLength, padding, NULL, 0, out, outLength, &produced, flags)
-            : BCryptDecrypt(key, data, (ULONG) dataLength, padding, NULL, 0, out, outLength, &produced, flags);
+            ? BCryptEncrypt(publicKey, data, (ULONG) dataLength, padding, NULL, 0, out, outLength, &produced, flags)
+            : (NTSTATUS) NCryptDecrypt(privateKey, (PBYTE) data, (DWORD) dataLength, padding,
+                                       out, outLength, (DWORD*) &produced, flags);
     if (status != STATUS_SUCCESS) {
         cn1CryptoFail(encrypt ? "RSA encrypt" : "RSA decrypt", status);
         goto done;
@@ -420,9 +456,11 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_rsaCrypt___java_lang_String
 
 done:
     free(out);
-    BCryptDestroyKey(key);
-    if (alg != NULL) {
-        BCryptCloseAlgorithmProvider(alg, 0);
+    if (publicKey != NULL) {
+        BCryptDestroyKey(publicKey);
+    }
+    if (privateKey != 0) {
+        NCryptFreeObject(privateKey);
     }
     return result;
 }
@@ -430,31 +468,35 @@ done:
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_signData___java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT algorithm, JAVA_OBJECT keyArray, JAVA_OBJECT dataArray) {
     const char* name = algorithm == JAVA_NULL ? "" : stringToUTF8(threadStateData, algorithm);
-    int keyLength = 0, dataLength = 0;
+    int keyLength = 0, dataLength = 0, isEc = 0;
     unsigned char* keyDer = cn1Bytes(keyArray, &keyLength);
     unsigned char* data = cn1Bytes(dataArray, &dataLength);
-    BCRYPT_ALG_HANDLE alg = NULL;
-    BCRYPT_KEY_HANDLE key = cn1PrivateKey(keyDer, keyLength, &alg);
+    NCRYPT_KEY_HANDLE key = cn1PrivateKey(keyDer, keyLength, &isEc);
     LPCWSTR digestAlgorithm = cn1DigestAlgorithm(name);
     unsigned char digest[64];
     int digestLength = cn1DigestLength(digestAlgorithm);
     BCRYPT_PKCS1_PADDING_INFO padding;
+    /* ECDSA carries no padding parameters; RSA signs with PKCS#1. */
+    void* paddingInfo;
+    DWORD flags;
     unsigned char* out = 0;
-    ULONG outLength = 0, produced = 0;
-    NTSTATUS status;
+    DWORD outLength = 0, produced = 0;
+    SECURITY_STATUS status;
     JAVA_OBJECT result = JAVA_NULL;
 
-    if (key == NULL) {
+    if (key == 0) {
         return JAVA_NULL;
     }
     if (!cn1Digest(digestAlgorithm, data, dataLength, digest, digestLength)) {
         goto done;
     }
     padding.pszAlgId = digestAlgorithm;
-    status = BCryptSignHash(key, &padding, digest, (ULONG) digestLength, NULL, 0, &outLength,
-                            BCRYPT_PAD_PKCS1);
-    if (status != STATUS_SUCCESS) {
-        cn1CryptoFail("sign size", status);
+    paddingInfo = isEc ? NULL : (void*) &padding;
+    flags = isEc ? 0 : BCRYPT_PAD_PKCS1;
+    status = NCryptSignHash(key, paddingInfo, digest, (DWORD) digestLength, NULL, 0,
+                            &outLength, flags);
+    if (status != ERROR_SUCCESS) {
+        cn1CryptoFail("sign size", (NTSTATUS) status);
         goto done;
     }
     out = (unsigned char*) malloc((size_t) outLength + 1);
@@ -462,20 +504,17 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_signData___java_lang_String
         cn1CryptoFail("out of memory", 0);
         goto done;
     }
-    status = BCryptSignHash(key, &padding, digest, (ULONG) digestLength, out, outLength, &produced,
-                            BCRYPT_PAD_PKCS1);
-    if (status != STATUS_SUCCESS) {
-        cn1CryptoFail("sign", status);
+    status = NCryptSignHash(key, paddingInfo, digest, (DWORD) digestLength, out, outLength,
+                            &produced, flags);
+    if (status != ERROR_SUCCESS) {
+        cn1CryptoFail("sign", (NTSTATUS) status);
         goto done;
     }
     result = cn1WinNewByteArray(threadStateData, out, (int) produced);
 
 done:
     free(out);
-    BCryptDestroyKey(key);
-    if (alg != NULL) {
-        BCryptCloseAlgorithmProvider(alg, 0);
-    }
+    NCryptFreeObject(key);
     return result;
 }
 
@@ -487,6 +526,9 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_verifyData___java_lang_Str
     unsigned char* keyDer = cn1Bytes(keyArray, &keyLength);
     unsigned char* data = cn1Bytes(dataArray, &dataLength);
     unsigned char* signature = cn1Bytes(signatureArray, &signatureLength);
+    /* CryptImportPublicKeyInfoEx2 handles both key kinds; only the padding
+     * differs, so read the algorithm out of the SubjectPublicKeyInfo. */
+    int isEc = cn1PublicKeyIsEc(keyDer, keyLength);
     BCRYPT_KEY_HANDLE key = cn1PublicKey(keyDer, keyLength);
     LPCWSTR digestAlgorithm = cn1DigestAlgorithm(name);
     unsigned char digest[64];
@@ -500,8 +542,9 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_verifyData___java_lang_Str
     if (cn1Digest(digestAlgorithm, data, dataLength, digest, digestLength)) {
         padding.pszAlgId = digestAlgorithm;
         /* A rejected signature is a normal answer here, not a fault. */
-        if (BCryptVerifySignature(key, &padding, digest, (ULONG) digestLength, signature,
-                                  (ULONG) signatureLength, BCRYPT_PAD_PKCS1) == STATUS_SUCCESS) {
+        if (BCryptVerifySignature(key, isEc ? NULL : &padding, digest, (ULONG) digestLength,
+                                  signature, (ULONG) signatureLength,
+                                  isEc ? 0 : BCRYPT_PAD_PKCS1) == STATUS_SUCCESS) {
             result = JAVA_TRUE;
         }
     }

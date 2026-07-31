@@ -393,7 +393,8 @@ public final class LinuxNative {
 
     /* ---------------------------------------------------------- crypto */
 
-    public static native void secureRandomBytes(byte[] out);
+    /** Fills {@code out} with fresh entropy; false when the platform RNG failed. */
+    public static native boolean secureRandomBytes(byte[] out);
 
     /**
      * AES in the mode named by {@code transformation}. For GCM the

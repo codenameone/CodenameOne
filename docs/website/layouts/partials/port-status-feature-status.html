@@ -61,17 +61,17 @@
     {{- $state = "pass" -}}
     {{- $mark = "✓" -}}
     {{- $label = printf "All %d mapped test%s passed%s" $total (cond (eq $total 1) "" "s") $incomplete -}}
-  {{- else if not $complete -}}
-    {{- $label = printf "Suite did not finish; %d passed, %d skipped, %d not run" $passed $skipped $notRun -}}
   {{- else if and $documented (eq (add $passed $skipped) $total) -}}
     {{- $state = "pass" -}}
     {{- $mark = "✓" -}}
     {{- $documentedSkips = $skippedTests -}}
     {{- if eq $passed 0 -}}
-      {{- $label = printf "%s skipped by the CI environment, see the skipped-test errata" (delimit $skippedTests ", ") -}}
+      {{- $label = printf "%s skipped by the CI environment, see the skipped-test errata%s" (delimit $skippedTests ", ") $incomplete -}}
     {{- else -}}
-      {{- $label = printf "%d of %d mapped tests passed; %s skipped by the CI environment, see the skipped-test errata" $passed $total (delimit $skippedTests ", ") -}}
+      {{- $label = printf "%d of %d mapped tests passed; %s skipped by the CI environment, see the skipped-test errata%s" $passed $total (delimit $skippedTests ", ") $incomplete -}}
     {{- end -}}
+  {{- else if not $complete -}}
+    {{- $label = printf "Suite did not finish; %d passed, %d skipped, %d not run" $passed $skipped $notRun -}}
   {{- else if eq $skipped $total -}}
     {{- $label = "All mapped tests skipped" -}}
   {{- end -}}
