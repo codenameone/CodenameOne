@@ -112,3 +112,8 @@ memset
 fastlane
 calloc
 Valgrind
+
+# Package-hosting and local-debugging terminology.
+Sonatype
+[Ll]oopback
+[Rr]unbook
