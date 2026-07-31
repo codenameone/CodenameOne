@@ -1338,6 +1338,21 @@
         "url": "https://medium.com/p/49d3fdbe0a43/edit",
         "syndicated_at": "2026-07-29T17:01:08+00:00"
       }
+    },
+    "javascript-free-open-source": {
+      "devto": {
+        "id": 4281839,
+        "url": "https://dev.to/codenameone/the-codename-one-javascript-port-is-now-free-and-open-source-2f84",
+        "syndicated_at": "2026-07-31T15:13:59+00:00"
+      },
+      "foojay": {
+        "id": 125141,
+        "url": "https://foojay.io/wp-admin/post.php?post=125141&action=edit",
+        "preview_url": "https://foojay.io/?p=125141",
+        "featured_media_id": 125140,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-07-31T15:14:57+00:00"
+      }
     }
   }
 }
