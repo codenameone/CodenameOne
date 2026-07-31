@@ -39,6 +39,7 @@ import com.codename1.ui.accessibility.AccessibilityAction;
 import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
 import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -2377,8 +2378,8 @@ public class WindowsImplementation extends CodenameOneImplementation {
     @Override
     public OutputStream openOutputStream(Object connection) throws IOException {
         if (connection instanceof String) {
-            long h = WindowsNative.fileOpenWrite(stripFileUrl((String) connection), false);
-            return new WindowsOutputStream(h, false);
+            String path = stripFileUrl((String) connection);
+            return new WindowsOutputStream(openForWrite(path, false), false);
         }
         return new WindowsOutputStream(((WindowsHttpConnection) connection).peer, true);
     }
@@ -2387,17 +2388,37 @@ public class WindowsImplementation extends CodenameOneImplementation {
     public OutputStream openOutputStream(Object connection, int offset) throws IOException {
         // offset-based writing maps to opening the file for append/seek; the
         // first cut appends, which covers the common resume-write case.
-        long h = WindowsNative.fileOpenWrite(stripFileUrl((String) connection), true);
-        return new WindowsOutputStream(h, false);
+        String path = stripFileUrl((String) connection);
+        return new WindowsOutputStream(openForWrite(path, true), false);
     }
 
     @Override
     public InputStream openInputStream(Object connection) throws IOException {
         if (connection instanceof String) {
-            long h = WindowsNative.fileOpenRead(stripFileUrl((String) connection));
+            String path = stripFileUrl((String) connection);
+            long h = WindowsNative.fileOpenRead(path);
+            if (h == 0) {
+                // A null handle otherwise produced a stream that read as a
+                // legitimately empty file, so callers could not tell a missing
+                // file from an empty one -- the exact defect issue #1502
+                // reported against iOS.
+                throw new FileNotFoundException("No such file: " + path);
+            }
             return new WindowsInputStream(h, false);
         }
         return new WindowsInputStream(((WindowsHttpConnection) connection).peer, true);
+    }
+
+    /// Opens `path` for writing, failing loudly when the platform cannot. A
+    /// null handle otherwise yields a stream that discards every write and
+    /// closes cleanly, which turns an unwritable path into a file that simply
+    /// never appears.
+    private long openForWrite(String path, boolean append) throws IOException {
+        long h = WindowsNative.fileOpenWrite(path, append);
+        if (h == 0) {
+            throw new IOException("Unable to open " + path + " for writing");
+        }
+        return h;
     }
 
     /**
@@ -2598,13 +2619,18 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public OutputStream createStorageOutputStream(String name) throws IOException {
-        long h = WindowsNative.fileOpenWrite(storagePath(name), false);
-        return new WindowsOutputStream(h, false);
+        // Same reason as openOutputStream: a discarded write that reports
+        // success loses the entry instead of reporting that it cannot be saved.
+        return new WindowsOutputStream(openForWrite(storagePath(name), false), false);
     }
 
     @Override
     public InputStream createStorageInputStream(String name) throws IOException {
-        long h = WindowsNative.fileOpenRead(storagePath(name));
+        String path = storagePath(name);
+        long h = WindowsNative.fileOpenRead(path);
+        if (h == 0) {
+            throw new FileNotFoundException("No such storage entry: " + name);
+        }
         return new WindowsInputStream(h, false);
     }
 

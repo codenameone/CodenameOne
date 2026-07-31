@@ -251,6 +251,103 @@ class PortStatusTest(unittest.TestCase):
             ):
                 port_status.validate(manifest)
 
+    def publishable_report(self, port_id, **overrides):
+        mapped = port_status.test_to_feature(self.manifest)
+        tests = {
+            test: {"status": "pass", "feature": feature}
+            for test, feature in mapped.items()
+        }
+        report = {
+            "schema_version": self.manifest["schema_version"],
+            "port": port_id,
+            "generated_at": "2026-07-30T09:24:29Z",
+            "suite_finished": True,
+            "summary": {"pass": len(tests), "fail": 0, "skip": 0, "not-run": 0},
+            "tests": tests,
+            "performance": {
+                "status": "complete",
+                "benchmark_version": 1,
+                "missing": [],
+                "skipped": {},
+                "benchmarks": {
+                    benchmark: {"duration_ns": 12000000, "checksum": "42"}
+                    for benchmark in self.manifest["performance_benchmarks"]
+                },
+            },
+        }
+        report.update(overrides)
+        return report
+
+    def test_publishable_accepts_a_report_that_skips_workloads(self):
+        # The shape every iOS, tvOS, and watchOS run produces: the simulator
+        # skips the three GC-footprint workloads and measures the other seven.
+        report = self.publishable_report("ios-gl")
+        for benchmark in ("objectAllocation", "hashMapChurn", "stringBuilding"):
+            del report["performance"]["benchmarks"][benchmark]
+            report["performance"]["skipped"][benchmark] = "ios-simulator-gc-footprint"
+
+        self.assertEqual(([], []), port_status.publishable_report_problems(
+            self.manifest, "ios-gl", report
+        ))
+
+    def test_publishable_accepts_a_documented_test_skip(self):
+        report = self.publishable_report("android")
+        report["tests"]["CameraApiTest"]["status"] = "skip"
+        report["summary"]["pass"] -= 1
+        report["summary"]["skip"] += 1
+
+        self.assertEqual(([], []), port_status.publishable_report_problems(
+            self.manifest, "android", report
+        ))
+
+    def test_publishable_separates_contract_drift_from_a_broken_report(self):
+        report = self.publishable_report("android")
+        del report["tests"]["CameraApiTest"]
+        drift, malformed = port_status.publishable_report_problems(
+            self.manifest, "android", report
+        )
+        self.assertEqual([], malformed)
+        self.assertIn("CameraApiTest", drift[0])
+
+    def test_publishable_rejects_unaccounted_and_unmeasured_workloads(self):
+        report = self.publishable_report("linux-x64")
+        del report["performance"]["benchmarks"]["quicksort"]
+        report["performance"]["benchmarks"]["recursion"]["duration_ns"] = None
+        drift, malformed = port_status.publishable_report_problems(
+            self.manifest, "linux-x64", report
+        )
+        self.assertEqual([], drift)
+        self.assertEqual(2, len(malformed), malformed)
+        self.assertTrue(any("do not match the contract" in item for item in malformed))
+        self.assertTrue(any("recursion" in item for item in malformed))
+
+    def test_publishable_rejects_an_incomplete_or_mislabelled_run(self):
+        for mutate, expected in (
+            (lambda report: report["performance"].update({"status": "partial"}), "partial"),
+            (lambda report: report["performance"].update({"missing": ["quicksort"]}), "quicksort"),
+            (lambda report: report.update({"port": "android"}), "android"),
+            (lambda report: report["summary"].update({"pass": 3}), "summary"),
+        ):
+            with self.subTest(expected=expected):
+                report = self.publishable_report("watchos")
+                mutate(report)
+                _, malformed = port_status.publishable_report_problems(
+                    self.manifest, "watchos", report
+                )
+                self.assertTrue(any(expected in item for item in malformed), malformed)
+
+    def test_publishable_matches_every_report_the_site_serves(self):
+        for port in self.manifest["ports"]:
+            report_path = port_status.REPO_ROOT / self.manifest["report_directory"] / (
+                port["id"] + ".json"
+            )
+            with self.subTest(port=port["id"]):
+                drift, malformed = port_status.publishable_report_problems(
+                    self.manifest, port["id"], port_status.read_json(report_path)
+                )
+                self.assertEqual([], malformed)
+                self.assertEqual([], drift)
+
 
 if __name__ == "__main__":
     unittest.main()

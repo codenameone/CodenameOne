@@ -86,7 +86,8 @@
 
   <section class="cn1-port-status__legend" aria-label="Status legend">
     <span><i class="cn1-port-status__mark is-pass" aria-hidden="true">✓</i> Passed</span>
-    <span><i class="cn1-port-status__mark is-partial" aria-hidden="true">−</i> Partial or skipped</span>
+    <span><i class="cn1-port-status__mark is-pass" aria-hidden="true">✓</i><sup class="cn1-port-status__note" aria-hidden="true">*</sup> Passed, with a skip the <a href="#skip-errata-title">errata</a> account for</span>
+    <span><i class="cn1-port-status__mark is-partial" aria-hidden="true">−</i> Incomplete run or an unexplained skip</span>
     <span><i class="cn1-port-status__mark is-fail" aria-hidden="true">×</i> Failed</span>
     <span><i class="cn1-port-status__mark is-unknown" aria-hidden="true">?</i> No current report</span>
   </section>
@@ -143,7 +144,7 @@
           </th>
           {{- range $contract.ports }}
           {{- $report := index $reports .id -}}
-          {{- partial "port-status-feature-status.html" (dict "feature" $feature "port" . "report" $report "contract" $contract "now" $snapshotTime) -}}
+          {{- partial "port-status-feature-status.html" (dict "feature" $feature "port" . "report" $report "contract" $contract "supplement" $supplement "now" $snapshotTime) -}}
           {{- end }}
         </tr>
         {{- end }}

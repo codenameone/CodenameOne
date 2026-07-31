@@ -39,6 +39,7 @@ import com.codename1.ui.accessibility.AccessibilityAction;
 import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
 import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -2363,8 +2364,8 @@ public class LinuxImplementation extends CodenameOneImplementation {
     @Override
     public OutputStream openOutputStream(Object connection) throws IOException {
         if (connection instanceof String) {
-            long h = LinuxNative.fileOpenWrite(stripFileUrl((String) connection), false);
-            return new LinuxOutputStream(h, false);
+            String path = stripFileUrl((String) connection);
+            return new LinuxOutputStream(openForWrite(path, false), false);
         }
         return new LinuxOutputStream(((LinuxHttpConnection) connection).peer, true);
     }
@@ -2373,23 +2374,44 @@ public class LinuxImplementation extends CodenameOneImplementation {
     public OutputStream openOutputStream(Object connection, int offset) throws IOException {
         // offset-based writing maps to opening the file for append/seek; the
         // first cut appends, which covers the common resume-write case.
-        long h = LinuxNative.fileOpenWrite(stripFileUrl((String) connection), true);
-        return new LinuxOutputStream(h, false);
+        String path = stripFileUrl((String) connection);
+        return new LinuxOutputStream(openForWrite(path, true), false);
     }
 
     @Override
     public InputStream openInputStream(Object connection) throws IOException {
         if (connection instanceof String) {
-            long h = LinuxNative.fileOpenRead(stripFileUrl((String) connection));
+            String path = stripFileUrl((String) connection);
+            long h = LinuxNative.fileOpenRead(path);
+            if (h == 0) {
+                // fopen() returns NULL for a missing (or unreadable) path.
+                // Wrapping that handle produced a stream that read as a
+                // legitimately empty file, so callers could not tell a missing
+                // file from an empty one -- the exact defect issue #1502
+                // reported against iOS.
+                throw new FileNotFoundException("No such file: " + path);
+            }
             return new LinuxInputStream(h, false);
         }
         return new LinuxInputStream(((LinuxHttpConnection) connection).peer, true);
     }
 
+    /// Opens `path` for writing, failing loudly when the platform cannot. A
+    /// null handle otherwise yields a stream that discards every write and
+    /// closes cleanly, which turns an unwritable path into a file that simply
+    /// never appears.
+    private long openForWrite(String path, boolean append) throws IOException {
+        long h = LinuxNative.fileOpenWrite(path, append);
+        if (h == 0) {
+            throw new IOException("Unable to open " + path + " for writing");
+        }
+        return h;
+    }
+
     /**
      * Resolves a classpath-style resource (e.g. {@code /theme.res}). The ParparVM
-     * linux target embeds the app's classpath resources into the executable's PE
-     * resource section, so they are served straight from the exe -- a single
+     * linux target embeds the app's classpath resources into the executable's
+     * data section, so they are served straight from the ELF -- a single
      * self-contained binary, the Linux analog of the iOS .app bundle. Falls back
      * to a file shipped next to the executable (a dev/debug convenience for
      * resources that were staged rather than embedded). Returns null when absent.
@@ -2407,8 +2429,11 @@ public class LinuxImplementation extends CodenameOneImplementation {
         if (dir == null) {
             return null;
         }
+        // Classpath resources are already '/'-separated, which is what the
+        // filesystem wants here; this port was carrying the Windows port's
+        // backslash join, so the staged-resource fallback never resolved.
         String name = resource.startsWith("/") ? resource.substring(1) : resource;
-        String path = dir + "\\" + name.replace('/', '\\');
+        String path = dir + "/" + name;
         long h = LinuxNative.fileOpenRead(path);
         if (h == 0) {
             return null;
@@ -2584,13 +2609,18 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public OutputStream createStorageOutputStream(String name) throws IOException {
-        long h = LinuxNative.fileOpenWrite(storagePath(name), false);
-        return new LinuxOutputStream(h, false);
+        // Same reason as openOutputStream: a discarded write that reports
+        // success loses the entry instead of reporting that it cannot be saved.
+        return new LinuxOutputStream(openForWrite(storagePath(name), false), false);
     }
 
     @Override
     public InputStream createStorageInputStream(String name) throws IOException {
-        long h = LinuxNative.fileOpenRead(storagePath(name));
+        String path = storagePath(name);
+        long h = LinuxNative.fileOpenRead(path);
+        if (h == 0) {
+            throw new FileNotFoundException("No such storage entry: " + name);
+        }
         return new LinuxInputStream(h, false);
     }
 

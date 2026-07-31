@@ -1,14 +1,56 @@
 {
-  "commit": "dec3d172f6fe327798cc083f2bab03a98cf9a8ac",
-  "generated_at": "2026-07-15T01:51:30Z",
+  "commit": "9c7affa41291e328b08a21d823737f581f1b7d3e",
+  "generated_at": "2026-07-30T09:36:29Z",
+  "performance": {
+    "benchmark_version": 1,
+    "benchmarks": {
+      "arrayRandom": {
+        "checksum": "-2288487891715278",
+        "duration_ns": 426870000
+      },
+      "arraySequential": {
+        "checksum": "0",
+        "duration_ns": 193328000
+      },
+      "intArithmetic": {
+        "checksum": "1307491170054",
+        "duration_ns": 200087000
+      },
+      "longArithmetic": {
+        "checksum": "6887886960473257608",
+        "duration_ns": 114148000
+      },
+      "mathTranscendental": {
+        "checksum": "4729652805076374709",
+        "duration_ns": 488586000
+      },
+      "quicksort": {
+        "checksum": "809667393311589960",
+        "duration_ns": 319774000
+      },
+      "recursion": {
+        "checksum": "33385282",
+        "duration_ns": 710894000
+      }
+    },
+    "method": "minimum of five measured runs after three in-process warm-ups",
+    "missing": [],
+    "skipped": {
+      "hashMapChurn": "ios-simulator-gc-footprint",
+      "objectAllocation": "ios-simulator-gc-footprint",
+      "stringBuilding": "ios-simulator-gc-footprint"
+    },
+    "status": "complete",
+    "suite_checksum": 0
+  },
   "port": "watchos",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29380730117",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30516173164",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
-    "not-run": 5,
-    "pass": 163,
+    "not-run": 0,
+    "pass": 168,
     "skip": 2
   },
   "tests": {
@@ -70,6 +112,10 @@
     },
     "BytecodeTranslatorRegressionTest": {
       "feature": "bytecode-runtime",
+      "status": "pass"
+    },
+    "CalendarApiTest": {
+      "feature": "calendar-integration",
       "status": "pass"
     },
     "CallDetectionAPITest": {
@@ -167,11 +213,11 @@
       "feature": "graphics-clipping",
       "status": "pass"
     },
-    "CodeEditorScreenshotTest": {
-      "feature": "pure-text-editing",
+    "ClipboardRoundTripTest": {
+      "feature": "clipboard",
       "status": "pass"
     },
-    "PureEditorScreenshotTest": {
+    "CodeEditorScreenshotTest": {
       "feature": "pure-text-editing",
       "status": "pass"
     },
@@ -339,6 +385,10 @@
       "feature": "text-input",
       "status": "pass"
     },
+    "InferenceOnDeviceApiTest": {
+      "feature": "on-device-inference",
+      "status": "pass"
+    },
     "InscribedTriangleGrid": {
       "feature": "graphics-shapes-strokes",
       "status": "pass"
@@ -349,6 +399,10 @@
     },
     "KotlinUiTest": {
       "feature": "application-bootstrap",
+      "status": "pass"
+    },
+    "LanguageOnDeviceApiTest": {
+      "feature": "on-device-language",
       "status": "pass"
     },
     "LargeStrokeDirtyClipTest": {
@@ -453,6 +507,10 @@
     },
     "PullToRefreshSpinnerScreenshotTest": {
       "feature": "scrolling-and-pull",
+      "status": "pass"
+    },
+    "PureEditorScreenshotTest": {
+      "feature": "pure-text-editing",
       "status": "pass"
     },
     "RealOsmVectorScreenshotTest": {
@@ -678,27 +736,9 @@
       ],
       "status": "skip"
     },
-    "CalendarApiTest": {
-      "feature": "calendar-integration",
-      "status": "not-run"
-    },
-    "ClipboardRoundTripTest": {
-      "feature": "clipboard",
-      "status": "not-run"
-    },
-    "InferenceOnDeviceApiTest": {
-      "feature": "on-device-inference",
-      "status": "not-run"
-    },
-    "LanguageOnDeviceApiTest": {
-      "feature": "on-device-language",
-      "status": "not-run"
-    },
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",
-      "status": "not-run"
+      "status": "pass"
     }
-  },
-  "bootstrap_source": "successful-master-workflow",
-  "workflow_conclusion": "success"
+  }
 }

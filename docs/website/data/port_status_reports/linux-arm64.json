@@ -1,14 +1,64 @@
 {
-  "commit": "205dcc675896c1c094db47d9b0a2622adf7ec3bf",
-  "generated_at": "2026-07-16T12:38:03Z",
+  "commit": "587813ab1f221046e99996b2c1d1dfcb58f4ac94",
+  "generated_at": "2026-07-30T19:22:38Z",
+  "performance": {
+    "benchmark_version": 1,
+    "benchmarks": {
+      "arrayRandom": {
+        "checksum": "-2288487891715278",
+        "duration_ns": 170452739
+      },
+      "arraySequential": {
+        "checksum": "0",
+        "duration_ns": 26587685
+      },
+      "hashMapChurn": {
+        "checksum": "49941",
+        "duration_ns": 35381384
+      },
+      "intArithmetic": {
+        "checksum": "1307491170054",
+        "duration_ns": 62814185
+      },
+      "longArithmetic": {
+        "checksum": "6887886960473257608",
+        "duration_ns": 39201326
+      },
+      "mathTranscendental": {
+        "checksum": "4729652805076374709",
+        "duration_ns": 270735594
+      },
+      "objectAllocation": {
+        "checksum": "2999790376128",
+        "duration_ns": 4175763773
+      },
+      "quicksort": {
+        "checksum": "809667393311589960",
+        "duration_ns": 94506846
+      },
+      "recursion": {
+        "checksum": "33385282",
+        "duration_ns": 132546281
+      },
+      "stringBuilding": {
+        "checksum": "-609121604069",
+        "duration_ns": 44943794
+      }
+    },
+    "method": "minimum of five measured runs after three in-process warm-ups",
+    "missing": [],
+    "skipped": {},
+    "status": "complete",
+    "suite_checksum": 0
+  },
   "port": "linux-arm64",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29496888305",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30571977091",
   "schema_version": 1,
   "suite_finished": false,
   "summary": {
-    "fail": 0,
-    "not-run": 5,
-    "pass": 165,
+    "fail": 7,
+    "not-run": 2,
+    "pass": 161,
     "skip": 0
   },
   "tests": {
@@ -46,7 +96,10 @@
     },
     "AudioMixerApiTest": {
       "feature": "audio-media-playback",
-      "status": "pass"
+      "reasons": [
+        "failed: AudioMixer API test failed: java.lang.IllegalStateException: mixed WAV file was not created"
+      ],
+      "status": "fail"
     },
     "BackgroundThreadUiAccessTest": {
       "feature": "threading",
@@ -62,7 +115,10 @@
     },
     "BrowserComponentScreenshotTest": {
       "feature": "embedded-web-content",
-      "status": "pass"
+      "reasons": [
+        "failed due to timeout waiting for DONE stage=show-completed"
+      ],
+      "status": "fail"
     },
     "ButtonThemeScreenshotTest": {
       "feature": "native-theme-controls",
@@ -72,13 +128,20 @@
       "feature": "bytecode-runtime",
       "status": "pass"
     },
+    "CalendarApiTest": {
+      "feature": "calendar-integration",
+      "status": "pass"
+    },
     "CallDetectionAPITest": {
       "feature": "device-security-signals",
       "status": "pass"
     },
     "CameraApiTest": {
       "feature": "camera-access",
-      "status": "pass"
+      "reasons": [
+        "failed: Camera.getCameras() returned no cameras"
+      ],
+      "status": "fail"
     },
     "CenteredDialogTitleScreenshotTest": {
       "feature": "dialogs-and-labels",
@@ -164,11 +227,11 @@
       "feature": "graphics-clipping",
       "status": "pass"
     },
-    "CodeEditorScreenshotTest": {
-      "feature": "pure-text-editing",
+    "ClipboardRoundTripTest": {
+      "feature": "clipboard",
       "status": "pass"
     },
-    "PureEditorScreenshotTest": {
+    "CodeEditorScreenshotTest": {
       "feature": "pure-text-editing",
       "status": "pass"
     },
@@ -190,7 +253,10 @@
     },
     "CryptoApiTest": {
       "feature": "secure-storage-crypto",
-      "status": "pass"
+      "reasons": [
+        "failed: Crypto API test failed: com.codename1.security.CryptoException: Crypto operation secureRandomBytes is not supported on this platform. If you are running in a fresh CodenameOneImplementation subclass, override the matching method."
+      ],
+      "status": "fail"
     },
     "CssFilterBlurScreenshotTest": {
       "feature": "theme-palette-css",
@@ -266,7 +332,10 @@
     },
     "FileSystemStorageOpenInputStreamMissingTest": {
       "feature": "filesystem-storage",
-      "status": "pass"
+      "reasons": [
+        "failed: openInputStream returned a stream (com.codename1.impl.linux.LinuxInputStream@FF4236CFD0F0) for a missing path /home/runner/.local/share/codenameone/this-file-must-not-exist-1502-1785438836814.bin instead of throwing. Platform=linux"
+      ],
+      "status": "fail"
     },
     "FillArc": {
       "feature": "graphics-primitives",
@@ -336,6 +405,10 @@
       "feature": "text-input",
       "status": "pass"
     },
+    "InferenceOnDeviceApiTest": {
+      "feature": "on-device-inference",
+      "status": "pass"
+    },
     "InscribedTriangleGrid": {
       "feature": "graphics-shapes-strokes",
       "status": "pass"
@@ -346,6 +419,10 @@
     },
     "KotlinUiTest": {
       "feature": "application-bootstrap",
+      "status": "pass"
+    },
+    "LanguageOnDeviceApiTest": {
+      "feature": "on-device-language",
       "status": "pass"
     },
     "LargeStrokeDirtyClipTest": {
@@ -450,6 +527,10 @@
     },
     "PullToRefreshSpinnerScreenshotTest": {
       "feature": "scrolling-and-pull",
+      "status": "pass"
+    },
+    "PureEditorScreenshotTest": {
+      "feature": "pure-text-editing",
       "status": "pass"
     },
     "RealOsmVectorScreenshotTest": {
@@ -558,7 +639,10 @@
     },
     "SurfacesPublishTest": {
       "feature": "surfaces",
-      "status": "pass"
+      "reasons": [
+        "failed: Surfaces publish contract failed: java.lang.UnsupportedOperationException: UnicodeHelper.getClasses() not supported"
+      ],
+      "status": "fail"
     },
     "SurfacesRasterizerScreenshotTest": {
       "feature": "surfaces",
@@ -610,7 +694,10 @@
     },
     "TimeApiTest": {
       "feature": "java-standard-apis",
-      "status": "pass"
+      "reasons": [
+        "failed: Time API test failed: java.lang.RuntimeException: Expected [2020-03-08T01:30:00-05:00[America/New_York]], Actual [2020-03-08T11:30:00-05:00[America/New_York]]"
+      ],
+      "status": "fail"
     },
     "ToastBarTopPositionScreenshotTest": {
       "feature": "toast-notifications",
@@ -666,82 +753,15 @@
     },
     "VideoIODecodedFramesScreenshotTest": {
       "feature": "video-decoding",
-      "status": "pass"
+      "status": "not-run"
     },
     "VideoIORoundTripTest": {
       "feature": "video-round-trip",
-      "status": "pass"
-    },
-    "CalendarApiTest": {
-      "feature": "calendar-integration",
-      "status": "not-run"
-    },
-    "ClipboardRoundTripTest": {
-      "feature": "clipboard",
-      "status": "not-run"
-    },
-    "InferenceOnDeviceApiTest": {
-      "feature": "on-device-inference",
-      "status": "not-run"
-    },
-    "LanguageOnDeviceApiTest": {
-      "feature": "on-device-language",
       "status": "not-run"
     },
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",
-      "status": "not-run"
+      "status": "pass"
     }
-  },
-  "bootstrap_source": "successful-master-workflow",
-  "workflow_conclusion": "success",
-  "performance": {
-    "benchmark_version": 1,
-    "benchmarks": {
-      "arrayRandom": {
-        "checksum": "-2288487891715278",
-        "duration_ns": 167647092
-      },
-      "arraySequential": {
-        "checksum": "0",
-        "duration_ns": 26067574
-      },
-      "hashMapChurn": {
-        "checksum": "49941",
-        "duration_ns": 29352127
-      },
-      "intArithmetic": {
-        "checksum": "1307491170054",
-        "duration_ns": 62775877
-      },
-      "longArithmetic": {
-        "checksum": "6887886960473257608",
-        "duration_ns": 39325844
-      },
-      "mathTranscendental": {
-        "checksum": "4729652805076374709",
-        "duration_ns": 273404082
-      },
-      "objectAllocation": {
-        "checksum": "2999790376128",
-        "duration_ns": 4638409365
-      },
-      "quicksort": {
-        "checksum": "809667393311589960",
-        "duration_ns": 91416037
-      },
-      "recursion": {
-        "checksum": "33385282",
-        "duration_ns": 137627018
-      },
-      "stringBuilding": {
-        "checksum": "-609121604069",
-        "duration_ns": 36440861
-      }
-    },
-    "method": "minimum of five measured runs after three in-process warm-ups",
-    "missing": [],
-    "status": "complete",
-    "suite_checksum": 0
   }
 }

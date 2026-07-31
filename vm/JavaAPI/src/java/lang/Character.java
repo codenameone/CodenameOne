@@ -1306,30 +1306,70 @@ public final class Character implements Comparable<Character>{
         return isHighSurrogate(ch) || isLowSurrogate(ch);
     }
     
-    private static UnicodeHelper.Range[] classMapping;
-    private static UnicodeHelper.Range[] getClasses() {
-       throw new UnsupportedOperationException("UnicodeHelper.getClasses() not supported");
-    }
-    
+    /**
+     * General category of every ASCII code point, indexed by code point.
+     *
+     * The rest of this class is deliberately ASCII-only (isDigit, isLowerCase
+     * and isUpperCase all answer false above 127), so the category table is
+     * too. It used to be absent altogether, and getType threw
+     * UnsupportedOperationException -- which meant isLetter, isLetterOrDigit,
+     * isJavaIdentifierStart, isJavaIdentifierPart and isIdentifierIgnorable
+     * threw for every input on the ports that use this runtime, rather than
+     * answering for the ASCII text they are almost always asked about.
+     */
+    private static final byte[] ASCII_TYPES = {
+        /* 00-0f */ CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL,
+                    CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL,
+        /* 10-1f */ CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL,
+                    CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL,
+        /* ' '!"# */ SPACE_SEPARATOR, OTHER_PUNCTUATION, OTHER_PUNCTUATION, OTHER_PUNCTUATION,
+        /* $%&' */   CURRENCY_SYMBOL, OTHER_PUNCTUATION, OTHER_PUNCTUATION, OTHER_PUNCTUATION,
+        /* ()*+ */   START_PUNCTUATION, END_PUNCTUATION, OTHER_PUNCTUATION, MATH_SYMBOL,
+        /* ,-./ */   OTHER_PUNCTUATION, DASH_PUNCTUATION, OTHER_PUNCTUATION, OTHER_PUNCTUATION,
+        /* 0-7 */    DECIMAL_DIGIT_NUMBER, DECIMAL_DIGIT_NUMBER, DECIMAL_DIGIT_NUMBER, DECIMAL_DIGIT_NUMBER,
+                     DECIMAL_DIGIT_NUMBER, DECIMAL_DIGIT_NUMBER, DECIMAL_DIGIT_NUMBER, DECIMAL_DIGIT_NUMBER,
+        /* 89:; */   DECIMAL_DIGIT_NUMBER, DECIMAL_DIGIT_NUMBER, OTHER_PUNCTUATION, OTHER_PUNCTUATION,
+        /* <=>? */   MATH_SYMBOL, MATH_SYMBOL, MATH_SYMBOL, OTHER_PUNCTUATION,
+        /* @A-G */   OTHER_PUNCTUATION, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+                     UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+        /* H-O */    UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+                     UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+        /* P-W */    UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+                     UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+        /* XYZ[ */   UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, START_PUNCTUATION,
+        /* \]^_ */   OTHER_PUNCTUATION, END_PUNCTUATION, MODIFIER_SYMBOL, CONNECTOR_PUNCTUATION,
+        /* `a-g */   MODIFIER_SYMBOL, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+                     LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+        /* h-o */    LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+                     LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+        /* p-w */    LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+                     LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+        /* xyz{ */   LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, START_PUNCTUATION,
+        /* |}~del */ MATH_SYMBOL, END_PUNCTUATION, MATH_SYMBOL, CONTROL
+    };
+
     public static int getType(int codePoint) {
         if (isBmpCodePoint(codePoint) && isSurrogate((char) codePoint)) {
             return SURROGATE;
         }
-        UnicodeHelper.Range[] classes = getClasses();
-        int l = 0;
-        int u = classes.length - 1;
-        while (l <= u) {
-            int i = (l + u) / 2;
-            UnicodeHelper.Range range = classes[i];
-            if (codePoint >= range.end) {
-                l = i + 1;
-            } else if (codePoint < range.start) {
-                u = i - 1;
-            } else {
-                return range.data[codePoint - range.start];
-            }
+        if (codePoint >= 0 && codePoint < ASCII_TYPES.length) {
+            return ASCII_TYPES[codePoint];
         }
-        return 0;
+        // Above ASCII this runtime carries no category table, so answer from
+        // the primitives it does implement instead of failing the call.
+        if (isLowerCase(codePoint)) {
+            return LOWERCASE_LETTER;
+        }
+        if (isUpperCase(codePoint)) {
+            return UPPERCASE_LETTER;
+        }
+        if (isDigit(codePoint)) {
+            return DECIMAL_DIGIT_NUMBER;
+        }
+        if (isWhitespace(codePoint)) {
+            return SPACE_SEPARATOR;
+        }
+        return UNASSIGNED;
     }
     
     /**

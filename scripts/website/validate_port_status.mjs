@@ -167,6 +167,23 @@ function validate() {
         fail("the generated page does not contain exhaustive skipped-test errata");
     }
 
+    // A cell may only read as a pass while carrying a skip when the errata name
+    // that exact test, so a green mark can never outrun its explanation.
+    const notedCells = primaryCellTags.filter((cell) => /\bhas-documented-skip\b/.test(cell));
+    if (notedCells.length === 0) {
+        fail("no cell reports a documented skip; the errata and the table disagree");
+    }
+    for (const cell of notedCells) {
+        const skips = attribute(cell, "data-documented-skip").split(/\s+/).filter(Boolean);
+        if (!/\bis-pass\b/.test(attribute(cell, "class")) || skips.length === 0 ||
+            !skips.every((test) => errata.includes(test))) {
+            fail(`a cell claims a documented skip the errata do not cover: ${cell}`);
+        }
+    }
+    if (countMatches(page, /<sup class="cn1-port-status__note"/g) < notedCells.length) {
+        fail("documented-skip cells must carry a visible note marker");
+    }
+
     const manualRows = countMatches(page, /\bdata-manual-feature-row(?:=|\s|>)/g);
     const manualCells = countMatches(page, /\bdata-manual-feature-cell(?:=|\s|>)/g);
     if (manualRows < 20 || manualCells !== manualRows * portCards) {

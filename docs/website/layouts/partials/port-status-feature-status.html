@@ -2,16 +2,19 @@
 {{- $port := .port -}}
 {{- $report := .report -}}
 {{- $contract := .contract -}}
+{{- $supplement := .supplement -}}
 {{- $now := .now -}}
 {{- $state := "unknown" -}}
 {{- $mark := "?" -}}
 {{- $label := "No current report" -}}
+{{- $documentedSkips := slice -}}
 {{- if $report -}}
   {{- $passed := 0 -}}
   {{- $failed := 0 -}}
   {{- $skipped := 0 -}}
   {{- $notRun := 0 -}}
   {{- $failedTests := slice -}}
+  {{- $skippedTests := slice -}}
   {{- range $feature.tests -}}
     {{- $result := index $report.tests . -}}
     {{- $status := "not-run" -}}
@@ -23,9 +26,21 @@
       {{- $failedTests = $failedTests | append . -}}
     {{- else if eq $status "skip" -}}
       {{- $skipped = add $skipped 1 -}}
+      {{- $skippedTests = $skippedTests | append . -}}
     {{- else -}}
       {{- $notRun = add $notRun 1 -}}
     {{- end -}}
+  {{- end -}}
+  {{- /* A skip only reads as green when the errata below account for it by
+         name. An undocumented skip stays a partial result. */ -}}
+  {{- $documented := gt (len $skippedTests) 0 -}}
+  {{- range $skippedTests -}}
+    {{- $test := . -}}
+    {{- $found := false -}}
+    {{- range $supplement.skip_reasons -}}
+      {{- if eq .test $test -}}{{- $found = true -}}{{- end -}}
+    {{- end -}}
+    {{- if not $found -}}{{- $documented = false -}}{{- end -}}
   {{- end -}}
   {{- $bootstrapComplete := and (eq $report.bootstrap_source "successful-master-workflow") (eq $report.workflow_conclusion "success") -}}
   {{- $complete := or $report.suite_finished $bootstrapComplete -}}
@@ -33,16 +48,30 @@
   {{- $state = "partial" -}}
   {{- $mark = "−" -}}
   {{- $label = printf "%d passed, %d skipped, %d not run" $passed $skipped $notRun -}}
+  {{- /* Evidence is per feature. A run that stopped early leaves its own
+         unreached tests as "not run" below, and the port card reports the
+         incomplete run; that is not a reason to withdraw the result of a
+         feature whose every mapped test reported back. */ -}}
+  {{- $incomplete := cond $complete "" " (the suite run stopped early)" -}}
   {{- if gt $failed 0 -}}
     {{- $state = "fail" -}}
     {{- $mark = "×" -}}
     {{- $label = printf "%d failed: %s" $failed (delimit $failedTests ", ") -}}
-  {{- else if not $complete -}}
-    {{- $label = "Suite did not finish" -}}
   {{- else if eq $passed $total -}}
     {{- $state = "pass" -}}
     {{- $mark = "✓" -}}
-    {{- $label = printf "All %d mapped test%s passed" $total (cond (eq $total 1) "" "s") -}}
+    {{- $label = printf "All %d mapped test%s passed%s" $total (cond (eq $total 1) "" "s") $incomplete -}}
+  {{- else if not $complete -}}
+    {{- $label = printf "Suite did not finish; %d passed, %d skipped, %d not run" $passed $skipped $notRun -}}
+  {{- else if and $documented (eq (add $passed $skipped) $total) -}}
+    {{- $state = "pass" -}}
+    {{- $mark = "✓" -}}
+    {{- $documentedSkips = $skippedTests -}}
+    {{- if eq $passed 0 -}}
+      {{- $label = printf "%s skipped by the CI environment, see the skipped-test errata" (delimit $skippedTests ", ") -}}
+    {{- else -}}
+      {{- $label = printf "%d of %d mapped tests passed; %s skipped by the CI environment, see the skipped-test errata" $passed $total (delimit $skippedTests ", ") -}}
+    {{- end -}}
   {{- else if eq $skipped $total -}}
     {{- $label = "All mapped tests skipped" -}}
   {{- end -}}
@@ -53,12 +82,14 @@
     {{- if ne $state "fail" -}}
       {{- $state = "stale" -}}
       {{- $mark = "!" -}}
+      {{- $documentedSkips = slice -}}
     {{- end -}}
     {{- $label = printf "Stale report. %s" $label -}}
   {{- end -}}
 {{- end -}}
 {{- $label = printf "%s: %s" $port.name $label -}}
-<td data-feature-cell data-port="{{ $port.id }}" data-feature="{{ $feature.id }}" class="is-{{ $state }}" title="{{ $label }}">
+<td data-feature-cell data-port="{{ $port.id }}" data-feature="{{ $feature.id }}" class="is-{{ $state }}{{ if $documentedSkips }} has-documented-skip{{ end }}"{{ with $documentedSkips }} data-documented-skip="{{ delimit . " " }}"{{ end }} title="{{ $label }}">
   <span class="cn1-port-status__mark is-{{ $state }}" aria-hidden="true">{{ $mark }}</span>
+  {{- if $documentedSkips }}<sup class="cn1-port-status__note" aria-hidden="true">*</sup>{{ end }}
   <span class="screen-reader-text">{{ $label }}</span>
 </td>

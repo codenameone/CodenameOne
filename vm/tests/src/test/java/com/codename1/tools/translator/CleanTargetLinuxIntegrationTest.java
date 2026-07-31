@@ -417,6 +417,14 @@ class CleanTargetLinuxIntegrationTest {
             // 40-minute hard cap either way.
             long stableMs = 300_000L;
             long deadline = System.currentTimeMillis() + 40L * 60 * 1000;
+            // Screenshot stabilization is a weak completion signal: DesktopMode,
+            // the VideoIO grid, the VR scene and the 360 panorama all capture
+            // AFTER the non-rendering API tail, so a slow tail trips the window
+            // while real screenshot tests are still queued -- the suite is then
+            // force-killed and every trailing test is reported as never run.
+            // CN1_REQUIRE_SUITE (as on the Windows arm64 pipeline) demands the
+            // suite's own completion marker instead.
+            boolean requireSuite = Boolean.parseBoolean(System.getenv("CN1_REQUIRE_SUITE"));
             int pngs = 0, lastPngs = -1;
             long lastChange = System.currentTimeMillis();
             while (System.currentTimeMillis() < deadline) {
@@ -432,12 +440,18 @@ class CleanTargetLinuxIntegrationTest {
                 }
                 pngs = CleanTargetIntegrationTest.countPngFiles(outDir);
                 if (pngs != lastPngs) { lastPngs = pngs; lastChange = System.currentTimeMillis(); }
-                if (pngs >= minPngs && (System.currentTimeMillis() - lastChange) >= stableMs) { break; }
+                if (!requireSuite && pngs >= minPngs
+                        && (System.currentTimeMillis() - lastChange) >= stableMs) { break; }
                 Thread.sleep(3000);
             }
             pngs = CleanTargetIntegrationTest.countPngFiles(outDir);
-            assertTrue(finished.get() || pngs >= minPngs,
-                    "hello suite capture incomplete: pngs=" + pngs + " (need " + minPngs + ")\n" + serverLog);
+            if (!finished.get()) {
+                System.out.println("CN1SS:HARNESS: suite never emitted CN1SS:SUITE:FINISHED; pngs=" + pngs
+                        + " -- every test after the last logged one is reported as never run.");
+            }
+            assertTrue(finished.get() || (!requireSuite && pngs >= minPngs),
+                    "hello suite capture incomplete: pngs=" + pngs + " (need " + minPngs + ")"
+                    + " suiteFinished=" + finished.get() + "\n" + serverLog);
 
             String outEnv = System.getenv("CN1_SHOT_OUTPUT_DIR");
             if (outEnv != null) {

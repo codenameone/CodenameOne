@@ -25,6 +25,10 @@ RUNNER = REPO_ROOT / (
 )
 COMMON_SOURCES = REPO_ROOT / "scripts/hellocodenameone/common/src/main"
 STRICT_GATE_FAILED = 10
+# "accept" exit codes: the caller keeps the checked-in fallback for both, but
+# only an unusable report is a defect worth failing the website build over.
+ACCEPT_CONTRACT_DRIFT = 11
+ACCEPT_UNUSABLE = 12
 
 START_RE = re.compile(r"suite starting test=([A-Za-z0-9_]+)")
 FINISH_RE = re.compile(r"suite finished test=([A-Za-z0-9_]+)")
@@ -581,6 +585,98 @@ def strict_report_errors(report: dict) -> list[str]:
     return errors
 
 
+def publishable_report_problems(
+    manifest: dict, port_id: str, report: dict
+) -> tuple[list[str], list[str]]:
+    """Decide whether a persisted report may replace the checked-in fallback.
+
+    Returns (drift, malformed). Drift means the report is well formed but was
+    produced against a different revision of the test contract, which happens
+    for every port between the commit that registers a test and that port's
+    next master run; the caller keeps the checked-in report and waits. Anything
+    in malformed is a defect in the report or in the producer and must be loud:
+    silently falling back for those is what lets a whole column of the public
+    table rot into "stale" while the port itself is healthy.
+    """
+    drift: list[str] = []
+    malformed: list[str] = []
+
+    if report.get("schema_version") != manifest.get("schema_version"):
+        malformed.append(
+            f"schema version {report.get('schema_version')!r} is not "
+            f"{manifest.get('schema_version')!r}"
+        )
+    if report.get("port") != port_id:
+        malformed.append(f"report identifies port {report.get('port')!r}")
+    generated_at = report.get("generated_at")
+    if not isinstance(generated_at, str) or not generated_at:
+        malformed.append("report has no generated_at timestamp")
+
+    mapped = test_to_feature(manifest)
+    tests = report.get("tests")
+    if not isinstance(tests, dict):
+        malformed.append("report has no test result map")
+        tests = {}
+    else:
+        missing = sorted(set(mapped) - set(tests))
+        unknown = sorted(set(tests) - set(mapped))
+        if missing:
+            drift.append("report predates tests: " + ", ".join(missing))
+        if unknown:
+            drift.append("report carries retired tests: " + ", ".join(unknown))
+
+    statuses = Counter()
+    for test, result in tests.items():
+        if not isinstance(result, dict) or result.get("status") not in {
+            "pass", "fail", "skip", "not-run"
+        }:
+            malformed.append(f"invalid result for {test}")
+            continue
+        statuses[result["status"]] += 1
+    expected_summary = {
+        key: statuses.get(key, 0) for key in ("pass", "fail", "skip", "not-run")
+    }
+    if report.get("summary") != expected_summary and not drift:
+        malformed.append("summary does not match the test results")
+
+    expected_benchmarks = manifest.get("performance_benchmarks", [])
+    performance = report.get("performance")
+    if not isinstance(performance, dict):
+        malformed.append("report has no performance section")
+        return drift, malformed
+    if performance.get("status") != "complete":
+        malformed.append(f"performance run is {performance.get('status')!r}")
+    if performance.get("missing"):
+        malformed.append(
+            "performance workloads never reported: "
+            + ", ".join(performance["missing"])
+        )
+
+    benchmarks = performance.get("benchmarks")
+    skipped = performance.get("skipped") or {}
+    if not isinstance(benchmarks, dict) or not isinstance(skipped, dict):
+        malformed.append("performance results are not objects")
+        return drift, malformed
+
+    # A port may legitimately skip a workload (the iOS simulator skips the
+    # GC-footprint workloads); measured plus skipped has to cover the contract.
+    accounted = sorted(set(benchmarks) | set(skipped))
+    if accounted != sorted(expected_benchmarks):
+        malformed.append(
+            "performance workloads do not match the contract: "
+            + ", ".join(accounted)
+        )
+    for name, measurement in benchmarks.items():
+        duration = measurement.get("duration_ns") if isinstance(measurement, dict) else None
+        if isinstance(duration, bool) or not isinstance(duration, int) or duration < 0:
+            malformed.append(f"{name} has no measured duration")
+    for name, reason in skipped.items():
+        if not isinstance(reason, str) or not reason:
+            malformed.append(f"skipped workload {name} has no reason")
+
+    return drift, malformed
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -591,6 +687,13 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("validate", help="validate feature and screenshot coverage")
+
+    accept_parser = subparsers.add_parser(
+        "accept",
+        help="decide whether a persisted report may replace the checked-in fallback",
+    )
+    accept_parser.add_argument("--port", required=True)
+    accept_parser.add_argument("--report", required=True, type=Path)
 
     normalize_parser = subparsers.add_parser("normalize", help="write a normalized port report")
     normalize_parser.add_argument("--port", required=True)
@@ -620,6 +723,20 @@ def main() -> int:
                 f"{counts['tests']} tests, {counts['features']} features, "
                 f"{counts['ports']} ports, {counts['goldens']} golden names."
             )
+            return 0
+        if args.command == "accept":
+            drift, malformed = publishable_report_problems(
+                manifest, args.port, read_json(args.report)
+            )
+            for problem in malformed:
+                print(f"port-status: {args.port} report is unusable: {problem}", file=sys.stderr)
+            for problem in drift:
+                print(f"port-status: {args.port} {problem}", file=sys.stderr)
+            if malformed:
+                return ACCEPT_UNUSABLE
+            if drift:
+                return ACCEPT_CONTRACT_DRIFT
+            print(f"{args.port} report accepted.")
             return 0
         report = normalize(
             manifest=manifest,

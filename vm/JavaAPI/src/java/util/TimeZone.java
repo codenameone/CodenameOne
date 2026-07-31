@@ -167,7 +167,12 @@ public abstract class TimeZone{
     public static java.util.TimeZone getTimeZone(final java.lang.String ID){
         if(ID != null && ID.equalsIgnoreCase("gmt")) {
             return GMT;
-        } else if (ID.equalsIgnoreCase(getTimezoneId())) {
+        }
+        TimeZone custom = customTimeZone(ID);
+        if (custom != null) {
+            return custom;
+        }
+        if (ID.equalsIgnoreCase(getTimezoneId())) {
             return getDefault();
         } else {
             TimeZone out = new TimeZone() {
@@ -202,6 +207,79 @@ public abstract class TimeZone{
             out.ID = ID;
             return out;
         }
+    }
+
+    /**
+     * Resolves a custom fixed-offset ID -- {@code GMT+2}, {@code GMT-05:00},
+     * {@code UTC+01:30} -- to a zone with that raw offset and no daylight
+     * saving, exactly as {@code java.util.TimeZone} documents them.
+     *
+     * These must never reach the host time zone database. A POSIX {@code TZ}
+     * value inverts the sign of its offset, so handing {@code "GMT-05:00"} to
+     * {@code tzset()} produced UTC+5 -- java.time converts a ZoneOffset to
+     * exactly this form, so every OffsetDateTime formatted through a pattern
+     * came out shifted by twice its offset. Windows is worse: its C runtime
+     * cannot parse the form at all.
+     *
+     * @return the fixed-offset zone, or null when {@code ID} is not a custom ID
+     */
+    private static TimeZone customTimeZone(String ID) {
+        if (ID == null) {
+            return null;
+        }
+        int index;
+        if (ID.regionMatches(true, 0, "GMT", 0, 3)) {
+            index = 3;
+        } else if (ID.regionMatches(true, 0, "UTC", 0, 3)) {
+            index = 3;
+        } else if (ID.regionMatches(true, 0, "UT", 0, 2)) {
+            index = 2;
+        } else {
+            return null;
+        }
+        if (index >= ID.length()) {
+            return new SimpleTimeZone(0, ID);
+        }
+        char sign = ID.charAt(index);
+        if (sign == 'Z' && index + 1 == ID.length()) {
+            return new SimpleTimeZone(0, ID);
+        }
+        if (sign != '+' && sign != '-') {
+            return null;
+        }
+        String digits = ID.substring(index + 1);
+        int colon = digits.indexOf(':');
+        String hourPart = colon < 0 ? digits : digits.substring(0, colon);
+        String rest = colon < 0 ? "" : digits.substring(colon + 1);
+        String minutePart = "0";
+        String secondPart = "0";
+        if (colon < 0) {
+            // The colon-less forms are hh, hhmm and hhmmss.
+            if (digits.length() == 4 || digits.length() == 6) {
+                hourPart = digits.substring(0, 2);
+                minutePart = digits.substring(2, 4);
+                secondPart = digits.length() == 6 ? digits.substring(4, 6) : "0";
+            }
+        } else {
+            int secondColon = rest.indexOf(':');
+            minutePart = secondColon < 0 ? rest : rest.substring(0, secondColon);
+            secondPart = secondColon < 0 ? "0" : rest.substring(secondColon + 1);
+        }
+        int hours;
+        int minutes;
+        int seconds;
+        try {
+            hours = Integer.parseInt(hourPart);
+            minutes = Integer.parseInt(minutePart);
+            seconds = Integer.parseInt(secondPart);
+        } catch (NumberFormatException notCustom) {
+            return null;
+        }
+        if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
+            return null;
+        }
+        int offset = ((hours * 60 + minutes) * 60 + seconds) * 1000;
+        return new SimpleTimeZone(sign == '-' ? -offset : offset, ID);
     }
 
     /**

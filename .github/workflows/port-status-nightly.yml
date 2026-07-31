@@ -11,6 +11,24 @@ permissions:
   contents: write
 
 jobs:
+  # port-status-publish.yml only publishes a report when a workflow_run event
+  # reaches it, and those events never arrive for some producers -- the Linux
+  # and Windows suites had not landed a single report, so the public table
+  # served their checked-in fallback until it aged out and the columns rendered
+  # as unknown. This sweep publishes from the newest master run of every
+  # producing workflow and fails when a port has no report inside the
+  # contract's staleness window.
+  publish-latest-port-reports:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - name: Publish the newest master report for every port
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/hellocodenameone/conformance/backfill_port_status.sh
+
   build-javascript-app:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -81,8 +99,10 @@ jobs:
           if-no-files-found: error
 
   publish-browser-evidence:
+    # Ordered after the report sweep (and tolerant of it failing) so the site
+    # rebuild at the end of this job picks up everything published tonight.
     if: always() && needs.build-javascript-app.result == 'success'
-    needs: [build-javascript-app, browser-lifecycle]
+    needs: [build-javascript-app, browser-lifecycle, publish-latest-port-reports]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

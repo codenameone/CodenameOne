@@ -182,13 +182,28 @@ final class DateTimeSupport {
     }
 
     public static ZoneOffset offsetFromInstant(Instant instant, ZoneId zone) {
+        if (zone instanceof ZoneOffset) {
+            // A fixed offset already is the answer; round-tripping it through
+            // the host time zone database can only lose or invert it.
+            return (ZoneOffset) zone;
+        }
         TimeZone tz = TimeZoneSupport.toTimeZone(zone);
-        Calendar cal = newCalendar(tz);
-        cal.setTime(new Date(instant.toEpochMilli()));
-        LocalDate localDate = LocalDate.of(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH));
-        LocalTime localTime = LocalTime.of(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), cal.get(Calendar.SECOND));
-        long localEpochSecond = localDate.toEpochDay() * SECONDS_PER_DAY + localTime.toSecondOfDay();
-        return ZoneOffset.ofTotalSeconds((int) (localEpochSecond - instant.getEpochSecond()));
+        // Ask the zone for its offset at this instant rather than reading the
+        // fields back out of a Calendar. Calendar reconstructs the local time
+        // from a raw offset plus a fixed one-hour daylight guess, which loses
+        // the saving on the desktop ports (Europe/Berlin in June came back as
+        // UTC), while TimeZone.getOffset consults the platform's own rules.
+        // The fields below are UTC, which is the reference frame every port's
+        // getOffset native resolves against.
+        long epochMilli = instant.toEpochMilli();
+        long epochDay = floorDiv(epochMilli, MILLIS_PER_DAY);
+        int millisOfDay = (int) floorMod(epochMilli, MILLIS_PER_DAY);
+        LocalDate utcDate = LocalDate.ofEpochDay(epochDay);
+        // Calendar.SUNDAY is 1 and epoch day 0 was a Thursday.
+        int dayOfWeek = (int) floorMod(epochDay + 4, 7) + 1;
+        int offsetMillis = tz.getOffset(1 /* GregorianCalendar.AD */, utcDate.getYear(),
+                utcDate.getMonthValue() - 1, utcDate.getDayOfMonth(), dayOfWeek, millisOfDay);
+        return ZoneOffset.ofTotalSeconds(offsetMillis / 1000);
     }
 
     public static SimpleDateFormat newFormat(String pattern, ZoneId zone, Locale locale) {
