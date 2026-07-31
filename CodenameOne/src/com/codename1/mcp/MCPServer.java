@@ -218,12 +218,6 @@ public class MCPServer {
         }
     }
 
-    /// Held across `open()` so two generations cannot be inside one transport's open at
-    /// the same time. Deliberately NOT the server monitor: `open()` blocks -- it binds a
-    /// listener -- and holding the monitor across it would make `stop()` wait on the
-    /// thing it is trying to stop.
-    private final Object openLock = new Object();
-
     private void runLoop(MCPTransport t, int generation) {
         // Opening is deferred to this thread, so by the time it happens the server may
         // already have been stopped or restarted. Either way stop()'s close() ran against a
@@ -235,14 +229,21 @@ public class MCPServer {
             return;
         }
         try {
-            // Serialized per server. A stop()/start() over the SAME transport while the
-            // old reader is still parked inside open() would otherwise have both
-            // generations open one instance: the same-transport rule then correctly
-            // declines to close it on the way out, and the transport is left holding two
-            // listeners with one handle for them -- so the first is leaked and outlives
-            // stop(). The superseded thread finds itself stale the moment it gets the
-            // lock, and unwinds without opening anything.
-            synchronized (openLock) {
+            // Serialized per TRANSPORT, on that transport's own monitor. A stop()/start()
+            // over the SAME transport while the old reader is still parked inside open()
+            // would otherwise have both generations open one instance: the same-transport
+            // rule then correctly declines to close it on the way out, and the transport
+            // is left holding two listeners with one handle for them -- so the first is
+            // leaked and outlives stop(). The superseded thread finds itself stale the
+            // moment it gets the lock, and unwinds without opening anything.
+            //
+            // Per transport and not per server, which is what a server-wide lock got
+            // wrong: a restart over a DIFFERENT transport has nothing to serialize
+            // against, and making it wait behind a superseded open that may never return
+            // deadlocks the restart -- the replacement never opens, so nothing wakes the
+            // thread that would release it. Not the server monitor either: open() blocks,
+            // and holding that across it would make stop() wait on what it is stopping.
+            synchronized (t) {
                 if (!isCurrent(t, generation)) {
                     releaseAndCloseIfCurrent(t, generation);
                     return;

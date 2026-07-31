@@ -544,20 +544,51 @@ final class IOSDeviceIntegrity {
         return "{\"n\":\"" + escapeJson(nonce) + "\",\"k\":\"" + escapeJson(keyId) + "\"}";
     }
 
+    /**
+     * JSON string escaping that is reversible.
+     *
+     * <p>Control characters are escaped, not replaced. Substituting a space for them
+     * lost information: a nonce containing a newline and the same nonce containing a
+     * space produced identical clientData, so the assertion no longer bound the exact
+     * challenge the server issued -- and the server, recomputing the hash over what it
+     * sent, would not match it either. The one-to-one binding between a challenge and
+     * the bytes signed over it is the whole point of the nonce.</p>
+     */
     private static String escapeJson(String s) {
         StringBuilder sb = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (c == '"' || c == '\\') {
                 sb.append('\\').append(c);
+            } else if (c == '\n') {
+                sb.append("\\n");
+            } else if (c == '\r') {
+                sb.append("\\r");
+            } else if (c == '\t') {
+                sb.append("\\t");
+            } else if (c == '\b') {
+                sb.append("\\b");
+            } else if (c == '\f') {
+                sb.append("\\f");
             } else if (c < 0x20) {
-                sb.append(' ');
+                // Everything else below 0x20 has no short form and must be \\u-escaped.
+                // Hand-rolled rather than String.format, which the CLDC-era core does
+                // not have -- and the exact serialization is part of the wire contract,
+                // so it has to be predictable rather than locale-dependent.
+                sb.append("\\u00");
+                sb.append(HEX[(c >> 4) & 0xf]);
+                sb.append(HEX[c & 0xf]);
             } else {
                 sb.append(c);
             }
         }
         return sb.toString();
     }
+
+    private static final char[] HEX = {
+        '0', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+    };
 
     // ---- Callbacks invoked from native code (do not rename) ----------------
 
