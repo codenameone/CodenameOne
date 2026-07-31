@@ -19,16 +19,16 @@ There is also one thing every existing push developer should do now:
 
 > Change the push service URL from `https://push.codenameone.com` to `https://cloud.codenameone.com` and send a real notification through your existing code.
 
-Next week we plan to bring down the old push service and direct `push.codenameone.com` traffic to the new implementation. The compatibility endpoint accepts the existing request format, so the switch should be seamless. It is still a completely new server, and “should” is not a test result. Please test before the cutover while both routes are easy to compare.
+Next week we plan to bring down the old push service and direct `push.codenameone.com` traffic to the new implementation. The compatibility endpoint accepts the existing request format, so existing code should keep working. It is still a completely new server, and “should” is not a test result. Please test before the cutover while both routes are easy to compare.
 
 ## TL;DR
 
-- [Push V3](#test-the-new-push-server-now): Existing push code can test `cloud.codenameone.com` today. V3 adds typed messages, managed credentials, segments, campaigns, analytics, and Surface commands.
-- [Plans and privacy](#what-each-plan-includes): Sending works on every Codename One plan. Higher plans increase quotas and add persistent campaign tools. Credentials are encrypted, public registration cannot assign identity or tags, and application data stays isolated.
-- [Health](#health-data-without-fake-certainty): The core now includes a major HealthKit, Health Connect, workout, nutrition, and Bluetooth sensor API. Its odd-looking rules preserve distinctions the platforms cannot safely hide.
-- [AI and MCP](#on-device-ai-and-mcp-on-every-port): The core now exposes on-device vision, language, and LiteRT inference. MCP can debug applications across loopback-capable ports, with a release-build gate because loopback is local, not private.
-- [Routing](#a-polyline-is-not-a-route): The new maps routing API turns coordinates into road-following routes through OSRM or a custom service.
-- [Maven repository](#phase-one-of-our-maven-repository-move): We are starting a staged move from Maven Central to Cloudflare R2. Central remains authoritative during phase one, and generated projects will start using the new repository next week.
+Push is the lead story today. Over the next four posts, I will unpack the other changes in this release:
+
+- [The Maven repository migration](#phase-one-of-our-maven-repository-move): Phase one is already running. We cut the measured release payload by 66 percent and started publishing the same signed artifacts to Cloudflare R2. Generated projects switch on August 7. Maven Central updates are scheduled to stop on August 28 if the observation period stays clean.
+- [On-device AI and MCP](#on-device-ai-and-mcp-on-every-port): The core now has portable OCR, vision, language, and LiteRT APIs. The MCP server can inspect and operate a real application on mobile ports through loopback, with a release-build guard because another local process can also reach that socket.
+- [Health data](#health-data-without-fake-certainty): A new API covers HealthKit, Health Connect, workouts, nutrition, eight Bluetooth health sensor profiles, and a deterministic simulator. The design preserves denied reads, missing values, source overlap, and compliance boundaries instead of flattening them into convenient answers.
+- [Road-following map routes](#a-polyline-is-not-a-route): `Routing.showRoute(...)` can now turn two coordinates into road geometry, distance, duration, legs, and steps. OSRM provides the default test path, while `RouteService` keeps production provider choice in application code.
 
 ## Test the new push server now
 
@@ -184,43 +184,199 @@ Free and Basic applications can send through the same durable provider pipeline.
 
 These numbers are the initial policy, not a claim that every application needs a million notifications. Start with a small, explicit audience. A precise notification that helps 200 people is better than a vague blast that trains 200,000 people to turn notifications off.
 
-## Health data without fake certainty
-
-[PR #5475](https://github.com/codenameone/CodenameOne/pull/5475) merged a first-class API for HealthKit, Health Connect, recorded workouts, nutrition, and eight adopted Bluetooth health sensor profiles into the core.
-
-Its most important design choice is refusing to invent certainty. HealthKit does not reveal whether read access was denied, so the API has no misleading `hasReadPermission()` method. An empty aggregate remains `null`, not zero. Calendar-day buckets require a time zone. Overlapping phone and watch sources remain visible instead of being silently guessed away.
-
-{{< post-link path="/blog/health-api-false-certainty" text="Read the Health article for the package model, platform matrix, authorization trap, change cursors, workouts, sensors, simulator, build configuration, and compliance boundaries." >}}
-
-## On-device AI and MCP on every port
-
-[PR #5467](https://github.com/codenameone/CodenameOne/pull/5467) brings vision, language, and LiteRT inference into the core. OCR, barcode recognition, pose detection, document correction, language identification, translation, smart reply, and application-owned `.tflite` models now share one selective API.
-
-[PR #5472](https://github.com/codenameone/CodenameOne/pull/5472) adds a loopback socket transport for MCP on mobile and desktop ports. An agent can inspect the semantic UI tree, find a component, activate it, set text, and reproduce a path through the real application.
-
-Loopback is safer than listening on every network interface, but any local process can still try to connect. MCP therefore refuses to start in a release build by default. That guard is as important as the debugging feature.
-
-{{< post-link path="/blog/on-device-ai-mcp-loopback" text="Read the AI and MCP article for platform backends, model verification, the semantic debugging loop, and the loopback threat boundary." >}}
-
-## A polyline is not a route
-
-A map polyline joins the coordinates you already have. It cannot discover the roads between two points.
-
-[PR #5480](https://github.com/codenameone/CodenameOne/pull/5480) adds `com.codename1.maps.routing`, with road geometry, distance, duration, legs, steps, waypoints, alternatives, bounds, and encoded-polyline support. `Routing.showRoute(...)` can fetch, draw, and frame the best route, while a `RouteService` SPI lets production applications choose their own provider.
-
-{{< post-link path="/blog/road-following-map-routing" text="Read the routing article for the two-line path, custom styling, OSRM limits, travel modes, and provider SPI." >}}
-
 ## Phase one of our Maven repository move
 
 We have also merged [phase one of a move from Maven Central to a Codename One repository on Cloudflare R2](https://github.com/codenameone/CodenameOne/pull/5497).
 
 Maven Central has every right to set commercial usage limits and charge for infrastructure. Codename One also has a workload that is difficult to fit inside those limits. One release currently publishes enough duplicated fat-jar content that our dashboard reports 2.12 GB against an 80 MB storage guideline, 19,962 files against 1,000, and 27 releases against 7.
 
-This week we are reducing a measured release payload from 229.5 MB to 76.9 MB and adding dual publication. Central remains authoritative. Next week generated projects and Initializr will start including `https://repo.codenameone.com/maven2`. Three weeks after that, if the dual-publish period is clean, new Codename One versions will stop going to Central.
+![Maven Central publishing usage shows Codename One far beyond the soft guidelines](/blog/maven-central-cloudflare-r2/maven-central-limit.png)
 
-Existing versions on Central remain there. The new repository will guarantee at least six months of version history. At the current release rate and optimized payload, the measured capacity is closer to 1.6 years.
+Those limits are soft guidelines, and the dashboard offers both open-source adjustments and a commercial plan. We are not leaving because Sonatype is doing something wrong. We are leaving because our weekly, multi-platform release shape is expensive to host there, while we can provide the same Maven layout free to users on infrastructure that fits it better.
 
-{{< post-link path="/blog/maven-central-cloudflare-r2" text="Read the repository migration article for the timeline, POM change, payload audit, R2 release safeguards, retention policy, and why this is not an attack on Maven Central." >}}
+Phase one reduced a measured release payload from 229.5 MB to 76.9 MB. The release pipeline now copies the signed Central staging tree to R2, so it does not perform a second build with potentially different bytes.
+
+{{< mermaid >}}
+flowchart LR
+    A["July 31<br/>Shrink and dual publish"] --> B["August 7<br/>Generated POMs use R2"]
+    B --> C["Three-week observation window"]
+    C --> D["August 28<br/>New releases on R2 only"]
+    A --> E["Maven Central remains authoritative"]
+    B --> E
+    E --> F["Existing Central versions remain available"]
+{{< /mermaid >}}
+
+Existing projects can prepare for post-cutover versions by adding the repository to both Maven resolution paths:
+
+```xml
+<repositories>
+    <repository>
+        <id>codenameone</id>
+        <url>https://repo.codenameone.com/maven2</url>
+    </repository>
+</repositories>
+
+<pluginRepositories>
+    <pluginRepository>
+        <id>codenameone-plugins</id>
+        <url>https://repo.codenameone.com/maven2</url>
+    </pluginRepository>
+</pluginRepositories>
+```
+
+The second block matters. Maven resolves build plugins separately from ordinary dependencies. Adding only `<repositories>` can leave a future `codenameone-maven-plugin` version undiscoverable.
+
+New projects receive this automatically on August 7. Existing versions remain on Central. The new repository guarantees at least six months of history, while the optimized payload currently fits about 1.6 years at the recent release rate.
+
+R2 object storage and Cloudflare's edge should improve dependency resolution and remove Central throttling from our release path. We also expect CI and releases to become faster and more stable. Those are expectations we will measure during dual publication, not results we have already proved.
+
+{{< post-link path="/blog/maven-central-cloudflare-r2" text="The Maven article publishes on August 4 with the full payload audit, cutover plan, R2 release safeguards, retention policy, and failure modes we are testing during dual publication." >}}
+
+## On-device AI and MCP on every port
+
+[PR #5467](https://github.com/codenameone/CodenameOne/pull/5467) brings vision, language, and LiteRT inference into the core. The API covers OCR, barcode recognition, face detection, image labels, pose detection, selfie segmentation, document correction, language identification, translation, smart reply, and application-owned `.tflite` models.
+
+The public surface stays portable, but the work remains on the device. Android uses ML Kit for higher-level operations. Apple ports use Vision, Core Image, and Natural Language where they fit. Unsupported ports report an unsupported capability instead of silently uploading input to a cloud fallback.
+
+OCR is deliberately asynchronous because native conversion and recognition cannot block the Codename One EDT:
+
+```java
+TextRecognizer recognizer = new TextRecognizer();
+recognizer.process(VisionImage.encoded(jpegBytes))
+        .ready(result -> textArea.setText(result.getText()))
+        .except(error -> Log.e(error));
+```
+
+Inference sessions keep an application-owned model loaded across multiple runs. Runtime model downloads can use `ModelCache`, which requires HTTPS and verifies the SHA-256 digest before activating the file. A model changes application behavior, so accepting unverified model bytes would be a software supply chain bug.
+
+[PR #5472](https://github.com/codenameone/CodenameOne/pull/5472) takes the existing semantic MCP server beyond JavaSE. On loopback-capable ports, an LLM can read the component tree, find a button by semantic identity, set text, activate an action, and inspect the resulting state in the actual application.
+
+{{< mermaid >}}
+sequenceDiagram
+    participant Dev as Developer and LLM client
+    participant Port as Device port forward
+    participant MCP as 127.0.0.1 MCP server
+    participant UI as Codename One EDT
+    Dev->>Port: Connect to debug device
+    Port->>MCP: Forward port 8642
+    Dev->>MCP: ui_snapshot
+    MCP->>UI: Read semantic component tree
+    UI-->>Dev: Roles, text, state, and actions
+    Dev->>MCP: Activate semantic target
+    MCP->>UI: Perform component action
+    UI-->>Dev: Updated state
+{{< /mermaid >}}
+
+This replaces coordinate guessing with application semantics. It also creates a control channel. Binding to `127.0.0.1` prevents accidental exposure to the local network, but it does not authenticate other processes on the device or workstation.
+
+```java
+if (Display.getInstance().isDebuggableBuild()) {
+    MCP.startSocketServer(8642);
+}
+```
+
+MCP refuses to start in a release build by default. An explicit override exists for controlled test labs, but it should not become a convenience flag in a consumer application.
+
+{{< post-link path="/blog/on-device-ai-mcp-loopback" text="The AI and MCP article publishes on August 2 with the capability matrix, portable inference model, semantic debugging loop, and the reasons loopback still needs a release-build gate." >}}
+
+## Health data without fake certainty
+
+[PR #5475](https://github.com/codenameone/CodenameOne/pull/5475) adds a first-class API for HealthKit, Health Connect, recorded workouts, sparse nutrition data, deterministic simulation, and eight adopted Bluetooth health sensor profiles.
+
+The public API is divided at the boundaries an application needs to reason about:
+
+| Package | Responsibility |
+| --- | --- |
+| `com.codename1.health` | Stores, permissions, samples, queries, aggregates, sources, and change cursors |
+| `com.codename1.health.workout` | Recorded workout sessions, events, configuration, and collected samples |
+| `com.codename1.health.sensors` | Live standard Bluetooth health devices without requiring a phone health store |
+| `com.codename1.health.nutrition` | Sparse nutrient records where an absent value remains absent |
+
+Simulator, desktop, and JavaScript builds return `LOCAL_ONLY`. That is a supported store with reads and writes, not a missing provider. Only Android provider failures should send the user to provider setup:
+
+```java
+Health health = Health.getInstance();
+HealthAvailability availability = health.getAvailability();
+if (availability == HealthAvailability.PROVIDER_NOT_INSTALLED
+        || availability == HealthAvailability.PROVIDER_UPDATE_REQUIRED) {
+    health.openProviderSetup();
+    return;
+}
+if (availability == HealthAvailability.NOT_SUPPORTED) {
+    return;
+}
+
+HealthStore store = health.getStore();
+```
+
+{{< mermaid >}}
+flowchart TB
+    A["Application"] --> B["Health"]
+    B --> C["HealthStore"]
+    B --> D["WorkoutManager"]
+    B --> E["HealthSensors"]
+    C --> F["HealthKit"]
+    C --> G["Health Connect"]
+    C --> H["Local and simulated store"]
+    E --> I["Eight Bluetooth LE profiles"]
+    I --> D
+    I --> C
+{{< /mermaid >}}
+
+Some of the API looks cautious because the platform contracts are cautious. HealthKit does not reveal whether a user denied read access. A completed authorization sheet means the user was asked, not that the application can read the category. The shared API therefore has no `hasReadPermission()` method that would lie on iOS.
+
+The API preserves these distinctions throughout the model. An empty aggregate returns `null`, not zero. Calendar-day buckets require a time zone. Phone and watch sources remain distinguishable because silently adding overlapping samples can double-count a walk. Unsupported phone mappings fail with `TYPE_NOT_SUPPORTED` instead of returning an empty collection that looks successful.
+
+The simulator includes a mode that grants writes while denying reads without an error. That lets you test the UI mistake that a permissive fake would miss: accusing a user of denying access when the only accurate statement is “no data available.”
+
+This API does not make an application HIPAA compliant. It never uploads health data, and it can enforce specific purpose strings and reject unsupported writes. The application still owns access control, encryption, audit records, retention, consent, breach handling, backend contracts, and store disclosures.
+
+{{< post-link path="/blog/health-api-false-certainty" text="The Health article publishes on August 1 with the platform matrix, authorization trap, sample model, change cursors, workouts, Bluetooth sensors, simulator failure modes, build configuration, and HIPAA boundary." >}}
+
+## A polyline is not a route
+
+A map polyline joins coordinates that already exist. It cannot discover the roads, travel time, maneuvers, or alternate paths between them.
+
+[PR #5480](https://github.com/codenameone/CodenameOne/pull/5480) adds `com.codename1.maps.routing`. The smallest useful path is two coordinates:
+
+```java
+MapView map = new MapView();
+Routing.showRoute(
+        map,
+        new LatLng(38.8977, -77.0365),
+        new LatLng(38.8894, -77.0352)
+);
+```
+
+The call returns immediately. The active `RouteService` finds a route, then the API draws its geometry and frames the map on the Codename One EDT.
+
+{{< mermaid >}}
+flowchart LR
+    A["Origin, destination, and waypoints"] --> B["RouteRequest"]
+    B --> C["RouteService"]
+    C --> D["Road network calculation"]
+    D --> E["Route alternatives"]
+    E --> F["Geometry and bounds"]
+    E --> G["Distance, duration, legs, and steps"]
+    F --> H["MapSurface"]
+    G --> I["Application UI"]
+{{< /mermaid >}}
+
+The default service is OSRM, so the first driving route needs no provider signup. It points to the public OSRM demonstration server, which has no production SLA and uses a car profile. A `WALKING` request does not turn that graph into a pedestrian route.
+
+Production applications can point `OsrmRouteService` at their own server or install another provider:
+
+```java
+Routing.setService(new OsrmRouteService(
+        "https://routing.example.com"
+));
+```
+
+The application consumes portable `Route` objects rather than provider JSON. Those objects carry alternatives, distance, duration, bounds, geometry, legs, step instructions, maneuver locations, and provider metadata.
+
+This is routing, not turn-by-turn navigation. The release does not claim rerouting, traffic prediction, offline map packages, or voice guidance. Those features need location updates, lifecycle state, and provider-specific rules.
+
+{{< post-link path="/blog/road-following-map-routing" text="The routing article publishes on August 3 with custom route styling, ETA handling, encoded polyline support, OSRM limits, travel modes, provider replacement, and the boundary between a route result and navigation." >}}
 
 ---
 
