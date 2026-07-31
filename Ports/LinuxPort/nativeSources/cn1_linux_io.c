@@ -78,6 +78,21 @@ void cn1LinuxStubOnce(const char* tag) {
     fflush(stderr);
 }
 
+char* cn1LinuxJStrDup(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT value) {
+    const char* utf8 = value == JAVA_NULL ? 0 : stringToUTF8(threadStateData, value);
+    char* copy;
+    size_t length;
+    if (utf8 == 0) {
+        return 0;
+    }
+    length = strlen(utf8);
+    copy = (char*) malloc(length + 1);
+    if (copy != 0) {
+        memcpy(copy, utf8, length + 1);
+    }
+    return copy;
+}
+
 JAVA_OBJECT cn1LinuxNewByteArray(CODENAME_ONE_THREAD_STATE, const void* src, int n) {
     JAVA_OBJECT arr;
     if (n < 0) {
@@ -254,15 +269,22 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_fileMkdir___java_lang_String(CODE
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_fileRename___java_lang_String_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_OBJECT newName) {
-    const char* p = cn1JStr(threadStateData, path);
-    const char* n;
+    /* Two conversions: copy the first, or stringToUTF8's shared per-thread
+     * buffer repoints it at the new name and the file is renamed onto itself. */
+    char* p = cn1LinuxJStrDup(threadStateData, path);
+    char* n = 0;
     char dir[4096];
     char dest[4096];
     char* slash;
     if (!p || newName == JAVA_NULL) {
+        free(p);
         return;
     }
-    n = stringToUTF8(threadStateData, newName);
+    n = cn1LinuxJStrDup(threadStateData, newName);
+    if (!n) {
+        free(p);
+        return;
+    }
     /* newName is a leaf name; rename within the same parent directory. */
     strncpy(dir, p, sizeof(dir) - 1);
     dir[sizeof(dir) - 1] = 0;
@@ -274,6 +296,8 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_fileRename___java_lang_String_jav
         snprintf(dest, sizeof(dest), "%s", n);
     }
     rename(p, dest);
+    free(p);
+    free(n);
 }
 
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_fileList___java_lang_String_R_java_lang_String_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {

@@ -2742,6 +2742,84 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return '\\';
     }
 
+    /* ------------------------------------------------------------ crypto */
+
+    /**
+     * The crypto bridge, backed by CNG. Every failure is reported as a
+     * RuntimeException carrying the provider status, which
+     * {@code com.codename1.security.Cipher} turns into a CryptoException --
+     * an authentication failure has to be an exception rather than an empty
+     * result, or a tampered message would read as an empty plaintext.
+     */
+    private static byte[] cryptoResult(byte[] value, String operation) {
+        if (value == null) {
+            throw new RuntimeException(operation + " failed: " + WindowsNative.lastCryptoError());
+        }
+        return value;
+    }
+
+    @Override
+    public void secureRandomBytes(byte[] out) {
+        if (out != null && out.length > 0) {
+            WindowsNative.secureRandomBytes(out);
+        }
+    }
+
+    @Override
+    public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
+        return cryptoResult(WindowsNative.aesCrypt(transformation, true, key, iv, aad, plaintext),
+                "AES encrypt");
+    }
+
+    @Override
+    public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
+        return cryptoResult(WindowsNative.aesCrypt(transformation, false, key, iv, aad, ciphertext),
+                "AES decrypt");
+    }
+
+    @Override
+    public byte[] rsaEncrypt(String transformation, byte[] publicKeyX509, byte[] plaintext) {
+        return cryptoResult(WindowsNative.rsaCrypt(transformation, true, publicKeyX509, plaintext),
+                "RSA encrypt");
+    }
+
+    @Override
+    public byte[] rsaDecrypt(String transformation, byte[] privateKeyPkcs8, byte[] ciphertext) {
+        return cryptoResult(WindowsNative.rsaCrypt(transformation, false, privateKeyPkcs8, ciphertext),
+                "RSA decrypt");
+    }
+
+    @Override
+    public byte[] cryptoSign(String algorithm, String keyAlgorithm, byte[] privateKeyPkcs8, byte[] data) {
+        // The digest and the key type both follow from the algorithm name and
+        // the DER key itself, so keyAlgorithm adds nothing here.
+        return cryptoResult(WindowsNative.signData(algorithm, privateKeyPkcs8, data), "sign");
+    }
+
+    @Override
+    public boolean cryptoVerify(String algorithm, String keyAlgorithm, byte[] publicKeyX509,
+            byte[] data, byte[] signature) {
+        return WindowsNative.verifyData(algorithm, publicKeyX509, data, signature);
+    }
+
+    @Override
+    public byte[][] generateRsaKeyPair(int bits) {
+        byte[] blob = cryptoResult(WindowsNative.generateRsaKeyPair(bits), "RSA key generation");
+        if (blob.length < 4) {
+            throw new RuntimeException("RSA key generation returned a truncated pair");
+        }
+        int publicLength = ((blob[0] & 0xff) << 24) | ((blob[1] & 0xff) << 16)
+                | ((blob[2] & 0xff) << 8) | (blob[3] & 0xff);
+        if (publicLength < 0 || publicLength > blob.length - 4) {
+            throw new RuntimeException("RSA key generation returned a malformed pair");
+        }
+        byte[] publicKey = new byte[publicLength];
+        byte[] privateKey = new byte[blob.length - 4 - publicLength];
+        System.arraycopy(blob, 4, publicKey, 0, publicKey.length);
+        System.arraycopy(blob, 4 + publicLength, privateKey, 0, privateKey.length);
+        return new byte[][] { publicKey, privateKey };
+    }
+
     /* ------------------------------------------------------------ platform */
 
     @Override

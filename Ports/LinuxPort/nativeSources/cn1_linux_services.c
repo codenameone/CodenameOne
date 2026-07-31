@@ -389,10 +389,18 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_showNotification___java_lang_Stri
     if (!cn1LoadNotify()) {
         return;
     }
-    r.id = id == JAVA_NULL ? "" : stringToUTF8(threadStateData, id);
-    r.title = title == JAVA_NULL ? "" : stringToUTF8(threadStateData, title);
-    r.body = body == JAVA_NULL ? "" : stringToUTF8(threadStateData, body);
+    /* Copy each: stringToUTF8 reuses one buffer per thread, so converting the
+     * title would otherwise repoint the id at it, and the body at both. */
+    char* idCopy = cn1LinuxJStrDup(threadStateData, id);
+    char* titleCopy = cn1LinuxJStrDup(threadStateData, title);
+    char* bodyCopy = cn1LinuxJStrDup(threadStateData, body);
+    r.id = idCopy == 0 ? "" : idCopy;
+    r.title = titleCopy == 0 ? "" : titleCopy;
+    r.body = bodyCopy == 0 ? "" : bodyCopy;
     cn1LinuxRunOnMainAndWait(cn1ShowNotifyOnMain, &r);
+    free(idCopy);
+    free(titleCopy);
+    free(bodyCopy);
 }
 
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_notificationPollClicked___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
@@ -553,15 +561,18 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_shareText___java_lang_String_j
     /* No universal share sheet on the Linux desktop (xdg-desktop-portal's Share
      * is not yet broadly available); fall back to composing a mail draft via the
      * default mailto handler, which is the closest portable "share". */
-    const char* t = text == JAVA_NULL ? "" : stringToUTF8(threadStateData, text);
-    const char* subj = title == JAVA_NULL ? "" : stringToUTF8(threadStateData, title);
-    char* body = g_uri_escape_string(t, NULL, FALSE);
-    char* s = g_uri_escape_string(subj, NULL, FALSE);
+    /* Copy the text before converting the title -- they share one buffer. */
+    char* t = cn1LinuxJStrDup(threadStateData, text);
+    char* subj = cn1LinuxJStrDup(threadStateData, title);
+    char* body = g_uri_escape_string(t == 0 ? "" : t, NULL, FALSE);
+    char* s = g_uri_escape_string(subj == 0 ? "" : subj, NULL, FALSE);
     char* uri = g_strconcat("mailto:?subject=", s, "&body=", body, NULL);
     gboolean ok = g_app_info_launch_default_for_uri(uri, NULL, NULL);
     g_free(body);
     g_free(s);
     g_free(uri);
+    free(t);
+    free(subj);
     return ok ? JAVA_TRUE : JAVA_FALSE;
 }
 

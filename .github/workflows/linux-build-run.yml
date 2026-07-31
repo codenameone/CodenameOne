@@ -149,7 +149,7 @@ jobs:
             cmake ninja-build pkg-config unzip xvfb fonts-dejavu-core \
             libgtk-3-dev libcairo2-dev libpango1.0-dev libgdk-pixbuf-2.0-dev libglib2.0-dev \
             libfontconfig1-dev libfreetype-dev \
-            libcurl4-openssl-dev \
+            libcurl4-openssl-dev libssl-dev \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
             libwebkit2gtk-4.1-dev libsecret-1-dev libnotify-dev libgeoclue-2-dev \
             libepoxy-dev libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dri
@@ -332,7 +332,7 @@ jobs:
               sed -i "s|^#\(.*/community\)|\1|" /etc/apk/repositories
               apk add --no-cache build-base cmake samurai pkgconf bash git openjdk8 openjdk17 maven \
                 gtk+3.0-dev cairo-dev pango-dev gdk-pixbuf-dev glib-dev fontconfig-dev freetype-dev \
-                curl-dev libepoxy-dev mesa-dev mesa-gles mesa-egl mesa-gbm mesa-dri-gallium \
+                curl-dev openssl-dev libepoxy-dev mesa-dev mesa-gles mesa-egl mesa-gbm mesa-dri-gallium \
                 webkit2gtk-4.1-dev gstreamer-dev gst-plugins-base-dev \
                 libsecret-dev libnotify-dev geoclue-dev xvfb ttf-dejavu
               # JDK 8 runs the translator/maven; JDK 17 is needed to compile the
