@@ -242,6 +242,14 @@ final class IOSDeviceIntegrity {
     /// The reset itself, for callers that must not release the lock between discarding
     /// the old identity and starting the replacement. Caller holds `flowLock`.
     private void resetLocked() {
+        resetLocked(false);
+    }
+
+    /// @param keepSpentMarker true when this reset is the discard step of a recovery
+    ///        that has already recorded itself as spent. Clearing the marker there would
+    ///        undo the one-shot limit at the exact moment it starts applying -- the
+    ///        replacement key would look like a first recovery all over again.
+    private void resetLocked(boolean keepSpentMarker) {
         SecureStorage store = SecureStorage.getInstance();
         // The two that carry the identity are checked. If the keychain refuses to
         // delete them the reset has not happened, and advancing the generation anyway
@@ -261,9 +269,12 @@ final class IOSDeviceIntegrity {
         // gone so nothing stops the loop.
         if (idGone && stateGone) {
             store.remove(KEY_ATTEST_STARTED);
-            store.remove(KEY_RECOVERY_SPENT);
-            recoverySpentInMemory = false;
             attestAnsweredForKey = null;
+            discardFailed = false;
+            if (!keepSpentMarker) {
+                store.remove(KEY_RECOVERY_SPENT);
+                recoverySpentInMemory = false;
+            }
         }
         if (!idGone || !stateGone) {
             // The identity survives in part, and there may be nothing left to make it
@@ -784,8 +795,32 @@ final class IOSDeviceIntegrity {
                 if (errorCode == DC_ERROR_INVALID_KEY && !recoverySpent) {
                     // The key is gone or was never valid. Wipe it and try once from
                     // scratch; a second failure is reported rather than looped.
+                    //
+                    // The spent marker is written BEFORE the identity is discarded, which
+                    // is the ordering the whole one-shot limit rests on. Discarding first
+                    // and then failing to record left no key at all AND no record that a
+                    // recovery had happened -- so the next request took the plain
+                    // generate-key path, which consults neither marker, and every request
+                    // (and every launch, since the in-memory copy does not survive one)
+                    // burned another rate-limited hardware key. Writing first means a
+                    // refusal costs one request and changes nothing else: the rejected
+                    // key is still there, and the terminal flag below stops it being
+                    // attested again in this process.
+                    instance.recoverySpentInMemory = true;
+                    if (!SecureStorage.getInstance().set(KEY_RECOVERY_SPENT, "1")) {
+                        instance.discardFailed = true;
+                        instance.bootstrapInFlight = false;
+                        fail(pending, "App Attest could not record that its one-time "
+                                + "recovery had been used, so it was not attempted");
+                        instance.failBootstrapWaiters("App Attest could not record that "
+                                + "its one-time recovery had been used");
+                        return;
+                    }
                     try {
-                        instance.resetLocked();
+                        // Keeps the marker written a moment ago: this reset IS the
+                        // recovery, so clearing it here would let the replacement look
+                        // like a first recovery all over again.
+                        instance.resetLocked(true);
                     } catch (IllegalStateException e) {
                         // Nothing was discarded, so starting a replacement would leave
                         // two identities and the old one still usable. Fail the caller.
@@ -793,29 +828,6 @@ final class IOSDeviceIntegrity {
                         fail(pending, "App Attest could not discard the rejected key");
                         instance.failBootstrapWaiters(
                                 "App Attest could not discard the rejected key");
-                        return;
-                    }
-                    // Recorded before the replacement starts, so a request arriving after
-                    // this process dies still sees the recovery as used. The in-memory
-                    // copy is set regardless: if the keychain refuses the write, the
-                    // one-shot limit still holds for the life of the process rather than
-                    // letting every later request burn another key.
-                    instance.recoverySpentInMemory = true;
-                    if (!SecureStorage.getInstance().set(KEY_RECOVERY_SPENT, "1")) {
-                        // No replacement without the marker. The in-memory copy only
-                        // covers this process, and the replacement's own start marker
-                        // DOES persist -- so after a restart the next launch would find a
-                        // discarded-looking key with no record that a recovery had been
-                        // spent, and start another one. That is a rate-limited hardware
-                        // key per launch, caused by the very write that was meant to
-                        // bound it. Failing here costs this caller one request, and the
-                        // device is left with no key at all, so a later attempt starts
-                        // cleanly rather than compounding.
-                        instance.bootstrapInFlight = false;
-                        fail(pending, "App Attest could not record that its one-time "
-                                + "recovery had been used, so it was not attempted");
-                        instance.failBootstrapWaiters("App Attest could not record that "
-                                + "its one-time recovery had been used");
                         return;
                     }
                     PendingRequest retry = new PendingRequest(pending.result, pending.nonce,

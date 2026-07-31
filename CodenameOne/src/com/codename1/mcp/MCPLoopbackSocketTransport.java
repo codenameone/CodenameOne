@@ -128,6 +128,16 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         synchronized (lock) {
             closed = false;
         }
+        // One listener per instance. The server serializes opens, but this handle is the
+        // only reference to the listener -- overwriting it strands the previous one, and
+        // a stranded listener survives close() and keeps the port bound. Refusing is the
+        // honest answer: the caller asked to open something that is already open.
+        synchronized (lock) {
+            if (listening != null) {
+                throw new IOException("This MCP transport is already listening on port "
+                        + port);
+            }
+        }
         try {
             listening = Socket.listenLoopback(port, Connection.class);
         } catch (RuntimeException ex) {

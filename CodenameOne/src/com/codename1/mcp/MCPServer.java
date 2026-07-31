@@ -218,6 +218,12 @@ public class MCPServer {
         }
     }
 
+    /// Held across `open()` so two generations cannot be inside one transport's open at
+    /// the same time. Deliberately NOT the server monitor: `open()` blocks -- it binds a
+    /// listener -- and holding the monitor across it would make `stop()` wait on the
+    /// thing it is trying to stop.
+    private final Object openLock = new Object();
+
     private void runLoop(MCPTransport t, int generation) {
         // Opening is deferred to this thread, so by the time it happens the server may
         // already have been stopped or restarted. Either way stop()'s close() ran against a
@@ -229,7 +235,20 @@ public class MCPServer {
             return;
         }
         try {
-            t.open();
+            // Serialized per server. A stop()/start() over the SAME transport while the
+            // old reader is still parked inside open() would otherwise have both
+            // generations open one instance: the same-transport rule then correctly
+            // declines to close it on the way out, and the transport is left holding two
+            // listeners with one handle for them -- so the first is leaked and outlives
+            // stop(). The superseded thread finds itself stale the moment it gets the
+            // lock, and unwinds without opening anything.
+            synchronized (openLock) {
+                if (!isCurrent(t, generation)) {
+                    releaseAndCloseIfCurrent(t, generation);
+                    return;
+                }
+                t.open();
+            }
         } catch (IOException ex) {
             // The transport failed to start listening. Log defensively: the CN1 Log
             // routes through the platform implementation, which may not be registered
