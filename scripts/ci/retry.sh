@@ -21,8 +21,21 @@ if [ "$#" -eq 0 ]; then
   exit 2
 fi
 
+# A malformed override must not silently degrade into "never ran the command,
+# reported success" -- these are set in workflow YAML, so a typo should be loud.
+# RETRY_ATTEMPTS must be >= 1: the command always runs at least once.
+case "$attempts" in
+  ''|*[!0-9]*|0) echo "retry.sh: RETRY_ATTEMPTS must be a positive integer, got '${attempts}'" >&2; exit 2 ;;
+esac
+case "$delay" in
+  ''|*[!0-9]*) echo "retry.sh: RETRY_DELAY_SECONDS must be a non-negative integer, got '${delay}'" >&2; exit 2 ;;
+esac
+
+# Counted with arithmetic rather than `seq`: BSD and GNU seq disagree on
+# degenerate ranges, and this loop body must run exactly `attempts` times.
 status=0
-for attempt in $(seq 1 "$attempts"); do
+attempt=1
+while [ "$attempt" -le "$attempts" ]; do
   "$@" && exit 0
   status=$?
   if [ "$attempt" -lt "$attempts" ]; then
@@ -30,6 +43,7 @@ for attempt in $(seq 1 "$attempts"); do
       "retrying in ${delay}s (possible transient Maven Central 403/429/5xx)" >&2
     sleep "$delay"
   fi
+  attempt=$((attempt + 1))
 done
 
 echo "retry.sh: command failed after ${attempts} attempts" >&2
