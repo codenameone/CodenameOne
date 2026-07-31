@@ -15,7 +15,7 @@ The hardest part of a health API is not reading a heart-rate number. It is knowi
 
 [PR #5475](https://github.com/codenameone/CodenameOne/pull/5475) merged a cross-platform health API for HealthKit, Health Connect, recorded workouts, nutrition, Bluetooth health sensors, and deterministic simulation into the core. The implementation has compile, link, and automated coverage. Real-device testing remains important for store permissions and sensor hardware.
 
-This is part of the [July 31 weekly release series](/blog/push-v3-new-cloud/), led by Push V3 and the new cloud migration.
+We talked about this in [Friday's release post](/blog/push-v3-new-cloud/), alongside Push V3 and the new cloud migration.
 
 ## The API has four public layers
 

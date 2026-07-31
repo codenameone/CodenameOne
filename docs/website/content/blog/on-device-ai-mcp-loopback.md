@@ -19,7 +19,7 @@ The other lets an agent stand outside the application, inspect its semantic UI, 
 
 This week Codename One merged both parts: [built-in on-device AI](https://github.com/codenameone/CodenameOne/pull/5467) and [MCP over a loopback socket on mobile and desktop ports](https://github.com/codenameone/CodenameOne/pull/5472).
 
-This is part of the [July 31 weekly release series](/blog/push-v3-new-cloud/).
+We talked about both changes in [Friday's release post](/blog/push-v3-new-cloud/).
 
 ## The AI API is selective, local, and portable
 

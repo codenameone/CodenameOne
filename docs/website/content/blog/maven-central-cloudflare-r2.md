@@ -17,7 +17,7 @@ This is not a story about Maven Central being bad. Sonatype runs expensive publi
 
 [PR #5497](https://github.com/codenameone/CodenameOne/pull/5497) implements phase one. It reduces what each release publishes and adds dual publication to R2. Maven Central remains authoritative during this phase.
 
-This is the final article in the [July 31 weekly release series](/blog/push-v3-new-cloud/).
+We first talked about the repository move in [Friday's release post](/blog/push-v3-new-cloud/).
 
 ## Our dashboard is not a near miss
 

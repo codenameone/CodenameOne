@@ -25,7 +25,7 @@ Next week we plan to bring down the old push service and direct `push.codenameon
 
 Push is the lead story today. Over the next four posts, I will unpack the other changes in this release:
 
-- [The Maven repository migration](#phase-one-of-our-maven-repository-move): Phase one is already running. We cut the measured release payload by 66 percent and started publishing the same signed artifacts to Cloudflare R2. Generated projects switch on August 7. Maven Central updates are scheduled to stop on August 28 if the observation period stays clean.
+- [Our own Maven repository](#phase-one-of-our-maven-repository-move): We are moving Codename One releases to `repo.codenameone.com`. New projects get the setting automatically next week. Existing projects will need a short POM block before new versions stop appearing on Maven Central.
 - [On-device AI and MCP](#on-device-ai-and-mcp-on-every-port): The core now has portable OCR, vision, language, and LiteRT APIs. The MCP server can inspect and operate a real application on mobile ports through loopback, with a release-build guard because another local process can also reach that socket.
 - [Health data](#health-data-without-fake-certainty): A new API covers HealthKit, Health Connect, workouts, nutrition, eight Bluetooth health sensor profiles, and a deterministic simulator. The design preserves denied reads, missing values, source overlap, and compliance boundaries instead of flattening them into convenient answers.
 - [Road-following map routes](#a-polyline-is-not-a-route): `Routing.showRoute(...)` can now turn two coordinates into road geometry, distance, duration, legs, and steps. OSRM provides the default test path, while `RouteService` keeps production provider choice in application code.
@@ -42,17 +42,6 @@ If your server currently sends through the classic endpoint, keep the request ex
 Send to test devices on every platform your application supports. Exercise a visible notification, a data payload, a cold start, and any badge, sound, category, image, or deep-link behavior you use. Compare the result with the old host and [open an issue](https://github.com/codenameone/CodenameOne/issues) if the two disagree.
 
 The new server contains a classic compatibility layer. Existing applications do not need to adopt the Java V3 client or the new REST API before the hostname switch. That separation matters: validating the new transport is a small operational change, while adopting the V3 model is an application change you can schedule.
-
-{{< mermaid >}}
-flowchart LR
-    A["Existing server code"] --> B["Classic /push/push request"]
-    B --> C["cloud.codenameone.com compatibility layer"]
-    C --> D["Durable delivery queue"]
-    D --> E["APNs"]
-    D --> F["FCM"]
-    D --> G["Huawei"]
-    D --> H["WNS and Web Push"]
-{{< /mermaid >}}
 
 The queue records a provider response for each target. “Accepted” means APNs, FCM, or another provider accepted the request. It does not prove that the operating system displayed the notification, that the user saw it, or that the application opened. The console keeps those states separate because a comforting number with the wrong definition is worse than no number.
 
@@ -74,7 +63,15 @@ PushMessage message = PushMessage.builder()
 
 The same envelope can carry visible content, application data, an image, a deep link, collapse and lifetime rules, provider-specific options, and a `surface` command. Incoming messages are parsed before reaching application code, exposed through immutable maps, and rejected when their schema is unsupported.
 
-The client is explicit too:
+V3 also replaces the old `PushCallback` contract. Your main application class no longer implements the push interface. You create a `PushClient` and give it a `PushListener`:
+
+| Previous API | V3 API |
+| --- | --- |
+| `PushCallback.push(String value)` | `PushListener.onMessage(PushMessage message)` |
+| `registeredForPush(String deviceId)` | `onRegistration(PushSubscription subscription)` |
+| `pushRegistrationError(...)` | `onError(PushError error)` |
+
+This is more than a method rename. The listener receives a parsed `PushMessage`, registration returns a subscription object, and errors carry a code plus retry information.
 
 ```java
 private PushClient push;
@@ -125,7 +122,9 @@ flowchart TB
     D --> I
 {{< /mermaid >}}
 
-This connection is important for both architecture and monitoring. A campaign can target a segment once, then update the user-facing surface that is appropriate on each platform. The server records provider outcomes without pretending that every destination has the same lifecycle.
+Consider a delivery application that is not running while the customer waits for a courier. A server push can update its Live Activity and Dynamic Island to say “Driver is 2 minutes away” without launching the main Codename One UI. On a platform without that Surface, the same campaign can deliver a normal notification instead.
+
+The message view still shows whether APNs or another provider accepted each update. That is useful when the Surface changes while no `PushListener` is running inside the application.
 
 ## The certificate stops being your server's problem
 
@@ -377,6 +376,8 @@ The application consumes portable `Route` objects rather than provider JSON. Tho
 This is routing, not turn-by-turn navigation. The release does not claim rerouting, traffic prediction, offline map packages, or voice guidance. Those features need location updates, lifecycle state, and provider-specific rules.
 
 {{< post-link path="/blog/road-following-map-routing" text="The routing article publishes on August 3 with custom route styling, ETA handling, encoded polyline support, OSRM limits, travel modes, provider replacement, and the boundary between a route result and navigation." >}}
+
+Tomorrow I will start taking these changes one at a time with the new Health API. For today, please send a real notification through `cloud.codenameone.com`. This is the one week when you can compare the old and new push implementations side by side. If anything behaves differently, [open an issue](https://github.com/codenameone/CodenameOne/issues) before we move the traffic next week.
 
 ---
 

@@ -15,7 +15,7 @@ A polyline can draw the points you give it. It cannot discover the road between 
 
 [PR #5480](https://github.com/codenameone/CodenameOne/pull/5480) adds `com.codename1.maps.routing`, a portable route model and service layer for road geometry, distance, duration, waypoints, alternatives, legs, steps, and encoded polylines.
 
-This is part of the [July 31 weekly release series](/blog/push-v3-new-cloud/).
+We talked about routing in [Friday's release post](/blog/push-v3-new-cloud/).
 
 ## The two-line route
 
