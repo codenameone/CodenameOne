@@ -399,6 +399,209 @@ static int cn1Digest(LPCWSTR algorithm, const unsigned char* data, int length,
     return 1;
 }
 
+
+/* ------------------------------------------------- OAEP and ECDSA encodings
+ *
+ * Two shapes CNG cannot produce on its own:
+ *
+ * OAEP -- BCRYPT_OAEP_PADDING_INFO carries one digest, which CNG uses for both
+ * the label hash and the mask function. The JCE providers behind the JavaSE and
+ * Android ports pair a SHA-256 label hash with a SHA-1 mask for
+ * "OAEPWithSHA-256AndMGF1Padding", and the Linux port matches them, so
+ * ciphertext has to use that pairing to stay readable across ports. Naming one
+ * digest for both halves either weakens the label hash or breaks interop, so
+ * the padding is built here and the key operation runs unpadded.
+ *
+ * ECDSA -- NCryptSignHash answers the fixed-width r||s of P1363, while the
+ * portable Signature contract (and Jwt.derToJoseEcdsa) expects ASN.1 DER, so
+ * signatures are converted in both directions.
+ */
+
+static int cn1Mgf1(LPCWSTR digestAlgorithm, const unsigned char* seed, int seedLength,
+                   unsigned char* mask, int maskLength) {
+    int digestLength = cn1DigestLength(digestAlgorithm);
+    unsigned char counted[256];
+    unsigned char digest[64];
+    int produced = 0;
+    unsigned int counter = 0;
+    if (seedLength + 4 > (int) sizeof(counted)) {
+        return 0;
+    }
+    memcpy(counted, seed, (size_t) seedLength);
+    while (produced < maskLength) {
+        int chunk = maskLength - produced;
+        counted[seedLength] = (unsigned char) ((counter >> 24) & 0xff);
+        counted[seedLength + 1] = (unsigned char) ((counter >> 16) & 0xff);
+        counted[seedLength + 2] = (unsigned char) ((counter >> 8) & 0xff);
+        counted[seedLength + 3] = (unsigned char) (counter & 0xff);
+        if (!cn1Digest(digestAlgorithm, counted, seedLength + 4, digest, digestLength)) {
+            return 0;
+        }
+        if (chunk > digestLength) {
+            chunk = digestLength;
+        }
+        memcpy(mask + produced, digest, (size_t) chunk);
+        produced += chunk;
+        counter++;
+    }
+    return 1;
+}
+
+/* EME-OAEP encoding of `message` into a `blockLength`-byte block. */
+static int cn1OaepEncode(LPCWSTR labelDigest, LPCWSTR maskDigest, const unsigned char* message,
+                         int messageLength, unsigned char* block, int blockLength) {
+    int hashLength = cn1DigestLength(labelDigest);
+    int dbLength = blockLength - hashLength - 1;
+    unsigned char seed[64];
+    unsigned char mask[512];
+    int i;
+    if (dbLength <= 0 || messageLength > dbLength - hashLength - 1 || dbLength > (int) sizeof(mask)) {
+        cn1CryptoFail("RSA-OAEP message is too long for the key", 0);
+        return 0;
+    }
+    memset(block, 0, (size_t) blockLength);
+    /* DB = lHash || PS || 0x01 || M, with an empty label. */
+    if (!cn1Digest(labelDigest, (const unsigned char*) "", 0, block + 1 + hashLength, hashLength)) {
+        return 0;
+    }
+    block[blockLength - messageLength - 1] = 0x01;
+    if (messageLength > 0) {
+        memcpy(block + blockLength - messageLength, message, (size_t) messageLength);
+    }
+    if (BCryptGenRandom(NULL, seed, (ULONG) hashLength, BCRYPT_USE_SYSTEM_PREFERRED_RNG)
+            != STATUS_SUCCESS) {
+        cn1CryptoFail("RSA-OAEP seed", 0);
+        return 0;
+    }
+    if (!cn1Mgf1(maskDigest, seed, hashLength, mask, dbLength)) {
+        return 0;
+    }
+    for (i = 0; i < dbLength; i++) {
+        block[1 + hashLength + i] ^= mask[i];
+    }
+    if (!cn1Mgf1(maskDigest, block + 1 + hashLength, dbLength, mask, hashLength)) {
+        return 0;
+    }
+    for (i = 0; i < hashLength; i++) {
+        block[1 + i] = (unsigned char) (seed[i] ^ mask[i]);
+    }
+    return 1;
+}
+
+/* Reverses cn1OaepEncode, writing the recovered message and its length. */
+static int cn1OaepDecode(LPCWSTR labelDigest, LPCWSTR maskDigest, unsigned char* block,
+                         int blockLength, unsigned char* message, int* messageLength) {
+    int hashLength = cn1DigestLength(labelDigest);
+    int dbLength = blockLength - hashLength - 1;
+    unsigned char mask[512];
+    unsigned char labelHash[64];
+    unsigned char seed[64];
+    int i, index;
+    if (dbLength <= 0 || dbLength > (int) sizeof(mask) || block[0] != 0x00) {
+        cn1CryptoFail("RSA-OAEP block is malformed", 0);
+        return 0;
+    }
+    if (!cn1Mgf1(maskDigest, block + 1 + hashLength, dbLength, mask, hashLength)) {
+        return 0;
+    }
+    for (i = 0; i < hashLength; i++) {
+        seed[i] = (unsigned char) (block[1 + i] ^ mask[i]);
+    }
+    if (!cn1Mgf1(maskDigest, seed, hashLength, mask, dbLength)) {
+        return 0;
+    }
+    for (i = 0; i < dbLength; i++) {
+        block[1 + hashLength + i] ^= mask[i];
+    }
+    if (!cn1Digest(labelDigest, (const unsigned char*) "", 0, labelHash, hashLength)) {
+        return 0;
+    }
+    if (memcmp(labelHash, block + 1 + hashLength, (size_t) hashLength) != 0) {
+        cn1CryptoFail("RSA-OAEP label hash does not match", 0);
+        return 0;
+    }
+    index = 1 + hashLength + hashLength;
+    while (index < blockLength && block[index] == 0x00) {
+        index++;
+    }
+    if (index >= blockLength || block[index] != 0x01) {
+        cn1CryptoFail("RSA-OAEP padding is malformed", 0);
+        return 0;
+    }
+    index++;
+    *messageLength = blockLength - index;
+    if (*messageLength > 0) {
+        memcpy(message, block + index, (size_t) *messageLength);
+    }
+    return 1;
+}
+
+/* One DER INTEGER holding an unsigned big-endian value. */
+static int cn1DerInteger(const unsigned char* value, int length, unsigned char* out) {
+    int start = 0;
+    int written = 0;
+    int pad;
+    while (start < length - 1 && value[start] == 0) {
+        start++;
+    }
+    pad = (value[start] & 0x80) != 0 ? 1 : 0;
+    out[written++] = 0x02;
+    out[written++] = (unsigned char) (length - start + pad);
+    if (pad) {
+        out[written++] = 0x00;
+    }
+    memcpy(out + written, value + start, (size_t) (length - start));
+    return written + length - start;
+}
+
+/* P1363 r||s (as CNG produces) to the ASN.1 DER sequence the API expects. */
+static int cn1EcdsaToDer(const unsigned char* raw, int rawLength, unsigned char* der) {
+    int half = rawLength / 2;
+    unsigned char body[160];
+    int bodyLength = 0;
+    if (rawLength <= 0 || (rawLength & 1) != 0 || half > 66) {
+        return 0;
+    }
+    bodyLength = cn1DerInteger(raw, half, body);
+    bodyLength += cn1DerInteger(raw + half, half, body + bodyLength);
+    der[0] = 0x30;
+    der[1] = (unsigned char) bodyLength;
+    memcpy(der + 2, body, (size_t) bodyLength);
+    return bodyLength + 2;
+}
+
+/* Inverse of cn1EcdsaToDer, padding each half back to `half` bytes. */
+static int cn1EcdsaFromDer(const unsigned char* der, int derLength, unsigned char* raw, int half) {
+    int index = 2;
+    int part;
+    if (derLength < 8 || der[0] != 0x30) {
+        return 0;
+    }
+    memset(raw, 0, (size_t) (half * 2));
+    for (part = 0; part < 2; part++) {
+        int length, start, copy;
+        if (index + 2 > derLength || der[index] != 0x02) {
+            return 0;
+        }
+        length = der[index + 1];
+        index += 2;
+        if (index + length > derLength) {
+            return 0;
+        }
+        start = 0;
+        while (start < length - 1 && der[index + start] == 0) {
+            start++;
+        }
+        copy = length - start;
+        if (copy > half) {
+            return 0;
+        }
+        memcpy(raw + part * half + (half - copy), der + index + start, (size_t) copy);
+        index += length;
+    }
+    return 1;
+}
+
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_rsaCrypt___java_lang_String_boolean_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT transformation, JAVA_BOOLEAN encrypt,
         JAVA_OBJECT keyArray, JAVA_OBJECT dataArray) {
@@ -408,54 +611,113 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_rsaCrypt___java_lang_String
     unsigned char* data = cn1Bytes(dataArray, &dataLength);
     BCRYPT_KEY_HANDLE publicKey = encrypt ? cn1PublicKey(keyDer, keyLength) : NULL;
     NCRYPT_KEY_HANDLE privateKey = encrypt ? 0 : cn1PrivateKey(keyDer, keyLength, 0);
-    BCRYPT_OAEP_PADDING_INFO oaep;
     int oaepMode = strstr(mode, "OAEP") != 0;
-    void* padding = 0;
-    ULONG flags = oaepMode ? BCRYPT_PAD_OAEP : BCRYPT_PAD_PKCS1;
+    LPCWSTR labelDigest = strstr(mode, "SHA-1") != 0 ? BCRYPT_SHA1_ALGORITHM : BCRYPT_SHA256_ALGORITHM;
     unsigned char* out = 0;
+    unsigned char* block = 0;
     ULONG outLength = 0, produced = 0;
+    DWORD modulusBytes = 0, propertyBytes = 0;
     NTSTATUS status;
     JAVA_OBJECT result = JAVA_NULL;
 
     if (encrypt ? (publicKey == NULL) : (privateKey == 0)) {
         return JAVA_NULL;
     }
+
     if (oaepMode) {
-        memset(&oaep, 0, sizeof(oaep));
-        /* CNG derives the mask function from this same digest, and the JCE
-         * providers behind the JavaSE and Android ports mask with SHA-1 for
-         * this transformation name. Naming SHA-256 here would make ciphertext
-         * sealed on those ports undecryptable, so keep the SHA-1 mask. */
-        oaep.pszAlgId = BCRYPT_SHA1_ALGORITHM;
-        oaep.pbLabel = NULL;
-        oaep.cbLabel = 0;
-        padding = &oaep;
-    }
-    status = encrypt
-            ? BCryptEncrypt(publicKey, data, (ULONG) dataLength, padding, NULL, 0, NULL, 0, &outLength, flags)
-            : (NTSTATUS) NCryptDecrypt(privateKey, (PBYTE) data, (DWORD) dataLength, padding,
-                                       NULL, 0, (DWORD*) &outLength, flags);
-    if (status != STATUS_SUCCESS) {
-        cn1CryptoFail("RSA size", status);
-        goto done;
-    }
-    out = (unsigned char*) malloc((size_t) outLength + 1);
-    if (out == 0) {
-        cn1CryptoFail("out of memory", 0);
-        goto done;
-    }
-    status = encrypt
-            ? BCryptEncrypt(publicKey, data, (ULONG) dataLength, padding, NULL, 0, out, outLength, &produced, flags)
-            : (NTSTATUS) NCryptDecrypt(privateKey, (PBYTE) data, (DWORD) dataLength, padding,
-                                       out, outLength, (DWORD*) &produced, flags);
-    if (status != STATUS_SUCCESS) {
-        cn1CryptoFail(encrypt ? "RSA encrypt" : "RSA decrypt", status);
-        goto done;
+        /* CNG's padding info names one digest for both the label hash and the
+         * mask, so it cannot express the SHA-256 label with the SHA-1 mask that
+         * the JCE providers -- and therefore the JavaSE, Android and Linux
+         * ports -- use for this transformation. Pad here and run the key
+         * operation raw so ciphertext stays readable across ports. */
+        ULONG bits = 0;
+        if (encrypt) {
+            status = BCryptGetProperty(publicKey, BCRYPT_KEY_STRENGTH, (PUCHAR) &bits,
+                                       sizeof(bits), &propertyBytes, 0);
+            if (status != STATUS_SUCCESS) {
+                cn1CryptoFail("RSA key size", status);
+                goto done;
+            }
+            modulusBytes = bits / 8;
+        } else {
+            if (NCryptGetProperty(privateKey, NCRYPT_LENGTH_PROPERTY, (PBYTE) &bits,
+                                  sizeof(bits), &propertyBytes, 0) != ERROR_SUCCESS) {
+                cn1CryptoFail("RSA key size", 0);
+                goto done;
+            }
+            modulusBytes = bits / 8;
+        }
+        block = (unsigned char*) malloc((size_t) modulusBytes + 1);
+        if (block == 0) {
+            cn1CryptoFail("out of memory", 0);
+            goto done;
+        }
+        if (encrypt) {
+            if (!cn1OaepEncode(labelDigest, BCRYPT_SHA1_ALGORITHM, data, dataLength, block,
+                               (int) modulusBytes)) {
+                goto done;
+            }
+            out = (unsigned char*) malloc((size_t) modulusBytes + 1);
+            if (out == 0) {
+                cn1CryptoFail("out of memory", 0);
+                goto done;
+            }
+            status = BCryptEncrypt(publicKey, block, modulusBytes, NULL, NULL, 0, out,
+                                   modulusBytes, &produced, BCRYPT_PAD_NONE);
+            if (status != STATUS_SUCCESS) {
+                cn1CryptoFail("RSA encrypt", status);
+                goto done;
+            }
+        } else {
+            DWORD recovered = 0;
+            int messageLength = 0;
+            if (NCryptDecrypt(privateKey, data, (DWORD) dataLength, NULL, block, modulusBytes,
+                              &recovered, NCRYPT_NO_PADDING_FLAG) != ERROR_SUCCESS) {
+                cn1CryptoFail("RSA decrypt", 0);
+                goto done;
+            }
+            out = (unsigned char*) malloc((size_t) modulusBytes + 1);
+            if (out == 0) {
+                cn1CryptoFail("out of memory", 0);
+                goto done;
+            }
+            if (!cn1OaepDecode(labelDigest, BCRYPT_SHA1_ALGORITHM, block, (int) modulusBytes,
+                               out, &messageLength)) {
+                goto done;
+            }
+            produced = (ULONG) messageLength;
+        }
+    } else {
+        ULONG flags = BCRYPT_PAD_PKCS1;
+        status = encrypt
+                ? BCryptEncrypt(publicKey, data, (ULONG) dataLength, NULL, NULL, 0, NULL, 0,
+                                &outLength, flags)
+                : (NTSTATUS) NCryptDecrypt(privateKey, data, (DWORD) dataLength, NULL, NULL, 0,
+                                           (DWORD*) &outLength, flags);
+        if (status != STATUS_SUCCESS) {
+            cn1CryptoFail("RSA size", status);
+            goto done;
+        }
+        out = (unsigned char*) malloc((size_t) outLength + 1);
+        if (out == 0) {
+            cn1CryptoFail("out of memory", 0);
+            goto done;
+        }
+        status = encrypt
+                ? BCryptEncrypt(publicKey, data, (ULONG) dataLength, NULL, NULL, 0, out,
+                                outLength, &produced, flags)
+                : (NTSTATUS) NCryptDecrypt(privateKey, data, (DWORD) dataLength, NULL, out,
+                                           outLength, (DWORD*) &produced, flags);
+        if (status != STATUS_SUCCESS) {
+            cn1CryptoFail(encrypt ? "RSA encrypt" : "RSA decrypt", status);
+            goto done;
+        }
     }
     result = cn1WinNewByteArray(threadStateData, out, (int) produced);
 
 done:
     free(out);
+    free(block);
     if (publicKey != NULL) {
         BCryptDestroyKey(publicKey);
     }
@@ -510,7 +772,19 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_signData___java_lang_String
         cn1CryptoFail("sign", (NTSTATUS) status);
         goto done;
     }
-    result = cn1WinNewByteArray(threadStateData, out, (int) produced);
+    if (isEc) {
+        /* NCrypt answers the fixed-width r||s of P1363; the portable Signature
+         * contract, and Jwt.derToJoseEcdsa with it, expects ASN.1 DER. */
+        unsigned char der[160];
+        int derLength = cn1EcdsaToDer(out, (int) produced, der);
+        if (derLength <= 0) {
+            cn1CryptoFail("ECDSA signature encoding", 0);
+            goto done;
+        }
+        result = cn1WinNewByteArray(threadStateData, der, derLength);
+    } else {
+        result = cn1WinNewByteArray(threadStateData, out, (int) produced);
+    }
 
 done:
     free(out);
@@ -540,11 +814,28 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_verifyData___java_lang_Str
         return JAVA_FALSE;
     }
     if (cn1Digest(digestAlgorithm, data, dataLength, digest, digestLength)) {
+        unsigned char raw[132];
+        const unsigned char* toVerify = signature;
+        ULONG toVerifyLength = (ULONG) signatureLength;
+        int usable = 1;
         padding.pszAlgId = digestAlgorithm;
+        if (isEc) {
+            /* Signatures arrive as DER; CNG verifies the P1363 pair. The half
+             * width follows the key size, which for the supported curves is
+             * the digest the caller named. */
+            int half = cn1DigestLength(digestAlgorithm);
+            if (half == 20) {
+                half = 32;
+            }
+            usable = cn1EcdsaFromDer(signature, signatureLength, raw, half);
+            toVerify = raw;
+            toVerifyLength = (ULONG) (half * 2);
+        }
         /* A rejected signature is a normal answer here, not a fault. */
-        if (BCryptVerifySignature(key, isEc ? NULL : &padding, digest, (ULONG) digestLength,
-                                  signature, (ULONG) signatureLength,
-                                  isEc ? 0 : BCRYPT_PAD_PKCS1) == STATUS_SUCCESS) {
+        if (usable && BCryptVerifySignature(key, isEc ? NULL : &padding, digest,
+                                            (ULONG) digestLength, (PUCHAR) toVerify,
+                                            toVerifyLength,
+                                            isEc ? 0 : BCRYPT_PAD_PKCS1) == STATUS_SUCCESS) {
             result = JAVA_TRUE;
         }
     }
