@@ -15,7 +15,7 @@ Codename One is starting a staged move from Maven Central to a repository we ope
 
 This is not a story about Maven Central being bad. Sonatype runs expensive public infrastructure and has every right to define usage limits or sell a commercial service. Our release shape is simply a bad fit for those limits, and passing that infrastructure bill to Codename One users would make less sense than serving the same signed Maven layout ourselves.
 
-[PR #5497](https://github.com/codenameone/CodenameOne/pull/5497) starts phase one. It reduces what each release publishes and adds dual publication to R2. Maven Central remains authoritative during this phase.
+[PR #5497](https://github.com/codenameone/CodenameOne/pull/5497) implements phase one. It reduces what each release publishes and adds dual publication to R2. Maven Central remains authoritative during this phase.
 
 This is the final article in the [July 31 weekly release series](/blog/push-v3-new-cloud/).
 

@@ -25,7 +25,7 @@ Next week we plan to bring down the old push service and direct `push.codenameon
 
 - [Push V3](#test-the-new-push-server-now): Existing push code can test `cloud.codenameone.com` today. V3 adds typed messages, managed credentials, segments, campaigns, analytics, and Surface commands.
 - [Plans and privacy](#what-each-plan-includes): Sending works on every Codename One plan. Higher plans increase quotas and add persistent campaign tools. Credentials are encrypted, public registration cannot assign identity or tags, and application data stays isolated.
-- [Health](#health-data-without-fake-certainty): A major HealthKit, Health Connect, workout, nutrition, and Bluetooth sensor API is in review. Its odd-looking rules preserve distinctions the platforms cannot safely hide.
+- [Health](#health-data-without-fake-certainty): The core now includes a major HealthKit, Health Connect, workout, nutrition, and Bluetooth sensor API. Its odd-looking rules preserve distinctions the platforms cannot safely hide.
 - [AI and MCP](#on-device-ai-and-mcp-on-every-port): The core now exposes on-device vision, language, and LiteRT inference. MCP can debug applications across loopback-capable ports, with a release-build gate because loopback is local, not private.
 - [Routing](#a-polyline-is-not-a-route): The new maps routing API turns coordinates into road-following routes through OSRM or a custom service.
 - [Maven repository](#phase-one-of-our-maven-repository-move): We are starting a staged move from Maven Central to Cloudflare R2. Central remains authoritative during phase one, and generated projects will start using the new repository next week.
@@ -186,7 +186,7 @@ These numbers are the initial policy, not a claim that every application needs a
 
 ## Health data without fake certainty
 
-[PR #5475](https://github.com/codenameone/CodenameOne/pull/5475) is in review with a first-class API for HealthKit, Health Connect, recorded workouts, nutrition, and eight adopted Bluetooth health sensor profiles.
+[PR #5475](https://github.com/codenameone/CodenameOne/pull/5475) merged a first-class API for HealthKit, Health Connect, recorded workouts, nutrition, and eight adopted Bluetooth health sensor profiles into the core.
 
 Its most important design choice is refusing to invent certainty. HealthKit does not reveal whether read access was denied, so the API has no misleading `hasReadPermission()` method. An empty aggregate remains `null`, not zero. Calendar-day buckets require a time zone. Overlapping phone and watch sources remain visible instead of being silently guessed away.
 
@@ -212,7 +212,7 @@ A map polyline joins the coordinates you already have. It cannot discover the ro
 
 ## Phase one of our Maven repository move
 
-We are also starting [phase one of a move from Maven Central to a Codename One repository on Cloudflare R2](https://github.com/codenameone/CodenameOne/pull/5497).
+We have also merged [phase one of a move from Maven Central to a Codename One repository on Cloudflare R2](https://github.com/codenameone/CodenameOne/pull/5497).
 
 Maven Central has every right to set commercial usage limits and charge for infrastructure. Codename One also has a workload that is difficult to fit inside those limits. One release currently publishes enough duplicated fat-jar content that our dashboard reports 2.12 GB against an 80 MB storage guideline, 19,962 files against 1,000, and 27 releases against 7.
 

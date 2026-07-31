@@ -13,7 +13,7 @@ series: ["release-2026-07-31"]
 
 The hardest part of a health API is not reading a heart-rate number. It is knowing what that number means, which store supplied it, whether anything is missing, and what the application is legally allowed to do next.
 
-[PR #5475](https://github.com/codenameone/CodenameOne/pull/5475) is in review with a cross-platform health API for HealthKit, Health Connect, recorded workouts, nutrition, Bluetooth health sensors, and deterministic simulation. This article describes the reviewed API contract. The PR has compile, link, and automated coverage, but device runtime validation is still part of the release work.
+[PR #5475](https://github.com/codenameone/CodenameOne/pull/5475) merged a cross-platform health API for HealthKit, Health Connect, recorded workouts, nutrition, Bluetooth health sensors, and deterministic simulation into the core. The implementation has compile, link, and automated coverage. Real-device testing remains important for store permissions and sensor hardware.
 
 This is part of the [July 31 weekly release series](/blog/push-v3-new-cloud/), led by Push V3 and the new cloud migration.
 
