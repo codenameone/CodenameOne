@@ -509,8 +509,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final long WEDGE_GRACE_MS = 30000L;
 
     private void startWedgeWatchdog() {
-        Thread watchdog = new Thread(() -> {
-            while (true) {
+        // Display.startThread rather than a bare Thread: the ports only support
+        // the thread surface the bytecode compliance gate allows, and this hands
+        // back a CodenameOneThread that the platform names and reaps for us.
+        Display.getInstance().startThread(() -> {
+            while (!suiteFinished) {
                 try {
                     Thread.sleep(1000L);
                 } catch (InterruptedException interrupted) {
@@ -531,18 +534,20 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                         + " returned from this test " + overrun + "ms past its deadline; the suite"
                         + " cannot continue and every later test is unreached");
                 log("CN1SS:SUITE:WEDGED test=" + name);
-                try {
-                    Thread.sleep(250L);
-                } catch (InterruptedException ignored) {
-                    // fall through to the exit below
-                }
-                Runtime.getRuntime().exit(70);
+                // Nothing here can end the process: exitApplication would have
+                // to run on the very thread that is stuck, and the raw exit
+                // calls are not part of the API the ports support. The marker
+                // above is the contract instead -- the capture harness watches
+                // for it and stops the run, having been told which test to
+                // blame.
+                return;
             }
-        });
-        watchdog.setName("cn1ss-wedge-watchdog");
-        watchdog.setDaemon(true);
-        watchdog.start();
+        }, "cn1ss-wedge-watchdog").start();
     }
+
+    /// Set once the suite is over so the watchdog thread returns instead of
+    /// outliving the run.
+    private volatile boolean suiteFinished;
 
     private void runNextTest(int index) {
         int offset = prependedTest != null ? 1 : 0;
@@ -728,6 +733,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             }
             log("CN1SS:INFO:swift_diag_status=" + status);
         } finally {
+            suiteFinished = true;
             log("CN1SS:SUITE:FINISHED");
         }
         try {

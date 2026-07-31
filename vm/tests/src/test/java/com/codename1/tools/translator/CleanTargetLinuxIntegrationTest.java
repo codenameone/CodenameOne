@@ -373,6 +373,9 @@ class CleanTargetLinuxIntegrationTest {
             appPb.redirectErrorStream(true);
             app = appPb.start();
             final AtomicBoolean finished = new AtomicBoolean(false);
+            // Set by the suite watchdog when a test blocks the event dispatch thread;
+            // the run cannot progress past that point, so stop instead of waiting.
+            final java.util.concurrent.atomic.AtomicReference<String> wedged = new java.util.concurrent.atomic.AtomicReference<>();
             final Process appF = app;
             Thread areader = new Thread(() -> {
                 // Tee the app's merged stdout/stderr to CN1_APP_LOG_TEE when
@@ -395,6 +398,7 @@ class CleanTargetLinuxIntegrationTest {
                     while ((line = r.readLine()) != null) {
                         if (tee != null) { tee.println(line); }
                         if (line.contains("CN1SS:SUITE:FINISHED")) { finished.set(true); }
+                        if (line.contains("CN1SS:SUITE:WEDGED")) { wedged.set(line); }
                     }
                 } catch (IOException ignore) {
                 }
@@ -429,6 +433,10 @@ class CleanTargetLinuxIntegrationTest {
             long lastChange = System.currentTimeMillis();
             while (System.currentTimeMillis() < deadline) {
                 if (finished.get()) { break; }
+                if (wedged.get() != null) {
+                    System.out.println("CN1SS:HARNESS: " + wedged.get());
+                    break;
+                }
                 if (!app.isAlive()) {
                     // The suite intermittently DIES mid-run with no output (the
                     // tee cuts mid-line): surface the exit status -- 128+N means
@@ -449,6 +457,9 @@ class CleanTargetLinuxIntegrationTest {
                 System.out.println("CN1SS:HARNESS: suite never emitted CN1SS:SUITE:FINISHED; pngs=" + pngs
                         + " -- every test after the last logged one is reported as never run.");
             }
+            assertTrue(wedged.get() == null,
+                    "the suite stopped because a test blocked the event dispatch thread: "
+                    + wedged.get());
             assertTrue(finished.get() || (!requireSuite && pngs >= minPngs),
                     "hello suite capture incomplete: pngs=" + pngs + " (need " + minPngs + ")"
                     + " suiteFinished=" + finished.get() + "\n" + serverLog);

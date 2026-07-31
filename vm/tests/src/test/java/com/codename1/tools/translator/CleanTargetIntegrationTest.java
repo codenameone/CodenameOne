@@ -1225,6 +1225,10 @@ class CleanTargetIntegrationTest {
             final java.util.concurrent.atomic.AtomicInteger finishedTests = new java.util.concurrent.atomic.AtomicInteger(0);
             final java.util.concurrent.atomic.AtomicReference<String> lastLine =
                     new java.util.concurrent.atomic.AtomicReference<String>("");
+            // Set by the suite watchdog when a test blocks the event dispatch
+            // thread; the run cannot progress past that point, so stop waiting.
+            final java.util.concurrent.atomic.AtomicReference<String> wedged =
+                    new java.util.concurrent.atomic.AtomicReference<String>();
             // The real shared benchmark emits "CN1SS:STAT:<metric>: <value>" lines
             // (Base64NativePerformanceTest: base64 native/CN1/SIMD + image
             // createMask/applyMask/modifyAlpha/PNG/JPEG, plus the SIMD kernel tally),
@@ -1255,6 +1259,7 @@ class CleanTargetIntegrationTest {
                                     performanceFinished.set(true);
                                 }
                             }
+                            if (line.contains("CN1SS:SUITE:WEDGED")) { wedged.set(line); }
                             int suite = line.indexOf("CN1SS:");
                             if (suite >= 0) { suiteLog.add(line.substring(suite)); }
                             if (line.contains("CN1SS:") || line.contains("suite ")) { lastLine.set(line); }
@@ -1286,6 +1291,10 @@ class CleanTargetIntegrationTest {
             long lastChange = System.currentTimeMillis();
             while (System.currentTimeMillis() < deadline) {
                 if (finished.get()) { break; }
+                if (wedged.get() != null) {
+                    System.out.println("CN1SS:HARNESS: " + wedged.get());
+                    break;
+                }
                 pngs = countPngFiles(outDir);
                 if (pngs != lastPngs) { lastPngs = pngs; lastChange = System.currentTimeMillis(); }
                 if (!requireSuite && pngs >= minPngs && (System.currentTimeMillis() - lastChange) >= stableMs
@@ -1293,6 +1302,9 @@ class CleanTargetIntegrationTest {
                 Thread.sleep(3000);
             }
             pngs = countPngFiles(outDir);
+            assertTrue(wedged.get() == null,
+                    "the suite stopped because a test blocked the event dispatch thread: "
+                    + wedged.get());
             assertTrue(finished.get() || (!requireSuite && pngs >= minPngs
                             && (!requirePerformance || performanceFinished.get())),
                     "hello suite capture incomplete: pngs=" + pngs + " (need " + minPngs + ")"
