@@ -491,7 +491,57 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 logThrowable("EDT", (Throwable)e.getSource());
             });
         });
+        startWedgeWatchdog();
         runNextTest(0);
+    }
+
+    /// Name of the test the event dispatch thread is inside, and the wall clock
+    /// at which it stops being plausible that it is still working. Written on
+    /// the EDT, read by the watchdog thread.
+    private volatile String activeTestName;
+    private volatile long activeTestDeadline;
+
+    /// Grace on top of a test's own timeout before the watchdog concludes the
+    /// EDT is not coming back. The per-test timeout is itself enforced by an
+    /// EDT callback, so a test that blocks the thread outright can never be
+    /// timed out by it -- the suite simply stops, and every remaining test is
+    /// published as "never run" with nothing saying why.
+    private static final long WEDGE_GRACE_MS = 30000L;
+
+    private void startWedgeWatchdog() {
+        Thread watchdog = new Thread(() -> {
+            while (true) {
+                try {
+                    Thread.sleep(1000L);
+                } catch (InterruptedException interrupted) {
+                    return;
+                }
+                String name = activeTestName;
+                long deadline = activeTestDeadline;
+                if (name == null || deadline <= 0L) {
+                    continue;
+                }
+                long overrun = System.currentTimeMillis() - (deadline + WEDGE_GRACE_MS);
+                if (overrun < 0L) {
+                    continue;
+                }
+                // Report against the test rather than the suite: this is the
+                // one line that says which test stopped the run.
+                log("CN1SS:ERR:suite test=" + name + " failed: the event dispatch thread has not"
+                        + " returned from this test " + overrun + "ms past its deadline; the suite"
+                        + " cannot continue and every later test is unreached");
+                log("CN1SS:SUITE:WEDGED test=" + name);
+                try {
+                    Thread.sleep(250L);
+                } catch (InterruptedException ignored) {
+                    // fall through to the exit below
+                }
+                Runtime.getRuntime().exit(70);
+            }
+        });
+        watchdog.setName("cn1ss-wedge-watchdog");
+        watchdog.setDaemon(true);
+        watchdog.start();
     }
 
     private void runNextTest(int index) {
@@ -529,6 +579,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         CN.callSerially(() -> {
             Cn1ssDeviceRunnerHelper.clearTransportFailure();
             log("CN1SS:INFO:suite starting test=" + testName);
+            activeTestName = testName;
+            activeTestDeadline = System.currentTimeMillis() + testTimeoutMs(testClass);
             try {
                 testClass.prepare();
                 testClass.runTest();
@@ -566,6 +618,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     }
 
     private void finalizeTest(int index, BaseTest testClass, String testName, boolean timedOut) {
+        activeTestName = null;
         final Runnable continueToNext = () -> {
             log("CN1SS:INFO:suite finished test=" + testName);
             runNextTest(index + 1);
