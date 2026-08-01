@@ -842,6 +842,32 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
+    /// The payload bytes out of a value's DataMap, never null.
+    ///
+    /// @param value a map obtained from {@link #valueMap}
+    /// @return the published bytes
+    static byte[] payloadOf(DataMap value) {
+        byte[] payload = value.getByteArray(PAYLOAD_KEY);
+        return payload == null ? new byte[0] : payload;
+    }
+
+    /**
+     * The DataMap of an ordinary published value, or null when the item is not one -- a file transfer
+     * (which carries an Asset instead of a payload) or something not written by this API at all.
+     * This is what keeps transfers out of {@link #getDataPaths()} and out of {@link #getData}.
+     *
+     * @param item a received or queried data item
+     * @return the value's DataMap, or null
+     */
+    static DataMap valueMap(DataItem item) {
+        try {
+            DataMap map = DataMapItem.fromDataItem(item).getDataMap();
+            return map.containsKey(PAYLOAD_KEY) ? map : null;
+        } catch (Throwable notADataMap) {
+            return null;
+        }
+    }
+
     public void removeData(String path) {
         Uri uri = new Uri.Builder().scheme("wear").authority("*").path(dataPath(path)).build();
         dataClient.deleteDataItems(uri);
