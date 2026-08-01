@@ -192,6 +192,12 @@ public class CN1WearableBridge implements WearableBridge {
         if (recentlySeen(sourceNodeId)) {
             return true;
         }
+        // The local node is checked again first: a peer snapshot can never contain this device, so
+        // rejecting on "populated but no match" would discard our own echoed putData() whenever any
+        // peer happens to be connected and the earlier getLocalNode() failed transiently.
+        if (sourceNodeId.equals(localNodeId(context))) {
+            return true;
+        }
         if (!connected.isEmpty()) {
             // A populated snapshot that does not contain the sender is real evidence against it.
             return false;
@@ -294,6 +300,26 @@ public class CN1WearableBridge implements WearableBridge {
         return known;
     }
 
+    /**
+     * Whether the calling thread must not be blocked.
+     *
+     * <p>The Codename One EDT is the obvious one. Android's main thread matters just as much and was
+     * missed: Play services completion listeners run there unless given an executor, so a blocking
+     * Data Layer call reached from one is an ANR rather than a dropped frame.
+     *
+     * @return true when the caller needs an immediate answer
+     */
+    private static boolean isCallerLatencySensitive() {
+        if (com.codename1.ui.CN.isEdt()) {
+            return true;
+        }
+        try {
+            return android.os.Looper.myLooper() == android.os.Looper.getMainLooper();
+        } catch (Throwable notOnAndroidThread) {
+            return false;
+        }
+    }
+
     /// Nodes the Data Layer knows about whether or not they are currently connected.
     private List<String> bondedNodeIds() {
         if (bondedStamp != 0 && System.currentTimeMillis() - bondedStamp <= NODE_CACHE_MILLIS) {
@@ -302,10 +328,14 @@ public class CN1WearableBridge implements WearableBridge {
             // completion notifies listeners again -- a self-sustaining loop.
             return cachedBonded;
         }
-        if (com.codename1.ui.CN.isEdt()) {
-            // Never block the EDT -- but the cache has to be filled by someone, or an installed
-            // companion is reported absent forever. Kick off a refresh and answer with what is
-            // known so far; listeners are notified only when the answer actually changed.
+        if (isCallerLatencySensitive()) {
+            // Never block the EDT -- or Android's main thread, which is where a Play services
+            // completion listener runs by default: fanOut() reaches here from the send-time refresh
+            // callback, and a five-second Tasks.await() there is an ANR, not a slow frame.
+            //
+            // The cache still has to be filled by someone, or an installed companion is reported
+            // absent forever. Kick off a refresh and answer with what is known so far; listeners
+            // are notified only when the answer actually changed.
             refreshBondedAsync();
             return cachedBonded;
         }
@@ -446,7 +476,18 @@ public class CN1WearableBridge implements WearableBridge {
             WearableConnection.notifyStateChanged();
             return;
         }
-        List<Node> updated = new ArrayList<Node>(b.cachedNodes);
+        synchronized (b.nodesLock) {
+            b.applyPeerChange(peer, connected);
+        }
+        // A disconnect can also mean the capability set shrank; let that refresh on its own clock.
+        WearableConnection.notifyStateChanged();
+    }
+
+    /// Applies a pushed peer change. Must hold {@link #nodesLock}: copying the cache outside it let
+    /// a refresh complete in between, after which this rebuilt the list from the OLD snapshot and
+    /// stamped it fresh -- dropping whatever peers that refresh had just discovered.
+    private void applyPeerChange(Node peer, boolean connected) {
+        List<Node> updated = new ArrayList<Node>(cachedNodes);
         if (peer != null) {
             for (int i = updated.size() - 1; i >= 0; i--) {
                 if (peer.getId().equals(updated.get(i).getId())) {
@@ -457,17 +498,13 @@ public class CN1WearableBridge implements WearableBridge {
                 updated.add(peer);
             }
         }
-        synchronized (b.nodesLock) {
-            b.cachedNodes = updated;
-            // Keep the stamp: this is a push from Play services, which is more current than any
-            // query we could make, so there is nothing to re-ask. A zero stamp would also make the
-            // next sendMessage() defer needlessly. Bumping the generation is what stops an in-flight
-            // refresh from undoing this.
-            b.cachedNodesStamp = System.currentTimeMillis();
-            b.nodesGeneration++;
-        }
-        // A disconnect can also mean the capability set shrank; let that refresh on its own clock.
-        WearableConnection.notifyStateChanged();
+        cachedNodes = updated;
+        // Keep the stamp: this is a push from Play services, which is more current than any query
+        // we could make, so there is nothing to re-ask. A zero stamp would also make the next
+        // sendMessage() defer needlessly. Bumping the generation is what stops an in-flight refresh
+        // from undoing this.
+        cachedNodesStamp = System.currentTimeMillis();
+        nodesGeneration++;
     }
 
     /// The live bridge, so the listener service can push state into it. The service and the bridge
@@ -561,7 +598,7 @@ public class CN1WearableBridge implements WearableBridge {
     private List<Node> connectedNodes() {
         long age = System.currentTimeMillis() - cachedNodesStamp;
         if (age > NODE_CACHE_MILLIS) {
-            if (com.codename1.ui.CN.isEdt()) {
+            if (isCallerLatencySensitive()) {
                 refreshNodesAsync();
             } else {
                 refreshNodesNow();
