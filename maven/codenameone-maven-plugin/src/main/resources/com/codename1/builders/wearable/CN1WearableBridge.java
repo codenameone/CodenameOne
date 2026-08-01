@@ -587,12 +587,21 @@ public class CN1WearableBridge implements WearableBridge {
         // Only once a capability query has actually completed. Before that an empty set means "not
         // asked yet", not "nobody runs the app", and refusing to send on it would break the first
         // send after a cold start -- so bondedKnown, not emptiness, is what gates the filter.
+        // Read the readiness flag BEFORE the list, and treat the pair as one snapshot. Reading the
+        // list first let an async capability query complete in between: the flag would then be true
+        // while withApp was still the stale empty list, so every nearby node was filtered out and
+        // the send reached nobody.
+        //
+        // This ordering is safe because every path that fills the cache assigns cachedBonded BEFORE
+        // setting bondedKnown, so a flag observed true is always accompanied by a list at least as
+        // new. Keep those assignments in that order.
+        boolean knownWhenSampled = bondedKnown;
         List<String> withApp = bondedNodeIds();
         for (Node n : nodes) {
             if (!n.isNearby()) {
                 continue;
             }
-            if (bondedKnown && !withApp.contains(n.getId())) {
+            if (knownWhenSampled && !withApp.contains(n.getId())) {
                 continue;
             }
             // The peer needs both the CN1 path and, when an answer is wanted, the token to answer
