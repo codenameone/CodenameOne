@@ -657,12 +657,24 @@ public class CN1WearableBridge implements WearableBridge {
             // there, so resolve the node list first -- a send is not a state query, and it is worth
             // one round trip to address it correctly. (connectedNodes() would only *start* an async
             // refresh on the EDT and then fan out to the stale list anyway.)
+            final long sendStartedAt;
+            synchronized (nodesLock) {
+                sendStartedAt = nodesGeneration;
+            }
             nodeClient.getConnectedNodes().addOnCompleteListener(
                     new com.google.android.gms.tasks.OnCompleteListener<List<Node>>() {
                         public void onComplete(com.google.android.gms.tasks.Task<List<Node>> task) {
                             if (task.isSuccessful() && task.getResult() != null) {
-                                cachedNodes = task.getResult();
-                                cachedNodesStamp = System.currentTimeMillis();
+                                synchronized (nodesLock) {
+                                    // A pushed peer connect/disconnect that landed while this query
+                                    // was out is more current than the query; keep it and fan out
+                                    // against it rather than reviving the older snapshot.
+                                    if (nodesGeneration == sendStartedAt) {
+                                        cachedNodes = task.getResult();
+                                        cachedNodesStamp = System.currentTimeMillis();
+                                        nodesGeneration++;
+                                    }
+                                }
                                 rememberAll(cachedNodes);
                             }
                             // On failure keep the previous snapshot rather than clearing it: a

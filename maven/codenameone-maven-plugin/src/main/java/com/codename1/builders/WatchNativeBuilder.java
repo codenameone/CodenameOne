@@ -831,12 +831,12 @@ class WatchNativeBuilder {
                 // per-SDK so the simulator build doesn't try arm64_32 (whose
                 // Swift stdlib slice doesn't exist -> 'Unable to find module Swift').
                 .append("  bs['ARCHS[sdk=watchos*]'] = 'arm64_32'\n")
-                // arm64 rather than ARCHS_STANDARD: the standard set still includes x86_64 for
-                // the watch simulator, and the shared sources include ARM-only code -- IOSSimd.m
-                // pulls <arm_neon.h> unconditionally, which an x86_64 slice cannot satisfy. The
-                // device arch (arm64_32) is ARM too, so pinning arm64 keeps the simulator honest
-                // about what it is simulating.
-                .append("  bs['ARCHS[sdk=watchsimulator*]'] = 'arm64'\n")
+                // The watch SIMULATOR arch is left to ARCHS_STANDARD plus ONLY_ACTIVE_ARCH, so it
+                // follows the host: arm64 on Apple Silicon, x86_64 on Intel. This was pinned to
+                // arm64 because IOSSimd.m included <arm_neon.h> unconditionally and an x86_64 slice
+                // could not satisfy it -- that has since been guarded (#if defined(__ARM_NEON)), so
+                // the pin now only serves to make the watch target unbuildable on an Intel host.
+                .append("  bs['ARCHS[sdk=watchsimulator*]'] = '$(ARCHS_STANDARD)'\n")
                 .append("  bs['ONLY_ACTIVE_ARCH'] = 'YES'\n")
                 .append("  bs['WATCHOS_DEPLOYMENT_TARGET'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(MIN_DEPLOYMENT_TARGET)).append("'\n")
