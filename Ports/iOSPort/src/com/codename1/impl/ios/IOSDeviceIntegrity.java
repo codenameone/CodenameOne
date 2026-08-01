@@ -153,6 +153,20 @@ final class IOSDeviceIntegrity {
      */
     private static final String KEY_ATTEST_ACCEPTED = "cn1.appattest.attestAccepted";
 
+    /**
+     * The key whose attestation was produced and never handed to anyone.
+     *
+     * <p>The attestation object itself is only worth keeping for this process: it is made
+     * over one challenge, and a later launch asks for a new one, so the retained copy
+     * cannot be used across a restart even if it were stored. What must survive is the
+     * FACT -- that this key's one-time attestation went nowhere, so the backend has never
+     * seen it. Without that, the next launch finds a pending key, waits out the grace
+     * window, promotes it, and asserts against a key nobody registered: rejected every
+     * time, then a reset, which costs another rate-limited key on top of the one already
+     * wasted.</p>
+     */
+    private static final String KEY_ATTEST_UNDELIVERED = "cn1.appattest.attestUndelivered";
+
     private static final String STATE_NEW = "new";
     private static final String STATE_ATTESTED = "attested";
     /**
@@ -371,6 +385,7 @@ final class IOSDeviceIntegrity {
             undeliveredAttestKeyId = null;
             undeliveredAttestNonce = null;
             undeliveredAttestToken = null;
+            store.remove(KEY_ATTEST_UNDELIVERED);
             inMemoryStateKeyId = null;
             inMemoryState = null;
             pendingSinceInMemory = 0L;
@@ -516,6 +531,11 @@ final class IOSDeviceIntegrity {
         store.remove(KEY_PENDING_SINCE);
         store.remove(KEY_ATTEST_STARTED);
         store.remove(KEY_ATTEST_ACCEPTED);
+        // Registered, so whatever happened to the delivery no longer matters.
+        store.remove(KEY_ATTEST_UNDELIVERED);
+        undeliveredAttestKeyId = null;
+        undeliveredAttestNonce = null;
+        undeliveredAttestToken = null;
         attestAnsweredForKey = null;
         recoverySpentInMemory = !store.remove(KEY_RECOVERY_SPENT);
     }
@@ -584,29 +604,36 @@ final class IOSDeviceIntegrity {
                     && keyId.equals(store.get(KEY_ATTEST_ACCEPTED))) {
                 state = STATE_PENDING;
             }
-            if (STATE_PENDING.equals(state) && keyId != null && keyId.length() > 0
-                    && keyId.equals(undeliveredAttestKeyId)) {
+            // The durable marker counts as much as the in-memory copy: after a restart it
+            // is the only thing that knows this key's one-time attestation went nowhere.
+            boolean neverDelivered = keyId != null && keyId.length() > 0
+                    && (keyId.equals(undeliveredAttestKeyId)
+                        || keyId.equals(store.get(KEY_ATTEST_UNDELIVERED)));
+            if (STATE_PENDING.equals(state) && neverDelivered) {
                 // An attestation was produced for this key and nobody took it -- the
                 // caller cancelled while Apple was working. It cannot be produced again,
                 // so it is handed to the retry that asks for the same challenge.
-                if (nonce.equals(undeliveredAttestNonce)) {
+                if (undeliveredAttestToken != null
+                        && nonce.equals(undeliveredAttestNonce)) {
                     String token = undeliveredAttestToken;
                     undeliveredAttestKeyId = null;
                     undeliveredAttestNonce = null;
                     undeliveredAttestToken = null;
+                    store.remove(KEY_ATTEST_UNDELIVERED);
                     r.complete(token);
                     return r;
                 }
-                // A different challenge, so the retained object is worthless: an
-                // attestation is made over one nonce and the backend checks it. What must
-                // NOT happen is the grace window promoting this key -- the backend has
-                // never seen it, so every assertion would be rejected, and the reset that
-                // follows costs a rate-limited key anyway on top of the failures. Discard
-                // it here instead: one key, once, deterministically, with the next lines
-                // generating its replacement.
+                // A different challenge, or a restart that lost the object entirely. Either
+                // way the retained copy cannot help: an attestation is made over one nonce
+                // and the backend checks it. What must NOT happen is the grace window
+                // promoting this key -- the backend has never seen it, so every assertion
+                // would be rejected, and the reset that follows costs a rate-limited key
+                // anyway on top of the failures. Discard it here instead: one key, once,
+                // deterministically, with the next lines generating its replacement.
                 undeliveredAttestKeyId = null;
                 undeliveredAttestNonce = null;
                 undeliveredAttestToken = null;
+                store.remove(KEY_ATTEST_UNDELIVERED);
                 resetLocked();
                 keyId = null;
                 state = null;
@@ -1067,6 +1094,12 @@ final class IOSDeviceIntegrity {
                 instance.undeliveredAttestKeyId = pending.keyId;
                 instance.undeliveredAttestNonce = pending.nonce;
                 instance.undeliveredAttestToken = attestToken;
+                // And durably, before anyone can take delivery. Only the fact, not the
+                // object: an attestation covers one challenge and a later launch asks for
+                // a new one, so a stored copy could never be used across a restart --
+                // whereas knowing the key was never delivered is what stops the next
+                // launch promoting it into assertions the backend must reject.
+                SecureStorage.getInstance().set(KEY_ATTEST_UNDELIVERED, pending.keyId);
             }
         }
         succeed(pending, attestToken, true);
@@ -1347,15 +1380,31 @@ final class IOSDeviceIntegrity {
                                 + "reset while this request was in flight"));
                         return;
                     }
-                    if (attestation && token.equals(instance.undeliveredAttestToken)) {
-                        // Somebody is taking delivery, so there is nothing left to
-                        // retain. Released under the lock the retry path reads it under.
-                        instance.undeliveredAttestKeyId = null;
-                        instance.undeliveredAttestNonce = null;
-                        instance.undeliveredAttestToken = null;
-                    }
+                }
+                // Re-checked immediately before the handover. A cancellation landing
+                // between the first check and here would otherwise be overwritten:
+                // AsyncResource.complete() does not refuse an already-cancelled resource,
+                // it sets the value and fires the success callback anyway.
+                if (pending.result.isDone()) {
+                    return;
                 }
                 pending.result.complete(token);
+                // Released only once delivery has actually won, and never on the strength
+                // of the check above alone: a cancellation racing that window leaves
+                // isCancelled() true afterwards, and dropping the retained copy there
+                // would throw away the one thing here that cannot be produced again --
+                // for a caller that never received it.
+                if (attestation && !pending.result.isCancelled()) {
+                    synchronized (instance.flowLock) {
+                        if (token.equals(instance.undeliveredAttestToken)) {
+                            instance.undeliveredAttestKeyId = null;
+                            instance.undeliveredAttestNonce = null;
+                            instance.undeliveredAttestToken = null;
+                            SecureStorage.getInstance().remove(KEY_ATTEST_UNDELIVERED);
+                        }
+                    }
+                }
+                return;
             }
         });
     }
