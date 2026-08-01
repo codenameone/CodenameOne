@@ -593,7 +593,7 @@ If you want to use a font other than the built-in fonts, you'll need to define t
 include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-028,indent=0]
 ----
 
-IMPORTANT: Only TrueType (`.ttf`) files are supported. The runtime rejects any font file whose name doesn't end in `.ttf`, and the iOS build registers only `.ttf` files with the operating system, so the CSS compiler fails the build on anything else rather than letting it reach the device. Convert an OpenType (`.otf`) font to TrueType before referencing it.
+IMPORTANT: Only TrueType (`.ttf`) files are supported. The runtime loads a font by a file name ending in `.ttf` and the iOS build registers only those files with the operating system, so the CSS compiler fails the build on anything else rather than letting it reach the device. Convert an OpenType (`.otf`) font to TrueType before referencing it. The compiler also reads each font at build time, so a file it can't parse, or one with no PostScript name, fails the build too -- iOS resolves fonts by their PostScript name, so a font without one would render everywhere except on an iOS device.
 
 Then you'll be able to reference the font using the specified `font-family` in any CSS element. For example:
 

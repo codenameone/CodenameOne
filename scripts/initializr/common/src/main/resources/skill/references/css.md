@@ -333,7 +333,7 @@ For the full Lottie feature matrix and troubleshooting, point users to `docs/dev
 
 ### Custom TTF fonts
 
-**TrueType only.** `Font.createTrueTypeFont` throws unless the file name ends in `.ttf`, and the iOS build registers only `.ttf` files with the OS, so the CSS compiler **fails the build** on a `.otf` instead of letting it reach the device. Convert OpenType fonts to TrueType first.
+**TrueType only.** `Font.createTrueTypeFont` throws unless the file name ends in `.ttf`, and the iOS build registers only `.ttf` files with the OS, so the CSS compiler **fails the build** on a `.otf` instead of letting it reach the device. Convert OpenType fonts to TrueType first. The compiler also parses each font at build time, so a corrupt file — or one with no PostScript name, which iOS needs to resolve it — fails the build rather than rendering fine in the simulator and falling back to the system font on an iPhone.
 
 Drop the `.ttf` anywhere under `common/src/main/css/` — relative `src:` URLs resolve against the directory holding `theme.css`, so both `url("Inter-Regular.ttf")` beside the CSS and `url("fonts/Inter-Regular.ttf")` in a subdirectory work. It must be somewhere under that directory though: only that directory is copied into the build, so a `../` reference, a missing file, or two rules naming different files that share a file name all fail the build. Then reference its **font name (not file name)** in `font-family`:
 

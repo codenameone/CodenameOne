@@ -59,8 +59,31 @@ public class CSSFontFaceValidationTest {
                 "@font-face { font-family: \"TestFont\"; src: url(TestFont-Regular.otf); }"
                         + "Label { font-family: \"TestFont\"; }",
                 "TestFont-Regular.otf");
-        assertContains(message, "OpenType fonts aren't supported");
+        assertContains(message, "an .otf never reaches the device");
         assertContains(message, "TestFont-Regular.otf");
+    }
+
+    /**
+     * A file the font parser rejects used to leave {@code EditorTTFFont.actualFont}
+     * null and then die as a bare NPE in {@code EditableResources.save} naming no
+     * rule, because {@code refresh()} swallows the Throwable.
+     */
+    @Test
+    void testUnreadableFontFileIsRejected() throws Exception {
+        Path cssDir = Files.createTempDirectory("cn1-font-corrupt");
+        Path outDir = Files.createTempDirectory("cn1-font-corrupt-out");
+        try {
+            Files.write(cssDir.resolve("Broken.ttf"), "this is not a font".getBytes(StandardCharsets.UTF_8));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, ("@font-face { font-family: \"Broken\"; src: url(Broken.ttf); }"
+                    + "Label { font-family: \"Broken\"; }").getBytes(StandardCharsets.UTF_8));
+
+            String message = compileExpectingFailure(cssFile, outDir.resolve("theme.res"));
+            assertContains(message, "isn't a font file Codename One can read");
+        } finally {
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
     }
 
     /**
@@ -74,7 +97,7 @@ public class CSSFontFaceValidationTest {
                 "@font-face { font-family: \"TestFont\"; src: url(TestFont-Regular.otf); }"
                         + "Label { color: #ff0000; }",
                 "TestFont-Regular.otf");
-        assertContains(message, "OpenType fonts aren't supported");
+        assertContains(message, "an .otf never reaches the device");
     }
 
     /**
@@ -189,7 +212,7 @@ public class CSSFontFaceValidationTest {
                         + "src: url(https://example.invalid/fonts/TestFont.otf); }"
                         + "Label { font-family: \"TestFont\"; }",
                 null);
-        assertContains(message, "OpenType fonts aren't supported");
+        assertContains(message, "an .otf never reaches the device");
     }
 
     /** A well-formed sheet must still compile, or the check is worthless. */

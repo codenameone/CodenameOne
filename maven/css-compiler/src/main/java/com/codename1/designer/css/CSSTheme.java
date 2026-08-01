@@ -2187,6 +2187,12 @@ public class CSSTheme {
                 errors.add("@font-face \"" + family + "\" refers to " + fontFile + ", which is outside the "
                         + "directory holding the CSS file. Only that directory is copied into the build, so "
                         + "move the font beside the CSS file or into a subdirectory of it");
+                continue;
+            }
+            String contentError = fontContentError(fontFile);
+            if (contentError != null) {
+                errors.add("@font-face \"" + family + "\" refers to " + fontFile.getName() + ", which "
+                        + contentError);
             }
         }
         if (!errors.isEmpty()) {
@@ -2214,6 +2220,34 @@ public class CSSTheme {
         return slash < 0 ? path : path.substring(slash + 1);
     }
 
+    /// Reads the font the way the rest of the toolchain will, so a file that
+    /// can't actually be used is caught here instead of on a device.
+    ///
+    /// Two failures hide until far too late otherwise. A file the font parser
+    /// rejects leaves `EditorTTFFont.actualFont` null -- `refresh()` swallows
+    /// the Throwable -- and then dies as a bare NPE inside `EditableResources`
+    /// `save()` naming no rule. And a font with no PostScript name works in the
+    /// simulator and on Android, which look the font up by file name, while iOS
+    /// resolves purely by the PostScript name written into the resource and so
+    /// falls back to the system font on the device.
+    ///
+    /// @return the problem phrased to follow "which ...", or null when the font
+    /// is usable
+    private static String fontContentError(File fontFile) {
+        java.awt.Font parsed;
+        try {
+            parsed = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, fontFile);
+        } catch (Exception ex) {
+            return "isn't a font file Codename One can read (" + ex.getMessage() + ")";
+        }
+        String psName = parsed.getPSName();
+        if (psName == null || psName.trim().length() == 0) {
+            return "has no PostScript name. iOS looks fonts up by that name, so this would render "
+                    + "in the simulator and on Android but fall back to the system font on an iOS device";
+        }
+        return null;
+    }
+
     /// Identity of the file a rule points at, used to tell a genuine name
     /// collision apart from two families deliberately sharing one font file.
     private static String canonicalSource(URL url) {
@@ -2229,16 +2263,21 @@ public class CSSTheme {
         return url.toString();
     }
 
+    /// The constraint is the file NAME, not the outline format: the runtime
+    /// check is `fileName.endsWith(".ttf")` and the iOS build only registers
+    /// files matching that. Worth being precise about, because "convert to
+    /// TrueType" and "rename the file" are different amounts of work and only
+    /// one of them is actually required.
     private static String fontExtensionAdvice(String fileName) {
         String lower = fileName.toLowerCase();
         if (lower.endsWith(".otf")) {
-            return "OpenType fonts aren't supported -- convert it to TrueType (.ttf) first. "
-                    + "It would compile but fail at runtime, and the iOS build wouldn't register it at all";
+            return "Codename One loads fonts by a file name ending in .ttf, so an .otf never reaches "
+                    + "the device -- convert it to TrueType";
         }
         if (lower.endsWith(".ttf")) {
-            return "the extension must be lower-case .ttf; the runtime check is case-sensitive";
+            return "the extension has to be lower-case .ttf; the runtime check is case-sensitive";
         }
-        return "only TrueType (.ttf) fonts are supported";
+        return "Codename One loads fonts by a file name ending in .ttf";
     }
 
     /// Containment is judged against `baseURL`, the stylesheet relative `src`
