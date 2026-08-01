@@ -68,6 +68,10 @@ public final class CN1LiveActivityManager {
     private static final int DECLARED_MISSING = 2;
     /// Cached manifest verdict: 0 not looked up yet, otherwise one of the DECLARED_ constants.
     private static volatile int permissionDeclaredState;
+    /// True while `checkForPermission` is blocked on the system dialog. Read and written only
+    /// under `PERMISSION_LOCK`, which is what publishes it; it exists because that monitor is
+    /// reentrant and `invokeAndBlock` pumps the EDT underneath it.
+    private static boolean permissionRequestInFlight;
     private static volatile boolean loggedMissingManifest;
     private static volatile boolean loggedBudgetExhausted;
 
@@ -244,6 +248,19 @@ public final class CN1LiveActivityManager {
                 CN1SurfaceStore.clearNotificationPrompts(ctx);
                 return true;
             }
+            // The monitor alone is not enough. `checkForPermission` blocks through
+            // `Display.invokeAndBlock`, which keeps dispatching EDT work, so a timer or
+            // `callSerially` that starts another live activity re-enters this method on the very
+            // thread already holding the lock -- and a Java monitor is reentrant, so it would
+            // walk straight through and raise a second dialog. Refuse instead: the nested start
+            // cannot wait for the outer one without deadlocking itself, and an inert handle is
+            // exactly what a refused start is documented to return.
+            if (permissionRequestInFlight) {
+                Log.w(TAG, "Ignoring a live activity start raised while the POST_NOTIFICATIONS "
+                        + "prompt is still open; wait for the first start to return before "
+                        + "starting another.");
+                return false;
+            }
             if (!canPromptAgain(ctx)) {
                 logBudgetExhaustedOnce();
                 return false;
@@ -264,6 +281,7 @@ public final class CN1LiveActivityManager {
                 return false;
             }
             boolean granted;
+            permissionRequestInFlight = true;
             try {
                 granted = AndroidImplementation.checkForPermission(
                         "android.permission.POST_NOTIFICATIONS",
@@ -272,6 +290,8 @@ public final class CN1LiveActivityManager {
                 // the request never completed, so it is not an attempt the user spent
                 Log.w(TAG, "Failed to request the POST_NOTIFICATIONS permission", t);
                 return false;
+            } finally {
+                permissionRequestInFlight = false;
             }
             if (granted) {
                 CN1SurfaceStore.clearNotificationPrompts(ctx);

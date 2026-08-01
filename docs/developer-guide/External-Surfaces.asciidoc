@@ -123,7 +123,7 @@ The simulator preview renders the running activity as a mock Dynamic Island pill
 
 image::img/surfaces-dynamic-island.png[The simulator's mock Dynamic Island pill and expanded live activity card,640]
 
-On iOS the activity appears on the lock screen and, on supported devices, inside the Dynamic Island (ActivityKit requires iOS 16.1 or newer). On Android it lowers to an ongoing notification that renders the same content; on Android 13 and newer the first `start(...)` prompts for the notification permission, which the build declares for you, and `isSupported()` reports false once the user has turned that prompt down twice. On desktop it appears in the simulator preview or as a floating window.
+On iOS the activity appears on the lock screen and, on supported devices, inside the Dynamic Island (ActivityKit requires iOS 16.1 or newer). On Android it lowers to an ongoing notification that renders the same content; on Android 13 and newer the first `start(...)` prompts for the notification permission, which the build declares for you, and `isSupported()` reports false once the user has turned that prompt down twice or has switched notifications off for the app. On desktop it appears in the simulator preview or as a floating window.
 
 === Actions and cold start
 

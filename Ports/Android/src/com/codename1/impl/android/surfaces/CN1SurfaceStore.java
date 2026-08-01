@@ -243,8 +243,15 @@ public final class CN1SurfaceStore {
     /// with the install it was earned against costs one cached lookup and needs no build-side
     /// backup rules.
     public static int getNotificationPromptCount(Context ctx) {
+        long stamp = installStamp(ctx);
+        if (stamp == 0) {
+            // the install could not be identified, so no stored count can be attributed to it.
+            // Reading zero errs toward prompting, which is the safe direction: a lookup failure
+            // of ours must never be what silently suppresses the dialog.
+            return 0;
+        }
         SharedPreferences prefs = prefs(ctx);
-        if (prefs.getLong(KEY_PROMPTS_INSTALL, 0) != installStamp(ctx)) {
+        if (prefs.getLong(KEY_PROMPTS_INSTALL, 0) != stamp) {
             return 0;
         }
         return prefs.getInt(KEY_NOTIFICATION_PROMPTS, 0);
@@ -252,9 +259,16 @@ public final class CN1SurfaceStore {
 
     /// Counts one raised prompt; see [#getNotificationPromptCount(Context)].
     public static void recordNotificationPrompt(Context ctx) {
+        long stamp = installStamp(ctx);
+        if (stamp == 0) {
+            // nothing to attribute the attempt to. Persisting it under a zero stamp would let a
+            // repeated lookup failure accumulate a budget that no install owns, and a later
+            // successful lookup could not tell that count apart from a legitimately unstamped one
+            return;
+        }
         prefs(ctx).edit()
                 .putInt(KEY_NOTIFICATION_PROMPTS, getNotificationPromptCount(ctx) + 1)
-                .putLong(KEY_PROMPTS_INSTALL, installStamp(ctx))
+                .putLong(KEY_PROMPTS_INSTALL, stamp)
                 .apply();
     }
 
