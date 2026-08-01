@@ -61,6 +61,35 @@ trap cleanup EXIT
 published=0
 skipped=0
 
+# Mirrors port_status.py's FUTURE_STAMP_TOLERANCE. The gate publishes a report
+# stamped slightly ahead of now, so the closing assertion has to accept the same
+# margin or it fails over reports this very run published.
+future_skew_seconds=3600
+
+# True when $1 is a strictly later instant than $2. Both are timezone-aware
+# ISO-8601, but not necessarily normalized to Z, so they are compared as
+# instants rather than as text.
+newer_instant() {
+  python3 - "$1" "$2" <<'INSTANT'
+import sys
+from datetime import datetime
+
+def parse(value):
+    try:
+        stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return stamp if stamp.tzinfo is not None else None
+
+candidate = parse(sys.argv[1])
+current = parse(sys.argv[2])
+# An unreadable candidate is never "newer"; an unreadable stored value is
+# replaced, since leaving it in place would strand the port on something the
+# page cannot render either.
+sys.exit(0 if candidate is not None and (current is None or candidate > current) else 1)
+INSTANT
+}
+
 # The contract's own freshness window bounds how far back a candidate run is
 # worth considering: a report older than this is stale by definition, so there
 # is nothing to be gained by looking past it.
@@ -116,6 +145,18 @@ while IFS= read -r workflow; do
         if [ -z "${found}" ] || [ -f "${download_dir}/covered-${found}" ]; then
           continue
         fi
+        # Only ports this workflow is declared to produce. The port is read from
+        # the artifact, so a misconfigured matrix that stamped someone else's id
+        # on its report would otherwise be published straight over that port's
+        # entry -- Linux evidence replacing Android's genuine result, with both
+        # the gate and the freshness check satisfied.
+        case " ${owned} " in
+          *" ${found} "*) ;;
+          *)
+            echo "Ignoring a report naming ${found}: ${workflow} does not produce that port." >&2
+            continue
+            ;;
+        esac
         # Gate before marking the port covered, not after. A newest run that
         # uploaded an unusable report would otherwise claim the port and stop
         # the older candidates from being consulted, so the sweep would keep
@@ -156,7 +197,11 @@ while IFS= read -r workflow; do
         --jq '.content' 2>/dev/null | base64 --decode > "${tmp_dir}/current.json" 2>/dev/null; then
       current="$(jq -r '.generated_at // empty' "${tmp_dir}/current.json" 2>/dev/null || true)"
     fi
-    if [ -n "${current}" ] && [[ ! "${generated}" > "${current}" ]]; then
+    # Compare instants rather than strings. The gate accepts any timezone-aware
+    # timestamp, and "2026-08-01T01:00:00+02:00" sorts after
+    # "2026-08-01T00:00:00Z" while being an hour older, so a lexical test can
+    # overwrite a newer report or refuse a genuinely newer one.
+    if [ -n "${current}" ] && ! newer_instant "${generated}" "${current}"; then
       skipped=$((skipped + 1))
       continue
     fi
@@ -198,15 +243,22 @@ raw = sys.argv[1]
 try:
     stamp = datetime.fromisoformat(raw.replace("Z", "+00:00"))
 except ValueError:
-    print(-1)
+    print("unreadable")
 else:
-    print(-1 if stamp.tzinfo is None
+    print("unreadable" if stamp.tzinfo is None
           else int((datetime.now(timezone.utc) - stamp).total_seconds()))
 AGE
 )"
   stale_seconds=$((stale_days * 86400))
-  if [ "${age_seconds}" -lt 0 ]; then
+  # The publication gate deliberately tolerates an hour of clock skew, so a
+  # report it accepted can legitimately carry a timestamp a little ahead of
+  # now. Calling that unreadable here would fail the nightly job over a report
+  # the same run just published, until wall time caught up. Unparseable stays
+  # -1 from the helper above and is still a problem.
+  if [ "${age_seconds}" = "unreadable" ]; then
     problems+=("${port}: unreadable generated_at ${generated:-<missing>}")
+  elif [ "${age_seconds}" -lt "-${future_skew_seconds}" ]; then
+    problems+=("${port}: generated_at ${generated} is $(( -age_seconds / 60 )) minutes in the future")
   elif [ "${age_seconds}" -gt "${stale_seconds}" ]; then
     problems+=("${port}: last report is $((age_seconds / 3600)) hours old (limit ${stale_days} days)")
   fi

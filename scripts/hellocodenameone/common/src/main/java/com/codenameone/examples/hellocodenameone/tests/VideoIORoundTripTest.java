@@ -157,6 +157,13 @@ public class VideoIORoundTripTest extends BaseTest {
                 + "/cn1-videoio-roundtrip-" + System.currentTimeMillis() + (webm ? ".webm" : ".mp4");
 
         // ---- ENCODE (encode-side unavailability is a SKIP, not a failure) ----
+        // Two phases, reported differently on purpose. Failing to obtain a
+        // writer is the documented "this runner exposes no encoder" case and
+        // is skipped. Failing after one was obtained means the encoder is
+        // there and broke, which is a regression -- reporting that as the same
+        // skip made an encoder failure render as a documented green cell,
+        // indistinguishable from a target that never had an encoder.
+        VideoWriter writer;
         try {
             VideoWriterBuilder builder = new VideoWriterBuilder()
                     .path(path).container(container)
@@ -165,7 +172,13 @@ public class VideoIORoundTripTest extends BaseTest {
             if (withAudio) {
                 builder.hasAudio(true).audioCodec(audioCodec).sampleRate(SAMPLE_RATE).audioChannels(1);
             }
-            VideoWriter writer = io.createWriter(builder);
+            writer = io.createWriter(builder);
+        } catch (Throwable t) {
+            cleanup(path);
+            skip("encode-unavailable-on-" + Display.getInstance().getPlatformName());
+            return;
+        }
+        try {
             int samplesPerFrame = SAMPLE_RATE / FRAMES;
             for (int i = 0; i < FRAMES; i++) {
                 writer.writeFrame(makeCountingFrame(i), Math.round(i * 1000f / FPS));
@@ -176,7 +189,7 @@ public class VideoIORoundTripTest extends BaseTest {
             writer.close();
         } catch (Throwable t) {
             cleanup(path);
-            skip("encode-unavailable-on-" + Display.getInstance().getPlatformName() + ":" + t.getMessage());
+            fail("the encoder was available but failed while writing: " + t);
             return;
         }
 

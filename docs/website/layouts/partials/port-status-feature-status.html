@@ -31,14 +31,38 @@
       {{- $notRun = add $notRun 1 -}}
     {{- end -}}
   {{- end -}}
-  {{- /* A skip only reads as green when the errata below account for it by
-         name. An undocumented skip stays a partial result. */ -}}
+  {{- /* A skip only reads as green when the errata account for that test AND
+         for the reason the run actually gave. Matching on the test name alone
+         let any future skip of a named test render as documented: the video
+         round trip reports encoder trouble as a skip on that test, so an
+         encoder that regressed would have shown a green, explained cell that
+         said nothing about what went wrong. An unrecognized reason -- or a
+         skip carrying none -- stays a partial result. */ -}}
   {{- $documented := gt (len $skippedTests) 0 -}}
   {{- range $skippedTests -}}
     {{- $test := . -}}
+    {{- $result := index $report.tests $test -}}
+    {{- $reasons := slice -}}
+    {{- with $result -}}{{- with .reasons -}}{{- $reasons = . -}}{{- end -}}{{- end -}}
     {{- $found := false -}}
     {{- range $supplement.skip_reasons -}}
-      {{- if eq .test $test -}}{{- $found = true -}}{{- end -}}
+      {{- if eq .test $test -}}
+        {{- $codes := .reason_codes -}}
+        {{- if $codes -}}
+          {{- $allMatched := gt (len $reasons) 0 -}}
+          {{- range $reasons -}}
+            {{- $reason := . -}}
+            {{- $ok := false -}}
+            {{- range $codes -}}
+              {{- if hasPrefix $reason . -}}{{- $ok = true -}}{{- end -}}
+            {{- end -}}
+            {{- if not $ok -}}{{- $allMatched = false -}}{{- end -}}
+          {{- end -}}
+          {{- if $allMatched -}}{{- $found = true -}}{{- end -}}
+        {{- else -}}
+          {{- $found = true -}}
+        {{- end -}}
+      {{- end -}}
     {{- end -}}
     {{- if not $found -}}{{- $documented = false -}}{{- end -}}
   {{- end -}}
