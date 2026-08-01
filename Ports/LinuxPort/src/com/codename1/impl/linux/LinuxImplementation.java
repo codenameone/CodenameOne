@@ -429,6 +429,29 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return bluetooth;
     }
 
+    private com.codename1.health.Health health;
+
+    /// Returns a local health store. There is no platform health provider
+    /// on this port, so the store reports
+    /// {@code HealthAvailability.LOCAL_ONLY}: reads and writes work and
+    /// are this app's own, but nothing else writes into it. The Bluetooth
+    /// sensor layer is unaffected and works fully.
+    @Override
+    public com.codename1.health.Health getHealth() {
+        // Guarded because everything the store serializes is per-instance:
+        // the authorization queue, the subscription registry, drain
+        // coalescing and the persisted-cursor lock. Two threads racing this
+        // getter each got their own store, and two stores coordinate on
+        // nothing -- they would launch overlapping permission flows despite
+        // the queue inside each one being correct.
+        synchronized (LinuxImplementation.class) {
+            if (health == null) {
+                health = new com.codename1.impl.health.LocalHealth();
+            }
+            return health;
+        }
+    }
+
     // WinRT Geolocator-backed location. getCurrentLocation reports OUT_OF_SERVICE
     // honestly when Linux location is disabled / denied.
     private com.codename1.location.LocationManager locationManager;

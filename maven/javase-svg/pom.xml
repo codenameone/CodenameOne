@@ -46,7 +46,13 @@
         <maven.compiler.source>1.7</maven.compiler.source>
         <maven.compiler.target>1.7</maven.compiler.target>
         <src.dir>../../Ports/JavaSEWithSVGSupport/src</src.dir>
-		
+        <!--
+        Exists only to give the deprecated Resource Editor Batik SVG support, so it
+        is frozen alongside it. The module itself is 10KB; the published
+        jar-with-dependencies was 33MB of shaded Batik, republished unchanged every
+        release. Still built and installed locally for the designer.
+        -->
+        <maven.deploy.skip>true</maven.deploy.skip>
     </properties>
     <build>
         <sourceDirectory>${src.dir}</sourceDirectory>

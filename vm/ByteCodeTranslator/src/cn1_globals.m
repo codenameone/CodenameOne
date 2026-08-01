@@ -28,6 +28,7 @@
 #endif
 #include "cn1_globals.h"
 #include <assert.h>
+#include <time.h>   // clock_gettime: paces the low-memory allocation throttle
 #include "java_lang_Class.h"
 #include "java_lang_Object.h"
 #include "java_lang_Boolean.h"
@@ -170,9 +171,9 @@ static JAVA_BOOLEAN GC_THRESHOLDS_INITIALIZED = JAVA_FALSE;
 
 int currentGcMarkValue = 1;
 #if defined(__APPLE__) && defined(__OBJC__)
-extern JAVA_BOOLEAN lowMemoryMode;
+extern _Atomic JAVA_BOOLEAN lowMemoryMode;
 #else
-JAVA_BOOLEAN lowMemoryMode = JAVA_FALSE;
+_Atomic JAVA_BOOLEAN lowMemoryMode = JAVA_FALSE;
 #endif
 
 static JAVA_BOOLEAN isEdt(long threadId) {
@@ -235,6 +236,91 @@ static long cn1_available_memory(void)
    return 1024L * 1024 * 100;
 #endif
  }
+
+// Monotonic milliseconds, used to pace the low-memory allocation throttle.
+// Monotonic (not wall clock) so a clock adjustment cannot make the throttle
+// either fire on every allocation or stop firing for hours.
+static JAVA_LONG cn1MonotonicMillis(void) {
+#ifdef _WIN32
+    /* clock_gettime / CLOCK_MONOTONIC are absent from the MSVC / clang-cl target.
+       gettimeofday would compile, but it is the WALL clock: an NTP step or a user
+       clock change would either suppress the throttle for the length of the jump
+       or park on every allocation until the clock caught up. cn1_win_compat's
+       cn1_monotonic_micros is QueryPerformanceCounter-backed, i.e. actually
+       monotonic. */
+    return (JAVA_LONG)(cn1_monotonic_micros() / 1000LL);
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (((JAVA_LONG)ts.tv_sec) * 1000LL) + (((JAVA_LONG)ts.tv_nsec) / 1000000LL);
+#endif
+}
+
+// Monotonic-millisecond stamp of this thread's last low-memory throttle park,
+// which bounds the throttle to one park per CN1_LOW_MEMORY_PARK_INTERVAL_MS
+// instead of one per allocation. __thread rather than a ThreadLocalData field:
+// zero-initialized per thread with no malloc'd-not-zeroed trap to remember, and
+// it leaves the struct layout (and therefore every generated translation unit's
+// codegen) untouched.
+static __thread JAVA_LONG cn1LowMemoryParkStampMs = 0;
+
+// Low-memory throttle accounting, reported by CN1_LOG_LOWMEM_PARKS at exit and
+// asserted on by LowMemoryThrottleIntegrationTest: a regression that restores the
+// park-on-every-allocation behaviour shows up as parks ~= throttledAllocations.
+// Counting is gated on the tracer so a shipping build pays nothing for it -- the
+// counters live on the legacy allocation path, which is hot during exactly the
+// pressure this throttle responds to. -1 = env not probed yet.
+static _Atomic long cn1LowMemoryParks = 0;
+static _Atomic long cn1LowMemoryThrottledAllocations = 0;
+static _Atomic int cn1LowMemoryTrace = -1;
+static int cn1LowMemoryTraceOn(void) {
+    int on = atomic_load_explicit(&cn1LowMemoryTrace, memory_order_relaxed);
+    if(on < 0) {
+        on = getenv("CN1_LOG_LOWMEM_PARKS") ? 1 : 0;
+        atomic_store_explicit(&cn1LowMemoryTrace, on, memory_order_relaxed);
+    }
+    return on;
+}
+
+// TEST HOOK. CN1_SIMULATE_MEMORY_WARNING_MS=<ms> raises lowMemoryMode at the
+// given cadence, standing in for the sustained UIApplicationDidReceiveMemoryWarning
+// delivery a memory-constrained device produces (each warning raises the flag; the
+// next completed collection cycle lowers it). Nothing else can reach this state off
+// iOS, so without the hook the throttle path is untestable on CI. Off unless set.
+static long cn1SimulateMemoryWarningMs = 0;
+static void* cn1SimulateMemoryWarningMain(void* arg) {
+    (void)arg;
+    for(;;) {
+        lowMemoryMode = JAVA_TRUE;
+        usleep((JAVA_INT)(cn1SimulateMemoryWarningMs * 1000));
+    }
+    return 0;
+}
+static void cn1StartSimulatedMemoryWarnings(void) {
+    const char* e = getenv("CN1_SIMULATE_MEMORY_WARNING_MS");
+    if(e == 0) {
+        return;
+    }
+    cn1SimulateMemoryWarningMs = atol(e);
+    if(cn1SimulateMemoryWarningMs <= 0) {
+        return;
+    }
+    pthread_t tid;
+    if(pthread_create(&tid, 0, cn1SimulateMemoryWarningMain, 0) == 0) {
+        pthread_detach(tid);
+        fprintf(stderr, "[LOWMEM] simulating a memory warning every %ld ms\n",
+                cn1SimulateMemoryWarningMs);
+    }
+}
+
+static void cn1ReportLowMemoryParks(void) {
+    if(!cn1LowMemoryTraceOn()) {
+        return;
+    }
+    fprintf(stderr, "[LOWMEM] parks=%ld throttledAllocations=%ld\n",
+            atomic_load_explicit(&cn1LowMemoryParks, memory_order_relaxed),
+            atomic_load_explicit(&cn1LowMemoryThrottledAllocations, memory_order_relaxed));
+}
 
 // Initializes the GC thresholds based on the free memory on the device.
 // This is run inside the gc mark method.
@@ -4770,14 +4856,53 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
                 cn1LastNamSetter ? cn1LastNamSetter : "(cleared)");
         }
     }
-    if(lowMemoryMode && !threadStateData->nativeAllocationMode) {
-        CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
-        threadStateData->threadActive = JAVA_FALSE;
-        usleep((JAVA_INT)(1000));
-        while(threadStateData->threadBlockedByGC) {
-            usleep((JAVA_INT)(1000));
+    // Relaxed: this gate is read on every legacy allocation and the flag carries
+    // no ordering relationship -- a raise seen one allocation late costs nothing,
+    // and a seq_cst load here would put an acquire barrier on the hot path.
+    if(atomic_load_explicit(&lowMemoryMode, memory_order_relaxed)
+            && !threadStateData->nativeAllocationMode) {
+        // Backpressure after an OS memory warning, PACED (issue #5482). This used
+        // to park 1ms on every legacy allocation, which is not backpressure but a
+        // hard ceiling of ~1000 legacy allocations/second per thread -- three
+        // orders of magnitude under the un-throttled rate. A loader that allocates
+        // a few hundred thousand buffers then takes minutes to hours instead of
+        // seconds, with no crash and no log: an apparent hang. It only ever bit
+        // iOS, because nothing else raises lowMemoryMode -- the simulator on a
+        // large-RAM host essentially never delivers a memory warning, and Android
+        // has no equivalent path -- so it read as "works everywhere but the
+        // device". Parking is now capped at one per CN1_LOW_MEMORY_PARK_INTERVAL_MS
+        // per thread, bounding the cost at that duty cycle however fast the thread
+        // allocates. Waiting out a collector that has actually stopped the world is
+        // a safepoint rather than a throttle, so it is honored every time.
+        JAVA_BOOLEAN blockedByGc = threadStateData->threadBlockedByGC;
+        JAVA_BOOLEAN throttle = JAVA_FALSE;
+        if(!blockedByGc) {
+            JAVA_LONG nowMs = cn1MonotonicMillis();
+            if(nowMs - cn1LowMemoryParkStampMs >= CN1_LOW_MEMORY_PARK_INTERVAL_MS) {
+                cn1LowMemoryParkStampMs = nowMs;
+                throttle = JAVA_TRUE;
+            }
         }
-        threadStateData->threadActive = JAVA_TRUE;
+        if(cn1LowMemoryTraceOn()) {
+            atomic_fetch_add_explicit(&cn1LowMemoryThrottledAllocations, 1, memory_order_relaxed);
+            if(throttle) {
+                // Counts THROTTLE parks only. A safepoint wait behind
+                // threadBlockedByGC lasts as long as the collector needs and is
+                // not part of the pacing budget the regression guard asserts on.
+                atomic_fetch_add_explicit(&cn1LowMemoryParks, 1, memory_order_relaxed);
+            }
+        }
+        if(blockedByGc || throttle) {
+            CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
+            threadStateData->threadActive = JAVA_FALSE;
+            if(throttle) {
+                usleep((JAVA_INT)(1000));
+            }
+            while(threadStateData->threadBlockedByGC) {
+                usleep((JAVA_INT)(1000));
+            }
+            threadStateData->threadActive = JAVA_TRUE;
+        }
     }
 #ifdef DEBUG_GC_OBJECTS_IN_HEAP
     totalAllocatedHeap += size;
@@ -6569,6 +6694,11 @@ void initConstantPool() {
 
     enteringNativeAllocations();
 
+    // Low-memory throttle diagnostics and the CN1_SIMULATE_MEMORY_WARNING_MS test
+    // hook. Both are no-ops unless their environment variable is set.
+    atexit(cn1ReportLowMemoryParks);
+    cn1StartSimulatedMemoryWarnings();
+
     // it will wait two seconds unless an explicit GC occurs
     java_lang_System_startGCThread__(threadStateData);
     finishedNativeAllocations();
@@ -6752,6 +6882,28 @@ void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int index) {
 JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_THREAD_STATE, int index) {
     throwArrayIndexOutOfBoundsException(threadStateData, index);
     return JAVA_FALSE;
+}
+
+// See the contract in cn1_globals.h. throwException() longjmps when a handler is
+// found and returns when none is; the statement-form check macros have nothing to
+// bail with, so returning here would fall through into the out-of-bounds access.
+CN1_NORETURN void cn1ThrowArrayIndexOrDie(CODENAME_ONE_THREAD_STATE, int index) {
+    throwArrayIndexOutOfBoundsException(threadStateData, index);
+    // Unreachable while any handler is installed -- every Java thread root has one
+    // (Thread.runImpl). Reached only from a native callback that entered Java
+    // without a try block, where the alternative is committing the bad read.
+    fprintf(stderr, "FATAL: array index %d out of bounds with no exception handler installed\n", index);
+    fflush(stderr);
+    abort();
+}
+
+// Null counterpart of cn1ThrowArrayIndexOrDie -- same reasoning: falling through
+// would dereference the null array the check just rejected.
+CN1_NORETURN void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE) {
+    throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData));
+    fprintf(stderr, "FATAL: null array access with no exception handler installed\n");
+    fflush(stderr);
+    abort();
 }
 
 void** interfaceVtableGlobal = 0;

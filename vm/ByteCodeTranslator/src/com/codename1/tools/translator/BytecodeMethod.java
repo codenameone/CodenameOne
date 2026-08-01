@@ -1566,7 +1566,16 @@ public class BytecodeMethod implements SignatureSet {
             // for call-bearing methods with hot call-free loops and neutral for the
             // libm-style loops the heuristic originally protected.
             // -DCN1_FORCE_VOLATILE_LOCALS=true restores the always-volatile behavior.
-            boolean volatileLocals = FORCE_VOLATILE_LOCALS || onDeviceDebug || synchronizedMethod;
+            // Decided before the frame macro is emitted, because SP needs the
+            // same answer. A method that catches anything emits setjmp, and
+            // everything longjmp can leave stale has to be volatile: the
+            // locals below, and SP, which every push and pop moves inside the
+            // try region and which is read again in the catch. Keeping one
+            // decision for both is the point -- decided apart, only the locals
+            // got it, and SP stayed undefined behaviour that gcc on musl
+            // eventually refused to compile at all.
+            boolean volatileLocals = FORCE_VOLATILE_LOCALS || onDeviceDebug
+                    || synchronizedMethod;
             if (!volatileLocals) {
                 for (Instruction tcScan : instructions) {
                     if (tcScan instanceof TryCatch) {
@@ -1575,6 +1584,9 @@ public class BytecodeMethod implements SignatureSet {
                     }
                 }
             }
+            // Selects the _VSP variant of whichever frame macro is emitted
+            // below; empty for the ordinary ones so nothing else changes.
+            String spVariant = volatileLocals ? "_VSP" : "";
             Set<String> added = new HashSet<String>();
             for (LocalVariable lv : localVariables) {
                 String variableName = lv.getQualifier() + "locals_"+lv.getIndex()+"_";
@@ -1621,7 +1633,7 @@ public class BytecodeMethod implements SignatureSet {
                         b.append(".initialized) __STATIC_INITIALIZER_").append(framelessCls);
                         b.append("(threadStateData);\n");
                     }
-                    b.append("    DEFINE_METHOD_STACK_FRAMELESS(");
+                    b.append("    DEFINE_METHOD_STACK_FRAMELESS").append(spVariant).append("(");
                     b.append(maxStack);
                     b.append(", ");
                     b.append(maxLocals);
@@ -1635,12 +1647,12 @@ public class BytecodeMethod implements SignatureSet {
                     if(methodName.equals("__CLINIT__")) {
                         if (useFastMethodStack) {
                             if (usePrimitiveFastFrame) {
-                                b.append("    DEFINE_METHOD_STACK_FAST_PRIMITIVE(");
+                                b.append("    DEFINE_METHOD_STACK_FAST_PRIMITIVE").append(spVariant).append("(");
                             } else {
-                                b.append("    DEFINE_METHOD_STACK_FAST_REF(");
+                                b.append("    DEFINE_METHOD_STACK_FAST_REF").append(spVariant).append("(");
                             }
                         } else {
-                            b.append("    DEFINE_METHOD_STACK(");
+                            b.append("    DEFINE_METHOD_STACK").append(spVariant).append("(");
                         }
                     } else {
                         b.append("    if (!class__");
@@ -1649,23 +1661,23 @@ public class BytecodeMethod implements SignatureSet {
                         b.append(clsName.replace('/', '_').replace('$', '_'));
                         if (useFastMethodStack) {
                             if (usePrimitiveFastFrame) {
-                                b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST_PRIMITIVE(");
+                                b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST_PRIMITIVE").append(spVariant).append("(");
                             } else {
-                                b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST_REF(");
+                                b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST_REF").append(spVariant).append("(");
                             }
                         } else {
-                            b.append("(threadStateData);\n    DEFINE_METHOD_STACK(");
+                            b.append("(threadStateData);\n    DEFINE_METHOD_STACK").append(spVariant).append("(");
                         }
                     }
                 } else {
                     if (useFastMethodStack) {
                         if (usePrimitiveFastFrame) {
-                            b.append("    DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE(");
+                            b.append("    DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE").append(spVariant).append("(");
                         } else {
-                            b.append("    DEFINE_INSTANCE_METHOD_STACK_FAST_REF(");
+                            b.append("    DEFINE_INSTANCE_METHOD_STACK_FAST_REF").append(spVariant).append("(");
                         }
                     } else {
-                        b.append("    DEFINE_INSTANCE_METHOD_STACK(");
+                        b.append("    DEFINE_INSTANCE_METHOD_STACK").append(spVariant).append("(");
                     }
                 }
                 // The frameless branch above already emitted its complete macro
@@ -1685,7 +1697,8 @@ public class BytecodeMethod implements SignatureSet {
                     b.append(");\n");
                 }
             } else {
-                b.append("    struct elementStruct* SP = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset];\n");
+                b.append("    struct elementStruct*").append(volatileLocals ? " volatile" : "")
+                        .append(" SP = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset];\n");
             }
             int startOffset = 0;
             if(synchronizedMethod) {

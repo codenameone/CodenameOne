@@ -99,6 +99,26 @@ public abstract class Executor {
     private Class<?>[] nativeInterfaces;
     private boolean unitTestMode;
     static boolean IS_MAC;
+    /**
+     * The internal class name inside a JVM field descriptor.
+     *
+     * <p>{@code Lcom/foo/Bar;} carries one character of punctuation at
+     * each end. Cutting two off the tail dropped the last letter of every
+     * class name reported from a field or a local variable, so any check
+     * comparing a whole name silently missed -- which is how a BLE-only
+     * app declaring a {@code HealthSample} field was still classified as
+     * using the health store.</p>
+     */
+    public static String descriptorToInternalName(String descriptor) {
+        if (descriptor == null || descriptor.length() < 3
+                || descriptor.charAt(0) != 'L') {
+            return descriptor;
+        }
+        int end = descriptor.charAt(descriptor.length() - 1) == ';'
+                ? descriptor.length() - 1 : descriptor.length();
+        return descriptor.substring(1, end);
+    }
+
     protected final Map<String,String> defaultEnvironment = new HashMap<String,String>();
 
     private Properties localBuilderProperties;
@@ -394,6 +414,92 @@ public abstract class Executor {
         public void usesClass(String cls);
 
         public void usesClassMethod(String cls, String method);
+
+        /**
+         * Reports that {@code cls} declares {@code iface} among its
+         * implemented interfaces.
+         *
+         * <p>{@link #usesClass(String)} is also called for the interface,
+         * but it only says that the interface was referenced somewhere --
+         * it drops which class did the implementing. Builders that need to
+         * generate a binding to an app-supplied callback need the
+         * implementor, so that a direct constructor call can be emitted
+         * instead of resolving a name reflectively at runtime.</p>
+         */
+        public void implementsInterface(String cls, String iface);
+
+        /**
+         * Reports that {@code cls} is a member of {@code outer}, as the
+         * class file's own {@code InnerClasses} attribute states it.
+         *
+         * <p>Nesting cannot be inferred from the binary name: a dollar is
+         * a legal Java identifier character, so a top-level
+         * {@code app.Step$Listener} is a class somebody may really have
+         * written and a generated {@code new app.Step.Listener()} would
+         * not compile. Only the attribute knows which dollars separate
+         * anything.</p>
+         */
+        public default void declaresEnclosedBy(String cls, String outer) {
+        }
+
+        /**
+         * Reports a type, its superclass, and whether the generated
+         * bindings could build it with {@code new X()} -- that is, it is
+         * a public, non-abstract, non-interface class with a public
+         * no-argument constructor.
+         *
+         * <p>Needed because the class that <em>declares</em> a listener
+         * interface is often not the one to bind: an abstract base cannot
+         * be constructed, and the concrete subclass never names the
+         * interface itself.</p>
+         */
+        public default void declaresType(String cls, String superName,
+                boolean isConstructible) {
+        }
+
+        /** Reports that {@code cls} is public. */
+        public default void declaresPublicType(String cls) {
+        }
+        /**
+         * Reports that {@code cls} is a concrete class -- neither
+         * abstract nor an interface -- whatever its constructors look
+         * like.
+         *
+         * <p>{@link #declaresType(String, String, boolean)} answers
+         * whether the generated bindings can build it, which folds two
+         * different situations into one false: an abstract base, which is
+         * meant to have a concrete subclass do the work, and a concrete
+         * class with no public no-argument constructor, which nothing can
+         * restore even though an app can register it. The second is a
+         * silent failure and the first is not, so the two have to be
+         * distinguishable.</p>
+         */
+        public default void declaresConcreteType(String cls) {
+        }
+
+        /**
+         * Reports a call whose last argument was pushed as a literal
+         * {@code boolean}, or null when it was not.
+         *
+         * <p>{@link #usesClassMethod(String, String)} fires for the same
+         * call and says nothing about the arguments, which is enough for
+         * "this class is used" but not for a setter that switches a
+         * feature on or off: {@code setWriteToStore(false)} is the app
+         * saying it wants no store at all, and treating it like
+         * {@code true} dragged a Bluetooth-only build into Health
+         * Connect, a privacy policy and a Play health review.</p>
+         *
+         * <p>{@code value} is null unless the constant is the instruction
+         * immediately before the call, so anything computed, loaded from
+         * a variable or reached through a branch reads as unknown. The
+         * caller must treat unknown as the feature being on: the cost of
+         * over-declaring is a permission the app does not need, and the
+         * cost of under-declaring is a SecurityException on a user's
+         * device.</p>
+         */
+        public default void usesClassMethodWithBooleanArgument(String cls,
+                String method, Boolean value) {
+        }
     }
 
     public static interface InternalClassRemapper {
@@ -468,11 +574,58 @@ public abstract class Executor {
                     is.close();
                     ClassVisitor classVisitor = new ClassVisitor(Opcodes.ASM9) {
 
+                        private String scannedName;
+                        private String scannedSuper;
+                        private boolean scannedPublic;
+                        private boolean scannedConcrete;
+                        private boolean scannedNonAbstract;
+                        private boolean scannedHasPublicNoArgCtor;
+
                         @Override
-                        public void visit(int i, int i1, String string, String string1, String superName, String[] interfaces) {
+                        public void visit(int i, int accessFlags, String string, String string1, String superName, String[] interfaces) {
+                            scannedName = string;
+                            scannedSuper = superName;
+                            // ACC_PUBLIC 0x0001, ACC_INTERFACE 0x0200,
+                            // ACC_ABSTRACT 0x0400. A class the generated
+                            // bindings construct from another package has
+                            // to be public and buildable; the constructor
+                            // is checked in visitMethod.
+                            scannedPublic = (accessFlags & 0x0001) != 0;
+                            // Two different questions. Concrete is
+                            // about the class itself -- neither abstract
+                            // nor an interface -- and stays true for a
+                            // package-private one, which an app can
+                            // still register and which the factory still
+                            // cannot name. Constructible additionally
+                            // requires the accessibility the generated
+                            // binding needs.
+                            scannedNonAbstract = (accessFlags & 0x0200) == 0
+                                    && (accessFlags & 0x0400) == 0;
+                            scannedConcrete = scannedNonAbstract
+                                    && scannedPublic;
+                            scannedHasPublicNoArgCtor = false;
                             scanner.usesClass(superName);
                             for (String s : interfaces) {
                                 scanner.usesClass(s);
+                                scanner.implementsInterface(string, s);
+                            }
+                        }
+
+                        @Override
+                        public void visitEnd() {
+                            // Reported here rather than in visit(): the
+                            // InnerClasses attribute arrives in between
+                            // and can still rule the class out.
+                            if (scannedName != null) {
+                                if (scannedPublic) {
+                                    scanner.declaresPublicType(scannedName);
+                                }
+                                if (scannedNonAbstract) {
+                                    scanner.declaresConcreteType(scannedName);
+                                }
+                                scanner.declaresType(scannedName,
+                                        scannedSuper, scannedConcrete
+                                                && scannedHasPublicNoArgCtor);
                             }
                         }
 
@@ -495,18 +648,42 @@ public abstract class Executor {
 
                         @Override
                         public void visitInnerClass(String string, String string1, String string2, int i) {
+                            // Only the entry naming this very class, and
+                            // only when it has an outer -- a null one is an
+                            // anonymous or local class, which is neither
+                            // nameable nor a member of anything.
+                            if (string != null && string.equals(scannedName)
+                                    && string1 != null) {
+                                scanner.declaresEnclosedBy(string, string1);
+                                // ACC_STATIC 0x0008. A non-static member
+                                // class needs an enclosing instance, so
+                                // `new Outer.Inner()` would not compile.
+                                if ((i & 0x0008) == 0) {
+                                    scannedConcrete = false;
+                                }
+                            }
                         }
 
                         @Override
                         public FieldVisitor visitField(int i, String string, String type, String string2, Object o) {
                             if (type.startsWith("L")) {
-                                scanner.usesClass(type.substring(1, type.length() - 2));
+                                scanner.usesClass(descriptorToInternalName(type));
                             }
                             return null;
                         }
 
                         @Override
                         public MethodVisitor visitMethod(int i, final String methodName, String string1, String string2, String[] strings) {
+                            // ACC_PUBLIC 0x0001. The generated bindings
+                            // call `new Listener()` from another package,
+                            // so anything less than a public no-argument
+                            // constructor produces source that does not
+                            // compile.
+                            if ("<init>".equals(methodName)
+                                    && "()V".equals(string1)
+                                    && (i & 0x0001) != 0) {
+                                scannedHasPublicNoArgCtor = true;
+                            }
                             return new MethodVisitor(Opcodes.ASM9) {
                                 @Override
                                 public AnnotationVisitor visitAnnotationDefault() {
@@ -533,55 +710,136 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitFrame(int i, int i1, Object[] os, int i2, Object[] os1) {
+                                    pushedBoolean = null;
                                 }
+
+                                /**
+                                  * The literal pushed immediately before
+                                  * the next call, or null. Cleared by
+                                  * every other visit below -- including
+                                  * labels and frames, since a constant
+                                  * that is last before a merge point is
+                                  * not a straight-line argument -- so
+                                  * "unknown" is what a missed case
+                                  * degrades to.
+                                  */
+                                private Boolean pushedBoolean;
 
                                 @Override
                                 public void visitInsn(int i) {
+                                    pushedBoolean = i == Opcodes.ICONST_0
+                                            ? Boolean.FALSE
+                                            : i == Opcodes.ICONST_1
+                                                    ? Boolean.TRUE : null;
                                 }
 
                                 @Override
                                 public void visitIntInsn(int i, int i1) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitVarInsn(int i, int i1) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitTypeInsn(int i, String string) {
+                                    pushedBoolean = null;
                                     scanner.usesClass(string);
                                 }
 
                                 @Override
                                 public void visitFieldInsn(int i, String string, String string1, String string2) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitMethodInsn(int i, String owner, String name, String string2) {
+                                    Boolean arg = pushedBoolean;
+                                    pushedBoolean = null;
                                     scanner.usesClass(owner);
                                     if (name != null && !name.equals("<init>")) {
                                         scanner.usesClassMethod(owner, name);
+                                        scanner.usesClassMethodWithBooleanArgument(
+                                                owner, name, arg);
                                     }
                                 }
 
                                 @Override
                                 public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+                                    Boolean arg = pushedBoolean;
+                                    pushedBoolean = null;
                                     scanner.usesClass(owner);
                                     if (name != null && !name.equals("<init>")) {
                                         scanner.usesClassMethod(owner, name);
+                                        scanner.usesClassMethodWithBooleanArgument(
+                                                owner, name, arg);
+                                    }
+                                }
+
+                                @Override
+                                public void visitInvokeDynamicInsn(String name,
+                                        String descriptor, Handle bootstrap,
+                                        Object... args) {
+                                    pushedBoolean = null;
+                                    // A method reference -- store::readSamples,
+                                    // or a lambda body -- is an invokedynamic
+                                    // whose real target sits in the bootstrap
+                                    // arguments as a Handle. visitMethodInsn
+                                    // never sees it, so every such call was
+                                    // invisible to feature detection: obtaining
+                                    // the store registered, and the read it was
+                                    // obtained for did not.
+                                    if (args == null) {
+                                        return;
+                                    }
+                                    for (Object a : args) {
+                                        if (!(a instanceof Handle)) {
+                                            continue;
+                                        }
+                                        Handle h = (Handle) a;
+                                        if (h.getOwner() == null) {
+                                            continue;
+                                        }
+                                        scanner.usesClass(h.getOwner());
+                                        if (h.getName() != null
+                                                && !"<init>".equals(h.getName())
+                                                && !"<clinit>".equals(
+                                                        h.getName())) {
+                                            scanner.usesClassMethod(
+                                                    h.getOwner(), h.getName());
+                                            // Unknown, never absent. The
+                                            // arguments of a method
+                                            // reference are supplied
+                                            // wherever it is later called,
+                                            // which this insn cannot see --
+                                            // and a consumer that decides
+                                            // on the argument alone would
+                                            // never hear about the call at
+                                            // all, so options::setWriteTo
+                                            // Store silently built an app
+                                            // with no health stack.
+                                            scanner.usesClassMethodWithBooleanArgument(
+                                                    h.getOwner(), h.getName(),
+                                                    null);
+                                        }
                                     }
                                 }
 
                                 @Override
                                 public void visitJumpInsn(int i, Label label) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitLabel(Label label) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitLdcInsn(Object o) {
+                                    pushedBoolean = null;
                                     if (o instanceof Type) {
                                         scanner.usesClass(((Type) o).getClassName());
                                     }
@@ -589,18 +847,22 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitIincInsn(int i, int i1) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitTableSwitchInsn(int i, int i1, Label label, Label[] labels) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitLookupSwitchInsn(Label label, int[] ints, Label[] labels) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
                                 public void visitMultiANewArrayInsn(String string, int i) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
@@ -610,12 +872,13 @@ public abstract class Executor {
                                 @Override
                                 public void visitLocalVariable(String string, String classType, String string2, Label label, Label label1, int i) {
                                     if (classType.startsWith("L")) {
-                                        scanner.usesClass(classType.substring(1, classType.length() - 2));
+                                        scanner.usesClass(descriptorToInternalName(classType));
                                     }
                                 }
 
                                 @Override
                                 public void visitLineNumber(int i, Label label) {
+                                    pushedBoolean = null;
                                 }
 
                                 @Override
@@ -628,9 +891,6 @@ public abstract class Executor {
                             };
                         }
 
-                        @Override
-                        public void visitEnd() {
-                        }
                     };
                     try {
                         r.accept(classVisitor, ClassReader.EXPAND_FRAMES);
@@ -1245,15 +1505,20 @@ public abstract class Executor {
             while ((entry = zis.getNextEntry()) != null) {
                 String entryName = entry.getName();
 
-                if(!"html.tar".equals(entryName)&& (entryName.startsWith("html") || entryName.startsWith("/html"))) {
+                if (entryName.startsWith("html/")
+                        || entryName.startsWith("/html/")) {
                     if(entry.isDirectory()) {
                         continue;
                     }
-
+                    int htmlPrefix = entryName.startsWith("html/")
+                            ? "html/".length() : "/html/".length();
+                    entryName = entryName.substring(htmlPrefix);
+                    // The stripped name becomes a member of another archive,
+                    // so validate it independently against that archive's root.
+                    resolveArchiveEntry(resDir, entryName);
                     if(tos == null) {
                         tos = new TarOutputStream(new FileOutputStream(new File(resDir, "html.tar")));
                     }
-                    entryName = entryName.substring(5);
                     TarEntry tEntry = new TarEntry(new File(entryName), entryName);
                     tEntry.setSize(entry.getSize());
                     debug("Packaging entry " + entryName + " size: " + entry.getSize());
@@ -1270,10 +1535,11 @@ public abstract class Executor {
                         continue;
                     }
                     int podSpecsPrefix = entryName.startsWith("podspecs/") ? "podspecs/".length() : "/podspecs/".length();
+                    entryName = entryName.substring(podSpecsPrefix);
+                    resolveArchiveEntry(resDir, entryName);
                     if(podspecTos == null) {
                         podspecTos = new TarOutputStream(new FileOutputStream(new File(resDir, "podspecs.tar")));
                     }
-                    entryName = entryName.substring(podSpecsPrefix);
                     TarEntry tEntry = new TarEntry(new File(entryName), entryName);
                     tEntry.setSize(entry.getSize());
                     debug("Packaging entry " + entryName + " size: " + entry.getSize());
@@ -1292,10 +1558,11 @@ public abstract class Executor {
                         continue;
                     }
                     int libPrefix = entryName.startsWith("javase.lib/") ? "javase.lib/".length() : "/javase.lib/".length();
+                    entryName = entryName.substring(libPrefix);
+                    resolveArchiveEntry(resDir, entryName);
                     if(libTos == null) {
                         libTos = new TarOutputStream(new FileOutputStream(new File(resDir, "javase.lib.tar")));
                     }
-                    entryName = entryName.substring(libPrefix);
                     TarEntry tEntry = new TarEntry(new File(entryName), entryName);
                     tEntry.setSize(entry.getSize());
                     debug("Packaging entry " + entryName + " size: " + entry.getSize());
@@ -1308,12 +1575,17 @@ public abstract class Executor {
                     continue;
                 }
 
+                // Entries outside the supported virtual cn1lib namespaces
+                // retain their original ZIP name, which must be relative and
+                // remain inside the extraction root.
+                resolveArchiveEntry(resDir, entryName);
+
                 if (entry.isDirectory()) {
-                    File dir = new File(classesDir, entryName);
+                    File dir = resolveArchiveEntry(classesDir, entryName);
                     dir.mkdirs();
-                    dir = new File(resDir, entryName);
+                    dir = resolveArchiveEntry(resDir, entryName);
                     dir.mkdirs();
-                    dir = new File(sourceDir, entryName);
+                    dir = resolveArchiveEntry(sourceDir, entryName);
                     dir.mkdirs();
                     continue;
                 }
@@ -1328,22 +1600,22 @@ public abstract class Executor {
                         log("!!!!Skipping "+entryName);
                         continue;
                     } else {
-                        destFile = new File(classesDir, entryName);
+                        destFile = resolveArchiveEntry(classesDir, entryName);
                     }
                 } else {
                     if (entryName.endsWith(".java") || entryName.endsWith(".kt") || entryName.endsWith(".swift") || entryName.endsWith(".m") || entryName.endsWith(".h") || entryName.endsWith(".cs")) {
-                        destFile = new File(sourceDir, entryName);
+                        destFile = resolveArchiveEntry(sourceDir, entryName);
                     } else {
                         if (entryName.endsWith(".jar") || entryName.endsWith(".a") || entryName.endsWith(".dylib") || entryName.endsWith(".andlib") || entryName.endsWith(".aar") || entryName.endsWith(dll)) {
-                            destFile = new File(libsDir, entryName);
+                            destFile = resolveArchiveEntry(libsDir, entryName);
                         } else {
                             if (useXMLDir() && entryName.endsWith(".xml")) {
                                 destFile = placeXMLFile(entry, xmlDir, resDir);
                             } else {
                                 if(entryName.equals("codenameone_settings.properties")) {
-                                    destFile = new File(sourceDir.getParentFile(), entryName);
+                                    destFile = resolveArchiveEntry(sourceDir.getParentFile(), entryName);
                                 } else {
-                                    destFile = new File(resDir, entryName);
+                                    destFile = resolveArchiveEntry(resDir, entryName);
                                 }
                             }
                         }
@@ -1390,7 +1662,7 @@ public abstract class Executor {
 
                 if (entry.isDirectory()) {
                     currentDir = entryName;
-                    File dir = new File(destDir, entryName);
+                    File dir = resolveArchiveEntry(destDir, entryName);
                     dir.mkdirs();
                     continue;
                 }
@@ -1398,8 +1670,17 @@ public abstract class Executor {
                 int count;
                 byte[] data = new byte[8192];
 
-                // write the files to the disk
+                // Validate the untrusted archive name before the trusted
+                // filter sees it. The filter deliberately owns final routing
+                // and may select a sibling (for example, project settings),
+                // so its canonical result is not constrained to destDir.
+                resolveArchiveEntry(destDir, entryName);
                 File destFile = filter.destFile(currentDir, entryName);
+                if (destFile == null) {
+                    throw new IOException("Extraction filter returned no destination for "
+                            + entryName);
+                }
+                destFile = destFile.getCanonicalFile();
                 destFile.getParentFile().mkdirs();
                 FileOutputStream fos = new FileOutputStream(destFile);
                 dest = new BufferedOutputStream(fos, data.length);
@@ -1416,7 +1697,7 @@ public abstract class Executor {
         }
     }
 
-    protected File placeXMLFile(ZipEntry entry, File xmlDir, File resDir) {
+    protected File placeXMLFile(ZipEntry entry, File xmlDir, File resDir) throws IOException {
         boolean putInXMLDir = false;
         String name = entry.getName();
         if (name.contains("/")) {
@@ -1431,10 +1712,43 @@ public abstract class Executor {
             name = name.substring(name.lastIndexOf("/") + 1, name.length());
         }
         if (putInXMLDir) {
-            return new File(xmlDir, name);
+            return resolveArchiveEntry(xmlDir, name);
         } else {
-            return new File(resDir, entry.getName());
+            return resolveArchiveEntry(resDir, entry.getName());
         }
+    }
+
+    /**
+     * Resolves an archive entry beneath its intended extraction directory.
+     * Entries that are absolute or escape through {@code ..} components are
+     * rejected before any directory or file is created.
+     *
+     * @param destinationDirectory extraction root
+     * @param entryName untrusted name read from the archive
+     * @return canonical destination contained by {@code destinationDirectory}
+     * @throws IOException if the entry escapes the extraction root
+     */
+    protected static File resolveArchiveEntry(File destinationDirectory,
+            String entryName) throws IOException {
+        if (new File(entryName).isAbsolute()) {
+            throw new IOException("Archive entry is absolute: " + entryName);
+        }
+        return requireArchiveDestination(destinationDirectory,
+                new File(destinationDirectory, entryName), entryName);
+    }
+
+    private static File requireArchiveDestination(File destinationDirectory,
+            File destinationFile, String entryName) throws IOException {
+        File canonicalDirectory = destinationDirectory.getCanonicalFile();
+        File canonicalDestination = destinationFile.getCanonicalFile();
+        String directoryPath = canonicalDirectory.getPath();
+        String directoryPrefix = directoryPath.endsWith(File.separator)
+                ? directoryPath : directoryPath + File.separator;
+        if (!canonicalDestination.getPath().startsWith(directoryPrefix)) {
+            throw new IOException("Archive entry escapes destination directory: "
+                    + entryName);
+        }
+        return canonicalDestination;
     }
 
     public int executeProcess(ProcessBuilder pb) throws Exception {

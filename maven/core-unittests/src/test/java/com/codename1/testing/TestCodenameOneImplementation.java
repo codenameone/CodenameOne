@@ -147,6 +147,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private boolean inCall;
     private LocationManager locationManager;
     private com.codename1.bluetooth.Bluetooth bluetooth;
+    private com.codename1.health.Health health;
     private L10NManager localizationManager;
     private ImageIO imageIO;
     private VideoIO videoIO;
@@ -936,6 +937,52 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return arImpl;
     }
 
+    private com.codename1.impl.VisionImpl visionImpl;
+    private Runnable visionImplCreationHook;
+    private com.codename1.impl.InferenceImpl inferenceImpl;
+    private com.codename1.impl.LanguageImpl languageImpl;
+
+    public void setVisionImpl(com.codename1.impl.VisionImpl visionImpl) {
+        this.visionImpl = visionImpl;
+    }
+
+    /**
+     * Installs a test hook invoked immediately before the vision backend is
+     * returned from {@link #createVisionImpl()}. Tests can use this to hold
+     * backend creation at a deterministic concurrency boundary.
+     *
+     * @param hook hook to invoke, or {@code null} to clear it
+     */
+    public void setVisionImplCreationHook(Runnable hook) {
+        visionImplCreationHook = hook;
+    }
+
+    @Override
+    public com.codename1.impl.VisionImpl createVisionImpl() {
+        if (visionImplCreationHook != null) {
+            visionImplCreationHook.run();
+        }
+        return visionImpl;
+    }
+
+    public void setInferenceImpl(com.codename1.impl.InferenceImpl inferenceImpl) {
+        this.inferenceImpl = inferenceImpl;
+    }
+
+    @Override
+    public com.codename1.impl.InferenceImpl createInferenceImpl() {
+        return inferenceImpl;
+    }
+
+    public void setLanguageImpl(com.codename1.impl.LanguageImpl languageImpl) {
+        this.languageImpl = languageImpl;
+    }
+
+    @Override
+    public com.codename1.impl.LanguageImpl createLanguageImpl() {
+        return languageImpl;
+    }
+
     private com.codename1.sensors.MotionSensorManager motionSensorManager;
 
     /**
@@ -1255,6 +1302,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         mediaRecorderBuilderHandler = null;
         locationManager = null;
         bluetooth = null;
+        health = null;
         localizationManager = null;
         imageIO = null;
         inAppPurchase = null;
@@ -1311,6 +1359,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         largerTextScale = 1f;
         cameraImpl = null;
         arImpl = null;
+        visionImplCreationHook = null;
         motionSensorManager = null;
         platformName = "test";
     }
@@ -1422,6 +1471,25 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
      */
     public void setBluetooth(com.codename1.bluetooth.Bluetooth bluetooth) {
         this.bluetooth = bluetooth;
+    }
+
+    /**
+     * Returns the scripted health entry point installed via
+     * {@link #setHealth(com.codename1.health.Health)}. Defaults to
+     * {@code null} so {@code Health.getInstance()} falls back to the no-op
+     * base instance, mirroring ports without health support.
+     */
+    @Override
+    public com.codename1.health.Health getHealth() {
+        return health;
+    }
+
+    /**
+     * Scripts the health stack returned by {@link #getHealth()}; cleared
+     * back to {@code null} by {@link #reset()}.
+     */
+    public void setHealth(com.codename1.health.Health health) {
+        this.health = health;
     }
 
     public void setLocalizationManager(L10NManager localizationManager) {

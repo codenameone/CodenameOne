@@ -46,6 +46,11 @@ open class HelloCodenameOne : Lifecycle() {
             "Jailbroken device detected by Display.isJailbrokenDevice()."
         }
         DefaultMethodDemo.validate()
+        // Array access must stay memory safe: an out-of-range index has to raise
+        // ArrayIndexOutOfBoundsException rather than read past the allocation.
+        // That regression is silent -- a corrupted read still returns a value --
+        // so it needs an explicit assertion (issue 5482).
+        ArrayGuardDemo.validate()
         // Reference the low-level camera API (com.codename1.camera.*) so the
         // build's bytecode scanner flips IPhoneBuilder.usesCn1Camera /
         // AiDependencyTable: this compiles the CN1Camera AVFoundation natives

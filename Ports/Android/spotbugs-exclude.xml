@@ -481,4 +481,20 @@
             <Bug pattern="MS_EXPOSE_REP" />
         </Or>
     </Match>
+
+    <!--
+    AndroidHealthSupport is the same intentional process-wide registry as AndroidCarSupport above:
+    the build-injected Kotlin CN1HealthConnectBridge publishes its HealthConnectDelegate here and
+    AndroidHealth reads it back. The port cannot hold the bridge any other way, since it compiles
+    against an android.jar with no AndroidX or Kotlin on it and the bridge type only exists in the
+    generated app. Storing the delegate in a static field is the whole point of the registry, so
+    the "mutable static" findings on its accessors are by design.
+    -->
+    <Match>
+        <Class name="com.codename1.impl.android.AndroidHealthSupport" />
+        <Or>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2" />
+            <Bug pattern="MS_EXPOSE_REP" />
+        </Or>
+    </Match>
 </FindBugsFilter>

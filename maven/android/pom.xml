@@ -89,6 +89,10 @@
                                      below because that zip takes the whole
                                      source dir. -->
                                 <exclude>com/codename1/impl/android/ar/**</exclude>
+                                <!-- Optional AI implementations compile in the
+                                     generated app after PlatformFeatureCatalog
+                                     injects their ML Kit/LiteRT dependencies. -->
+                                <exclude>com/codename1/impl/android/ai/**</exclude>
                             </excludes>
                         </configuration>
                     </plugin>

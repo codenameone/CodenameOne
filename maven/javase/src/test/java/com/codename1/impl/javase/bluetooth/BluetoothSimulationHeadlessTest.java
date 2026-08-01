@@ -43,11 +43,22 @@ public class BluetoothSimulationHeadlessTest {
     private static final String PACKAGE_DIR =
             "../../Ports/JavaSE/src/com/codename1/impl/javase/bluetooth";
 
-    /** The pure-Java stack core that must not import Codename One UI. */
-    private static final String[] LAYER_A_SOURCES = {
+    /**
+     * The schedulers are shared with the simulated health store and
+     * therefore live one package up, in {@code impl.javase.simulator}.
+     * They are still stack core and still bound by these guards.
+     */
+    private static final String SIMULATOR_DIR =
+            "../../Ports/JavaSE/src/com/codename1/impl/javase/simulator";
+
+    private static final String[] SHARED_SCHEDULER_SOURCES = {
             "SimScheduler.java",
             "AutoScheduler.java",
-            "ManualScheduler.java",
+            "ManualScheduler.java"
+    };
+
+    /** The pure-Java stack core that must not import Codename One UI. */
+    private static final String[] LAYER_A_SOURCES = {
             "SimulatedBluetoothStack.java",
             "VirtualPeripheral.java",
             "VirtualService.java",
@@ -64,6 +75,14 @@ public class BluetoothSimulationHeadlessTest {
         File dir = new File(PACKAGE_DIR);
         Assertions.assertTrue(dir.isDirectory(),
                 "Could not find the bluetooth package sources at "
+                        + dir.getAbsolutePath());
+        return dir;
+    }
+
+    private static File simulatorDir() {
+        File dir = new File(SIMULATOR_DIR);
+        Assertions.assertTrue(dir.isDirectory(),
+                "Could not find the simulator package sources at "
                         + dir.getAbsolutePath());
         return dir;
     }
@@ -104,7 +123,8 @@ public class BluetoothSimulationHeadlessTest {
             throws Exception {
         for (String name : new String[] {"SimulatedBluetoothStack.java",
                 "ManualScheduler.java"}) {
-            File src = new File(packageDir(), name);
+            File src = new File("ManualScheduler.java".equals(name)
+                    ? simulatorDir() : packageDir(), name);
             Assertions.assertTrue(src.exists(), "missing " + name);
             String content = read(src);
             Assertions.assertFalse(content.contains("Thread.sleep"),
@@ -123,13 +143,33 @@ public class BluetoothSimulationHeadlessTest {
     @Test
     public void stackCoreStaysFreeOfCodenameOneUi() throws Exception {
         for (String name : LAYER_A_SOURCES) {
-            File src = new File(packageDir(), name);
+            assertNoCodenameOneUi(new File(packageDir(), name), name);
+        }
+        for (String name : SHARED_SCHEDULER_SOURCES) {
+            assertNoCodenameOneUi(new File(simulatorDir(), name), name);
+        }
+    }
+
+    private static void assertNoCodenameOneUi(File src, String name)
+            throws IOException {
+        Assertions.assertTrue(src.exists(), "missing " + name);
+        String content = read(src);
+        Assertions.assertFalse(
+                content.contains("import com.codename1.ui"),
+                name + " is stack core and must not depend on"
+                        + " com.codename1.ui");
+    }
+
+    @Test
+    public void sharedSchedulersAreHeadless() throws Exception {
+        for (String name : SHARED_SCHEDULER_SOURCES) {
+            File src = new File(simulatorDir(), name);
             Assertions.assertTrue(src.exists(), "missing " + name);
             String content = read(src);
-            Assertions.assertFalse(
-                    content.contains("import com.codename1.ui"),
-                    name + " is stack core and must not depend on"
-                            + " com.codename1.ui");
+            Assertions.assertFalse(content.contains("javax.swing"),
+                    name + " must not use Swing");
+            Assertions.assertFalse(content.contains("javafx."),
+                    name + " must not use JavaFX");
         }
     }
 }

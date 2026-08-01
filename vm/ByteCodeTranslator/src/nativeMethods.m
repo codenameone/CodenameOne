@@ -83,7 +83,7 @@
 #import <mach/mach.h>
 #endif
 
-extern JAVA_BOOLEAN lowMemoryMode;
+extern _Atomic JAVA_BOOLEAN lowMemoryMode;
 
 // Compact-string: logical char at index i of String s, decoding Latin-1(byte[]) or UTF-16(char[]).
 static inline JAVA_CHAR cn1StrCharAtRaw(JAVA_OBJECT s, JAVA_INT i) {

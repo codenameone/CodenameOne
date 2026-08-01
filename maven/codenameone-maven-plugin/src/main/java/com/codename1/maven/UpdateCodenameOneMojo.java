@@ -1,7 +1,24 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.maven;
 
@@ -15,6 +32,8 @@ import org.apache.maven.model.jdom.etl.ModelETL;
 import org.apache.maven.model.jdom.etl.ModelETLRequest;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import java.util.List;
+import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.codehaus.plexus.util.FileUtils;
@@ -29,6 +48,17 @@ import java.net.URL;
  */
 @Mojo(name = "update")
 public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
+
+    /** Where releases are published now. Asked first. */
+    private static final String R2_METADATA_URL =
+            "https://repo.codenameone.com/maven2/com/codenameone/codenameone-maven-plugin/maven-metadata.xml";
+
+    /** Where releases were published before the migration. Fallback only. */
+    private static final String MAVEN_CENTRAL_METADATA_URL =
+            "https://repo1.maven.org/maven2/com/codenameone/codenameone-maven-plugin/maven-metadata.xml";
+
+    @Parameter(property = "cn1.metadataUrl", defaultValue = R2_METADATA_URL)
+    private String metadataUrl;
 
 
     @Parameter(property="newVersion", defaultValue = "")
@@ -55,7 +85,7 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
 
         if ("LATEST".equals(newVersion)) {
             try {
-                newVersion = findLatestVersionOnMavenCentral();
+                newVersion = findLatestVersion();
             } catch (Exception ex) {
                 getLog().error("Failed to find latest version from Maven central", ex);
             }
@@ -166,16 +196,99 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
  
     }
 
-    private String findLatestVersionOnMavenCentral() throws IOException, XmlPullParserException {
-        URL mavenMetadata = new URL("https://repo1.maven.org/maven2/com/codenameone/codenameone-maven-plugin/maven-metadata.xml");
-        MetadataXpp3Reader reader = new MetadataXpp3Reader();
-        try (Reader input = new InputStreamReader(mavenMetadata.openStream(), "UTF-8")) {
-            Metadata metadata = reader.read(input, false);
-            return metadata.getVersioning().getLatest();
+    /**
+     * Finds the newest version this project could actually build against.
+     *
+     * Codename One publishes to its own repository, and during the migration also to
+     * Maven Central. Asking the Codename One repository first is what lets cn1:update
+     * see releases made after Central stops receiving them. But discovery must not run
+     * ahead of resolution: a project whose pom does not declare that repository cannot
+     * resolve a version that exists only there, so offering it would write an
+     * unbuildable version into cn1.version and cn1.plugin.version. Such a project is
+     * therefore only offered what Central can serve.
+     *
+     * This corrects itself: generated projects gain the repository as part of the
+     * migration, and from then on they discover from it too.
+     *
+     * Override the primary source with -Dcn1.metadataUrl=... to point at a mirror.
+     */
+    private String findLatestVersion() throws IOException, XmlPullParserException {
+        if (!projectCanResolveFrom(metadataUrl)) {
+            getLog().info("This project does not declare " + repositoryHost(metadataUrl)
+                    + " in <repositories>/<pluginRepositories>, so only versions available "
+                    + "from Maven Central are offered. Add that repository to see newer "
+                    + "releases.");
+            return readLatestVersion(MAVEN_CENTRAL_METADATA_URL);
         }
+        IOException primaryFailure;
+        try {
+            return readLatestVersion(metadataUrl);
+        } catch (IOException ex) {
+            primaryFailure = ex;
+            getLog().debug("Could not read " + metadataUrl + ", falling back to Maven Central", ex);
+        }
+        try {
+            return readLatestVersion(MAVEN_CENTRAL_METADATA_URL);
+        } catch (IOException fallbackFailure) {
+            // Report the primary failure: it is the one that matters, and the fallback
+            // failing too usually just means the machine is offline.
+            throw primaryFailure;
+        }
+    }
 
+    /** Host of a metadata URL, for both the containment test and the message. */
+    private static String repositoryHost(String url) {
+        try {
+            return new URL(url).getHost();
+        } catch (IOException ex) {
+            return url;
+        }
+    }
 
+    /**
+     * Whether the project declares a repository on the same host as the given metadata
+     * URL, for either dependencies or plugins. Both matter: the framework artifacts come
+     * from &lt;repositories&gt; and codenameone-maven-plugin from &lt;pluginRepositories&gt;,
+     * so a version is only usable when both can be reached.
+     */
+    private boolean projectCanResolveFrom(String url) {
+        return canResolveFrom(url,
+                project.getRemoteArtifactRepositories(),
+                project.getPluginArtifactRepositories());
+    }
 
+    /** Pure form of {@link #projectCanResolveFrom(String)}, so it can be tested directly. */
+    static boolean canResolveFrom(String url,
+                                  List<ArtifactRepository> dependencyRepositories,
+                                  List<ArtifactRepository> pluginRepositories) {
+        String host = repositoryHost(url);
+        return declaresHost(dependencyRepositories, host)
+                && declaresHost(pluginRepositories, host);
+    }
+
+    private static boolean declaresHost(List<ArtifactRepository> repositories, String host) {
+        if (repositories == null) {
+            return false;
+        }
+        for (ArtifactRepository repository : repositories) {
+            if (repository != null && repository.getUrl() != null
+                    && repository.getUrl().contains(host)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String readLatestVersion(String url) throws IOException, XmlPullParserException {
+        MetadataXpp3Reader reader = new MetadataXpp3Reader();
+        try (Reader input = new InputStreamReader(new URL(url).openStream(), "UTF-8")) {
+            Metadata metadata = reader.read(input, false);
+            String latest = metadata.getVersioning().getLatest();
+            if (latest == null || latest.trim().isEmpty()) {
+                throw new IOException("No <latest> version in " + url);
+            }
+            return latest;
+        }
     }
     
 }

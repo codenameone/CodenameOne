@@ -478,6 +478,7 @@ public final class IOSNative {
     native String getUDID();
     native String getOSVersion();
     native String getDeviceName();
+    native boolean isSimulator();
     // The hardware/marketing model identifier (e.g. "iPhone15,2"). Unlike
     // getDeviceName() -- which returns the user-assigned device name and is
     // therefore personally identifying -- this is safe to use for analytics
@@ -537,6 +538,29 @@ public final class IOSNative {
     native void cn1CameraPause(long sessionPeer);
     native void cn1CameraResume(long sessionPeer);
     native void cn1CameraClose(long sessionPeer);
+
+    // On-device image analysis backed by Apple Vision/Core Image.
+    native boolean cn1VisionIsSupported(int feature, boolean mlKit);
+    native String cn1VisionAnalyze(byte[] imageData, int feature, boolean mlKit,
+                                   int rotationDegrees, int width, int height,
+                                   int frameFormat);
+    native boolean cn1LanguageIsSupported(int feature, boolean mlKit);
+    native String cn1LanguageIdentify(String text, float minimumConfidence,
+                                      boolean mlKit);
+    native String cn1LanguageTranslate(String text, String sourceLanguage,
+                                       String targetLanguage);
+    native String cn1LanguageSmartReply(String conversationJson);
+    native boolean cn1InferenceIsSupported();
+    native String cn1InferenceOpen(byte[] model, int threads, int accelerator,
+                                   boolean allowFallback);
+    native String cn1InferenceOpenFile(String path, int threads, int accelerator,
+                                      boolean allowFallback);
+    native String cn1InferenceMetadata(int handle, boolean outputs);
+    native String cn1InferenceCopyInput(int handle, int index, byte[] data);
+    native String cn1InferenceInvoke(int handle);
+    native long cn1InferenceOutputData(int handle, int index);
+    native String cn1InferenceResize(int handle, int index, int[] shape);
+    native void cn1InferenceClose(int handle);
 
     // Augmented reality API (com.codename1.ar). Backed by CN1AR.m which wraps
     // an ARKit ARSession composited through an ARSCNView. The IOSARImpl class
@@ -1344,6 +1368,33 @@ public final class IOSNative {
     native int btL2capRead(long channelHandle, byte[] buffer, int offset,
             int len);
 
+    // --- Health (HealthKit) ---
+    // Implemented in nativeSources/CN1Health.m, gated on CN1_INCLUDE_HEALTH.
+    // The #else branch there provides no-op trampolines so a health-free
+    // app -- and the tvOS / Mac Catalyst slices, where HealthKit does not
+    // exist -- still link.
+    native boolean hkIsAvailable();
+    /// Whether the native layer can map this portable type onto a
+    /// HealthKit type at all. Asked rather than assumed: a type with a
+    /// canonical unit is not necessarily one HealthKit knows, and
+    /// advertising it means a query that passes validation and then fails.
+    native boolean hkIsTypeSupported(String typeIdentifier);
+    /// Meaningful for WRITE types only. HealthKit deliberately never
+    /// discloses read authorization, so there is no read equivalent --
+    /// adding one would require inventing an answer.
+    native int hkShareAuthorizationStatus(String typeIdentifier);
+    native void hkRequestAuthorization(int requestId, String[] readTypes,
+            String[] shareTypes);
+    /// `sourceBundleIds` is tab-separated and may be empty for "any
+    /// source". It has to reach HealthKit rather than being filtered after
+    /// the fact: the limit is applied by the query, so filtering the
+    /// results afterwards can return nothing at all while matching data
+    /// sits just past the cut.
+    native void hkQuerySamples(int requestId, String typeIdentifier,
+            double startEpochMs, double endEpochMs, int limit,
+            boolean ascending, String sourceBundleIds);
+    native void hkSaveSamples(int requestId, String samplesTsv);
+
     /** Blocking write to an open L2CAP channel. Returns the byte count
      * written (possibly short), or -2 on error. */
     native int btL2capWrite(long channelHandle, byte[] buffer, int offset,
@@ -1427,6 +1478,13 @@ public final class IOSNative {
     native boolean checkCameraUsage();
     native boolean checkFaceIDUsage();
     native boolean checkLocationUsage();
+    /// Whether ios.NSHealthShareUsageDescription was declared. Lives here
+    /// rather than in CN1Health.m because it must answer even when health
+    /// is compiled out, so IOSImplementation can throw a build-hint
+    /// diagnostic instead of failing later in App Review.
+    native boolean checkHealthShareUsage();
+    /// Whether ios.NSHealthUpdateUsageDescription was declared.
+    native boolean checkHealthUpdateUsage();
     native boolean checkMicrophoneUsage();
     native boolean checkMotionUsage();
     native boolean checkPhotoLibraryAddUsage();

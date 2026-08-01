@@ -88,6 +88,14 @@
                             <goal>single</goal>
                         </goals>
                         <configuration>
+                            <!-- Built for the -bundle step below / local use, but deliberately NOT
+                                 attached: nothing consumes the published
+                                 jar-with-dependencies classifier (verified across this repo
+                                 plus BuildDaemon, BuildCloud, BuildClient, OfflineBuilder and
+                                 Deploy - the builders use the -bundle classifier). It was
+                                 ~44MB of shaded third-party bytes per release across the five
+                                 ports. -->
+                            <attach>false</attach>
                             <descriptorRefs>
                                 <descriptorRef>jar-with-dependencies</descriptorRef>
                             </descriptorRefs>

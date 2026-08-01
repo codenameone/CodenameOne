@@ -7877,6 +7877,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return bluetooth;
     }
 
+    private com.codename1.health.Health health;
+
+    /// Returns the Health Connect-backed health entry point. The store
+    /// degrades to reporting itself unsupported when no bridge has been
+    /// injected, which is the case for apps that never reference
+    /// com.codename1.health.
+    @Override
+    public com.codename1.health.Health getHealth() {
+        // Guarded because everything the store serializes is per-instance:
+        // the authorization queue, the subscription registry, drain
+        // coalescing and the persisted-cursor lock. Two threads racing this
+        // getter each got their own store, and two stores coordinate on
+        // nothing -- they would launch overlapping permission flows despite
+        // the queue inside each one being correct.
+        synchronized (AndroidImplementation.class) {
+            if (health == null) {
+                health = new AndroidHealth();
+            }
+            return health;
+        }
+    }
+
     /**
      * This method returns the platform Location Control
      *
@@ -11375,6 +11397,32 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             Class<?> clazz = Class.forName("com.codename1.impl.android.ar.AndroidARImpl");
             return (com.codename1.impl.ARImpl) clazz
                     .getConstructor(Activity.class).newInstance(act);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    @Override
+    public com.codename1.impl.VisionImpl createVisionImpl() {
+        return (com.codename1.impl.VisionImpl) createOptionalAiBackend(
+                "com.codename1.impl.android.ai.AndroidVisionImpl");
+    }
+
+    @Override
+    public com.codename1.impl.InferenceImpl createInferenceImpl() {
+        return (com.codename1.impl.InferenceImpl) createOptionalAiBackend(
+                "com.codename1.impl.android.ai.AndroidInferenceImpl");
+    }
+
+    @Override
+    public com.codename1.impl.LanguageImpl createLanguageImpl() {
+        return (com.codename1.impl.LanguageImpl) createOptionalAiBackend(
+                "com.codename1.impl.android.ai.AndroidLanguageImpl");
+    }
+
+    private Object createOptionalAiBackend(String className) {
+        try {
+            return Class.forName(className).newInstance();
         } catch (Throwable t) {
             return null;
         }

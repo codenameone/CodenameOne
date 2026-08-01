@@ -1261,6 +1261,18 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 //
 // Gated by -DCN1_INLINE_ALLOC. OFF => CN1_FAST_NEW(X) is exactly __NEW_X.
 // =========================================================================
+// Low-memory backpressure pacing (issue #5482). After the OS reports memory
+// pressure (iOS didReceiveMemoryWarning -> lowMemoryMode) allocators are slowed
+// so the collector can catch up. The throttle parks a legacy-path allocation for
+// one millisecond, but at most ONCE PER THREAD PER WINDOW: an unconditional park
+// on every allocation caps a thread at ~1000 legacy allocations/second, which
+// turns an allocation-heavy load into an apparent hang. With the window, the
+// worst case a thread can lose is 1ms per window (about 10%), independent of how
+// fast it allocates. Parking for a collector that has actually stopped the world
+// (threadBlockedByGC) is a safepoint, not a throttle, and is never skipped.
+#ifndef CN1_LOW_MEMORY_PARK_INTERVAL_MS
+#define CN1_LOW_MEMORY_PARK_INTERVAL_MS 10
+#endif
 #ifndef CN1_BIBOP_PAGE_SIZE
 #define CN1_BIBOP_PAGE_SIZE (64*1024)
 #endif
@@ -1714,46 +1726,105 @@ extern JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_T
 
 #define THROW_ARRAY_INDEX_EXCEPTION(index)    throwArrayIndexOutOfBoundsException(threadStateData, index)
 
-#ifdef CN1_INCLUDE_NPE_CHECKS
-    #define CHECK_NPE_TOP_OF_STACK() if(SP[-1].data.o == JAVA_NULL) { NSLog(@"Throwing NullPointerException!"); throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }
-    #define CHECK_NPE_AT_STACK(pos) if(SP[-pos].data.o == JAVA_NULL) { NSLog(@"Throwing NullPointerException!"); throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }
+#if defined(_MSC_VER)
+    #define CN1_NORETURN __declspec(noreturn)
+#else
+    #define CN1_NORETURN __attribute__((noreturn))
+#endif
 
-    #ifdef CN1_INCLUDE_ARRAY_BOUND_CHECKS
-        #define CHECK_ARRAY_ACCESS(array_pos, bounds) if(SP[- array_pos].data.o == JAVA_NULL) { NSLog(@"Throwing NullPointerException!"); throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); } \
-            if(bounds < 0 || bounds >= ((JAVA_ARRAY)SP[- array_pos].data.o)->length) { THROW_ARRAY_INDEX_EXCEPTION(bounds); }
-        #define CHECK_ARRAY_ACCESS_EXPR(array, bounds) ((array == JAVA_NULL) ? throwException_R_boolean(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : (bounds < 0 || bounds >= ((JAVA_ARRAY)array)->length) ? throwArrayIndexOutOfBoundsException_R_boolean(threadStateData, bounds) : JAVA_TRUE)
-        #define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds) if(array == JAVA_NULL) { NSLog(@"Throwing NullPointerException!"); throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); } \
-            if(bounds < 0 || bounds >= ((JAVA_ARRAY)array)->length) { THROW_ARRAY_INDEX_EXCEPTION(bounds); }
-        // DIVERGING check for FRAMELESS methods only: the failure path throws and
-        // RETURNS from the (frame-free) method instead of falling through. That
-        // keeps the throwException CALL out of every loop cycle, so clang can
-        // hoist the array header loads (data/length) that the merging accessors
-        // (cn1_array_element_*) force it to reload each iteration. Mirrors the
-        // CN1_FRAMELESS_SOE_GUARD throw-and-return pattern.
-        #define CN1_ARRAY_CHECK_DIVERGE(array, bounds, retval) \
-            if(__builtin_expect(array == JAVA_NULL, 0)) { THROW_NULL_POINTER_EXCEPTION(); return retval; } \
-            if(__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)array)->length), 0)) { THROW_ARRAY_INDEX_EXCEPTION(bounds); return retval; }
-    #else
-        #define CHECK_ARRAY_ACCESS(array_pos, bounds) if(SP[-array_pos].data.o == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); }
-        #define CHECK_ARRAY_ACCESS_EXPR(array, bounds) ((array == JAVA_NULL) ? throwException_R_boolean(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : JAVA_TRUE)
-        #define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds) if(array == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); }
-        #define CN1_ARRAY_CHECK_DIVERGE(array, bounds, retval) \
-            if(__builtin_expect(array == JAVA_NULL, 0)) { THROW_NULL_POINTER_EXCEPTION(); return retval; }
-    #endif
+// Throws ArrayIndexOutOfBoundsException and NEVER returns to the caller.
+//
+// throwException() longjmps to a matching handler, but FALLS OFF THE END when no
+// handler is on the block stack -- and the statement-form check macros below have
+// no return value to bail with, so they used to fall straight through into the
+// very access that was just reported out of bounds. Every Java thread root does
+// install a catch-all (Thread.runImpl), but a native callback that enters Java
+// need not, so the no-handler path is reachable. Terminating there is strictly
+// better than committing an out-of-bounds read.
+//
+// The noreturn attribute is also what makes bounds checks cheap: without it clang
+// must assume the (cold, never-taken) throw call may return and clobber memory, so
+// it reloads the array header -- both ->length and ->data -- on EVERY iteration of
+// a scanning loop rather than hoisting them into registers once.
+extern CN1_NORETURN void cn1ThrowArrayIndexOrDie(CODENAME_ONE_THREAD_STATE, int index);
+
+// Same contract for the null case. cn1_array_access_validate() -- the reduced
+// expression path -- has always thrown NullPointerException on a null array in
+// every configuration; the statement-form macros below only did so when
+// CN1_INCLUDE_NPE_CHECKS was on, i.e. never in a shipping build.
+//
+// On iOS/tvOS/watchOS that did NOT leave null unhandled: the port installs a
+// SIGSEGV handler that converts EXC_BAD_ACCESS into a NullPointerException
+// (installSignalHandlers in CodenameOne_GLAppDelegate.m, mirrored in
+// CN1WatchRuntime.m). Checking explicitly here makes the behaviour portable and
+// defined rather than dependent on a fault handler that: is switched off by the
+// ios.convertSignalsToExceptions=false build hint; does not work under the
+// debugger (per its own comment); calls throwException -- which allocates and
+// longjmps -- from a signal handler, which is not async-signal-safe; and has no
+// counterpart on the other targets (the Windows handler only writes a crash
+// report, and the clean/desktop target installs nothing).
+//
+// Note this never covered the out-of-bounds case above: an out-of-range index
+// usually reads adjacent heap rather than faulting, so no signal ever arrives.
+extern CN1_NORETURN void cn1ThrowNullPointerOrDie(CODENAME_ONE_THREAD_STATE);
+
+// Array bounds checks are ALWAYS compiled in, in every configuration.
+//
+// They used to sit inside #ifdef CN1_INCLUDE_NPE_CHECKS, which is commented out
+// just above (CN1_INCLUDE_ARRAY_BOUND_CHECKS was set, but it only ever selected
+// between two branches that were BOTH already disabled by the outer NPE gate). So
+// in a shipping app an out-of-bounds index became a raw C pointer read past the
+// allocation: adjacent heap bytes, or SIGSEGV when it crossed an unmapped page.
+// That turned a defect Java defines as an exception into silent corruption or a
+// hard crash, and it was never a considered trade: the reduced-expression paths
+// (cn1_array_element_* and CN1_ARRAY_CHECK_DIVERGE) already checked in every
+// build, so only the un-optimized stack-machine fallback was unsafe.
+//
+// The single unsigned compare below folds "index < 0" and "index >= length" into
+// one branch, and cn1ThrowArrayIndexOrDie is noreturn so the cold path does not
+// stop clang hoisting the array header out of a loop. Provably-safe accesses are
+// removed earlier and for free by the bounds-check-elimination pass
+// (BytecodeMethod.analyzeBoundsChecks), and a method may opt out deliberately via
+// the DisableNullAndArrayBoundsChecks annotation.
+// One guard, used by every configuration: null then bounds, matching the order
+// and the semantics cn1_array_access_validate() has always had. The bounds test
+// is a single unsigned compare, so it covers index < 0 and index >= length.
+#define CN1_ARRAY_ACCESS_GUARD(array, bounds) \
+    do { \
+        if(__builtin_expect((array) == JAVA_NULL, 0)) { cn1ThrowNullPointerOrDie(threadStateData); } \
+        if(__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)(array))->length), 0)) { cn1ThrowArrayIndexOrDie(threadStateData, bounds); } \
+    } while(0)
+
+#define CN1_ARRAY_ACCESS_GUARD_EXPR(array, bounds) \
+    (__builtin_expect((array) == JAVA_NULL, 0) ? throwException_R_boolean(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) \
+     : __builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)(array))->length), 0) ? throwArrayIndexOutOfBoundsException_R_boolean(threadStateData, bounds) : JAVA_TRUE)
+
+// DIVERGING form for FRAMELESS methods only: the failure path throws and RETURNS
+// from the (frame-free) method instead of falling through, so it needs the
+// returning throw helpers rather than the ...OrDie() pair.
+#define CN1_ARRAY_CHECK_DIVERGE(array, bounds, retval) \
+    do { \
+        if(__builtin_expect((array) == JAVA_NULL, 0)) { THROW_NULL_POINTER_EXCEPTION(); return retval; } \
+        if(__builtin_expect(((unsigned int)(bounds)) >= (unsigned int)(((JAVA_ARRAY)(array))->length), 0)) { THROW_ARRAY_INDEX_EXCEPTION(bounds); return retval; } \
+    } while(0)
+
+#define CHECK_ARRAY_ACCESS(array_pos, bounds) CN1_ARRAY_ACCESS_GUARD(SP[- array_pos].data.o, bounds)
+#define CHECK_ARRAY_ACCESS_EXPR(array, bounds) CN1_ARRAY_ACCESS_GUARD_EXPR(array, bounds)
+#define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds) CN1_ARRAY_ACCESS_GUARD(array, bounds)
+
+#ifdef CN1_INCLUDE_NPE_CHECKS
+    #define CHECK_NPE_TOP_OF_STACK() if(SP[-1].data.o == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); }
+    #define CHECK_NPE_AT_STACK(pos) if(SP[-pos].data.o == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); }
 #else
     #define CHECK_NPE_TOP_OF_STACK()
     #define CHECK_NPE_AT_STACK(pos)
-    #define CHECK_ARRAY_ACCESS(array_pos, bounds)
-    #define CHECK_ARRAY_ACCESS_EXPR(array, bounds) JAVA_TRUE
-    #define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds)
-    #define CN1_ARRAY_CHECK_DIVERGE(array, bounds, retval)
 #endif
 
-#ifdef CN1_INCLUDE_ARRAY_BOUND_CHECKS
-    #define CHECK_ARRAY_BOUNDS_AT_STACK(pos, bounds) if(bounds < 0 || bounds >= ((JAVA_ARRAY)PEEK_OBJ(pos))->length) { THROW_ARRAY_INDEX_EXCEPTION(bounds); }
-#else
-    #define CHECK_ARRAY_BOUNDS_AT_STACK(pos, bounds)
-#endif
+// Currently unused -- the translator has no emission site for it. Kept (and kept
+// correct) because native sources may reference it. Renaming CN1_ARRAY_BOUNDS_GUARD
+// to CN1_ARRAY_ACCESS_GUARD left this pointing at a macro that no longer existed;
+// nothing caught it precisely because nothing expands it.
+#define CHECK_ARRAY_BOUNDS_AT_STACK(pos, bounds) CN1_ARRAY_ACCESS_GUARD(PEEK_OBJ(pos), bounds)
 
 #ifdef CN1_INCLUDE_NPE_CHECKS
 #define CN1_ARRAY_LENGTH(array) ((array == JAVA_NULL) ? throwException_R_int(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : (*((JAVA_ARRAY)array)).length)
@@ -2203,61 +2274,108 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     threadStateData->callStackOffset++;
 }
 
+// How SP is declared, and why it is a parameter rather than a fixed token.
+//
+// ParparVM compiles a try/catch into a setjmp region, so the edges leaving it
+// are abnormal ones. SP is modified all through that region -- every push and
+// pop moves it -- and it is read again after a longjmp lands in the catch.
+// C99 7.13.2.1p3 makes the value of a non-volatile automatic that was modified
+// since the setjmp *indeterminate* after a longjmp, so the old unqualified
+// declaration was undefined behaviour in every method that catches anything.
+//
+// It stayed invisible until a toolchain took it up: gcc on musl refuses the
+// translation unit outright with `internal compiler error: SSA corruption` --
+// "Unable to coalesce ssa_names 57 and 58 which are marked as MUST COALESCE,
+// SP_57(ab) and SP_58(ab), during RTL pass: expand" -- because two versions of
+// SP live across an abnormal edge must occupy one register and cannot. Any Java
+// method with a short-circuit condition inside a try was enough to trigger it,
+// which means app code, not just the framework.
+//
+// `volatile` goes on the POINTER, not the pointee: `struct elementStruct* volatile SP`
+// keeps SP itself in memory so longjmp cannot clobber it, while stack slot
+// accesses through it stay ordinary. Writing `volatile struct elementStruct* SP`
+// would instead make every operand-stack read and write volatile, which is a
+// different -- and expensive -- statement.
+//
+// Only frames that actually emit setjmp pay for it; BytecodeMethod picks the
+// _VSP variant using the same test it already uses to decide whether locals are
+// volatile.
+#define CN1_DECLARE_SP(spQualifier, spPosition) \
+    struct elementStruct* spQualifier SP = &stack[spPosition];
+
 // we need to zero out the values with memset otherwise we will run into a problem
 // when invoking release on pre-existing object which might be garbage
-#define DEFINE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
+#define DEFINE_METHOD_STACK_IMPL(spQualifier, stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition]; \
+    CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1InitMethodStackInline(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, classNameId, methodNameId); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 
-#define DEFINE_INSTANCE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
+#define DEFINE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_METHOD_STACK_IMPL(, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
+#define DEFINE_METHOD_STACK_VSP(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_METHOD_STACK_IMPL(volatile, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
+
+#define DEFINE_INSTANCE_METHOD_STACK_IMPL(spQualifier, stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition]; \
+    CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1InitMethodStackInline(threadStateData, __cn1ThisObject, stackSize, localsStackSize, classNameId, methodNameId); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 
-#define DEFINE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) \
+#define DEFINE_INSTANCE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_INSTANCE_METHOD_STACK_IMPL(, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
+#define DEFINE_INSTANCE_METHOD_STACK_VSP(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_INSTANCE_METHOD_STACK_IMPL(volatile, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
+
+#define DEFINE_METHOD_STACK_FAST_REF_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition]; \
+    CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, JAVA_TRUE); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 
-#define DEFINE_INSTANCE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) \
+#define DEFINE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_REF_IMPL(, stackSize, localsStackSize, spPosition)
+#define DEFINE_METHOD_STACK_FAST_REF_VSP(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_REF_IMPL(volatile, stackSize, localsStackSize, spPosition)
+
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition]; \
+    CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, __cn1ThisObject, stackSize, localsStackSize, JAVA_TRUE); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 
-#define DEFINE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) \
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(, stackSize, localsStackSize, spPosition)
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_REF_VSP(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(volatile, stackSize, localsStackSize, spPosition)
+
+#define DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition]; \
+    CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, JAVA_FALSE); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
 
-#define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) \
+#define DEFINE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(, stackSize, localsStackSize, spPosition)
+#define DEFINE_METHOD_STACK_FAST_PRIMITIVE_VSP(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(volatile, stackSize, localsStackSize, spPosition)
+
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition]; \
+    CN1_DECLARE_SP(spQualifier, spPosition) \
     cn1_init_method_stack_fast(threadStateData, __cn1ThisObject, stackSize, localsStackSize, JAVA_FALSE); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;\
     int methodBlockOffset = threadStateData->tryBlockOffset;
+
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(, stackSize, localsStackSize, spPosition)
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_VSP(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(volatile, stackSize, localsStackSize, spPosition)
 
 #define CN1_FAST_RETURN_RELEASE() \
     threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread; \
@@ -2272,11 +2390,14 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 // no callStackOffset bump. The method body (PUSH/POP/SP ops, arithmetic, calls)
 // is emitted byte-for-byte unchanged; it just operates on this local SP. Frame
 // elimination is GC-trivial here -- it changes nothing the collector sees.
-#define DEFINE_METHOD_STACK_FRAMELESS(stackSize, localsStackSize, spPosition) \
+#define DEFINE_METHOD_STACK_FRAMELESS_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
     struct elementStruct cn1_frameless_frame[(localsStackSize) + (stackSize)]; \
     struct elementStruct* locals = &cn1_frameless_frame[0]; \
     struct elementStruct* stack = &cn1_frameless_frame[localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition];
+    CN1_DECLARE_SP(spQualifier, spPosition)
+
+#define DEFINE_METHOD_STACK_FRAMELESS(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FRAMELESS_IMPL(, stackSize, localsStackSize, spPosition)
+#define DEFINE_METHOD_STACK_FRAMELESS_VSP(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FRAMELESS_IMPL(volatile, stackSize, localsStackSize, spPosition)
 
 // Headroom (bytes) kept below the end of the native C stack: enough to detect the
 // overflow and still build + throw the StackOverflowError without overrunning.

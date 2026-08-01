@@ -103,14 +103,14 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
             project.getProperties().setProperty("ffmpeg.dir", System.getProperty("ffmpeg.dir"));
         }
         
-        File designerJar = getDesignerJar();
-        
-        if (designerJar != null && designerJar.exists()) {
-            project.getModel().addProperty("codename1.designer.jar", designerJar.getAbsolutePath());
-        } else {
-            throw new MojoExecutionException("Can't find designer jar");
-        }
-        
+        // Live CSS reload (CSSWatcher) forks the headless CSS compiler CLI, whose
+        // classpath is published through simulator.properties below. This used to
+        // resolve the designer's 43MB shaded jar and hand it over as
+        // codename1.designer.jar; it no longer does, because the deprecated editor is
+        // resolved on demand only by cn1:designer. Generated poms still forward
+        // -Dcodename1.designer.jar, but with the property undefined that argument
+        // arrives blank and CSSWatcher ignores it in favour of the CLI classpath.
+
         File cssFile = new File(getCN1ProjectDir(), "src" + File.separator + "main" + File.separator + "css" + File.separator + "theme.css");
         File resFile = new File(getCN1ProjectDir(), "target" + File.separator + "classes" + File.separator + "theme.res");
         File mergeFile = new File(getCN1ProjectDir(), "target" + File.separator + "css" + File.separator + "theme.css");
@@ -206,6 +206,12 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
            simulatorProperties.setProperty("cn1.maven.compileClasspathElements", compileClasspath.toString());
 
         } catch (Exception ex){}
+
+        // Classpath the simulator's CSSWatcher uses to fork the headless CSS compiler.
+        // Simulator.java loads simulator.properties into System properties, so the port
+        // reads this the same way SourceChangeWatcher reads
+        // cn1.maven.compileClasspathElements -- no change needed in generated poms.
+        simulatorProperties.setProperty(CSS_CLI_CLASSPATH_PROPERTY, getCssCliClasspath());
 
         try (FileOutputStream fos = new FileOutputStream(simulatorPropertiesFile)) {
             if (System.getProperty("ffmpeg.dir") != null) {

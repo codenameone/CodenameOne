@@ -69,6 +69,12 @@ public final class LlmChatBinding {
     private LlmChatBinding() {
     }
 
+    /// Connects a chat view to a streaming client. Each submitted user message
+    /// replays the current view history while retaining the base request's
+    /// model, sampling, tool, metadata, and safety settings.
+    /// @param view chat UI to drive
+    /// @param client provider client used for every turn
+    /// @param baseRequest request template and optional initial messages
     public static void bind(final ChatView view,
                             final LlmClient client,
                             final ChatRequest baseRequest) {

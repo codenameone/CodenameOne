@@ -1,0 +1,307 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.sensors;
+
+import com.codename1.bluetooth.Bluetooth;
+import com.codename1.bluetooth.BluetoothUuid;
+import com.codename1.bluetooth.le.BlePeripheral;
+import com.codename1.bluetooth.le.BleScan;
+import com.codename1.util.AsyncResult;
+import com.codename1.bluetooth.le.ScanFilter;
+import com.codename1.bluetooth.le.ScanListener;
+import com.codename1.bluetooth.le.ScanResult;
+import com.codename1.bluetooth.le.ScanSettings;
+import com.codename1.health.HealthError;
+import com.codename1.health.HealthException;
+import com.codename1.util.AsyncResource;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import com.codename1.impl.health.EdtResult;
+
+/// Discovers and streams from standard Bluetooth SIG health sensors --
+/// heart-rate straps, power meters, speed and cadence sensors, foot pods,
+/// thermometers, scales, blood-pressure cuffs and glucose meters.
+///
+/// Obtain one from [com.codename1.health.Health#getSensors()].
+///
+/// #### This works everywhere Bluetooth LE does
+///
+/// Unlike the rest of the health API, this layer needs no platform health
+/// store and no per-port implementation: it is built entirely on
+/// `com.codename1.bluetooth.le`, so it behaves identically on iOS,
+/// Android, the simulator, the desktop ports and -- where the browser
+/// exposes Web Bluetooth -- JavaScript. A desktop app that reports
+/// [com.codename1.health.HealthAvailability#LOCAL_ONLY] for the store can
+/// still stream a chest strap.
+///
+/// #### Quick start
+///
+/// ```java
+/// HealthSensors sensors = Health.getInstance().getSensors();
+/// SensorScanSettings settings = new SensorScanSettings()
+///         .addProfile(HealthSensorProfile.HEART_RATE)
+///         .setTimeoutMillis(15000);
+/// SensorScan scan = sensors.startScan(settings, new SensorDiscoveryListener() {
+///     public void sensorDiscovered(HealthSensor sensor) {
+///         scan.stop();
+///         sensors.connect(sensor, HealthSensorProfile.HEART_RATE,
+///                 new SensorSessionOptions())
+///               .onResult((session, err) -> { ... });
+///     }
+///     public void scanFailed(HealthException e) { Log.e(e); }
+/// });
+/// ```
+///
+/// #### Permissions
+///
+/// These are Bluetooth operations, not health-store operations, so they
+/// need Bluetooth permission -- `BluetoothPermission.SCAN` and
+/// `CONNECT` -- and **not** a HealthKit entitlement or a Health Connect
+/// declaration. The build server makes the same distinction: an app that
+/// only uses this package is not treated as a health-data app.
+public class HealthSensors {
+
+    private final List<SensorSession> active = new ArrayList<SensorSession>();
+
+    /// `true` when this device can talk to BLE sensors at all -- that is,
+    /// when Bluetooth LE is supported by the port and the hardware.
+    public boolean isSupported() {
+        return Bluetooth.getInstance().isLeSupported();
+    }
+
+    /// Scans for sensors matching `settings`, reporting each discovery to
+    /// `listener`.
+    ///
+    /// Returns a handle even when scanning cannot start; the failure
+    /// arrives through [SensorDiscoveryListener#scanFailed(HealthException)]
+    /// rather than as a null return, so callers never need a null check.
+    public final SensorScan startScan(SensorScanSettings settings,
+            final SensorDiscoveryListener listener) {
+        if (listener == null) {
+            throw new IllegalArgumentException("startScan needs a listener");
+        }
+        if (!isSupported()) {
+            notifyScanFailed(listener, new HealthException(
+                    HealthError.NOT_SUPPORTED,
+                    "Bluetooth LE is not available on this device"));
+            return new SensorScan(null);
+        }
+        SensorScanSettings s = settings == null
+                ? new SensorScanSettings() : settings;
+        // A copy, taken once. getProfiles() answers with an unmodifiable
+        // view of the caller's own list, so keeping it left this scan
+        // reading a list the caller could still change -- and the listener
+        // walks it on the platform's callback thread, where a concurrent
+        // addProfile() throws ConcurrentModificationException and the
+        // discovery it was decoding is lost.
+        final List<HealthSensorProfile> wanted =
+                new ArrayList<HealthSensorProfile>(
+                        s.getProfiles().isEmpty()
+                                ? HealthSensorProfile.values()
+                                : s.getProfiles());
+
+        ScanSettings bleSettings = new ScanSettings();
+        if (s.isLowPower()) {
+            // The setting was accepted and then ignored, so a scan asking
+            // to be gentle on the battery ran at the balanced duty cycle
+            // anyway -- and a background or long-running scan is exactly
+            // where the caller meant it.
+            bleSettings.setScanMode(com.codename1.bluetooth.le.ScanMode
+                    .LOW_POWER);
+        }
+        for (HealthSensorProfile wantedItem : wanted) {
+            bleSettings.addFilter(new ScanFilter()
+                    .setServiceUuid(wantedItem.getServiceUuid()));
+        }
+        BleScan scan = Bluetooth.getInstance().getLE().startScan(bleSettings,
+                makeScanListener(wanted, listener));
+        // A scan can fail without anything being thrown -- a missing
+        // BLUETOOTH_SCAN grant, a platform abort -- and that failure
+        // reaches the caller only through the BleScan. Callers here are
+        // handed a SensorScan, which deliberately does not expose the
+        // delegate, so without this the documented scanFailed() callback
+        // never fired and the scan just quietly was not running.
+        scan.onResult(new ScanFailure(listener));
+        SensorScan out = new SensorScan(scan);
+        out.scheduleTimeout(s.getTimeoutMillis());
+        return out;
+    }
+
+    /// Translates a failed BLE scan into the health listener's own
+    /// callback.
+    ///
+    /// Named rather than anonymous so it carries no synthetic reference
+    /// to the enclosing object (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class ScanFailure
+            implements AsyncResult<Boolean> {
+
+        private final SensorDiscoveryListener listener;
+
+        ScanFailure(SensorDiscoveryListener listener) {
+            this.listener = listener;
+        }
+
+        @Override
+        public void onReady(Boolean value, Throwable error) {
+            if (error == null || listener == null) {
+                return;
+            }
+            // Through the same hop the unsupported-BLE path uses. This
+            // callback runs wherever the scan failed -- the caller's
+            // thread for a synchronous start failure, the platform's for
+            // a later onScanFailed -- and SensorDiscoveryListener
+            // promises the EDT, so a listener that touched the UI here
+            // would have raced.
+            notifyScanFailed(listener, error instanceof HealthException
+                    ? (HealthException) error
+                    : new HealthException(HealthError.SENSOR_DISCONNECTED,
+                            "the Bluetooth scan could not be started",
+                            error));
+        }
+    }
+
+    /// Built in a static method so the listener carries no synthetic
+    /// reference to this object (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static ScanListener makeScanListener(
+            final List<HealthSensorProfile> wanted,
+            final SensorDiscoveryListener listener) {
+        return new ScanListener() {
+            @Override
+            public void peripheralDiscovered(ScanResult result) {
+                HealthSensor sensor = toSensor(result, wanted);
+                if (sensor != null) {
+                    listener.sensorDiscovered(sensor);
+                }
+            }
+        };
+    }
+
+    /// Which of the wanted profiles a discovered device actually
+    /// advertises. Returns null when it advertises none of them, which
+    /// happens when a platform scan filter is coarser than requested.
+    private static HealthSensor toSensor(ScanResult result,
+            List<HealthSensorProfile> wanted) {
+        if (result == null || result.getPeripheral() == null) {
+            return null;
+        }
+        List<BluetoothUuid> advertised = result.getAdvertisementData() == null
+                ? Collections.<BluetoothUuid>emptyList()
+                : result.getAdvertisementData().getServiceUuids();
+        List<HealthSensorProfile> matched =
+                new ArrayList<HealthSensorProfile>();
+        for (HealthSensorProfile p : wanted) {
+            if (advertised.contains(p.getServiceUuid())) {
+                matched.add(p);
+            }
+        }
+        if (matched.isEmpty()) {
+            return null;
+        }
+        BlePeripheral peripheral = result.getPeripheral();
+        return new HealthSensor(peripheral.getAddress(), peripheral.getName(),
+                matched, result.getRssi());
+    }
+
+    /// Connects to a discovered sensor and starts streaming.
+    public final AsyncResource<SensorSession> connect(HealthSensor sensor,
+            HealthSensorProfile profile, SensorSessionOptions options) {
+        if (sensor == null) {
+            AsyncResource<SensorSession> out =
+                    new EdtResult<SensorSession>();
+            out.error(new HealthException(HealthError.INVALID_ARGUMENT,
+                    "connect needs a sensor"));
+            return out;
+        }
+        return connect(sensor.getId(), profile, options);
+    }
+
+    /// Reconnects to a sensor by the identifier persisted from an earlier
+    /// session, without scanning first.
+    ///
+    /// This is how a fitness app should reconnect to the user's own strap:
+    /// remember [HealthSensor#getId()] the first time and go straight to
+    /// it afterwards, rather than making them pick from a list every
+    /// session.
+    public final AsyncResource<SensorSession> connect(final String sensorId,
+            final HealthSensorProfile profile,
+            final SensorSessionOptions options) {
+        final AsyncResource<SensorSession> out =
+                new EdtResult<SensorSession>();
+        if (sensorId == null || profile == null) {
+            out.error(new HealthException(HealthError.INVALID_ARGUMENT,
+                    "connect needs a sensor id and a profile"));
+            return out;
+        }
+        if (!isSupported()) {
+            out.error(new HealthException(HealthError.NOT_SUPPORTED,
+                    "Bluetooth LE is not available on this device"));
+            return out;
+        }
+        BlePeripheral peripheral =
+                Bluetooth.getInstance().getLE().getPeripheral(sensorId);
+        if (peripheral == null) {
+            out.error(new HealthException(HealthError.SENSOR_DISCONNECTED,
+                    "no sensor known with id " + sensorId));
+            return out;
+        }
+        BleSensorSession session = new BleSensorSession(sensorId, profile,
+                options, peripheral);
+        synchronized (active) {
+            active.add(session);
+        }
+        session.start(out);
+        return out;
+    }
+
+    /// Every session currently connected or reconnecting.
+    public final List<SensorSession> getActiveSessions() {
+        synchronized (active) {
+            return new ArrayList<SensorSession>(active);
+        }
+    }
+
+    /// Forgets a session that has stopped. Called by the session itself.
+    final void sessionEnded(SensorSession session) {
+        synchronized (active) {
+            active.remove(session);
+        }
+    }
+
+    /// Built in a static method so the `Runnable` carries no synthetic
+    /// reference to this object (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static void notifyScanFailed(
+            final SensorDiscoveryListener listener,
+            final HealthException error) {
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                listener.scanFailed(error);
+            }
+        });
+    }
+}

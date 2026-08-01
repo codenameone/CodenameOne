@@ -4635,6 +4635,32 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    private static IOSHealth health;
+
+    /// Returns the health entry point.
+    ///
+    /// The missing-privacy-string diagnostic is *not* thrown here, and
+    /// that is deliberate. `Health.getInstance()` is also how an app
+    /// reaches `getSensors()`, which is pure Bluetooth LE and touches no
+    /// HealthKit at all -- the iOS builder knows this and injects neither
+    /// the framework nor the usage strings for a sensor-only app. Throwing
+    /// on the way in made that supported path impossible to use without
+    /// declaring HealthKit disclosures the app has no business declaring,
+    /// and which App Review would ask it to justify.
+    ///
+    /// It is thrown from [IOSHealth#getStore()] instead: that is the
+    /// first thing that actually needs HealthKit, and it is still before
+    /// anything can be swallowed into an AsyncResource error nobody reads.
+    @Override
+    public com.codename1.health.Health getHealth() {
+        synchronized (IOSImplementation.class) {
+            if (health == null) {
+                health = new IOSHealth(nativeInstance);
+            }
+            return health;
+        }
+    }
+
     public LocationManager getLocationManager() {
         if (!nativeInstance.checkLocationUsage()) {
             throw new RuntimeException("Please add the ios.NSLocationUsageDescription or ios.NSLocationAlwaysUsageDescription build hint");
@@ -4785,6 +4811,33 @@ public class IOSImplementation extends CodenameOneImplementation {
             return null;
         }
         return new IOSARImpl();
+    }
+
+    @Override
+    public com.codename1.impl.VisionImpl createVisionImpl() {
+        for (int feature = 0;
+                feature < com.codename1.ai.vision.VisionFeature.values().length;
+                feature++) {
+            if (nativeInstance.cn1VisionIsSupported(feature, false)
+                    || nativeInstance.cn1VisionIsSupported(feature, true)) {
+                return new IOSVisionImpl();
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public com.codename1.impl.LanguageImpl createLanguageImpl() {
+        return nativeInstance.cn1LanguageIsSupported(0, false)
+                || nativeInstance.cn1LanguageIsSupported(1, false)
+                || nativeInstance.cn1LanguageIsSupported(2, false)
+                ? new IOSLanguageImpl() : null;
+    }
+
+    @Override
+    public com.codename1.impl.InferenceImpl createInferenceImpl() {
+        return nativeInstance.cn1InferenceIsSupported()
+                ? new IOSInferenceImpl() : null;
     }
 
     @Override
@@ -7867,6 +7920,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
         }
         return dDensity;
+    }
+
+    @Override
+    public boolean isSimulator() {
+        return nativeInstance.isSimulator();
     }
     
     double ppi = 0;

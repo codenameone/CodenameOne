@@ -1,0 +1,66 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.language;
+
+/// One message supplied to the on-device smart-reply model.
+public final class SmartReplyMessage {
+    private final String text;
+    private final String participantId;
+    private final boolean localUser;
+    private final long timestampMillis;
+
+    /// Creates one conversation turn used to generate reply suggestions.
+    /// @param text message body; {@code null} becomes an empty string
+    /// @param participantId stable speaker id used to group conversation turns;
+    ///        {@code null} becomes {@code "remote"}
+    /// @param localUser whether this message was written by the current user
+    /// @param timestampMillis message time in Unix epoch milliseconds
+    public SmartReplyMessage(String text, String participantId,
+                             boolean localUser, long timestampMillis) {
+        this.text = text == null ? "" : text;
+        this.participantId = participantId == null ? "remote" : participantId;
+        this.localUser = localUser;
+        this.timestampMillis = timestampMillis;
+    }
+
+    /// @return message text supplied to the local model
+    public String getText() {
+        return text;
+    }
+
+    /// @return stable participant identifier used to group remote speakers,
+    ///         never {@code null}
+    public String getParticipantId() {
+        return participantId;
+    }
+
+    /// @return whether this message was authored by the device user
+    public boolean isLocalUser() {
+        return localUser;
+    }
+
+    /// @return conversation timestamp in milliseconds since the epoch
+    public long getTimestampMillis() {
+        return timestampMillis;
+    }
+}

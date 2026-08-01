@@ -33,6 +33,9 @@ ERROR_RE = re.compile(r"CN1SS:ERR:suite test=([A-Za-z0-9_]+)(?:\s+(.*))?$")
 PERF_BENCH_RE = re.compile(
     r"CN1SS:PERF:benchmark id=([A-Za-z0-9-]+) duration_ns=(\d+) checksum=(-?\d+)"
 )
+PERF_SKIP_RE = re.compile(
+    r"CN1SS:PERF:skipped id=([A-Za-z0-9-]+) reason=([A-Za-z0-9-]+)"
+)
 PERF_COMPLETE_RE = re.compile(
     r"CN1SS:PERF:complete benchmark_version=(\d+) checksum=(-?\d+)"
 )
@@ -211,6 +214,19 @@ def validate(manifest: dict) -> dict:
                     problems.append(f"Stored report {report_path} has an invalid result for {test}")
                 elif result.get("status") == "skip":
                     skipped_tests.add(test)
+            actual_summary = Counter(
+                result.get("status")
+                for result in report_tests.values()
+                if isinstance(result, dict)
+            )
+            expected_summary = {
+                key: actual_summary.get(key, 0)
+                for key in ("pass", "fail", "skip", "not-run")
+            }
+            if report.get("summary") != expected_summary:
+                problems.append(
+                    f"Stored report {report_path} summary does not match its test results"
+                )
 
     manual_feature_count = 0
     try:
@@ -393,6 +409,7 @@ def parse_logs(paths: list[Path], states: dict[str, dict]) -> bool:
 
 def parse_performance(paths: list[Path], expected_benchmarks: list[str], binary_size: int | None) -> dict:
     benchmarks: dict[str, dict] = {}
+    skipped: dict[str, str] = {}
     benchmark_version: int | None = None
     suite_checksum: int | None = None
     for path in paths:
@@ -408,11 +425,24 @@ def parse_performance(paths: list[Path], expected_benchmarks: list[str], binary_
                     "duration_ns": int(match.group(2)),
                     "checksum": match.group(3),
                 }
+                skipped.pop(benchmark_id, None)
+            match = PERF_SKIP_RE.search(line)
+            if match:
+                benchmark_id = match.group(1)
+                if benchmark_id not in expected_benchmarks:
+                    raise ContractError(
+                        f"Unknown skipped performance benchmark {benchmark_id} in {path}"
+                    )
+                if benchmark_id not in benchmarks:
+                    skipped[benchmark_id] = match.group(2)
             match = PERF_COMPLETE_RE.search(line)
             if match:
                 benchmark_version = int(match.group(1))
                 suite_checksum = int(match.group(2))
-    missing = [item for item in expected_benchmarks if item not in benchmarks]
+    missing = [
+        item for item in expected_benchmarks
+        if item not in benchmarks and item not in skipped
+    ]
     status = "complete" if (
         not missing and benchmark_version is not None and suite_checksum is not None
     ) else "partial"
@@ -421,6 +451,7 @@ def parse_performance(paths: list[Path], expected_benchmarks: list[str], binary_
         "benchmark_version": benchmark_version,
         "method": "minimum of five measured runs after three in-process warm-ups",
         "benchmarks": {item: benchmarks[item] for item in expected_benchmarks if item in benchmarks},
+        "skipped": {item: skipped[item] for item in expected_benchmarks if item in skipped},
         "missing": missing,
         "suite_checksum": suite_checksum,
     }

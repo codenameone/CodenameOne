@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CompileCSSMojoTest {
 
     @Test
-    void addsLocalizationDirectoryToDesignerInvocation(@TempDir Path tempDir) throws Exception {
+    void addsLocalizationDirectoryToCssCliInvocation(@TempDir Path tempDir) throws Exception {
         Path projectDir = setupProject(tempDir, "l10n");
         TestCompileCSSMojo mojo = createMojo(projectDir);
 
@@ -89,7 +89,7 @@ class CompileCSSMojoTest {
     }
 
     @Test
-    void addsI18nDirectoryToDesignerInvocation(@TempDir Path tempDir) throws Exception {
+    void addsI18nDirectoryToCssCliInvocation(@TempDir Path tempDir) throws Exception {
         Path projectDir = setupProject(tempDir, "i18n");
         TestCompileCSSMojo mojo = createMojo(projectDir);
 
@@ -200,7 +200,7 @@ class CompileCSSMojoTest {
         mavenProject.setBuild(build);
         mavenProject.setArtifacts(new HashSet<>());
 
-        TestCompileCSSMojo mojo = new TestCompileCSSMojo(projectDir.resolve("designer.jar").toFile());
+        TestCompileCSSMojo mojo = new TestCompileCSSMojo(projectDir.resolve("codenameone-css-cli.jar").toFile());
         mojo.project = mavenProject;
         mojo.antProject = new Project();
         mojo.antProject.setBaseDir(projectDir.toFile());
@@ -221,7 +221,7 @@ class CompileCSSMojoTest {
         Files.write(cssDir.resolve("theme.css"), Arrays.asList("/* test css */"));
         Files.write(projectDir.resolve("codenameone_settings.properties"), Arrays.asList("codename1.cssTheme=true"));
         Files.createDirectories(projectDir.resolve("target/classes"));
-        Files.createFile(projectDir.resolve("designer.jar"));
+        Files.createFile(projectDir.resolve("codenameone-css-cli.jar"));
         Files.write(projectDir.resolve("pom.xml"), Arrays.asList(
                 "<project xmlns=\"http://maven.apache.org/POM/4.0.0\"",
                 "         xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"",
@@ -258,7 +258,7 @@ class CompileCSSMojoTest {
         Files.write(cssDir.resolve("theme.css"), Arrays.asList("/* test css */"));
         Files.write(commonDir.resolve("codenameone_settings.properties"), Arrays.asList("codename1.cssTheme=true"));
         Files.createDirectories(commonDir.resolve("target/classes"));
-        Files.createFile(commonDir.resolve("designer.jar"));
+        Files.createFile(commonDir.resolve("codenameone-css-cli.jar"));
         Files.write(commonDir.resolve("pom.xml"), Arrays.asList(
                 "<project xmlns=\"http://maven.apache.org/POM/4.0.0\"",
                 "         xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"",
@@ -279,11 +279,11 @@ class CompileCSSMojoTest {
     }
 
     private static class TestCompileCSSMojo extends CompileCSSMojo {
-        private final File designerJar;
+        private final String cssCliClasspath;
         private RecordingJava recordingJava;
 
-        private TestCompileCSSMojo(File designerJar) {
-            this.designerJar = designerJar;
+        private TestCompileCSSMojo(File cssCliJar) {
+            this.cssCliClasspath = cssCliJar.getAbsolutePath();
         }
 
         @Override
@@ -294,8 +294,10 @@ class CompileCSSMojoTest {
         }
 
         @Override
-        protected File getDesignerJar() {
-            return designerJar;
+        protected String getCssCliClasspath() {
+            // CSS compilation runs CN1CSSCLI from the thin codenameone-css-cli module
+            // on a resolved classpath; it no longer shells out to the designer jar.
+            return cssCliClasspath;
         }
 
         RecordingJava getRecordingJava() {

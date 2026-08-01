@@ -1538,6 +1538,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                         : getGeneratedIOSProjectSourceDirectory();
                 output.getParentFile().mkdirs();
                 try {
+                    // This directory is a generated target. Replacing it is
+                    // required when class scanning removes a dependency:
+                    // copyDirectory() alone leaves stale Podfiles, workspaces,
+                    // Pods and optional native sources from the prior build.
+                    if (output.exists()) {
+                        FileUtils.deleteDirectory(output);
+                    }
                     getLog().info("Copying Xcode Project to "+output);
                     FileUtils.copyDirectory(xcodeProject, output);
                 } catch (IOException ex) {

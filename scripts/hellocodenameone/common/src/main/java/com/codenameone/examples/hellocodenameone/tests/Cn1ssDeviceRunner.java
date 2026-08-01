@@ -121,6 +121,13 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 && testClass instanceof ToastBarTopPositionScreenshotTest) {
             return 45000;
         }
+        if (!"HTML5".equals(Display.getInstance().getPlatformName())
+                && testClass instanceof VisionOnDeviceApiTest) {
+            // The first Apple Vision request may compile its detector model on
+            // a cold simulator. Keep the EDT free and allow that one-time
+            // native initialization a bounded minute.
+            return TEST_TIMEOUT_MS_NATIVE * 2;
+        }
         return "HTML5".equals(Display.getInstance().getPlatformName())
                 ? TEST_TIMEOUT_MS_HTML5
                 : TEST_TIMEOUT_MS_NATIVE;
@@ -366,6 +373,16 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // prompts). Self-skips on iOS / Android / JS where the open
             // call would surface an OS dialog.
             new CameraApiTest(),
+            // Built-in on-device AI coverage. These are assertion-only tests:
+            // portable value/lifecycle contracts run everywhere, while
+            // capability queries exercise each port's native bridge without
+            // requiring a camera, a downloaded language model, or a bundled
+            // inference model. Referencing the individual entry points also
+            // keeps the builders' granular dependency selection under the
+            // permanent cross-platform source-build suite.
+            new VisionOnDeviceApiTest(),
+            new LanguageOnDeviceApiTest(),
+            new InferenceOnDeviceApiTest(),
             // Exercises com.codename1.ar end-to-end: the unsupported
             // contract on the CI platforms (none has an AR runtime) and a
             // full session round trip when a backend is present.

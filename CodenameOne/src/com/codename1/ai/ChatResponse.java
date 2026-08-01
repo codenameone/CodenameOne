@@ -40,6 +40,12 @@ public final class ChatResponse {
     private final Usage usage;
     private final String modelUsed;
 
+    /// Creates a normalized terminal response.
+    /// @param assistantMessage aggregated assistant output, or {@code null}
+    /// @param toolCalls requested tool calls; {@code null} becomes empty
+    /// @param finishReason normalized provider finish reason
+    /// @param usage token accounting, or {@code null}
+    /// @param modelUsed provider-reported model id, or {@code null}
     public ChatResponse(ChatMessage assistantMessage, List<ToolCall> toolCalls,
                         String finishReason, Usage usage, String modelUsed) {
         this.assistantMessage = assistantMessage;
@@ -50,28 +56,34 @@ public final class ChatResponse {
         this.modelUsed = modelUsed;
     }
 
+    /// @return normalized assistant message, including any multimodal parts
     public ChatMessage getAssistantMessage() {
         return assistantMessage;
     }
 
+    /// @return immutable tool calls requested by the model
     public List<ToolCall> getToolCalls() {
         return toolCalls;
     }
 
     /// Convenience: the assembled assistant text. Equivalent to
     /// `getAssistantMessage().getText()` when there is one.
+    /// @return assistant text, or an empty string without a message
     public String getText() {
         return assistantMessage == null ? "" : assistantMessage.getText();
     }
 
+    /// @return provider finish reason such as {@code stop} or {@code length}
     public String getFinishReason() {
         return finishReason;
     }
 
+    /// @return token accounting, or {@code null} when the provider omitted it
     public Usage getUsage() {
         return usage;
     }
 
+    /// @return provider-reported model id, or {@code null} when omitted
     public String getModelUsed() {
         return modelUsed;
     }

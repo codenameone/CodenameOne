@@ -209,6 +209,18 @@ fi
 if [ -n "${CN1_TEST_OPT_LEVEL:-}" ]; then
   DERIVED_ARGS+=("GCC_OPTIMIZATION_LEVEL=$CN1_TEST_OPT_LEVEL")
 fi
+SIMULATOR_ARCH_ARGS=()
+PODFILE_LOCK="$PROJECT_DIR/Podfile.lock"
+if [ -f "$PODFILE_LOCK" ] && grep -q "GoogleMLKit/" "$PODFILE_LOCK"; then
+  # Match the UI build and the generated project: Google ML Kit currently
+  # supplies an x86_64 simulator slice, not an arm64 simulator slice.
+  SIMULATOR_ARCH_ARGS=(
+    "ARCHS=x86_64"
+    "ONLY_ACTIVE_ARCH=YES"
+    "EXCLUDED_ARCHS=arm64 armv7 armv7s"
+  )
+  ri_log "Google ML Kit detected; selecting its supported x86_64 simulator slice"
+fi
 ri_log "Running xcodebuild test (scheme=$TEST_SCHEME, destination=$DESTINATION)"
 set +e
 xcodebuild \
@@ -216,6 +228,7 @@ xcodebuild \
   -scheme "$TEST_SCHEME" \
   -destination "$DESTINATION" \
   ${DERIVED_ARGS[@]+"${DERIVED_ARGS[@]}"} \
+  ${SIMULATOR_ARCH_ARGS[@]+"${SIMULATOR_ARCH_ARGS[@]}"} \
   test | tee "$TEST_LOG"
 RC=${PIPESTATUS[0]}
 set -e

@@ -2,20 +2,52 @@
   "_comment": "Queue of browser-only syndication tasks (Medium, DZone, Hashnode) drained by a local syndication tool that runs on the maintainer's machine inside an already-signed-in browser session. Tasks are appended by scripts/website/queue_browser_syndication.py which is invoked by the daily blog-syndication workflow, and the local tool writes the resulting URLs back into syndication-state.json.",
   "tasks": [
     {
-      "id": "linkedin:2026-07-29-1200-shai-compact-strings-parparvm",
+      "id": "linkedin:2026-08-02-1200-shai-on-device-ai-mcp-loopback",
       "site": "linkedin",
       "kind": "social",
-      "slug": "2026-07-29-1200-shai-compact-strings-parparvm",
-      "source_slug": "compact-strings-parparvm",
+      "slug": "2026-08-02-1200-shai-on-device-ai-mcp-loopback",
+      "source_slug": "on-device-ai-mcp-loopback",
       "account": "shai",
-      "title": "Compact strings cut character storage in half",
-      "canonical": "https://www.codenameone.com/blog/compact-strings-parparvm/",
-      "cover_image_url": "https://www.codenameone.com/blog/compact-strings-parparvm.jpg",
-      "body_text": "We added compact strings to ParparVM this week.\n\nLatin-1 text now uses a `byte[]`. Other text keeps the full `char[]` representation. That cuts the character storage in half for strings such as URLs, JSON keys, class names, numbers, and much Western European text.\n\nUsing separate fields for `byte[]` and `char[]` would make every string carry two references when only one can be useful.\n\nWe kept one `Object value` field instead. The concrete array type is the encoding marker. Then we taught fused allocation to place either kind of array inline with the String in the same BiBOP block.\n\nThe result has no second backing pointer, no reduction in Unicode support, and no application code change. String operations preserve the compact representation, and wider text continues to use `char[]`.\n\nhttps://www.codenameone.com/blog/compact-strings-parparvm/",
-      "scheduled_at": "2026-07-29T09:00:00+00:00",
-      "scheduled_local": "2026-07-29T12:00+03:00",
+      "title": "Loopback is local, not private",
+      "canonical": "https://www.codenameone.com/blog/on-device-ai-mcp-loopback/",
+      "cover_image_url": "https://www.codenameone.com/blog/on-device-ai-mcp-loopback.jpg",
+      "body_text": "Loopback is local. It is not private.\n\nWe added a loopback socket transport so an MCP client can inspect and drive a Codename One application on mobile and desktop ports.\n\nThis is a powerful debugging loop. An LLM can read the semantic UI tree, find a button by role and text, activate it, set text, and inspect the state that follows. No screenshot coordinates are required.\n\nBinding to loopback prevents the control channel from appearing on office Wi-Fi. It does not stop another local process from trying to connect.\n\nThat is why `MCP.startSocketServer(...)` refuses to run in a release build by default. There is an explicit override for controlled test labs, but it should feel serious because it is serious.\n\nThe same release also moves on-device vision, language, and LiteRT inference into the core. OCR, barcode recognition, pose detection, translation, and application-owned models now have a selective cross-platform API with no surprise cloud fallback.\n\nThe article separates those two AI stories and explains the threat boundary.\n\nhttps://www.codenameone.com/blog/on-device-ai-mcp-loopback/",
+      "scheduled_at": "2026-08-02T09:00:00+00:00",
+      "scheduled_local": "2026-08-02T12:00+03:00",
       "timezone": "Asia/Jerusalem",
-      "queued_at": "2026-07-26T06:52:36+00:00"
+      "queued_at": "2026-07-31T15:14:58+00:00"
+    },
+    {
+      "id": "linkedin:2026-08-03-1200-codenameone-road-following-map-routing",
+      "site": "linkedin",
+      "kind": "social",
+      "slug": "2026-08-03-1200-codenameone-road-following-map-routing",
+      "source_slug": "road-following-map-routing",
+      "account": "codenameone",
+      "title": "A polyline is not a route",
+      "canonical": "https://www.codenameone.com/blog/road-following-map-routing/",
+      "cover_image_url": "https://www.codenameone.com/blog/road-following-map-routing.jpg",
+      "body_text": "A polyline joins the coordinates you already have. It cannot discover the road between them.\n\nThe new `com.codename1.maps.routing` API turns an origin, destination, and optional waypoints into road-following geometry, distance, duration, alternatives, legs, and steps.\n\nThe small path is two lines: create a map and call `Routing.showRoute(...)`.\n\nThe controlled path returns portable `Route` objects so the application can style the line, frame the bounds, show distance and ETA, compare alternatives, or retain encoded geometry.\n\nThe default OSRM service is keyless and useful for a first run. Its public demo endpoint has no production SLA and uses a car profile, so asking it for walking or cycling does not make the underlying road graph change.\n\nProduction applications can point at a controlled OSRM instance or install another `RouteService`.\n\nhttps://www.codenameone.com/blog/road-following-map-routing/",
+      "scheduled_at": "2026-08-03T09:00:00+00:00",
+      "scheduled_local": "2026-08-03T12:00+03:00",
+      "timezone": "Asia/Jerusalem",
+      "queued_at": "2026-07-31T15:14:58+00:00"
+    },
+    {
+      "id": "linkedin:2026-08-04-1200-shai-maven-central-cloudflare-r2",
+      "site": "linkedin",
+      "kind": "social",
+      "slug": "2026-08-04-1200-shai-maven-central-cloudflare-r2",
+      "source_slug": "maven-central-cloudflare-r2",
+      "account": "shai",
+      "title": "Why Codename One is moving beyond Maven Central",
+      "canonical": "https://www.codenameone.com/blog/maven-central-cloudflare-r2/",
+      "cover_image_url": "https://www.codenameone.com/blog/maven-central-cloudflare-r2.jpg",
+      "body_text": "Codename One is starting a staged move from Maven Central to a repository we operate on Cloudflare R2.\n\nI do not think Maven Central is doing something wrong by setting commercial usage limits. We are simply a terrible fit for them.\n\nOur dashboard reports 2.12 GB against an 80 MB guideline, 19,962 files against 1,000, and 27 releases against 7.\n\nThe first thing we found was our own waste. A real release publishes 229.5 MB. After removing unused fat JAR attachments, freezing stable packages, and extracting a 28 KB CSS command from the 43.5 MB Resource Editor JAR, that falls to 76.9 MB.\n\nThis week we start dual publishing. Next week new projects will include the Codename One repository. Three weeks later, if the observation period is clean, new versions will stop going to Central.\n\nCoordinates and normal Maven resolution stay the same. Existing projects will need a small `<repositories>` and `<pluginRepositories>` addition for future updates.\n\nThe article includes the POM block, exact dates, retention guarantee, release integrity design, known risks, and why this is not an attack on Sonatype.\n\nhttps://www.codenameone.com/blog/maven-central-cloudflare-r2/",
+      "scheduled_at": "2026-08-04T09:00:00+00:00",
+      "scheduled_local": "2026-08-04T12:00+03:00",
+      "timezone": "Asia/Jerusalem",
+      "queued_at": "2026-07-31T15:14:58+00:00"
     }
   ]
 }

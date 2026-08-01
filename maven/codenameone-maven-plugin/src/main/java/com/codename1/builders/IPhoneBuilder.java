@@ -22,6 +22,7 @@
  */
 package com.codename1.builders;
 
+import com.codename1.build.shared.PlatformFeatureCatalog;
 import com.codename1.util.IOSWalletExtensionBuilder;
 import com.codename1.util.IOSWidgetExtensionBuilder;
 import org.w3c.dom.Document;
@@ -115,8 +116,33 @@ public class IPhoneBuilder extends Executor {
     private boolean usesNfc;
     private boolean usesBluetooth;
     private boolean usesBluetoothPeripheral;
+
+    // See AndroidGradleBuilder for why the store flag is separate from the
+    // umbrella one: com.codename1.health.sensors is pure BLE and must not
+    // pull in HealthKit or its entitlement.
+    private boolean usesHealth;
+    private boolean usesHealthStore;
+    /// Treats a blank hint as missing.
+    private static String trimToNull(String v) {
+        if (v == null) {
+            return null;
+        }
+        String t = v.trim();
+        return t.length() == 0 ? null : t;
+    }
+
+    /// What the scan saw about health background listeners, and which of
+    /// them the generated factory can actually construct.
+    private final HealthListenerScan healthScan = new HealthListenerScan();
+
+    private boolean usesHealthRead;
+    private boolean usesHealthWrite;
+    private boolean usesHealthWorkout;
     private boolean usesCn1Camera;
     private boolean usesCn1Ar;
+    private boolean usesCn1Vision;
+    private boolean usesCn1Language;
+    private boolean usesCn1Inference;
     // Set when the app references com.codename1.car.* (Apple CarPlay support). Gates the
     // CN1_USE_CARPLAY native define, CarPlay.framework linkage, the carplay entitlement and the
     // CarPlay scene in the Info.plist scene manifest. Apps that never touch the API see no change.
@@ -334,7 +360,71 @@ public class IPhoneBuilder extends Executor {
         }
         return str + append;
     }
-    
+
+    private static String appendFrameworks(String libraries,
+                                           String... frameworks) {
+        String out = libraries == null ? "" : libraries;
+        for (String framework : frameworks) {
+            boolean present = false;
+            for (String item : out.split(";")) {
+                if (framework.equalsIgnoreCase(item.trim())) {
+                    present = true;
+                    break;
+                }
+            }
+            if (!present) {
+                out = out.length() == 0 ? framework : out + ";" + framework;
+            }
+        }
+        return out;
+    }
+
+    static String appendPodSpecIfAbsent(String pods, String candidate) {
+        String out = pods == null ? "" : pods;
+        String candidateName = podName(candidate);
+        for (String existing : out.split("[,;]")) {
+            if (candidateName.equalsIgnoreCase(podName(existing))) {
+                return out;
+            }
+        }
+        return out.length() == 0 ? candidate : out + "," + candidate;
+    }
+
+    static String deduplicatePodSpecs(String pods) {
+        String out = "";
+        if (pods == null) {
+            return out;
+        }
+        for (String podSpec : pods.split("[,;]")) {
+            podSpec = podSpec.trim();
+            if (podSpec.length() > 0) {
+                out = appendPodSpecIfAbsent(out, podSpec);
+            }
+        }
+        return out;
+    }
+
+    private static String podName(String podSpec) {
+        String value = podSpec == null ? "" : podSpec.trim();
+        int separator = value.indexOf(' ');
+        return separator < 0 ? value : value.substring(0, separator).trim();
+    }
+
+    private void applyCatalogPlistEntry(BuildRequest request,
+                                        String[] plistEntry) {
+        String privacyKey = plistEntry[0];
+        String requestKey = "ios." + privacyKey;
+        String value = request.getArg(requestKey, null);
+        if (value == null) {
+            value = plistEntry[1];
+            request.putArgument(requestKey, value);
+        }
+        if (value != null
+                && !privacyUsageDescriptions.containsKey(privacyKey)) {
+            privacyUsageDescriptions.put(privacyKey, value);
+        }
+    }
+
     private int getDeploymentTargetInt(BuildRequest request) {
         String target = getDeploymentTarget(request);
         if (target.indexOf(".") > 0) {
@@ -347,6 +437,11 @@ public class IPhoneBuilder extends Executor {
 
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
+        // Builder instances are normally single-use, but keep scan-derived
+        // native feature state deterministic if an instance is reused.
+        usesCn1Vision = false;
+        usesCn1Language = false;
+        usesCn1Inference = false;
         Stopwatch stopwatch = new Stopwatch();
         addMinDeploymentTarget(DEFAULT_MIN_DEPLOYMENT_VERSION);
         if (request.getArg("ios.deployment_target", null) == null) {
@@ -791,13 +886,46 @@ public class IPhoneBuilder extends Executor {
         }
         
         // Accumulator for AI/ML class hits. After the scan we apply
-        // every matched AiDependencyTable.Entry -- appending pods,
+        // every matched PlatformFeatureCatalog.Entry -- appending pods,
         // SPM specs, plist defaults and Android perms -- so the user
         // doesn't have to declare them by hand.
-        final AiDependencyTable.Accumulator aiAcc = new AiDependencyTable.Accumulator();
+        final PlatformFeatureCatalog.Accumulator aiAcc = new PlatformFeatureCatalog.Accumulator();
+        boolean excludeArm64Simulator = false;
 
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
+                // iOS has no OS-relaunch delivery, but it does have cold
+                // launches, and that is enough to need these. A restored
+                // subscription carries only the listener's class *name*;
+                // without generated bindings the runtime cannot turn that
+                // back into an instance, so even a manual drainChanges()
+                // after a restart delivered nothing.
+                @Override
+                public void implementsInterface(String cls, String iface) {
+                    healthScan.implementsInterface(cls, iface);
+                }
+
+                @Override
+                public void declaresEnclosedBy(String cls, String outer) {
+                    healthScan.declaresEnclosedBy(cls, outer);
+                }
+
+                @Override
+                public void declaresPublicType(String cls) {
+                    healthScan.declaresPublicType(cls);
+                }
+
+                @Override
+                public void declaresConcreteType(String cls) {
+                    healthScan.declaresConcreteType(cls);
+                }
+
+                @Override
+                public void declaresType(String cls, String superName,
+                        boolean isConcrete) {
+                    healthScan.declaresType(cls, superName, isConcrete);
+                }
+
                 @Override
                 public void usesClass(String cls) {
                     if (cls == null) return;
@@ -860,6 +988,47 @@ public class IPhoneBuilder extends Executor {
                             usesBluetoothPeripheral = true;
                         }
                     }
+                    // First-class health (com.codename1.health.*). The
+                    // store flag is what gates HealthKit, its entitlement
+                    // and the privacy-string requirement; the sensors
+                    // subpackage is ordinary BLE and must not trigger any
+                    // of that.
+                    if (cls.indexOf("com/codename1/health/") == 0) {
+                        usesHealth = true;
+                        // The facade itself is not evidence of the store:
+                        // the documented sensor-only flow is
+                        // Health.getInstance().getSensors(), which the
+                        // scanner reports with com/codename1/health/Health
+                        // as the owner. Treating that as store usage failed
+                        // the build for BLE-only apps over Health Connect
+                        // hints they have no use for. The usesClassMethod
+                        // hook below decides for the facade.
+                        // The value types are exempt for the same reason the
+                        // sensors package is: a sensor callback is handed a
+                        // HealthSample and reading a number off it names
+                        // QuantitySample, so counting those as store use linked
+                        // HealthKit into a BLE-only binary and put it through
+                        // health processing it never asked for.
+                        if (cls.indexOf("com/codename1/health/sensors/") != 0
+                                && !"com/codename1/health/Health".equals(cls)
+                                && !isSharedHealthModel(cls)) {
+                            usesHealthStore = true;
+                        }
+                        if (cls.indexOf("com/codename1/health/workout/") == 0) {
+                            usesHealthWorkout = true;
+                            // The update string, matching the getWorkouts()
+                            // hook. usesHealthWorkout alone drove nothing,
+                            // and a workout-only app shipped without any
+                            // purpose string and was refused when it asked
+                            // HealthKit for access.
+                            //
+                            // Not the share string: naming
+                            // WorkoutConfiguration says no more about
+                            // reading than calling getWorkouts() does, and
+                            // nothing in the package reads.
+                            usesHealthWrite = true;
+                        }
+                    }
                     // Low-level camera API (com.codename1.camera.*). Gated on
                     // actual usage -- NOT on the camera privacy description --
                     // so the old modal Capture API (which only sets
@@ -873,6 +1042,16 @@ public class IPhoneBuilder extends Executor {
                     // built for apps that reference the AR API.
                     if (!usesCn1Ar && cls.indexOf("com/codename1/ar/") == 0) {
                         usesCn1Ar = true;
+                    }
+                    if (!usesCn1Vision && isVisionAnalyzerClass(cls)) {
+                        usesCn1Vision = true;
+                    }
+                    if (!usesCn1Language && isLanguageFeatureClass(cls)) {
+                        usesCn1Language = true;
+                    }
+                    if (!usesCn1Inference
+                            && "com/codename1/ai/inference/InferenceSession".equals(cls)) {
+                        usesCn1Inference = true;
                     }
                     // Apple CarPlay (com.codename1.car.*). Gated on actual usage so the
                     // CarPlay scene/entitlement/framework are only added for apps that
@@ -926,7 +1105,130 @@ public class IPhoneBuilder extends Executor {
                 }
 
                 @Override
+                public void usesClassMethodWithBooleanArgument(String cls,
+                        String method, Boolean value) {
+                    // Sensor write-through is HealthKit use. An app enables
+                    // it with SensorSessionOptions.setWriteToStore(true)
+                    // and need never name HealthStore, so the
+                    // sensors-package exemption -- there so a BLE-only app
+                    // is not linked against HealthKit -- hid the one call
+                    // in that package that genuinely needs it, and the
+                    // build omitted the framework, the entitlement and the
+                    // purpose-string check.
+                    //
+                    // The argument decides it, which is why this is not in
+                    // usesClassMethod: an explicit setWriteToStore(false)
+                    // is a BLE-only app switching the store off, and
+                    // reading it as store use linked that app against
+                    // HealthKit and demanded purpose strings for data it
+                    // had just declined to touch.
+                    if (HealthManifestFragments.enablesSensorWriteThrough(
+                            cls, method, value)) {
+                        usesHealth = true;
+                        usesHealthStore = true;
+                        usesHealthWrite = true;
+                    }
+                }
+
+                @Override
                 public void usesClassMethod(String cls, String method) {
+                    // The catalog first: it decides frameworks and plist
+                    // entries for every feature, health included, and is
+                    // indifferent to what follows.
+                    aiAcc.consumeMethod(cls, method);
+                    // Health.getStore()/getWorkouts() mean a real platform
+                    // store; Health.getSensors() means BLE only. The class
+                    // reference alone cannot tell them apart, so the facade
+                    // is decided here.
+                    if ("com/codename1/health/Health".equals(cls)) {
+                        usesHealth = true;
+                        if (method.startsWith("getStore")
+                                || method.startsWith("getWorkouts")
+                                || method.startsWith("openHealthSettings")
+                                || method.startsWith("openProviderSetup")
+                                || method.startsWith("getAvailability")
+                                // The probes need the backend as much as a read
+                                // does: isSupported() asks the Health Connect
+                                // delegate whether it is there and hkIsAvailable()
+                                // asks the native, and neither exists unless the
+                                // build bundles them -- so an app whose only health
+                                // call was "is this supported?" was told no on every
+                                // device, for ever, because it had asked.
+                                || method.startsWith("isSupported")
+                                || method.startsWith("getConfigurationProblems")) {
+                            usesHealthStore = true;
+                        }
+                        if (method.startsWith("getWorkouts")) {
+                            usesHealthWorkout = true;
+                            // The update string, as the Android hook demands the
+                            // write direction. The class-reference branch sets this
+                            // when a workout type is named, but an app that calls
+                            // getWorkouts() and passes the facade around as Object
+                            // never names one -- and was entitled for HealthKit with
+                            // no string at all, so its first authorization request
+                            // was refused.
+                            //
+                            // Not the share string: nothing in the workout package
+                            // reads. The rollup is computed from the samples the app
+                            // fed in, and end() writes them. Asking for a read
+                            // purpose string an app cannot justify is the kind of
+                            // over-declaration App Review pushes back on, and the
+                            // build refused to proceed without it.
+                            usesHealthWrite = true;
+                        }
+                        if (method.startsWith("getSensors")) {
+                            // Same reason as Android: the sensor layer is
+                            // built on the public bluetooth API, so an app
+                            // that only calls getSensors() would otherwise
+                            // ship without CoreBluetooth linked or
+                            // CN1_INCLUDE_BLUETOOTH set.
+                            usesBluetooth = true;
+                        }
+                    }
+                    if (cls.indexOf("com/codename1/health/HealthStore") == 0) {
+                        // Writing needs a separate privacy string from
+                        // reading, and observers need a separate
+                        // entitlement, so both are detected rather than
+                        // assumed from mere health usage.
+                        if (method.startsWith("write")
+                                || method.startsWith("delete")) {
+                            usesHealthWrite = true;
+                        }
+                        // Reading needs NSHealthShareUsageDescription and
+                        // writing needs NSHealthUpdateUsageDescription.
+                        // They are not interchangeable: iOS kills the app
+                        // when it reads without the share string, so a
+                        // read-only app that declared only the update
+                        // string must not be waved through.
+                        if (method.startsWith("read")
+                                || method.startsWith("aggregate")
+                                || method.startsWith("subscribe")
+                                || method.startsWith("drainChanges")
+                                || method.startsWith("hasAnyData")
+                                || method.startsWith("requestAuthorization")) {
+                            usesHealthRead = true;
+                        }
+                        // Deliberately not set from subscribe() or
+                        // drainChanges(). Neither registers an
+                        // HKObserverQuery -- IOSHealthStore.doDrainChanges
+                        // polls with sample queries -- so the
+                        // background-delivery entitlement they used to
+                        // trigger bought nothing, while demanding a
+                        // provisioning-profile capability that a
+                        // polling-only app has no reason to hold. Getting
+                        // that wrong fails codesign with an opaque
+                        // message. The explicit build hint still turns it
+                        // on, for an app that knows it wants it.
+                        // requestAuthorization takes a HealthAccess list whose
+                        // contents the scanner cannot see, and asking for any
+                        // write access needs the update string. Requiring both
+                        // descriptions is the conservative reading; the
+                        // alternative is a build that passes and an app that
+                        // iOS kills the moment it requests share access.
+                        if (method.startsWith("requestAuthorization")) {
+                            usesHealthWrite = true;
+                        }
+                    }
                     if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0
                             || (cls.indexOf("com/codename1/calendar/CalendarManager") == 0
                             && (method.indexOf("getLocalSource") >= 0
@@ -1010,7 +1312,8 @@ public class IPhoneBuilder extends Executor {
         // iosPods string and SPM entries through the request build
         // hints, so the IOSDependencyManager.resolve() call below can
         // pick them up consistently with manually-declared deps.
-        if (!aiAcc.hits().isEmpty()) {
+        Set<PlatformFeatureCatalog.Entry> platformFeatureHits = aiAcc.hits();
+        if (!platformFeatureHits.isEmpty()) {
             // Prefer SPM when the project already uses SPM and the
             // entry exposes an SPM spec; otherwise pods. A handful
             // of ML Kit libs are pods-only -- those force pods on
@@ -1018,10 +1321,34 @@ public class IPhoneBuilder extends Executor {
             // upgrade the effective mode to BOTH below).
             boolean projectPrefersSpm = dependencyConfig.usesSwiftPackages() && !dependencyConfig.usesCocoaPods();
             StringBuilder spmPackages = new StringBuilder(request.getArg("ios.spm.packages", ""));
-            for (AiDependencyTable.Entry entry : aiAcc.hits()) {
+            for (PlatformFeatureCatalog.Entry entry : platformFeatureHits) {
+                // Third-party AI packages may omit Catalyst or arm64
+                // simulator slices. Keep framework-only Apple Vision enabled
+                // for macNative and record the simulator constraint for the
+                // generated Xcode and Pods projects.
+                boolean includeApplePackageDependencies =
+                        !macNativeBuilder.isEnabled()
+                        || entry.iosDependenciesSupportMacCatalyst();
+                if (includeApplePackageDependencies
+                        && entry.iosMinimumDeploymentTarget() != null) {
+                    addMinDeploymentTarget(
+                            entry.iosMinimumDeploymentTarget());
+                }
+                if (includeApplePackageDependencies
+                        && !entry.iosDependenciesSupportArm64Simulator()
+                        && (!entry.iosPods().isEmpty()
+                        || !entry.iosSpmSpecs().isEmpty())) {
+                    excludeArm64Simulator = true;
+                    log("Catalog-selected iOS dependency \""
+                            + entry.description()
+                            + "\" has no arm64 simulator slice. The generated "
+                            + "project will use the x86_64 simulator architecture.");
+                }
                 boolean handledViaSpm = false;
-                if (projectPrefersSpm && !entry.iosSpmSpecs().isEmpty()) {
-                    for (AiDependencyTable.IosSpm spm : entry.iosSpmSpecs()) {
+                if (includeApplePackageDependencies
+                        && projectPrefersSpm
+                        && !entry.iosSpmSpecs().isEmpty()) {
+                    for (PlatformFeatureCatalog.IosSpm spm : entry.iosSpmSpecs()) {
                         if (spmPackages.length() > 0) spmPackages.append(';');
                         spmPackages.append(spm.identity).append('|')
                                 .append(spm.url).append('|')
@@ -1040,19 +1367,18 @@ public class IPhoneBuilder extends Executor {
                     }
                     handledViaSpm = true;
                 }
-                if (!handledViaSpm) {
+                if (includeApplePackageDependencies && !handledViaSpm) {
                     for (String pod : entry.iosPods()) {
-                        if (iosPods.length() > 0) iosPods += ",";
-                        iosPods += pod;
+                        // User-declared specs are already first in iosPods, so
+                        // they win when the catalog requests the same pod.
+                        iosPods = appendPodSpecIfAbsent(iosPods, pod);
                     }
                 }
                 for (String[] plistEntry : entry.iosPlistEntries()) {
-                    String key = "ios." + plistEntry[0];
-                    if (request.getArg(key, null) == null) {
-                        request.putArgument(key, plistEntry[1]);
-                    }
+                    applyCatalogPlistEntry(request, plistEntry);
                 }
             }
+            iosPods = deduplicatePodSpecs(iosPods);
             if (spmPackages.length() > 0) {
                 request.putArgument("ios.spm.packages", spmPackages.toString());
             }
@@ -1493,6 +1819,14 @@ public class IPhoneBuilder extends Executor {
         // its installGlobal() call into the Stub right before the first
         // init(Object) so theme.getImage("foo.svg") returns the transcoded
         // SVG immediately. Skipped silently for apps that have no SVGs.
+        String healthBindingsInstall = "";
+        String healthInstallStatement = HealthListenerBindings
+                .installStatement(healthScan.resolve());
+        if (healthInstallStatement != null) {
+            healthBindingsInstall = "            "
+                    + healthInstallStatement;
+        }
+
         String svgRegistryInstall = "";
         File svgRegistryClassFile = new File(classesDir,
                 "com/codename1/generated/svg/SVGRegistry.class");
@@ -1664,6 +1998,7 @@ public class IPhoneBuilder extends Executor {
                     + "            initialized = true;\n"
                     + firebaseRegisterInstall
                     + svgRegistryInstall
+                    + healthBindingsInstall
                     + "            i.init(this);\n"
                     + createStartInvocation(request, "i")
                     + "        } else {\n"
@@ -1940,6 +2275,30 @@ public class IPhoneBuilder extends Executor {
                     }
                 }
             }
+        }
+        // Health background-listener bindings, written where the stub
+        // sources are compiled from so javac picks them up and ParparVM
+        // translates the result. Generated rather than resolved
+        // reflectively: a direct constructor call is a reference the
+        // translator follows, and a name passed to Class.forName is not.
+        for (String warning : healthScan.warnings()) {
+            log("WARNING: " + warning);
+        }
+        String healthBindingsSource =
+                HealthListenerBindings.generate(healthScan.resolve());
+        if (healthBindingsSource != null) {
+            File healthBindingsFile = new File(stubSource,
+                    HealthListenerBindings.sourcePath());
+            healthBindingsFile.getParentFile().mkdirs();
+            try (OutputStream bindings =
+                    new FileOutputStream(healthBindingsFile)) {
+                bindings.write(healthBindingsSource.getBytes("UTF-8"));
+            } catch (Exception ex) {
+                throw new BuildException(
+                        "Failed to write the health listener bindings", ex);
+            }
+            log("Generated health background-listener bindings for "
+                    + healthScan.resolve().keySet());
         }
         String javacPath = System.getProperty("java.home") + "/../bin/javac";
         if (!new File(javacPath).exists()) {
@@ -2401,7 +2760,7 @@ public class IPhoneBuilder extends Executor {
             // First-class Bluetooth: weak-link CoreBluetooth and compile in
             // the CN1Bluetooth natives only when the app references
             // com.codename1.bluetooth.*. The NSBluetooth* privacy strings
-            // are defaulted (only-if-unset) by the AiDependencyTable entry
+            // are defaulted (only-if-unset) by the PlatformFeatureCatalog entry
             // through the standard plist application above. Background
             // operation is opt-in through the ios.bluetooth.background hint
             // ("central", "peripheral" or "central,peripheral"), merged into
@@ -2446,13 +2805,204 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // First-class health (com.codename1.health.*). Gated on
+            // usesHealthStore, NOT usesHealth: an app that only streams a
+            // heart-rate strap through com.codename1.health.sensors is
+            // doing ordinary BLE and must not acquire HealthKit, its
+            // entitlement, or an App Store health-data review.
+            if (usesHealthStore) {
+                // Trimmed, and blank counts as absent. A hint present
+                // but empty produced an empty purpose string, which is
+                // exactly what App Review rejects and what iOS enforces at
+                // runtime -- the validation existed to prevent that.
+                String share = trimToNull(request.getArg(
+                        "ios.NSHealthShareUsageDescription", null));
+                String update = trimToNull(request.getArg(
+                        "ios.NSHealthUpdateUsageDescription", null));
+                if (share != null) {
+                    request.putArgument("ios.NSHealthShareUsageDescription",
+                            share);
+                }
+                if (update != null) {
+                    request.putArgument("ios.NSHealthUpdateUsageDescription",
+                            update);
+                }
+
+                // Deliberately a hard failure rather than a defaulted
+                // placeholder. Apple reviews health purpose strings against
+                // what the app actually does, so a generic string is
+                // precisely what gets the app rejected -- injecting one
+                // would also be a privacy claim made in the developer's
+                // name. Compare the camera/bluetooth entries in
+                // PlatformFeatureCatalog, which do default their strings.
+                // Availability alone needs no purpose string: checking
+                // whether HKHealthStore exists reads nothing, so there is
+                // no truthful text to demand. HealthKit still links.
+                if (!usesHealthRead && !usesHealthWrite) {
+                    // nothing to validate
+                } else if (share == null && update == null) {
+                    throw new BuildException(
+                        "This app uses com.codename1.health but declares no "
+                      + "HealthKit privacy strings.\n"
+                      + "  Add ios.NSHealthShareUsageDescription=<why your "
+                      + "app reads health data>\n"
+                      + "  and/or ios.NSHealthUpdateUsageDescription=<why "
+                      + "your app writes it>\n"
+                      + "to codenameone_settings.properties. Codename One "
+                      + "does not inject a placeholder: Apple reviews this "
+                      + "text against your app's behaviour and rejects "
+                      + "generic copy.");
+                }
+                if (usesHealthRead && share == null) {
+                    throw new BuildException(
+                        "This app reads health data (com.codename1.health "
+                      + "read/aggregate/subscribe) but declares no "
+                      + "ios.NSHealthShareUsageDescription build hint. "
+                      + "iOS terminates the app when it reads HealthKit "
+                      + "without it; the update string does not cover "
+                      + "reads.");
+                }
+                if (usesHealthWrite && update == null) {
+                    throw new BuildException(
+                        "This app writes health data (com.codename1.health "
+                      + "write/delete) but declares no "
+                      + "ios.NSHealthUpdateUsageDescription build hint. "
+                      + "HealthKit write authorization cannot be requested "
+                      + "without it.");
+                }
+
+                String hk = "HealthKit.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = hk;
+                } else if (!addLibs.toLowerCase().contains("healthkit")) {
+                    addLibs = addLibs + ";" + hk;
+                }
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define CN1_INCLUDE_HEALTH",
+                            "#define CN1_INCLUDE_HEALTH");
+                } catch (Exception ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_HEALTH", ex);
+                }
+
+                // HealthKit is entitlement-gated, unlike CoreBluetooth --
+                // this has no Bluetooth precedent. The profile must also
+                // carry the capability; without it the failure surfaces
+                // much later as an opaque codesign error.
+                //
+                // Only for an app that touches health *data*. An
+                // availability-only app is deliberately allowed to build
+                // without purpose strings, because it accesses nothing --
+                // so entitling it demanded a provisioning profile with a
+                // capability its App ID may never have enabled, and an
+                // otherwise harmless getAvailability() call failed
+                // codesigning.
+                // The explicit sub-capability hints count as usage too.
+                // Each block below emits its sub-entitlement from the hint
+                // alone, and a HealthKit sub-capability without
+                // com.apple.developer.healthkit beneath it is not a
+                // capability Apple can enable -- so an availability-only
+                // app asking for background delivery produced an
+                // entitlement set that could not be signed against a
+                // profile and would not have worked if it had been.
+                // The long-form keys count too. A sub-entitlement can be
+                // asked for either through the ios.health.* alias or
+                // written out in the ios.entitlements.* namespace, and
+                // the generic renderer emits whatever is in that
+                // namespace -- so an availability-only app that spelled
+                // it out in full got its sub-capability emitted while
+                // this gate, reading only the aliases, left
+                // com.apple.developer.healthkit off. That is the same
+                // unsignable entitlement set the aliases were fixed to
+                // avoid, reachable by the other spelling.
+                boolean entitleHealthKit = usesHealthRead || usesHealthWrite
+                        || usesHealthWorkout
+                        || "true".equalsIgnoreCase(request.getArg(
+                                "ios.health.backgroundDelivery", "false"))
+                        || "true".equalsIgnoreCase(request.getArg(
+                                "ios.health.recalibrateEstimates", "false"))
+                        || "true".equalsIgnoreCase(request.getArg(
+                                "ios.entitlements.com.apple.developer"
+                                        + ".healthkit.background-delivery",
+                                "false"))
+                        || "true".equalsIgnoreCase(request.getArg(
+                                "ios.entitlements.com.apple.developer"
+                                        + ".healthkit.recalibrate-estimates",
+                                "false"));
+                String healthKitEntitlement = request.getArg(
+                        "ios.entitlements.com.apple.developer.healthkit",
+                        null);
+                if (entitleHealthKit && healthKitEntitlement != null
+                        && !"true".equalsIgnoreCase(healthKitEntitlement)) {
+                    // Refused rather than overridden. The app calls the
+                    // health store and the hint says not to entitle it,
+                    // and neither reading wins on its own: silently
+                    // forcing the entitlement on contradicts an explicit
+                    // instruction, while honouring it signs the app with
+                    // <false/> and every authorization request fails at
+                    // runtime with the build having looked perfectly
+                    // healthy. A missing HealthKit capability is a
+                    // developer bug this feature already fails the build
+                    // over -- see the usage strings -- so it fails here
+                    // too, saying which two things disagree.
+                    error("This app uses com.codename1.health but sets "
+                            + "ios.entitlements.com.apple.developer"
+                            + ".healthkit=" + healthKitEntitlement
+                            + ". HealthKit cannot be used without that "
+                            + "entitlement: the app would be signed "
+                            + "without the capability and every "
+                            + "authorization request would fail at "
+                            + "runtime. Remove the hint to have it added "
+                            + "for you, set it to true, or stop calling "
+                            + "the health store.",
+                            new RuntimeException(
+                                "healthkit entitlement disabled"));
+                }
+                if (entitleHealthKit && healthKitEntitlement == null) {
+                    request.putArgument(
+                        "ios.entitlements.com.apple.developer.healthkit",
+                        "true");
+                }
+                boolean bgDelivery = "true".equalsIgnoreCase(
+                        request.getArg("ios.health.backgroundDelivery",
+                                "false"));
+                if (bgDelivery && request.getArg(
+                        "ios.entitlements.com.apple.developer.healthkit"
+                        + ".background-delivery", null) == null) {
+                    request.putArgument(
+                        "ios.entitlements.com.apple.developer.healthkit"
+                        + ".background-delivery", "true");
+                }
+                if ("true".equalsIgnoreCase(request.getArg(
+                        "ios.health.recalibrateEstimates", "false"))
+                        && request.getArg(
+                            "ios.entitlements.com.apple.developer.healthkit"
+                            + ".recalibrate-estimates", null) == null) {
+                    request.putArgument(
+                        "ios.entitlements.com.apple.developer.healthkit"
+                        + ".recalibrate-estimates", "true");
+                }
+                if ("true".equalsIgnoreCase(
+                        request.getArg("ios.health.required", "false"))) {
+                    String caps = request.getArg(
+                            "ios.UIRequiredDeviceCapabilities", "");
+                    if (!caps.contains("healthkit")) {
+                        request.putArgument("ios.UIRequiredDeviceCapabilities",
+                                caps.length() == 0 ? "healthkit"
+                                        : caps + "," + "healthkit");
+                    }
+                }
+            }
+
             // Uncomment INCLUDE_CN1_CAMERA in CodenameOne_GLViewController.h
             // so the com.codename1.camera native bridge (CN1Camera.{h,m})
             // compiles in. This is deliberately independent of
             // INCLUDE_CAMERA_USAGE (the old modal Capture API): the new
             // AVFoundation natives are only built when the app actually
             // references com.codename1.camera.*, matching the AVFoundation
-            // framework injection driven by the same scan via AiDependencyTable.
+            // framework injection driven by the same scan via PlatformFeatureCatalog.
             if (usesCn1Camera) {
                 try {
                     replaceInFile(new File(buildinRes,
@@ -2468,7 +3018,8 @@ public class IPhoneBuilder extends Executor {
             // Augmented reality: uncomment INCLUDE_CN1_AR so the CN1AR
             // natives (ARKit + ARSCNView) compile in, and link ARKit /
             // SceneKit explicitly -- neither is default-linked and the
-            // AiDependencyTable iosFrameworks field is documentation-only.
+            // Catalog frameworks are linked below. This explicit AR block also
+            // controls the native compile define and remains for compatibility.
             // Apps that never reference com.codename1.ar leave the define
             // commented out so no ARKit symbol is referenced, which keeps
             // Apple's API-usage scan quiet and tvOS/watchOS slices clean.
@@ -2488,6 +3039,53 @@ public class IPhoneBuilder extends Executor {
                 } else if (!addLibs.toLowerCase().contains("arkit.framework")) {
                     addLibs = addLibs + ";" + arLibs;
                 }
+            }
+
+            for (String framework : aiAcc.iosFrameworks()) {
+                addLibs = appendFrameworks(addLibs,
+                        framework + ".framework");
+            }
+
+            if (usesCn1Vision) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_VISION",
+                            "#define INCLUDE_CN1_VISION");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_VISION", ex);
+                }
+                addLibs = appendFrameworks(addLibs, "Vision.framework",
+                        "CoreImage.framework", "CoreVideo.framework");
+            }
+
+            if (usesCn1Language) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_LANGUAGE",
+                            "#define INCLUDE_CN1_LANGUAGE");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_LANGUAGE", ex);
+                }
+                addLibs = appendFrameworks(addLibs,
+                        "NaturalLanguage.framework");
+            }
+
+            if (usesCn1Inference) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_INFERENCE",
+                            "#define INCLUDE_CN1_INFERENCE");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_INFERENCE", ex);
+                }
+                addLibs = appendFrameworks(addLibs, "CoreML.framework",
+                        "Metal.framework", "Accelerate.framework");
             }
 
             // CarPlay: link CarPlay.framework (+ MediaPlayer for the now-playing template) and
@@ -3042,6 +3640,9 @@ public class IPhoneBuilder extends Executor {
                         targetStr = "8.0";
                     }
                     addMinDeploymentTarget(targetStr);
+                    String simulatorArchitectureSettings = excludeArm64Simulator
+                            ? "      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'\n"
+                            : "";
                     deploymentTargetStr = "begin\n"
                             + "  xcproj.targets.find{|e|e.name=='" + request.getMainClass() + "'}.build_configurations.each{|config| \n"
                             + "    config.build_settings['PRODUCT_BUNDLE_IDENTIFIER']='"+request.getPackageName()+"'\n"
@@ -3058,6 +3659,7 @@ public class IPhoneBuilder extends Executor {
                             + "    next if target.respond_to?(:product_type) && target.product_type == 'com.apple.product-type.app-extension'\n"
                             + "    target.build_configurations.each do |config|\n"
                             + "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '" + getDeploymentTarget(request) + "'\n"
+                            + simulatorArchitectureSettings
                             + "    end\n"
                             + "  end\n"
                             + "  xcproj.save\n"
@@ -3208,6 +3810,20 @@ public class IPhoneBuilder extends Executor {
 
                     }
 
+                    String arcPhaseFixScript =
+                            usesCn1Vision || usesCn1Language || usesCn1Inference
+                            ? "    arc_sources = ['CN1Vision.m', 'CN1Language.m', 'CN1Inference.m']\n"
+                            + "    main_target.source_build_phase.files.each do |bf|\n"
+                            + "      ref = bf.file_ref\n"
+                            + "      name = ref && File.basename(ref.path || ref.name || '')\n"
+                            + "      next unless arc_sources.include?(name)\n"
+                            + "      settings = bf.settings || {}\n"
+                            + "      flags = settings['COMPILER_FLAGS'].to_s.split\n"
+                            + "      flags << '-fobjc-arc' unless flags.include?('-fobjc-arc')\n"
+                            + "      settings['COMPILER_FLAGS'] = flags.join(' ')\n"
+                            + "      bf.settings = settings\n"
+                            + "    end\n"
+                            : "";
                     String createSchemesScript = "#!/usr/bin/env ruby\n" +
                             "require 'xcodeproj'\n" +
                             "require 'pathname'\n" +
@@ -3318,6 +3934,7 @@ public class IPhoneBuilder extends Executor {
                             + "      end\n"
                             + "      raise \"Swift files/resources still present in Copy Bundle Resources: #{names.join(', ')}\"\n"
                             + "    end\n"
+                            + arcPhaseFixScript
                             + "  end\n"
                             + "rescue => e\n"
                             + "  puts \"Error while correcting Swift build phases: #{$!}\"\n"
@@ -3353,7 +3970,7 @@ public class IPhoneBuilder extends Executor {
                         return false;
                     }
                     String podFileContents = "target '" + request.getMainClass() + "' do\n";
-                    String[] pods = iosPods.split("[,;]");
+                    String[] pods = deduplicatePodSpecs(iosPods).split("[,;]");
                     for (String podLib : pods) {
                         podLib = podLib.trim();
                         if (podLib.isEmpty()) {
@@ -3408,6 +4025,14 @@ public class IPhoneBuilder extends Executor {
 
                     if (useMetal) {
                         buildSettings += "      config.build_settings['CLANG_ENABLE_MODULES'] = \"YES\"\n";
+                    }
+                    if (excludeArm64Simulator) {
+                        // Google ML Kit's binary frameworks contain device
+                        // arm64 and simulator x86_64 slices. Apply the same
+                        // exclusion to every pod target so CocoaPods doesn't
+                        // drop its conflicting per-pod setting while merging
+                        // the aggregate xcconfig.
+                        buildSettings += "      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = \"arm64\"\n";
                     }
 
 
@@ -3615,6 +4240,42 @@ public class IPhoneBuilder extends Executor {
     }
 
     private File xcodeProjectDir;
+
+    /// Whether `cls` is a health value type rather than the store.
+    ///
+    /// These travel through the BLE sensor layer, which needs no HealthKit
+    /// entitlement, no framework and no purpose string.
+    private static boolean isSharedHealthModel(String cls) {
+        return "com/codename1/health/HealthSample".equals(cls)
+                || "com/codename1/health/QuantitySample".equals(cls)
+                || "com/codename1/health/SeriesSample".equals(cls)
+                || "com/codename1/health/CategorySample".equals(cls)
+                || "com/codename1/health/HealthQuantity".equals(cls)
+                || "com/codename1/health/HealthUnit".equals(cls)
+                || "com/codename1/health/HealthDataType".equals(cls)
+                || "com/codename1/health/HealthSource".equals(cls)
+                || "com/codename1/health/RecordingMethod".equals(cls)
+                || "com/codename1/health/BloodPressureSample".equals(cls)
+                // The error types travel the same way. A sensor callback
+                // is handed a HealthException, and asking it what went
+                // wrong names HealthError -- so a sensor-only app that
+                // handled its errors was read as touching the store, and
+                // got the Health Connect bridge bundled and its
+                // minSdkVersion raised to 26, cutting off the API 21-25
+                // devices the BLE-only flow is documented to support.
+                || "com/codename1/health/HealthException".equals(cls)
+                || "com/codename1/health/HealthError".equals(cls)
+                // Same exemption as the Android scanner, for the same
+                // reason. A BLE-only listener branching on
+                // getType().getKind(), or asking a unit for its dimension,
+                // makes a direct enum reference -- and here the cost is
+                // HealthKit linked and CN1_INCLUDE_HEALTH enabled for an app
+                // that never opens the store, which on iOS also means the
+                // HealthKit entitlement and the privacy usage strings the
+                // build demands with it.
+                || "com/codename1/health/HealthDataKind".equals(cls)
+                || "com/codename1/health/HealthUnitDimension".equals(cls);
+    }
 
     public File getXcodeProjectDir() {
         return xcodeProjectDir;
@@ -5480,6 +6141,22 @@ public class IPhoneBuilder extends Executor {
         
         }
         return out.toString();
+    }
+
+    private static boolean isVisionAnalyzerClass(String cls) {
+        return "com/codename1/ai/vision/TextRecognizer".equals(cls)
+                || "com/codename1/ai/vision/BarcodeScanner".equals(cls)
+                || "com/codename1/ai/vision/FaceDetector".equals(cls)
+                || "com/codename1/ai/vision/ImageLabeler".equals(cls)
+                || "com/codename1/ai/vision/PoseDetector".equals(cls)
+                || "com/codename1/ai/vision/SelfieSegmenter".equals(cls)
+                || "com/codename1/ai/vision/DocumentScanner".equals(cls);
+    }
+
+    private static boolean isLanguageFeatureClass(String cls) {
+        return "com/codename1/ai/language/LanguageIdentifier".equals(cls)
+                || "com/codename1/ai/language/Translator".equals(cls)
+                || "com/codename1/ai/language/SmartReply".equals(cls);
     }
 
 }
