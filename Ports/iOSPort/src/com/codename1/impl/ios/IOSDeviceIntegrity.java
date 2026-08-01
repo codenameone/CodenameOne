@@ -651,7 +651,18 @@ final class IOSDeviceIntegrity {
                     undeliveredAttestKeyId = null;
                     undeliveredAttestNonce = null;
                     undeliveredAttestToken = null;
-                    store.set(KEY_STATE, STATE_PENDING);
+                    // The same promotion the scheduled delivery does, including what to
+                    // do when the keychain refuses it: this caller is walking away with
+                    // the attestation, so a persisted state still saying nobody received
+                    // it would have the NEXT request discard a key the backend may
+                    // already have registered. Two paths hand this object over, and both
+                    // have to record that they did.
+                    if (!store.set(KEY_STATE, STATE_PENDING)) {
+                        deliveredAttestKeyId = keyId;
+                    }
+                    if (STATE_PENDING_UNDELIVERED.equals(inMemoryState)) {
+                        inMemoryState = STATE_PENDING;
+                    }
                     r.complete(token);
                     return r;
                 }
