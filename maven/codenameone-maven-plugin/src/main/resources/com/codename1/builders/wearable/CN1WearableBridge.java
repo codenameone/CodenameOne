@@ -109,6 +109,14 @@ public class CN1WearableBridge implements WearableBridge {
     private volatile List<Node> cachedNodes = new ArrayList<Node>();
     private volatile long cachedNodesStamp;
     private volatile boolean refreshingNodes;
+    /**
+     * Bumped on every write to the node cache, for the same reason as {@link #bondedGeneration}: an
+     * in-flight refresh must not overwrite a pushed onPeerConnected/Disconnected update with an
+     * older snapshot and stamp it fresh, which would leave isReachable() wrong until the cache
+     * expired.
+     */
+    private final Object nodesLock = new Object();
+    private long nodesGeneration;
 
     private final Context context;
     private final MessageClient messageClient;
@@ -301,6 +309,10 @@ public class CN1WearableBridge implements WearableBridge {
             refreshBondedAsync();
             return cachedBonded;
         }
+        final long startedAt;
+        synchronized (bondedLock) {
+            startedAt = bondedGeneration;
+        }
         List<String> out = new ArrayList<String>();
         try {
             CapabilityInfo info = Tasks.await(
@@ -317,6 +329,12 @@ public class CN1WearableBridge implements WearableBridge {
             return cachedBonded;
         }
         synchronized (bondedLock) {
+            if (bondedGeneration != startedAt) {
+                // A pushed onCapabilityChanged landed while this blocking query was out. It is more
+                // current than anything we asked for, so keep it rather than restoring the older
+                // answer and stamping it fresh.
+                return cachedBonded;
+            }
             cachedBonded = out;
             bondedStamp = System.currentTimeMillis();
             bondedKnown = true;
@@ -439,11 +457,15 @@ public class CN1WearableBridge implements WearableBridge {
                 updated.add(peer);
             }
         }
-        b.cachedNodes = updated;
-        // Keep the stamp: this is a push from Play services, which is more current than any query
-        // we could make, so there is nothing to re-ask. A zero stamp would also make the next
-        // sendMessage() defer needlessly.
-        b.cachedNodesStamp = System.currentTimeMillis();
+        synchronized (b.nodesLock) {
+            b.cachedNodes = updated;
+            // Keep the stamp: this is a push from Play services, which is more current than any
+            // query we could make, so there is nothing to re-ask. A zero stamp would also make the
+            // next sendMessage() defer needlessly. Bumping the generation is what stops an in-flight
+            // refresh from undoing this.
+            b.cachedNodesStamp = System.currentTimeMillis();
+            b.nodesGeneration++;
+        }
         // A disconnect can also mean the capability set shrank; let that refresh on its own clock.
         WearableConnection.notifyStateChanged();
     }
@@ -559,8 +581,11 @@ public class CN1WearableBridge implements WearableBridge {
             // blocking query happened to time out.
             return;
         }
-        cachedNodes = fresh;
-        cachedNodesStamp = System.currentTimeMillis();
+        synchronized (nodesLock) {
+            cachedNodes = fresh;
+            cachedNodesStamp = System.currentTimeMillis();
+            nodesGeneration++;
+        }
         rememberAll(cachedNodes);
     }
 
@@ -569,6 +594,10 @@ public class CN1WearableBridge implements WearableBridge {
             return;
         }
         refreshingNodes = true;
+        final long nodesStartedAt;
+        synchronized (nodesLock) {
+            nodesStartedAt = nodesGeneration;
+        }
         nodeClient.getConnectedNodes().addOnCompleteListener(
                 new com.google.android.gms.tasks.OnCompleteListener<List<Node>>() {
                     public void onComplete(com.google.android.gms.tasks.Task<List<Node>> task) {
@@ -582,9 +611,18 @@ public class CN1WearableBridge implements WearableBridge {
                             return;
                         }
                         List<Node> fresh = task.getResult();
-                        boolean changed = !sameIds(idsOf(cachedNodes), idsOf(fresh));
-                        cachedNodes = fresh;
-                        cachedNodesStamp = System.currentTimeMillis();
+                        boolean changed;
+                        synchronized (nodesLock) {
+                            if (nodesGeneration != nodesStartedAt) {
+                                // A pushed peer connect/disconnect landed while this was in flight.
+                                refreshingNodes = false;
+                                return;
+                            }
+                            changed = !sameIds(idsOf(cachedNodes), idsOf(fresh));
+                            cachedNodes = fresh;
+                            cachedNodesStamp = System.currentTimeMillis();
+                            nodesGeneration++;
+                        }
                         refreshingNodes = false;
                         rememberAll(fresh);
                         // Reachability may have changed; let listeners re-query. Only on an actual
