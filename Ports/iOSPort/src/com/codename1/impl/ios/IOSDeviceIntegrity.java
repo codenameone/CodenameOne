@@ -629,9 +629,19 @@ final class IOSDeviceIntegrity {
             // next launch finds STATE_NEW plus a start marker, reads an accepted key as
             // an interrupted attempt, and discards it for another rate-limited one --
             // every launch, for as long as the keychain stays unwilling.
+            //
+            // It rehydrates as UNDELIVERED, not as pending. This marker is written in
+            // exactly one place: the branch where the state write was refused, which is
+            // before anyone could have taken delivery. Reading it back as ordinary
+            // pending asserted the opposite -- and with the pending deadline also lost
+            // with the process, the grace window was already over, so the next request
+            // promoted the key immediately and started asserting against something the
+            // backend has never seen. A persisted STATE_PENDING wins over it, because
+            // that value is only ever written once a caller has the attestation.
             if (keyId != null && !STATE_ATTESTED.equals(state)
+                    && !STATE_PENDING.equals(state)
                     && keyId.equals(store.get(KEY_ATTEST_ACCEPTED))) {
-                state = STATE_PENDING;
+                state = STATE_PENDING_UNDELIVERED;
             }
             // Delivery that the keychain refused to record still happened. Without this
             // the state says nobody received the attestation and the branch below
