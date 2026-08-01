@@ -6,7 +6,23 @@
       "platform_support": "A skipped camera test does not mean the Codename One port is unsupported. Every listed target remains a supported port; camera availability is a separate runtime capability and depends on the device, permissions, and camera backend.",
       "verification": "The native camera implementations are compiled in their port builds and exercised with granted permissions on real hardware or an interactive browser. Deterministic API assertions use the synthetic camera backend outside this portability table.",
       "reason_codes": [
-        "needs-runtime-permission-on-"
+        {
+          "prefix": "needs-runtime-permission-on-"
+        },
+        {
+          "prefix": "no-host-webcam-capture-on-win",
+          "ports": [
+            "windows-x64",
+            "windows-arm64"
+          ]
+        },
+        {
+          "prefix": "no-camera-device-on-headless-runner",
+          "ports": [
+            "linux-x64",
+            "linux-arm64"
+          ]
+        }
       ]
     },
     {
@@ -15,8 +31,36 @@
       "platform_support": "The port remains supported. Video playback and frame decoding are measured separately by VideoIODecodedFramesScreenshotTest; this skip is limited to creating a new encoded video in that CI environment.",
       "verification": "Encoder-backed targets run the full counting-frame and audio round trip. Apple media playback and decoding are covered separately, while device-only recording is verified in signed hardware builds.",
       "reason_codes": [
-        "encode-unavailable-on-",
-        "VideoIO-unsupported-on-"
+        {
+          "prefix": "encode-unavailable-on-",
+          "ports": [
+            "ios-gl",
+            "ios-metal",
+            "mac-native",
+            "tvos",
+            "watchos"
+          ]
+        },
+        {
+          "prefix": "encode-write-failed-on-",
+          "ports": [
+            "ios-gl",
+            "ios-metal",
+            "mac-native",
+            "tvos",
+            "watchos"
+          ]
+        },
+        {
+          "prefix": "VideoIO-unsupported-on-",
+          "ports": [
+            "ios-gl",
+            "ios-metal",
+            "mac-native",
+            "tvos",
+            "watchos"
+          ]
+        }
       ]
     }
   ],

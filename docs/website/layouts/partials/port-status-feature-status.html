@@ -54,7 +54,16 @@
             {{- $reason := . -}}
             {{- $ok := false -}}
             {{- range $codes -}}
-              {{- if hasPrefix $reason . -}}{{- $ok = true -}}{{- end -}}
+              {{- /* A code documents this skip only when the reason matches
+                     AND, where the erratum names ports, this is one of them.
+                     Encoder trouble is expected on the Apple simulators and
+                     nowhere else, so the same code from a port whose encoder is
+                     meant to work stays undocumented and cannot render green. */ -}}
+              {{- $portAllowed := true -}}
+              {{- with .ports -}}
+                {{- $portAllowed = in . $port.id -}}
+              {{- end -}}
+              {{- if and $portAllowed (hasPrefix $reason .prefix) -}}{{- $ok = true -}}{{- end -}}
             {{- end -}}
             {{- if not $ok -}}{{- $allMatched = false -}}{{- end -}}
           {{- end -}}
