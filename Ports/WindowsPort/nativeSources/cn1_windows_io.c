@@ -85,7 +85,9 @@ static JAVA_OBJECT cn1WinWideToJavaString(CODENAME_ONE_THREAD_STATE, const WCHAR
 /* Reason the last open failed. The port reports "could not open X" from Java,
  * where the thread's last-error value is long gone; without this the only way
  * to tell a missing directory from a sharing violation was another CI run. */
-static DWORD cn1WinLastIoError;
+/* Per-thread: two threads failing an open at once would otherwise overwrite
+ * each other and lastIoError() could report the wrong reason. */
+static __declspec(thread) DWORD cn1WinLastIoError;
 
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_lastIoError___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
     char buffer[256];

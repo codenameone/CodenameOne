@@ -54,7 +54,10 @@
 
 #define CN1_GCM_TAG_BYTES 16
 
-static char cn1WinCryptoError[512];
+/* Per-thread: crypto failures on different threads would otherwise overwrite
+ * each other and lastCryptoError() could answer with an unrelated call's
+ * message. */
+static __declspec(thread) char cn1WinCryptoError[512];
 
 static void cn1CryptoFail(const char* what, NTSTATUS status) {
     _snprintf(cn1WinCryptoError, sizeof(cn1WinCryptoError), "%s (status 0x%08lx)", what,
@@ -417,24 +420,57 @@ static int cn1Digest(LPCWSTR algorithm, const unsigned char* data, int length,
  * signatures are converted in both directions.
  */
 
+/* One digest over two buffers in sequence, without joining them first.
+ *
+ * MGF1's second call seeds from the whole masked DB -- 351 bytes for a
+ * 3072-bit key and 479 for a 4096-bit one, both of which KeyGenerator.rsa()
+ * supports -- so the seed cannot be staged in a buffer sized for a hash. This
+ * feeds the seed and the counter to the hash object directly instead. */
+static int cn1DigestPair(LPCWSTR algorithm, const unsigned char* first, int firstLength,
+                         const unsigned char* second, int secondLength,
+                         unsigned char* digest, int digestLength) {
+    BCRYPT_ALG_HANDLE alg = NULL;
+    BCRYPT_HASH_HANDLE hash = NULL;
+    NTSTATUS status = BCryptOpenAlgorithmProvider(&alg, algorithm, NULL, 0);
+    if (status != STATUS_SUCCESS) {
+        cn1CryptoFail("digest provider", status);
+        return 0;
+    }
+    status = BCryptCreateHash(alg, &hash, NULL, 0, NULL, 0, 0);
+    if (status == STATUS_SUCCESS) {
+        status = BCryptHashData(hash, (PUCHAR) first, (ULONG) firstLength, 0);
+    }
+    if (status == STATUS_SUCCESS) {
+        status = BCryptHashData(hash, (PUCHAR) second, (ULONG) secondLength, 0);
+    }
+    if (status == STATUS_SUCCESS) {
+        status = BCryptFinishHash(hash, digest, (ULONG) digestLength, 0);
+    }
+    if (hash != NULL) {
+        BCryptDestroyHash(hash);
+    }
+    BCryptCloseAlgorithmProvider(alg, 0);
+    if (status != STATUS_SUCCESS) {
+        cn1CryptoFail("digest", status);
+        return 0;
+    }
+    return 1;
+}
+
 static int cn1Mgf1(LPCWSTR digestAlgorithm, const unsigned char* seed, int seedLength,
                    unsigned char* mask, int maskLength) {
     int digestLength = cn1DigestLength(digestAlgorithm);
-    unsigned char counted[256];
+    unsigned char counter[4];
     unsigned char digest[64];
     int produced = 0;
-    unsigned int counter = 0;
-    if (seedLength + 4 > (int) sizeof(counted)) {
-        return 0;
-    }
-    memcpy(counted, seed, (size_t) seedLength);
+    unsigned int count = 0;
     while (produced < maskLength) {
         int chunk = maskLength - produced;
-        counted[seedLength] = (unsigned char) ((counter >> 24) & 0xff);
-        counted[seedLength + 1] = (unsigned char) ((counter >> 16) & 0xff);
-        counted[seedLength + 2] = (unsigned char) ((counter >> 8) & 0xff);
-        counted[seedLength + 3] = (unsigned char) (counter & 0xff);
-        if (!cn1Digest(digestAlgorithm, counted, seedLength + 4, digest, digestLength)) {
+        counter[0] = (unsigned char) ((count >> 24) & 0xff);
+        counter[1] = (unsigned char) ((count >> 16) & 0xff);
+        counter[2] = (unsigned char) ((count >> 8) & 0xff);
+        counter[3] = (unsigned char) (count & 0xff);
+        if (!cn1DigestPair(digestAlgorithm, seed, seedLength, counter, 4, digest, digestLength)) {
             return 0;
         }
         if (chunk > digestLength) {
@@ -442,7 +478,7 @@ static int cn1Mgf1(LPCWSTR digestAlgorithm, const unsigned char* seed, int seedL
         }
         memcpy(mask + produced, digest, (size_t) chunk);
         produced += chunk;
-        counter++;
+        count++;
     }
     return 1;
 }
@@ -453,9 +489,13 @@ static int cn1OaepEncode(LPCWSTR labelDigest, LPCWSTR maskDigest, const unsigned
     int hashLength = cn1DigestLength(labelDigest);
     int dbLength = blockLength - hashLength - 1;
     unsigned char seed[64];
-    unsigned char mask[512];
+    unsigned char mask[1024];
     int i;
-    if (dbLength <= 0 || messageLength > dbLength - hashLength - 1 || dbLength > (int) sizeof(mask)) {
+    if (dbLength <= 0 || dbLength > (int) sizeof(mask)) {
+        cn1CryptoFail("RSA-OAEP block does not fit the key", 0);
+        return 0;
+    }
+    if (messageLength > dbLength - hashLength - 1) {
         cn1CryptoFail("RSA-OAEP message is too long for the key", 0);
         return 0;
     }
@@ -488,19 +528,43 @@ static int cn1OaepEncode(LPCWSTR labelDigest, LPCWSTR maskDigest, const unsigned
     return 1;
 }
 
-/* Reverses cn1OaepEncode, writing the recovered message and its length. */
+/* All ones when a == b, zero otherwise, without branching on the values. */
+static unsigned int cn1CtEqMask(unsigned int a, unsigned int b) {
+    unsigned int diff = a ^ b;
+    /* 1 when diff is nonzero, 0 when it is zero; minus one turns that into a
+     * full-width mask without a comparison the compiler can branch on. */
+    unsigned int nonZero = (diff | (0u - diff)) >> 31;
+    return nonZero - 1u;
+}
+
+/* Reverses cn1OaepEncode, writing the recovered message and its length.
+ *
+ * Every check on the decrypted block feeds one accumulator and the function
+ * reports a single generic failure, rather than returning early with a
+ * distinct message per cause. An application that decrypts attacker-chosen
+ * ciphertext and surfaces the exception (WindowsImplementation.cryptoResult
+ * puts this text in it) would otherwise hand back which of the leading byte,
+ * the label hash or the delimiter was wrong -- and telling those apart is
+ * enough to mount the adaptive attacks OAEP exists to prevent. Only the
+ * block geometry, which follows the key and not the ciphertext, is allowed to
+ * bail early. */
 static int cn1OaepDecode(LPCWSTR labelDigest, LPCWSTR maskDigest, unsigned char* block,
                          int blockLength, unsigned char* message, int* messageLength) {
     int hashLength = cn1DigestLength(labelDigest);
     int dbLength = blockLength - hashLength - 1;
-    unsigned char mask[512];
+    unsigned char mask[1024];
     unsigned char labelHash[64];
     unsigned char seed[64];
-    int i, index;
-    if (dbLength <= 0 || dbLength > (int) sizeof(mask) || block[0] != 0x00) {
-        cn1CryptoFail("RSA-OAEP block is malformed", 0);
+    int i;
+    unsigned int bad = 0;
+    unsigned int seenDelimiter = 0;
+    unsigned int messageStart = 0;
+    if (dbLength <= 0 || dbLength > (int) sizeof(mask)) {
+        cn1CryptoFail("RSA-OAEP block does not fit the key", 0);
         return 0;
     }
+    /* The leading byte must be zero; fold it in rather than returning here. */
+    bad |= (unsigned int) block[0];
     if (!cn1Mgf1(maskDigest, block + 1 + hashLength, dbLength, mask, hashLength)) {
         return 0;
     }
@@ -516,22 +580,29 @@ static int cn1OaepDecode(LPCWSTR labelDigest, LPCWSTR maskDigest, unsigned char*
     if (!cn1Digest(labelDigest, (const unsigned char*) "", 0, labelHash, hashLength)) {
         return 0;
     }
-    if (memcmp(labelHash, block + 1 + hashLength, (size_t) hashLength) != 0) {
-        cn1CryptoFail("RSA-OAEP label hash does not match", 0);
+    for (i = 0; i < hashLength; i++) {
+        bad |= (unsigned int) (labelHash[i] ^ block[1 + hashLength + i]);
+    }
+    /* Walk the whole padding: zeros until one 0x01, then the message. The loop
+     * never stops early, so its timing follows the key size alone. */
+    for (i = 1 + hashLength + hashLength; i < blockLength; i++) {
+        unsigned int value = block[i];
+        unsigned int isDelimiter = cn1CtEqMask(value, 0x01);
+        unsigned int isZero = cn1CtEqMask(value, 0x00);
+        unsigned int firstDelimiter = isDelimiter & ~seenDelimiter;
+        messageStart |= ((unsigned int) (i + 1)) & firstDelimiter;
+        /* Ahead of the delimiter nothing but zeros is allowed. */
+        bad |= ~seenDelimiter & ~isDelimiter & ~isZero;
+        seenDelimiter |= isDelimiter;
+    }
+    bad |= ~seenDelimiter; /* no delimiter anywhere in the block */
+    if (bad != 0) {
+        cn1CryptoFail("RSA-OAEP decryption failed", 0);
         return 0;
     }
-    index = 1 + hashLength + hashLength;
-    while (index < blockLength && block[index] == 0x00) {
-        index++;
-    }
-    if (index >= blockLength || block[index] != 0x01) {
-        cn1CryptoFail("RSA-OAEP padding is malformed", 0);
-        return 0;
-    }
-    index++;
-    *messageLength = blockLength - index;
+    *messageLength = blockLength - (int) messageStart;
     if (*messageLength > 0) {
-        memcpy(message, block + index, (size_t) *messageLength);
+        memcpy(message, block + messageStart, (size_t) *messageLength);
     }
     return 1;
 }
@@ -554,29 +625,62 @@ static int cn1DerInteger(const unsigned char* value, int length, unsigned char* 
     return written + length - start;
 }
 
-/* P1363 r||s (as CNG produces) to the ASN.1 DER sequence the API expects. */
+/* P1363 r||s (as CNG produces) to the ASN.1 DER sequence the API expects.
+ *
+ * P-521 coordinates are 66 bytes each, so the sequence body runs to about 138
+ * bytes and DER requires the long form (0x81 followed by the length) for
+ * anything over 127. A single length byte there sets the high bit, which
+ * Jwt.derToJoseEcdsa and every conforming parser read as a long-form marker,
+ * and the ES512 signature is rejected. */
 static int cn1EcdsaToDer(const unsigned char* raw, int rawLength, unsigned char* der) {
     int half = rawLength / 2;
     unsigned char body[160];
     int bodyLength = 0;
+    int written = 0;
     if (rawLength <= 0 || (rawLength & 1) != 0 || half > 66) {
         return 0;
     }
     bodyLength = cn1DerInteger(raw, half, body);
     bodyLength += cn1DerInteger(raw + half, half, body + bodyLength);
-    der[0] = 0x30;
-    der[1] = (unsigned char) bodyLength;
-    memcpy(der + 2, body, (size_t) bodyLength);
-    return bodyLength + 2;
+    der[written++] = 0x30;
+    if (bodyLength > 127) {
+        der[written++] = 0x81;
+    }
+    der[written++] = (unsigned char) bodyLength;
+    memcpy(der + written, body, (size_t) bodyLength);
+    return written + bodyLength;
+}
+
+/* Coordinate width of an EC key in bytes: 66 for P-521, whose 521 bits do not
+ * fill a whole byte count that any digest length happens to match. */
+static int cn1EcCoordinateBytes(BCRYPT_KEY_HANDLE key) {
+    DWORD bits = 0;
+    ULONG copied = 0;
+    if (BCryptGetProperty(key, BCRYPT_KEY_STRENGTH, (PUCHAR) &bits, sizeof(bits), &copied, 0)
+            != STATUS_SUCCESS || bits == 0) {
+        return 0;
+    }
+    return (int) ((bits + 7) / 8);
 }
 
 /* Inverse of cn1EcdsaToDer, padding each half back to `half` bytes. */
 static int cn1EcdsaFromDer(const unsigned char* der, int derLength, unsigned char* raw, int half) {
-    int index = 2;
+    int index = 1;
     int part;
     if (derLength < 8 || der[0] != 0x30) {
         return 0;
     }
+    /* Accept the long form the P-521 body needs, and only that one extra
+     * length byte -- a sequence of two integers never runs past 255 bytes. */
+    if (der[index] == 0x81) {
+        index++;
+        if (index >= derLength) {
+            return 0;
+        }
+    } else if ((der[index] & 0x80) != 0) {
+        return 0;
+    }
+    index++;
     memset(raw, 0, (size_t) (half * 2));
     for (part = 0; part < 2; part++) {
         int length, start, copy;
@@ -585,7 +689,7 @@ static int cn1EcdsaFromDer(const unsigned char* der, int derLength, unsigned cha
         }
         length = der[index + 1];
         index += 2;
-        if (index + length > derLength) {
+        if (length <= 0 || index + length > derLength) {
             return 0;
         }
         start = 0;
@@ -821,15 +925,18 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_verifyData___java_lang_Str
         padding.pszAlgId = digestAlgorithm;
         if (isEc) {
             /* Signatures arrive as DER; CNG verifies the P1363 pair. The half
-             * width follows the key size, which for the supported curves is
-             * the digest the caller named. */
-            int half = cn1DigestLength(digestAlgorithm);
-            if (half == 20) {
-                half = 32;
+             * width is the curve's, read off the key -- deriving it from the
+             * named digest gets P-521 wrong, whose coordinates are 66 bytes
+             * while SHA-512 is 64, so a valid ES512 signature would be handed
+             * to CNG as a 128-byte pair instead of the required 132. */
+            int half = cn1EcCoordinateBytes(key);
+            if (half <= 0 || half * 2 > (int) sizeof(raw)) {
+                usable = 0;
+            } else {
+                usable = cn1EcdsaFromDer(signature, signatureLength, raw, half);
+                toVerify = raw;
+                toVerifyLength = (ULONG) (half * 2);
             }
-            usable = cn1EcdsaFromDer(signature, signatureLength, raw, half);
-            toVerify = raw;
-            toVerifyLength = (ULONG) (half * 2);
         }
         /* A rejected signature is a normal answer here, not a fault. */
         if (usable && BCryptVerifySignature(key, isEc ? NULL : &padding, digest,

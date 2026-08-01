@@ -51,7 +51,10 @@
 
 #define CN1_GCM_TAG_BYTES 16
 
-static char cn1CryptoError[512];
+/* Per-thread: crypto failures on different threads would otherwise overwrite
+ * each other and lastCryptoError() could answer with an unrelated call's
+ * message. */
+static __thread char cn1CryptoError[512];
 
 static void cn1CryptoFail(const char* what) {
     unsigned long code = ERR_get_error();

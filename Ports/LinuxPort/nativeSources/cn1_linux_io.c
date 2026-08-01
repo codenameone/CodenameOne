@@ -171,7 +171,10 @@ static const char* cn1JStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s) {
 /* Reason the last open failed. The port reports "could not open X" from Java,
  * where errno is long gone; without this the only way to tell a missing
  * directory from a permission problem was another CI round trip. */
-static char cn1LastIoError[512];
+/* Per-thread: two threads failing an open at once would otherwise overwrite
+ * each other and lastIoError() could report the wrong reason, or a torn
+ * mixture of both. */
+static __thread char cn1LastIoError[512];
 
 static void cn1RecordIoError(const char* path) {
     snprintf(cn1LastIoError, sizeof(cn1LastIoError), "%s", strerror(errno));

@@ -169,9 +169,20 @@ function validate() {
 
     // A cell may only read as a pass while carrying a skip when the errata name
     // that exact test, so a green mark can never outrun its explanation.
+    //
+    // Whether any such cell exists at all depends on what the live reports
+    // skipped this round: a round in which every port ran everything is a good
+    // outcome, not a page defect, so requiring at least one would fail the
+    // website build for the best possible reason. What must hold instead is
+    // that the marker and the cell's own label agree. Stale cells are exempt
+    // because staleness drops the marker while keeping the label it replaced.
     const notedCells = primaryCellTags.filter((cell) => /\bhas-documented-skip\b/.test(cell));
-    if (notedCells.length === 0) {
-        fail("no cell reports a documented skip; the errata and the table disagree");
+    const labelledSkipCells = primaryCellTags.filter((cell) =>
+        !/\bis-stale\b/.test(attribute(cell, "class")) &&
+        /skipped by the CI environment/i.test(attribute(cell, "title")));
+    if (notedCells.length !== labelledSkipCells.length) {
+        fail(`documented-skip markers and cell labels disagree: ${notedCells.length} marked, `
+            + `${labelledSkipCells.length} labelled`);
     }
     for (const cell of notedCells) {
         const skips = attribute(cell, "data-documented-skip").split(/\s+/).filter(Boolean);

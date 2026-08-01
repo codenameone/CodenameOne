@@ -315,29 +315,36 @@ static void (__cdecl *cn1_ucal_setMillis)(CN1UCalendar, double, int32_t*);
 static int32_t (__cdecl *cn1_ucal_get)(const CN1UCalendar, int32_t, int32_t*);
 static void (__cdecl *cn1_ucal_close)(CN1UCalendar);
 static int cn1IcuResolved;
+/* Resolution runs under a lock, and cn1IcuResolved is written only once the
+ * function pointers are in place. Publishing "in progress" first, as a plain
+ * flag test would, lets a second thread asking for a zone at startup see a
+ * nonzero value, conclude ICU is unavailable and fall through to the CRT --
+ * which cannot read IANA identifiers, so that one query intermittently
+ * answers UTC. */
+static SRWLOCK cn1IcuLock = SRWLOCK_INIT;
 
 static int cn1IcuAvailable(void) {
-    HMODULE icu;
-    if (cn1IcuResolved != 0) {
-        return cn1IcuResolved > 0;
+    int resolved;
+    AcquireSRWLockExclusive(&cn1IcuLock);
+    if (cn1IcuResolved == 0) {
+        HMODULE icu = LoadLibraryA("icu.dll");
+        int ok = 0;
+        if (icu != NULL) {
+            cn1_ucal_open = (CN1UCalendar (__cdecl *)(const WCHAR*, int32_t, const char*, int32_t, int32_t*))
+                    GetProcAddress(icu, "ucal_open");
+            cn1_ucal_setMillis = (void (__cdecl *)(CN1UCalendar, double, int32_t*))
+                    GetProcAddress(icu, "ucal_setMillis");
+            cn1_ucal_get = (int32_t (__cdecl *)(const CN1UCalendar, int32_t, int32_t*))
+                    GetProcAddress(icu, "ucal_get");
+            cn1_ucal_close = (void (__cdecl *)(CN1UCalendar)) GetProcAddress(icu, "ucal_close");
+            ok = cn1_ucal_open != 0 && cn1_ucal_setMillis != 0
+                    && cn1_ucal_get != 0 && cn1_ucal_close != 0;
+        }
+        cn1IcuResolved = ok ? 1 : -1;
     }
-    cn1IcuResolved = -1;
-    icu = LoadLibraryA("icu.dll");
-    if (icu == NULL) {
-        return 0;
-    }
-    cn1_ucal_open = (CN1UCalendar (__cdecl *)(const WCHAR*, int32_t, const char*, int32_t, int32_t*))
-            GetProcAddress(icu, "ucal_open");
-    cn1_ucal_setMillis = (void (__cdecl *)(CN1UCalendar, double, int32_t*))
-            GetProcAddress(icu, "ucal_setMillis");
-    cn1_ucal_get = (int32_t (__cdecl *)(const CN1UCalendar, int32_t, int32_t*))
-            GetProcAddress(icu, "ucal_get");
-    cn1_ucal_close = (void (__cdecl *)(CN1UCalendar)) GetProcAddress(icu, "ucal_close");
-    if (cn1_ucal_open == 0 || cn1_ucal_setMillis == 0 || cn1_ucal_get == 0 || cn1_ucal_close == 0) {
-        return 0;
-    }
-    cn1IcuResolved = 1;
-    return 1;
+    resolved = cn1IcuResolved;
+    ReleaseSRWLockExclusive(&cn1IcuLock);
+    return resolved > 0;
 }
 
 int cn1_win_zone_offset_millis(const char* zoneId, long long millis, int* offsetOut, int* dstOut) {
