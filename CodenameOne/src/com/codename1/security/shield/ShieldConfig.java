@@ -105,7 +105,7 @@ public final class ShieldConfig {
     /// Header names the transport owns, so an attestation token put in one does not
     /// arrive as a header at all.
     ///
-    /// Three families, all lower-cased for comparison because header names are
+    /// Four families, all lower-cased for comparison because header names are
     /// case-insensitive:
     ///
     /// - framing (`content-length`, `transfer-encoding`) -- the transport computes these
@@ -116,7 +116,13 @@ public final class ShieldConfig {
     /// - hop-by-hop (`connection`, `keep-alive`, `proxy-connection`, `te`, `trailer`,
     ///   `upgrade`, `proxy-authorization`, `proxy-authenticate`) -- defined to be
     ///   consumed by the next hop and not forwarded, so the token would be stripped in
-    ///   transit by a proxy that is behaving correctly.
+    ///   transit by a proxy that is behaving correctly;
+    /// - written by a port on the way out (`accept-encoding`, `x-http-method-override`)
+    ///   -- the Android implementation clears `Accept-Encoding` on a HEAD request to work
+    ///   around a platform bug, and sets `X-HTTP-Method-Override` itself when its PATCH
+    ///   fallback is in use. Both overwrite whatever was there, so a token in one of them
+    ///   is replaced between `attach()` reporting success and the request going out, and
+    ///   only on the platform and request shape that triggers it.
     ///
     /// Refused rather than warned about, because the failure has no symptom on the
     /// client: `attach()` returns having set the header, and the request reaches the
@@ -132,6 +138,13 @@ public final class ShieldConfig {
         // appears only once a user is behind such a proxy, on a network nobody testing
         // this was on.
         "proxy-authorization", "proxy-authenticate",
+        // Not transport metadata: these are written by a port. Android clears
+        // Accept-Encoding on HEAD around a platform bug and sets X-HTTP-Method-Override
+        // for its PATCH fallback, both after the request's own headers are in place. The
+        // failure is worse than a plain collision because it is conditional -- one HTTP
+        // method, one platform -- so it would pass every test that did not happen to use
+        // that shape.
+        "accept-encoding", "x-http-method-override",
         // Cookie is not transport framing, but it fails the same way and worse.
         // ConnectionRequest emits userHeaders first and THEN calls setHeader("Cookie",
         // ...) with the generated cookie string, so with cookie handling on and any

@@ -469,6 +469,11 @@ class ShieldApiTest {
             // sees the token -- and only for users behind such a proxy, which is a
             // network nobody testing this was on.
             "Proxy-Authorization", "Proxy-Authenticate",
+            // Written by a port on the way out: Android clears Accept-Encoding on HEAD
+            // around a platform bug, and sets X-HTTP-Method-Override for its PATCH
+            // fallback. Conditional on the method and the platform, so a token in one of
+            // them survives every test that does not use that exact shape.
+            "Accept-Encoding", "X-HTTP-Method-Override",
             // Not framing, but overwritten by the request itself: ConnectionRequest
             // emits userHeaders and then sets Cookie from its own cookie store.
             "Cookie"
