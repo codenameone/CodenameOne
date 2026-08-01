@@ -139,7 +139,17 @@ public abstract class WebSocketImpl {
         String n = asciiLower(name);
         return "host".equals(n) || "upgrade".equals(n) || "connection".equals(n)
                 || "sec-websocket-key".equals(n) || "sec-websocket-version".equals(n)
-                || "sec-websocket-protocol".equals(n) || "content-length".equals(n);
+                || "sec-websocket-protocol".equals(n)
+                // Extensions negotiate what the FRAMES mean, and no reader here
+                // implements one. Emitting it let a caller ask for permessage-deflate;
+                // a compliant server then agrees, sets RSV1 and sends compressed
+                // payloads -- and the readers mask off the opcode and pass the bytes
+                // straight through, so text arrives as mojibake and binary arrives
+                // compressed. The failure appears at the application, far from the one
+                // header that caused it, and only against servers that happen to offer
+                // the extension. Ignored until a port can actually inflate.
+                || "sec-websocket-extensions".equals(n)
+                || "content-length".equals(n);
     }
 
     /// Lowercases ASCII letters only, so the result never depends on the device locale.

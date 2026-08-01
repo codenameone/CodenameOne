@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -190,6 +191,32 @@ class WebSocketTest {
         assertEquals(true, WebSocket.isSupported());
     }
 
+    /**
+     * Extension negotiation is ignored, like the other handshake-control headers.
+     *
+     * <p>Extensions change what the FRAMES mean, and no reader in this repo implements
+     * one. Emitting the header let a caller ask for permessage-deflate; a compliant
+     * server then agrees, sets RSV1 and sends compressed payloads -- and the readers mask
+     * off the opcode and pass the bytes through, so text arrives as mojibake and binary
+     * arrives compressed. The symptom shows up at the application, nowhere near the
+     * header that caused it, and only against servers that happen to offer the
+     * extension.</p>
+     */
+    @Test
+    void extensionNegotiationIsNotEmittedInTheHandshake() {
+        MockImpl impl = new MockImpl("wss://example.com/socket");
+        impl.setRequestHeader("Sec-WebSocket-Extensions", "permessage-deflate");
+        impl.setRequestHeader("SEC-WEBSOCKET-EXTENSIONS", "permessage-deflate");
+        impl.setRequestHeader("X-Mine", "kept");
+
+        String emitted = impl.testHandshakeHeaders();
+
+        assertFalse(emitted.toLowerCase().contains("sec-websocket-extensions"),
+                "an extension this client cannot decode must not be negotiated: " + emitted);
+        assertTrue(emitted.contains("X-Mine: kept"),
+                "and an ordinary header still goes out: " + emitted);
+    }
+
     private final class WebSocketingImpl extends TestCodenameOneImplementation {
         boolean supported = true;
 
@@ -258,6 +285,13 @@ class WebSocketTest {
         /// Test-only accessors for the subprotocol plumbing on the base.
         String[] testRequestedSubprotocols() {
             return super.requestedSubprotocols();
+        }
+
+        /// Test-only view of what the handshake would actually emit.
+        String testHandshakeHeaders() {
+            StringBuilder sb = new StringBuilder();
+            super.appendRequestHeaders(sb);
+            return sb.toString();
         }
 
         void testSelect(String protocol) {
