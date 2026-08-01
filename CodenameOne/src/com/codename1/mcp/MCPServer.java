@@ -232,14 +232,128 @@ public class MCPServer {
     /// listening" -- and that IOException stopped the server the restart had just brought
     /// up.
     ///
-    /// Only ever called while holding `t`'s monitor, which is what makes "the replacement
-    /// cannot have opened yet" true rather than merely likely.
+    /// Only ever called while holding `t`'s open lock, which is what makes "the
+    /// replacement cannot have opened yet" true rather than merely likely.
     private synchronized void discardOwnOpen(MCPTransport t, int generation) {
         if (startGeneration == generation
                 && transport == t) { // NOPMD identity: is this still our transport?
             running = false;
         }
         t.close();
+    }
+
+    /// Opens `t` for this generation, serialized against any other generation opening the
+    /// same transport. Returns false when this thread is done and must not read.
+    ///
+    /// Serialized per TRANSPORT, and the WHOLE open -- the attempt, its failure path, and
+    /// the teardown of a superseded one -- happens inside. A stop()/start() over the SAME
+    /// transport while the old reader is still parked in open() would otherwise have both
+    /// generations open one instance: the same-transport rule then correctly declines to
+    /// close it on the way out, and the transport is left holding two listeners with one
+    /// handle for them, so the first is leaked and outlives stop().
+    ///
+    /// The teardown has to be in here too, not after. Releasing the lock first let the
+    /// replacement acquire it and call open() while this thread's now-stale listener was
+    /// still registered -- and a transport refuses a second listener, so the replacement
+    /// took an IOException and stopped the server it had just started.
+    ///
+    /// Per transport and not per server, which is what a server-wide lock got wrong: a
+    /// restart over a DIFFERENT transport has nothing to serialize against, and making it
+    /// wait behind a superseded open that may never return deadlocks the restart. Not the
+    /// server monitor either: open() blocks, and holding that across it would make stop()
+    /// wait on what it is stopping.
+    ///
+    /// And deliberately NOT the transport's own monitor, which is what this used to be.
+    /// [MCPTransport] is a public interface: an implementation is entitled to write
+    /// `synchronized void close()`, and with such a transport the two locks were taken in
+    /// opposite orders -- this thread held the transport and waited for the server monitor
+    /// inside `isCurrent`, while `stop()` held the server monitor and waited for the
+    /// transport inside `close()`. Both threads park forever. The same ownership also
+    /// blocked the one call that can end a legitimately blocking `open()`: `close()` could
+    /// not run until `open()` returned, and `open()` was waiting for `close()`. A lock the
+    /// server owns and no transport can name has neither problem, and the ordering below
+    /// has one direction only -- open lock, then server monitor, then whatever the
+    /// transport locks internally.
+    private boolean openSerialized(MCPTransport t, int generation) {
+        Object openLock = acquireOpenLock(t);
+        try {
+            synchronized (openLock) {
+                if (!isCurrent(t, generation)) {
+                    releaseAndCloseIfCurrent(t, generation);
+                    return false;
+                }
+                try {
+                    t.open();
+                } catch (IOException ex) {
+                    // The transport failed to start listening. Log defensively: the CN1
+                    // Log routes through the platform implementation, which may not be
+                    // registered yet when the server is auto-started early in
+                    // Display.init(), and a raw NullPointerException here would silently
+                    // kill the reader thread.
+                    try {
+                        Log.e(ex);
+                    } catch (Throwable logErr) {
+                        System.err.println("[cn1.mcp] transport open failed: " + ex);
+                    }
+                    // A failed open can still have registered something -- the loopback
+                    // transport claims the process-wide slot before it binds -- so this
+                    // unwinds the same way a successful one does.
+                    discardOwnOpen(t, generation);
+                    return false;
+                }
+                if (!isCurrent(t, generation)) {
+                    // Same window, the far side of it: the server moved on while open()
+                    // was in flight. The listener now on `t` is this thread's and has to
+                    // go.
+                    discardOwnOpen(t, generation);
+                    return false;
+                }
+                return true;
+            }
+        } finally {
+            releaseOpenLock(t);
+        }
+    }
+
+    /// The per-transport open locks, and how many threads are currently holding a
+    /// reference to each.
+    ///
+    /// A plain map would grow one entry per transport instance the process ever serves.
+    /// The count is what makes removal safe: dropping an entry while a thread is parked on
+    /// that monitor would let the next generation mint a second lock for the same
+    /// transport, and two generations serializing on different objects are not serialized
+    /// at all.
+    private final List<Object[]> openLocks = new ArrayList<Object[]>();
+
+    private Object acquireOpenLock(MCPTransport t) {
+        synchronized (openLocks) {
+            for (int i = 0; i < openLocks.size(); i++) {
+                Object[] entry = openLocks.get(i);
+                if (entry[0] == t) { // NOPMD identity: one lock per transport INSTANCE
+                    ((int[]) entry[2])[0]++;
+                    return entry[1];
+                }
+            }
+            Object lock = new Object();
+            openLocks.add(new Object[] {t, lock, new int[] {1}});
+            return lock;
+        }
+    }
+
+    private void releaseOpenLock(MCPTransport t) {
+        synchronized (openLocks) {
+            for (int i = 0; i < openLocks.size(); i++) {
+                Object[] entry = openLocks.get(i);
+                if (entry[0] == t) { // NOPMD identity: one lock per transport INSTANCE
+                    int[] users = (int[]) entry[2];
+                    users[0]--;
+                    if (users[0] <= 0) {
+                        openLocks.remove(i);
+                    }
+                    return;
+                }
+            }
+        }
     }
 
     private void runLoop(MCPTransport t, int generation) {
@@ -252,59 +366,8 @@ public class MCPServer {
         if (!isCurrent(t, generation)) {
             return;
         }
-        // Serialized per TRANSPORT, on that transport's own monitor, and the WHOLE
-        // open -- the attempt, its failure path, and the teardown of a superseded one --
-        // happens inside. A stop()/start() over the SAME transport while the old reader
-        // is still parked in open() would otherwise have both generations open one
-        // instance: the same-transport rule then correctly declines to close it on the
-        // way out, and the transport is left holding two listeners with one handle for
-        // them, so the first is leaked and outlives stop().
-        //
-        // The teardown has to be in here too, not after. Releasing the monitor first let
-        // the replacement acquire it and call open() while this thread's now-stale
-        // listener was still registered -- and the transport refuses a second listener,
-        // so the replacement took an IOException and stopped the server it had just
-        // started. Holding the monitor until the stale one is actually closed is what
-        // makes "the replacement may open" mean what it says.
-        //
-        // Per transport and not per server, which is what a server-wide lock got wrong:
-        // a restart over a DIFFERENT transport has nothing to serialize against, and
-        // making it wait behind a superseded open that may never return deadlocks the
-        // restart -- the replacement never opens, so nothing wakes the thread that would
-        // release it. Not the server monitor either: open() blocks, and holding that
-        // across it would make stop() wait on what it is stopping. The server monitor is
-        // taken inside this one (by isCurrent and releaseAndCloseIfCurrent) and never the
-        // other way round -- stop() closes through the transport's own internal lock, not
-        // its monitor -- so the nesting has one direction only.
-        synchronized (t) {
-            if (!isCurrent(t, generation)) {
-                releaseAndCloseIfCurrent(t, generation);
-                return;
-            }
-            try {
-                t.open();
-            } catch (IOException ex) {
-                // The transport failed to start listening. Log defensively: the CN1 Log
-                // routes through the platform implementation, which may not be registered
-                // yet when the server is auto-started early in Display.init(), and a raw
-                // NullPointerException here would silently kill the reader thread.
-                try {
-                    Log.e(ex);
-                } catch (Throwable logErr) {
-                    System.err.println("[cn1.mcp] transport open failed: " + ex);
-                }
-                // A failed open can still have registered something -- the loopback
-                // transport claims the process-wide slot before it binds -- so this
-                // unwinds the same way a successful one does.
-                discardOwnOpen(t, generation);
-                return;
-            }
-            if (!isCurrent(t, generation)) {
-                // Same window, the far side of it: the server moved on while open() was
-                // in flight. The listener now on `t` is this thread's and has to go.
-                discardOwnOpen(t, generation);
-                return;
-            }
+        if (!openSerialized(t, generation)) {
+            return;
         }
         while (isCurrent(t, generation)) {
             String line;
