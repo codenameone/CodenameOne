@@ -1030,6 +1030,8 @@ final class IOSDeviceIntegrity {
         // Labelled so the storage-failure branches can leave the critical section and
         // still hand the caller its attestation, which is the one thing in here that
         // cannot be produced a second time.
+        String attestToken = TOKEN_PREFIX + ":attest:" + base64(bytes(pending.keyId))
+                + ":" + attestationB64;
         shieldAttestState:
         synchronized (instance.flowLock) {
             if (isStale(pending)) {
@@ -1037,6 +1039,15 @@ final class IOSDeviceIntegrity {
                 return;
             }
             SecureStorage store = SecureStorage.getInstance();
+            // Retained in the SAME critical section that publishes the undelivered state,
+            // and before it. Split across two, a request arriving in the gap read
+            // "attested, nobody has it" with no object to hand over -- and answered the
+            // only way that state allows, by discarding a key Apple had just accepted.
+            // The two facts are one fact, so anything that can observe either has to
+            // observe both.
+            instance.undeliveredAttestKeyId = pending.keyId;
+            instance.undeliveredAttestNonce = pending.nonce;
+            instance.undeliveredAttestToken = attestToken;
             if (!store.set(KEY_STATE, STATE_PENDING_UNDELIVERED)) {
                 // The key is attested with Apple and the keychain will not record it.
                 //
@@ -1133,27 +1144,12 @@ final class IOSDeviceIntegrity {
             instance.failBootstrapWaiters("App Attest is completing first-run "
                     + "registration for this device; retry shortly");
         }
-        String attestToken = TOKEN_PREFIX + ":attest:" + base64(bytes(pending.keyId))
-                + ":" + attestationB64;
-        if (instance != null) {
-            // Retained until somebody takes delivery. The caller may have cancelled while
-            // Apple was working, and succeed() correctly declines to complete a resource
-            // that is already done -- but the attestation object is the one thing here
-            // that cannot be produced again, so dropping it left a key the backend could
-            // never register, which the grace window then promoted into assertions that
-            // are rejected and a reset that costs another rate-limited key.
-            synchronized (instance.flowLock) {
-                instance.undeliveredAttestKeyId = pending.keyId;
-                instance.undeliveredAttestNonce = pending.nonce;
-                instance.undeliveredAttestToken = attestToken;
-                // The durable half is the STATE the callback above wrote:
-                // STATE_PENDING_UNDELIVERED. Only the fact is persisted, never the
-                // object -- an attestation covers one challenge and a later launch asks
-                // for a new one, so a stored copy could not be used across a restart
-                // anyway, whereas knowing nobody received it is what stops the next
-                // launch promoting a key the backend has never seen.
-            }
-        }
+        // The retention above is what a concurrent request needs; the durable half is the
+        // state the block wrote. Only the fact is persisted, never the object -- an
+        // attestation covers one challenge and a later launch asks for a new one, so a
+        // stored copy could not be used across a restart anyway, whereas knowing nobody
+        // received it is what stops the next launch promoting a key the backend has never
+        // seen.
         succeed(pending, attestToken, true);
     }
 
