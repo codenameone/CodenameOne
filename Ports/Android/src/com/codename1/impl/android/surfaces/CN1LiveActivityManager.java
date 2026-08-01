@@ -120,14 +120,14 @@ public final class CN1LiveActivityManager {
             }
             if (targetSdkVersion(ctx) < 33) {
                 // Legacy target on a modern device: the platform owns this prompt and raises it
-                // when the app creates its first notification channel, not when an app asks. On a
-                // fresh install nothing has been asked yet, so notifications read as disabled for
-                // want of a question -- and returning false here would hand back an inert handle
-                // from LiveActivity.start, so notifyActivity would never reach ensureChannel and
-                // the prompt could never appear at all. Stay supported until a channel exists to
-                // show the user was actually asked; once one does, disabled means declined. None
-                // of the budget below applies either way, since such an app never spends it.
-                return !hasNotificationChannels(nm);
+                // around the app's first notification channel, not when an app asks. Android
+                // exposes nothing that separates "not asked yet" from "asked and declined" here --
+                // areNotificationsEnabled is false either way, and a created channel does not
+                // prove the prompt was shown, since the platform ties it to the next activity
+                // start. Rather than guess, report on the one thing that is knowable: whether the
+                // permission was declared at all. That keeps a legacy app retrying instead of
+                // being locked out by a wrong guess, and the budget below never applies to it.
+                return !isPermissionMissing(ctx);
             }
             // From API 33 notifications also read as disabled while POST_NOTIFICATIONS is merely
             // ungranted, which is the state of every fresh install.
@@ -254,12 +254,33 @@ public final class CN1LiveActivityManager {
         }
         if (targetSdkVersion(ctx) < 33) {
             // Legacy target on a modern device: requesting cannot raise a dialog, because the
-            // platform shows this one on first notification-channel creation instead -- which
-            // notifyActivity is about to do. Asking anyway would return ungranted every time and
-            // spend the whole budget on requests the user never saw, leaving isSupported false
-            // for good without the channel that would have prompted them. Let the start through
-            // and let the platform ask.
-            return true;
+            // platform shows this one around the app's first notification channel instead. The
+            // manifest still has to declare the permission, and that check has to come first --
+            // otherwise an app that never set "liveActivities": true sails past it here and gets
+            // an active handle for a notification Android will not post.
+            if (isPermissionMissing(ctx)) {
+                logMissingManifestOnce();
+                return false;
+            }
+            // Create the channel now so the platform has its trigger, then re-check. The prompt
+            // is asynchronous -- the system ties it to the next activity start -- so a fresh
+            // install is still ungranted on the way out of here, and posting anyway would hand
+            // back a live handle for a notification that never appeared and is never reposted
+            // once the user does allow it. Refuse this start; the next one, after the grant,
+            // posts for real.
+            NotificationManager nm =
+                    (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                ensureChannel(ctx, nm, DEFAULT_CHANNEL);
+            }
+            if (hasPostNotificationsPermission(ctx)) {
+                return true;
+            }
+            Log.w(TAG, "Live activities are not available yet: this build targets an SDK below "
+                    + "33, so Android raises the notification prompt itself around the app's "
+                    + "first notification channel. The channel now exists; start the activity "
+                    + "again once the user has allowed notifications.");
+            return false;
         }
         // `start` is callable from any thread and `checkForPermission` drives the activity's one
         // shared request flag and request code, so two concurrent starts would otherwise raise a
@@ -479,18 +500,6 @@ public final class CN1LiveActivityManager {
             }
             permissionDeclaredState = missing ? DECLARED_MISSING : DECLARED_PRESENT;
             return missing;
-        } catch (Throwable t) {
-            return false;
-        }
-    }
-
-    /// True once the app owns at least one notification channel, which for a legacy target is
-    /// the evidence that the platform has had its chance to raise the prompt. An unreadable
-    /// answer counts as "no channels yet", erring toward letting the prompt happen.
-    private static boolean hasNotificationChannels(NotificationManager nm) {
-        try {
-            java.util.List<NotificationChannel> channels = nm.getNotificationChannels();
-            return channels != null && !channels.isEmpty();
         } catch (Throwable t) {
             return false;
         }
