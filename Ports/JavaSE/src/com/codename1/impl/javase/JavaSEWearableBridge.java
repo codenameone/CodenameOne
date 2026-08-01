@@ -544,6 +544,12 @@ class JavaSEWearableBridge implements WearableBridge {
                 synchronized (seenData) {
                     seenData.put(f.getName(), Long.valueOf(stamp));
                 }
+                if (isTransfer(f.getName()) && !isInboundTransfer(f.getName())) {
+                    // Our own outbound transfer, seen again because primeSeenData() deliberately
+                    // records nothing at startup. It is not an inbound delivery: reporting it would
+                    // hand the sender its own file through its own data listener.
+                    continue;
+                }
                 try {
                     WearableConnection.deliverDataChanged(deliveryPath(f.getName()), readFully(f));
                     if (isInboundTransfer(f.getName())) {
@@ -610,11 +616,20 @@ class JavaSEWearableBridge implements WearableBridge {
             Integer.toHexString(java.lang.management.ManagementFactory.getRuntimeMXBean()
                     .getName().hashCode());
 
-    private static synchronized long nextStamp(File f) {
-        long now = System.currentTimeMillis();
-        long floor = Math.max(f.lastModified(), lastStamp);
-        lastStamp = now > floor ? now : floor + 1;
-        return lastStamp;
+    private long nextStamp(File f) {
+        synchronized (JavaSEWearableBridge.class) {
+            long now = System.currentTimeMillis();
+            long floor = Math.max(f.lastModified(), lastStamp);
+            long base = now > floor ? now : floor + 1;
+            // Put the two JVMs in disjoint residue classes. lastStamp and this lock are process
+            // local, so both halves publishing the same path in the same millisecond could otherwise
+            // compute the SAME stamp from the same lastModified() -- and each would then record the
+            // other's published stamp as its own and never deliver the peer's value. Doubling and
+            // adding a side bit makes a collision arithmetically impossible while keeping the
+            // strictly-increasing property the watcher relies on.
+            lastStamp = base;
+            return base * 2 + (watchSide ? 1 : 0);
+        }
     }
 
     private static long lastStamp;

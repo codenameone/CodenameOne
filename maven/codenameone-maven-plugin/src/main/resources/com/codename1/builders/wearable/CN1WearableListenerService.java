@@ -198,9 +198,14 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // the strength of this event alone would tell the listener the value disappeared
                 // while getData(path) still returned it. Ask what is left and report that instead.
                 try {
-                    byte[] remaining = CN1WearableBridge.currentValue(this, appPath);
+                    CN1WearableBridge.ResolvedValue remaining =
+                            CN1WearableBridge.resolveValue(this, appPath);
                     if (remaining != null) {
-                        WearableConnection.deliverDataChanged(appPath, remaining);
+                        // Record the survivor's sequence as delivered. Without it the path has no
+                        // delivery stamp, so an older item still queued under another authority
+                        // would pass the newer-than-delivered test and overwrite the winner.
+                        CN1WearableBridge.isNewerThanDelivered(appPath, remaining.sequence);
+                        WearableConnection.deliverDataChanged(appPath, remaining.payload);
                     } else {
                         WearableConnection.deliverDataRemoved(appPath);
                     }

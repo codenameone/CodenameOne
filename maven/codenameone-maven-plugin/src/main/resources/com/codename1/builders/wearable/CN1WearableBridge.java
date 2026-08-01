@@ -1050,10 +1050,34 @@ public class CN1WearableBridge implements WearableBridge {
      * @return the winning payload, or null when the path is genuinely empty
      */
     static byte[] currentValue(Context context, String path) throws java.io.IOException {
-        CN1WearableBridge b = current;
-        if (b != null) {
-            return b.getData(path);
+        ResolvedValue v = resolveValue(context, path);
+        return v == null ? null : v.payload;
+    }
+
+    /** A path's winning value together with the sequence it was published at. */
+    static final class ResolvedValue {
+        final byte[] payload;
+        final long sequence;
+
+        ResolvedValue(byte[] payload, long sequence) {
+            this.payload = payload;
+            this.sequence = sequence;
         }
+    }
+
+    /**
+     * The winning value for a path and the sequence it carries, or null when the path is empty.
+     *
+     * <p>The sequence matters to the caller: after a deletion the surviving item has to be recorded
+     * as delivered, or an older item still queued under another authority would later pass the
+     * newer-than-delivered test and overwrite it.
+     *
+     * @param context any context
+     * @param path the application path
+     * @return the winner, or null when nothing is published there
+     * @throws java.io.IOException when the query failed, which is NOT the same as an empty path
+     */
+    static ResolvedValue resolveValue(Context context, String path) throws java.io.IOException {
         try {
             Uri uri = new Uri.Builder().scheme("wear").authority("*").path(dataPath(path)).build();
             DataItemBuffer items = Tasks.await(
@@ -1073,7 +1097,7 @@ public class CN1WearableBridge implements WearableBridge {
                         bestSeq = seq;
                     }
                 }
-                return best;
+                return best == null ? null : new ResolvedValue(best, bestSeq);
             } finally {
                 items.release();
             }

@@ -155,8 +155,16 @@ class WatchNativeBuilder {
         // Read before the enablement check, deliberately: the HealthKit entitlement decision
         // consults these even for a project that declares no watch app, and returning early first
         // would silently turn an explicit watchNative.health=false back into inference.
+        // getMainClass() is the SIMPLE class name while watchMain is fully qualified, so comparing
+        // them directly marked every project as having a distinct watch root -- including one whose
+        // watchMain names the very same class. That matters because "distinct" is what tells the
+        // HealthKit inference it cannot read the watch's usage from the phone's privacy strings.
+        String phoneMainFqn = request.getPackageName() == null || request.getPackageName().isEmpty()
+                ? request.getMainClass()
+                : request.getPackageName() + "." + request.getMainClass();
         distinctWatchMain = watchMain.length() > 0
-                && !watchMain.equals(request.getMainClass());
+                && !watchMain.equals(request.getMainClass())
+                && !watchMain.equals(phoneMainFqn);
         healthHint = request.getArg("watchNative.health", "").trim();
         workoutProcessingHint = request.getArg(
                 "watchNative.health.workoutProcessing", "false").trim();
