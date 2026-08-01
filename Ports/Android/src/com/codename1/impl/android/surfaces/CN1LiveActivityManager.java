@@ -110,7 +110,12 @@ public final class CN1LiveActivityManager {
     /// Raises the `POST_NOTIFICATIONS` prompt first when Android 13+ needs it, blocking the
     /// calling thread until the user answers.
     public static String start(Context ctx, String descriptorJson, Map<String, byte[]> images) {
-        if (!isSupported(ctx) || !ensureNotificationPermission(ctx)) {
+        // permission first: `isSupported` reports false once the prompt budget is spent, so
+        // testing it first would short-circuit past the one place that logs *why* a start was
+        // refused -- precisely the case a developer needs to see. Nothing is prompted that
+        // `isSupported` would have rejected on capability grounds either, since the permission
+        // only exists from API 33 and live activities need API 24.
+        if (!ensureNotificationPermission(ctx) || !isSupported(ctx)) {
             return null;
         }
         try {
@@ -199,6 +204,14 @@ public final class CN1LiveActivityManager {
         // single dialog whose single outcome released both callers -- and then be counted twice,
         // spending the whole budget on one answer. One request at a time; whoever waited re-reads
         // the state the winner produced.
+        //
+        // This serializes surfaces against itself only. A camera or location request in flight
+        // elsewhere still shares that same activity-wide flag and request code, and its callback
+        // can release this one early -- an existing limitation of the shared permission machinery
+        // rather than of this path, and one that needs per-request completion state in
+        // `AndroidImplementation` to fix properly. The damage here is bounded: a spuriously
+        // counted attempt costs the user one of two prompts, and any later grant, from any
+        // source, clears the count.
         synchronized (PERMISSION_LOCK) {
             if (hasPostNotificationsPermission(ctx)) {
                 CN1SurfaceStore.clearNotificationPrompts(ctx);
