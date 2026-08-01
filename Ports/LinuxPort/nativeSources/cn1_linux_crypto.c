@@ -372,6 +372,19 @@ done:
 
 /* ------------------------------------------------------------ signatures */
 
+/* The signature algorithm's family must match the key that was actually handed
+ * over, read from the DER rather than from the caller's label. PrivateKey.
+ * fromPkcs8 and PublicKey.fromX509 take an arbitrary algorithm string and never
+ * check it against the bytes, so a Java-side comparison of that label can be
+ * satisfied while the encoded key is a different family entirely -- and the
+ * primitive below would then sign an "RSA" request with ECDSA. */
+static int cn1KeyFamilyMatches(const char* algorithm, EVP_PKEY* key) {
+    int wantsEc = strstr(algorithm, "ECDSA") != 0;
+    int keyIsEc = EVP_PKEY_base_id(key) == EVP_PKEY_EC;
+    return wantsEc == keyIsEc;
+}
+
+
 static const EVP_MD* cn1SignatureDigest(const char* algorithm) {
     return cn1SignatureDigestOrNull(algorithm);
 }
@@ -396,6 +409,11 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_signData___java_lang_String_byt
          * on would let OpenSSL choose one, which is how an unsupported name
          * used to come back as a valid signature over a different digest. */
         cn1CryptoFail("unsupported signature algorithm");
+        EVP_PKEY_free(key);
+        return JAVA_NULL;
+    }
+    if (!cn1KeyFamilyMatches(name, key)) {
+        cn1CryptoFail("the signature algorithm does not match the key");
         EVP_PKEY_free(key);
         return JAVA_NULL;
     }
@@ -445,6 +463,11 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_verifyData___java_lang_String_
     }
     if (cn1SignatureDigest(name) == 0) {
         cn1CryptoFail("unsupported signature algorithm");
+        EVP_PKEY_free(key);
+        return JAVA_FALSE;
+    }
+    if (!cn1KeyFamilyMatches(name, key)) {
+        cn1CryptoFail("the signature algorithm does not match the key");
         EVP_PKEY_free(key);
         return JAVA_FALSE;
     }

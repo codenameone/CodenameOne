@@ -925,6 +925,15 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_signData___java_lang_String
         cn1CryptoFail("unsupported signature algorithm", 0);
         goto done;
     }
+    /* The family has to come from the DER, not from the caller's label:
+     * PrivateKey.fromPkcs8 takes an arbitrary algorithm string and never checks
+     * it against the bytes, so the Java-side comparison can be satisfied while
+     * the encoded key is a different family -- and NCrypt would then answer an
+     * "RSA" request with an ECDSA signature. */
+    if ((strstr(name, "ECDSA") != 0) != (isEc != 0)) {
+        cn1CryptoFail("the signature algorithm does not match the key", 0);
+        goto done;
+    }
     if (!cn1Digest(digestAlgorithm, data, dataLength, digest, digestLength)) {
         goto done;
     }
@@ -991,6 +1000,11 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_verifyData___java_lang_Str
     }
     if (digestAlgorithm == NULL) {
         cn1CryptoFail("unsupported signature algorithm", 0);
+        BCryptDestroyKey(key);
+        return JAVA_FALSE;
+    }
+    if ((strstr(name, "ECDSA") != 0) != (isEc != 0)) {
+        cn1CryptoFail("the signature algorithm does not match the key", 0);
         BCryptDestroyKey(key);
         return JAVA_FALSE;
     }

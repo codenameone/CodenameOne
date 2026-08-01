@@ -284,6 +284,141 @@ static int cn1_seckey_op(SecKeyRef key, SecKeyAlgorithm alg, int forEncrypt,
     return (int) len;
 }
 
+/*
+ * OAEP, built here rather than taken from SecKey.
+ *
+ * kSecKeyAlgorithmRSAEncryptionOAEPSHA256 uses SHA-256 for the label hash AND
+ * for MGF1. The transformation this port advertises is the JCE name
+ * "RSA/ECB/OAEPWithSHA-256AndMGF1Padding", which in JCE means a SHA-256 label
+ * with a SHA-1 mask -- that is what java.crypto gives the JavaSE and Android
+ * ports for the same string, and what the Linux and Windows ports produce. iOS
+ * was the only port pairing SHA-256 with SHA-256, so ciphertext never crossed
+ * between it and any other port. SecKey cannot express the JCE pairing, so the
+ * padding is built here and the key operation runs raw.
+ */
+
+static void cn1_mgf1_sha1(const uint8_t* seed, int seedLen, uint8_t* mask, int maskLen) {
+    uint8_t counter[4];
+    uint8_t digest[CC_SHA1_DIGEST_LENGTH];
+    int produced = 0;
+    uint32_t count = 0;
+    while (produced < maskLen) {
+        int chunk = maskLen - produced;
+        CC_SHA1_CTX ctx;
+        counter[0] = (uint8_t) ((count >> 24) & 0xff);
+        counter[1] = (uint8_t) ((count >> 16) & 0xff);
+        counter[2] = (uint8_t) ((count >> 8) & 0xff);
+        counter[3] = (uint8_t) (count & 0xff);
+        CC_SHA1_Init(&ctx);
+        CC_SHA1_Update(&ctx, seed, (CC_LONG) seedLen);
+        CC_SHA1_Update(&ctx, counter, 4);
+        CC_SHA1_Final(digest, &ctx);
+        if (chunk > CC_SHA1_DIGEST_LENGTH) {
+            chunk = CC_SHA1_DIGEST_LENGTH;
+        }
+        memcpy(mask + produced, digest, (size_t) chunk);
+        produced += chunk;
+        count++;
+    }
+}
+
+/* All ones when a == b, zero otherwise, without branching on the values. */
+static uint32_t cn1_ct_eq_mask(uint32_t a, uint32_t b) {
+    uint32_t diff = a ^ b;
+    uint32_t nonZero = (diff | (0u - diff)) >> 31;
+    return nonZero - 1u;
+}
+
+static int cn1_oaep_encode(const uint8_t* message, int messageLen,
+                           uint8_t* block, int blockLen) {
+    const int hashLen = CC_SHA256_DIGEST_LENGTH;
+    int dbLen = blockLen - hashLen - 1;
+    uint8_t seed[CC_SHA256_DIGEST_LENGTH];
+    uint8_t* mask;
+    int i;
+    if (dbLen <= 0 || messageLen > dbLen - hashLen - 1) {
+        return 0;
+    }
+    mask = (uint8_t*) malloc((size_t) dbLen);
+    if (!mask) {
+        return 0;
+    }
+    memset(block, 0, (size_t) blockLen);
+    CC_SHA256("", 0, block + 1 + hashLen);
+    block[blockLen - messageLen - 1] = 0x01;
+    if (messageLen > 0) {
+        memcpy(block + blockLen - messageLen, message, (size_t) messageLen);
+    }
+    if (CCRandomGenerateBytes(seed, (size_t) hashLen) != kCCSuccess) {
+        free(mask);
+        return 0;
+    }
+    cn1_mgf1_sha1(seed, hashLen, mask, dbLen);
+    for (i = 0; i < dbLen; i++) {
+        block[1 + hashLen + i] ^= mask[i];
+    }
+    cn1_mgf1_sha1(block + 1 + hashLen, dbLen, mask, hashLen);
+    for (i = 0; i < hashLen; i++) {
+        block[1 + i] = (uint8_t) (seed[i] ^ mask[i]);
+    }
+    free(mask);
+    return 1;
+}
+
+/* Every check folds into one accumulator and one generic failure is reported:
+ * telling a leading-byte error from a label-hash error is enough to mount the
+ * adaptive attacks OAEP exists to prevent. */
+static int cn1_oaep_decode(uint8_t* block, int blockLen, uint8_t* message, int* messageLen) {
+    const int hashLen = CC_SHA256_DIGEST_LENGTH;
+    int dbLen = blockLen - hashLen - 1;
+    uint8_t labelHash[CC_SHA256_DIGEST_LENGTH];
+    uint8_t seed[CC_SHA256_DIGEST_LENGTH];
+    uint8_t* mask;
+    int i;
+    uint32_t bad = 0;
+    uint32_t seenDelimiter = 0;
+    uint32_t messageStart = 0;
+    if (dbLen <= 0) {
+        return 0;
+    }
+    mask = (uint8_t*) malloc((size_t) dbLen);
+    if (!mask) {
+        return 0;
+    }
+    bad |= (uint32_t) block[0];
+    cn1_mgf1_sha1(block + 1 + hashLen, dbLen, mask, hashLen);
+    for (i = 0; i < hashLen; i++) {
+        seed[i] = (uint8_t) (block[1 + i] ^ mask[i]);
+    }
+    cn1_mgf1_sha1(seed, hashLen, mask, dbLen);
+    for (i = 0; i < dbLen; i++) {
+        block[1 + hashLen + i] ^= mask[i];
+    }
+    free(mask);
+    CC_SHA256("", 0, labelHash);
+    for (i = 0; i < hashLen; i++) {
+        bad |= (uint32_t) (labelHash[i] ^ block[1 + hashLen + i]);
+    }
+    for (i = 1 + hashLen + hashLen; i < blockLen; i++) {
+        uint32_t value = block[i];
+        uint32_t isDelimiter = cn1_ct_eq_mask(value, 0x01);
+        uint32_t isZero = cn1_ct_eq_mask(value, 0x00);
+        uint32_t firstDelimiter = isDelimiter & ~seenDelimiter;
+        messageStart |= ((uint32_t) (i + 1)) & firstDelimiter;
+        bad |= ~seenDelimiter & ~isDelimiter & ~isZero;
+        seenDelimiter |= isDelimiter;
+    }
+    bad |= ~seenDelimiter;
+    if (bad != 0) {
+        return 0;
+    }
+    *messageLen = blockLen - (int) messageStart;
+    if (*messageLen > 0) {
+        memcpy(message, block + messageStart, (size_t) *messageLen);
+    }
+    return 1;
+}
+
 static SecKeyAlgorithm rsa_padding_alg(int paddingKind) {
     return paddingKind == 2
         ? kSecKeyAlgorithmRSAEncryptionOAEPSHA256
@@ -296,6 +431,26 @@ int cn1_crypto_rsa_encrypt(int paddingKind,
                            uint8_t* out, int outCap) {
     SecKeyRef key = cn1_load_rsa_public(x509, x509Len);
     if (!key) return CN1_CRYPTO_E_BAD_KEY;
+    if (paddingKind == 2) {
+        /* Pad here and run the key raw, so the mask stays SHA-1 (see the OAEP
+         * note above). */
+        int blockLen = (int) SecKeyGetBlockSize(key);
+        uint8_t* block = (uint8_t*) malloc((size_t) (blockLen > 0 ? blockLen : 1));
+        int rc;
+        if (!block) {
+            CFRelease(key);
+            return CN1_CRYPTO_E_GENERIC;
+        }
+        if (!cn1_oaep_encode(in, inLen, block, blockLen)) {
+            free(block);
+            CFRelease(key);
+            return CN1_CRYPTO_E_BAD_INPUT;
+        }
+        rc = cn1_seckey_op(key, kSecKeyAlgorithmRSAEncryptionRaw, 1, block, blockLen, out, outCap);
+        free(block);
+        CFRelease(key);
+        return rc;
+    }
     int rc = cn1_seckey_op(key, rsa_padding_alg(paddingKind), 1, in, inLen, out, outCap);
     CFRelease(key);
     return rc;
@@ -307,6 +462,42 @@ int cn1_crypto_rsa_decrypt(int paddingKind,
                            uint8_t* out, int outCap) {
     SecKeyRef key = cn1_load_rsa_private(pkcs8, pkcs8Len);
     if (!key) return CN1_CRYPTO_E_BAD_KEY;
+    if (paddingKind == 2) {
+        int blockLen = (int) SecKeyGetBlockSize(key);
+        uint8_t* raw = (uint8_t*) malloc((size_t) (blockLen > 0 ? blockLen : 1));
+        uint8_t* block;
+        int rawLen, messageLen = 0, rc;
+        if (!raw) {
+            CFRelease(key);
+            return CN1_CRYPTO_E_GENERIC;
+        }
+        rawLen = cn1_seckey_op(key, kSecKeyAlgorithmRSAEncryptionRaw, 0, in, inLen, raw, blockLen);
+        CFRelease(key);
+        if (rawLen < 0) {
+            free(raw);
+            return rawLen;
+        }
+        /* A raw result may arrive with its leading zero bytes dropped; the OAEP
+         * block is defined at exactly the modulus width, so restore them. */
+        block = (uint8_t*) calloc((size_t) (blockLen > 0 ? blockLen : 1), 1);
+        if (!block) {
+            free(raw);
+            return CN1_CRYPTO_E_GENERIC;
+        }
+        if (rawLen > blockLen) {
+            free(raw);
+            free(block);
+            return CN1_CRYPTO_E_BAD_INPUT;
+        }
+        memcpy(block + (blockLen - rawLen), raw, (size_t) rawLen);
+        free(raw);
+        if (!cn1_oaep_decode(block, blockLen, out, &messageLen) || messageLen > outCap) {
+            free(block);
+            return CN1_CRYPTO_E_BAD_INPUT;
+        }
+        free(block);
+        return messageLen;
+    }
     int rc = cn1_seckey_op(key, rsa_padding_alg(paddingKind), 0, in, inLen, out, outCap);
     CFRelease(key);
     return rc;
