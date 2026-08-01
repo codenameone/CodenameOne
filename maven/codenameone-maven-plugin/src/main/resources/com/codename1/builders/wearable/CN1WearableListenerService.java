@@ -208,9 +208,14 @@ public class CN1WearableListenerService extends WearableListenerService {
                         // ordinary: the winner is gone precisely because it was removed), leaving
                         // the dead item's higher stamp recorded and filtering out any later item
                         // that falls between the two.
-                        CN1WearableBridge.setDeliveredSequence(
-                                appPath, remaining.sequence, remaining.node);
-                        WearableConnection.deliverDataChanged(appPath, remaining.payload);
+                        // Only when the winner actually changed. Deleting a lower-ranked SHADOW
+                        // replica leaves the same item winning, and re-announcing a value the app
+                        // already holds is a spurious change -- listeners re-render, and anything
+                        // that treats a change as an event would act on it twice.
+                        if (CN1WearableBridge.setDeliveredSequence(
+                                appPath, remaining.sequence, remaining.node)) {
+                            WearableConnection.deliverDataChanged(appPath, remaining.payload);
+                        }
                     } else {
                         // Genuinely empty, so the stamp can go: a value republished here later with
                         // a lower stamp than the removed one carried must not be filtered as older.

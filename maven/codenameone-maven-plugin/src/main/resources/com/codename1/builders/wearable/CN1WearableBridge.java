@@ -1209,10 +1209,13 @@ public class CN1WearableBridge implements WearableBridge {
      * @param path the application path
      * @param sequence the surviving item's sequence
      * @param node the surviving item's publishing node
+     * @return true when this differs from what was last delivered, and so is worth delivering
      */
-    static void setDeliveredSequence(String path, long sequence, String node) {
+    static boolean setDeliveredSequence(String path, long sequence, String node) {
+        String stamp = sequence + "|" + (node == null ? "" : node);
         synchronized (deliveredSequences) {
-            deliveredSequences.put(path, sequence + "|" + (node == null ? "" : node));
+            String previous = deliveredSequences.put(path, stamp);
+            return !stamp.equals(previous);
         }
     }
 
