@@ -111,10 +111,34 @@ NSString *cn1JailbreakSignals(void) {
 }
 
 #ifdef CN1_DETECT_JAILBREAK
+/**
+ * Whether a signal says the DEVICE is compromised, as opposed to saying somebody is
+ * looking at the app.
+ *
+ * The probe list grew a `traced` signal so DeviceIntegrity could report a debugger,
+ * which is worth reporting -- attaching one is how a build gets instrumented. Exiting on
+ * it is a different matter: a clean physical device launched from Xcode is traced, so the
+ * launch gate terminated every ordinary debug session on a project that leaves
+ * ios.detectJailbreak on. That reads as "the app crashes on device", and the usual fix a
+ * developer reaches for is turning the protection off.
+ */
+static BOOL cn1IsJailbreakSignal(NSString *signal) {
+    return [signal isEqualToString:@"dyldInsert"]
+        || [signal isEqualToString:@"hookLib"]
+        || [signal isEqualToString:@"jailbreakFile"]
+        || [signal isEqualToString:@"restrictedWrite"];
+}
+
 void cn1DetectJailbreakBypassesAndExit(void) {
     NSString *signals = cn1JailbreakSignals();
-    if (signals.length > 0) {
-        NSLog(@"Jailbreak bypass detected: %@", signals);
+    NSMutableArray *fatal = [NSMutableArray array];
+    for (NSString *signal in [signals componentsSeparatedByString:@","]) {
+        if (cn1IsJailbreakSignal(signal)) {
+            [fatal addObject:signal];
+        }
+    }
+    if (fatal.count > 0) {
+        NSLog(@"Jailbreak bypass detected: %@", [fatal componentsJoinedByString:@","]);
         exit(0);
     }
 }

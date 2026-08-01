@@ -435,12 +435,23 @@ final class IOSDeviceIntegrity {
             if (!pendingInMemory && !STATE_PENDING.equals(store.get(KEY_STATE))) {
                 return;
             }
-            if (!store.set(KEY_STATE, STATE_ATTESTED)) {
-                // Still a promotion, just one only this process knows about -- exactly
-                // what the grace-window promotion does when the keychain refuses it.
+            // Promoted in memory whether or not the keychain takes it. If the write is
+            // refused this is the only record, exactly as it is for the grace-window
+            // promotion. If it succeeds, this is what stops the OLD in-memory value
+            // outvoting it: the request path deliberately prefers what this process knows
+            // over what the keychain holds, so a leftover STATE_PENDING kept answering
+            // "registration in progress" for the rest of the grace window on a key the
+            // backend had already accepted -- a keychain that recovered in time to record
+            // the acceptance still left the device refusing to use it.
+            boolean persisted = store.set(KEY_STATE, STATE_ATTESTED);
+            if (!persisted || pendingInMemory) {
                 inMemoryStateKeyId = keyId;
                 inMemoryState = STATE_ATTESTED;
             }
+            // The key is registered, so there is no first-run window left to wait out --
+            // and leaving the deadline behind would make registrationGraceRemaining()
+            // report one.
+            pendingSinceInMemory = 0L;
             store.remove(KEY_PENDING_SINCE);
             // Then the rest of the bookkeeping the attestation callback does on its way
             // out, because the branch that recorded a refused state write returned before
