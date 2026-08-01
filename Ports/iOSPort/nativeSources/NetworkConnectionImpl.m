@@ -271,7 +271,12 @@ static BOOL cn1ReadDerTlv(const uint8_t* buf, NSUInteger len, NSUInteger off,
         }
         *totalLen = *headerLen + contentLen;
     }
-    return off + *totalLen <= len;
+    // Against what is left, not by forming off + *totalLen. That sum can wrap
+    // NSUInteger for a large off, and a wrapped sum compares small -- so the check
+    // that exists to stop an overread would be the thing that let it through. The
+    // subtraction cannot wrap: off <= len is this function's precondition and is
+    // re-established on the short-form path above.
+    return off <= len && *totalLen <= len - off;
 }
 
 /**

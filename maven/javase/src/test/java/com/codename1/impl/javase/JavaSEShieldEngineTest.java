@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.security.shield.AppShield;
 import com.codename1.security.shield.PinSet;
 import com.codename1.security.shield.ShieldConfig;
 import com.codename1.security.shield.ShieldException;
@@ -123,6 +124,29 @@ class JavaSEShieldEngineTest {
                 "a host covered by a registered wildcard must be enforced too");
         assertFalse(pins.isEnforcedFor("wild.example.com"),
                 "but the apex is not covered by its own wildcard");
+    }
+
+    /// A backend registered after init has to be enforced too.
+    ///
+    /// AppShield.addProtectedHost() exists for a host discovered at runtime, and a pin set
+    /// built only from the startup ShieldConfig never sees it. The consequence is not
+    /// cosmetic: ShieldNetworkGuard asks PinSet.isEnforcedFor() before it asks
+    /// verifyPins(), so an unpinned host skips the certificate check entirely and "Force
+    /// Pin Mismatch On Next Request" cannot reach it. The one host the app went out of its
+    /// way to register was the one host whose failure path could not be rehearsed.
+    @Test
+    void aHostRegisteredAtRuntimeIsEnforcedToo() {
+        String host = "discovered.example.com";
+        assertFalse(engine.getPinSet().isEnforcedFor(host),
+                "the fixture must start with this host unregistered, or this proves nothing");
+
+        AppShield.addProtectedHost(host);
+        assertTrue(engine.getPinSet().isEnforcedFor(host),
+                "a runtime registration must reach the simulated pin set");
+
+        JavaSEShield.forcePinMismatch = true;
+        assertFalse(engine.verifyPins(host, new String[0], new String[0]),
+                "and the force switch has to be able to fail it");
     }
 
     @Test

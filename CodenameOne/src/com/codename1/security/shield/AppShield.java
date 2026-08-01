@@ -30,6 +30,7 @@ import com.codename1.security.shield.spi.ShieldEngine;
 import com.codename1.security.shield.spi.ShieldEngineRegistry;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
+import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -433,6 +434,35 @@ public final class AppShield {
     /// [ShieldConfig#defaultFailureMode(FailureMode)].
     public static void addProtectedHost(String host) {
         addProtectedHost(host, null);
+    }
+
+    /// Every host currently protected: the ones [ShieldConfig] carried into
+    /// [#init(ShieldConfig)], plus anything registered since through
+    /// [#addProtectedHost(String, HostPolicy)].
+    ///
+    /// The config alone is not the answer to "what is protected", and treating it as such
+    /// is a quiet way to lose the runtime registrations. An engine building a pin set from
+    /// the config would leave a backend discovered at runtime with no pins, so
+    /// [PinSet#isEnforcedFor] returns false for it and the certificate check is skipped
+    /// entirely -- the host the app went out of its way to register is the one host not
+    /// pinned.
+    public static Enumeration protectedHosts() {
+        Vector all = new Vector();
+        Enumeration configured = getConfig().protectedHosts();
+        while (configured.hasMoreElements()) {
+            Object host = configured.nextElement();
+            if (host != null && !all.contains(host)) {
+                all.addElement(host);
+            }
+        }
+        Enumeration runtime = runtimeHosts.keys();
+        while (runtime.hasMoreElements()) {
+            Object host = runtime.nextElement();
+            if (host != null && !all.contains(host)) {
+                all.addElement(host);
+            }
+        }
+        return all.elements();
     }
 
     private static HostPolicy implicitPolicy() {

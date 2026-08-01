@@ -189,11 +189,28 @@ public final class JavaSEShieldEngine implements ShieldEngine {
         // switch would still have nothing to act on: PinSet.isEnforcedFor() is false for
         // a host with no pins, and ShieldNetworkGuard checks that before asking.
         Hashtable hostToPins = new Hashtable();
+        // Both sources, not just the ShieldConfig handed to initialize(). That config is a
+        // snapshot of what the app declared up front and never learns about
+        // AppShield.addProtectedHost() -- so a backend discovered at runtime, which is
+        // exactly the case that call exists for, had no simulated pin, hence no
+        // enforcement, hence no way for "Force Pin Mismatch On Next Request" to reach it.
+        // The one pin-failure path a developer cannot produce any other way was the one
+        // the simulator could not produce either.
+        //
+        // The config is still read directly rather than only through AppShield, because
+        // an engine can be initialized with a config that AppShield was never handed --
+        // which is how the tests drive it, and losing that would trade one blind spot
+        // for another.
+        Vector sources = new Vector();
         if (config != null) {
-            java.util.Enumeration hosts = config.protectedHosts();
+            sources.addElement(config.protectedHosts());
+        }
+        sources.addElement(AppShield.protectedHosts());
+        for (int i = 0; i < sources.size(); i++) {
+            java.util.Enumeration hosts = (java.util.Enumeration) sources.elementAt(i);
             while (hosts.hasMoreElements()) {
                 String host = (String) hosts.nextElement();
-                if (host == null) {
+                if (host == null || hostToPins.containsKey(host)) {
                     continue;
                 }
                 // Wildcards included. PinSet.isEnforcedFor() resolves "api.example.com"

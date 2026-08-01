@@ -12573,9 +12573,29 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    /**
+     * The documented jailbreak/root check, and only that.
+     *
+     * <p>Deliberately not "any compromise reason". {@code getCompromiseReasons()} also
+     * reports a debugger, and a clean device with Xcode attached emits {@code traced} --
+     * so a plain debug session made this return true. That is a specifically documented
+     * jailbreak API with callers that branch on it, and telling them a developer's own
+     * device is jailbroken every time they hit Run is a regression, not extra vigilance.
+     * Aggregating the rest is {@link #isDeviceCompromised()}'s job.</p>
+     *
+     * <p>Hooking is left out for the same reason it is reported separately: a hooking
+     * framework is evidence of instrumentation, which usually accompanies a jailbreak but
+     * is not one, and callers that want the broader question have the broader method.</p>
+     */
     @Override
     public boolean isJailbrokenDevice() {
-        return getCompromiseReasons().length > 0;
+        String[] reasons = getCompromiseReasons();
+        for (int i = 0; i < reasons.length; i++) {
+            if ("jailbreak".equals(reasons[i])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
