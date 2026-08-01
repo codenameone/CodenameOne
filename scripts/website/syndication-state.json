@@ -1372,6 +1372,15 @@
         "source_slug": "push-v3-new-cloud",
         "scheduled_at": "2026-07-31T09:00:00+00:00"
       }
+    },
+    "2026-08-01-1200-codenameone-health-api-false-certainty": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/company/5041007/admin/page-posts/published/",
+        "syndicated_at": "2026-08-01T09:00:47+00:00",
+        "account": "codenameone",
+        "source_slug": "health-api-false-certainty",
+        "scheduled_at": "2026-08-01T09:00:00+00:00"
+      }
     }
   }
 }

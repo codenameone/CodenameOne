@@ -24,22 +24,6 @@
       "queued_at": "2026-07-31T15:14:58+00:00"
     },
     {
-      "id": "linkedin:2026-08-01-1200-codenameone-health-api-false-certainty",
-      "site": "linkedin",
-      "kind": "social",
-      "slug": "2026-08-01-1200-codenameone-health-api-false-certainty",
-      "source_slug": "health-api-false-certainty",
-      "account": "codenameone",
-      "title": "HealthKit cannot tell you whether read access was denied",
-      "canonical": "https://www.codenameone.com/blog/health-api-false-certainty/",
-      "cover_image_url": "https://www.codenameone.com/blog/health-api-false-certainty.jpg",
-      "body_text": "HealthKit cannot tell an application whether the user denied read access.\n\nA denied read looks exactly like an empty store. That is a privacy guarantee: the application cannot infer that someone chose to hide a sensitive category.\n\nIt also means a cross-platform `hasReadPermission()` method would lie.\n\nThe new Codename One health API keeps that asymmetry visible. On iOS, a completed permission sheet means the user was asked. An empty query means \u201cno data available,\u201d not \u201caccess denied.\u201d\n\nThat same refusal to invent certainty shapes the rest of the API:\n\n\u2022 An aggregate with no samples is null, not zero.\n\u2022 Calendar buckets require a time zone.\n\u2022 Phone and watch sources are not silently deduplicated.\n\u2022 Change subscriptions say when they can miss backdated data.\n\u2022 Unsupported workout, sleep, nutrition, and sensor paths fail explicitly.\n\nThe deep dive covers HealthKit, Health Connect, recorded workouts, eight Bluetooth health sensor profiles, deterministic simulation, build hints, and why no framework switch can make an application HIPAA compliant.\n\nhttps://www.codenameone.com/blog/health-api-false-certainty/",
-      "scheduled_at": "2026-08-01T09:00:00+00:00",
-      "scheduled_local": "2026-08-01T12:00+03:00",
-      "timezone": "Asia/Jerusalem",
-      "queued_at": "2026-07-31T15:14:58+00:00"
-    },
-    {
       "id": "linkedin:2026-08-02-1200-shai-on-device-ai-mcp-loopback",
       "site": "linkedin",
       "kind": "social",
