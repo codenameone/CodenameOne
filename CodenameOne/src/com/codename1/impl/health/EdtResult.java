@@ -22,6 +22,9 @@
  */
 package com.codename1.impl.health;
 
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+import com.codename1.util.EasyThread;
 import com.codename1.ui.Display;
 
 /// The resource every public health operation hands back: one outcome,
@@ -46,6 +49,41 @@ import com.codename1.ui.Display;
 /// Already on the EDT means completed inline, so a callback chain that
 /// completes another resource does not queue a runnable per link.
 public final class EdtResult<T> extends OneShot<T> {
+
+    /// Late registration is delivered on the EDT too.
+    ///
+    /// `AsyncResource.ready` runs the callback immediately, on the registering thread,
+    /// when the resource has already settled -- so the guarantee this class exists to
+    /// make held only for listeners attached before completion. Every facade action that
+    /// answers without a backend (`openHealthSettings`, `openProviderSetup`) completes
+    /// the resource before returning it, so the caller CANNOT attach in time, and which
+    /// thread the callback ran on came down to whether the EDT had drained the hop yet.
+    /// Off the EDT on a busy machine, on it on an idle one -- a callback that is usually
+    /// on the EDT is exactly the thing the class doc calls not-a-design.
+    ///
+    /// Deliberately NOT done for `except`. Reading the error out of an already-failed
+    /// resource by registering a callback and looking at what it captured is an
+    /// established idiom here -- `HealthFallbackTest.errorOf` and `BtTestUtil` both do
+    /// it, and it depends on that call being synchronous. The asymmetry is the honest
+    /// one: this contract exists so a callback that acts on a VALUE -- updates a label,
+    /// touches a form -- is on the EDT, and introspecting a failure that has already
+    /// happened is not that.
+    @Override
+    public AsyncResource<T> ready(SuccessCallback<T> callback, EasyThread t) {
+        if (isDone() && !isCancelled() && Display.isInitialized()
+                && !Display.getInstance().isEdt()) {
+            final SuccessCallback<T> target = callback;
+            final EasyThread thread = t;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    EdtResult.super.ready(target, thread);
+                }
+            });
+            return this;
+        }
+        return super.ready(callback, t);
+    }
 
     @Override
     public void complete(T value) {
