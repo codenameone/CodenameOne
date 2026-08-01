@@ -72,6 +72,10 @@ public final class CN1LiveActivityManager {
     /// under `PERMISSION_LOCK`, which is what publishes it; it exists because that monitor is
     /// reentrant and `invokeAndBlock` pumps the EDT underneath it.
     private static boolean permissionRequestInFlight;
+    /// Incremented under `PERMISSION_LOCK` each time a request returns an answer. Volatile
+    /// because callers sample it before contending for the lock, which is how one that waited
+    /// recognises that the burst it belongs to has already been answered.
+    private static volatile long permissionRequestGeneration;
     private static volatile boolean loggedMissingManifest;
     private static volatile boolean loggedBudgetExhausted;
 
@@ -236,6 +240,9 @@ public final class CN1LiveActivityManager {
         // spending the whole budget on one answer. One request at a time; whoever waited re-reads
         // the state the winner produced.
         //
+        // Sampled before the lock so that a caller which then waits can tell a request completed
+        // underneath it; see the generation check below.
+        long seenGeneration = permissionRequestGeneration;
         // This serializes surfaces against itself only. A camera or location request in flight
         // elsewhere still shares that same activity-wide flag and request code, and its callback
         // can release this one early -- an existing limitation of the shared permission machinery
@@ -261,6 +268,24 @@ public final class CN1LiveActivityManager {
                         + "starting another.");
                 return false;
             }
+            if (permissionRequestGeneration != seenGeneration) {
+                // A request finished while this caller was blocked on the lock, so it belongs to
+                // that same burst and adopts the answer rather than asking again. Serializing
+                // alone was not enough: the waiter would find the budget merely decremented and
+                // open a second dialog back to back, spending the whole budget on one burst of
+                // starts. A start issued later, with no request in between, still gets its turn.
+                return hasPostNotificationsPermission(ctx);
+            }
+            // Manifest first, matching the precedence in `isSupported`. A build that never
+            // declared the permission is the most actionable diagnosis and the only one the
+            // developer can act on directly, so it must not be masked by a spent budget -- which
+            // a restored preference file can present on a first run -- or by a transient
+            // background start. Requesting an undeclared permission is auto-denied without any
+            // UI, and is not counted as an attempt, so fixing the manifest is all it takes.
+            if (isPermissionMissing(ctx)) {
+                logMissingManifestOnce();
+                return false;
+            }
             if (!canPromptAgain(ctx)) {
                 logBudgetExhaustedOnce();
                 return false;
@@ -274,18 +299,15 @@ public final class CN1LiveActivityManager {
                         + "live activity while the app is visible.");
                 return false;
             }
-            if (isPermissionMissing(ctx)) {
-                // requesting an undeclared permission is auto-denied without any UI; not counted
-                // as an attempt either, so fixing the manifest is all it takes
-                logMissingManifestOnce();
-                return false;
-            }
             boolean granted;
             permissionRequestInFlight = true;
             try {
                 granted = AndroidImplementation.checkForPermission(
                         "android.permission.POST_NOTIFICATIONS",
                         "This is required to show live activities", true);
+                // bumped only once an answer actually came back, so a throw leaves waiters free
+                // to ask rather than adopting an outcome that never happened
+                permissionRequestGeneration++;
             } catch (Throwable t) {
                 // the request never completed, so it is not an attempt the user spent
                 Log.w(TAG, "Failed to request the POST_NOTIFICATIONS permission", t);

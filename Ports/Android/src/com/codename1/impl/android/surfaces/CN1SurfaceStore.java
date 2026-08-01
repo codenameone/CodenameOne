@@ -58,8 +58,9 @@ public final class CN1SurfaceStore {
     private static final String KEY_FETCH_AT_PREFIX = "bgFetchAt_";
     private static final String KEY_NOTIFICATION_PROMPTS = "notificationPrompts";
     private static final String KEY_PROMPTS_INSTALL = "notificationPromptsInstall";
-    /// Cached `firstInstallTime`; constant for the life of the process.
-    private static volatile long installStamp;
+    /// Cached `firstInstallTime`; constant for the life of the process. Named apart from the
+    /// `installStamp(Context)` helper that fills it so the two cannot be misread for each other.
+    private static volatile long cachedInstallStamp;
 
     private CN1SurfaceStore() {
     }
@@ -285,7 +286,7 @@ public final class CN1SurfaceStore {
     /// must not hand back a spent budget -- but changes on a genuine reinstall and on a restore
     /// to another device, which is precisely the line this needs to draw.
     private static long installStamp(Context ctx) {
-        long stamp = installStamp;
+        long stamp = cachedInstallStamp;
         if (stamp != 0) {
             return stamp;
         }
@@ -299,7 +300,7 @@ public final class CN1SurfaceStore {
             // rest of the process and quietly hand every count back as zero.
             return 0;
         }
-        installStamp = stamp;
+        cachedInstallStamp = stamp;
         return stamp;
     }
 
