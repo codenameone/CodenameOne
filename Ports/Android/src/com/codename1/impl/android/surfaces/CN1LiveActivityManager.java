@@ -262,6 +262,18 @@ public final class CN1LiveActivityManager {
                 logMissingManifestOnce();
                 return false;
             }
+            // Creating the channel is what arms the platform's prompt, so it needs the same
+            // foreground gate the modern path puts in front of its request. Android defers this
+            // prompt to the next activity launch, so arming it from a background push or service
+            // would ambush the user with a notification dialog the next time they opened the app,
+            // for a live activity they never saw asked for.
+            if (!hasForegroundActivity()) {
+                Log.w(TAG, "Cannot start a live activity: this build targets an SDK below 33, so "
+                        + "the notification prompt is armed by creating a channel, and doing that "
+                        + "from the background would prompt the user at their next app launch. "
+                        + "Start the first live activity while the app is visible.");
+                return false;
+            }
             // Create the channel now so the platform has its trigger, then re-check. The prompt
             // is asynchronous -- the system ties it to the next activity start -- so a fresh
             // install is still ungranted on the way out of here, and posting anyway would hand
