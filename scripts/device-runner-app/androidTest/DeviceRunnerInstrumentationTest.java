@@ -26,6 +26,7 @@ public class DeviceRunnerInstrumentationTest {
     @Test
     public void launchMainActivityAndWaitForDeviceRunner() throws Exception {
         Context context = ApplicationProvider.getApplicationContext();
+        grantNotificationPermission(context.getPackageName());
         Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
         assertNotNull("Launch intent not found for package " + context.getPackageName(), intent);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -34,6 +35,38 @@ public class DeviceRunnerInstrumentationTest {
         boolean finished = waitForDeviceRunner();
         if (!finished) {
             Log.w(TAG, "DeviceRunner did not emit completion marker; proceeding without hard failure");
+        }
+    }
+
+    /// Pre-grants POST_NOTIFICATIONS, the way an unattended instrumentation suite has to.
+    ///
+    /// The suite's SurfacesPublishTest starts a live activity, which on Android 13+ lowers to an
+    /// ongoing notification and therefore needs this permission. Without the grant the port asks
+    /// for it, the system dialog opens over the app, and nobody is there to answer: the requesting
+    /// thread waits on it indefinitely and the modal sits on top of every screenshot that follows,
+    /// so the suite stops emitting output partway through and never reaches its completion marker.
+    /// Granting up front is what a device user does once by hand, and it lets the suite exercise
+    /// the granted path rather than the prompt.
+    ///
+    /// Failures are logged and ignored: below API 33 the permission does not exist and `pm grant`
+    /// rejects it, which is correct and must not fail the run.
+    private void grantNotificationPermission(String packageName) {
+        String command = "pm grant " + packageName + " android.permission.POST_NOTIFICATIONS";
+        try {
+            UiAutomation automation = InstrumentationRegistry.getInstrumentation().getUiAutomation();
+            ParcelFileDescriptor pfd = automation.executeShellCommand(command);
+            try (FileInputStream fis = new FileInputStream(pfd.getFileDescriptor())) {
+                // draining the pipe is what lets the command run to completion
+                byte[] buffer = new byte[256];
+                while (fis.read(buffer) > 0) {
+                    // discard
+                }
+            } finally {
+                pfd.close();
+            }
+            Log.i(TAG, "Granted POST_NOTIFICATIONS to " + packageName);
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not grant POST_NOTIFICATIONS (expected below API 33): " + t);
         }
     }
 
