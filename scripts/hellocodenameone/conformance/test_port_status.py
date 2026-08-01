@@ -3,6 +3,7 @@
 import json
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -296,6 +297,33 @@ class PortStatusTest(unittest.TestCase):
         report["summary"]["pass"] -= 1
         report["summary"]["skip"] += 1
 
+        self.assertEqual(([], []), port_status.publishable_report_problems(
+            self.manifest, "android", report
+        ))
+
+    def test_publishable_rejects_a_timestamp_from_the_future(self):
+        # A skewed producer clock poisons the data branch rather than merely
+        # looking odd: the page reads the report as permanently fresh, and the
+        # sweep's "is this newer" comparison then refuses every later correct
+        # timestamp. Nothing downstream can undo it, so it has to be refused
+        # here.
+        ahead = datetime.now(timezone.utc) + timedelta(days=400)
+        report = self.publishable_report(
+            "android", generated_at=ahead.strftime("%Y-%m-%dT%H:%M:%SZ")
+        )
+        drift, malformed = port_status.publishable_report_problems(
+            self.manifest, "android", report
+        )
+        self.assertEqual([], drift)
+        self.assertTrue(any("future" in problem for problem in malformed), malformed)
+
+    def test_publishable_allows_a_little_clock_skew(self):
+        # Runner clocks drift and a report is stamped a moment before it is
+        # published, so being marginally ahead is normal rather than a defect.
+        skewed = datetime.now(timezone.utc) + timedelta(minutes=5)
+        report = self.publishable_report(
+            "android", generated_at=skewed.strftime("%Y-%m-%dT%H:%M:%SZ")
+        )
         self.assertEqual(([], []), port_status.publishable_report_problems(
             self.manifest, "android", report
         ))

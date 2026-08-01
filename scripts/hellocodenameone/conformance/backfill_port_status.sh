@@ -98,10 +98,21 @@ while IFS= read -r workflow; do
       run_id="${candidate}"
       while IFS= read -r downloaded; do
         found="$(jq -r '.port // empty' "${downloaded}" 2>/dev/null || true)"
-        if [ -n "${found}" ] && [ ! -f "${download_dir}/covered-${found}" ]; then
-          cp "${downloaded}" "${download_dir}/port-status-${found}.json"
-          : > "${download_dir}/covered-${found}"
+        if [ -z "${found}" ] || [ -f "${download_dir}/covered-${found}" ]; then
+          continue
         fi
+        # Gate before marking the port covered, not after. A newest run that
+        # uploaded an unusable report would otherwise claim the port and stop
+        # the older candidates from being consulted, so the sweep would keep
+        # serving stale data -- or fail its closing freshness assertion --
+        # while a perfectly good report sat in the run behind it.
+        if ! python3 "${SCRIPT_DIR}/port_status.py" accept \
+            --port "${found}" --report "${downloaded}" >/dev/null 2>&1; then
+          echo "Ignoring the ${found} report from run ${candidate}: not usable by the website." >&2
+          continue
+        fi
+        cp "${downloaded}" "${download_dir}/port-status-${found}.json"
+        : > "${download_dir}/covered-${found}"
       done < <(find "${download_dir}/run-${candidate}" -type f -name 'port-status-*.json' | sort)
     fi
   done

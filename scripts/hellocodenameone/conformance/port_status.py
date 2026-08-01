@@ -10,7 +10,7 @@ import os
 import re
 import sys
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -29,6 +29,12 @@ STRICT_GATE_FAILED = 10
 # only an unusable report is a defect worth failing the website build over.
 ACCEPT_CONTRACT_DRIFT = 11
 ACCEPT_UNUSABLE = 12
+
+# Producers and this checker can disagree by a little without anything
+# being wrong -- runner clocks drift, and a report is stamped slightly
+# before it is published. An hour absorbs that; a skewed clock or a
+# mistyped --generated-at lands far outside it.
+FUTURE_STAMP_TOLERANCE = timedelta(hours=1)
 
 START_RE = re.compile(r"suite starting test=([A-Za-z0-9_]+)")
 FINISH_RE = re.compile(r"suite finished test=([A-Za-z0-9_]+)")
@@ -622,6 +628,15 @@ def publishable_report_problems(
         else:
             if stamp.tzinfo is None:
                 malformed.append(f"generated_at {generated_at!r} has no time zone")
+            elif stamp - datetime.now(timezone.utc) > FUTURE_STAMP_TOLERANCE:
+                # A clock skewed far ahead poisons the data branch rather than
+                # just looking odd: the page reads the report as permanently
+                # fresh, and the sweep's lexical "is this newer" comparison
+                # then refuses every later, correct timestamp. Nothing
+                # downstream can recover from that, so refuse it at the gate.
+                malformed.append(
+                    f"generated_at {generated_at!r} is in the future"
+                )
 
     mapped = test_to_feature(manifest)
     tests = report.get("tests")

@@ -34,6 +34,9 @@ import com.codename1.health.HealthUnit;
 import com.codename1.health.QuantitySample;
 import com.codename1.health.SampleQuery;
 import com.codename1.util.AsyncResource;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -138,15 +141,46 @@ class HealthReadAuthTrapTest {
         return r;
     }
 
-    private static Throwable errorOf(AsyncResource<?> r) {
+    /// Settles `r` and returns the failure it carries, or null if it
+    /// succeeded.
+    ///
+    /// This used to read the error straight back, because a callback attached
+    /// to an already-failed resource fired inline on the registering thread.
+    /// Health results are delivered on the EDT whether the listener arrives
+    /// before the outcome or after it, so an off-EDT caller gets it queued and
+    /// has to wait -- the same wait `settled` makes one step earlier.
+    ///
+    /// Both sides are registered because most callers ask this of a resource
+    /// that succeeded and expect null; only one of the two ever fires, so
+    /// waiting on `except` alone would burn the whole limit on every
+    /// successful call.
+    private static <T> Throwable errorOf(AsyncResource<T> r) {
         settled(r);
-        final Throwable[] err = new Throwable[1];
+        // Atomics because the callback runs on the EDT while the value is read
+        // from the test thread.
+        final AtomicReference<Throwable> err = new AtomicReference<Throwable>();
+        final AtomicBoolean delivered = new AtomicBoolean();
         r.except(new SuccessCallback<Throwable>() {
             public void onSucess(Throwable t) {
-                err[0] = t;
+                err.set(t);
+                delivered.set(true);
             }
         });
-        return err[0];
+        r.ready(new SuccessCallback<T>() {
+            public void onSucess(T value) {
+                delivered.set(true);
+            }
+        });
+        long deadline = System.currentTimeMillis() + 10_000L;
+        while (!delivered.get() && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(5L);
+            } catch (InterruptedException ex) {
+                break;
+            }
+        }
+        assertTrue(delivered.get(), "the outcome must be delivered rather than hang");
+        return err.get();
     }
 
     /** The permissive baseline: data is there and comes back. */

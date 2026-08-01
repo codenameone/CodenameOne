@@ -664,23 +664,39 @@ static int cn1EcCoordinateBytes(BCRYPT_KEY_HANDLE key) {
 }
 
 /* Inverse of cn1EcdsaToDer, padding each half back to `half` bytes. */
+/* Rejects anything that is not the one canonical encoding of this signature.
+ *
+ * Being liberal here is not harmless: CNG verifies the P1363 pair this
+ * produces, so a signature carrying trailing bytes, a falsified outer length
+ * or a non-minimal INTEGER would verify on Windows and be rejected by JavaSE
+ * and by any conforming verifier -- the same signature accepted on one port
+ * and refused on another. The whole input must be exactly one
+ * ECDSA-Sig-Value. */
 static int cn1EcdsaFromDer(const unsigned char* der, int derLength, unsigned char* raw, int half) {
     int index = 1;
     int part;
+    int bodyLength;
     if (derLength < 8 || der[0] != 0x30) {
         return 0;
     }
     /* Accept the long form the P-521 body needs, and only that one extra
-     * length byte -- a sequence of two integers never runs past 255 bytes. */
+     * length byte -- a sequence of two integers never runs past 255 bytes.
+     * DER also requires the shortest form, so a 0x81 that encodes a length
+     * under 128 is not canonical. */
     if (der[index] == 0x81) {
         index++;
-        if (index >= derLength) {
+        if (index >= derLength || der[index] < 0x80) {
             return 0;
         }
     } else if ((der[index] & 0x80) != 0) {
         return 0;
     }
+    bodyLength = der[index];
     index++;
+    /* The sequence must describe exactly the bytes that follow it. */
+    if (index + bodyLength != derLength) {
+        return 0;
+    }
     memset(raw, 0, (size_t) (half * 2));
     for (part = 0; part < 2; part++) {
         int length, start, copy;
@@ -690,6 +706,14 @@ static int cn1EcdsaFromDer(const unsigned char* der, int derLength, unsigned cha
         length = der[index + 1];
         index += 2;
         if (length <= 0 || index + length > derLength) {
+            return 0;
+        }
+        /* Canonical INTEGER: no leading 0x00 unless it is there to keep the
+         * value positive, and never negative. */
+        if (length > 1 && der[index] == 0x00 && (der[index + 1] & 0x80) == 0) {
+            return 0;
+        }
+        if ((der[index] & 0x80) != 0) {
             return 0;
         }
         start = 0;
@@ -703,7 +727,8 @@ static int cn1EcdsaFromDer(const unsigned char* der, int derLength, unsigned cha
         memcpy(raw + part * half + (half - copy), der + index + start, (size_t) copy);
         index += length;
     }
-    return 1;
+    /* Nothing may follow the second INTEGER. */
+    return index == derLength;
 }
 
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_rsaCrypt___java_lang_String_boolean_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(

@@ -2805,15 +2805,34 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public byte[] cryptoSign(String algorithm, String keyAlgorithm, byte[] privateKeyPkcs8, byte[] data) {
-        // The digest and the key type both follow from the algorithm name and
-        // the DER key itself, so keyAlgorithm adds nothing here.
+        checkKeyFamily(algorithm, keyAlgorithm);
         return cryptoResult(LinuxNative.signData(algorithm, privateKeyPkcs8, data), "sign");
     }
 
     @Override
     public boolean cryptoVerify(String algorithm, String keyAlgorithm, byte[] publicKeyX509,
             byte[] data, byte[] signature) {
+        checkKeyFamily(algorithm, keyAlgorithm);
         return LinuxNative.verifyData(algorithm, publicKeyX509, data, signature);
+    }
+
+    /// The portable contract pairs an algorithm with a key of its own family,
+    /// and JavaSE rejects a mismatch when the Signature is initialised. The
+    /// native here reads the family off the DER key and takes only the digest
+    /// from the algorithm name, so `SHA256withRSA` handed an EC key would
+    /// quietly produce an ECDSA signature -- and the matching verify would
+    /// accept it, so nothing looks wrong until another port reads it. Refuse
+    /// the pairing rather than silently substituting the algorithm.
+    private static void checkKeyFamily(String algorithm, String keyAlgorithm) {
+        if (algorithm == null || keyAlgorithm == null) {
+            return;
+        }
+        boolean wantsEc = algorithm.toUpperCase().indexOf("ECDSA") >= 0;
+        boolean keyIsEc = keyAlgorithm.toUpperCase().startsWith("EC");
+        if (wantsEc != keyIsEc) {
+            throw new RuntimeException(algorithm + " cannot be used with a "
+                    + keyAlgorithm + " key");
+        }
     }
 
     @Override
