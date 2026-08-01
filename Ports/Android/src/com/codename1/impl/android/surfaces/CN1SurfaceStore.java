@@ -56,7 +56,7 @@ public final class CN1SurfaceStore {
     private static final String KEY_ACTIVITY_SEQ = "laSeq";
     private static final String KEY_FETCH_CLASS = "bgFetchClass";
     private static final String KEY_FETCH_AT_PREFIX = "bgFetchAt_";
-    private static final String KEY_NOTIFICATIONS_REFUSED = "notificationsRefused";
+    private static final String KEY_NOTIFICATION_PROMPTS = "notificationPrompts";
 
     private CN1SurfaceStore() {
     }
@@ -226,22 +226,29 @@ public final class CN1SurfaceStore {
 
     // --- live activity notification permission --------------------------------
 
-    /// True once the user turned down the `POST_NOTIFICATIONS` prompt raised by the first
-    /// `LiveActivity.start()` on Android 13+. `CN1LiveActivityManager` consults this so a refusal
-    /// makes `isLiveActivitySupported()` report false (the honest answer) instead of re-prompting
-    /// on every start. Granting notifications later in the system settings makes
-    /// `areNotificationsEnabled()` true again, which is checked first, so the flag never traps an
-    /// app that the user changed their mind about.
-    public static boolean isNotificationPermissionRefused(Context ctx) {
-        return prefs(ctx).getBoolean(KEY_NOTIFICATIONS_REFUSED, false);
+    /// How many times `LiveActivity.start()` has raised the `POST_NOTIFICATIONS` prompt on
+    /// Android 13+ without ending up granted. `CN1LiveActivityManager` bounds the prompt at two
+    /// attempts, mirroring Android's own two-strike model, so an outcome it cannot tell apart --
+    /// an explicit "Don't allow", a dialog the user dismissed without choosing, or a request the
+    /// system auto-denied without showing anything -- costs at most one more attempt instead of
+    /// being locked in as a permanent refusal on the first one.
+    public static int getNotificationPromptCount(Context ctx) {
+        return prefs(ctx).getInt(KEY_NOTIFICATION_PROMPTS, 0);
     }
 
-    /// Records the outcome of the `POST_NOTIFICATIONS` prompt; see
-    /// [#isNotificationPermissionRefused(Context)].
-    public static void setNotificationPermissionRefused(Context ctx, boolean refused) {
+    /// Counts one raised prompt; see [#getNotificationPromptCount(Context)].
+    public static void recordNotificationPrompt(Context ctx) {
         SharedPreferences prefs = prefs(ctx);
-        if (prefs.getBoolean(KEY_NOTIFICATIONS_REFUSED, false) != refused) {
-            prefs.edit().putBoolean(KEY_NOTIFICATIONS_REFUSED, refused).apply();
+        prefs.edit().putInt(KEY_NOTIFICATION_PROMPTS,
+                prefs.getInt(KEY_NOTIFICATION_PROMPTS, 0) + 1).apply();
+    }
+
+    /// Forgets the prompt count once the permission is held, so a user who grants, later revokes
+    /// in the system settings and comes back gets the same two attempts a fresh install does.
+    public static void clearNotificationPrompts(Context ctx) {
+        SharedPreferences prefs = prefs(ctx);
+        if (prefs.getInt(KEY_NOTIFICATION_PROMPTS, 0) != 0) {
+            prefs.edit().remove(KEY_NOTIFICATION_PROMPTS).apply();
         }
     }
 

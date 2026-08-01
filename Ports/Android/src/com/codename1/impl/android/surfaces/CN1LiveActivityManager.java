@@ -33,6 +33,7 @@ import android.widget.RemoteViews;
 
 import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.android.AndroidNativeUtil;
+import com.codename1.impl.android.CodenameOneActivity;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -51,14 +52,16 @@ import java.util.Map;
 /// below that and when the user disabled notifications. On Android 13 (API 33) and newer an
 /// ongoing notification additionally needs the `POST_NOTIFICATIONS` runtime permission, which the
 /// build declares for you: [#start(Context, String, Map)] raises the system prompt the first time
-/// an app starts a live activity without it, and a refusal is remembered so `isSupported` reports
-/// false from then on rather than re-prompting on every start. Updates re-render locally from the
-/// descriptor persisted at start time merged with the latest state map (state-only updates per
-/// the SPI contract). Android 16 "Live Updates" / `ProgressStyle` is a possible future lowering.
+/// an app starts a live activity without it, at most twice across the install before `isSupported`
+/// reports false. Updates re-render locally from the descriptor persisted at start time merged
+/// with the latest state map (state-only updates per the SPI contract). Android 16 "Live Updates" / `ProgressStyle` is a possible future lowering.
 public final class CN1LiveActivityManager {
     private static final String TAG = "CN1Surfaces";
     private static final String DEFAULT_CHANNEL = "cn1_live_activities";
     private static final String NOTIFICATION_TAG = "cn1la";
+    /// Prompt attempts before live activities report unsupported; Android's own model auto-denies
+    /// after two refusals, so a third attempt would never reach the user anyway.
+    private static final int MAX_NOTIFICATION_PROMPTS = 2;
 
     private CN1LiveActivityManager() {
     }
@@ -66,7 +69,9 @@ public final class CN1LiveActivityManager {
     /// Returns true when live activities can be presented on this device, either right now or
     /// after the `POST_NOTIFICATIONS` prompt `start` raises on Android 13+. A pending permission
     /// counts as supported: reporting false there would make the app skip the very call that
-    /// prompts, so a first-run install could never present an activity at all.
+    /// prompts, so a first-run install could never present an activity at all. It goes false once
+    /// the permission is held but notifications are switched off, or the prompt has been refused
+    /// as often as `start` will raise it.
     public static boolean isSupported(Context ctx) {
         if (ctx == null || Build.VERSION.SDK_INT < 24) {
             return false;
@@ -86,9 +91,8 @@ public final class CN1LiveActivityManager {
             }
             // From API 33 notifications also read as disabled while POST_NOTIFICATIONS is merely
             // ungranted, which is the state of every fresh install. Granted-but-disabled is the
-            // settled choice again; ungranted is still requestable, hence still supported.
-            return !hasPostNotificationsPermission(ctx)
-                    && !CN1SurfaceStore.isNotificationPermissionRefused(ctx);
+            // settled choice again; ungranted is supported while a prompt attempt remains.
+            return !hasPostNotificationsPermission(ctx) && canPromptAgain(ctx);
         } catch (Throwable t) {
             return false;
         }
@@ -160,34 +164,52 @@ public final class CN1LiveActivityManager {
     /// Makes sure the ongoing notification a live activity lowers to can actually be posted:
     /// on Android 13+ that needs the `POST_NOTIFICATIONS` runtime permission the build declares
     /// but nobody has granted yet on a fresh install. Raises the standard Codename One permission
-    /// request (which blocks the calling thread until the user answers, in a way that keeps the
-    /// EDT pumping when called from it) and remembers a refusal so the next `start` reports
-    /// unsupported instead of prompting again.
+    /// request, which blocks the calling thread until the user answers in a way that keeps the
+    /// EDT pumping when called from it.
+    ///
+    /// A request that comes back ungranted is counted rather than latched: the platform hands
+    /// back one bare boolean for an explicit "Don't allow", a dialog the user dismissed without
+    /// choosing and a request the system auto-denied without showing anything at all, so treating
+    /// the first false as a permanent refusal would strand a user who only swiped the dialog
+    /// away. Two attempts, matching Android's own two-strike model, then `isSupported` reports
+    /// false. Nothing is consulted before the live permission state, so a grant that arrives from
+    /// anywhere -- these prompts, push registration, `Display.requestNotificationPermission`, the
+    /// system settings -- takes effect immediately and resets the count.
     ///
     /// Only `start` calls this. `update` and `end` act on an activity that is already running,
     /// so the permission was necessarily granted when it started.
     private static boolean ensureNotificationPermission(Context ctx) {
-        if (Build.VERSION.SDK_INT < 33 || ctx == null || hasPostNotificationsPermission(ctx)) {
+        if (Build.VERSION.SDK_INT < 33 || ctx == null) {
             return true;
         }
-        if (CN1SurfaceStore.isNotificationPermissionRefused(ctx)) {
+        if (hasPostNotificationsPermission(ctx)) {
+            CN1SurfaceStore.clearNotificationPrompts(ctx);
+            return true;
+        }
+        if (!canPromptAgain(ctx)) {
+            Log.w(TAG, "Live activities are unavailable: POST_NOTIFICATIONS was refused twice. "
+                    + "LiveActivity.isSupported() reports false until the user enables "
+                    + "notifications for this app in the system settings.");
             return false;
         }
-        if (AndroidNativeUtil.getActivity() == null) {
-            // nothing to prompt from -- a live activity started from a background service or a
-            // push. Leave the refusal flag alone so the next start with UI in front still asks.
+        if (!hasForegroundActivity()) {
+            // nothing to prompt from -- a live activity started from a background service, a
+            // push, or with the app stopped. Not counted as an attempt, so the next start with
+            // the app in front still asks.
             Log.w(TAG, "Cannot start a live activity: POST_NOTIFICATIONS has not been granted "
-                    + "and there is no activity in the foreground to request it from.");
+                    + "and the app is not in the foreground to request it. Start the first live "
+                    + "activity while the app is visible.");
             return false;
         }
-        if (!isPermissionDeclared()) {
-            // requesting an undeclared permission is auto-denied without any UI, which would
-            // otherwise look like a refusal and be remembered as one
+        if (isPermissionMissing(ctx)) {
+            // requesting an undeclared permission is auto-denied without any UI; not counted as
+            // an attempt either, so fixing the manifest is all it takes
             Log.e(TAG, "Cannot start a live activity: POST_NOTIFICATIONS is missing from the "
                     + "manifest. The build declares it for apps whose surfaces.json sets "
                     + "\"liveActivities\": true -- add that and rebuild.");
             return false;
         }
+        CN1SurfaceStore.recordNotificationPrompt(ctx);
         boolean granted;
         try {
             granted = AndroidImplementation.checkForPermission(
@@ -197,24 +219,56 @@ public final class CN1LiveActivityManager {
             Log.w(TAG, "Failed to request the POST_NOTIFICATIONS permission", t);
             return false;
         }
-        CN1SurfaceStore.setNotificationPermissionRefused(ctx, !granted);
-        if (!granted) {
-            Log.w(TAG, "Live activities are unavailable: the user declined the POST_NOTIFICATIONS "
-                    + "permission. LiveActivity.isSupported() reports false from now on; the user "
-                    + "can re-enable notifications in the system settings.");
+        if (granted) {
+            CN1SurfaceStore.clearNotificationPrompts(ctx);
+            return true;
         }
-        return granted;
+        Log.w(TAG, "Live activities are unavailable for now: POST_NOTIFICATIONS was not granted "
+                + "(attempt " + CN1SurfaceStore.getNotificationPromptCount(ctx) + " of "
+                + MAX_NOTIFICATION_PROMPTS + ").");
+        return false;
     }
 
-    /// True when `POST_NOTIFICATIONS` is in the merged manifest. A failed or empty lookup reads
-    /// as "declared" so a broken query never blocks the prompt.
-    private static boolean isPermissionDeclared() {
+    /// True while a prompt attempt remains; see
+    /// `CN1SurfaceStore#getNotificationPromptCount(Context)`.
+    private static boolean canPromptAgain(Context ctx) {
+        return CN1SurfaceStore.getNotificationPromptCount(ctx) < MAX_NOTIFICATION_PROMPTS;
+    }
+
+    /// True when the app has a visible activity to raise the system dialog from. The activity
+    /// reference outlives `onStop`, so a non-null one proves nothing on its own -- a background
+    /// fetch or a push handler running with the app stopped still sees it.
+    private static boolean hasForegroundActivity() {
+        android.app.Activity a = AndroidNativeUtil.getActivity();
+        return a instanceof CodenameOneActivity && !((CodenameOneActivity) a).isBackground();
+    }
+
+    /// True only when the manifest was read successfully and `POST_NOTIFICATIONS` is definitely
+    /// absent from it. "Definitely" is the point: a package that declares no permissions at all
+    /// yields an empty or null array, which is a real answer and not a failed lookup, while a
+    /// manifest that could not be read at all reports false so an unknown never blocks the prompt.
+    /// Reading `PackageInfo` here rather than through
+    /// `AndroidImplementation#getRequestedPermissions()` is what keeps those apart -- that helper
+    /// flattens both a missing package and an unreadable one into the same empty list.
+    private static boolean isPermissionMissing(Context ctx) {
         try {
-            java.util.List<String> declared = AndroidImplementation.getRequestedPermissions();
-            return declared.isEmpty()
-                    || declared.contains("android.permission.POST_NOTIFICATIONS");
-        } catch (Throwable t) {
+            android.content.pm.PackageInfo info = ctx.getPackageManager().getPackageInfo(
+                    ctx.getPackageName(), PackageManager.GET_PERMISSIONS);
+            if (info == null) {
+                return false;
+            }
+            String[] declared = info.requestedPermissions;
+            if (declared == null) {
+                return true;
+            }
+            for (String p : declared) {
+                if ("android.permission.POST_NOTIFICATIONS".equals(p)) {
+                    return false;
+                }
+            }
             return true;
+        } catch (Throwable t) {
+            return false;
         }
     }
 
