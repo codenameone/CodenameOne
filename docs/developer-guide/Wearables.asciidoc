@@ -288,10 +288,17 @@ On Wear OS the declared class *is* the watch launcher, so a project that keeps
 its watch screens behind that check behaves the same on both platforms -- which is
 the pattern to write today regardless.
 
-Submitting the companion pair to the App Store also needs an app icon for the
-watch app, which the generated project doesn't produce. Building, running and
-testing on the simulator and on a device don't require one; add an `AppIcon` set
-to the watch target before you archive for submission.
+Distribution has rough edges too, and they surface at archive time rather than in
+the build itself. Submitting the companion pair to the App Store needs an app icon
+for the watch app, which the generated project doesn't produce. Under manual
+signing the embedded watch target has no provisioning profile of its own, since
+the host app's profile is the one installed. And with
+`codename1.watchStandalone` the watch product is built but not archived, because
+the archive step targets the phone scheme.
+
+None of this affects building, running or testing on the simulator or a device.
+Before you archive for submission, add an `AppIcon` set to the watch target, and
+under manual signing give the watch bundle id its own profile.
 
 ==== Supported and Unsupported APIs on watchOS
 [[watch-supported-apis]]
