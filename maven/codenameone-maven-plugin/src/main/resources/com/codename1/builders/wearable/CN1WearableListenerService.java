@@ -236,6 +236,24 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // Under our prefix but not written by this API -- nothing to deliver.
                 continue;
             }
+            if (!CN1WearableBridge.hasDeliveredStamp(appPath)) {
+                // First sight of this path in this process -- after a restart there is no baseline,
+                // so accepting the event on the strength of "nothing recorded" would hand the app a
+                // lower-ranked replica while a higher-ranked item exists on another node, and
+                // getData() would immediately disagree. Resolve the actual winner instead.
+                try {
+                    CN1WearableBridge.ResolvedValue winner =
+                            CN1WearableBridge.resolveValue(this, appPath);
+                    if (winner != null && CN1WearableBridge.setDeliveredSequence(
+                            appPath, winner.sequence, winner.node)) {
+                        WearableConnection.deliverDataChanged(appPath, winner.payload);
+                    }
+                    continue;
+                } catch (java.io.IOException couldNotResolve) {
+                    // Fall through and use the event itself: delivering the item we were actually
+                    // handed beats delivering nothing at all.
+                }
+            }
             if (!CN1WearableBridge.isNewerThanDelivered(
                     appPath, CN1WearableBridge.sequenceOf(value), uri.getHost())) {
                 // An older item arriving after a newer one, which a reconnect can do when both nodes

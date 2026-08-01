@@ -1228,6 +1228,22 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
+    /**
+     * Whether this process has delivered anything for a path yet.
+     *
+     * <p>An empty baseline is not the same as "this event is newer". After a restart the map is
+     * empty, so the first event for a path would be accepted whatever it is -- including a
+     * lower-ranked replica while a higher-ranked one exists on another node.
+     *
+     * @param path the application path
+     * @return true when a delivery stamp is already recorded
+     */
+    static boolean hasDeliveredStamp(String path) {
+        synchronized (deliveredSequences) {
+            return deliveredSequences.containsKey(path);
+        }
+    }
+
     static void forgetDeliveredSequence(String path) {
         synchronized (deliveredSequences) {
             deliveredSequences.remove(path);
