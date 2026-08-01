@@ -816,6 +816,10 @@ final class IOSDeviceIntegrity {
         // rejects it, the app calls DeviceIntegrity.resetAttestation() instead.
         // Same lock as the reset, for the same reason as nativeKeyGenerated: the
         // staleness check and the state it writes have to move together.
+        // Labelled so the storage-failure branches can leave the critical section and
+        // still hand the caller its attestation, which is the one thing in here that
+        // cannot be produced a second time.
+        shieldAttestState:
         synchronized (instance.flowLock) {
             if (isStale(pending)) {
                 fail(pending, "App Attest state was reset while this request was in flight");
@@ -837,10 +841,21 @@ final class IOSDeviceIntegrity {
                 instance.inMemoryState = STATE_PENDING;
                 instance.pendingSinceInMemory = System.currentTimeMillis();
                 instance.bootstrapInFlight = false;
-                fail(pending, "App Attest could not record its attestation state");
-                instance.failBootstrapWaiters(
-                        "App Attest could not record its attestation state");
-                return;
+                instance.failBootstrapWaiters("App Attest is completing first-run "
+                        + "registration for this device; retry shortly");
+                // The caller still gets the attestation, because it is the ONE thing
+                // here that cannot be produced again. Apple attests a key once; failing
+                // this request threw that object away, so the backend never received the
+                // key to register -- and after the grace window the client promotes it
+                // locally and starts asserting against a key the backend has never seen,
+                // which is rejected, which resets, which spends another rate-limited
+                // key. Discarding an irreplaceable result to report a storage problem
+                // costs strictly more than reporting nothing.
+                //
+                // Falls through to the same succeed() the normal path uses. The state is
+                // pending in memory, so later callers take the registration-in-progress
+                // path exactly as they would have.
+                break shieldAttestState;
             }
             long pendingSince = System.currentTimeMillis();
             // Held in memory whatever the keychain does, and set BEFORE the write is
@@ -869,10 +884,12 @@ final class IOSDeviceIntegrity {
                 // backend's confirmation is unknown -- and it costs no rate-limited key.
                 store.remove(KEY_ATTEST_STARTED);
                 instance.bootstrapInFlight = false;
-                fail(pending, "App Attest could not record its registration deadline");
-                instance.failBootstrapWaiters(
-                        "App Attest could not record its registration deadline");
-                return;
+                instance.failBootstrapWaiters("App Attest is completing first-run "
+                        + "registration for this device; retry shortly");
+                // Same reasoning as the state write above: the attestation object is
+                // one-time, so it goes to the caller rather than being discarded to
+                // report that a timestamp could not be stored.
+                break shieldAttestState;
             }
             // The recovery this key came from, if any, is now complete. Leaving the
             // marker would refuse a future replacement when iOS legitimately invalidates
