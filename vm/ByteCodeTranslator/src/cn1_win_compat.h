@@ -143,6 +143,15 @@ int gettimeofday(struct timeval* tv, void* tz);
    system clock must not stretch or cut the remaining sleep. */
 long long cn1_monotonic_micros(void);
 
+/* --- IANA time zone offsets ---
+   Answers the total offset (zone plus daylight) in milliseconds for an IANA
+   zone identifier at an instant, writing the offset to offsetOut and whether
+   daylight time is in effect to dstOut. Returns non-zero on success, and zero
+   when the platform cannot answer -- the caller then keeps whatever the C
+   runtime reported. Lives in cn1_win_compat.c because resolving it needs
+   <windows.h>, which this header keeps out of translated units. */
+int cn1_win_zone_offset_millis(const char* zoneId, long long millis, int* offsetOut, int* dstOut);
+
 /* --- environment / time.h POSIX helpers absent from MSVC ---
    Thin static-inline wrappers over the MSVC equivalents; used by the date /
    timezone runtime in nativeMethods. */

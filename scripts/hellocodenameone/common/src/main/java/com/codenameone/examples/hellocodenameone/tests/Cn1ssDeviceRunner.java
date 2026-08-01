@@ -508,20 +508,20 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     /// published as "never run" with nothing saying why.
     private static final long WEDGE_GRACE_MS = 30000L;
 
-    private void startWedgeWatchdog() {
-        // Not on HTML5. That port schedules its threads cooperatively on the
-        // browser's single thread, so a second thread waking every second to
-        // poll competes with the suite it is supposed to be watching -- it cost
-        // the JavaScript job its whole 40 minute budget. Its harness already
-        // bounds the run, and the wedges this watchdog exists to name are on
-        // the native desktop ports.
-        if ("HTML5".equals(Display.getInstance().getPlatformName())) {
-            return;
-        }
-        // Display.startThread rather than a bare Thread: the ports only support
-        // the thread surface the bytecode compliance gate allows, and this hands
-        // back a CodenameOneThread that the platform names and reaps for us.
-        Display.getInstance().startThread(() -> {
+    /// The watchdog body.
+    ///
+    /// This is a named class and MUST NOT be rewritten as a lambda. The
+    /// JavaScript port hand-binds three of this class's Runnable lambdas by
+    /// translated id -- Cn1ssDeviceRunner_lambda_1_run through _3_run, see
+    /// bindCiFallback in port.js -- and the translator numbers lambdas in their
+    /// declaration order within the class. A lambda declared here, ahead of the
+    /// ones in runNextTest, shifts every one of those ids by one, so the bridge
+    /// that polls for a test's completion gets handed the lambda that starts a
+    /// test instead. The ids still resolve, so nothing reports an error: the
+    /// suite simply stops advancing after its first test. A named class has its
+    /// own method namespace and leaves that numbering alone.
+    private final class WedgeWatchdog implements Runnable {
+        public void run() {
             while (!suiteFinished) {
                 try {
                     Thread.sleep(1000L);
@@ -551,7 +551,21 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 // blame.
                 return;
             }
-        }, "cn1ss-wedge-watchdog").start();
+        }
+    }
+
+    private void startWedgeWatchdog() {
+        // Not on HTML5. That port drives the suite from the browser's single
+        // thread through the bridges described on WedgeWatchdog, and its harness
+        // already bounds the run and force-advances a stalled dispatch. The
+        // wedges this watchdog exists to name are on the native desktop ports.
+        if ("HTML5".equals(Display.getInstance().getPlatformName())) {
+            return;
+        }
+        // Display.startThread rather than a bare Thread: the ports only support
+        // the thread surface the bytecode compliance gate allows, and this hands
+        // back a CodenameOneThread that the platform names and reaps for us.
+        Display.getInstance().startThread(new WedgeWatchdog(), "cn1ss-wedge-watchdog").start();
     }
 
     /// Set once the suite is over so the watchdog thread returns instead of

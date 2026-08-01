@@ -2618,84 +2618,13 @@ static void cn1_with_timezone(const char* zoneId, void (*func)(void*), void* ctx
  * instant, or reports failure so the caller can fall back.
  */
 #ifdef _WIN32
-/*
- * ICU ships with Windows 10 1703 and later as icu.dll, and its calendar speaks
- * IANA identifiers and knows the daylight rules for a given instant. It is
- * resolved at runtime rather than linked: the clean target builds against a
- * minimal SDK layout that need not carry icu.lib or <icu.h>, and a host
- * without ICU degrades to the fallback below instead of failing to load.
- *
- * The two enum values used here are fixed by ICU's stable C API --
- * UCAL_GREGORIAN, and the ZONE_OFFSET / DST_OFFSET calendar fields.
- */
-#define CN1_UCAL_GREGORIAN 1
-#define CN1_UCAL_ZONE_OFFSET 15
-#define CN1_UCAL_DST_OFFSET 16
-
-typedef void* CN1UCalendar;
-
-static CN1UCalendar (__cdecl *cn1_ucal_open)(const WCHAR*, int32_t, const char*, int32_t, int32_t*);
-static void (__cdecl *cn1_ucal_setMillis)(CN1UCalendar, double, int32_t*);
-static int32_t (__cdecl *cn1_ucal_get)(const CN1UCalendar, int32_t, int32_t*);
-static void (__cdecl *cn1_ucal_close)(CN1UCalendar);
-static int cn1IcuResolved;
-
-static int cn1IcuAvailable(void) {
-    HMODULE icu;
-    if (cn1IcuResolved != 0) {
-        return cn1IcuResolved > 0;
-    }
-    cn1IcuResolved = -1;
-    icu = LoadLibraryA("icu.dll");
-    if (icu == NULL) {
-        return 0;
-    }
-    cn1_ucal_open = (CN1UCalendar (__cdecl *)(const WCHAR*, int32_t, const char*, int32_t, int32_t*))
-            GetProcAddress(icu, "ucal_open");
-    cn1_ucal_setMillis = (void (__cdecl *)(CN1UCalendar, double, int32_t*))
-            GetProcAddress(icu, "ucal_setMillis");
-    cn1_ucal_get = (int32_t (__cdecl *)(const CN1UCalendar, int32_t, int32_t*))
-            GetProcAddress(icu, "ucal_get");
-    cn1_ucal_close = (void (__cdecl *)(CN1UCalendar)) GetProcAddress(icu, "ucal_close");
-    if (cn1_ucal_open == 0 || cn1_ucal_setMillis == 0 || cn1_ucal_get == 0 || cn1_ucal_close == 0) {
-        return 0;
-    }
-    cn1IcuResolved = 1;
-    return 1;
-}
-
-/* Total offset (zone plus daylight) for a zone at an instant, 0 when ICU
- * cannot answer -- the caller then keeps the C runtime's reply. */
+/* Total offset (zone plus daylight) for a zone at an instant, 0 when the
+ * platform cannot answer -- the caller then keeps the C runtime's reply.
+ * The lookup itself lives in cn1_win_compat.c, the one translation unit that
+ * may include <windows.h>; keeping it out of here is what lets the clean
+ * target compile this file against a minimal SDK layout. */
 static int cn1WinZoneOffsetMillis(const char* zoneId, long long millis, int* offsetOut, int* dstOut) {
-    WCHAR zone[128];
-    CN1UCalendar cal;
-    int32_t status = 0;
-    int32_t zoneOffset, dstOffset;
-    if (zoneId == 0 || zoneId[0] == 0 || !cn1IcuAvailable()) {
-        return 0;
-    }
-    if (MultiByteToWideChar(CP_UTF8, 0, zoneId, -1, zone,
-                            (int) (sizeof(zone) / sizeof(zone[0]))) == 0) {
-        return 0;
-    }
-    cal = cn1_ucal_open(zone, -1, "en_US", CN1_UCAL_GREGORIAN, &status);
-    if (status > 0 || cal == 0) {
-        return 0;
-    }
-    cn1_ucal_setMillis(cal, (double) millis, &status);
-    zoneOffset = cn1_ucal_get(cal, CN1_UCAL_ZONE_OFFSET, &status);
-    dstOffset = cn1_ucal_get(cal, CN1_UCAL_DST_OFFSET, &status);
-    cn1_ucal_close(cal);
-    if (status > 0) {
-        return 0;
-    }
-    if (offsetOut != 0) {
-        *offsetOut = (int) (zoneOffset + dstOffset);
-    }
-    if (dstOut != 0) {
-        *dstOut = dstOffset != 0;
-    }
-    return 1;
+    return cn1_win_zone_offset_millis(zoneId, millis, offsetOut, dstOut);
 }
 
 /* Milliseconds since the epoch for a set of UTC calendar fields. */
