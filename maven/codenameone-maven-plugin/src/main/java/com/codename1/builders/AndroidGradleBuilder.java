@@ -5622,6 +5622,15 @@ public class AndroidGradleBuilder extends Executor {
 
         if (legacyGplayServicesMode) {
             additionalDependencies += " "+compile+" 'com.google.android.gms:play-services:6.5.87'\n";
+            if (playServicesWear) {
+                // The 6.5.87 monolith predates the Wearable Data Layer split, so it does NOT carry
+                // MessageClient/DataClient. An app that references com.codename1.wearable while
+                // keeping android.includeGPlayServices=true would compile the injected bridge
+                // against classes that are not on the classpath, so add the wearable artifact
+                // alongside the monolith rather than leaving the build to fail.
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-wearable:"
+                        + getDefaultPlayServiceVersion("wearable") + "'\n";
+            }
         } else {
             if(playServicesPlus){
                 additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-plus:"+getDefaultPlayServiceVersion("plus")+"'\n";

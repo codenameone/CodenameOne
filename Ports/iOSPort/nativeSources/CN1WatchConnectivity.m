@@ -142,7 +142,12 @@ static const int64_t kCN1TombstoneTTLMillis = 24 * 60 * 60 * 1000LL;
 static const NSUInteger kCN1MaxTombstones = 256;
 
 /// Drops tombstones that have outlived their purpose, oldest first.
-static void cn1WearablePruneTombstones(NSMutableDictionary *ctx) {
+///
+/// `peerCtx` is what the peer last told us it holds. A tombstone may only go once the peer has
+/// stopped holding an older value for that path -- otherwise dropping it lets that value win the
+/// next comparison and the removal silently undoes itself. Age alone is not evidence of that: a peer
+/// that has been offline for a week still has its old value when it comes back.
+static void cn1WearablePruneTombstones(NSMutableDictionary *ctx, NSDictionary *peerCtx) {
     NSMutableArray *tombKeys = [NSMutableArray array];
     for (NSString *key in ctx.allKeys) {
         if ([key isKindOfClass:[NSString class]] && [key hasPrefix:kTombPrefix]) {
@@ -152,10 +157,22 @@ static void cn1WearablePruneTombstones(NSMutableDictionary *ctx) {
     int64_t now = (int64_t) ([[NSDate date] timeIntervalSince1970] * 1000.0);
     for (NSString *key in tombKeys) {
         id stamp = ctx[key];
-        if (![stamp isKindOfClass:[NSNumber class]]
-                || now - [stamp longLongValue] > kCN1TombstoneTTLMillis) {
+        if (![stamp isKindOfClass:[NSNumber class]]) {
+            // Not ours, or corrupt: nothing to preserve.
             [ctx removeObjectForKey:key];
+            continue;
         }
+        if (now - [stamp longLongValue] <= kCN1TombstoneTTLMillis) {
+            continue;
+        }
+        // Old enough to consider -- but only actually drop it once the peer has acknowledged the
+        // removal, meaning it no longer holds a value for that path older than the tombstone.
+        NSString *path = [key substringFromIndex:kTombPrefix.length];
+        CN1WearableEntry theirs = cn1WearableEntryFor(peerCtx, path);
+        if (theirs.known && !theirs.removed && theirs.stamp < [stamp longLongValue]) {
+            continue;
+        }
+        [ctx removeObjectForKey:key];
     }
     if (ctx.count <= kCN1MaxTombstones) {
         return;
@@ -175,7 +192,16 @@ static void cn1WearablePruneTombstones(NSMutableDictionary *ctx) {
         return sa < sb ? NSOrderedAscending : (sa > sb ? NSOrderedDescending : NSOrderedSame);
     }];
     for (NSUInteger i = 0; i + kCN1MaxTombstones < remaining.count; i++) {
-        [ctx removeObjectForKey:remaining[i]];
+        NSString *key = remaining[i];
+        NSString *path = [key substringFromIndex:kTombPrefix.length];
+        CN1WearableEntry theirs = cn1WearableEntryFor(peerCtx, path);
+        if (theirs.known && !theirs.removed && theirs.stamp < [ctx[key] longLongValue]) {
+            // Still unacknowledged. The cap is a backstop against unbounded growth, not a licence to
+            // resurrect data; an app churning this many unacknowledged removals while its peer stays
+            // offline keeps them until the peer catches up.
+            continue;
+        }
+        [ctx removeObjectForKey:key];
     }
 }
 
@@ -408,7 +434,7 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     [ctx removeObjectForKey:cn1WearableValueKey(path)];
     [ctx removeObjectForKey:cn1WearableStampKey(path)];
     ctx[cn1WearableTombKey(path)] = @(cn1WearableNextSequence());
-    cn1WearablePruneTombstones(ctx);
+    cn1WearablePruneTombstones(ctx, [s receivedApplicationContext]);
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
     [ctx release];
@@ -455,8 +481,21 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
               dirErr.localizedDescription);
         return;
     }
-    NSString *file = [dir stringByAppendingPathComponent:
-            (name.length > 0 ? name : @"cn1-wearable-transfer")];
+    // Only ever a bare file name inside our directory. A caller-supplied name is untrusted input --
+    // "../../Documents/state" would otherwise let stringByAppendingPathComponent: escape the staging
+    // directory and overwrite an arbitrary file in the app's sandbox, and the completion handler
+    // would then delete whatever directory it landed in.
+    NSString *safeName = [name lastPathComponent];
+    if (safeName.length == 0 || [safeName isEqualToString:@"."]
+            || [safeName isEqualToString:@".."] || [safeName hasPrefix:@"/"]) {
+        safeName = @"cn1-wearable-transfer";
+    }
+    NSString *file = [dir stringByAppendingPathComponent:safeName];
+    if (![[file stringByDeletingLastPathComponent] isEqualToString:dir]) {
+        NSLog(@"[cn1.wearable] refusing a transfer name that escapes its staging directory: %@", name);
+        [[NSFileManager defaultManager] removeItemAtPath:dir error:nil];
+        return;
+    }
     if (![contents writeToFile:file atomically:YES]) {
         NSLog(@"[cn1.wearable] could not stage %@ for transfer", file);
         [[NSFileManager defaultManager] removeItemAtPath:dir error:nil];

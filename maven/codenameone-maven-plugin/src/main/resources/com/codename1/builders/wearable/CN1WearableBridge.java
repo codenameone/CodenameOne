@@ -170,17 +170,29 @@ public class CN1WearableBridge implements WearableBridge {
         if (recentlySeen(sourceNodeId)) {
             return true;
         }
-        if (connected.isEmpty()) {
-            // The query established nothing at all: the sender disconnected while we were starting,
-            // or Play services could not answer. Rejecting here would discard the very first event
-            // of a cold start -- the case this service exists for -- on no evidence. Play services
-            // delivered it, which is the only provenance available, so trust it and remember the
-            // node; a forged intent from another app is still rejected on every later event, once
-            // there is a real snapshot to test against.
-            rememberNode(sourceNodeId);
-            return true;
+        if (!connected.isEmpty()) {
+            // A populated snapshot that does not contain the sender is real evidence against it.
+            return false;
         }
-        // A populated snapshot that does not contain the sender is real evidence against it.
+        // The query established nothing at all: the sender may have disconnected while we were
+        // starting, or Play services may not have been ready. That is not licence to trust an
+        // arbitrary id -- this service is exported, so an empty snapshot is exactly the state a
+        // forged intent would like to find. Retry a couple of times instead, which covers the
+        // transient case without ever admitting an unverified node.
+        for (int attempt = 0; attempt < NODE_QUERY_RETRIES; attempt++) {
+            try {
+                Thread.sleep(NODE_QUERY_RETRY_MILLIS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+            for (String id : connectedNodeIds(context)) {
+                rememberNode(id);
+            }
+            if (recentlySeen(sourceNodeId)) {
+                return true;
+            }
+        }
         return false;
     }
 
@@ -210,6 +222,9 @@ public class CN1WearableBridge implements WearableBridge {
     private static final Map<String, Long> recentNodes = new HashMap<String, Long>();
     /** How long a node stays trusted after it was last seen. */
     private static final long RECENT_NODE_MILLIS = 10 * 60 * 1000L;
+    /** Retries for a cold-start node query that came back empty; see {@link #isKnownNode}. */
+    private static final int NODE_QUERY_RETRIES = 2;
+    private static final long NODE_QUERY_RETRY_MILLIS = 750;
     private static volatile String localNode;
 
     private static void rememberNode(String id) {
@@ -366,11 +381,17 @@ public class CN1WearableBridge implements WearableBridge {
         capabilityClient.getCapability("cn1_wearable", CapabilityClient.FILTER_ALL)
                 .addOnCompleteListener(new com.google.android.gms.tasks.OnCompleteListener<CapabilityInfo>() {
                     public void onComplete(com.google.android.gms.tasks.Task<CapabilityInfo> task) {
+                        if (!task.isSuccessful() || task.getResult() == null) {
+                            // A transient failure is not evidence the companion was uninstalled.
+                            // Overwriting a good cache with an empty result -- and stamping it fresh
+                            // -- would make isCompanionAppInstalled(), isPaired() and isReachable()
+                            // all report "no companion" for a full cache lifetime.
+                            refreshingBonded = false;
+                            return;
+                        }
                         List<String> out = new ArrayList<String>();
-                        if (task.isSuccessful() && task.getResult() != null) {
-                            for (Node n : task.getResult().getNodes()) {
-                                out.add(n.getId());
-                            }
+                        for (Node n : task.getResult().getNodes()) {
+                            out.add(n.getId());
                         }
                         boolean changed = !sameIds(cachedBonded, out);
                         cachedBonded = out;
@@ -500,10 +521,15 @@ public class CN1WearableBridge implements WearableBridge {
             nodeClient.getConnectedNodes().addOnCompleteListener(
                     new com.google.android.gms.tasks.OnCompleteListener<List<Node>>() {
                         public void onComplete(com.google.android.gms.tasks.Task<List<Node>> task) {
-                            cachedNodes = task.isSuccessful() && task.getResult() != null
-                                    ? task.getResult() : new ArrayList<Node>();
-                            cachedNodesStamp = System.currentTimeMillis();
-                            rememberAll(cachedNodes);
+                            if (task.isSuccessful() && task.getResult() != null) {
+                                cachedNodes = task.getResult();
+                                cachedNodesStamp = System.currentTimeMillis();
+                                rememberAll(cachedNodes);
+                            }
+                            // On failure keep the previous snapshot rather than clearing it: a
+                            // stale-but-real node list still addresses the peer, whereas an empty
+                            // one silently drops this message (or fails its reply handler) purely
+                            // because a refresh happened to time out.
                             fanOut(path, payload, replyToken);
                         }
                     });
@@ -793,7 +819,8 @@ public class CN1WearableBridge implements WearableBridge {
         // WearableMessage rather than raw bytes.
         String fileName = name == null ? "file" : name;
         byte[] body = contents == null ? new byte[0] : contents;
-        PutDataMapRequest req = PutDataMapRequest.create(transferPath(path, fileName));
+        long sequence = nextSequence();
+        PutDataMapRequest req = PutDataMapRequest.create(transferPath(path, fileName, sequence));
         req.getDataMap().putString("name", fileName);
         // The DataItem path is namespaced and filename-suffixed, so the caller's own path has to
         // travel with the payload -- a listener routes on the path it was given, not on ours.
@@ -802,7 +829,7 @@ public class CN1WearableBridge implements WearableBridge {
         // bytes to the same name twice would produce an identical item, which the Data Layer treats
         // as unchanged and never reports, silently dropping the second transfer. The sequence stamp
         // makes every invocation a real change.
-        req.getDataMap().putLong(SEQUENCE_KEY, nextSequence());
+        req.getDataMap().putLong(SEQUENCE_KEY, sequence);
         req.getDataMap().putAsset("asset", Asset.createFromBytes(body));
         dataClient.putDataItem(req.asPutDataRequest().setUrgent());
     }
@@ -955,10 +982,11 @@ public class CN1WearableBridge implements WearableBridge {
     /// @param path the path the sender passed to transferFile
     /// @param fileName the file's name
     /// @return the DataItem path
-    static String transferPath(String path, String fileName) {
-        // Republishing the same path and name lands on the same URI and therefore replaces the
-        // previous item, which is what bounds a sender's transfer storage.
-        return TRANSFER_PREFIX + encode(path + "/" + fileName);
+    static String transferPath(String path, String fileName, long sequence) {
+        // The sequence is part of the URI, not just the payload. A transfer is one-shot, so two
+        // sends to the same path and name while the peer is offline have to queue as two items --
+        // sharing a URI meant the second Asset replaced the first before it could ever sync.
+        return TRANSFER_PREFIX + encode(path + "/" + fileName) + "/" + Long.toHexString(sequence);
     }
 
     /// True when a DataItem path belongs to the transfer namespace.
@@ -1021,7 +1049,7 @@ public class CN1WearableBridge implements WearableBridge {
      * @param path the application path
      * @return the winning payload, or null when the path is genuinely empty
      */
-    static byte[] currentValue(Context context, String path) {
+    static byte[] currentValue(Context context, String path) throws java.io.IOException {
         CN1WearableBridge b = current;
         if (b != null) {
             return b.getData(path);
@@ -1050,7 +1078,9 @@ public class CN1WearableBridge implements WearableBridge {
                 items.release();
             }
         } catch (Throwable unavailable) {
-            return null;
+            // Not the same as "the path is empty": saying so would let a timed-out query be reported
+            // to the app as a removal of a path another node may still be publishing.
+            throw new java.io.IOException("could not resolve " + path, unavailable);
         }
     }
 

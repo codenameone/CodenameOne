@@ -197,11 +197,18 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // have published it, and the other item can still be there. Reporting a removal on
                 // the strength of this event alone would tell the listener the value disappeared
                 // while getData(path) still returned it. Ask what is left and report that instead.
-                byte[] remaining = CN1WearableBridge.currentValue(this, appPath);
-                if (remaining != null) {
-                    WearableConnection.deliverDataChanged(appPath, remaining);
-                } else {
-                    WearableConnection.deliverDataRemoved(appPath);
+                try {
+                    byte[] remaining = CN1WearableBridge.currentValue(this, appPath);
+                    if (remaining != null) {
+                        WearableConnection.deliverDataChanged(appPath, remaining);
+                    } else {
+                        WearableConnection.deliverDataRemoved(appPath);
+                    }
+                } catch (java.io.IOException couldNotResolve) {
+                    // The follow-up query failed rather than answering "nothing here". Reporting a
+                    // removal on that would tell the app a path had gone when another node may still
+                    // be publishing it -- and a removal is not recoverable from the app's side. Say
+                    // nothing; the next sync re-reports whatever is actually there.
                 }
                 continue;
             }
