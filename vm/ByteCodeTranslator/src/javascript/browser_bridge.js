@@ -4622,7 +4622,14 @@
   hostBridge.register('__cn1_wait_for_ui_settle__', function(request) {
     var payload = request || {};
     var reason = payload.reason == null ? 'unknown' : String(payload.reason);
-    var maxFrames = Math.max(1, Math.min(96, (payload.maxFrames | 0) || 14));
+    // Honour the caller's budget rather than quietly halving it. The
+    // graphics tests that render into an offscreen image and composite it
+    // ask for 120 frames precisely because they are the slowest to settle,
+    // and the old ceiling of 96 silently returned whatever had been drawn
+    // so far -- which is how DrawImage shipped a capture with its two
+    // offscreen-image cells still half-painted. The bound stays, well above
+    // any current request, so a bad value cannot spin forever.
+    var maxFrames = Math.max(1, Math.min(240, (payload.maxFrames | 0) || 14));
     var stableFrames = Math.max(1, Math.min(6, (payload.stableFrames | 0) || 2));
     var quietFramesRequired = Math.max(1, Math.min(12, (payload.quietFrames | 0) || stableFrames));
     var previousSignature = String(global.__cn1LastScreenshotSignature || '');
@@ -4634,6 +4641,7 @@
     var seenRenderSeq = startRenderSeq;
     var renderAdvanced = false;
     var quietFrames = 0;
+    var settleExhausted = false;
     function chooseBetter(a, b) {
       if (!a) {
         return b;
@@ -4687,6 +4695,12 @@
           }
         }
         if (index + 1 >= maxFrames) {
+          // Out of budget without ever meeting the quiet + stable condition.
+          // The capture still proceeds with the best frame seen, but say so:
+          // an exhausted settle is the difference between "the UI was ready"
+          // and "we stopped waiting", and only one of those explains a
+          // half-drawn screenshot afterwards.
+          settleExhausted = true;
           return best;
         }
         return runFrame(index + 1);
@@ -4712,6 +4726,7 @@
       diag('SCREENSHOT_START', 'settleRenderEndSeq', seenRenderSeq | 0);
       diag('SCREENSHOT_START', 'settleRenderAdvanced', renderAdvanced ? 1 : 0);
       diag('SCREENSHOT_START', 'settleQuietObserved', quietFrames | 0);
+      diag('SCREENSHOT_START', 'settleExhausted', settleExhausted ? 1 : 0);
       return {
         changedFromPrevious: changed ? 1 : 0,
         canvasSignature: meta.canvasSignature || 'none',
@@ -4721,7 +4736,8 @@
         canvasPick: meta.canvasPick | 0,
         renderStartSeq: startRenderSeq | 0,
         renderEndSeq: seenRenderSeq | 0,
-        renderAdvanced: renderAdvanced ? 1 : 0
+        renderAdvanced: renderAdvanced ? 1 : 0,
+        settleExhausted: settleExhausted ? 1 : 0
       };
     });
   });
