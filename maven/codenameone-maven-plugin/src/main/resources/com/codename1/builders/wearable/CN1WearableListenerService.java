@@ -202,10 +202,13 @@ public class CN1WearableListenerService extends WearableListenerService {
                     CN1WearableBridge.ResolvedValue remaining =
                             CN1WearableBridge.resolveValue(this, appPath);
                     if (remaining != null) {
-                        // Record the survivor's sequence as delivered. Without it the path has no
-                        // delivery stamp, so an older item still queued under another authority
-                        // would pass the newer-than-delivered test and overwrite the winner.
-                        CN1WearableBridge.isNewerThanDelivered(
+                        // Record the survivor's stamp outright -- the state of the path IS this
+                        // item now. Using the newer-than test here would decline whenever the
+                        // survivor carries a lower sequence than the winner just deleted (which is
+                        // ordinary: the winner is gone precisely because it was removed), leaving
+                        // the dead item's higher stamp recorded and filtering out any later item
+                        // that falls between the two.
+                        CN1WearableBridge.setDeliveredSequence(
                                 appPath, remaining.sequence, remaining.node);
                         WearableConnection.deliverDataChanged(appPath, remaining.payload);
                     } else {

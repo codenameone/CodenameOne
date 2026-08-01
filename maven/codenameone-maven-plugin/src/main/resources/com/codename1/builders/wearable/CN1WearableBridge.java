@@ -1168,6 +1168,24 @@ public class CN1WearableBridge implements WearableBridge {
      *
      * @param path the logical path
      */
+    /**
+     * Records a delivery stamp outright, replacing whatever was there.
+     *
+     * <p>Distinct from {@link #isNewerThanDelivered}, which refuses to go backwards. After a
+     * deletion the surviving item can legitimately carry a LOWER sequence than the winner that was
+     * just removed, so the newer-than test would decline to record it and leave the dead winner's
+     * stamp in place -- filtering out a later item that sits between the two.
+     *
+     * @param path the application path
+     * @param sequence the surviving item's sequence
+     * @param node the surviving item's publishing node
+     */
+    static void setDeliveredSequence(String path, long sequence, String node) {
+        synchronized (deliveredSequences) {
+            deliveredSequences.put(path, sequence + "|" + (node == null ? "" : node));
+        }
+    }
+
     static void forgetDeliveredSequence(String path) {
         synchronized (deliveredSequences) {
             deliveredSequences.remove(path);
