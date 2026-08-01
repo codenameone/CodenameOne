@@ -284,6 +284,37 @@ class ShieldInitOrderTest extends UITestBase {
         assertEquals("token-from-a-fully-initialized-engine", handle[0].get().getValue());
     }
 
+    /**
+     * The cleanup only touches the request the shield actually decorated.
+     *
+     * <p>The remembered names were process-global, so every request lost them -- and an
+     * app whose token header is also one an unprotected service legitimately expects
+     * ({@code X-API-Key} being the obvious case) found the shield quietly deleting that
+     * service's header on a request the shield has nothing to do with. Removing a header
+     * an app set itself is a bug that presents as the other service rejecting the call.</p>
+     */
+    @Test
+    void anotherRequestKeepsAHeaderTheAppSetItself() throws Exception {
+        Thread init = initOnAnotherThread();
+        engine.release();
+        init.join(GENEROUS_TIMEOUT_MS);
+
+        RecordingRequest protectedRequest = new RecordingRequest();
+        protectedRequest.setUrl("https://api.example.com/secure");
+        AppShield.attach(protectedRequest);
+        assertEquals("token-from-a-fully-initialized-engine", protectedRequest.attached());
+
+        // A different request, to a host the shield does not protect, carrying a header
+        // of the app's own that happens to share the token header's name.
+        RecordingRequest ownRequest = new RecordingRequest();
+        ownRequest.setUrl("https://elsewhere.example.com/thing");
+        ownRequest.addRequestHeader("X-CN1-Attest", "the-app-put-this-here");
+        AppShield.attach(ownRequest);
+
+        assertEquals("the-app-put-this-here", ownRequest.headerValue("X-CN1-Attest"),
+                "the shield must not strip a header it did not attach to this request");
+    }
+
     private Thread initOnAnotherThread() {
         ShieldEngineRegistry.setEngine(engine);
         Thread t = new Thread(new Runnable() {

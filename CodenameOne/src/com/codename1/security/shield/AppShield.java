@@ -472,7 +472,7 @@ public final class AppShield {
             setStatus(token == null ? ShieldStatus.SERVICE_DOWN : token.getStatus());
             if (token != null && token.isValid()) {
                 String header = getConfig().getTokenHeader();
-                rememberAttachedHeader(header);
+                rememberAttachedHeader(request, header);
                 request.addRequestHeader(header, token.getValue());
                 return;
             }
@@ -493,34 +493,80 @@ public final class AppShield {
         }
     }
 
-    /// Every header name a token has been attached under, so all of them can be cleared
-    /// before the next attempt.
+    /// The header name a token was attached under, per REQUEST.
     ///
-    /// Not a single "current name", because the current name is read from a live,
-    /// mutable [ShieldConfig]: the name that has to be removed is the one that was used
-    /// when the header was set, which may no longer be configured.
+    /// A single "current name" is not enough: [ShieldConfig] is mutable and
+    /// [#getConfig()] hands out the live instance, so the name that has to be removed on
+    /// a redirect is the one used when the header was set, which may no longer be
+    /// configured. A process-wide list of every name ever used is too much: the shield
+    /// would then strip that name from EVERY request, so an app whose token header is
+    /// also a header some unprotected service legitimately expects -- `X-API-Key` is the
+    /// obvious one -- would find the shield quietly deleting it on the way out, on a
+    /// request the shield has nothing to do with.
+    ///
+    /// So the name is remembered against the request it was attached to. Weak keys,
+    /// because a request that is dropped rather than redirected must not be held alive
+    /// by this, and the dead entries are swept on every attach so the list cannot grow
+    /// without bound in a long-lived app.
     private static final Vector attachedHeaderNames = new Vector();
 
-    private static void rememberAttachedHeader(String name) {
-        if (name == null || name.length() == 0) {
+    /// One remembered attachment: which request, and the name used.
+    private static final class AttachedHeader {
+
+        private final java.lang.ref.WeakReference request;
+        private final String name;
+
+        AttachedHeader(ConnectionRequest request, String name) {
+            this.request = new java.lang.ref.WeakReference(request);
+            this.name = name;
+        }
+
+        ConnectionRequest get() {
+            return (ConnectionRequest) request.get();
+        }
+    }
+
+    private static void rememberAttachedHeader(ConnectionRequest request, String name) {
+        if (request == null || name == null || name.length() == 0) {
             return;
         }
         synchronized (attachedHeaderNames) {
-            if (!attachedHeaderNames.contains(name)) {
-                attachedHeaderNames.addElement(name);
+            sweepAttachedHeaders();
+            for (int i = 0; i < attachedHeaderNames.size(); i++) {
+                AttachedHeader entry = (AttachedHeader) attachedHeaderNames.elementAt(i);
+                if (entry.get() == request && name.equals(entry.name)) { // NOPMD identity
+                    return;
+                }
             }
+            attachedHeaderNames.addElement(new AttachedHeader(request, name));
         }
     }
 
     private static void clearAttachedHeaders(ConnectionRequest request) {
-        // The configured name as well as the used ones: an app that changes the header
-        // before the first attach still has to have that name cleared on a redirect,
-        // and a token attached by an app calling addRequestHeader itself is its own
-        // business but cheaper to clear than to reason about.
-        request.removeRequestHeader(getConfig().getTokenHeader());
+        // ONLY what this request was given. Clearing the configured name unconditionally
+        // was the same mistake one step smaller: it reached every request, so an app whose
+        // token header is also one an unprotected service expects lost that service's
+        // header on a call the shield has nothing to do with. A header the shield did not
+        // attach is the app's, whatever it is called.
         synchronized (attachedHeaderNames) {
-            for (int i = 0; i < attachedHeaderNames.size(); i++) {
-                request.removeRequestHeader((String) attachedHeaderNames.elementAt(i));
+            for (int i = attachedHeaderNames.size() - 1; i >= 0; i--) {
+                AttachedHeader entry = (AttachedHeader) attachedHeaderNames.elementAt(i);
+                ConnectionRequest owner = entry.get();
+                if (owner == null) {
+                    attachedHeaderNames.removeElementAt(i);
+                } else if (owner == request) { // NOPMD identity: this request, not an equal one
+                    request.removeRequestHeader(entry.name);
+                    attachedHeaderNames.removeElementAt(i);
+                }
+            }
+        }
+    }
+
+    /// Drops entries whose request has been collected. Called under the lock.
+    private static void sweepAttachedHeaders() {
+        for (int i = attachedHeaderNames.size() - 1; i >= 0; i--) {
+            if (((AttachedHeader) attachedHeaderNames.elementAt(i)).get() == null) {
+                attachedHeaderNames.removeElementAt(i);
             }
         }
     }
@@ -562,18 +608,27 @@ public final class AppShield {
         if (url == null) {
             return out;
         }
-        // As in attach(): during startup this would silently return no headers, and a
-        // BrowserComponent navigating a protected host would load it unauthenticated.
-        if (!awaitInitialization()) {
-            // This method returns headers rather than throwing, so there is no
-            // fail-closed path available here -- the caller decides what to do with an
-            // empty map. Saying so beats a silent one: a WebView that loads a protected
-            // page unauthenticated looks exactly like one that loaded it correctly.
-            Log.p("AppShield: interrupted while waiting for initialization, so no "
-                    + "headers were produced for " + hostOf(url));
-            return out;
-        }
+        // Deliberately does NOT wait for initialization.
+        //
+        // This method is documented as never blocking and is called from the EDT --
+        // BrowserComponent is its reason for existing -- so waiting here froze the UI for
+        // the length of a cold start, and an engine whose initialization dispatches
+        // anything to the EDT deadlocked: the EDT parked on the initialization that was
+        // waiting for the EDT. A synchronous method that returns a map has no way to say
+        // "later", so the only honest options are to answer now or to hang, and hanging
+        // the UI is not an option.
+        //
+        // The cost is real and belongs in the log rather than in silence: a
+        // BrowserComponent navigating a protected host during startup loads it without a
+        // token, and that looks exactly like a page that loaded correctly. Apps that
+        // navigate to a protected host at launch should call init() before doing so, or
+        // use fetchToken(), which does wait -- on a background thread.
         if (!initialized) {
+            if (initializing) {
+                Log.p("AppShield: headersFor(" + hostOf(url) + ") was called while "
+                        + "initialization is still running, so no token is attached. Call "
+                        + "AppShield.init(...) before navigating to a protected host.");
+            }
             return out;
         }
         if (!policyFor(hostOf(url)).isAttachToken()) {
