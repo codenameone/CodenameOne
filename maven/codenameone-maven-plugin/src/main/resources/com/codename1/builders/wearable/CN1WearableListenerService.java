@@ -199,8 +199,12 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // the strength of this event alone would tell the listener the value disappeared
                 // while getData(path) still returned it. Ask what is left and report that instead.
                 try {
+                    // Retry, because a deletion is the ONLY callback for this state: if the path is
+                    // now empty, or an unchanged lower-ranked replica is the survivor, nothing else
+                    // will fire and staying silent leaves the listener permanently wrong while
+                    // getData() reports otherwise. Same reasoning as the first-sight path.
                     CN1WearableBridge.ResolvedValue remaining =
-                            CN1WearableBridge.resolveValue(this, appPath);
+                            CN1WearableBridge.resolveValueWithRetry(this, appPath);
                     if (remaining != null) {
                         // Record the survivor's stamp outright -- the state of the path IS this
                         // item now. Using the newer-than test here would decline whenever the
