@@ -441,6 +441,33 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesBluetoothPeripheral;
     private boolean usesBluetoothClassic;
 
+    // Health. usesHealthStore is deliberately distinct from usesHealth:
+    // com.codename1.health.sensors is pure com.codename1.bluetooth.le and
+    // needs no Health Connect at all, so a heart-rate-strap app must not be
+    // treated as a health-data app.
+    private boolean usesHealth;
+    private boolean usesHealthStore;
+    private boolean usesHealthData;
+    /// Whether a read-direction store call was seen. Tracked apart from
+    /// [#usesHealthWrite] because Health Connect permissions are
+    /// directional: an app that only reads but declares only
+    /// android.health.write passed validation and shipped a manifest with
+    /// no read permission, so every read failed at runtime with nothing in
+    /// the build log to explain it.
+    private boolean usesHealthRead;
+    private boolean usesHealthWrite;
+    private boolean usesHealthWorkout;
+    /// What the scan saw about health background listeners, and which of
+    /// them the generated factory can actually construct.
+    private final HealthListenerScan healthScan = new HealthListenerScan();
+
+    // Computed while the permissions are assembled but consumed later, at
+    // the points where <queries>, the <application> body and the gradle
+    // dependency list are actually built.
+    private String healthQueriesFragment = "";
+    private String healthApplicationFragment = "";
+    private String healthGradleDependency = "";
+
     private boolean integrateMoPub = false;
 
     private static final boolean isMac;
@@ -641,6 +668,26 @@ public class AndroidGradleBuilder extends Executor {
             } catch (Exception ex) {
                 return 0;
             }
+        }
+    }
+
+    /// Whether `url` can serve as the health privacy-policy link.
+    ///
+    /// Absolute, https, and with a host. The rationale screen hands the
+    /// value to the platform as a link, so a non-blank string is not
+    /// enough: a scheme-less "example.com/privacy" opens nothing, and
+    /// http:// is blocked outright by the cleartext policy that applies at
+    /// the target API levels health builds require.
+    static boolean isHealthPolicyUrl(String url) {
+        if (url == null || url.length() == 0) {
+            return false;
+        }
+        try {
+            java.net.URI uri = new java.net.URI(url);
+            return "https".equalsIgnoreCase(uri.getScheme())
+                    && uri.getHost() != null && uri.getHost().length() > 0;
+        } catch (java.net.URISyntaxException malformed) {
+            return false;
         }
     }
 
@@ -1423,6 +1470,27 @@ public class AndroidGradleBuilder extends Executor {
         // unsynchronized; parallelizing the scanner requires revisiting them.
         try {
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
+                @Override
+                public void implementsInterface(String cls, String iface) {
+                    healthScan.implementsInterface(cls, iface);
+                }
+
+                @Override
+                public void declaresEnclosedBy(String cls, String outer) {
+                    healthScan.declaresEnclosedBy(cls, outer);
+                }
+
+                @Override
+                public void declaresPublicType(String cls) {
+                    healthScan.declaresPublicType(cls);
+                }
+
+                @Override
+                public void declaresType(String cls, String superName,
+                        boolean isConcrete) {
+                    healthScan.declaresType(cls, superName, isConcrete);
+                }
+
 
 
                 @Override
@@ -1600,6 +1668,43 @@ public class AndroidGradleBuilder extends Executor {
                     // (Scan* handles vs the GATT/stream types); the
                     // usesClassMethod hook below catches facade-only
                     // callers.
+                    if (cls.indexOf("com/codename1/health/") == 0) {
+                        usesHealth = true;
+                        // The facade itself is not evidence of the store:
+                        // the documented sensor-only flow is
+                        // Health.getInstance().getSensors(), which the
+                        // scanner reports with com/codename1/health/Health
+                        // as the owner. Treating that as store usage failed
+                        // the build for BLE-only apps over Health Connect
+                        // hints they have no use for. The usesClassMethod
+                        // hook below decides for the facade.
+                        // Naming a class is not using the store. A
+                        // sensor-only app implements SensorSampleListener,
+                        // which puts HealthSample in its signature, and the
+                        // documented heart-rate example reads a value off a
+                        // QuantitySample -- both live outside the sensors
+                        // subpackage, so demanding Health Connect types and
+                        // a privacy-policy URL of a BLE-only app was the
+                        // exact failure the sensors exemption exists to
+                        // prevent. Store *calls* count, and the
+                        // usesClassMethod hook below sees those.
+                        if (cls.indexOf("com/codename1/health/sensors/") != 0
+                                && !"com/codename1/health/Health".equals(cls)
+                                && !isSharedHealthModel(cls)) {
+                            usesHealthStore = true;
+                        }
+                        if (cls.indexOf("com/codename1/health/workout/") == 0) {
+                            usesHealthWorkout = true;
+                            // Write only, as the getWorkouts() hook is.
+                            // Naming WorkoutConfiguration or WorkoutSession
+                            // says no more about reading than calling
+                            // getWorkouts() does, and nothing in the package
+                            // reads -- so this branch went on demanding
+                            // android.health.read of an app that had
+                            // correctly declared only a write.
+                            usesHealthWrite = true;
+                        }
+                    }
                     if (cls.indexOf("com/codename1/bluetooth/") == 0) {
                         usesBluetooth = true;
                         if (cls.indexOf("com/codename1/bluetooth/le/server/") == 0) {
@@ -1628,8 +1733,116 @@ public class AndroidGradleBuilder extends Executor {
 
 
                 @Override
+                public void usesClassMethodWithBooleanArgument(String cls,
+                        String method, Boolean value) {
+                    // Sensor write-through is store use. An app can enable
+                    // it with SensorSessionOptions.setWriteToStore(true)
+                    // and never name HealthStore, so the sensors-package
+                    // exemption -- which exists so a BLE-only app is not
+                    // dragged into Health Connect -- hid the one call that
+                    // genuinely needs it, and the build shipped no bridge
+                    // and no permissions for a documented flow.
+                    //
+                    // The argument decides it, which is why this is not in
+                    // usesClassMethod: an explicit setWriteToStore(false)
+                    // is a BLE-only app switching the store off, and
+                    // reading it as store use handed that app a Health
+                    // Connect dependency, a permission set and a Play
+                    // health review it had just declined.
+                    if (HealthManifestFragments.enablesSensorWriteThrough(
+                            cls, method, value)) {
+                        usesHealth = true;
+                        usesHealthStore = true;
+                        usesHealthData = true;
+                        usesHealthWrite = true;
+                    }
+                }
+
+                @Override
                 public void usesClassMethod(String cls, String method) {
+                    // The catalog first: it decides frameworks, gradle
+                    // dependencies and plist entries for every feature,
+                    // health included, and is indifferent to what follows.
                     aiAcc.consumeMethod(cls, method);
+                    // A store method reached through a passed-in HealthStore
+                    // never names Health at all, so the facade hook below
+                    // cannot see it -- and without this the build skipped the
+                    // type validation and shipped a manifest with no per-type
+                    // permissions, leaving those calls unauthorized.
+                    if (cls.indexOf("com/codename1/health/HealthStore") == 0) {
+                        usesHealth = true;
+                        usesHealthStore = true;
+                        usesHealthWrite |=
+                                HealthManifestFragments.isWriteCall(method);
+                        usesHealthRead |=
+                                HealthManifestFragments.isReadCall(method);
+                        // Data access, not merely touching the store. The
+                        // capability probes -- isSupported, isTypeSupported,
+                        // isWritable, getSupportedTypes -- read no records and
+                        // need no permission, so demanding declared types for
+                        // them made a build that only asks "is this available"
+                        // request permissions it never uses.
+                        usesHealthData |= usesHealthRead || usesHealthWrite;
+                    }
+                    // Health.getStore()/getWorkouts() mean a real platform
+                    // store; Health.getSensors() means BLE only. The class
+                    // reference alone cannot tell them apart, so the facade
+                    // is decided here.
+                    if ("com/codename1/health/Health".equals(cls)) {
+                        usesHealth = true;
+                        if (method.startsWith("getStore")
+                                || method.startsWith("getWorkouts")
+                                || method.startsWith("openHealthSettings")
+                                || method.startsWith("openProviderSetup")
+                                || method.startsWith("getAvailability")
+                                // The probes need the backend as much as a read
+                                // does: isSupported() asks the Health Connect
+                                // delegate whether it is there and hkIsAvailable()
+                                // asks the native, and neither exists unless the
+                                // build bundles them -- so an app whose only health
+                                // call was "is this supported?" was told no on every
+                                // device, for ever, because it had asked.
+                                || method.startsWith("isSupported")
+                                || method.startsWith("getConfigurationProblems")) {
+                            usesHealthStore = true;
+                        }
+                        // getStore() installs the bridge but is not itself
+                        // data access: an app that takes the handle to probe
+                        // isTypeSupported reads nothing, and availability and
+                        // the settings shortcuts read nothing either. The
+                        // HealthStore method hook above sets usesHealthData
+                        // when a real read or write is called.
+                        if (method.startsWith("getWorkouts")) {
+                            usesHealthWorkout = true;
+                            // A recorded workout writes: end() stores the
+                            // child samples it was fed. Without this the
+                            // manifest carried only ACTIVITY_RECOGNITION
+                            // and every one of those writes was
+                            // unauthorized at runtime.
+                            //
+                            // It does not read. Nothing in the workout
+                            // package calls readSamples or aggregate --
+                            // the rollup is computed from the samples the
+                            // app fed in -- so demanding a read token
+                            // forced a workout-only app to request a
+                            // sensitive permission it never uses, which
+                            // Play policy asks you not to do and which the
+                            // build then refused to proceed without.
+                            usesHealthData = true;
+                            usesHealthWrite = true;
+                        }
+                        if (method.startsWith("getSensors")) {
+                            // The BLE sensor layer runs entirely on the
+                            // public bluetooth API, and an app that only
+                            // calls getSensors() never names that package
+                            // itself -- so without this the manifest got no
+                            // BLUETOOTH_SCAN/CONNECT and discovery failed on
+                            // Android 12+.
+                            usesBluetooth = true;
+                            usesBluetoothScan = true;
+                            usesBluetoothConnect = true;
+                        }
+                    }
                     if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0
                             || (cls.indexOf("com/codename1/calendar/CalendarManager") == 0
                             && (method.indexOf("getLocalSource") >= 0
@@ -1948,6 +2161,191 @@ public class AndroidGradleBuilder extends Executor {
                     usesBluetoothScan, usesBluetoothConnect,
                     usesBluetoothPeripheral, usesBluetoothClassic,
                     neverForLocation, bleRequired, targetSDKVersionInt);
+        }
+
+        // First-class health (com.codename1.health.*). Gated on
+        // usesHealthStore, NOT usesHealth: com.codename1.health.sensors is
+        // pure BLE and must not drag in Health Connect or a Google Play
+        // health-permissions review.
+        if (usesHealthStore) {
+            String readHint = request.getArg("android.health.read", "");
+            String writeHint = request.getArg("android.health.write", "");
+            List<String> readTypes =
+                    HealthManifestFragments.parseTypeList(readHint);
+            List<String> writeTypes =
+                    HealthManifestFragments.parseTypeList(writeHint);
+            // Checked after parsing, so "  , " counts as empty rather than
+            // passing a raw length test and installing the bridge with no
+            // permissions at all. Availability-only apps are exempt: they
+            // touch no data type, and demanding one would put a permission
+            // in the manifest the app never uses.
+            if (usesHealthData && readTypes.isEmpty()
+                    && writeTypes.isEmpty()) {
+                // The scanner cannot infer these: a data type is referenced
+                // as a constant, and field reads are not recorded. Play
+                // also requires declaring exactly the types you use.
+                throw new BuildException("This app uses com.codename1.health"
+                        + " but declares no health data types. Health"
+                        + " Connect permissions are "
+                        + "per-data-type and cannot be inferred from "
+                        + "bytecode, so list them explicitly:\n"
+                        + "  android.health.read=steps,heart_rate,sleep\n"
+                        + "  android.health.write=steps\n"
+                        + "Known tokens: "
+                        + HealthManifestFragments.knownTokens());
+            }
+            if (usesHealthRead && readTypes.isEmpty()) {
+                throw new BuildException("This app reads health data but"
+                        + " android.health.read is empty. Health Connect"
+                        + " permissions are directional, "
+                        + "so a write declaration does not authorize a read:\n"
+                        + "  android.health.read=steps,heart_rate\n"
+                        + "Known tokens: "
+                        + HealthManifestFragments.knownTokens());
+            }
+            if (usesHealthWrite && writeTypes.isEmpty()) {
+                throw new BuildException("This app writes or deletes"
+                        + " health data"
+                        + " but android.health.write is empty. Health Connect "
+                        + "permissions are directional, so a read declaration "
+                        + "does not authorize a write:\n"
+                        + "  android.health.write=steps\n"
+                        + "Known tokens: "
+                        + HealthManifestFragments.knownTokens());
+            }
+            // No workout-token requirement. Android never reads or writes
+            // the WORKOUT type in this release -- HealthWire excludes it
+            // from both capability tables, and a recorded workout persists
+            // only its writable child samples and marks the session record
+            // as not persisted. Demanding READ_EXERCISE and WRITE_EXERCISE
+            // would make apps request permissions no runtime path uses, and
+            // invite a Play health-data declaration for the same nothing.
+            java.util.List<String> readTokens =
+                    HealthManifestFragments.parseTypeList(readHint);
+            java.util.List<String> writeTokens =
+                    HealthManifestFragments.parseTypeList(writeHint);
+            // Declared, permitted, and unusable. Thirteen tokens have a
+            // Health Connect permission but no record class the bridge can
+            // read or delete, so an app declaring one shipped a health
+            // permission it could never exercise -- and Play asks what
+            // every health permission is for.
+            // One list for both directions. A permission covers more than
+            // one operation -- write authorises inserts and deletes, read
+            // covers reads and change subscriptions -- and deletes and
+            // subscriptions go through the wider recordClassFor gate. So
+            // the union for each direction is recordClassFor, and the
+            // build cannot know which operation an app will use. Rejecting
+            // per direction refused an app that only deletes power records
+            // and one that only subscribes to sleep changes; both work.
+            java.util.List<String> unreadable =
+                    HealthManifestFragments.unsupportedTokens(readTokens);
+            unreadable.addAll(
+                    HealthManifestFragments.unsupportedTokens(writeTokens));
+            if (!unreadable.isEmpty()) {
+                throw new BuildException("Health Connect support for "
+                        + unreadable
+                        + " is not implemented in this build, so declaring"
+                        + " it would request a permission the app cannot"
+                        + " use. Remove it from android.health.read /"
+                        + " android.health.write.");
+            }
+            java.util.List<String> unknown =
+                    HealthManifestFragments.unknownTokens(readTokens);
+            unknown.addAll(HealthManifestFragments.unknownTokens(writeTokens));
+            if (!unknown.isEmpty()) {
+                throw new BuildException("Unknown health data type(s) "
+                        + unknown
+                        + " in android.health.read / android.health.write. "
+                        + "Known tokens: "
+                        + HealthManifestFragments.knownTokens());
+            }
+            // Only when the app actually requests a Health Connect
+            // permission. An availability-only app never presents the
+            // rationale screen, so demanding a policy URL rejected a
+            // harmless flow for a hint it would never use.
+            // The two special reads count as permissions in their own
+            // right: they are injected into the manifest whether or not
+            // any type list is populated, so a build declaring only
+            // android.health.background shipped READ_HEALTH_DATA_IN_
+            // BACKGROUND with a rationale screen that had no policy link
+            // to show -- exactly the Play rejection this gate exists to
+            // prevent.
+            boolean specialReads = "true".equalsIgnoreCase(request.getArg(
+                    "android.health.background", "false"))
+                    || "true".equalsIgnoreCase(request.getArg(
+                            "android.health.history", "false"));
+            boolean requestsPermissions =
+                    !readTypes.isEmpty() || !writeTypes.isEmpty()
+                    || specialReads;
+            // Trimmed before it is judged, and the trimmed value is what
+            // gets emitted. A raw length test accepted "   " and wrote a
+            // whitespace-only resource, so the rationale screen had no
+            // usable link while the build reported the policy requirement
+            // as satisfied.
+            String policyUrl = request.getArg(
+                    "android.health.privacyPolicyUrl", "").trim();
+            if (requestsPermissions && !isHealthPolicyUrl(policyUrl)) {
+                // Play requires a privacy policy for health permissions and
+                // the rationale screen has to link to it, so a missing URL
+                // means a rejected app rather than a broken build later.
+                // The value is parsed rather than merely counted: the
+                // rationale screen turns it into a link, so "example.com" or
+                // an ftp URL passed the requirement and shipped a disclosure
+                // nothing on the device can open.
+                throw new BuildException("Google Play requires a privacy"
+                        + " policy for apps that request Health"
+                        + " Connect permissions, and the "
+                        + "permissions-rationale screen must link to it. Set "
+                        + "android.health.privacyPolicyUrl to an absolute "
+                        + "https:// URL"
+                        + (policyUrl.length() == 0 ? "; it is unset."
+                                : "; it is \"" + policyUrl + "\"."));
+            }
+            if (isHealthPolicyUrl(policyUrl)) {
+                // Emit the URL as the string resource
+                // HealthPermissionsRationaleActivity looks up. Validating
+                // the hint without emitting it would leave the rationale
+                // screen with nothing to show, which is the exact
+                // disclosure the check above claims to enforce.
+                additionalKeyVals += "    <string name=\""
+                        + HealthManifestFragments.POLICY_URL_RESOURCE
+                        + "\">"
+                        + xmlize(policyUrl)
+                        + "</string>\n";
+            }
+            if (targetSDKVersionInt < 30) {
+                // <queries> is only emitted from API 30, and without it the
+                // provider is invisible to package visibility.
+                throw new BuildException("Health Connect requires"
+                        + " android.targetSDKVersion 30 "
+                        + "or higher so the provider <queries> entry is "
+                        + "emitted; this app targets "
+                        + targetSDKVersionInt + ".");
+            }
+            log("Health Connect fragments version "
+                    + HealthManifestFragments.FRAGMENT_VERSION);
+            xPermissions = HealthManifestFragments.injectPermissions(
+                    xPermissions, readTokens, writeTokens,
+                    "true".equalsIgnoreCase(request.getArg(
+                            "android.health.background", "false")),
+                    "true".equalsIgnoreCase(request.getArg(
+                            "android.health.history", "false")),
+                    targetSDKVersionInt);
+            healthQueriesFragment =
+                    HealthManifestFragments.injectQueries("");
+            healthApplicationFragment =
+                    HealthManifestFragments.injectApplicationEntries("",
+                            targetSDKVersionInt);
+
+            // Health Connect ships as an AndroidX library with a Kotlin
+            // coroutine API; the port itself never references it (see
+            // HealthConnectDelegate) but the app module must resolve it.
+            healthGradleDependency = "    implementation "
+                    + "'androidx.health.connect:connect-client:"
+                    + request.getArg("android.health.connectVersion",
+                            "1.1.0-alpha07") + "'\n";
+            minSDK = maxInt("26", minSDK);
+            log("Health Connect raises minSdkVersion to " + minSDK);
         }
 
         String messagingService = request.getArg("android.messagingService",
@@ -2343,6 +2741,154 @@ public class AndroidGradleBuilder extends Executor {
             throw new BuildException("Failed to extract android port sources from "+androidPortSrcJar, ex);
         }
 
+        // Health background-listener bindings: generated rather than
+        // resolved reflectively, so each listener is reached through a
+        // direct constructor call that shrinking and obfuscation follow.
+        for (String warning : healthScan.warnings()) {
+            log("WARNING: " + warning);
+        }
+        String healthBindingsSource =
+                HealthListenerBindings.generate(healthScan.resolve());
+        if (healthBindingsSource != null) {
+            File bindingsFile = new File(srcDir,
+                    HealthListenerBindings.sourcePath());
+            bindingsFile.getParentFile().mkdirs();
+            try {
+                createFile(bindingsFile, healthBindingsSource.getBytes(
+                        StandardCharsets.UTF_8));
+            } catch (Exception ex) {
+                throw new BuildException(
+                        "Failed to write the health listener bindings", ex);
+            }
+            log("Generated health background-listener bindings for "
+                    + healthScan.resolve().keySet());
+        }
+
+        // Health Connect bridge: Kotlin, because androidx.health.connect
+        // exposes only suspend functions and the Android port compiles
+        // against an old android.jar with no AndroidX or Kotlin. Same
+        // pattern as the Android Auto glue below -- a real source resource
+        // copied into the generated project, never reflection.
+        if (usesHealthStore) {
+            File healthDir = new File(srcDir, "com/codename1/health");
+            healthDir.mkdirs();
+            InputStream hin = getResourceAsStream(
+                    "/com/codename1/builders/health/CN1HealthConnectBridge.kt");
+            if (hin == null) {
+                throw new BuildException(
+                        "Missing Health Connect bridge resource");
+            }
+            try {
+                copy(hin, new FileOutputStream(new File(healthDir,
+                        "CN1HealthConnectBridge.kt")));
+            } catch (IOException ex) {
+                throw new BuildException(
+                        "Failed to write the Health Connect bridge", ex);
+            }
+            // connect-client needs Kotlin 1.9+; the builder's default of
+            // 1.7.22 will not compile it.
+            //
+            // The argument raised here is requireKotlinStdlib, because that
+            // is the one the Gradle generator actually reads. Setting
+            // android.kotlinVersion looks right and does nothing: the
+            // generator never consults it, so a non-Gradle-8 project would
+            // still be pinned to 1.7.22 and fail compiling the bridge.
+            String kotlinFloor = "1.9.22";
+            // Checked before, and independently of, whether this builder
+            // has to raise the version: a project that already sets
+            // requireKotlinStdlib=1.9.22 with useGradle8=false is just as
+            // broken, and the earlier nesting let it through.
+            //
+            // The version that will actually run, not the flag that
+            // usually selects it. android.gradleVersion overrides the
+            // choice, so useGradle8=true with gradleVersion=6.5 satisfied
+            // the flag and then failed compiling the bridge with the very
+            // requirement this message states.
+            if (!useGradle8 || gradleVersionInt < 7) {
+                throw new BuildException(
+                        "Health Connect requires Kotlin " + kotlinFloor
+                        + ", whose Gradle plugin needs Gradle 6.8.3 or"
+                        + " newer, but this build would use Gradle "
+                        + gradleVersion + " (android.useGradle8="
+                        + useGradle8 + "). Set android.useGradle8=true and"
+                        + " leave android.gradleVersion unset to build a"
+                        + " health-enabled app.");
+            }
+            // androidx.health.connect is an AndroidX artifact. Without
+            // AndroidX the generator writes neither android.useAndroidX
+            // nor Jetifier, and Gradle's own dependency check rejects the
+            // project rather than building it. Forcing it on would change
+            // how every other dependency in the app resolves, which is not
+            // this block's call to make.
+            if (!useAndroidX) {
+                throw new BuildException(
+                        "Health Connect ships as an AndroidX library, but"
+                        + " this build sets android.useAndroidX=false."
+                        + " Remove that hint to build a health-enabled"
+                        + " app.");
+            }
+            String declaredKotlin =
+                    request.getArg("requireKotlinStdlib", "").trim();
+            // Compared on the numeric prefix. A qualified version like
+            // 1.9.22-RC2 is perfectly acceptable, and feeding it to
+            // compareVersions -- which parses each segment as an int --
+            // threw and failed the build instead of accepting it.
+            String comparableKotlin = HealthManifestFragments
+                    .numericVersionPrefix(declaredKotlin);
+            if (comparableKotlin == null
+                    || compareVersions(comparableKotlin, kotlinFloor) < 0) {
+                request.putArgument("requireKotlinStdlib", kotlinFloor);
+                log("Health Connect requires Kotlin " + kotlinFloor
+                        + " or newer; raising requireKotlinStdlib from "
+                        + (declaredKotlin.length() == 0
+                                ? "the default" : declaredKotlin));
+            }
+            // A kotlin-gradle-plugin the app declares for itself wins:
+            // the Gradle generator skips adding its own line when it sees
+            // one, so raising requireKotlinStdlib above changed nothing
+            // and the bridge was compiled by whatever compiler was pinned.
+            // Overriding a version the app asked for would break whatever
+            // it wanted that compiler for, so say so instead.
+            String topDependency =
+                    request.getArg("android.topDependency", "");
+            String declaredPlugin =
+                    HealthManifestFragments.declaredKotlinPluginVersion(
+                            topDependency);
+            if (HealthManifestFragments.declaresKotlinPlugin(topDependency)
+                    && declaredPlugin == null) {
+                // A version this build cannot read -- a Gradle variable,
+                // typically. The generator suppresses its own plugin line
+                // on the bare substring, so the declaration takes effect
+                // while the floor check below sees nothing to check, and a
+                // variable resolving to 1.7.x compiled the bridge with an
+                // incompatible compiler. Nothing here can resolve it, so
+                // ask for a literal rather than guess.
+                error("This app declares kotlin-gradle-plugin in "
+                        + "android.topDependency with a version this build "
+                        + "cannot read, and that declaration replaces the "
+                        + "plugin the build would otherwise add. Health "
+                        + "Connect needs Kotlin " + kotlinFloor + " or "
+                        + "newer to compile the bridge, so state the "
+                        + "version literally -- "
+                        + "org.jetbrains.kotlin:kotlin-gradle-plugin:"
+                        + kotlinFloor + " -- or drop the declaration.",
+                        new RuntimeException("kotlin plugin version "
+                                + "unreadable"));
+            }
+            if (declaredPlugin != null
+                    && compareVersions(declaredPlugin, kotlinFloor) < 0) {
+                error("This app declares kotlin-gradle-plugin "
+                        + declaredPlugin + " in android.topDependency, but "
+                        + "Health Connect needs Kotlin " + kotlinFloor
+                        + " or newer to compile the bridge. A plugin "
+                        + "declared there replaces the one this build would "
+                        + "otherwise add, so raise it to " + kotlinFloor
+                        + " or drop the declaration.",
+                        new RuntimeException("kotlin plugin below the "
+                                + "Health Connect floor"));
+            }
+        }
+
         // Android Auto glue: when the app references com.codename1.car, copy the injected
         // CarAppService / Session / Screen + the CarBridge converter (typed against androidx.car.app)
         // into the generated project and add the car-app gradle dependency. These ship as real .java
@@ -2639,7 +3185,9 @@ public class AndroidGradleBuilder extends Executor {
         }
         xQueries = "";
         if (targetSDKVersionInt >= 30) {
-            xQueries = "<queries>\n" + request.getArg("android.manifest.queries", "") + "</queries>\n";
+            xQueries = "<queries>\n"
+                    + request.getArg("android.manifest.queries", "")
+                    + healthQueriesFragment + "</queries>\n";
         }
 
         //Delete the Facebook implemetation if this app does not use FB.
@@ -3758,6 +4306,7 @@ public class AndroidGradleBuilder extends Executor {
                 + foregroundServiceEntry
                 + shareReceiverActivity
                 + locationServices
+                + healthApplicationFragment
                 + mediaService
                 + remoteControlService
                 + hceService
@@ -5011,6 +5560,11 @@ public class AndroidGradleBuilder extends Executor {
                         : "")
                 + facebookProguard
                 + " " + request.getArg("android.proguardKeep", "") + "\n"
+                + (usesHealthStore
+                        ? HealthManifestFragments.proguardKeepRules(
+                                new java.util.ArrayList<String>(
+                                        healthScan.resolve().keySet()))
+                        : "")
                 + googlePlayObfuscation
                 + "-keep class com.google.mygson.**{\n"
                 + "*;\n"
@@ -5042,6 +5596,7 @@ public class AndroidGradleBuilder extends Executor {
 
         request.putArgument("var.android.playServicesVersion", playServicesVersion);
         String additionalDependencies = request.getArg("gradleDependencies", "");
+        additionalDependencies += healthGradleDependency;
         if (facebookSupported) {
             minSDK = maxInt("15", minSDK);
 
@@ -5846,6 +6401,27 @@ public class AndroidGradleBuilder extends Executor {
     private String createOnCreateCode(BuildRequest request) {
         String retVal = "";
 
+        // Install the generated health background-listener bindings. These
+        // construct each listener with a direct `new`, so nothing is
+        // resolved reflectively after the OS relaunches the app in the
+        // background -- see HealthListenerBindings for why that matters on
+        // shrunk and obfuscated builds.
+        String healthBindings = HealthListenerBindings.installStatement(
+                healthScan.resolve());
+        if (healthBindings != null) {
+            retVal += healthBindings;
+        }
+        if (usesHealthStore) {
+            // Publish the Kotlin bridge so AndroidHealth can reach Health
+            // Connect. Without this the health API degrades to reporting
+            // itself unsupported, exactly as com.codename1.car does when
+            // Android Auto is not bundled.
+            retVal += "com.codename1.impl.android.AndroidHealthSupport"
+                    + ".setDelegate(new com.codename1.health"
+                    + ".CN1HealthConnectBridge(com.codename1.impl.android"
+                    + ".AndroidNativeUtil.getContext()));\n";
+        }
+
         if (request.getArg("android.includeGPlayServices", "true").equals("true") || playServicesLocation) {
             retVal += "Display.getInstance().setProperty(\"IncludeGPlayServices\", \"true\");\n";
         }
@@ -6389,6 +6965,46 @@ public class AndroidGradleBuilder extends Executor {
 
     private static String maxInt(String a, String b) {
         return String.valueOf(Math.max(Integer.parseInt(a), Integer.parseInt(b)));
+    }
+
+    /// Whether `cls` is a health value type rather than the store.
+    ///
+    /// These travel through the BLE sensor layer, which needs no Health
+    /// Connect permission at all: a sensor callback is handed a
+    /// HealthSample, and reading a number off it names QuantitySample and
+    /// HealthQuantity. Counting those as store access made every
+    /// documented sensor-only app fail the health-hint gate.
+    private static boolean isSharedHealthModel(String cls) {
+        return "com/codename1/health/HealthSample".equals(cls)
+                || "com/codename1/health/QuantitySample".equals(cls)
+                || "com/codename1/health/SeriesSample".equals(cls)
+                || "com/codename1/health/CategorySample".equals(cls)
+                || "com/codename1/health/HealthQuantity".equals(cls)
+                || "com/codename1/health/HealthUnit".equals(cls)
+                || "com/codename1/health/HealthDataType".equals(cls)
+                || "com/codename1/health/HealthSource".equals(cls)
+                || "com/codename1/health/RecordingMethod".equals(cls)
+                || "com/codename1/health/BloodPressureSample".equals(cls)
+                // The error types travel the same way. A sensor callback
+                // is handed a HealthException, and asking it what went
+                // wrong names HealthError -- so a sensor-only app that
+                // handled its errors was read as touching the store, and
+                // got the Health Connect bridge bundled and its
+                // minSdkVersion raised to 26, cutting off the API 21-25
+                // devices the BLE-only flow is documented to support.
+                || "com/codename1/health/HealthException".equals(cls)
+                || "com/codename1/health/HealthError".equals(cls)
+                // And the enums a sensor callback reads off the sample it
+                // was just handed. Branching on getType().getKind(), or
+                // asking a unit for its dimension before converting, is
+                // ordinary BLE-only code -- and a direct enum reference is
+                // exactly what the scanner records, so those apps were read
+                // as touching the store too. Same cost as above: Health
+                // Connect bundled for an app that never opens it, and
+                // minSdkVersion raised to 26 away from the API 21-25 range
+                // the BLE-only flow is documented to support.
+                || "com/codename1/health/HealthDataKind".equals(cls)
+                || "com/codename1/health/HealthUnitDimension".equals(cls);
     }
 
     static int compareVersions(String v1, String v2) {

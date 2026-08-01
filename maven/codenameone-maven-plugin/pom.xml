@@ -71,15 +71,23 @@
             <artifactId>codenameone-core</artifactId>
             <version>${project.version}</version>
             <!-- compile scope (was test) so the OpenAPI codegen mojo can use
-                 com.codename1.io.JSONParser to parse spec documents. The
-                 plugin already ships the codenameone-designer (jar-with-deps)
-                 above so the additional surface area is small. -->
+                 com.codename1.io.JSONParser to parse spec documents. -->
         </dependency>
+        <!-- The headless CSS compiler CLI that CompileCSSMojo forks. A thin jar:
+             we resolve it transitively and launch with `java -cp`, so the plugin
+             does not need the 43MB codenameone-designer jar-with-dependencies
+             (the Swing resource editor) to compile a stylesheet. -->
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>codenameone-designer</artifactId>
-            <classifier>jar-with-dependencies</classifier>
+            <artifactId>codenameone-css-cli</artifactId>
         </dependency>
+        <!-- codenameone-designer is deliberately NOT a dependency. The Resource Editor
+             is deprecated and frozen, and only the cn1:designer goal needs it, so
+             AbstractCN1Mojo.getDesignerJar resolves it on demand at
+             ${cn1.designer.version} the way OpenGameBuilderMojo resolves the game
+             builder. Declaring it here made every build download ~43MB of Swing
+             editor, and would now also drag a stale codenameone-core onto the
+             plugin classpath. -->
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>codenameone-svg-transcoder</artifactId>

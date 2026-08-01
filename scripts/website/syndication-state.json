@@ -1338,6 +1338,78 @@
         "url": "https://medium.com/p/49d3fdbe0a43/edit",
         "syndicated_at": "2026-07-29T17:01:08+00:00"
       }
+    },
+    "javascript-free-open-source": {
+      "devto": {
+        "id": 4281839,
+        "url": "https://dev.to/codenameone/the-codename-one-javascript-port-is-now-free-and-open-source-2f84",
+        "syndicated_at": "2026-07-31T15:13:59+00:00"
+      },
+      "foojay": {
+        "id": 125141,
+        "url": "https://foojay.io/wp-admin/post.php?post=125141&action=edit",
+        "preview_url": "https://foojay.io/?p=125141",
+        "featured_media_id": 125140,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-07-31T15:14:57+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/draft/6a6cd8a77553d4089b8fb959",
+        "published": false,
+        "draft_url": "https://hashnode.com/draft/6a6cd8a77553d4089b8fb959",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": false,
+        "canonical_set": false,
+        "syndicated_at": "2026-07-31T17:19:12+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/d4c6ea644187/edit",
+        "syndicated_at": "2026-08-01T15:02:36+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3667063/edit.html",
+        "syndicated_at": "2026-08-01T15:03:48+00:00"
+      }
+    },
+    "2026-07-31-1200-shai-push-v3-new-cloud": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-08-01T02:00:52+00:00",
+        "account": "shai",
+        "source_slug": "push-v3-new-cloud",
+        "scheduled_at": "2026-07-31T09:00:00+00:00"
+      }
+    },
+    "2026-08-01-1200-codenameone-health-api-false-certainty": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/company/5041007/admin/page-posts/published/",
+        "syndicated_at": "2026-08-01T09:00:47+00:00",
+        "account": "codenameone",
+        "source_slug": "health-api-false-certainty",
+        "scheduled_at": "2026-08-01T09:00:00+00:00"
+      }
+    },
+    "calendar-is-not-add-event": {
+      "devto": {
+        "id": 4288004,
+        "url": "https://dev.to/codenameone/calendar-api-local-calendars-cloud-sync-and-conflict-handling-1a1p",
+        "syndicated_at": "2026-08-01T14:23:54+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/790309dfa730/edit",
+        "syndicated_at": "2026-08-01T15:05:20+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmsai8e5800000ajfasgs3ypf",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a6cd8a77553d4089b8fb959",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-01T15:06:46+00:00"
+      }
     }
   }
 }

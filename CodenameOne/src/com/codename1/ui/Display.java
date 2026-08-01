@@ -4869,6 +4869,14 @@ public final class Display extends CN1Constants {
         return impl.getBluetooth();
     }
 
+    /// Returns the platform health entry point. Prefer
+    /// {@link com.codename1.health.Health#getInstance()} in application
+    /// code --- it handles the fallback to a no-op stub when the current
+    /// port does not implement health data.
+    public com.codename1.health.Health getHealth() {
+        return impl.getHealth();
+    }
+
     /// This method tries to invoke the device native camera to capture images.
     /// The method returns immediately and the response will be sent asynchronously
     /// to the given ActionListener Object
@@ -7129,7 +7137,11 @@ public final class Display extends CN1Constants {
             return cause;
         }
 
-        public void setCause(Throwable t) {
+        // Overrides nothing -- Throwable has no setCause, and adding the
+        // annotation PMD asks for does not compile. Suppressed rather than
+        // "fixed": this file only reaches the analyser at all because the
+        // health entry point was added to it.
+        public void setCause(Throwable t) { //NOPMD MissingOverride
             this.cause = t;
         }
 

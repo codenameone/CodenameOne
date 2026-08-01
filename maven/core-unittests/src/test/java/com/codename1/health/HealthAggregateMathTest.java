@@ -1,0 +1,391 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+import com.codename1.impl.health.LocalHealthStore;
+import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Bucket arithmetic.
+ *
+ * <p>Every one of these assertions corresponds to a way the totals have
+ * been wrong: a workout counted whole in two buckets, a spot reading adding
+ * a millisecond of "time covered", a calendar bucket reaching outside the
+ * query and counting time nobody asked for. The arithmetic is shared by
+ * every platform, so getting it wrong is wrong everywhere at once.</p>
+ */
+class HealthAggregateMathTest {
+
+    private static final long NOON = 1767268800000L;
+    private static final long HOUR = 3600000L;
+    private static final long MINUTE = 60000L;
+
+    private static LocalHealthStore store(HealthSample... samples)
+            throws Exception {
+        LocalHealthStore s = new LocalHealthStore();
+        List<HealthSample> in = new ArrayList<HealthSample>();
+        for (HealthSample sample : samples) {
+            in.add(sample);
+        }
+        s.write(in).get();
+        return s;
+    }
+
+    private static List<AggregateResult> hourly(LocalHealthStore s,
+            HealthDataType type, AggregateMetric metric, long from, long to)
+            throws Exception {
+        return s.aggregate(new AggregateQuery().addType(type)
+                .addMetric(metric)
+                .setTimeRange(HealthTimeRange.between(from, to))
+                .setBucket(HealthInterval.hours(1))).get();
+    }
+
+    private static double value(AggregateResult r, HealthDataType t,
+            AggregateMetric m) {
+        HealthQuantity q = r.get(t, m);
+        return q == null ? -1 : q.getValue(t.getCanonicalUnit());
+    }
+
+    /**
+     * A two-hour workout across two hourly buckets is one hour in each,
+     * not two in both.
+     */
+    @Test
+    void intervalDurationIsClippedToItsBucket() throws Exception {
+        LocalHealthStore s = store(FakeHealthStore.sample(
+                HealthDataType.EXERCISE_TIME, NOON, NOON + 2 * HOUR, 120));
+        List<AggregateResult> b = hourly(s, HealthDataType.EXERCISE_TIME,
+                AggregateMetric.DURATION, NOON, NOON + 2 * HOUR);
+        assertEquals(2, b.size());
+        assertEquals(HOUR, b.get(0).get(HealthDataType.EXERCISE_TIME,
+                AggregateMetric.DURATION).getValue(HealthUnit.MILLISECOND),
+                1.0);
+        assertEquals(HOUR, b.get(1).get(HealthDataType.EXERCISE_TIME,
+                AggregateMetric.DURATION).getValue(HealthUnit.MILLISECOND),
+                1.0);
+    }
+
+    /**
+     * DURATION is time covered, so two samples that overlap count the
+     * overlap once. Summed instead, a bucket reported more time than it
+     * is wide -- and both mobile stores fall back to this same shared
+     * aggregation, so the error was everywhere at once.
+     */
+    @Test
+    void overlappingIntervalsCountTheOverlapOnce() throws Exception {
+        LocalHealthStore s = store(
+                FakeHealthStore.sample(HealthDataType.EXERCISE_TIME,
+                        NOON, NOON + 10 * MINUTE, 10),
+                FakeHealthStore.sample(HealthDataType.EXERCISE_TIME,
+                        NOON + 5 * MINUTE, NOON + 15 * MINUTE, 10));
+        List<AggregateResult> b = hourly(s, HealthDataType.EXERCISE_TIME,
+                AggregateMetric.DURATION, NOON, NOON + HOUR);
+        assertEquals(1, b.size());
+        assertEquals(15 * MINUTE,
+                b.get(0).get(HealthDataType.EXERCISE_TIME,
+                        AggregateMetric.DURATION)
+                        .getValue(HealthUnit.MILLISECOND), 1.0);
+    }
+
+    /** Disjoint intervals in one bucket still add up. */
+    @Test
+    void disjointIntervalsStillSum() throws Exception {
+        LocalHealthStore s = store(
+                FakeHealthStore.sample(HealthDataType.EXERCISE_TIME,
+                        NOON, NOON + 10 * MINUTE, 10),
+                FakeHealthStore.sample(HealthDataType.EXERCISE_TIME,
+                        NOON + 20 * MINUTE, NOON + 25 * MINUTE, 5));
+        List<AggregateResult> b = hourly(s, HealthDataType.EXERCISE_TIME,
+                AggregateMetric.DURATION, NOON, NOON + HOUR);
+        assertEquals(15 * MINUTE,
+                b.get(0).get(HealthDataType.EXERCISE_TIME,
+                        AggregateMetric.DURATION)
+                        .getValue(HealthUnit.MILLISECOND), 1.0);
+    }
+
+    /** One interval wholly inside another is not extra time. */
+    @Test
+    void anIntervalContainedInAnotherAddsNothing() throws Exception {
+        LocalHealthStore s = store(
+                FakeHealthStore.sample(HealthDataType.EXERCISE_TIME,
+                        NOON, NOON + 30 * MINUTE, 30),
+                FakeHealthStore.sample(HealthDataType.EXERCISE_TIME,
+                        NOON + 5 * MINUTE, NOON + 10 * MINUTE, 5));
+        List<AggregateResult> b = hourly(s, HealthDataType.EXERCISE_TIME,
+                AggregateMetric.DURATION, NOON, NOON + HOUR);
+        assertEquals(30 * MINUTE,
+                b.get(0).get(HealthDataType.EXERCISE_TIME,
+                        AggregateMetric.DURATION)
+                        .getValue(HealthUnit.MILLISECOND), 1.0);
+    }
+
+    /**
+     * A cumulative value spanning two buckets is split in proportion, so
+     * the buckets still sum to the original.
+     */
+    @Test
+    void cumulativeValueIsProRatedAcrossBuckets() throws Exception {
+        LocalHealthStore s = store(FakeHealthStore.sample(
+                HealthDataType.STEPS, NOON, NOON + 2 * HOUR, 100));
+        List<AggregateResult> b = hourly(s, HealthDataType.STEPS,
+                AggregateMetric.TOTAL, NOON, NOON + 2 * HOUR);
+        assertEquals(2, b.size());
+        double first = value(b.get(0), HealthDataType.STEPS,
+                AggregateMetric.TOTAL);
+        double second = value(b.get(1), HealthDataType.STEPS,
+                AggregateMetric.TOTAL);
+        assertEquals(50.0, first, 0.5);
+        assertEquals(50.0, second, 0.5);
+        assertEquals(100.0, first + second, 0.5,
+                "pro-rating must conserve the total");
+    }
+
+    /**
+     * An interval ending exactly on a bucket boundary belongs to the
+     * earlier bucket only. Counting it in both is how boundary totals
+     * inflated.
+     */
+    @Test
+    void intervalEndingOnABoundaryCountsOnce() throws Exception {
+        LocalHealthStore s = store(FakeHealthStore.sample(
+                HealthDataType.STEPS, NOON, NOON + HOUR, 60));
+        List<AggregateResult> b = hourly(s, HealthDataType.STEPS,
+                AggregateMetric.TOTAL, NOON, NOON + 2 * HOUR);
+        assertEquals(60.0, value(b.get(0), HealthDataType.STEPS,
+                AggregateMetric.TOTAL), 0.5);
+        assertNull(b.get(1).get(HealthDataType.STEPS,
+                AggregateMetric.TOTAL),
+                "the second bucket saw none of it");
+    }
+
+    /**
+     * Instantaneous samples cover no time. The one-millisecond averaging
+     * weight is not a duration, and adding it made "total time covered"
+     * grow with the number of spot readings.
+     */
+    @Test
+    void instantaneousSamplesContributeNoDuration() throws Exception {
+        LocalHealthStore s = store(
+                FakeHealthStore.sample(HealthDataType.BODY_MASS,
+                        NOON + MINUTE, NOON + MINUTE, 70),
+                FakeHealthStore.sample(HealthDataType.BODY_MASS,
+                        NOON + 2 * MINUTE, NOON + 2 * MINUTE, 71),
+                FakeHealthStore.sample(HealthDataType.BODY_MASS,
+                        NOON + 3 * MINUTE, NOON + 3 * MINUTE, 72));
+        List<AggregateResult> b = hourly(s, HealthDataType.BODY_MASS,
+                AggregateMetric.DURATION, NOON, NOON + HOUR);
+        assertEquals(0.0, b.get(0).get(HealthDataType.BODY_MASS,
+                AggregateMetric.DURATION).getValue(HealthUnit.MILLISECOND),
+                0.001);
+    }
+
+    /** Spot readings still average, weighted equally. */
+    @Test
+    void instantaneousSamplesStillAverage() throws Exception {
+        LocalHealthStore s = store(
+                FakeHealthStore.sample(HealthDataType.BODY_MASS,
+                        NOON + MINUTE, NOON + MINUTE, 70),
+                FakeHealthStore.sample(HealthDataType.BODY_MASS,
+                        NOON + 2 * MINUTE, NOON + 2 * MINUTE, 72));
+        List<AggregateResult> b = hourly(s, HealthDataType.BODY_MASS,
+                AggregateMetric.AVERAGE, NOON, NOON + HOUR);
+        assertEquals(71.0, value(b.get(0), HealthDataType.BODY_MASS,
+                AggregateMetric.AVERAGE), 0.001);
+    }
+
+    /**
+     * A bucket wider than the query must not count time outside the query.
+     * A daily bucket on a one-hour query is the case that caught this.
+     */
+    @Test
+    void overlapIsClippedToTheQueryRangeNotJustTheBucket()
+            throws Exception {
+        LocalHealthStore s = store(FakeHealthStore.sample(
+                HealthDataType.STEPS, NOON - 5 * MINUTE, NOON + 5 * MINUTE,
+                10));
+        // One bucket covering the whole query, but the query starts at noon
+        // while the sample starts five minutes earlier.
+        List<AggregateResult> b = s.aggregate(new AggregateQuery()
+                .addType(HealthDataType.STEPS)
+                .addMetric(AggregateMetric.TOTAL)
+                .setTimeRange(HealthTimeRange.between(NOON,
+                        NOON + 10 * MINUTE))).get();
+        assertEquals(1, b.size());
+        assertEquals(5.0, value(b.get(0), HealthDataType.STEPS,
+                AggregateMetric.TOTAL), 0.5,
+                "only the five minutes inside the query count");
+    }
+
+    /** A bucket with no data stays empty rather than reporting zero. */
+    @Test
+    void emptyBucketsAreNullNotZero() throws Exception {
+        LocalHealthStore s = store(FakeHealthStore.sample(
+                HealthDataType.STEPS, NOON, NOON + MINUTE, 10));
+        List<AggregateResult> b = hourly(s, HealthDataType.STEPS,
+                AggregateMetric.TOTAL, NOON, NOON + 2 * HOUR);
+        assertNotNull(b.get(0).get(HealthDataType.STEPS,
+                AggregateMetric.TOTAL));
+        assertNull(b.get(1).get(HealthDataType.STEPS,
+                AggregateMetric.TOTAL),
+                "no data and zero data are different facts");
+    }
+
+    /**
+     * A series contributes its measurements, not just its existence.
+     *
+     * <p>The local and simulator stores hold a series whole and aggregate
+     * their records directly, without the read path's flattening. Counting
+     * the record while contributing none of its points produced a null
+     * AVERAGE, MINIMUM and MAXIMUM for a record full of values -- which
+     * reads as "no data" rather than as the bug it was.</p>
+     */
+    @Test
+    void aSeriesContributesItsMeasurementsToTheBucket() throws Exception {
+        long[] at = {NOON + MINUTE, NOON + 2 * MINUTE, NOON + 3 * MINUTE};
+        double[] bpm = {60, 70, 80};
+        SeriesSample series = SeriesSample.create(HealthDataType.HEART_RATE,
+                at[0], at[2], at, at, bpm, HealthUnit.COUNT_PER_MINUTE);
+
+        LocalHealthStore s = new LocalHealthStore();
+        List<HealthSample> in = new ArrayList<HealthSample>();
+        in.add(series);
+        s.write(in).get();
+
+        List<AggregateResult> b = s.aggregate(new AggregateQuery()
+                .addType(HealthDataType.HEART_RATE)
+                .addMetric(AggregateMetric.AVERAGE)
+                .addMetric(AggregateMetric.MINIMUM)
+                .addMetric(AggregateMetric.MAXIMUM)
+                .addMetric(AggregateMetric.COUNT)
+                .setTimeRange(HealthTimeRange.between(NOON, NOON + HOUR))
+                .setBucket(HealthInterval.hours(1))).get();
+
+        assertEquals(1, b.size());
+        assertEquals(70.0, value(b.get(0), HealthDataType.HEART_RATE,
+                AggregateMetric.AVERAGE), 1e-9);
+        assertEquals(60.0, value(b.get(0), HealthDataType.HEART_RATE,
+                AggregateMetric.MINIMUM), 1e-9);
+        assertEquals(80.0, value(b.get(0), HealthDataType.HEART_RATE,
+                AggregateMetric.MAXIMUM), 1e-9);
+        // Three measurements, not one container. The same data read
+        // through a flattening store reports three, and a count that
+        // disagreed with the average it was computed from is worse than
+        // either number alone.
+        assertEquals(3.0, b.get(0).get(HealthDataType.HEART_RATE,
+                AggregateMetric.COUNT).getValue(HealthUnit.COUNT), 1e-9);
+        assertEquals(3, b.get(0).getSampleCount(HealthDataType.HEART_RATE));
+    }
+
+    /**
+     * A series with no measurements is not a record. Writing one expanded
+     * to no wire records at all, and an empty batch is reported by both
+     * bridges as a successful write of nothing.
+     */
+    @Test
+    void anEmptySeriesIsRefused() {
+        assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        SeriesSample.create(HealthDataType.HEART_RATE,
+                                NOON, NOON, new long[0], new long[0],
+                                new double[0],
+                                HealthUnit.COUNT_PER_MINUTE);
+                    }
+                });
+    }
+
+    /**
+     * An interval ending exactly at the range start is outside it.
+     *
+     * <p>A calendar bucket can begin before the requested range -- a daily
+     * bucket on a noon-to-midnight query starts at midnight -- and a `<`
+     * test let an interval ending at noon through. It was then counted and
+     * fed into the average, minimum and maximum while contributing zero
+     * overlap, so the first bucket was contaminated by data from outside
+     * the query.</p>
+     */
+    @Test
+    void anIntervalEndingAtTheRangeStartIsExcluded() throws Exception {
+        LocalHealthStore s = store(
+                FakeHealthStore.sample(HealthDataType.HEART_RATE,
+                        NOON - HOUR, NOON, 200),
+                FakeHealthStore.sample(HealthDataType.HEART_RATE,
+                        NOON + MINUTE, NOON + MINUTE, 60));
+
+        // A calendar bucket starts at midnight, before the query does,
+        // which is what exposes the boundary.
+        List<AggregateResult> b = s.aggregate(new AggregateQuery()
+                .addType(HealthDataType.HEART_RATE)
+                .addMetric(AggregateMetric.MAXIMUM)
+                .addMetric(AggregateMetric.COUNT)
+                .setTimeRange(HealthTimeRange.between(NOON, NOON + HOUR))
+                .setBucket(HealthInterval.calendarDays(1,
+                        java.time.ZoneId.of("UTC")))).get();
+
+        assertEquals(60.0, value(b.get(0), HealthDataType.HEART_RATE,
+                AggregateMetric.MAXIMUM), 1e-9,
+                "the reading that ended at the range start is outside it");
+        assertEquals(1.0, b.get(0).get(HealthDataType.HEART_RATE,
+                AggregateMetric.COUNT).getValue(HealthUnit.COUNT), 1e-9,
+                "and it is not counted either");
+    }
+
+    /**
+     * A series measurement that straddles the bucket start counts for the
+     * part inside it.
+     *
+     * <p>Series points were tested on their start alone, so an interval
+     * measurement running 11:55-12:05 contributed nothing to a noon
+     * bucket -- while the identical span as a scalar sample contributed
+     * its five minutes. An interval-only type requires interval
+     * measurements, so this is the ordinary shape, not an exotic one.</p>
+     */
+    @Test
+    void seriesMeasurementsAreProRatedLikeScalarSamples() throws Exception {
+        long[] starts = {NOON - 5 * MINUTE};
+        long[] ends = {NOON + 5 * MINUTE};
+        double[] values = {10};
+        SeriesSample series = SeriesSample.create(HealthDataType.STEPS,
+                starts[0], ends[0], starts, ends, values, HealthUnit.COUNT);
+
+        LocalHealthStore s = new LocalHealthStore();
+        List<HealthSample> in = new ArrayList<HealthSample>();
+        in.add(series);
+        s.write(in).get();
+
+        List<AggregateResult> b = s.aggregate(new AggregateQuery()
+                .addType(HealthDataType.STEPS)
+                .addMetric(AggregateMetric.TOTAL)
+                .setTimeRange(HealthTimeRange.between(NOON,
+                        NOON + 10 * MINUTE))).get();
+        assertEquals(5.0, value(b.get(0), HealthDataType.STEPS,
+                AggregateMetric.TOTAL), 0.5,
+                "only the five minutes inside the query count, as they"
+                        + " would for a scalar sample");
+    }
+}

@@ -32,6 +32,14 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-css-compiler</artifactId>
         </dependency>
+        <!-- CN1CSSCLI moved out of CodenameOneDesigner/src into its own thin
+             module so headless CSS builds no longer need the whole editor.
+             The editor still drives it directly (CSSImageImporter,
+             ResourceEditorApp), so it depends on it now. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-css-cli</artifactId>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/org.swinglabs/swing-layout -->
         <dependency>
             <groupId>org.swinglabs</groupId>
@@ -102,6 +110,19 @@
         <maven.compiler.source>6</maven.compiler.source>
         <maven.compiler.target>6</maven.compiler.target>
         <src.dir>../../CodenameOneDesigner/src</src.dir>
+        <!--
+        The Resource Editor is deprecated and frozen at the cn1.designer.version
+        pinned in AbstractCN1Mojo. It
+        still builds and installs locally (build-ios-port.sh / build-android-port.sh
+        rely on the designer -> javase-svg -> javase chain, and cn1:designer needs a
+        buildable module), but it is no longer published. Its four artifacts were
+        ~62MB of every release, 43MB of that a shaded jar-with-dependencies.
+        cn1:designer resolves the pinned release on demand instead. Note that this
+        property alone does not stop publication - central-publishing-maven-plugin
+        takes over the deploy phase and only honours its own <excludeArtifacts>,
+        which the parent pom sets. This is here for the plain maven-deploy-plugin path.
+        -->
+        <maven.deploy.skip>true</maven.deploy.skip>
     </properties>
     <build>
         <sourceDirectory>${src.dir}</sourceDirectory>

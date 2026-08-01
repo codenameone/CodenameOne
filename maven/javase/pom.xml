@@ -156,10 +156,14 @@
             <artifactId>codenameone-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Version deliberately omitted so the pinned ${cn1.sqlite.jdbc.version} in the
+             parent's dependencyManagement applies. sqlite-jdbc is frozen and excluded from
+             publication; an explicit ${project.version} here would override the pin and
+             make every released codenameone-javase pom request a sqlite-jdbc that was
+             never uploaded. -->
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>sqlite-jdbc</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.jhlabs</groupId>
@@ -303,6 +307,11 @@
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>2.4.1</version>
                 <configuration>
+                    <!-- Built for local use but deliberately NOT attached: nothing consumes
+                         the published codenameone-javase jar-with-dependencies (29MB of
+                         shaded deps per release). Verified across this repo plus BuildDaemon,
+                         BuildCloud, BuildClient, OfflineBuilder and Deploy. -->
+                    <attach>false</attach>
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>

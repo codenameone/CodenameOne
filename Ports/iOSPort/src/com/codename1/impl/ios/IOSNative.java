@@ -1390,6 +1390,33 @@ public final class IOSNative {
     native int btL2capRead(long channelHandle, byte[] buffer, int offset,
             int len);
 
+    // --- Health (HealthKit) ---
+    // Implemented in nativeSources/CN1Health.m, gated on CN1_INCLUDE_HEALTH.
+    // The #else branch there provides no-op trampolines so a health-free
+    // app -- and the tvOS / Mac Catalyst slices, where HealthKit does not
+    // exist -- still link.
+    native boolean hkIsAvailable();
+    /// Whether the native layer can map this portable type onto a
+    /// HealthKit type at all. Asked rather than assumed: a type with a
+    /// canonical unit is not necessarily one HealthKit knows, and
+    /// advertising it means a query that passes validation and then fails.
+    native boolean hkIsTypeSupported(String typeIdentifier);
+    /// Meaningful for WRITE types only. HealthKit deliberately never
+    /// discloses read authorization, so there is no read equivalent --
+    /// adding one would require inventing an answer.
+    native int hkShareAuthorizationStatus(String typeIdentifier);
+    native void hkRequestAuthorization(int requestId, String[] readTypes,
+            String[] shareTypes);
+    /// `sourceBundleIds` is tab-separated and may be empty for "any
+    /// source". It has to reach HealthKit rather than being filtered after
+    /// the fact: the limit is applied by the query, so filtering the
+    /// results afterwards can return nothing at all while matching data
+    /// sits just past the cut.
+    native void hkQuerySamples(int requestId, String typeIdentifier,
+            double startEpochMs, double endEpochMs, int limit,
+            boolean ascending, String sourceBundleIds);
+    native void hkSaveSamples(int requestId, String samplesTsv);
+
     /** Blocking write to an open L2CAP channel. Returns the byte count
      * written (possibly short), or -2 on error. */
     native int btL2capWrite(long channelHandle, byte[] buffer, int offset,
@@ -1473,6 +1500,13 @@ public final class IOSNative {
     native boolean checkCameraUsage();
     native boolean checkFaceIDUsage();
     native boolean checkLocationUsage();
+    /// Whether ios.NSHealthShareUsageDescription was declared. Lives here
+    /// rather than in CN1Health.m because it must answer even when health
+    /// is compiled out, so IOSImplementation can throw a build-hint
+    /// diagnostic instead of failing later in App Review.
+    native boolean checkHealthShareUsage();
+    /// Whether ios.NSHealthUpdateUsageDescription was declared.
+    native boolean checkHealthUpdateUsage();
     native boolean checkMicrophoneUsage();
     native boolean checkMotionUsage();
     native boolean checkPhotoLibraryAddUsage();

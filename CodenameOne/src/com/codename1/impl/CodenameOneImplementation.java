@@ -7385,6 +7385,17 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the port-specific health entry point. Default
+    /// implementation returns {@code null}; ports that implement
+    /// {@link com.codename1.health.Health} override this to return a
+    /// cached singleton. Application code should use
+    /// {@link com.codename1.health.Health#getInstance()} instead of
+    /// calling this directly --- it transparently substitutes a no-op
+    /// fallback when the port returns {@code null}.
+    public com.codename1.health.Health getHealth() {
+        return null;
+    }
+
     /// Allows buggy implementations (Android) to release image objects
     ///
     /// #### Parameters

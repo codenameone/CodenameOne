@@ -1,7 +1,24 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.impl.javase.util;
 
@@ -74,17 +91,17 @@ public class MavenUtils {
     
     /**
      * Locate the codenameone-designer:jar-with-dependencies jar inside the local
-     * Maven (~/.m2) repository, using the version of the codenameone-core jar that
-     * is currently loaded into this JVM. Returns null if the running framework is
-     * not loaded from m2 (e.g. running from a build directory) or if the matching
-     * designer jar has not been resolved yet.
+     * Maven (~/.m2) repository, starting from the codenameone-core jar currently
+     * loaded into this JVM. Returns null if the running framework is not loaded from
+     * m2 (e.g. running from a build directory) or if no designer has been fetched.
      *
-     * <p>The Maven plugin declares codenameone-designer as a plugin dependency, so
-     * any plugin invocation (cn1:run, mvn compile when bound to the css goal, etc.)
-     * implicitly fetches the matching designer jar into m2. This lookup lets the
-     * simulator runtime use that exact version even when codename1.designer.jar
-     * isn't passed as a system property -- avoiding a stale ~/.codenameone/designer_1.jar
-     * fallback.
+     * <p>The Resource Editor is deprecated and frozen, so it is no longer a plugin
+     * dependency and its version no longer tracks the framework's: an ordinary build
+     * does not pull ~43MB of Swing editor it will never open. It reaches m2 on demand,
+     * through the cn1:designer goal. This lookup therefore prefers a designer matching
+     * the core version and otherwise falls back to the newest one present, so the
+     * Component Inspector's Edit Style action keeps working wherever one has been
+     * fetched -- rather than requiring a match that can no longer occur.
      */
     public static File findDesignerJarInM2() {
         try {
@@ -117,7 +134,21 @@ public class MavenUtils {
                 return null;
             }
             String version = versionDir.getName();
-            File designerVersionDir = new File(codenameoneGroupDir, "codenameone-designer" + File.separator + version);
+            File designerRoot = new File(codenameoneGroupDir, "codenameone-designer");
+            File designerVersionDir = new File(designerRoot, version);
+            if (!designerVersionDir.isDirectory()) {
+                // The Resource Editor is deprecated and frozen, so its version no longer
+                // tracks the framework's. Fall back to whatever build of it is present,
+                // newest first: the Component Inspector's Edit Style action only needs
+                // *a* designer, and forcing an exact match would make that action dead on
+                // every project whose core version moved past the frozen editor.
+                File newest = newestDesignerVersionDir(designerRoot);
+                if (newest == null) {
+                    return null;
+                }
+                designerVersionDir = newest;
+                version = newest.getName();
+            }
             // The published jar-with-dependencies artifact is *not* directly runnable:
             // maven/designer/pom.xml's antrun step renames the shaded jar to
             // designer_1.jar and re-zips it, so this file is a zip wrapper containing
@@ -141,6 +172,53 @@ public class MavenUtils {
             // Best-effort lookup. Any unexpected layout means we can't resolve via m2.
         }
         return null;
+    }
+
+    /**
+     * Newest {@code codenameone-designer/<version>} directory that actually holds the
+     * wrapper artifact, or null when none does. Versions are ordered by numeric segment
+     * so 7.0.9 sorts below 7.0.10.
+     */
+    private static File newestDesignerVersionDir(File designerRoot) {
+        File[] versionDirs = designerRoot.listFiles();
+        if (versionDirs == null) {
+            return null;
+        }
+        File best = null;
+        for (File candidate : versionDirs) {
+            if (!candidate.isDirectory()) {
+                continue;
+            }
+            File wrapper = new File(candidate,
+                    "codenameone-designer-" + candidate.getName() + "-jar-with-dependencies.jar");
+            if (!wrapper.isFile()) {
+                continue;
+            }
+            if (best == null || compareVersions(candidate.getName(), best.getName()) > 0) {
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    /** Compares dotted versions segment by segment, numerically where both segments are numeric. */
+    static int compareVersions(String left, String right) {
+        String[] l = left.split("[.-]");
+        String[] r = right.split("[.-]");
+        for (int i = 0; i < Math.max(l.length, r.length); i++) {
+            String a = i < l.length ? l[i] : "";
+            String b = i < r.length ? r[i] : "";
+            int result;
+            if (a.matches("\\d+") && b.matches("\\d+")) {
+                result = Long.compare(Long.parseLong(a), Long.parseLong(b));
+            } else {
+                result = a.compareTo(b);
+            }
+            if (result != 0) {
+                return result;
+            }
+        }
+        return 0;
     }
 
     private static final String INNER_JAR_NAME = "designer_1.jar";
