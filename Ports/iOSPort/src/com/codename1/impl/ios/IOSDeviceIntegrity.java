@@ -190,6 +190,20 @@ final class IOSDeviceIntegrity {
      */
     private long pendingSinceInMemory;
     /**
+     * The key whose state this process holds in memory, when the keychain refused to
+     * hold it.
+     *
+     * <p>Apple accepts an attestation once. If the write recording that fact fails, the
+     * persisted state still describes a key that has never been submitted -- and acting
+     * on it re-submits an already-consumed one-time key, which Apple answers with
+     * invalidKey, which spends the one-shot recovery and mints a replacement. Every
+     * route out of a failed state write costs a rate-limited hardware key unless
+     * something remembers what actually happened.</p>
+     */
+    private String inMemoryStateKeyId;
+    /** The state {@link #inMemoryStateKeyId} is really in. */
+    private String inMemoryState;
+    /**
      * The throttle deadline, held in memory as well as in the keychain.
      *
      * <p>{@code requestToken} reads the deadline from storage, so a refused write left
@@ -313,6 +327,10 @@ final class IOSDeviceIntegrity {
         if (idGone && stateGone) {
             store.remove(KEY_ATTEST_STARTED);
             attestAnsweredForKey = null;
+            // The identity is gone, so anything this process remembered about it is too.
+            inMemoryStateKeyId = null;
+            inMemoryState = null;
+            pendingSinceInMemory = 0L;
             discardFailed = false;
             if (!keepSpentMarker) {
                 // Checked, and the in-memory flag follows what the keychain actually
@@ -455,6 +473,13 @@ final class IOSDeviceIntegrity {
             SecureStorage store = SecureStorage.getInstance();
             String keyId = store.get(KEY_ID);
             String state = store.get(KEY_STATE);
+            // What this process knows wins over what the keychain managed to store. The
+            // keychain copy is what survives a restart; this one is what survives the
+            // keychain refusing the write, and without it an accepted key reads as one
+            // that was never submitted.
+            if (keyId != null && keyId.equals(inMemoryStateKeyId) && inMemoryState != null) {
+                state = inMemoryState;
+            }
             if (STATE_PENDING.equals(state) && keyId != null && keyId.length() > 0) {
                 if (registrationGraceRemaining() > 0) {
                     // The key is attested with Apple but no backend has confirmed
@@ -469,7 +494,14 @@ final class IOSDeviceIntegrity {
                 // not participate in acknowledgement at all, or its registration
                 // call was lost. Assume registered rather than re-attesting on
                 // every request forever.
-                store.set(KEY_STATE, STATE_ATTESTED);
+                if (!store.set(KEY_STATE, STATE_ATTESTED)) {
+                    // Same reasoning one step later: a promotion the keychain refused
+                    // must not send an accepted key back to attestKey on the next
+                    // request. Held in memory for this process; a restart re-reads
+                    // whatever the keychain does hold.
+                    inMemoryStateKeyId = keyId;
+                    inMemoryState = STATE_ATTESTED;
+                }
                 store.remove(KEY_PENDING_SINCE);
                 state = STATE_ATTESTED;
             }
@@ -791,9 +823,19 @@ final class IOSDeviceIntegrity {
             }
             SecureStorage store = SecureStorage.getInstance();
             if (!store.set(KEY_STATE, STATE_PENDING)) {
-                // The key is attested with Apple but we cannot record that. Reporting
-                // success would leave the next request attesting the same key again,
-                // against Apple's rate limit, forever.
+                // The key is attested with Apple and the keychain will not record it.
+                //
+                // Reporting success would leave the next request attesting the same key
+                // again -- but so did simply failing, because the persisted state still
+                // says "new" with a start marker, which is read as an interrupted
+                // attestation and discards the key for another rate-limited one. Every
+                // route out of here spent a key until something remembered that Apple
+                // had already answered. So the state is held in memory for this process,
+                // exactly as the deadline below is, and this request is failed so the
+                // caller retries into a state that now describes the key correctly.
+                instance.inMemoryStateKeyId = pending.keyId;
+                instance.inMemoryState = STATE_PENDING;
+                instance.pendingSinceInMemory = System.currentTimeMillis();
                 instance.bootstrapInFlight = false;
                 fail(pending, "App Attest could not record its attestation state");
                 instance.failBootstrapWaiters(
