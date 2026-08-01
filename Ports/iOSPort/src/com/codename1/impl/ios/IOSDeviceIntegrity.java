@@ -76,12 +76,35 @@ import java.util.Map;
  */
 final class IOSDeviceIntegrity {
 
+    /**
+     * Never true. Exists so the call sites below are real call sites.
+     *
+     * <p>Not {@code final}, and not a compile-time constant: javac deletes the body of
+     * an {@code if} on a constant false, which would take the very references this is
+     * here to keep. A plain field is opaque to it, and the translator's elimination pass
+     * works on reachability in the bytecode rather than on whether the branch can be
+     * taken -- so the callbacks survive and nothing runs.</p>
+     */
+    private static boolean retainNativeCallbacks;
+
     static {
-        // Prevents the iOS VM optimizer from eliding these native callbacks.
-        nativeKeyGenerated(-1, null);
-        nativeAttestationReady(-1, null);
-        nativeAssertionReady(-1, null);
-        nativeAttestError(-1, -1, null);
+        // Prevents the iOS VM optimizer from eliding these native callbacks: no Java
+        // caller exists, and without a reference they translate to empty stubs and the
+        // native dispatch silently does nothing.
+        //
+        // Guarded rather than invoked. Calling them for real ran the callback bodies
+        // during class initialization -- before the static fields below this block were
+        // assigned, since static initializers run in textual order -- so take() locked
+        // on a null REQUESTS map and threw. The class initializes on the EDT, so that
+        // NPE reached Display's EDT handler, which shows a modal error dialog: the app
+        // hung on a dialog nobody could dismiss the first time anything touched device
+        // integrity. A reference the optimizer can see is all that was ever needed.
+        if (retainNativeCallbacks) {
+            nativeKeyGenerated(-1, null);
+            nativeAttestationReady(-1, null);
+            nativeAssertionReady(-1, null);
+            nativeAttestError(-1, -1, null);
+        }
     }
 
     static final String TOKEN_PREFIX = "cn1aa1";
