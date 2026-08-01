@@ -23,6 +23,7 @@
 package com.codename1.security.shield;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.util.AsyncResource;
 import com.codename1.junit.UITestBase;
 import com.codename1.io.NetworkGuard;
 import com.codename1.io.NetworkGuardTestAccess;
@@ -239,6 +240,48 @@ class ShieldInitOrderTest extends UITestBase {
         assertNull(request.headerValue("X-CN1-Attest"),
                 "the token attached under the old name must not survive to another host");
         assertNull(request.headerValue("X-Other-Attest"));
+    }
+
+    /**
+     * The asynchronous fetch does not become synchronous during startup.
+     *
+     * <p>{@code fetchToken()} is documented asynchronous, and it waited for
+     * initialization before returning its {@code AsyncResource} -- so a caller on the EDT
+     * froze for the length of a cold start, and an engine whose own initialization needs
+     * anything dispatched to the EDT deadlocked outright: the EDT parked waiting for the
+     * initialization that is waiting for the EDT.</p>
+     */
+    @Test
+    void fetchTokenReturnsWhileInitializationIsStillRunning() throws Exception {
+        Thread init = initOnAnotherThread();
+        assertTrue(engine.entered.await(GENEROUS_TIMEOUT_MS, TimeUnit.MILLISECONDS),
+                "the engine should have been asked to initialize");
+
+        final AsyncResource<ShieldToken>[] handle = new AsyncResource[1];
+        final CountDownLatch returned = new CountDownLatch(1);
+        Thread caller = new Thread(new Runnable() {
+            public void run() {
+                handle[0] = AppShield.fetchToken();
+                returned.countDown();
+            }
+        }, "shield-fetch-during-init");
+        caller.setDaemon(true);
+        caller.start();
+
+        assertTrue(returned.await(GENEROUS_TIMEOUT_MS, TimeUnit.MILLISECONDS),
+                "fetchToken must hand back its resource without waiting for startup");
+        assertNotNull(handle[0]);
+        assertFalse(handle[0].isDone(),
+                "and it cannot be finished yet -- the engine has not started");
+
+        engine.release();
+        init.join(GENEROUS_TIMEOUT_MS);
+        long deadline = System.currentTimeMillis() + GENEROUS_TIMEOUT_MS;
+        while (!handle[0].isDone() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10L);
+        }
+        assertTrue(handle[0].isDone(), "the resource has to settle once startup finishes");
+        assertEquals("token-from-a-fully-initialized-engine", handle[0].get().getValue());
     }
 
     private Thread initOnAnotherThread() {

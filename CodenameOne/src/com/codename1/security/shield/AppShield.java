@@ -348,18 +348,30 @@ public final class AppShield {
     /// @param bindingData the data to bind to, typically a digest of the request body
     public static AsyncResource<ShieldToken> fetchToken(final String bindingData) {
         final AsyncResource<ShieldToken> result = new AsyncResource<ShieldToken>();
-        // Same window as attach(): a caller racing startup would otherwise be told the
-        // shield was never initialized, which is a lie that lasts milliseconds and an
-        // error the app has no way to distinguish from the real one.
-        awaitInitialization();
-        if (!initialized) {
-            result.error(new ShieldException(ShieldStatus.NOT_INITIALIZED,
-                    "AppShield.init(...) has not been called"));
-            return result;
-        }
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             @Override
             public void run() {
+                // The wait happens HERE, not before the task is scheduled.
+                //
+                // Same window attach() covers -- a caller racing startup must not be told
+                // the shield was never initialized, which is a lie that lasts
+                // milliseconds and an error the app cannot tell from the real one -- but
+                // this method is the asynchronous one, and waiting for it in the caller
+                // froze whatever thread asked. On the EDT that is a visible stall for the
+                // length of a cold start, and if the engine's own initialization needs
+                // anything dispatched to the EDT it is a deadlock: the EDT is parked
+                // waiting for the initialization that is waiting for the EDT.
+                if (!awaitInitialization()) {
+                    result.error(new ShieldException(ShieldStatus.NOT_INITIALIZED,
+                            "AppShield was still initializing and the wait was "
+                            + "interrupted"));
+                    return;
+                }
+                if (!initialized) {
+                    result.error(new ShieldException(ShieldStatus.NOT_INITIALIZED,
+                            "AppShield.init(...) has not been called"));
+                    return;
+                }
                 try {
                     ShieldToken token = ShieldEngineRegistry.getEngine().fetchToken(bindingData);
                     setStatus(token.getStatus());
