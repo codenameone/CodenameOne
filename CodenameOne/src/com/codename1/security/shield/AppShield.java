@@ -158,6 +158,25 @@ public final class AppShield {
     /// conflating them is what let a caller act on a half-built shield.
     private static boolean initializing;
 
+    /// Blocks until an initialization in progress has finished. Returns at once when
+    /// none is, which is every call after startup.
+    ///
+    /// Safe from a network thread, which is where [#attach(ConnectionRequest)] runs by
+    /// contract, and it waits on the same monitor `init()` notifies -- so the wait ends
+    /// when setup does, including when the engine threw and the `finally` released it.
+    private static void awaitInitialization() {
+        synchronized (AppShield.class) {
+            while (initializing) {
+                try {
+                    AppShield.class.wait();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
+    }
+
     /// Hooks the shield into the network stack, which is what makes
     /// [ShieldConfig#protect(String, HostPolicy)] take effect on ordinary requests. Without it a
     /// registered host would carry a policy nothing consults.
@@ -285,6 +304,10 @@ public final class AppShield {
     /// @param bindingData the data to bind to, typically a digest of the request body
     public static AsyncResource<ShieldToken> fetchToken(final String bindingData) {
         final AsyncResource<ShieldToken> result = new AsyncResource<ShieldToken>();
+        // Same window as attach(): a caller racing startup would otherwise be told the
+        // shield was never initialized, which is a lie that lasts milliseconds and an
+        // error the app has no way to distinguish from the real one.
+        awaitInitialization();
         if (!initialized) {
             result.error(new ShieldException(ShieldStatus.NOT_INITIALIZED,
                     "AppShield.init(...) has not been called"));
@@ -332,7 +355,18 @@ public final class AppShield {
     /// Honours the host's [FailureMode]: under [FailureMode#OPEN] a token failure leaves the
     /// request untouched, under [FailureMode#CLOSED] it propagates.
     public static void attach(ConnectionRequest request) throws ShieldException {
-        if (request == null || !initialized) {
+        if (request == null) {
+            return;
+        }
+        // Waits for an initialization already under way rather than treating it as
+        // "no shield". installNetworkGuard() necessarily runs before init() publishes
+        // completion -- the guard has to exist before anything can claim to be
+        // protected -- so a request that started concurrently reaches this method
+        // through the freshly installed guard while the flag is still false. Returning
+        // there sent a protected request untouched, including for a host configured to
+        // fail closed, which is exactly the request that must not go out unprotected.
+        awaitInitialization();
+        if (!initialized) {
             return;
         }
         String url = request.getUrl();
@@ -420,7 +454,13 @@ public final class AppShield {
     /// visible to the framework and cannot be given a token or pinned.
     public static Hashtable headersFor(String url) {
         Hashtable out = new Hashtable();
-        if (!initialized || url == null) {
+        if (url == null) {
+            return out;
+        }
+        // As in attach(): during startup this would silently return no headers, and a
+        // BrowserComponent navigating a protected host would load it unauthenticated.
+        awaitInitialization();
+        if (!initialized) {
             return out;
         }
         if (!policyFor(hostOf(url)).isAttachToken()) {

@@ -182,6 +182,14 @@ final class IOSDeviceIntegrity {
     private final Object flowLock = new Object();
     private long currentBackoff = MIN_BACKOFF_MILLIS;
     /**
+     * When this key's attestation was accepted, held here as well as in the keychain.
+     *
+     * <p>The keychain copy is what survives a restart; this one is what survives the
+     * keychain refusing the write. Without it an accepted key looked unregistered, and
+     * every route out of that state cost a rate-limited hardware key.</p>
+     */
+    private long pendingSinceInMemory;
+    /**
      * The throttle deadline, held in memory as well as in the keychain.
      *
      * <p>{@code requestToken} reads the deadline from storage, so a refused write left
@@ -552,6 +560,15 @@ final class IOSDeviceIntegrity {
     private static long registrationGraceRemaining() {
         String since = SecureStorage.getInstance().get(KEY_PENDING_SINCE);
         if (since == null || since.length() == 0) {
+            // The keychain refused the timestamp, and this process remembers when the
+            // key was accepted. Falling through to 0 here is what made the accepted key
+            // look unregistered and sent it back through attestation.
+            IOSDeviceIntegrity live = instance;
+            if (live != null && live.pendingSinceInMemory > 0) {
+                long left = REGISTRATION_GRACE_MILLIS
+                        - (System.currentTimeMillis() - live.pendingSinceInMemory);
+                return left > 0 ? left : 0;
+            }
             return 0;
         }
         long started;
@@ -783,38 +800,32 @@ final class IOSDeviceIntegrity {
                         "App Attest could not record its attestation state");
                 return;
             }
-            if (!store.set(KEY_PENDING_SINCE, Long.toString(System.currentTimeMillis()))) {
-                // Part of the same state transition, not a nicety: with no timestamp,
-                // registrationGraceRemaining() reads the window as already expired, so
-                // the very next request promotes the key to attested and asserts against
-                // a key no backend has acknowledged -- the first-use rejection and
-                // pointless key reset this state exists to prevent.
+            long pendingSince = System.currentTimeMillis();
+            // Held in memory whatever the keychain does, and set BEFORE the write is
+            // attempted so the fallback is already in place if it fails.
+            instance.pendingSinceInMemory = pendingSince;
+            if (!store.set(KEY_PENDING_SINCE, Long.toString(pendingSince))) {
+                // The key is KEPT, in the pending state it is already in. Nothing is
+                // rolled back and nothing is discarded.
                 //
-                // The start marker goes FIRST, and that ordering is the whole fix. Apple
-                // has already accepted this attestation, so the key is good; rolling the
-                // state back to new while KEY_ATTEST_STARTED was still there made the
-                // next request read it as an interrupted attestation of unknown outcome
-                // -- which discards the key and generates another rate-limited one. A
-                // deadline write that keeps failing then burns a fresh hardware key on
-                // every single attempt, which is the opposite of what a rollback is for.
-                // Clearing it first means the worst case is re-attesting a key we still
-                // hold, not replacing it.
+                // Two earlier attempts here were both wrong in the same direction --
+                // they sent an accepted key back through attestation. Rolling the state
+                // to new while KEY_ATTEST_STARTED was present made it read as an
+                // interrupted attestation, which discards the key and mints another;
+                // clearing that marker first only moved the failure, because a key in
+                // STATE_NEW is submitted to attestKey again and Apple answers invalidKey
+                // for a one-time key it has already consumed -- which triggers recovery
+                // and burns a replacement anyway. Apple accepted this attestation. The
+                // key is good. The only thing missing is a timestamp.
+                //
+                // So the timestamp lives in memory for this process (set above, before
+                // the write was attempted) and registrationGraceRemaining() falls back
+                // to it. Across a restart the key is found PENDING with no deadline,
+                // which the request path already handles: it promotes to attested and
+                // uses it, the same fallback applied when a consumer never acknowledges.
+                // That is right here too -- the key IS attested with Apple; only the
+                // backend's confirmation is unknown -- and it costs no rate-limited key.
                 store.remove(KEY_ATTEST_STARTED);
-                // Roll back to new so the key is attested again rather than used
-                // prematurely.
-                if (!store.set(KEY_STATE, STATE_NEW)) {
-                    // The rollback failed too, so the key would sit pending with no
-                    // deadline and be promoted on the next request. Discard the identity
-                    // outright rather than leave a state that reads as ready.
-                    try {
-                        instance.resetLocked();
-                    } catch (IllegalStateException ignored) {
-                        // resetLocked already advanced the generation and failed the
-                        // waiters; nothing further to do but report to this caller.
-                    }
-                    fail(pending, "App Attest could not record its registration deadline");
-                    return;
-                }
                 instance.bootstrapInFlight = false;
                 fail(pending, "App Attest could not record its registration deadline");
                 instance.failBootstrapWaiters(

@@ -86,8 +86,8 @@ public final class ShieldConfig {
                         + "and the token would follow the redirect. Use a header of your "
                         + "own, or leave the default " + DEFAULT_TOKEN_HEADER + ".");
             }
-            for (int i = 0; i < TRANSPORT_HEADERS.length; i++) {
-                if (TRANSPORT_HEADERS[i].equals(normalized)) {
+            for (String reserved : TRANSPORT_HEADERS) {
+                if (reserved.equals(normalized)) {
                     throw new IllegalArgumentException(name + " cannot carry the "
                             + "attestation token: it is connection or framing metadata, "
                             + "which the HTTP transport owns. Depending on the platform it "
