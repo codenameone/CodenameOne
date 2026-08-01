@@ -23,6 +23,9 @@
 package com.codename1.impl.health;
 
 import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.EasyThread;
+import com.codename1.util.SuccessCallback;
 
 /// The resource every public health operation hands back: one outcome,
 /// delivered on the EDT.
@@ -63,6 +66,73 @@ public final class EdtResult<T> extends OneShot<T> {
             return;
         }
         Display.getInstance().callSerially(new Deliver<T>(this, null, t));
+    }
+
+    /// Completing on the EDT is only half of the guarantee. `AsyncResource`
+    /// runs a callback registered against an already-finished resource
+    /// immediately, on whichever thread registered it, so the outcome landing
+    /// on the EDT does not mean the callback does.
+    ///
+    /// That is the ordinary case for the operations that resolve before they
+    /// return -- the facade's `openHealthSettings` and `openProviderSetup`
+    /// complete inside the call -- where the delivery thread came down to
+    /// whether the EDT had drained the hop above before the caller got as far
+    /// as `onResult`. The same call arrived on the EDT or off it from one run
+    /// to the next.
+    ///
+    /// Wrapping every callback closes that half. A callback already reached on
+    /// the EDT sees `isEdt()` and runs inline, so this costs a branch and
+    /// never an extra queued runnable. Both arities funnel through the
+    /// `EasyThread` overloads, so overriding these two covers `ready`,
+    /// `except` and `onResult` alike.
+    ///
+    /// A caller who names an `EasyThread` is asking for delivery there
+    /// specifically, which is the point of that overload, so those are left
+    /// alone -- the default is the EDT, not an override of an explicit choice.
+    @Override
+    public AsyncResource<T> ready(SuccessCallback<T> callback, EasyThread t) {
+        return super.ready(t == null ? new OnEdt<T>(callback) : callback, t);
+    }
+
+    @Override
+    public AsyncResource<T> except(SuccessCallback<Throwable> callback, EasyThread t) {
+        return super.except(t == null ? new OnEdt<Throwable>(callback) : callback, t);
+    }
+
+    /// Named rather than anonymous so the hop carries no synthetic reference
+    /// to anything enclosing (SpotBugs `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class OnEdt<V> implements SuccessCallback<V> {
+
+        private final SuccessCallback<V> delegate;
+
+        OnEdt(SuccessCallback<V> delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void onSucess(V value) {
+            if (Display.getInstance().isEdt()) {
+                delegate.onSucess(value);
+                return;
+            }
+            Display.getInstance().callSerially(new Invoke<V>(delegate, value));
+        }
+    }
+
+    private static final class Invoke<V> implements Runnable {
+
+        private final SuccessCallback<V> delegate;
+        private final V value;
+
+        Invoke(SuccessCallback<V> delegate, V value) {
+            this.delegate = delegate;
+            this.value = value;
+        }
+
+        @Override
+        public void run() {
+            delegate.onSucess(value);
+        }
     }
 
     /// Named rather than anonymous so the hop carries no synthetic reference

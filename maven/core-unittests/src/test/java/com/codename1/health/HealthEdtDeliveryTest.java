@@ -310,6 +310,56 @@ class HealthEdtDeliveryTest extends UITestBase {
         return "<unknown>";
     }
 
+    /**
+     * A listener attached after the outcome has already landed still arrives on
+     * the EDT.
+     *
+     * <p>{@code AsyncResource} runs a callback registered against a finished
+     * resource immediately, on whichever thread registered it, so completing on
+     * the EDT is only half the guarantee. The facade operations resolve inside
+     * the call, which made {@link #aFacadeActionDeliversOnTheEdt()} a race: it
+     * passed when the caller reached {@code onResult} before the EDT drained
+     * the completion, and failed when it did not.</p>
+     *
+     * <p>Waiting for {@code isDone()} before listening makes the late case the
+     * only case, so this fails every time against that bug rather than
+     * occasionally.</p>
+     */
+    @Test
+    void aListenerAttachedAfterCompletionStillArrivesOnTheEdt() {
+        final Landing<Boolean> landing = new Landing<Boolean>();
+        CN.invokeAndBlock(new Runnable() {
+            public void run() {
+                assertFalse(CN.isEdt(), "the operation must start off the EDT");
+                AsyncResource<Boolean> settings =
+                        Health.getInstance().openHealthSettings();
+                long deadline = System.currentTimeMillis() + 10_000L;
+                while (!settings.isDone()
+                        && System.currentTimeMillis() < deadline) {
+                    try {
+                        Thread.sleep(5L);
+                    } catch (InterruptedException ex) {
+                        return;
+                    }
+                }
+                assertTrue(settings.isDone(), "the outcome must have landed first");
+                settings.onResult(landing);
+                deadline = System.currentTimeMillis() + 10_000L;
+                while (!landing.arrived.get()
+                        && System.currentTimeMillis() < deadline) {
+                    try {
+                        Thread.sleep(5L);
+                    } catch (InterruptedException ex) {
+                        return;
+                    }
+                }
+            }
+        });
+        assertTrue(landing.arrived.get(), "the callback must arrive");
+        assertTrue(landing.onEdt.get(),
+                "a late listener must still be called on the EDT");
+    }
+
     @Test
     void aFacadeActionDeliversOnTheEdt() {
         final Landing<Boolean> landing = new Landing<Boolean>();
