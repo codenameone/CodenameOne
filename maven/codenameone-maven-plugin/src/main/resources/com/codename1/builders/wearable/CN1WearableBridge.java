@@ -203,7 +203,11 @@ public class CN1WearableBridge implements WearableBridge {
             for (String id : connectedNodeIds(context)) {
                 rememberNode(id);
             }
-            if (recentlySeen(sourceNodeId)) {
+            // Re-attempt the local identity too. A peer query can never return this device, so if
+            // getLocalNode() failed transiently on the first pass, an event from our OWN putData()
+            // -- which the Data Layer echoes back with the local node as host -- would be rejected
+            // no matter how many times we asked about peers.
+            if (recentlySeen(sourceNodeId) || sourceNodeId.equals(localNodeId(context))) {
                 return true;
             }
         }
@@ -1230,14 +1234,26 @@ public class CN1WearableBridge implements WearableBridge {
      * re-synced copy of a very old transfer could be delivered twice, and the sender's own sweep
      * removes those items long before that many newer ones accumulate.
      */
-    private static final Map<String, String> deliveredSequences =
+    private static final Map<String, String> deliveredSequences = new HashMap<String, String>();
+
+    /**
+     * Transfer claims, bounded separately from the replicated ordering stamps.
+     *
+     * <p>They shared one map, which meant a burst of transfers could evict a replicated path's
+     * ordering stamp -- and losing that is a correctness bug, because a reconnect supplying an older
+     * item for the path would then pass the newer-than test and overwrite the current value.
+     * Replicated paths are few and application-defined, so they are held unbounded; transfer keys
+     * are unbounded by nature (every transfer has its own URI) and are what needs the cap. Evicting
+     * a transfer claim only risks delivering a very old re-synced transfer twice.
+     */
+    private static final Map<String, String> transferClaims =
             new java.util.LinkedHashMap<String, String>(64, 0.75f, true) {
                 protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
-                    return size() > MAX_DELIVERY_KEYS;
+                    return size() > MAX_TRANSFER_CLAIMS;
                 }
             };
 
-    private static final int MAX_DELIVERY_KEYS = 2048;
+    private static final int MAX_TRANSFER_CLAIMS = 2048;
 
     /**
      * The value a path still resolves to, or null when nothing is left under it.
@@ -1393,7 +1409,22 @@ public class CN1WearableBridge implements WearableBridge {
         // logical path and file name; their items differ only in the Uri authority, so dropping it
         // would treat the two as one stream and discard the second sender's file whenever its
         // sequence did not happen to exceed the first's.
-        return isNewerThanDelivered("\u0000xfer:" + uri.getHost() + ":" + uri.getPath(), sequence, uri.getHost());
+        String key = uri.getHost() + ":" + uri.getPath();
+        synchronized (transferClaims) {
+            String previous = transferClaims.get(key);
+            if (previous != null) {
+                int split = previous.indexOf('|');
+                long prevSeq = Long.parseLong(previous.substring(0, split));
+                String prevNode = previous.substring(split + 1);
+                if (!outranks(sequence, uri.getHost(), prevSeq,
+                        prevNode.length() == 0 ? null : prevNode)) {
+                    return false;
+                }
+            }
+            transferClaims.put(key,
+                    sequence + "|" + (uri.getHost() == null ? "" : uri.getHost()));
+            return true;
+        }
     }
 
     /**
