@@ -296,7 +296,11 @@ public class CN1WearableBridge implements WearableBridge {
                 out.add(n.getId());
             }
         } catch (Throwable unavailable) {
-            // No capability info: fall back to "nothing known".
+            // Keep the previous snapshot, as every other refresh path does. Falling through to the
+            // assignments below would replace a valid companion set with an empty one and stamp it
+            // fresh, so isCompanionAppInstalled(), isPaired() and isReachable() would all report no
+            // companion for a full cache lifetime because one query timed out.
+            return cachedBonded;
         }
         cachedBonded = out;
         bondedStamp = System.currentTimeMillis();
@@ -865,9 +869,17 @@ public class CN1WearableBridge implements WearableBridge {
                     DataItemBuffer items = Tasks.await(dataClient.getDataItems(),
                             TIMEOUT_SECONDS, TimeUnit.SECONDS);
                     try {
+                        String localNode = localNodeId(context);
                         for (DataItem item : items) {
                             String p = item.getUri().getPath();
                             if (p == null || !isTransferPath(p)) {
+                                continue;
+                            }
+                            // Only our OWN items. getDataItems() also returns transfers replicated
+                            // from other nodes, and deleting one of those propagates -- which is
+                            // precisely how a second watch loses a file it has not collected yet.
+                            // A publisher is responsible for its own items and nobody else's.
+                            if (localNode == null || !localNode.equals(item.getUri().getHost())) {
                                 continue;
                             }
                             DataMap map = valueOrTransferMap(item);
