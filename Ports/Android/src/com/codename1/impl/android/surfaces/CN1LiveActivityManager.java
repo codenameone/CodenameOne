@@ -83,6 +83,12 @@ public final class CN1LiveActivityManager {
                 return false;
             }
             if (nm.areNotificationsEnabled()) {
+                // Observing the grant is what retires earlier refusals, not the path it arrived
+                // by -- these prompts, push registration, Display.requestNotificationPermission
+                // or the settings screen. Doing it here too means a grant the app only ever
+                // observes through isSupported still resets the budget, so a later revoke starts
+                // over with the full two attempts instead of a stale count.
+                CN1SurfaceStore.clearNotificationPrompts(ctx);
                 return true;
             }
             if (Build.VERSION.SDK_INT < 33) {
@@ -209,13 +215,13 @@ public final class CN1LiveActivityManager {
                     + "\"liveActivities\": true -- add that and rebuild.");
             return false;
         }
-        CN1SurfaceStore.recordNotificationPrompt(ctx);
         boolean granted;
         try {
             granted = AndroidImplementation.checkForPermission(
                     "android.permission.POST_NOTIFICATIONS",
                     "This is required to show live activities", true);
         } catch (Throwable t) {
+            // the request never completed, so it is not an attempt the user spent
             Log.w(TAG, "Failed to request the POST_NOTIFICATIONS permission", t);
             return false;
         }
@@ -223,6 +229,9 @@ public final class CN1LiveActivityManager {
             CN1SurfaceStore.clearNotificationPrompts(ctx);
             return true;
         }
+        // counted only now that the request came back ungranted: a prompt the app died during,
+        // or one that threw, is not an answer and must not spend part of the budget
+        CN1SurfaceStore.recordNotificationPrompt(ctx);
         Log.w(TAG, "Live activities are unavailable for now: POST_NOTIFICATIONS was not granted "
                 + "(attempt " + CN1SurfaceStore.getNotificationPromptCount(ctx) + " of "
                 + MAX_NOTIFICATION_PROMPTS + ").");
