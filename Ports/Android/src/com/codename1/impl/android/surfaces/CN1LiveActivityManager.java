@@ -64,18 +64,21 @@ public final class CN1LiveActivityManager {
     private static final int MAX_NOTIFICATION_PROMPTS = 2;
     /// Guards the permission request so concurrent starts raise one dialog and count one answer.
     private static final Object PERMISSION_LOCK = new Object();
+    /// Guards the request bookkeeping. Only ever held for a few statements, never across the
+    /// dialog, and always taken after `PERMISSION_LOCK` when both are held -- arriving callers
+    /// take it alone and release it before contending, so there is no hold-and-wait.
+    private static final Object STATE_LOCK = new Object();
     private static final int DECLARED_PRESENT = 1;
     private static final int DECLARED_MISSING = 2;
     /// Cached manifest verdict: 0 not looked up yet, otherwise one of the DECLARED_ constants.
     private static volatile int permissionDeclaredState;
-    /// True while `checkForPermission` is blocked on the system dialog. Read and written only
-    /// under `PERMISSION_LOCK`, which is what publishes it; it exists because that monitor is
-    /// reentrant and `invokeAndBlock` pumps the EDT underneath it.
+    /// Published together under `STATE_LOCK`, never under `PERMISSION_LOCK` alone: an arriving
+    /// caller has to see a completing request as one event, or it can miss the handoff. The flag
+    /// is true while `checkForPermission` blocks on the system dialog -- needed because
+    /// `PERMISSION_LOCK` is reentrant and `invokeAndBlock` pumps the EDT underneath it -- and the
+    /// counter moves once per answered request.
     private static boolean permissionRequestInFlight;
-    /// Incremented under `PERMISSION_LOCK` each time a request returns an answer. Volatile
-    /// because callers sample it before contending for the lock, which is how one that waited
-    /// recognises that the burst it belongs to has already been answered.
-    private static volatile long permissionRequestGeneration;
+    private static long permissionRequestGeneration;
     private static volatile boolean loggedMissingManifest;
     private static volatile boolean loggedBudgetExhausted;
 
@@ -240,9 +243,18 @@ public final class CN1LiveActivityManager {
         // spending the whole budget on one answer. One request at a time; whoever waited re-reads
         // the state the winner produced.
         //
-        // Sampled before the lock so that a caller which then waits can tell a request completed
-        // underneath it; see the generation check below.
-        long seenGeneration = permissionRequestGeneration;
+        // Snapshot both facts atomically with respect to a completing request: the generation
+        // alone is not enough, because it is published while the winner still holds
+        // PERMISSION_LOCK, so a caller sampling in that window would see the new value, wait, and
+        // then find nothing had changed by its own reckoning. Capturing "a request was open when
+        // I arrived" closes it -- STATE_LOCK publishes the counter and the flag together, so an
+        // arriving caller sees either (open, N) or (closed, N+1), never a torn pair.
+        long seenGeneration;
+        boolean requestOpenOnArrival;
+        synchronized (STATE_LOCK) {
+            seenGeneration = permissionRequestGeneration;
+            requestOpenOnArrival = permissionRequestInFlight;
+        }
         // This serializes surfaces against itself only. A camera or location request in flight
         // elsewhere still shares that same activity-wide flag and request code, and its callback
         // can release this one early -- an existing limitation of the shared permission machinery
@@ -262,18 +274,26 @@ public final class CN1LiveActivityManager {
             // walk straight through and raise a second dialog. Refuse instead: the nested start
             // cannot wait for the outer one without deadlocking itself, and an inert handle is
             // exactly what a refused start is documented to return.
-            if (permissionRequestInFlight) {
-                Log.w(TAG, "Ignoring a live activity start raised while the POST_NOTIFICATIONS "
-                        + "prompt is still open; wait for the first start to return before "
-                        + "starting another.");
-                return false;
+            boolean answeredWhileWaiting;
+            synchronized (STATE_LOCK) {
+                if (permissionRequestInFlight) {
+                    // reached the monitor with a dialog still open, which only a reentrant call
+                    // on the prompting thread can do
+                    Log.w(TAG, "Ignoring a live activity start raised while the "
+                            + "POST_NOTIFICATIONS prompt is still open; wait for the first start "
+                            + "to return before starting another.");
+                    return false;
+                }
+                answeredWhileWaiting = requestOpenOnArrival
+                        || permissionRequestGeneration != seenGeneration;
             }
-            if (permissionRequestGeneration != seenGeneration) {
-                // A request finished while this caller was blocked on the lock, so it belongs to
-                // that same burst and adopts the answer rather than asking again. Serializing
-                // alone was not enough: the waiter would find the budget merely decremented and
-                // open a second dialog back to back, spending the whole budget on one burst of
-                // starts. A start issued later, with no request in between, still gets its turn.
+            if (answeredWhileWaiting) {
+                // A request was open when this caller arrived, or finished while it was blocked
+                // on the lock: either way it belongs to that same burst and adopts the answer
+                // rather than asking again. Serializing alone was not enough -- the waiter would
+                // find the budget merely decremented and open a second dialog back to back,
+                // spending the whole budget on one burst of starts. A start issued later, with no
+                // request open or completing in between, still gets its own turn.
                 return hasPostNotificationsPermission(ctx);
             }
             // Manifest first, matching the precedence in `isSupported`. A build that never
@@ -299,21 +319,33 @@ public final class CN1LiveActivityManager {
                         + "live activity while the app is visible.");
                 return false;
             }
-            boolean granted;
-            permissionRequestInFlight = true;
+            synchronized (STATE_LOCK) {
+                permissionRequestInFlight = true;
+            }
+            boolean granted = false;
+            boolean answered = false;
             try {
                 granted = AndroidImplementation.checkForPermission(
                         "android.permission.POST_NOTIFICATIONS",
                         "This is required to show live activities", true);
-                // bumped only once an answer actually came back, so a throw leaves waiters free
-                // to ask rather than adopting an outcome that never happened
-                permissionRequestGeneration++;
+                answered = true;
             } catch (Throwable t) {
                 // the request never completed, so it is not an attempt the user spent
                 Log.w(TAG, "Failed to request the POST_NOTIFICATIONS permission", t);
-                return false;
             } finally {
-                permissionRequestInFlight = false;
+                synchronized (STATE_LOCK) {
+                    // counter and flag drop together, so no caller can observe a completed
+                    // request that still looks open, or an open one that already counted. The
+                    // generation moves only for an answer, so a throw leaves waiters free to ask
+                    // rather than adopting an outcome that never happened.
+                    if (answered) {
+                        permissionRequestGeneration++;
+                    }
+                    permissionRequestInFlight = false;
+                }
+            }
+            if (!answered) {
+                return false;
             }
             if (granted) {
                 CN1SurfaceStore.clearNotificationPrompts(ctx);
