@@ -81,6 +81,10 @@ public class BrowserComponentScreenshotTest extends BaseTest {
         return "HTML5".equals(Display.getInstance().getPlatformName());
     }
 
+    private static boolean isLinux() {
+        return "linux".equals(Display.getInstance().getPlatformName());
+    }
+
     private void checkReady() {
         if (!loaded || readyRunnable == null) {
             return;
@@ -106,11 +110,15 @@ public class BrowserComponentScreenshotTest extends BaseTest {
             return;
         }
 
-        if (isHtml5() || CN.isDesktop()) {
+        if (isHtml5() || CN.isDesktop() || isLinux()) {
             // Desktop screenshots intentionally cannot include the native web
             // peer (the committed Mac/JavaSE baselines contain its black
-            // placeholder). The execute() assertion above validates the real
-            // DOM; use the normal harness capture for the surrounding form.
+            // placeholder), and the Linux port cannot either: its
+            // browserCapturePng is a documented stub pending the async WebKit
+            // snapshot bridge, so generatePeerImage always answers null and the
+            // peer never reaches the capture. The execute() assertion above
+            // validates the real DOM; use the normal harness capture for the
+            // surrounding form.
             UITimer.timer(2000, false, form, readyRunnable);
         } else {
             // DOM readiness and even WebKit's first meaningful paint do not
@@ -179,7 +187,9 @@ public class BrowserComponentScreenshotTest extends BaseTest {
         screen.toRGB(visualBand, 0, 0, left, top, bandWidth, bandHeight);
         int[] rgb = visualBand.getRGB();
         int requiredBrightPixels = Math.max(32, bandWidth / 20);
+        int requiredDarkPixels = Math.max(32, bandWidth / 20);
         int brightPixels = 0;
+        int darkPixels = 0;
         for (int y = 0; y < bandHeight; y++) {
             int rowOffset = y * bandWidth;
             for (int x = 0; x < bandWidth; x++) {
@@ -191,9 +201,19 @@ public class BrowserComponentScreenshotTest extends BaseTest {
                 // background. The black uncomposited peer contains neither.
                 if ((r > 160 && g > 160 && b > 160)
                         || (g > 120 && b > 160 && b > r + 30)) {
-                    if (++brightPixels >= requiredBrightPixels) {
-                        return true;
-                    }
+                    brightPixels++;
+                } else if (r < 80 && g < 80 && b < 80) {
+                    // The fixture's #0e1116 backdrop. Requiring it as well as
+                    // the text is what stops a blank frame from passing: a peer
+                    // that never composited leaves the form's plain white
+                    // background, which is bright everywhere and would satisfy
+                    // the text test on its own -- which is exactly how the
+                    // Linux port, whose peer capture is still a stub, recorded
+                    // an empty rectangle as a rendered page.
+                    darkPixels++;
+                }
+                if (brightPixels >= requiredBrightPixels && darkPixels >= requiredDarkPixels) {
+                    return true;
                 }
             }
         }
