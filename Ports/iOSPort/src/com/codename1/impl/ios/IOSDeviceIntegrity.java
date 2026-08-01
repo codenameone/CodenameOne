@@ -136,6 +136,23 @@ final class IOSDeviceIntegrity {
      */
     private static final String KEY_RECOVERY_SPENT = "cn1.appattest.recoverySpent";
 
+    /**
+     * The key Apple has ACCEPTED an attestation for, when the state write that should
+     * have recorded that failed.
+     *
+     * <p>Distinct from {@link #KEY_ATTEST_STARTED}, which means "submitted, outcome
+     * unknown", and from {@link #attestAnsweredForKey}, which means "Apple answered with
+     * an error that did not consume the key". This one means the opposite of both: the
+     * one-time attestation is spent and it succeeded.</p>
+     *
+     * <p>Written as a separate item precisely because the state write has just been
+     * refused -- a keychain can fail one item and take another, and the alternative is
+     * relying on process memory for a fact that costs a rate-limited hardware key every
+     * time it is forgotten. A restart with only the in-memory copy read an accepted key
+     * as an interrupted attempt and discarded it.</p>
+     */
+    private static final String KEY_ATTEST_ACCEPTED = "cn1.appattest.attestAccepted";
+
     private static final String STATE_NEW = "new";
     private static final String STATE_ATTESTED = "attested";
     /**
@@ -326,6 +343,10 @@ final class IOSDeviceIntegrity {
         boolean markerGone = true;
         if (idGone && stateGone) {
             store.remove(KEY_ATTEST_STARTED);
+            // The acceptance belonged to the identity that has just gone with it. Left
+            // behind, it would name a key that no longer exists -- harmless while the
+            // identifier is absent, and wrong the moment a replacement is generated.
+            store.remove(KEY_ATTEST_ACCEPTED);
             attestAnsweredForKey = null;
             // The identity is gone, so anything this process remembered about it is too.
             inMemoryStateKeyId = null;
@@ -472,6 +493,7 @@ final class IOSDeviceIntegrity {
         pendingSinceInMemory = 0L;
         store.remove(KEY_PENDING_SINCE);
         store.remove(KEY_ATTEST_STARTED);
+        store.remove(KEY_ATTEST_ACCEPTED);
         attestAnsweredForKey = null;
         recoverySpentInMemory = !store.remove(KEY_RECOVERY_SPENT);
     }
@@ -530,6 +552,15 @@ final class IOSDeviceIntegrity {
             // that was never submitted.
             if (keyId != null && keyId.equals(inMemoryStateKeyId) && inMemoryState != null) {
                 state = inMemoryState;
+            }
+            // And the durable record of an acceptance whose state write was refused. This
+            // is what makes the in-memory copy above survive a restart: without it the
+            // next launch finds STATE_NEW plus a start marker, reads an accepted key as
+            // an interrupted attempt, and discards it for another rate-limited one --
+            // every launch, for as long as the keychain stays unwilling.
+            if (keyId != null && !STATE_ATTESTED.equals(state)
+                    && keyId.equals(store.get(KEY_ATTEST_ACCEPTED))) {
+                state = STATE_PENDING;
             }
             if (STATE_PENDING.equals(state) && keyId != null && keyId.length() > 0) {
                 if (registrationGraceRemaining() > 0) {
@@ -618,6 +649,7 @@ final class IOSDeviceIntegrity {
                     }
                     store.remove(KEY_STATE);
                     store.remove(KEY_ATTEST_STARTED);
+                    store.remove(KEY_ATTEST_ACCEPTED);
                     // The discarded key is the one the in-memory marker named.
                     attestAnsweredForKey = null;
                     PendingRequest fresh = new PendingRequest(r, nonce,
@@ -891,6 +923,15 @@ final class IOSDeviceIntegrity {
                 instance.inMemoryStateKeyId = pending.keyId;
                 instance.inMemoryState = STATE_PENDING;
                 instance.pendingSinceInMemory = System.currentTimeMillis();
+                // And durably, in a DIFFERENT item, because process memory does not
+                // survive the restart this is most likely to be followed by: storage
+                // still says "new" with a start marker, which the next launch reads as an
+                // interrupted attestation and answers by discarding the key -- spending
+                // another rate-limited one on a key Apple has already accepted. A
+                // keychain that refused the state write can still take an item it has
+                // never seen; if it refuses this too, the in-memory copy is what is left
+                // and the loss is bounded to one key rather than one per launch.
+                store.set(KEY_ATTEST_ACCEPTED, pending.keyId);
                 instance.bootstrapInFlight = false;
                 instance.failBootstrapWaiters("App Attest is completing first-run "
                         + "registration for this device; retry shortly");
