@@ -1359,18 +1359,27 @@ public class AndroidGradleBuilder extends Executor {
         // which is why it maps to the standalone branch.
         boolean legacyWear = "true".equals(request.getArg("android.wear", "false"))
                 || "true".equals(request.getArg("android.wear.standalone", "false"));
+        // ...but android.wear.standalone=false is an explicit opt-OUT, and honouring android.wear
+        // while ignoring it would flip a project that deliberately configured a companion app into
+        // a standalone one. The two settings are separable: the watch feature and the API floor say
+        // "this is a Wear build", the standalone marker says "it runs without a phone".
+        boolean legacyStandaloneOptOut =
+                "false".equals(request.getArg("android.wear.standalone", "").trim());
         if (legacyWear) {
             log("[wearable] android.wear is superseded by codename1.watchMain plus "
                     + "codename1.watchStandalone; still honoured, but the new settings also build "
                     + "the Apple Watch app from the same declaration.");
         }
+        boolean standaloneWatchBuild =
+                (watchMain.length() > 0 && watchStandalone) || (legacyWear && !legacyStandaloneOptOut);
         if ((watchMain.length() > 0 && watchStandalone) || legacyWear) {
             // Wear OS 2.0 (the standalone-app baseline) is API 23.
             minSDK = maxInt("23", minSDK);
             if (!xPermissions.contains("android.hardware.type.watch")) {
                 xPermissions += "    <uses-feature android:name=\"android.hardware.type.watch\" android:required=\"true\" />\n";
             }
-            if (!userXapplication.contains("com.google.android.wearable.standalone")) {
+            if (standaloneWatchBuild
+                    && !userXapplication.contains("com.google.android.wearable.standalone")) {
                 wearApplicationMetaData = "        <meta-data android:name=\"com.google.android.wearable.standalone\" android:value=\"true\" />\n";
             }
         }

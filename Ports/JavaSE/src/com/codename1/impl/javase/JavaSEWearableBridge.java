@@ -224,18 +224,19 @@ class JavaSEWearableBridge implements WearableBridge {
             } finally {
                 out.close();
             }
+            // Stamp the staging file, then publish by rename. Stamping AFTER the rename was a race:
+            // writer A could rename, writer B could replace A's file, and A would then set the
+            // modification time on B's file and record that time as its own -- so A's watcher would
+            // skip B's winning value forever. Renaming an already-stamped file makes publication a
+            // single atomic step that can only ever touch this writer's own bytes.
+            long stamp = nextStamp(f);
+            tmp.setLastModified(stamp);
             if (!tmp.renameTo(f)) {
                 f.delete();
                 if (!tmp.renameTo(f)) {
                     throw new IOException("could not replace " + f);
                 }
             }
-            // Give every replacement a strictly increasing stamp. The watcher detects a change by
-            // comparing lastModified(), and two writes to the same path inside the file system's
-            // timestamp granularity would otherwise be indistinguishable -- the second value would
-            // sit on disk and never be delivered.
-            long stamp = nextStamp(f);
-            f.setLastModified(stamp);
             // Our own write must not come back to us as a peer change.
             synchronized (seenData) {
                 seenData.put(f.getName(), Long.valueOf(stamp));
@@ -300,9 +301,30 @@ class JavaSEWearableBridge implements WearableBridge {
         // twice to the same path and name before the 500ms watcher has consumed the first -- or at
         // any time while the peer is offline -- must queue two deliveries, not silently replace one
         // with the other. (A replicated value is the opposite: putData deliberately overwrites.)
+        // The sender's side is part of the name. Both halves scan this one directory, so without it
+        // a sender cannot tell its own pending transfer from an inbound one: after a restart
+        // primeSeenData() records nothing, and the sender's first scan would consume and delete the
+        // very transfer it is waiting to hand over.
         writeValue(new File(dataDir, encodePath(path) + TRANSFER_MARKER + encodePath(fileName)
+                        + TRANSFER_MARKER + sideTag()
                         + TRANSFER_MARKER + Long.toHexString(nextTransferSequence())),
                 wrapper.toByteArray(), path);
+    }
+
+    /** Identifies which half wrote a file: transfers are only consumed by the other side. */
+    private String sideTag() {
+        return watchSide ? "w" : "p";
+    }
+
+    /** True when this transfer was written by the other half, and so is ours to consume. */
+    private boolean isInboundTransfer(String storageName) {
+        if (!isTransfer(storageName)) {
+            return false;
+        }
+        String[] parts = storageName.split(TRANSFER_MARKER);
+        // <path>X<name>X<side>X<seq>; anything shorter predates the side tag, so treat it as inbound
+        // rather than stranding it.
+        return parts.length < 4 || !parts[2].equals(sideTag());
     }
 
     /** Distinguishes successive transfers so neither overwrites the other on disk. */
@@ -524,15 +546,17 @@ class JavaSEWearableBridge implements WearableBridge {
                 }
                 try {
                     WearableConnection.deliverDataChanged(deliveryPath(f.getName()), readFully(f));
-                    if (isTransfer(f.getName())) {
+                    if (isInboundTransfer(f.getName())) {
                         // A transfer is one-shot, so the delivered file goes. Leaving it would make
                         // every restart of the receiving simulator replay it -- primeSeenData()
                         // deliberately records nothing so that offline values DO replay, and without
                         // this a transfer would be caught by the same rule. Distinct path/name pairs
                         // would also pile up in the shared directory indefinitely.
                         //
-                        // Unlike the device ports there is exactly one peer here, so consuming the
-                        // file cannot deprive a second watch of it.
+                        // Only an INBOUND transfer, though: deleting our own would destroy a
+                        // transfer still waiting for the peer to start. Unlike the device ports
+                        // there is exactly one peer here, so consuming an inbound file cannot
+                        // deprive a second watch of it.
                         f.delete();
                         synchronized (seenData) {
                             seenData.remove(f.getName());
@@ -549,6 +573,13 @@ class JavaSEWearableBridge implements WearableBridge {
         for (String name : gone) {
             synchronized (seenData) {
                 seenData.remove(name);
+            }
+            if (isTransfer(name)) {
+                // A transfer disappearing means the peer consumed it, which is the transport doing
+                // its job -- not the logical path being removed. Reporting dataRemoved here would
+                // tell the sender's own listeners that a path it never removed had gone, and that
+                // path may well still hold an unrelated replicated value.
+                continue;
             }
             WearableConnection.deliverDataRemoved(deliveryPath(name));
         }
