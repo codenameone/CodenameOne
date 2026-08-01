@@ -226,37 +226,45 @@ public final class AndroidSecureStorage extends SecureStorage {
             // reported success while storing ciphertext under a key that no longer
             // exists -- unreadable forever, and silently so.
             synchronized (PLAIN_KEY_LOCK) {
-                SecretKey key = plainKey(true);
-                if (key == null) {
+                // The invalid-key DECISION is taken in here too, not in a catch outside
+                // the lock. Deciding out there let a delayed caller reset a key that was
+                // no longer the one that failed it: another caller had already reset, a
+                // writer had created a fresh key and committed ciphertext under it, and
+                // this one then deleted that new key and wiped every stored value --
+                // destroying data written after the failure it was reacting to.
+                try {
+                    SecretKey key = plainKey(true);
+                    if (key == null) {
+                        return false;
+                    }
+                    Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+                    c.init(Cipher.ENCRYPT_MODE, key);
+                    byte[] enc = c.doFinal(value.getBytes("UTF-8"));
+                    SharedPreferences prefs = plainPrefs();
+                    if (prefs == null) {
+                        return false;
+                    }
+                    // commit(), not apply(): apply() is asynchronous, so the write could
+                    // land on disk after a reset that ran once this lock was released --
+                    // storing ciphertext under a key that had already been deleted.
+                    // Holding the lock is only atomic if the persist finishes inside it.
+                    return prefs.edit()
+                            .putString(account, Base64.encodeToString(c.getIV(), Base64.NO_WRAP)
+                                    + ":" + Base64.encodeToString(enc, Base64.NO_WRAP))
+                            .commit();
+                } catch (InvalidKeyException e) {
+                    // Includes KeyPermanentlyInvalidatedException.
+                    resetPlainKey();
+                    return false;
+                } catch (UnrecoverableKeyException e) {
+                    // Handled like an invalid key rather than falling into the generic
+                    // catch: leaving the unusable alias installed made every later write
+                    // return false for good, and only a read happened to clear it -- so
+                    // an app that only ever writes could never store anything again.
+                    resetPlainKey();
                     return false;
                 }
-                Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-                c.init(Cipher.ENCRYPT_MODE, key);
-                byte[] enc = c.doFinal(value.getBytes("UTF-8"));
-                SharedPreferences prefs = plainPrefs();
-                if (prefs == null) {
-                    return false;
-                }
-                // commit(), not apply(): apply() is asynchronous, so the write could land
-                // on disk after a reset that ran once this lock was released -- storing
-                // ciphertext under a key that had already been deleted. Holding the lock
-                // is only atomic if the persist finishes inside it.
-                return prefs.edit()
-                        .putString(account, Base64.encodeToString(c.getIV(), Base64.NO_WRAP)
-                                + ":" + Base64.encodeToString(enc, Base64.NO_WRAP))
-                        .commit();
             }
-        } catch (InvalidKeyException e) {
-            // Includes KeyPermanentlyInvalidatedException.
-            resetPlainKey();
-            return false;
-        } catch (UnrecoverableKeyException e) {
-            // Handled like an invalid key rather than falling into the generic catch:
-            // leaving the unusable alias installed made every later write return false
-            // for good, and only a read happened to clear it -- so an app that only ever
-            // writes could never store anything again.
-            resetPlainKey();
-            return false;
         } catch (Throwable t) {
             Log.e(t);
             return false;
@@ -296,26 +304,34 @@ public final class AndroidSecureStorage extends SecureStorage {
             // Same reasoning as set(): a reset landing mid-read would otherwise
             // invalidate the key between the lookup and the decrypt.
             synchronized (PLAIN_KEY_LOCK) {
-                SecretKey key = plainKey(false);
-                if (key == null) {
+                // The invalid-key DECISION is taken in here too, not in a catch
+                // outside the lock. Deciding out there let a delayed caller reset a key
+                // that was no longer the one that failed it: another caller had already
+                // reset, a writer had created a fresh key and committed ciphertext under
+                // it, and this one then deleted that new key and wiped every stored
+                // value -- destroying data written after the failure it was reacting to.
+                try {
+                    SecretKey key = plainKey(false);
+                    if (key == null) {
+                        return null;
+                    }
+                    byte[] iv = Base64.decode(stored.substring(0, sep), Base64.NO_WRAP);
+                    byte[] enc = Base64.decode(stored.substring(sep + 1), Base64.NO_WRAP);
+                    Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+                    c.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_BITS, iv));
+                    return new String(c.doFinal(enc), "UTF-8");
+                } catch (InvalidKeyException e) {
+                    // The key was invalidated out from under us (device-wide credential
+                    // change, or the Samsung 8.0.0 quirk documented on the biometric
+                    // tier). Everything encrypted under it is unrecoverable, so drop
+                    // the key and the ciphertexts rather than failing forever.
+                    resetPlainKey();
+                    return null;
+                } catch (UnrecoverableKeyException e) {
+                    resetPlainKey();
                     return null;
                 }
-                byte[] iv = Base64.decode(stored.substring(0, sep), Base64.NO_WRAP);
-                byte[] enc = Base64.decode(stored.substring(sep + 1), Base64.NO_WRAP);
-                Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-                c.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_BITS, iv));
-                return new String(c.doFinal(enc), "UTF-8");
             }
-        } catch (InvalidKeyException e) {
-            // The key was invalidated out from under us (device-wide credential
-            // change, or the Samsung 8.0.0 quirk documented on the biometric
-            // tier). Everything encrypted under it is unrecoverable, so drop
-            // the key and the ciphertexts rather than failing forever.
-            resetPlainKey();
-            return null;
-        } catch (UnrecoverableKeyException e) {
-            resetPlainKey();
-            return null;
         } catch (Throwable t) {
             Log.e(t);
             return null;

@@ -510,7 +510,21 @@ final class IOSDeviceIntegrity {
                     // spent key is rejected and the failure repeats on every request
                     // until something resets, so discard it and start clean. One
                     // rate-limited key is spent either way; this way the device recovers.
-                    store.remove(KEY_ID);
+                    // Ordered like resetLocked, and for the same reason: the markers
+                    // that make a surviving key terminal go only once the key itself is
+                    // confirmed gone. Removing KEY_ATTEST_STARTED while the keychain
+                    // refused KEY_ID left an outcome-unknown key looking like one that
+                    // was never submitted, so the next request handed it to attestKey
+                    // again -- and if Apple had already consumed the original submission
+                    // that burns another rate-limited attempt and drops the device into
+                    // invalid-key recovery for a reason that was never true.
+                    if (!store.remove(KEY_ID)) {
+                        bootstrapInFlight = false;
+                        failResource(r, "App Attest could not discard the key whose "
+                                + "attestation was interrupted; the keychain refused the "
+                                + "deletion");
+                        return r;
+                    }
                     store.remove(KEY_STATE);
                     store.remove(KEY_ATTEST_STARTED);
                     // The discarded key is the one the in-memory marker named.
