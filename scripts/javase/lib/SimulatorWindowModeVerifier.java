@@ -1,25 +1,3 @@
-/*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
- */
 package com.codenameone.examples.javase.tests;
 
 import javax.imageio.ImageIO;
@@ -145,8 +123,7 @@ public class SimulatorWindowModeVerifier {
             // real failure).
             BufferedImage image = captureDesktop();
             Instant renderDeadline = Instant.now().plusSeconds(30);
-            while ((isBlankOrFlat(image) || isSingleWindowDeviceMissing(parsed, image)
-                    || isComponentInspectorDetailsEmpty(parsed, image))
+            while ((isBlankOrFlat(image) || isSingleWindowDeviceMissing(parsed, image))
                     && Instant.now().isBefore(renderDeadline)) {
                 Thread.sleep(500);
                 image = captureDesktop();
@@ -218,54 +195,6 @@ public class SimulatorWindowModeVerifier {
 
     private static boolean isBlankOrFlat(BufferedImage image) {
         return sampleColorCount(image) < 3;
-    }
-
-    /**
-     * True while the component inspector's lower "Component Details" panel is still
-     * blank.
-     *
-     * <p>That panel populates a moment after the inspector opens, and nothing was
-     * waiting for it -- the warmup is a fixed floor and the existing predicates only
-     * ask whether the desktop and the device window have painted. So the capture landed
-     * on either side of the population depending on how loaded the runner was, and the
-     * stored reference happens to hold the empty one. A test that photographs a race
-     * reports its own timing rather than the product: this suite passed and failed on
-     * successive runs of identical code, which is worse than a wrong expectation because
-     * it teaches everyone to re-run it.</p>
-     *
-     * <p>Same shape as the device-window predicate above: count dark pixels in the
-     * region the panel occupies, and keep polling until its field labels are there. The
-     * outer loop has a deadline, so a panel that genuinely never populates still fails
-     * on the assertion that follows rather than hanging.</p>
-     */
-    private static boolean isComponentInspectorDetailsEmpty(Args args, BufferedImage image) {
-        if (!"component-inspector".equals(args.scenario)) {
-            return false;
-        }
-        int xMax = Math.min(image.getWidth(), 700);
-        int yMin = Math.min(image.getHeight(), 660);
-        int yMax = Math.min(image.getHeight(), 960);
-        if (xMax <= 0 || yMax <= yMin) {
-            return false;
-        }
-        int darkPixels = 0;
-        for (int y = yMin; y < yMax; y++) {
-            for (int x = 0; x < xMax; x++) {
-                int rgb = image.getRGB(x, y);
-                int r = (rgb >> 16) & 0xff;
-                int g = (rgb >> 8) & 0xff;
-                int b = rgb & 0xff;
-                if (r < 90 && g < 90 && b < 90) {
-                    darkPixels++;
-                }
-            }
-        }
-        // Measured on the two real captures rather than guessed: the populated panel
-        // gives 3712 dark pixels in this region, the empty one 1512 -- the empty state is
-        // not blank, it still carries the tab label, the borders and the overflow button,
-        // which is why a naive "is it flat" test does not separate them. The midpoint is
-        // clear of both by a wide margin.
-        return darkPixels < 2500;
     }
 
     private static boolean isSingleWindowDeviceMissing(Args args, BufferedImage image) {
