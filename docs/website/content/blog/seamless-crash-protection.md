@@ -24,7 +24,7 @@ Put plainly: once a product ships on several platforms and starts to grow, this 
 
 **It files GitHub issues, not emails.** Crashes land where you already track work, deduplicated, instead of arriving as a stream of messages.
 
-**It symbolicates native crashes on every platform we support.** Native faults on iOS, macOS, Windows (Win32) and Linux come back as symbolicated stacks, and obfuscated Android exceptions are deobfuscated back to your original class and method names. The cloud build keeps the symbols and applies them server-side, so every platform we ship is covered.
+**It symbolicates native crashes on every platform we support.** Native faults on iOS, watchOS, tvOS, macOS, Windows (Win32) and Linux come back as symbolicated stacks, and obfuscated Android exceptions are deobfuscated back to your original class and method names. The cloud build keeps the symbols and applies them server-side, so every platform we ship is covered.
 
 ## Storage-first delivery on the device
 
@@ -48,7 +48,7 @@ sequenceDiagram
     Cloud->>GitHub: open or update an issue (dedup by eventId)
 {{< /mermaid >}}
 
-Symbolication is the half that needs the cloud. After a successful release build, the executor ships the build's symbol artifacts, `mapping.txt` for Android or the dSYM for iOS, to the server, which keeps them and applies them when a matching crash arrives. On iOS the existing signal handlers already convert native signals into JVM exceptions that flow through the same error handler, so a native crash and a Java exception travel the same path.
+Symbolication is the half that needs the cloud. After a successful release build, the executor ships the build's symbol artifacts to the server, which keeps them and applies them when a matching crash arrives. On Android that is the ProGuard/R8 `mapping.txt`. An Apple build sends one archive holding every slice it produced, because a single Xcode archive can emit several independently symbolicated binaries: the phone app, an embedded watch app, an Apple TV app, and the Mac Catalyst slice. Each carries its own debug symbols, and the server picks the one matching the device a crash came from, so a watch crash resolves against the watch binary rather than the phone's. On iOS the existing signal handlers already convert native signals into JVM exceptions that flow through the same error handler, so a native crash and a Java exception travel the same path.
 
 ## A real native crash, made readable
 
