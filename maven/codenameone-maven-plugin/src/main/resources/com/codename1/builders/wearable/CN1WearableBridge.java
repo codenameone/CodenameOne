@@ -556,8 +556,19 @@ public class CN1WearableBridge implements WearableBridge {
         boolean sentToAnyone = false;
         List<com.google.android.gms.tasks.Task<Integer>> tasks =
                 new ArrayList<com.google.android.gms.tasks.Task<Integer>>();
+        // Prefer nodes that advertise the app capability, so a connected watch WITHOUT this app is
+        // not counted as a recipient -- otherwise a reply-bearing request "succeeds" against a watch
+        // that cannot answer and the caller waits out the full timeout instead of being told there
+        // is nobody to ask. This also stops fanOut and isReachable() disagreeing.
+        //
+        // Only when we actually know: an empty capability set means the cache has not been filled
+        // yet, and refusing to send on that would break the first send after a cold start.
+        List<String> withApp = bondedNodeIds();
         for (Node n : nodes) {
             if (!n.isNearby()) {
+                continue;
+            }
+            if (!withApp.isEmpty() && !withApp.contains(n.getId())) {
                 continue;
             }
             // The peer needs both the CN1 path and, when an answer is wanted, the token to answer
@@ -728,6 +739,27 @@ public class CN1WearableBridge implements WearableBridge {
         long now = System.currentTimeMillis();
         lastSequence = now > lastSequence ? now : lastSequence + 1;
         return lastSequence;
+    }
+
+    /**
+     * Raises this device's clock past a stamp it has just seen from a peer.
+     *
+     * <p>Wall-clock millis alone are not a sound cross-device order: if one device's clock runs
+     * ahead -- automatic time switched off, or either clock corrected -- its stamps would beat every
+     * later write from the other device until real time caught up, which can be hours.
+     *
+     * <p>Observing fixes that without needing synchronised clocks. Every sequence we read from an
+     * item pushes our own counter past it, so the moment a behind device sees an ahead device's
+     * stamp it can publish a higher one. Millis remain the seed, which keeps stamps monotonic across
+     * a process restart and roughly meaningful as a time; the observation is what makes the ORDER
+     * correct. This is a Lamport clock with a wall-clock floor.
+     *
+     * @param seen a sequence read from a published item
+     */
+    static synchronized void observeSequence(long seen) {
+        if (seen != Long.MIN_VALUE && seen > lastSequence) {
+            lastSequence = seen;
+        }
     }
 
     private static long lastSequence;
@@ -1220,7 +1252,11 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     static long sequenceOf(DataMap map) {
-        return map == null ? Long.MIN_VALUE : map.getLong(SEQUENCE_KEY, Long.MIN_VALUE);
+        long seq = map == null ? Long.MIN_VALUE : map.getLong(SEQUENCE_KEY, Long.MIN_VALUE);
+        // Every stamp we read raises our own clock, so a peer whose clock is ahead cannot keep
+        // winning; reading one of our own items is a no-op because it can never exceed our counter.
+        observeSequence(seq);
+        return seq;
     }
 
     /**
