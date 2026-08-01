@@ -192,10 +192,39 @@ jobs:
         working-directory: vm
         shell: pwsh
         run: |
-          mvn -B clean package -pl JavaAPI -am -DskipTests
-          # Single-quote the -D args: PowerShell otherwise mangles the dotted
-          # property name (splitting it at the '.').
-          mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest' '-Dsurefire.failIfNoSpecifiedTests=false'
+          # Retried, in the same spirit as the Ninja install above: Maven Central
+          # answers 429 Too Many Requests under load and the build dies during
+          # dependency RESOLUTION, before a line of this project is compiled. Nothing
+          # about the failure involves the code under test, and a fresh runner IP is
+          # not something a re-run can be relied on to produce. Backoff is in tens of
+          # seconds rather than the 5 used for the pip blip, because a rate limit needs
+          # waiting out rather than retrying through.
+          # Written in the same plain loop shape as the Ninja install above rather
+          # than with a function and splatting, because that shape is already proven
+          # on these runners and this is not the place to find out about a quoting
+          # difference.
+          $ok = $false
+          foreach ($delay in 0, 30, 90) {
+            if ($delay -gt 0) {
+              Write-Host "mvn failed; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            mvn -B clean package -pl JavaAPI -am -DskipTests
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+          }
+          if (-not $ok) { throw "mvn clean package failed after all retries" }
+          $ok = $false
+          foreach ($delay in 0, 30, 90) {
+            if ($delay -gt 0) {
+              Write-Host "mvn failed; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            # Single-quote the -D args: PowerShell otherwise mangles the dotted
+            # property name (splitting it at the '.').
+            mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest' '-Dsurefire.failIfNoSpecifiedTests=false'
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+          }
+          if (-not $ok) { throw "mvn test failed after all retries" }
         env:
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
           JDK_11_HOME: ${{ env.JDK_11_HOME }}
