@@ -509,6 +509,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final long WEDGE_GRACE_MS = 30000L;
 
     private void startWedgeWatchdog() {
+        // Not on HTML5. That port schedules its threads cooperatively on the
+        // browser's single thread, so a second thread waking every second to
+        // poll competes with the suite it is supposed to be watching -- it cost
+        // the JavaScript job its whole 40 minute budget. Its harness already
+        // bounds the run, and the wedges this watchdog exists to name are on
+        // the native desktop ports.
+        if ("HTML5".equals(Display.getInstance().getPlatformName())) {
+            return;
+        }
         // Display.startThread rather than a bare Thread: the ports only support
         // the thread surface the bytecode compliance gate allows, and this hands
         // back a CodenameOneThread that the platform names and reaps for us.
