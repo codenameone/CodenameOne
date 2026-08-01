@@ -320,6 +320,7 @@ public class CN1WearableBridge implements WearableBridge {
             cachedBonded = out;
             bondedStamp = System.currentTimeMillis();
             bondedKnown = true;
+            bondedGeneration++;
         }
         return out;
     }
@@ -335,6 +336,15 @@ public class CN1WearableBridge implements WearableBridge {
     private volatile boolean bondedKnown;
     /** Guards the {@link #cachedBonded} / {@link #bondedKnown} pair so they can be read together. */
     private final Object bondedLock = new Object();
+    /**
+     * Bumped on every write to the capability cache.
+     *
+     * <p>An in-flight refresh and a pushed {@code onCapabilityChanged} can complete in either order.
+     * Without a version the older query result lands last, overwrites the newer pushed set AND gets
+     * a fresh timestamp -- so an install or removal that Play services told us about directly is
+     * discarded and the wrong answer is held for a full cache lifetime.
+     */
+    private long bondedGeneration;
 
     /**
      * The capability cache read as ONE value.
@@ -390,6 +400,7 @@ public class CN1WearableBridge implements WearableBridge {
             b.cachedBonded = out;
             b.bondedStamp = System.currentTimeMillis();
             b.bondedKnown = true;
+            b.bondedGeneration++;
         }
         if (changed) {
             WearableConnection.notifyStateChanged();
@@ -446,6 +457,10 @@ public class CN1WearableBridge implements WearableBridge {
             return;
         }
         refreshingBonded = true;
+        final long startedAt;
+        synchronized (bondedLock) {
+            startedAt = bondedGeneration;
+        }
         capabilityClient.getCapability("cn1_wearable", CapabilityClient.FILTER_ALL)
                 .addOnCompleteListener(new com.google.android.gms.tasks.OnCompleteListener<CapabilityInfo>() {
                     public void onComplete(com.google.android.gms.tasks.Task<CapabilityInfo> task) {
@@ -463,10 +478,19 @@ public class CN1WearableBridge implements WearableBridge {
                         }
                         boolean changed;
                         synchronized (bondedLock) {
+                            if (bondedGeneration != startedAt) {
+                                // Something newer landed while this query was in flight -- typically
+                                // a pushed onCapabilityChanged, which is more current than anything
+                                // we could have asked for. Discard this result rather than reviving
+                                // a pre-install/pre-removal answer and stamping it fresh.
+                                refreshingBonded = false;
+                                return;
+                            }
                             changed = !sameIds(cachedBonded, out);
                             cachedBonded = out;
                             bondedStamp = System.currentTimeMillis();
                             bondedKnown = true;
+                            bondedGeneration++;
                         }
                         refreshingBonded = false;
                         if (changed) {
@@ -981,6 +1005,11 @@ public class CN1WearableBridge implements WearableBridge {
 
     /** How long one of our own published transfer items is kept before it is swept. */
     private static final long TRANSFER_RETENTION_MILLIS = 24 * 60 * 60 * 1000L;
+    /** Floor between sweeps; retention is a day, so sweeping more often than this buys nothing. */
+    private static final long SWEEP_MIN_INTERVAL_MILLIS = 5 * 60 * 1000L;
+    private final Object sweepLock = new Object();
+    private boolean sweepScheduled;
+    private long lastSweepAt;
 
     /**
      * Deletes transfer items this device published long enough ago that the peer has had every
@@ -993,6 +1022,18 @@ public class CN1WearableBridge implements WearableBridge {
      * propagate and rob a second watch of the file.
      */
     private void expireOwnTransfers() {
+        // One sweep at a time, and not more often than the interval. A burst of transfers used to
+        // schedule one immediate task per call, each blocking on a full DataItem query and scan --
+        // on the same single timer the unreadable-asset retries use, so transfer traffic starved
+        // the retries it was most likely to need.
+        synchronized (sweepLock) {
+            long now = System.currentTimeMillis();
+            if (sweepScheduled || now - lastSweepAt < SWEEP_MIN_INTERVAL_MILLIS) {
+                return;
+            }
+            sweepScheduled = true;
+            lastSweepAt = now;
+        }
         final long cutoff = System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;
         transferTimer.schedule(new java.util.TimerTask() {
             public void run() {
@@ -1028,6 +1069,10 @@ public class CN1WearableBridge implements WearableBridge {
                     }
                 } catch (Throwable unavailable) {
                     // Best effort: the next transfer sweeps again.
+                } finally {
+                    synchronized (sweepLock) {
+                        sweepScheduled = false;
+                    }
                 }
             }
         }, 0);
