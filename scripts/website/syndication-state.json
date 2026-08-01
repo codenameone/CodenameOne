@@ -1362,6 +1362,14 @@
         "tags_set": false,
         "canonical_set": false,
         "syndicated_at": "2026-07-31T17:19:12+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/d4c6ea644187/edit",
+        "syndicated_at": "2026-08-01T15:02:36+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3667063/edit.html",
+        "syndicated_at": "2026-08-01T15:03:48+00:00"
       }
     },
     "2026-07-31-1200-shai-push-v3-new-cloud": {
@@ -1387,6 +1395,20 @@
         "id": 4288004,
         "url": "https://dev.to/codenameone/calendar-api-local-calendars-cloud-sync-and-conflict-handling-1a1p",
         "syndicated_at": "2026-08-01T14:23:54+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/790309dfa730/edit",
+        "syndicated_at": "2026-08-01T15:05:20+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmsai8e5800000ajfasgs3ypf",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a6cd8a77553d4089b8fb959",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-01T15:06:46+00:00"
       }
     }
   }
