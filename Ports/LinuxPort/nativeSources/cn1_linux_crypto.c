@@ -101,6 +101,43 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_secureRandomBytes___byte_1ARRA
     return JAVA_TRUE;
 }
 
+/* ------------------------------------------- advertised names, and only those
+ *
+ * JavaSE hands these strings to JCE, which either supports a name as written or
+ * refuses it. Matching loosely here -- picking CBC because a string contains
+ * neither "/GCM/" nor "/ECB/", or SHA-256 because it names no digest we know --
+ * means the same request encrypts or signs differently depending on which port
+ * runs it, and the caller is never told. A name outside the advertised set is
+ * refused instead.
+ */
+
+static int cn1IsAesTransformation(const char* transformation) {
+    return strcmp(transformation, "AES/GCM/NoPadding") == 0
+        || strcmp(transformation, "AES/CBC/PKCS5Padding") == 0
+        || strcmp(transformation, "AES/CBC/NoPadding") == 0
+        || strcmp(transformation, "AES/ECB/PKCS5Padding") == 0;
+}
+
+static int cn1IsRsaTransformation(const char* transformation) {
+    return strcmp(transformation, "RSA/ECB/OAEPWithSHA-256AndMGF1Padding") == 0
+        || strcmp(transformation, "RSA/ECB/PKCS1Padding") == 0;
+}
+
+/* The digest half of Signature's six advertised algorithms; 0 for anything
+ * else, which the callers turn into a failure. */
+static const EVP_MD* cn1SignatureDigestOrNull(const char* algorithm) {
+    if (strcmp(algorithm, "SHA256withRSA") == 0 || strcmp(algorithm, "SHA256withECDSA") == 0) {
+        return EVP_sha256();
+    }
+    if (strcmp(algorithm, "SHA384withRSA") == 0 || strcmp(algorithm, "SHA384withECDSA") == 0) {
+        return EVP_sha384();
+    }
+    if (strcmp(algorithm, "SHA512withRSA") == 0 || strcmp(algorithm, "SHA512withECDSA") == 0) {
+        return EVP_sha512();
+    }
+    return 0;
+}
+
 /* ------------------------------------------------------------ AES */
 
 static const EVP_CIPHER* cn1AesCipher(const char* transformation, int keyLength) {
@@ -127,7 +164,12 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_aesCrypt___java_lang_String_boo
     const unsigned char* iv = cn1Bytes(ivArray, &ivLength);
     const unsigned char* aad = cn1Bytes(aadArray, &aadLength);
     const unsigned char* data = cn1Bytes(dataArray, &dataLength);
-    int gcm = strstr(mode, "/GCM/") != 0;
+    int gcm;
+    if (!cn1IsAesTransformation(mode)) {
+        cn1CryptoFail("unsupported cipher transformation");
+        return JAVA_NULL;
+    }
+    gcm = strstr(mode, "/GCM/") != 0;
     int ecb = strstr(mode, "/ECB/") != 0;
     int padded = strstr(mode, "NoPadding") == 0;
     const EVP_CIPHER* cipher = cn1AesCipher(mode, keyLength);
@@ -256,8 +298,12 @@ static EVP_PKEY* cn1PrivateKey(const unsigned char* der, int length) {
 }
 
 static int cn1ApplyRsaPadding(EVP_PKEY_CTX* ctx, const char* transformation) {
+    if (!cn1IsRsaTransformation(transformation)) {
+        cn1CryptoFail("unsupported cipher transformation");
+        return 0;
+    }
     if (strstr(transformation, "OAEP") != 0) {
-        const EVP_MD* md = strstr(transformation, "SHA-1") != 0 ? EVP_sha1() : EVP_sha256();
+        const EVP_MD* md = EVP_sha256();
         // The mask function stays on SHA-1 even when the OAEP digest is
         // SHA-256. That is what the JCE providers behind the JavaSE and
         // Android ports do for this transformation name, and ciphertext has to
@@ -327,16 +373,7 @@ done:
 /* ------------------------------------------------------------ signatures */
 
 static const EVP_MD* cn1SignatureDigest(const char* algorithm) {
-    if (strstr(algorithm, "SHA512") != 0 || strstr(algorithm, "SHA-512") != 0) {
-        return EVP_sha512();
-    }
-    if (strstr(algorithm, "SHA384") != 0 || strstr(algorithm, "SHA-384") != 0) {
-        return EVP_sha384();
-    }
-    if (strstr(algorithm, "SHA1") != 0 || strstr(algorithm, "SHA-1") != 0) {
-        return EVP_sha1();
-    }
-    return EVP_sha256();
+    return cn1SignatureDigestOrNull(algorithm);
 }
 
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_signData___java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(
@@ -352,6 +389,14 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_signData___java_lang_String_byt
     JAVA_OBJECT result = JAVA_NULL;
 
     if (key == 0) {
+        return JAVA_NULL;
+    }
+    if (cn1SignatureDigest(name) == 0) {
+        /* Not one of Signature's advertised algorithms. Passing a null digest
+         * on would let OpenSSL choose one, which is how an unsupported name
+         * used to come back as a valid signature over a different digest. */
+        cn1CryptoFail("unsupported signature algorithm");
+        EVP_PKEY_free(key);
         return JAVA_NULL;
     }
     ctx = EVP_MD_CTX_new();
@@ -396,6 +441,11 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_verifyData___java_lang_String_
     JAVA_BOOLEAN result = JAVA_FALSE;
 
     if (key == 0) {
+        return JAVA_FALSE;
+    }
+    if (cn1SignatureDigest(name) == 0) {
+        cn1CryptoFail("unsupported signature algorithm");
+        EVP_PKEY_free(key);
         return JAVA_FALSE;
     }
     ctx = EVP_MD_CTX_new();

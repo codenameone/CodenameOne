@@ -118,6 +118,28 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_secureRandomBytes___byte_1
     return JAVA_TRUE;
 }
 
+/* ------------------------------------------- advertised names, and only those
+ *
+ * JavaSE hands these strings to JCE, which either supports a name as written or
+ * refuses it. Matching loosely here -- picking CBC because a string contains
+ * neither "/GCM/" nor "/ECB/", or SHA-256 because it names no digest we know --
+ * means the same request encrypts or signs differently depending on which port
+ * runs it, and the caller is never told. A name outside the advertised set is
+ * refused instead.
+ */
+
+static int cn1IsAesTransformation(const char* transformation) {
+    return strcmp(transformation, "AES/GCM/NoPadding") == 0
+        || strcmp(transformation, "AES/CBC/PKCS5Padding") == 0
+        || strcmp(transformation, "AES/CBC/NoPadding") == 0
+        || strcmp(transformation, "AES/ECB/PKCS5Padding") == 0;
+}
+
+static int cn1IsRsaTransformation(const char* transformation) {
+    return strcmp(transformation, "RSA/ECB/OAEPWithSHA-256AndMGF1Padding") == 0
+        || strcmp(transformation, "RSA/ECB/PKCS1Padding") == 0;
+}
+
 /* ------------------------------------------------------------ AES */
 
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_aesCrypt___java_lang_String_boolean_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(
@@ -129,7 +151,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_aesCrypt___java_lang_String
     unsigned char* iv = cn1Bytes(ivArray, &ivLength);
     unsigned char* aad = cn1Bytes(aadArray, &aadLength);
     unsigned char* data = cn1Bytes(dataArray, &dataLength);
-    int gcm = strstr(mode, "/GCM/") != 0;
+    int gcm;
     int ecb = strstr(mode, "/ECB/") != 0;
     int padded = strstr(mode, "NoPadding") == 0;
     int bodyLength = dataLength;
@@ -143,6 +165,11 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_aesCrypt___java_lang_String
     BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO auth;
     unsigned char tag[CN1_GCM_TAG_BYTES];
 
+    if (!cn1IsAesTransformation(mode)) {
+        cn1CryptoFail("unsupported cipher transformation", 0);
+        return JAVA_NULL;
+    }
+    gcm = strstr(mode, "/GCM/") != 0;
     /* A missing GCM nonce would otherwise repeat across messages under one
      * key, which destroys the mode, and a short CBC IV is read as a whole
      * block. */
@@ -358,20 +385,29 @@ static int cn1PublicKeyIsEc(const unsigned char* der, int length) {
     return isEc;
 }
 
+/* The digest half of Signature's six advertised algorithms; NULL for anything
+ * else, which the callers turn into a failure rather than signing with a digest
+ * nobody asked for. */
 static LPCWSTR cn1DigestAlgorithm(const char* algorithm) {
-    if (strstr(algorithm, "SHA512") != 0 || strstr(algorithm, "SHA-512") != 0) {
-        return BCRYPT_SHA512_ALGORITHM;
+    if (strcmp(algorithm, "SHA256withRSA") == 0 || strcmp(algorithm, "SHA256withECDSA") == 0) {
+        return BCRYPT_SHA256_ALGORITHM;
     }
-    if (strstr(algorithm, "SHA384") != 0 || strstr(algorithm, "SHA-384") != 0) {
+    if (strcmp(algorithm, "SHA384withRSA") == 0 || strcmp(algorithm, "SHA384withECDSA") == 0) {
         return BCRYPT_SHA384_ALGORITHM;
     }
-    if (strstr(algorithm, "SHA1") != 0 || strstr(algorithm, "SHA-1") != 0) {
-        return BCRYPT_SHA1_ALGORITHM;
+    if (strcmp(algorithm, "SHA512withRSA") == 0 || strcmp(algorithm, "SHA512withECDSA") == 0) {
+        return BCRYPT_SHA512_ALGORITHM;
     }
-    return BCRYPT_SHA256_ALGORITHM;
+    return NULL;
 }
 
 static int cn1DigestLength(LPCWSTR algorithm) {
+    if (algorithm == NULL) {
+        /* cn1DigestAlgorithm answers NULL for a name outside the advertised
+         * set; the callers check for that, but this is evaluated in their
+         * declarations, before the check runs. */
+        return 0;
+    }
     if (wcscmp(algorithm, BCRYPT_SHA512_ALGORITHM) == 0) {
         return 64;
     }
@@ -741,7 +777,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_rsaCrypt___java_lang_String
     BCRYPT_KEY_HANDLE publicKey = encrypt ? cn1PublicKey(keyDer, keyLength) : NULL;
     NCRYPT_KEY_HANDLE privateKey = encrypt ? 0 : cn1PrivateKey(keyDer, keyLength, 0);
     int oaepMode = strstr(mode, "OAEP") != 0;
-    LPCWSTR labelDigest = strstr(mode, "SHA-1") != 0 ? BCRYPT_SHA1_ALGORITHM : BCRYPT_SHA256_ALGORITHM;
+    LPCWSTR labelDigest = BCRYPT_SHA256_ALGORITHM;
     unsigned char* out = 0;
     unsigned char* block = 0;
     ULONG outLength = 0, produced = 0;
@@ -749,6 +785,10 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_rsaCrypt___java_lang_String
     NTSTATUS status;
     JAVA_OBJECT result = JAVA_NULL;
 
+    if (!cn1IsRsaTransformation(mode)) {
+        cn1CryptoFail("unsupported cipher transformation", 0);
+        return JAVA_NULL;
+    }
     if (encrypt ? (publicKey == NULL) : (privateKey == 0)) {
         return JAVA_NULL;
     }
@@ -878,6 +918,13 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_signData___java_lang_String
     if (key == 0) {
         return JAVA_NULL;
     }
+    if (digestAlgorithm == NULL) {
+        /* Not one of Signature's advertised algorithms. Falling back to SHA-256
+         * would return a valid signature over a digest the caller never asked
+         * for, which no other port would agree with. */
+        cn1CryptoFail("unsupported signature algorithm", 0);
+        goto done;
+    }
     if (!cn1Digest(digestAlgorithm, data, dataLength, digest, digestLength)) {
         goto done;
     }
@@ -940,6 +987,11 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_verifyData___java_lang_Str
     JAVA_BOOLEAN result = JAVA_FALSE;
 
     if (key == NULL) {
+        return JAVA_FALSE;
+    }
+    if (digestAlgorithm == NULL) {
+        cn1CryptoFail("unsupported signature algorithm", 0);
+        BCryptDestroyKey(key);
         return JAVA_FALSE;
     }
     if (cn1Digest(digestAlgorithm, data, dataLength, digest, digestLength)) {

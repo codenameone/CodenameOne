@@ -347,7 +347,8 @@ static int cn1IcuAvailable(void) {
     return resolved > 0;
 }
 
-int cn1_win_zone_offset_millis(const char* zoneId, long long millis, int* offsetOut, int* dstOut) {
+int cn1_win_zone_offset_millis(const char* zoneId, long long millis, int* offsetOut,
+                               int* dstOut, int* rawOut) {
     WCHAR zone[128];
     CN1UCalendar cal;
     int32_t status = 0;
@@ -375,6 +376,11 @@ int cn1_win_zone_offset_millis(const char* zoneId, long long millis, int* offset
     }
     if (dstOut != 0) {
         *dstOut = dstOffset != 0;
+    }
+    if (rawOut != 0) {
+        /* UCAL_ZONE_OFFSET is the standard-time offset on its own; the daylight
+         * adjustment is the separate UCAL_DST_OFFSET field. */
+        *rawOut = (int) zoneOffset;
     }
     return 1;
 }

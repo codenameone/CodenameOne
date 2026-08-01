@@ -61,17 +61,32 @@ trap cleanup EXIT
 published=0
 skipped=0
 
+# The contract's own freshness window bounds how far back a candidate run is
+# worth considering: a report older than this is stale by definition, so there
+# is nothing to be gained by looking past it.
+sweep_stale_days="$(jq -r '.stale_after_days' "${MANIFEST}")"
+
 # One producing workflow can own several ports (the iOS suite emits four), so
 # sweep per workflow and let the report itself name the port it belongs to.
 while IFS= read -r workflow; do
   # Newest first, and a failed run counts: a suite that fails still uploads the
   # normalized report, and a report that records real failures is the result
   # the table is supposed to show.
-  candidates="$(gh run list --workflow "${workflow}" --branch master --limit 40 \
+  # Every run still inside the staleness horizon is a candidate, rather than a
+  # fixed newest-five slice. A workflow whose matrix legs fail independently --
+  # the Linux producer especially, whose reports are not reliably published by
+  # workflow_run -- can accumulate several runs that each omit a different leg,
+  # and a five-run cap then hides a perfectly good report just behind them. The
+  # loop below stops as soon as every port the workflow owns is covered, so the
+  # wider net costs nothing when the newest run is complete.
+  horizon="$(date -u -d "${sweep_stale_days} days ago" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+    || date -u -v-"${sweep_stale_days}"d +%Y-%m-%dT%H:%M:%SZ)"
+  candidates="$(gh run list --workflow "${workflow}" --branch master --limit 100 \
     --json databaseId,event,conclusion,updatedAt \
-    --jq '[.[] | select((.event == "push" or .event == "schedule") and
-          (.conclusion == "success" or .conclusion == "failure"))]
-          | sort_by(.updatedAt) | reverse | .[0:5] | .[].databaseId')"
+    --jq --arg horizon "${horizon}" '[.[] | select((.event == "push" or .event == "schedule") and
+          (.conclusion == "success" or .conclusion == "failure") and
+          (.updatedAt >= $horizon))]
+          | sort_by(.updatedAt) | reverse | .[].databaseId')"
   if [ -z "${candidates}" ]; then
     echo "No completed master run for ${workflow}; nothing to publish." >&2
     continue

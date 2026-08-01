@@ -2623,8 +2623,9 @@ static void cn1_with_timezone(const char* zoneId, void (*func)(void*), void* ctx
  * The lookup itself lives in cn1_win_compat.c, the one translation unit that
  * may include <windows.h>; keeping it out of here is what lets the clean
  * target compile this file against a minimal SDK layout. */
-static int cn1WinZoneOffsetMillis(const char* zoneId, long long millis, int* offsetOut, int* dstOut) {
-    return cn1_win_zone_offset_millis(zoneId, millis, offsetOut, dstOut);
+static int cn1WinZoneOffsetMillis(const char* zoneId, long long millis, int* offsetOut,
+                                  int* dstOut, int* rawOut) {
+    return cn1_win_zone_offset_millis(zoneId, millis, offsetOut, dstOut, rawOut);
 }
 
 /* Milliseconds since the epoch for a set of UTC calendar fields. */
@@ -2752,7 +2753,7 @@ JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int
     {
         int offset = 0;
         if (cn1WinZoneOffsetMillis(buffer, cn1WinUtcMillis(year, month, day, timeOfDayMillis),
-                                   &offset, 0)) {
+                                   &offset, 0, 0)) {
             return offset;
         }
     }
@@ -2771,36 +2772,20 @@ JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String_R_int(CODENA
     cn1_timezone_raw_ctx ctx;
 #ifdef _WIN32
     {
-        /* The raw offset is the current standard-time one. Sample both
-         * solstices of the current year rather than a fixed past year: a zone
-         * whose base offset changes (Asia/Almaty moved from UTC+6 to UTC+5
-         * during 2024, with neither sample flagged as daylight saving) would
-         * otherwise report its retired offset forever. When neither sample is
-         * in daylight saving they can still differ, so prefer the later one --
-         * that is the rule in force now. */
-        int januaryOffset = 0, januaryDst = 0, julyOffset = 0, julyDst = 0;
-        time_t nowSeconds = time(NULL);
-        struct tm nowUtc;
-        int currentYear = 2024;
-#ifdef _WIN32
-        if (gmtime_s(&nowUtc, &nowSeconds) == 0) {
-            currentYear = nowUtc.tm_year + 1900;
-        }
-#endif
-        if (cn1WinZoneOffsetMillis(buffer, cn1WinUtcMillis(currentYear, 1, 1, 43200000),
-                                   &januaryOffset, &januaryDst) &&
-            cn1WinZoneOffsetMillis(buffer, cn1WinUtcMillis(currentYear, 7, 1, 43200000),
-                                   &julyOffset, &julyDst)) {
-            if (!januaryDst && !julyDst) {
-                return julyOffset;
-            }
-            if (!julyDst) {
-                return julyOffset;
-            }
-            if (!januaryDst) {
-                return januaryOffset;
-            }
-            return januaryOffset < julyOffset ? januaryOffset : julyOffset;
+        /* The raw offset is the standard-time one in force right now. ICU keeps
+         * the base offset and the daylight adjustment in separate calendar
+         * fields, so asking at the current instant answers it directly.
+         *
+         * This used to sample both solstices of the current year and prefer
+         * July's when neither was in daylight saving, which is wrong whenever
+         * the base offset changes mid-year: with the clock in February 2024,
+         * Asia/Almaty was still UTC+6 but July's reading is the UTC+5 rule that
+         * had not taken effect yet, and a change landing after July stayed
+         * invisible for the rest of the year. */
+        int rawOffset = 0;
+        long long nowMillis = (long long) time(NULL) * 1000LL;
+        if (cn1WinZoneOffsetMillis(buffer, nowMillis, 0, 0, &rawOffset)) {
+            return rawOffset;
         }
     }
 #endif
@@ -2824,7 +2809,7 @@ JAVA_BOOLEAN java_util_TimeZone_isTimezoneDST___java_lang_String_long_R_boolean(
 #ifdef _WIN32
     {
         int dst = 0;
-        if (cn1WinZoneOffsetMillis(buffer, (long long) millis, 0, &dst)) {
+        if (cn1WinZoneOffsetMillis(buffer, (long long) millis, 0, &dst, 0)) {
             return dst ? JAVA_TRUE : JAVA_FALSE;
         }
     }

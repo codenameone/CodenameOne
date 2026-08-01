@@ -148,9 +148,14 @@ long long cn1_monotonic_micros(void);
    zone identifier at an instant, writing the offset to offsetOut and whether
    daylight time is in effect to dstOut. Returns non-zero on success, and zero
    when the platform cannot answer -- the caller then keeps whatever the C
-   runtime reported. Lives in cn1_win_compat.c because resolving it needs
+   runtime reported. rawOut, when non-null, receives the zone's standard-time
+   offset at that instant with any daylight adjustment excluded -- ICU tracks
+   the two separately, so the base offset in force now needs no guessing from
+   seasonal samples. Any output pointer may be null.
+   Lives in cn1_win_compat.c because resolving it needs
    <windows.h>, which this header keeps out of translated units. */
-int cn1_win_zone_offset_millis(const char* zoneId, long long millis, int* offsetOut, int* dstOut);
+int cn1_win_zone_offset_millis(const char* zoneId, long long millis, int* offsetOut,
+                               int* dstOut, int* rawOut);
 
 /* --- environment / time.h POSIX helpers absent from MSVC ---
    Thin static-inline wrappers over the MSVC equivalents; used by the date /
