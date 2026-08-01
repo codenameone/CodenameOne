@@ -118,6 +118,14 @@ public final class CN1LiveActivityManager {
                 // disabled notifications are a settled user choice, not a pending prompt
                 return false;
             }
+            if (targetSdkVersion(ctx) < 33) {
+                // Legacy target on a modern device: the platform owns this prompt and raises it
+                // when the first notification channel is created, not when an app asks. So
+                // areNotificationsEnabled is the whole answer -- false here means the system
+                // already asked and the user declined. None of the budget below applies, because
+                // this app never gets to spend it.
+                return false;
+            }
             // From API 33 notifications also read as disabled while POST_NOTIFICATIONS is merely
             // ungranted, which is the state of every fresh install.
             if (hasPostNotificationsPermission(ctx)) {
@@ -239,6 +247,15 @@ public final class CN1LiveActivityManager {
         }
         if (hasPostNotificationsPermission(ctx)) {
             CN1SurfaceStore.clearNotificationPrompts(ctx);
+            return true;
+        }
+        if (targetSdkVersion(ctx) < 33) {
+            // Legacy target on a modern device: requesting cannot raise a dialog, because the
+            // platform shows this one on first notification-channel creation instead -- which
+            // notifyActivity is about to do. Asking anyway would return ungranted every time and
+            // spend the whole budget on requests the user never saw, leaving isSupported false
+            // for good without the channel that would have prompted them. Let the start through
+            // and let the platform ask.
             return true;
         }
         // `start` is callable from any thread and `checkForPermission` drives the activity's one
@@ -461,6 +478,17 @@ public final class CN1LiveActivityManager {
             return missing;
         } catch (Throwable t) {
             return false;
+        }
+    }
+
+    /// The app's own target SDK, which decides who owns the notification prompt. Falls back to
+    /// the device level, i.e. the modern path, when it cannot be read -- the same answer every
+    /// build produces unless it overrides the android.targetSDKVersion hint downward.
+    private static int targetSdkVersion(Context ctx) {
+        try {
+            return ctx.getApplicationInfo().targetSdkVersion;
+        } catch (Throwable t) {
+            return Build.VERSION.SDK_INT;
         }
     }
 
