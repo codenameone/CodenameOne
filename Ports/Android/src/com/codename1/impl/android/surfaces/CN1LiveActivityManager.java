@@ -26,9 +26,13 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.util.Log;
 import android.widget.RemoteViews;
+
+import com.codename1.impl.android.AndroidImplementation;
+import com.codename1.impl.android.AndroidNativeUtil;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -44,7 +48,11 @@ import java.util.Map;
 ///
 /// Requires API 24 (`Notification.Builder#setCustomContentView` and
 /// `DecoratedCustomViewStyle`); `AndroidSurfaceBridge#isLiveActivitySupported()` reports false
-/// below that and when the user disabled notifications. Updates re-render locally from the
+/// below that and when the user disabled notifications. On Android 13 (API 33) and newer an
+/// ongoing notification additionally needs the `POST_NOTIFICATIONS` runtime permission, which the
+/// build declares for you: [#start(Context, String, Map)] raises the system prompt the first time
+/// an app starts a live activity without it, and a refusal is remembered so `isSupported` reports
+/// false from then on rather than re-prompting on every start. Updates re-render locally from the
 /// descriptor persisted at start time merged with the latest state map (state-only updates per
 /// the SPI contract). Android 16 "Live Updates" / `ProgressStyle` is a possible future lowering.
 public final class CN1LiveActivityManager {
@@ -55,7 +63,10 @@ public final class CN1LiveActivityManager {
     private CN1LiveActivityManager() {
     }
 
-    /// Returns true when live activities can be presented on this device right now.
+    /// Returns true when live activities can be presented on this device, either right now or
+    /// after the `POST_NOTIFICATIONS` prompt `start` raises on Android 13+. A pending permission
+    /// counts as supported: reporting false there would make the app skip the very call that
+    /// prompts, so a first-run install could never present an activity at all.
     public static boolean isSupported(Context ctx) {
         if (ctx == null || Build.VERSION.SDK_INT < 24) {
             return false;
@@ -63,15 +74,31 @@ public final class CN1LiveActivityManager {
         try {
             NotificationManager nm =
                     (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-            return nm != null && nm.areNotificationsEnabled();
+            if (nm == null) {
+                return false;
+            }
+            if (nm.areNotificationsEnabled()) {
+                return true;
+            }
+            if (Build.VERSION.SDK_INT < 33) {
+                // disabled notifications are a settled user choice, not a pending prompt
+                return false;
+            }
+            // From API 33 notifications also read as disabled while POST_NOTIFICATIONS is merely
+            // ungranted, which is the state of every fresh install. Granted-but-disabled is the
+            // settled choice again; ungranted is still requestable, hence still supported.
+            return !hasPostNotificationsPermission(ctx)
+                    && !CN1SurfaceStore.isNotificationPermissionRefused(ctx);
         } catch (Throwable t) {
             return false;
         }
     }
 
     /// Starts a live activity from a serialized descriptor; returns its id or null on failure.
+    /// Raises the `POST_NOTIFICATIONS` prompt first when Android 13+ needs it, blocking the
+    /// calling thread until the user answers.
     public static String start(Context ctx, String descriptorJson, Map<String, byte[]> images) {
-        if (!isSupported(ctx)) {
+        if (!isSupported(ctx) || !ensureNotificationPermission(ctx)) {
             return null;
         }
         try {
@@ -125,6 +152,78 @@ public final class CN1LiveActivityManager {
             Log.w(TAG, "Failed to end live activity " + activityId, t);
         } finally {
             CN1SurfaceStore.deleteLiveActivity(ctx, activityId);
+        }
+    }
+
+    // --- notification permission ----------------------------------------------
+
+    /// Makes sure the ongoing notification a live activity lowers to can actually be posted:
+    /// on Android 13+ that needs the `POST_NOTIFICATIONS` runtime permission the build declares
+    /// but nobody has granted yet on a fresh install. Raises the standard Codename One permission
+    /// request (which blocks the calling thread until the user answers, in a way that keeps the
+    /// EDT pumping when called from it) and remembers a refusal so the next `start` reports
+    /// unsupported instead of prompting again.
+    ///
+    /// Only `start` calls this. `update` and `end` act on an activity that is already running,
+    /// so the permission was necessarily granted when it started.
+    private static boolean ensureNotificationPermission(Context ctx) {
+        if (Build.VERSION.SDK_INT < 33 || ctx == null || hasPostNotificationsPermission(ctx)) {
+            return true;
+        }
+        if (CN1SurfaceStore.isNotificationPermissionRefused(ctx)) {
+            return false;
+        }
+        if (AndroidNativeUtil.getActivity() == null) {
+            // nothing to prompt from -- a live activity started from a background service or a
+            // push. Leave the refusal flag alone so the next start with UI in front still asks.
+            Log.w(TAG, "Cannot start a live activity: POST_NOTIFICATIONS has not been granted "
+                    + "and there is no activity in the foreground to request it from.");
+            return false;
+        }
+        if (!isPermissionDeclared()) {
+            // requesting an undeclared permission is auto-denied without any UI, which would
+            // otherwise look like a refusal and be remembered as one
+            Log.e(TAG, "Cannot start a live activity: POST_NOTIFICATIONS is missing from the "
+                    + "manifest. The build declares it for apps whose surfaces.json sets "
+                    + "\"liveActivities\": true -- add that and rebuild.");
+            return false;
+        }
+        boolean granted;
+        try {
+            granted = AndroidImplementation.checkForPermission(
+                    "android.permission.POST_NOTIFICATIONS",
+                    "This is required to show live activities", true);
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to request the POST_NOTIFICATIONS permission", t);
+            return false;
+        }
+        CN1SurfaceStore.setNotificationPermissionRefused(ctx, !granted);
+        if (!granted) {
+            Log.w(TAG, "Live activities are unavailable: the user declined the POST_NOTIFICATIONS "
+                    + "permission. LiveActivity.isSupported() reports false from now on; the user "
+                    + "can re-enable notifications in the system settings.");
+        }
+        return granted;
+    }
+
+    /// True when `POST_NOTIFICATIONS` is in the merged manifest. A failed or empty lookup reads
+    /// as "declared" so a broken query never blocks the prompt.
+    private static boolean isPermissionDeclared() {
+        try {
+            java.util.List<String> declared = AndroidImplementation.getRequestedPermissions();
+            return declared.isEmpty()
+                    || declared.contains("android.permission.POST_NOTIFICATIONS");
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
+    private static boolean hasPostNotificationsPermission(Context ctx) {
+        try {
+            return ctx.getPackageManager().checkPermission("android.permission.POST_NOTIFICATIONS",
+                    ctx.getPackageName()) == PackageManager.PERMISSION_GRANTED;
+        } catch (Throwable t) {
+            return false;
         }
     }
 

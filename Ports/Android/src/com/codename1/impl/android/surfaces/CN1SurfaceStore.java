@@ -56,6 +56,7 @@ public final class CN1SurfaceStore {
     private static final String KEY_ACTIVITY_SEQ = "laSeq";
     private static final String KEY_FETCH_CLASS = "bgFetchClass";
     private static final String KEY_FETCH_AT_PREFIX = "bgFetchAt_";
+    private static final String KEY_NOTIFICATIONS_REFUSED = "notificationsRefused";
 
     private CN1SurfaceStore() {
     }
@@ -221,6 +222,27 @@ public final class CN1SurfaceStore {
         }
         prefs.edit().putLong(key, now).apply();
         return true;
+    }
+
+    // --- live activity notification permission --------------------------------
+
+    /// True once the user turned down the `POST_NOTIFICATIONS` prompt raised by the first
+    /// `LiveActivity.start()` on Android 13+. `CN1LiveActivityManager` consults this so a refusal
+    /// makes `isLiveActivitySupported()` report false (the honest answer) instead of re-prompting
+    /// on every start. Granting notifications later in the system settings makes
+    /// `areNotificationsEnabled()` true again, which is checked first, so the flag never traps an
+    /// app that the user changed their mind about.
+    public static boolean isNotificationPermissionRefused(Context ctx) {
+        return prefs(ctx).getBoolean(KEY_NOTIFICATIONS_REFUSED, false);
+    }
+
+    /// Records the outcome of the `POST_NOTIFICATIONS` prompt; see
+    /// [#isNotificationPermissionRefused(Context)].
+    public static void setNotificationPermissionRefused(Context ctx, boolean refused) {
+        SharedPreferences prefs = prefs(ctx);
+        if (prefs.getBoolean(KEY_NOTIFICATIONS_REFUSED, false) != refused) {
+            prefs.edit().putBoolean(KEY_NOTIFICATIONS_REFUSED, refused).apply();
+        }
     }
 
     // --- internals ------------------------------------------------------------
