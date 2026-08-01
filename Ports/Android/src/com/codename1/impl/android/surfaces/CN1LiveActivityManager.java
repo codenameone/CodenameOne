@@ -78,6 +78,10 @@ public final class CN1LiveActivityManager {
     /// `PERMISSION_LOCK` is reentrant and `invokeAndBlock` pumps the EDT underneath it -- and the
     /// counter moves once per answered request.
     private static boolean permissionRequestInFlight;
+    /// Which thread owns the open request, so a reentrant call on the prompting thread can be
+    /// told apart from a caller admitted during that request's tail: the first must be refused,
+    /// the second adopts the answer.
+    private static Thread permissionRequestThread;
     private static long permissionRequestGeneration;
     private static volatile boolean loggedMissingManifest;
     private static volatile boolean loggedBudgetExhausted;
@@ -262,6 +266,16 @@ public final class CN1LiveActivityManager {
         // `AndroidImplementation` to fix properly. The damage here is bounded: a spuriously
         // counted attempt costs the user one of two prompts, and any later grant, from any
         // source, clears the count.
+        // The flag is cleared in the outer finally, after PERMISSION_LOCK is released, not
+        // inside it. Publishing the completed state while still holding the monitor left a window
+        // where a caller could snapshot the settled pair, block, and then be admitted having
+        // observed no change at all -- so it would prompt again straight after a denial. Holding
+        // "open" across the handoff means every caller that arrives while the monitor is held, or
+        // in the instant after it is dropped, sees an open request and adopts. The cost is that a
+        // genuinely later start landing in that sliver adopts too; that errs toward one dialog,
+        // which is the right way to be wrong.
+        boolean ranRequest = false;
+        try {
         synchronized (PERMISSION_LOCK) {
             if (hasPostNotificationsPermission(ctx)) {
                 CN1SurfaceStore.clearNotificationPrompts(ctx);
@@ -276,16 +290,21 @@ public final class CN1LiveActivityManager {
             // exactly what a refused start is documented to return.
             boolean answeredWhileWaiting;
             synchronized (STATE_LOCK) {
-                if (permissionRequestInFlight) {
-                    // reached the monitor with a dialog still open, which only a reentrant call
-                    // on the prompting thread can do
+                if (permissionRequestInFlight
+                        && permissionRequestThread == Thread.currentThread()) {
+                    // holding the monitor with our own dialog still open: only a reentrant call
+                    // on the prompting thread can be here
                     Log.w(TAG, "Ignoring a live activity start raised while the "
                             + "POST_NOTIFICATIONS prompt is still open; wait for the first start "
                             + "to return before starting another.");
                     return false;
                 }
+                // A flag still set by *another* thread means we were admitted during its tail --
+                // it released the monitor but has not cleared the flag yet -- which is the same
+                // burst and adopts, exactly like the two arrival facts.
                 answeredWhileWaiting = requestOpenOnArrival
-                        || permissionRequestGeneration != seenGeneration;
+                        || permissionRequestGeneration != seenGeneration
+                        || permissionRequestInFlight;
             }
             if (answeredWhileWaiting) {
                 // A request was open when this caller arrived, or finished while it was blocked
@@ -321,7 +340,9 @@ public final class CN1LiveActivityManager {
             }
             synchronized (STATE_LOCK) {
                 permissionRequestInFlight = true;
+                permissionRequestThread = Thread.currentThread();
             }
+            ranRequest = true;
             boolean granted = false;
             boolean answered = false;
             try {
@@ -334,14 +355,12 @@ public final class CN1LiveActivityManager {
                 Log.w(TAG, "Failed to request the POST_NOTIFICATIONS permission", t);
             } finally {
                 synchronized (STATE_LOCK) {
-                    // counter and flag drop together, so no caller can observe a completed
-                    // request that still looks open, or an open one that already counted. The
-                    // generation moves only for an answer, so a throw leaves waiters free to ask
-                    // rather than adopting an outcome that never happened.
+                    // The generation moves only for an answer, so a throw leaves waiters free to
+                    // ask rather than adopting an outcome that never happened. The in-flight flag
+                    // is deliberately NOT cleared here -- see the outer finally.
                     if (answered) {
                         permissionRequestGeneration++;
                     }
-                    permissionRequestInFlight = false;
                 }
             }
             if (!answered) {
@@ -358,6 +377,14 @@ public final class CN1LiveActivityManager {
                     + "granted (attempt " + CN1SurfaceStore.getNotificationPromptCount(ctx)
                     + " of " + MAX_NOTIFICATION_PROMPTS + ").");
             return false;
+        }
+        } finally {
+            if (ranRequest) {
+                synchronized (STATE_LOCK) {
+                    permissionRequestInFlight = false;
+                    permissionRequestThread = null;
+                }
+            }
         }
     }
 
