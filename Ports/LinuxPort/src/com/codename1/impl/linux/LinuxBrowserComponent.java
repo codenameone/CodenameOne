@@ -117,6 +117,15 @@ class LinuxBrowserComponent extends PeerComponent {
                 browser.fireWebEvent(BrowserComponent.onLoad, new ActionEvent(""));
             } else if (ev.startsWith("NAV|")) {
                 browser.fireBrowserNavigationCallbacks(ev.substring(4));
+            } else if (ev.startsWith("MSG|")) {
+                // The JS->Java bridge. The page's cn1application.shouldNavigate
+                // posts here rather than assigning window.location, so an
+                // execute() return value comes back through the message handler
+                // instead of a navigation to codenameone.com -- which needed
+                // working egress to deliver a callback and took the page under
+                // test away with it. Same sink as a navigation callback: the
+                // portable layer decodes the return-value URL either way.
+                browser.fireBrowserNavigationCallbacks(ev.substring(4));
             }
         }
     }

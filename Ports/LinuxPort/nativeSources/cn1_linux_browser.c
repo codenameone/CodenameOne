@@ -56,6 +56,9 @@ static __typeof__(jsc_value_to_string)*                                        p
 static __typeof__(webkit_web_view_load_html)*                                  p_webkit_web_view_load_html;
 static __typeof__(webkit_web_view_load_uri)*                                   p_webkit_web_view_load_uri;
 static __typeof__(webkit_web_view_run_javascript)*                             p_webkit_web_view_run_javascript;
+static __typeof__(webkit_user_script_new)*                                     p_webkit_user_script_new;
+static __typeof__(webkit_user_content_manager_add_script)*                     p_webkit_user_content_manager_add_script;
+static __typeof__(webkit_user_script_unref)*                                   p_webkit_user_script_unref;
 
 static int cn1_wk_state = 0; /* 0 = untried, 1 = available, -1 = unavailable */
 
@@ -91,6 +94,14 @@ static int cn1LoadWebkit(void) {
     CN1_WK_SYM(p_webkit_web_view_load_uri, "webkit_web_view_load_uri");
     CN1_WK_SYM(p_webkit_web_view_run_javascript, "webkit_web_view_run_javascript");
 #undef CN1_WK_SYM
+    /* Optional: the JS->Java bootstrap is an improvement on the navigation
+     * fallback, not a requirement for browsing, so a build missing any of these
+     * keeps a working BrowserComponent rather than reporting unsupported. */
+#define CN1_WK_OPT(ptr, name) do { *(void**)(&ptr) = dlsym(h, name); } while (0)
+    CN1_WK_OPT(p_webkit_user_script_new, "webkit_user_script_new");
+    CN1_WK_OPT(p_webkit_user_content_manager_add_script, "webkit_user_content_manager_add_script");
+    CN1_WK_OPT(p_webkit_user_script_unref, "webkit_user_script_unref");
+#undef CN1_WK_OPT
     cn1_wk_state = ok ? 1 : -1;
     if (!ok) { cn1LinuxStubOnce("WebKitGTK present but an expected symbol was missing; BrowserComponent unsupported"); }
     return ok;
@@ -148,6 +159,27 @@ static void cn1BrowserCreateOnMain(void* p) {
     pthread_mutex_init(&b->lock, 0);
     p_webkit_user_content_manager_register_script_message_handler(mgr, "cn1");
     g_signal_connect(mgr, "script-message-received::cn1", G_CALLBACK(cn1BrowserScriptMessage), b);
+    /* Give the page the object BrowserComponent.execute's generated JavaScript
+     * looks for. Without it that code falls through to its last resort,
+     * `window.location.href = "https://www.codenameone.com/..."`, so every
+     * execute() callback and every JS->Java message became a real navigation to
+     * the internet: the return value only came back if the runner could reach
+     * that host, and the page navigated away from the content under test. This
+     * is the same bootstrap the iOS port injects, routed to the "cn1" message
+     * handler registered above. */
+    if (p_webkit_user_script_new != 0 && p_webkit_user_content_manager_add_script != 0) {
+        WebKitUserScript* bootstrap = p_webkit_user_script_new(
+            "window.cn1application = window.cn1application || {};"
+            "window.cn1application.shouldNavigate = function(url) {"
+            "  window.webkit.messageHandlers.cn1.postMessage(String(url));"
+            "};",
+            WEBKIT_USER_CONTENT_INJECT_TOP_FRAME,
+            WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, 0, 0);
+        p_webkit_user_content_manager_add_script(mgr, bootstrap);
+        if (p_webkit_user_script_unref != 0) {
+            p_webkit_user_script_unref(bootstrap);
+        }
+    }
     b->view = p_webkit_web_view_new_with_user_content_manager(mgr);
     g_signal_connect(b->view, "load-changed", G_CALLBACK(cn1BrowserLoadChanged), b);
     cn1LinuxOverlayAdd(b->view, 0, 0, req->w > 0 ? req->w : 1, req->h > 0 ? req->h : 1);
