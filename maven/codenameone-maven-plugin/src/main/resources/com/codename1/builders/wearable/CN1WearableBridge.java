@@ -571,6 +571,10 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     private void refreshNodesNow() {
+        final long startedAt;
+        synchronized (nodesLock) {
+            startedAt = nodesGeneration;
+        }
         List<Node> fresh;
         try {
             fresh = Tasks.await(nodeClient.getConnectedNodes(),
@@ -582,6 +586,11 @@ public class CN1WearableBridge implements WearableBridge {
             return;
         }
         synchronized (nodesLock) {
+            if (nodesGeneration != startedAt) {
+                // A pushed peer connect/disconnect landed while this blocking query was out. Keep
+                // it: a push is more current than anything we could have asked for.
+                return;
+            }
             cachedNodes = fresh;
             cachedNodesStamp = System.currentTimeMillis();
             nodesGeneration++;
