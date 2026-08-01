@@ -553,7 +553,7 @@ final class IOSDeviceIntegrity {
     }
 
     AsyncResource<String> requestToken(String nonce) {
-        AsyncResource<String> r = new AsyncResource<String>();
+        OneShotResource r = new OneShotResource();
         if (!nativeInstance.isAppAttestSupported()) {
             r.error(new UnsupportedOperationException(
                     "App Attest is not supported on this device"));
@@ -777,11 +777,11 @@ final class IOSDeviceIntegrity {
 
     // --- flow steps ------------------------------------------------------
 
-    private void attestKey(AsyncResource<String> r, String nonce, String keyId) {
+    private void attestKey(OneShotResource r, String nonce, String keyId) {
         attestKey(r, nonce, keyId, false);
     }
 
-    private void attestKey(AsyncResource<String> r, String nonce, String keyId, boolean retried) {
+    private void attestKey(OneShotResource r, String nonce, String keyId, boolean retried) {
         // The attestation binds to SHA-256 of the raw nonce. Hashing here rather
         // than natively keeps a single hash implementation across both paths.
         String hash = base64(Hash.sha256(bytes(nonce)));
@@ -803,7 +803,7 @@ final class IOSDeviceIntegrity {
         nativeInstance.appAttestAttestKey(rid, keyId, hash);
     }
 
-    private void assertWithKey(AsyncResource<String> r, String nonce, String keyId) {
+    private void assertWithKey(OneShotResource r, String nonce, String keyId) {
         String clientData = clientDataJson(nonce, keyId);
         String hash = base64(Hash.sha256(bytes(clientData)));
         PendingRequest pending =
@@ -1105,6 +1105,54 @@ final class IOSDeviceIntegrity {
         succeed(pending, attestToken, true);
     }
 
+    /**
+     * The resource handed to a caller, where cancelling and delivering cannot both win.
+     *
+     * <p>{@link AsyncResource#complete} does not refuse an already-cancelled resource --
+     * it writes the value and fires the success callback -- and {@code cancel()} does not
+     * refuse an already-completed one either. Checking one before doing the other narrows
+     * the window without closing it, and what falls into it is the one object here that
+     * cannot be produced again: the application may have received and submitted an
+     * attestation while this class concluded delivery had lost and kept it for a retry,
+     * or the reverse. A claim taken once decides it.</p>
+     *
+     * <p>Only this class's own results are of this type, so nothing outside it can be
+     * affected by the stricter cancel().</p>
+     */
+    static final class OneShotResource extends AsyncResource<String> {
+
+        private final java.util.concurrent.atomic.AtomicBoolean claimed =
+                new java.util.concurrent.atomic.AtomicBoolean();
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            if (!claimed.compareAndSet(false, true)) {
+                // Delivery got here first. Reporting the cancellation as refused is the
+                // truth -- the caller's success callback has run or is about to.
+                return false;
+            }
+            return super.cancel(mayInterruptIfRunning);
+        }
+
+        /** True when this call is the one that delivered. */
+        boolean deliver(String value) {
+            if (!claimed.compareAndSet(false, true)) {
+                return false;
+            }
+            super.complete(value);
+            return true;
+        }
+
+        /** True when this call is the one that failed it. */
+        boolean fail(Throwable t) {
+            if (!claimed.compareAndSet(false, true)) {
+                return false;
+            }
+            super.error(t);
+            return true;
+        }
+    }
+
     /** Called from native with an assertion over an already attested key. */
     public static void nativeAssertionReady(final int requestId, final String assertionB64) {
         if (dceGuard) {
@@ -1361,7 +1409,7 @@ final class IOSDeviceIntegrity {
                     return;
                 }
                 if (instance == null) {
-                    pending.result.complete(token);
+                    pending.result.deliver(token);
                     return;
                 }
                 // The staleness check happens under the lock; the completion itself does
@@ -1376,25 +1424,20 @@ final class IOSDeviceIntegrity {
                 // no such recovery, so the trade runs this way round.
                 synchronized (instance.flowLock) {
                     if (isStale(pending)) {
-                        pending.result.error(new RuntimeException("App Attest state was "
+                        pending.result.fail(new RuntimeException("App Attest state was "
                                 + "reset while this request was in flight"));
                         return;
                     }
                 }
-                // Re-checked immediately before the handover. A cancellation landing
-                // between the first check and here would otherwise be overwritten:
-                // AsyncResource.complete() does not refuse an already-cancelled resource,
-                // it sets the value and fires the success callback anyway.
-                if (pending.result.isDone()) {
+                // One claim decides it. A check followed by a completion left a window
+                // where a cancellation could win the check and the completion could
+                // happen anyway -- AsyncResource.complete() does not refuse a cancelled
+                // resource -- so the application received the attestation while this
+                // class concluded delivery had lost and kept it for a retry.
+                if (!pending.result.deliver(token)) {
                     return;
                 }
-                pending.result.complete(token);
-                // Released only once delivery has actually won, and never on the strength
-                // of the check above alone: a cancellation racing that window leaves
-                // isCancelled() true afterwards, and dropping the retained copy there
-                // would throw away the one thing here that cannot be produced again --
-                // for a caller that never received it.
-                if (attestation && !pending.result.isCancelled()) {
+                if (attestation) {
                     synchronized (instance.flowLock) {
                         if (token.equals(instance.undeliveredAttestToken)) {
                             instance.undeliveredAttestKeyId = null;
@@ -1417,12 +1460,10 @@ final class IOSDeviceIntegrity {
      * That reference outlives the call for as long as the EDT queue holds the Runnable,
      * and it is a reference nothing here needs.</p>
      */
-    private static void failResource(final AsyncResource<String> r, final String msg) {
+    private static void failResource(final OneShotResource r, final String msg) {
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                if (!r.isDone()) {
-                    r.error(new RuntimeException(msg));
-                }
+                r.fail(new RuntimeException(msg));
             }
         });
     }
@@ -1430,9 +1471,7 @@ final class IOSDeviceIntegrity {
     private static void fail(final PendingRequest pending, final String msg) {
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                if (!pending.result.isDone()) {
-                    pending.result.error(new RuntimeException(msg));
-                }
+                pending.result.fail(new RuntimeException(msg));
             }
         });
     }
@@ -1463,7 +1502,7 @@ final class IOSDeviceIntegrity {
         static final int OP_ATTEST = 1;
         static final int OP_ASSERT = 2;
 
-        final AsyncResource<String> result;
+        final OneShotResource result;
         final String nonce;
         final int op;
         final String keyId;
@@ -1473,7 +1512,7 @@ final class IOSDeviceIntegrity {
         /// carrying an older one belongs to an abandoned flow.
         int generation;
 
-        PendingRequest(AsyncResource<String> result, String nonce, int op, String keyId) {
+        PendingRequest(OneShotResource result, String nonce, int op, String keyId) {
             this.result = result;
             this.nonce = nonce;
             this.op = op;

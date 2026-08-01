@@ -623,8 +623,20 @@ public final class AppShield {
         // token, and that looks exactly like a page that loaded correctly. Apps that
         // navigate to a protected host at launch should call init() before doing so, or
         // use fetchToken(), which does wait -- on a background thread.
-        if (!initialized) {
-            if (initializing) {
+        // Read under the monitor, and only read -- no wait. Without it there is no
+        // happens-before with init()'s writes, so a caller on another thread could go on
+        // seeing `initialized == false` after startup finished and quietly navigate a
+        // protected host without a token, indefinitely. The synchronized block costs an
+        // uncontended lock and keeps the never-blocking contract, which is a different
+        // promise from the never-synchronizing one nobody made.
+        boolean ready;
+        boolean starting;
+        synchronized (AppShield.class) {
+            ready = initialized;
+            starting = initializing;
+        }
+        if (!ready) {
+            if (starting) {
                 Log.p("AppShield: headersFor(" + hostOf(url) + ") was called while "
                         + "initialization is still running, so no token is attached. Call "
                         + "AppShield.init(...) before navigating to a protected host.");
