@@ -114,8 +114,9 @@ public final class ShieldConfig {
     /// - routing (`host`) -- this selects the virtual host, so overwriting it sends the
     ///   request somewhere else entirely;
     /// - hop-by-hop (`connection`, `keep-alive`, `proxy-connection`, `te`, `trailer`,
-    ///   `upgrade`) -- defined to be consumed by the next hop and not forwarded, so the
-    ///   token would be stripped in transit by a proxy that is behaving correctly.
+    ///   `upgrade`, `proxy-authorization`, `proxy-authenticate`) -- defined to be
+    ///   consumed by the next hop and not forwarded, so the token would be stripped in
+    ///   transit by a proxy that is behaving correctly.
     ///
     /// Refused rather than warned about, because the failure has no symptom on the
     /// client: `attach()` returns having set the header, and the request reaches the
@@ -124,6 +125,13 @@ public final class ShieldConfig {
     private static final String[] TRANSPORT_HEADERS = {
         "host", "content-length", "transfer-encoding", "connection",
         "keep-alive", "proxy-connection", "te", "trailer", "upgrade",
+        // The two proxy-credential headers are hop-by-hop like the rest, and worth
+        // naming because they do not LOOK like transport plumbing -- they look like a
+        // place credentials belong, which is exactly why someone would pick one. A
+        // forward proxy consumes them; the origin never sees the token, and the failure
+        // appears only once a user is behind such a proxy, on a network nobody testing
+        // this was on.
+        "proxy-authorization", "proxy-authenticate",
         // Cookie is not transport framing, but it fails the same way and worse.
         // ConnectionRequest emits userHeaders first and THEN calls setHeader("Cookie",
         // ...) with the generated cookie string, so with cookie handling on and any

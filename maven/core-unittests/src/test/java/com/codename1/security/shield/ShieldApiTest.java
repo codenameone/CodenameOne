@@ -464,6 +464,11 @@ class ShieldApiTest {
         String[] refused = {
             "Host", "Content-Length", "Transfer-Encoding", "Connection",
             "Keep-Alive", "Proxy-Connection", "TE", "Trailer", "Upgrade",
+            // Hop-by-hop like the rest, and the two that do not look like plumbing: a
+            // forward proxy consumes them as its own credentials, so the origin never
+            // sees the token -- and only for users behind such a proxy, which is a
+            // network nobody testing this was on.
+            "Proxy-Authorization", "Proxy-Authenticate",
             // Not framing, but overwritten by the request itself: ConnectionRequest
             // emits userHeaders and then sets Cookie from its own cookie store.
             "Cookie"
