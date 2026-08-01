@@ -78,6 +78,15 @@ public class CN1WearableBridge implements WearableBridge {
     /** The publication order of a value or transfer, so the newer of two items wins. */
     private static final String SEQUENCE_KEY = "cn1.seq";
     /**
+     * When an item was published, in wall-clock millis.
+     *
+     * <p>Separate from {@link #SEQUENCE_KEY} because the sequence is a logical clock: once this
+     * device has observed a peer running ahead, a sequence no longer corresponds to a time at all,
+     * and the transfer sweep -- which is genuinely about age -- would keep items until local time
+     * happened to reach the borrowed value.
+     */
+    private static final String PUBLISHED_AT_KEY = "cn1.at";
+    /**
      * Transfers live under their own prefix, not under {@link #PATH_PREFIX}. Sharing the prefix made
      * the two APIs collide: {@code transferFile("/inbox", "photo.png", ...)} built the same DataItem
      * URI as {@code putData("/inbox/photo.png")}, so each could silently overwrite the other.
@@ -123,6 +132,7 @@ public class CN1WearableBridge implements WearableBridge {
         this.nodeClient = Wearable.getNodeClient(this.context);
         this.capabilityClient = Wearable.getCapabilityClient(this.context);
         current = this;
+        restoreClock(this.context);
         // Sweep at startup as well as after each publish. An app that sends a few files and then
         // stops would otherwise never run the sweep again, leaving its last transfers published
         // indefinitely -- the post-publish sweep only helps an app that keeps transferring.
@@ -304,12 +314,19 @@ public class CN1WearableBridge implements WearableBridge {
         }
         cachedBonded = out;
         bondedStamp = System.currentTimeMillis();
+        bondedKnown = true;
         return out;
     }
 
     private volatile List<String> cachedBonded = new ArrayList<String>();
     private volatile boolean refreshingBonded;
     private volatile long bondedStamp;
+    /**
+     * Whether a capability query has ever completed. An empty {@link #cachedBonded} is ambiguous
+     * without it -- "not asked yet" and "asked, nobody runs the app" are opposite answers for
+     * {@link #fanOut}, and treating the second as the first sends to a watch that cannot receive.
+     */
+    private volatile boolean bondedKnown;
 
     /// Accepts a capability set pushed by Play services, so the cache tracks an install or
     /// uninstall that happens while the device stays connected.
@@ -331,6 +348,7 @@ public class CN1WearableBridge implements WearableBridge {
         boolean changed = !sameIds(b.cachedBonded, out);
         b.cachedBonded = out;
         b.bondedStamp = System.currentTimeMillis();
+        b.bondedKnown = true;
         if (changed) {
             WearableConnection.notifyStateChanged();
         }
@@ -404,6 +422,7 @@ public class CN1WearableBridge implements WearableBridge {
                         boolean changed = !sameIds(cachedBonded, out);
                         cachedBonded = out;
                         bondedStamp = System.currentTimeMillis();
+                        bondedKnown = true;
                         refreshingBonded = false;
                         if (changed) {
                             WearableConnection.notifyStateChanged();
@@ -561,14 +580,15 @@ public class CN1WearableBridge implements WearableBridge {
         // that cannot answer and the caller waits out the full timeout instead of being told there
         // is nobody to ask. This also stops fanOut and isReachable() disagreeing.
         //
-        // Only when we actually know: an empty capability set means the cache has not been filled
-        // yet, and refusing to send on that would break the first send after a cold start.
+        // Only once a capability query has actually completed. Before that an empty set means "not
+        // asked yet", not "nobody runs the app", and refusing to send on it would break the first
+        // send after a cold start -- so bondedKnown, not emptiness, is what gates the filter.
         List<String> withApp = bondedNodeIds();
         for (Node n : nodes) {
             if (!n.isNearby()) {
                 continue;
             }
-            if (!withApp.isEmpty() && !withApp.contains(n.getId())) {
+            if (bondedKnown && !withApp.contains(n.getId())) {
                 continue;
             }
             // The peer needs both the CN1 path and, when an answer is wanted, the token to answer
@@ -738,7 +758,51 @@ public class CN1WearableBridge implements WearableBridge {
     private static synchronized long nextSequence() {
         long now = System.currentTimeMillis();
         lastSequence = now > lastSequence ? now : lastSequence + 1;
+        persistClock(lastSequence);
         return lastSequence;
+    }
+
+    /** Preference store for the logical clock; see {@link #persistClock}. */
+    private static final String CLOCK_PREFS = "cn1.wearable";
+    private static final String CLOCK_KEY = "clock";
+    private static volatile long persistedClock;
+
+    /**
+     * Remembers the clock floor across process restarts.
+     *
+     * <p>Once this device has observed a peer sequence ahead of its own wall clock, that floor is
+     * the only thing keeping its next publish above the peer's existing item. Holding it in a static
+     * field alone means a restart drops back to local time and publishes something the peer will
+     * correctly judge older -- silently losing the write.
+     *
+     * @param value the clock value to remember
+     */
+    private static void persistClock(long value) {
+        CN1WearableBridge b = current;
+        if (b == null || value <= persistedClock) {
+            return;
+        }
+        persistedClock = value;
+        try {
+            b.context.getSharedPreferences(CLOCK_PREFS, Context.MODE_PRIVATE)
+                    .edit().putLong(CLOCK_KEY, value).apply();
+        } catch (Throwable unavailable) {
+            // Best effort: the in-memory floor still holds for this process.
+        }
+    }
+
+    /** Restores the persisted floor, so the first publish after a restart cannot regress. */
+    private static synchronized void restoreClock(Context context) {
+        try {
+            long stored = context.getSharedPreferences(CLOCK_PREFS, Context.MODE_PRIVATE)
+                    .getLong(CLOCK_KEY, 0);
+            persistedClock = stored;
+            if (stored > lastSequence) {
+                lastSequence = stored;
+            }
+        } catch (Throwable unavailable) {
+            // No stored floor: wall-clock millis seed the counter as before.
+        }
     }
 
     /**
@@ -759,6 +823,7 @@ public class CN1WearableBridge implements WearableBridge {
     static synchronized void observeSequence(long seen) {
         if (seen != Long.MIN_VALUE && seen > lastSequence) {
             lastSequence = seen;
+            persistClock(lastSequence);
         }
     }
 
@@ -875,6 +940,7 @@ public class CN1WearableBridge implements WearableBridge {
         // as unchanged and never reports, silently dropping the second transfer. The sequence stamp
         // makes every invocation a real change.
         req.getDataMap().putLong(SEQUENCE_KEY, sequence);
+        req.getDataMap().putLong(PUBLISHED_AT_KEY, System.currentTimeMillis());
         req.getDataMap().putAsset("asset", Asset.createFromBytes(body));
         dataClient.putDataItem(req.asPutDataRequest().setUrgent());
         expireOwnTransfers();
@@ -915,9 +981,12 @@ public class CN1WearableBridge implements WearableBridge {
                                 continue;
                             }
                             DataMap map = valueOrTransferMap(item);
-                            long seq = sequenceOf(map);
-                            // The stamp is wall-clock millis, so it doubles as the publication time.
-                            if (seq != Long.MIN_VALUE && seq < cutoff) {
+                            // Age, not order: the sequence is a logical clock and may have been
+                            // raised far past local time by a peer, so it says nothing about when
+                            // this item was published.
+                            long publishedAt = map == null
+                                    ? Long.MIN_VALUE : map.getLong(PUBLISHED_AT_KEY, Long.MIN_VALUE);
+                            if (publishedAt != Long.MIN_VALUE && publishedAt < cutoff) {
                                 dataClient.deleteDataItems(item.getUri());
                             }
                         }
