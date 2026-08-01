@@ -57,6 +57,9 @@ public final class CN1SurfaceStore {
     private static final String KEY_FETCH_CLASS = "bgFetchClass";
     private static final String KEY_FETCH_AT_PREFIX = "bgFetchAt_";
     private static final String KEY_NOTIFICATION_PROMPTS = "notificationPrompts";
+    private static final String KEY_PROMPTS_INSTALL = "notificationPromptsInstall";
+    /// Cached `firstInstallTime`; constant for the life of the process.
+    private static volatile long installStamp;
 
     private CN1SurfaceStore() {
     }
@@ -232,24 +235,56 @@ public final class CN1SurfaceStore {
     /// an explicit "Don't allow", a dialog the user dismissed without choosing, or a request the
     /// system auto-denied without showing anything -- costs at most one more attempt instead of
     /// being locked in as a permanent refusal on the first one.
+    ///
+    /// The count is scoped to one installation. Codename One builds allow backup by default, so
+    /// these preferences ride along to a reinstall or a new device, where a restored "2" would
+    /// silently suppress the dialog forever on what the API documents as a fresh install --
+    /// exactly the permanent silent failure this whole path exists to remove. Stamping the count
+    /// with the install it was earned against costs one cached lookup and needs no build-side
+    /// backup rules.
     public static int getNotificationPromptCount(Context ctx) {
-        return prefs(ctx).getInt(KEY_NOTIFICATION_PROMPTS, 0);
+        SharedPreferences prefs = prefs(ctx);
+        if (prefs.getLong(KEY_PROMPTS_INSTALL, 0) != installStamp(ctx)) {
+            return 0;
+        }
+        return prefs.getInt(KEY_NOTIFICATION_PROMPTS, 0);
     }
 
     /// Counts one raised prompt; see [#getNotificationPromptCount(Context)].
     public static void recordNotificationPrompt(Context ctx) {
-        SharedPreferences prefs = prefs(ctx);
-        prefs.edit().putInt(KEY_NOTIFICATION_PROMPTS,
-                prefs.getInt(KEY_NOTIFICATION_PROMPTS, 0) + 1).apply();
+        prefs(ctx).edit()
+                .putInt(KEY_NOTIFICATION_PROMPTS, getNotificationPromptCount(ctx) + 1)
+                .putLong(KEY_PROMPTS_INSTALL, installStamp(ctx))
+                .apply();
     }
 
     /// Forgets the prompt count once the permission is held, so a user who grants, later revokes
     /// in the system settings and comes back gets the same two attempts a fresh install does.
     public static void clearNotificationPrompts(Context ctx) {
         SharedPreferences prefs = prefs(ctx);
-        if (prefs.getInt(KEY_NOTIFICATION_PROMPTS, 0) != 0) {
-            prefs.edit().remove(KEY_NOTIFICATION_PROMPTS).apply();
+        if (prefs.contains(KEY_NOTIFICATION_PROMPTS) || prefs.contains(KEY_PROMPTS_INSTALL)) {
+            prefs.edit().remove(KEY_NOTIFICATION_PROMPTS).remove(KEY_PROMPTS_INSTALL).apply();
         }
+    }
+
+    /// Identifies the current installation. `firstInstallTime` survives app *updates* -- which
+    /// must not hand back a spent budget -- but changes on a genuine reinstall and on a restore
+    /// to another device, which is precisely the line this needs to draw.
+    private static long installStamp(Context ctx) {
+        long stamp = installStamp;
+        if (stamp != 0) {
+            return stamp;
+        }
+        try {
+            stamp = ctx.getPackageManager()
+                    .getPackageInfo(ctx.getPackageName(), 0).firstInstallTime;
+        } catch (Throwable t) {
+            // unknown: 0 matches the default of an unstamped preference, so a count written
+            // under a known stamp is discarded rather than trusted
+            stamp = 0;
+        }
+        installStamp = stamp;
+        return stamp;
     }
 
     // --- internals ------------------------------------------------------------

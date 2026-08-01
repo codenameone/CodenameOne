@@ -64,6 +64,10 @@ public final class CN1LiveActivityManager {
     private static final int MAX_NOTIFICATION_PROMPTS = 2;
     /// Guards the permission request so concurrent starts raise one dialog and count one answer.
     private static final Object PERMISSION_LOCK = new Object();
+    private static final int DECLARED_PRESENT = 1;
+    private static final int DECLARED_MISSING = 2;
+    /// Cached manifest verdict: 0 not looked up yet, otherwise one of the DECLARED_ constants.
+    private static volatile int permissionDeclaredState;
 
     private CN1LiveActivityManager() {
     }
@@ -99,8 +103,14 @@ public final class CN1LiveActivityManager {
             }
             // From API 33 notifications also read as disabled while POST_NOTIFICATIONS is merely
             // ungranted, which is the state of every fresh install. Granted-but-disabled is the
-            // settled choice again; ungranted is supported while a prompt attempt remains.
-            return !hasPostNotificationsPermission(ctx) && canPromptAgain(ctx);
+            // settled choice again; ungranted is supported while the permission is one the app
+            // can actually ask for and a prompt attempt remains. The manifest test is what keeps
+            // an app that publishes widgets but never set "liveActivities": true from reporting
+            // supported forever: no declaration means no prompt, so no attempt is ever spent and
+            // the count alone would never settle.
+            return !hasPostNotificationsPermission(ctx)
+                    && !isPermissionMissing(ctx)
+                    && canPromptAgain(ctx);
         } catch (Throwable t) {
             return false;
         }
@@ -286,6 +296,14 @@ public final class CN1LiveActivityManager {
     /// `AndroidImplementation#getRequestedPermissions()` is what keeps those apart -- that helper
     /// flattens both a missing package and an unreadable one into the same empty list.
     private static boolean isPermissionMissing(Context ctx) {
+        // `isSupported` consults this, and apps do call it per screen or per frame, so the binder
+        // round trip is cached. A manifest cannot change under a live process -- an app update
+        // kills it first -- and only a definite answer is cached, so a lookup that failed is
+        // retried rather than frozen.
+        int cached = permissionDeclaredState;
+        if (cached != 0) {
+            return cached == DECLARED_MISSING;
+        }
         try {
             android.content.pm.PackageInfo info = ctx.getPackageManager().getPackageInfo(
                     ctx.getPackageName(), PackageManager.GET_PERMISSIONS);
@@ -293,15 +311,17 @@ public final class CN1LiveActivityManager {
                 return false;
             }
             String[] declared = info.requestedPermissions;
-            if (declared == null) {
-                return true;
-            }
-            for (String p : declared) {
-                if ("android.permission.POST_NOTIFICATIONS".equals(p)) {
-                    return false;
+            boolean missing = true;
+            if (declared != null) {
+                for (String p : declared) {
+                    if ("android.permission.POST_NOTIFICATIONS".equals(p)) {
+                        missing = false;
+                        break;
+                    }
                 }
             }
-            return true;
+            permissionDeclaredState = missing ? DECLARED_MISSING : DECLARED_PRESENT;
+            return missing;
         } catch (Throwable t) {
             return false;
         }
