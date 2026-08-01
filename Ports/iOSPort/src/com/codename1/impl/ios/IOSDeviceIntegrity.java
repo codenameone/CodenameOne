@@ -69,42 +69,45 @@ import java.util.Map;
  * <h2>ParparVM note</h2>
  *
  * <p>The native side dispatches results back through the static callbacks
- * below. As with {@link IOSBiometrics}, the static initializer invokes each with
- * no-op values so the dead-code eliminator does not strip them -- no Java caller
- * exists, and without a reachable reference they become empty stubs and the
- * native call silently does nothing.</p>
+ * below. As with {@link IOSBiometrics}, the static initializer invokes each once
+ * so the dead-code eliminator does not strip them -- no Java caller exists, and
+ * without a reachable reference they become empty stubs and the native call
+ * silently does nothing. Each returns immediately while that is happening; see
+ * {@code dceGuard}.</p>
  */
 final class IOSDeviceIntegrity {
 
     /**
-     * Never true. Exists so the call sites below are real call sites.
+     * True only while the retention calls below are running, so each callback returns
+     * before it touches anything.
      *
-     * <p>Not {@code final}, and not a compile-time constant: javac deletes the body of
-     * an {@code if} on a constant false, which would take the very references this is
-     * here to keep. A plain field is opaque to it, and the translator's elimination pass
-     * works on reachability in the bytecode rather than on whether the branch can be
-     * taken -- so the callbacks survive and nothing runs.</p>
+     * <p>The same idiom as {@code IOSCarPlayCallbacks} and {@code IOSSurfaceCallbacks},
+     * and it is deliberately not the more obvious {@code if (neverTrue) { call(); }}:
+     * the call has to be unconditional for the eliminator to be certain to keep it,
+     * whereas a branch on a field nothing ever assigns is something an optimizer is
+     * entitled to fold away -- taking the reference with it, silently, and leaving the
+     * native dispatch calling an empty stub.</p>
      */
-    private static boolean retainNativeCallbacks;
+    private static boolean dceGuard;
 
     static {
         // Prevents the iOS VM optimizer from eliding these native callbacks: no Java
         // caller exists, and without a reference they translate to empty stubs and the
         // native dispatch silently does nothing.
         //
-        // Guarded rather than invoked. Calling them for real ran the callback bodies
-        // during class initialization -- before the static fields below this block were
-        // assigned, since static initializers run in textual order -- so take() locked
-        // on a null REQUESTS map and threw. The class initializes on the EDT, so that
-        // NPE reached Display's EDT handler, which shows a modal error dialog: the app
-        // hung on a dialog nobody could dismiss the first time anything touched device
-        // integrity. A reference the optimizer can see is all that was ever needed.
-        if (retainNativeCallbacks) {
-            nativeKeyGenerated(-1, null);
-            nativeAttestationReady(-1, null);
-            nativeAssertionReady(-1, null);
-            nativeAttestError(-1, -1, null);
-        }
+        // The guard is what makes the calls harmless. Without it they ran their real
+        // bodies during class initialization -- before the static fields below this
+        // block were assigned, since static initializers run in textual order -- so
+        // take() synchronized on a null REQUESTS map and threw. This class initializes
+        // on the EDT, so that NPE reached Display's EDT handler, which shows a modal
+        // error dialog: the app hung at launch on a dialog nobody could dismiss, the
+        // first time anything asked about device integrity.
+        dceGuard = true;
+        nativeKeyGenerated(-1, null);
+        nativeAttestationReady(-1, null);
+        nativeAssertionReady(-1, null);
+        nativeAttestError(-1, -1, null);
+        dceGuard = false;
     }
 
     static final String TOKEN_PREFIX = "cn1aa1";
@@ -647,6 +650,9 @@ final class IOSDeviceIntegrity {
 
     /** Called from native once a fresh hardware key exists. */
     public static void nativeKeyGenerated(final int requestId, final String keyId) {
+        if (dceGuard) {
+            return;
+        }
         PendingRequest pending = take(requestId);
         if (pending == null || instance == null) {
             return;
@@ -692,6 +698,9 @@ final class IOSDeviceIntegrity {
 
     /** Called from native with the attestation object for a newly attested key. */
     public static void nativeAttestationReady(final int requestId, final String attestationB64) {
+        if (dceGuard) {
+            return;
+        }
         PendingRequest pending = take(requestId);
         if (pending == null) {
             return;
@@ -784,6 +793,9 @@ final class IOSDeviceIntegrity {
 
     /** Called from native with an assertion over an already attested key. */
     public static void nativeAssertionReady(final int requestId, final String assertionB64) {
+        if (dceGuard) {
+            return;
+        }
         PendingRequest pending = take(requestId);
         if (pending == null) {
             return;
@@ -828,6 +840,9 @@ final class IOSDeviceIntegrity {
     /** Called from native when any step fails. errorCode is the raw DCError code. */
     public static void nativeAttestError(final int requestId, final int errorCode,
             final String msg) {
+        if (dceGuard) {
+            return;
+        }
         PendingRequest pending = take(requestId);
         if (pending == null) {
             return;
