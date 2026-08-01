@@ -165,7 +165,19 @@ final class IOSDeviceIntegrity {
      * time, then a reset, which costs another rate-limited key on top of the one already
      * wasted.</p>
      */
-    private static final String KEY_ATTEST_UNDELIVERED = "cn1.appattest.attestUndelivered";
+    /**
+     * The state of a key whose attestation has been produced but not handed to anyone.
+     *
+     * <p>A VALUE of the state item rather than an item of its own, which is the whole
+     * point: the two facts -- Apple attested this key, and nobody has received the
+     * object -- move together or not at all. Written separately, a keychain that took the
+     * state and refused the marker left a key that reads as ordinary pending, so the next
+     * launch waited out the grace window and promoted a key the backend has never seen.
+     * One write cannot half-succeed.</p>
+     *
+     * <p>Promoted to {@link #STATE_PENDING} the moment a caller takes delivery.</p>
+     */
+    private static final String STATE_PENDING_UNDELIVERED = "pendingUndelivered";
 
     private static final String STATE_NEW = "new";
     private static final String STATE_ATTESTED = "attested";
@@ -277,6 +289,18 @@ final class IOSDeviceIntegrity {
      * different nonce would produce a token the backend rejects, which is the failure
      * this exists to avoid rather than a way out of it.</p>
      */
+    /**
+     * The key this process knows was delivered, when the keychain refused to record it.
+     *
+     * <p>Delivery promotes {@link #STATE_PENDING_UNDELIVERED} to {@link #STATE_PENDING}.
+     * If that write is refused, the persisted state still says nobody received the
+     * attestation -- and the next request would discard a key the backend may already
+     * have registered, on the strength of a fact this process knows to be out of date.
+     * Same shape as every other in-memory override here: the keychain copy survives a
+     * restart, this one survives the keychain saying no.</p>
+     */
+    private String deliveredAttestKeyId;
+
     private String undeliveredAttestKeyId;
     private String undeliveredAttestNonce;
     private String undeliveredAttestToken;
@@ -385,7 +409,7 @@ final class IOSDeviceIntegrity {
             undeliveredAttestKeyId = null;
             undeliveredAttestNonce = null;
             undeliveredAttestToken = null;
-            store.remove(KEY_ATTEST_UNDELIVERED);
+            deliveredAttestKeyId = null;
             inMemoryStateKeyId = null;
             inMemoryState = null;
             pendingSinceInMemory = 0L;
@@ -475,7 +499,8 @@ final class IOSDeviceIntegrity {
             // persisted one: both are only ever set for the key this process is actually
             // holding, and a reset clears both together.
             boolean pendingInMemory = keyId.equals(inMemoryStateKeyId)
-                    && STATE_PENDING.equals(inMemoryState);
+                    && (STATE_PENDING.equals(inMemoryState)
+                        || STATE_PENDING_UNDELIVERED.equals(inMemoryState));
             if (!keyId.equals(store.get(KEY_ID)) && !pendingInMemory) {
                 return;
             }
@@ -490,7 +515,11 @@ final class IOSDeviceIntegrity {
             // marker is still there, because the path that clears it never ran) and
             // discarded for another rate-limited key. Honouring the in-memory state costs
             // nothing when the keychain is healthy and is the whole point of holding it.
-            if (!pendingInMemory && !STATE_PENDING.equals(store.get(KEY_STATE))) {
+            // Either spelling. A backend confirming the key is proof somebody took
+            // delivery, whatever this device managed to record about it.
+            String persisted = store.get(KEY_STATE);
+            if (!pendingInMemory && !STATE_PENDING.equals(persisted)
+                    && !STATE_PENDING_UNDELIVERED.equals(persisted)) {
                 return;
             }
             promoteToAttested(store, keyId, pendingInMemory);
@@ -532,7 +561,7 @@ final class IOSDeviceIntegrity {
         store.remove(KEY_ATTEST_STARTED);
         store.remove(KEY_ATTEST_ACCEPTED);
         // Registered, so whatever happened to the delivery no longer matters.
-        store.remove(KEY_ATTEST_UNDELIVERED);
+        deliveredAttestKeyId = null;
         undeliveredAttestKeyId = null;
         undeliveredAttestNonce = null;
         undeliveredAttestToken = null;
@@ -604,12 +633,15 @@ final class IOSDeviceIntegrity {
                     && keyId.equals(store.get(KEY_ATTEST_ACCEPTED))) {
                 state = STATE_PENDING;
             }
-            // The durable marker counts as much as the in-memory copy: after a restart it
-            // is the only thing that knows this key's one-time attestation went nowhere.
-            boolean neverDelivered = keyId != null && keyId.length() > 0
-                    && (keyId.equals(undeliveredAttestKeyId)
-                        || keyId.equals(store.get(KEY_ATTEST_UNDELIVERED)));
-            if (STATE_PENDING.equals(state) && neverDelivered) {
+            // Delivery that the keychain refused to record still happened. Without this
+            // the state says nobody received the attestation and the branch below
+            // discards a key the backend may already have registered.
+            if (STATE_PENDING_UNDELIVERED.equals(state) && keyId != null
+                    && keyId.equals(deliveredAttestKeyId)) {
+                state = STATE_PENDING;
+            }
+            if (STATE_PENDING_UNDELIVERED.equals(state) && keyId != null
+                    && keyId.length() > 0) {
                 // An attestation was produced for this key and nobody took it -- the
                 // caller cancelled while Apple was working. It cannot be produced again,
                 // so it is handed to the retry that asks for the same challenge.
@@ -619,7 +651,7 @@ final class IOSDeviceIntegrity {
                     undeliveredAttestKeyId = null;
                     undeliveredAttestNonce = null;
                     undeliveredAttestToken = null;
-                    store.remove(KEY_ATTEST_UNDELIVERED);
+                    store.set(KEY_STATE, STATE_PENDING);
                     r.complete(token);
                     return r;
                 }
@@ -633,7 +665,6 @@ final class IOSDeviceIntegrity {
                 undeliveredAttestKeyId = null;
                 undeliveredAttestNonce = null;
                 undeliveredAttestToken = null;
-                store.remove(KEY_ATTEST_UNDELIVERED);
                 resetLocked();
                 keyId = null;
                 state = null;
@@ -985,7 +1016,7 @@ final class IOSDeviceIntegrity {
                 return;
             }
             SecureStorage store = SecureStorage.getInstance();
-            if (!store.set(KEY_STATE, STATE_PENDING)) {
+            if (!store.set(KEY_STATE, STATE_PENDING_UNDELIVERED)) {
                 // The key is attested with Apple and the keychain will not record it.
                 //
                 // Reporting success would leave the next request attesting the same key
@@ -997,7 +1028,7 @@ final class IOSDeviceIntegrity {
                 // exactly as the deadline below is, and this request is failed so the
                 // caller retries into a state that now describes the key correctly.
                 instance.inMemoryStateKeyId = pending.keyId;
-                instance.inMemoryState = STATE_PENDING;
+                instance.inMemoryState = STATE_PENDING_UNDELIVERED;
                 instance.pendingSinceInMemory = System.currentTimeMillis();
                 // And durably, in a DIFFERENT item, because process memory does not
                 // survive the restart this is most likely to be followed by: storage
@@ -1094,12 +1125,12 @@ final class IOSDeviceIntegrity {
                 instance.undeliveredAttestKeyId = pending.keyId;
                 instance.undeliveredAttestNonce = pending.nonce;
                 instance.undeliveredAttestToken = attestToken;
-                // And durably, before anyone can take delivery. Only the fact, not the
-                // object: an attestation covers one challenge and a later launch asks for
-                // a new one, so a stored copy could never be used across a restart --
-                // whereas knowing the key was never delivered is what stops the next
-                // launch promoting it into assertions the backend must reject.
-                SecureStorage.getInstance().set(KEY_ATTEST_UNDELIVERED, pending.keyId);
+                // The durable half is the STATE the callback above wrote:
+                // STATE_PENDING_UNDELIVERED. Only the fact is persisted, never the
+                // object -- an attestation covers one challenge and a later launch asks
+                // for a new one, so a stored copy could not be used across a restart
+                // anyway, whereas knowing nobody received it is what stops the next
+                // launch promoting a key the backend has never seen.
             }
         }
         succeed(pending, attestToken, true);
@@ -1440,10 +1471,23 @@ final class IOSDeviceIntegrity {
                 if (attestation) {
                     synchronized (instance.flowLock) {
                         if (token.equals(instance.undeliveredAttestToken)) {
+                            String keyId = instance.undeliveredAttestKeyId;
                             instance.undeliveredAttestKeyId = null;
                             instance.undeliveredAttestNonce = null;
                             instance.undeliveredAttestToken = null;
-                            SecureStorage.getInstance().remove(KEY_ATTEST_UNDELIVERED);
+                            // Somebody has it, so the key is pending registration rather
+                            // than pending delivery. A refused write leaves the persisted
+                            // state saying nobody received it, which would have the next
+                            // request discard a key the backend may already know -- so
+                            // this process remembers what it did.
+                            SecureStorage store = SecureStorage.getInstance();
+                            if (STATE_PENDING_UNDELIVERED.equals(store.get(KEY_STATE))
+                                    && !store.set(KEY_STATE, STATE_PENDING)) {
+                                instance.deliveredAttestKeyId = keyId;
+                            }
+                            if (STATE_PENDING_UNDELIVERED.equals(instance.inMemoryState)) {
+                                instance.inMemoryState = STATE_PENDING;
+                            }
                         }
                     }
                 }
