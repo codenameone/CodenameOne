@@ -409,19 +409,51 @@ final class IOSDeviceIntegrity {
             // STATE_ATTESTED over a STATE_NEW key Apple has not attested yet -- and the
             // next request would assert against it.
             SecureStorage store = SecureStorage.getInstance();
-            if (!STATE_PENDING.equals(store.get(KEY_STATE))) {
+            // It must acknowledge THIS key. A response for an earlier attestation can
+            // arrive after a reset has already replaced the identity, and promoting on
+            // that would mark a key attested that the backend has never seen -- so the
+            // next assertion is rejected and costs another reset, which is the loop this
+            // state exists to break. The in-memory identity counts as much as the
+            // persisted one: both are only ever set for the key this process is actually
+            // holding, and a reset clears both together.
+            boolean pendingInMemory = keyId.equals(inMemoryStateKeyId)
+                    && STATE_PENDING.equals(inMemoryState);
+            if (!keyId.equals(store.get(KEY_ID)) && !pendingInMemory) {
                 return;
             }
-            // And it must acknowledge THIS key. A response for an earlier attestation
-            // can arrive after a reset has already replaced the identity, and promoting
-            // on that would mark a key attested that the backend has never seen -- so
-            // the next assertion is rejected and costs another reset, which is the loop
-            // this state exists to break.
-            if (!keyId.equals(store.get(KEY_ID))) {
+            // What this process knows wins over what the keychain managed to store, the
+            // same rule the request path follows.
+            //
+            // When the write recording the attestation was refused, storage still says
+            // "new" -- so reading it alone dropped the backend's acknowledgement of a key
+            // Apple had already attested, and dropped it permanently: the acceptance is
+            // never re-sent. The key then sat until the grace window promoted it, or, if
+            // the app restarted first, was read as an interrupted attestation (the start
+            // marker is still there, because the path that clears it never ran) and
+            // discarded for another rate-limited key. Honouring the in-memory state costs
+            // nothing when the keychain is healthy and is the whole point of holding it.
+            if (!pendingInMemory && !STATE_PENDING.equals(store.get(KEY_STATE))) {
                 return;
             }
-            store.set(KEY_STATE, STATE_ATTESTED);
+            if (!store.set(KEY_STATE, STATE_ATTESTED)) {
+                // Still a promotion, just one only this process knows about -- exactly
+                // what the grace-window promotion does when the keychain refuses it.
+                inMemoryStateKeyId = keyId;
+                inMemoryState = STATE_ATTESTED;
+            }
             store.remove(KEY_PENDING_SINCE);
+            // Then the rest of the bookkeeping the attestation callback does on its way
+            // out, because the branch that recorded a refused state write returned before
+            // reaching any of it. The start marker left behind makes an attested key look
+            // like an interrupted attempt on the next launch and costs a replacement key
+            // -- the precise outcome the in-memory state exists to avoid, arrived at one
+            // step later -- and a recovery marker left behind refuses the one-shot
+            // replacement the next time iOS legitimately invalidates this key. Doing it
+            // here rather than only there is harmless on the healthy path: it removes
+            // entries that are already gone.
+            store.remove(KEY_ATTEST_STARTED);
+            attestAnsweredForKey = null;
+            recoverySpentInMemory = !store.remove(KEY_RECOVERY_SPENT);
         }
     }
 

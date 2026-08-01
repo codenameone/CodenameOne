@@ -131,6 +131,20 @@ public final class AppShield {
             initializing = true;
         }
         try {
+            // Installed FIRST, before the engine is given a chance to run.
+            //
+            // Publishing `initializing` is not enough on its own: a request that starts
+            // while the engine is still initializing only reaches awaitInitialization()
+            // if something routes it there, and the only thing that does is the guard.
+            // With the install last, a concurrent ConnectionRequest found a null guard at
+            // performOperationComplete(), skipped the shield entirely and opened the
+            // connection -- so a fail-closed protected host could be called with neither a
+            // token nor a pin check for as long as engine.initialize() took, which on a
+            // cold start is exactly when it takes longest. The guard reads the
+            // configuration live and every path through it waits for initialization, so
+            // installing it before the engine makes that window a wait rather than a
+            // bypass.
+            installNetworkGuard();
             ShieldEngine engine = ShieldEngineRegistry.getEngine();
             try {
                 engine.initialize(contextForEngine(), config);
@@ -140,15 +154,32 @@ public final class AppShield {
                 Log.e(t);
                 setStatus(ShieldStatus.UNPROTECTED);
             }
-            // Installed BEFORE initialization is published, so there is no instant at
-            // which the shield claims to be up and a request can slip past unprotected.
-            installNetworkGuard();
         } finally {
             synchronized (AppShield.class) {
                 initializing = false;
                 initialized = true;
                 AppShield.class.notifyAll();
             }
+        }
+    }
+
+    /// Test hook: puts the shield back to its pre-`init()` state.
+    ///
+    /// `init()` is deliberately one-shot, so without this the ordering it guarantees can
+    /// only be asserted once per JVM -- and the ordering is the thing that has been wrong
+    /// twice. Matches the hooks
+    /// [com.codename1.security.shield.spi.ShieldEngineRegistry] and
+    /// [com.codename1.io.NetworkManager] already carry for the same reason.
+    static void resetForTesting() {
+        synchronized (AppShield.class) {
+            config = null;
+            initialized = false;
+            initializing = false;
+            guard = null;
+            lastStatus = ShieldStatus.NOT_INITIALIZED;
+            runtimeHosts.clear();
+            listeners.removeAllElements();
+            AppShield.class.notifyAll();
         }
     }
 
