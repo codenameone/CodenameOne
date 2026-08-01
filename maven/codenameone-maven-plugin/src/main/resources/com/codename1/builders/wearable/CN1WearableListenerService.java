@@ -204,7 +204,8 @@ public class CN1WearableListenerService extends WearableListenerService {
                         // Record the survivor's sequence as delivered. Without it the path has no
                         // delivery stamp, so an older item still queued under another authority
                         // would pass the newer-than-delivered test and overwrite the winner.
-                        CN1WearableBridge.isNewerThanDelivered(appPath, remaining.sequence);
+                        CN1WearableBridge.isNewerThanDelivered(
+                                appPath, remaining.sequence, remaining.node);
                         WearableConnection.deliverDataChanged(appPath, remaining.payload);
                     } else {
                         WearableConnection.deliverDataRemoved(appPath);
@@ -224,7 +225,7 @@ public class CN1WearableListenerService extends WearableListenerService {
                 continue;
             }
             if (!CN1WearableBridge.isNewerThanDelivered(
-                    appPath, CN1WearableBridge.sequenceOf(value))) {
+                    appPath, CN1WearableBridge.sequenceOf(value), uri.getHost())) {
                 // An older item arriving after a newer one, which a reconnect can do when both nodes
                 // publish this path. getData() would return the newer value, so delivering this would
                 // make the listener and the getter disagree.

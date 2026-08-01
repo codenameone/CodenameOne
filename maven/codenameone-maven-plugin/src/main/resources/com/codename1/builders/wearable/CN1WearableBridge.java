@@ -1189,13 +1189,18 @@ public class CN1WearableBridge implements WearableBridge {
      * @param sequence the item's publication stamp
      * @return true when the event should be delivered
      */
-    static boolean isNewerThanDelivered(String path, long sequence) {
+    static boolean isNewerThanDelivered(String path, long sequence, String node) {
         synchronized (deliveredSequences) {
-            Long previous = deliveredSequences.get(path);
-            if (previous != null && sequence <= previous.longValue()) {
-                return false;
+            String previous = deliveredSequences.get(path);
+            if (previous != null) {
+                int split = previous.indexOf('|');
+                long prevSeq = Long.parseLong(previous.substring(0, split));
+                String prevNode = previous.substring(split + 1);
+                if (!outranks(sequence, node, prevSeq, prevNode.length() == 0 ? null : prevNode)) {
+                    return false;
+                }
             }
-            deliveredSequences.put(path, Long.valueOf(sequence));
+            deliveredSequences.put(path, sequence + "|" + (node == null ? "" : node));
             return true;
         }
     }
@@ -1224,9 +1229,9 @@ public class CN1WearableBridge implements WearableBridge {
      * re-synced copy of a very old transfer could be delivered twice, and the sender's own sweep
      * removes those items long before that many newer ones accumulate.
      */
-    private static final Map<String, Long> deliveredSequences =
-            new java.util.LinkedHashMap<String, Long>(64, 0.75f, true) {
-                protected boolean removeEldestEntry(Map.Entry<String, Long> eldest) {
+    private static final Map<String, String> deliveredSequences =
+            new java.util.LinkedHashMap<String, String>(64, 0.75f, true) {
+                protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
                     return size() > MAX_DELIVERY_KEYS;
                 }
             };
@@ -1253,11 +1258,42 @@ public class CN1WearableBridge implements WearableBridge {
     static final class ResolvedValue {
         final byte[] payload;
         final long sequence;
+        /** The node that published it, which is also how a sequence tie is broken. */
+        final String node;
 
-        ResolvedValue(byte[] payload, long sequence) {
+        ResolvedValue(byte[] payload, long sequence, String node) {
             this.payload = payload;
             this.sequence = sequence;
+            this.node = node;
         }
+    }
+
+    /**
+     * Whether one publication beats another, ties included.
+     *
+     * <p>Two devices that publish the same path in the same millisecond before observing each other
+     * produce identical sequences -- the logical clock only orders them once one has seen the other.
+     * Without a tiebreak, {@code getData()} keeps whichever item the buffer happened to yield first
+     * while the delivery path keeps whichever arrived first, so the getter and the listener can
+     * disagree and two watches can settle on different values for the same path.
+     *
+     * <p>The publishing node id is the tiebreak: it is stable, it is visible to every device, and
+     * comparing it lexicographically makes every device pick the same winner.
+     *
+     * @param seq the candidate's sequence
+     * @param node the candidate's publishing node
+     * @param bestSeq the incumbent's sequence
+     * @param bestNode the incumbent's publishing node
+     * @return true when the candidate should win
+     */
+    static boolean outranks(long seq, String node, long bestSeq, String bestNode) {
+        if (seq != bestSeq) {
+            return seq > bestSeq;
+        }
+        if (node == null) {
+            return false;
+        }
+        return bestNode == null || node.compareTo(bestNode) > 0;
     }
 
     /**
@@ -1281,18 +1317,21 @@ public class CN1WearableBridge implements WearableBridge {
             try {
                 byte[] best = null;
                 long bestSeq = Long.MIN_VALUE;
+                String bestNode = null;
                 for (DataItem item : items) {
                     DataMap map = valueMap(item);
                     if (map == null) {
                         continue;
                     }
                     long seq = sequenceOf(map);
-                    if (best == null || seq > bestSeq) {
+                    String node = item.getUri().getHost();
+                    if (best == null || outranks(seq, node, bestSeq, bestNode)) {
                         best = payloadOf(map);
                         bestSeq = seq;
+                        bestNode = node;
                     }
                 }
-                return best == null ? null : new ResolvedValue(best, bestSeq);
+                return best == null ? null : new ResolvedValue(best, bestSeq, bestNode);
             } finally {
                 items.release();
             }
@@ -1353,7 +1392,7 @@ public class CN1WearableBridge implements WearableBridge {
         // logical path and file name; their items differ only in the Uri authority, so dropping it
         // would treat the two as one stream and discard the second sender's file whenever its
         // sequence did not happen to exceed the first's.
-        return isNewerThanDelivered("\u0000xfer:" + uri.getHost() + ":" + uri.getPath(), sequence);
+        return isNewerThanDelivered("\u0000xfer:" + uri.getHost() + ":" + uri.getPath(), sequence, uri.getHost());
     }
 
     /**
