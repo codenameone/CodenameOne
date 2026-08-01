@@ -341,14 +341,18 @@ public class MCPServer {
 
     private void releaseOpenLock(MCPTransport t) {
         synchronized (openLocks) {
-            for (Object[] entry : openLocks) {
+            // Iterator.remove rather than List.remove during a foreach. The foreach
+            // version could not actually throw -- it returned before the iterator was
+            // touched again -- but that made its safety depend on a `return` three lines
+            // away, which is the kind of coupling a later edit breaks without anything
+            // saying so. This shape is safe on its own terms.
+            for (java.util.Iterator<Object[]> it = openLocks.iterator(); it.hasNext();) {
+                Object[] entry = it.next();
                 if (entry[0] == t) { // NOPMD identity: one lock per transport INSTANCE
                     int[] users = (int[]) entry[2];
                     users[0]--;
                     if (users[0] <= 0) {
-                        // Safe to remove while iterating only because this returns
-                        // immediately afterwards.
-                        openLocks.remove(entry);
+                        it.remove();
                     }
                     return;
                 }
