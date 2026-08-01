@@ -62,6 +62,8 @@ public final class CN1LiveActivityManager {
     /// Prompt attempts before live activities report unsupported; Android's own model auto-denies
     /// after two refusals, so a third attempt would never reach the user anyway.
     private static final int MAX_NOTIFICATION_PROMPTS = 2;
+    /// Guards the permission request so concurrent starts raise one dialog and count one answer.
+    private static final Object PERMISSION_LOCK = new Object();
 
     private CN1LiveActivityManager() {
     }
@@ -192,50 +194,61 @@ public final class CN1LiveActivityManager {
             CN1SurfaceStore.clearNotificationPrompts(ctx);
             return true;
         }
-        if (!canPromptAgain(ctx)) {
-            Log.w(TAG, "Live activities are unavailable: POST_NOTIFICATIONS was refused twice. "
-                    + "LiveActivity.isSupported() reports false until the user enables "
-                    + "notifications for this app in the system settings.");
+        // `start` is callable from any thread and `checkForPermission` drives the activity's one
+        // shared request flag and request code, so two concurrent starts would otherwise raise a
+        // single dialog whose single outcome released both callers -- and then be counted twice,
+        // spending the whole budget on one answer. One request at a time; whoever waited re-reads
+        // the state the winner produced.
+        synchronized (PERMISSION_LOCK) {
+            if (hasPostNotificationsPermission(ctx)) {
+                CN1SurfaceStore.clearNotificationPrompts(ctx);
+                return true;
+            }
+            if (!canPromptAgain(ctx)) {
+                Log.w(TAG, "Live activities are unavailable: POST_NOTIFICATIONS was refused "
+                        + "twice. LiveActivity.isSupported() reports false until the user enables "
+                        + "notifications for this app in the system settings.");
+                return false;
+            }
+            if (!hasForegroundActivity()) {
+                // nothing to prompt from -- a live activity started from a background service, a
+                // push, or with the app stopped. Not counted as an attempt, so the next start
+                // with the app in front still asks.
+                Log.w(TAG, "Cannot start a live activity: POST_NOTIFICATIONS has not been granted "
+                        + "and the app is not in the foreground to request it. Start the first "
+                        + "live activity while the app is visible.");
+                return false;
+            }
+            if (isPermissionMissing(ctx)) {
+                // requesting an undeclared permission is auto-denied without any UI; not counted
+                // as an attempt either, so fixing the manifest is all it takes
+                Log.e(TAG, "Cannot start a live activity: POST_NOTIFICATIONS is missing from the "
+                        + "manifest. The build declares it for apps whose surfaces.json sets "
+                        + "\"liveActivities\": true -- add that and rebuild.");
+                return false;
+            }
+            boolean granted;
+            try {
+                granted = AndroidImplementation.checkForPermission(
+                        "android.permission.POST_NOTIFICATIONS",
+                        "This is required to show live activities", true);
+            } catch (Throwable t) {
+                // the request never completed, so it is not an attempt the user spent
+                Log.w(TAG, "Failed to request the POST_NOTIFICATIONS permission", t);
+                return false;
+            }
+            if (granted) {
+                CN1SurfaceStore.clearNotificationPrompts(ctx);
+                return true;
+            }
+            // counted only now that the request came back ungranted: a prompt the app died
+            // during, or one that threw, is not an answer and must not spend part of the budget
+            CN1SurfaceStore.recordNotificationPrompt(ctx);
+            Log.w(TAG, "Live activities are unavailable for now: POST_NOTIFICATIONS was not "
+                    + "granted (attempt " + CN1SurfaceStore.getNotificationPromptCount(ctx)
+                    + " of " + MAX_NOTIFICATION_PROMPTS + ").");
             return false;
         }
-        if (!hasForegroundActivity()) {
-            // nothing to prompt from -- a live activity started from a background service, a
-            // push, or with the app stopped. Not counted as an attempt, so the next start with
-            // the app in front still asks.
-            Log.w(TAG, "Cannot start a live activity: POST_NOTIFICATIONS has not been granted "
-                    + "and the app is not in the foreground to request it. Start the first live "
-                    + "activity while the app is visible.");
-            return false;
-        }
-        if (isPermissionMissing(ctx)) {
-            // requesting an undeclared permission is auto-denied without any UI; not counted as
-            // an attempt either, so fixing the manifest is all it takes
-            Log.e(TAG, "Cannot start a live activity: POST_NOTIFICATIONS is missing from the "
-                    + "manifest. The build declares it for apps whose surfaces.json sets "
-                    + "\"liveActivities\": true -- add that and rebuild.");
-            return false;
-        }
-        boolean granted;
-        try {
-            granted = AndroidImplementation.checkForPermission(
-                    "android.permission.POST_NOTIFICATIONS",
-                    "This is required to show live activities", true);
-        } catch (Throwable t) {
-            // the request never completed, so it is not an attempt the user spent
-            Log.w(TAG, "Failed to request the POST_NOTIFICATIONS permission", t);
-            return false;
-        }
-        if (granted) {
-            CN1SurfaceStore.clearNotificationPrompts(ctx);
-            return true;
-        }
-        // counted only now that the request came back ungranted: a prompt the app died during,
-        // or one that threw, is not an answer and must not spend part of the budget
-        CN1SurfaceStore.recordNotificationPrompt(ctx);
-        Log.w(TAG, "Live activities are unavailable for now: POST_NOTIFICATIONS was not granted "
-                + "(attempt " + CN1SurfaceStore.getNotificationPromptCount(ctx) + " of "
-                + MAX_NOTIFICATION_PROMPTS + ").");
-        return false;
     }
 
     /// True while a prompt attempt remains; see
