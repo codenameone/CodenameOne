@@ -179,6 +179,9 @@ public final class AppShield {
             lastStatus = ShieldStatus.NOT_INITIALIZED;
             runtimeHosts.clear();
             listeners.removeAllElements();
+            synchronized (attachedHeaderNames) {
+                attachedHeaderNames.removeAllElements();
+            }
             AppShield.class.notifyAll();
         }
     }
@@ -195,17 +198,27 @@ public final class AppShield {
     /// Safe from a network thread, which is where [#attach(ConnectionRequest)] runs by
     /// contract, and it waits on the same monitor `init()` notifies -- so the wait ends
     /// when setup does, including when the engine threw and the `finally` released it.
-    private static void awaitInitialization() {
+    /// False when the wait was cut short by an interrupt, which is NOT the same as the
+    /// shield being up.
+    ///
+    /// Returning quietly made the interrupt look like "initialization finished": the
+    /// caller then saw `initialized == false`, took its early return, and the request
+    /// went out with no token and no pin check -- on a fail-closed host, which is the one
+    /// request that must not. `ConnectionRequest` does not consult the interrupt flag
+    /// either, so nothing further down stopped it. The interrupt status is preserved for
+    /// whoever set it and the caller is told the shield could not be waited for.
+    private static boolean awaitInitialization() {
         synchronized (AppShield.class) {
             while (initializing) {
                 try {
                     AppShield.class.wait();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    return;
+                    return false;
                 }
             }
         }
+        return true;
     }
 
     /// Hooks the shield into the network stack, which is what makes
@@ -396,18 +409,33 @@ public final class AppShield {
         // through the freshly installed guard while the flag is still false. Returning
         // there sent a protected request untouched, including for a host configured to
         // fail closed, which is exactly the request that must not go out unprotected.
-        awaitInitialization();
-        if (!initialized) {
-            return;
-        }
+        boolean waited = awaitInitialization();
         String url = request.getUrl();
         String host = hostOf(url);
         HostPolicy policy = policyFor(host);
-        // Always clear first. A redirect reuses this request object with its
-        // headers intact, so a protected endpoint with an open redirect would
-        // otherwise hand a replayable token to whatever host it points at.
-        // Re-adding below is conditional on the *current* host's policy.
-        request.removeRequestHeader(getConfig().getTokenHeader());
+        // Always clear first, and clear EVERY name a token has been attached under.
+        //
+        // A redirect reuses this request object with its headers intact, so a protected
+        // endpoint with an open redirect would otherwise hand a replayable token to
+        // whatever host it points at. Removing only the currently configured name was
+        // not enough for that: ShieldConfig is mutable and getConfig() hands out the live
+        // instance, so an app that renames its token header between attempts leaves the
+        // bearer token sitting in the request under the OLD name -- and the redirect
+        // carries it to the new host. The set is tiny (one entry unless an app renames
+        // the header) and only ever grows when a name is actually used.
+        clearAttachedHeaders(request);
+        if (!waited) {
+            // Interrupted mid-wait. Nothing is known about the shield, so this is
+            // routed through the host's failure mode exactly like an engine that
+            // could not produce a token: fail-closed refuses, fail-open proceeds.
+            failOrContinue(policy, new ShieldException(ShieldStatus.NOT_INITIALIZED,
+                    "AppShield: interrupted while waiting for initialization, so no "
+                    + "token could be attached for " + host));
+            return;
+        }
+        if (!initialized) {
+            return;
+        }
         if (!policy.isAttachToken()) {
             return;
         }
@@ -431,7 +459,9 @@ public final class AppShield {
             ShieldToken token = ShieldEngineRegistry.getEngine().fetchToken(null);
             setStatus(token == null ? ShieldStatus.SERVICE_DOWN : token.getStatus());
             if (token != null && token.isValid()) {
-                request.addRequestHeader(getConfig().getTokenHeader(), token.getValue());
+                String header = getConfig().getTokenHeader();
+                rememberAttachedHeader(header);
+                request.addRequestHeader(header, token.getValue());
                 return;
             }
             failOrContinue(policy, new ShieldException(
@@ -448,6 +478,38 @@ public final class AppShield {
             setStatus(ShieldStatus.SERVICE_DOWN);
             failOrContinue(policy, new ShieldException(ShieldStatus.SERVICE_DOWN,
                     "Attestation engine failed for " + host));
+        }
+    }
+
+    /// Every header name a token has been attached under, so all of them can be cleared
+    /// before the next attempt.
+    ///
+    /// Not a single "current name", because the current name is read from a live,
+    /// mutable [ShieldConfig]: the name that has to be removed is the one that was used
+    /// when the header was set, which may no longer be configured.
+    private static final Vector attachedHeaderNames = new Vector();
+
+    private static void rememberAttachedHeader(String name) {
+        if (name == null || name.length() == 0) {
+            return;
+        }
+        synchronized (attachedHeaderNames) {
+            if (!attachedHeaderNames.contains(name)) {
+                attachedHeaderNames.addElement(name);
+            }
+        }
+    }
+
+    private static void clearAttachedHeaders(ConnectionRequest request) {
+        // The configured name as well as the used ones: an app that changes the header
+        // before the first attach still has to have that name cleared on a redirect,
+        // and a token attached by an app calling addRequestHeader itself is its own
+        // business but cheaper to clear than to reason about.
+        request.removeRequestHeader(getConfig().getTokenHeader());
+        synchronized (attachedHeaderNames) {
+            for (int i = 0; i < attachedHeaderNames.size(); i++) {
+                request.removeRequestHeader((String) attachedHeaderNames.elementAt(i));
+            }
         }
     }
 
@@ -490,7 +552,15 @@ public final class AppShield {
         }
         // As in attach(): during startup this would silently return no headers, and a
         // BrowserComponent navigating a protected host would load it unauthenticated.
-        awaitInitialization();
+        if (!awaitInitialization()) {
+            // This method returns headers rather than throwing, so there is no
+            // fail-closed path available here -- the caller decides what to do with an
+            // empty map. Saying so beats a silent one: a WebView that loads a protected
+            // page unauthenticated looks exactly like one that loaded it correctly.
+            Log.p("AppShield: interrupted while waiting for initialization, so no "
+                    + "headers were produced for " + hostOf(url));
+            return out;
+        }
         if (!initialized) {
             return out;
         }

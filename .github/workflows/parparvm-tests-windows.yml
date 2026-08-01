@@ -213,16 +213,26 @@ jobs:
             if ($LASTEXITCODE -eq 0) { $ok = $true; break }
           }
           if (-not $ok) { throw "mvn clean package failed after all retries" }
+          # This one RUNS TESTS, so the retry is restricted to the failure shape it
+          # exists for. A blanket loop lets an intermittent product regression pass on
+          # attempt two and turns a blocking gate green -- which is the opposite of what
+          # a gate is for, and worse than the flake it was hiding.
+          $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies'
           $ok = $false
           foreach ($delay in 0, 30, 90) {
             if ($delay -gt 0) {
-              Write-Host "mvn failed; retrying in $delay s..."
+              Write-Host "mvn failed on a dependency-resolution error; retrying in $delay s..."
               Start-Sleep -Seconds $delay
             }
             # Single-quote the -D args: PowerShell otherwise mangles the dotted
             # property name (splitting it at the '.').
-            mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest' '-Dsurefire.failIfNoSpecifiedTests=false'
+            # Tee-Object keeps the log on the console AND gives us something to match.
+            mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest' '-Dsurefire.failIfNoSpecifiedTests=false' 2>&1 |
+              Tee-Object -Variable mvnOutput
             if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            if (-not ($mvnOutput -match $resolutionFailure)) {
+              throw "mvn test failed for a reason that is not a transient dependency-resolution error; not retrying"
+            }
           }
           if (-not $ok) { throw "mvn test failed after all retries" }
         env:

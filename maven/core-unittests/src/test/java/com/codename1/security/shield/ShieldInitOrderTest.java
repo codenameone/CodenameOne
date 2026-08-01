@@ -155,6 +155,92 @@ class ShieldInitOrderTest extends UITestBase {
         assertFalse(init.isAlive(), "init() should have finished");
     }
 
+    /**
+     * An interrupt while waiting for startup does not turn a fail-closed host into an
+     * open one.
+     *
+     * <p>The wait used to return quietly on interrupt, which is indistinguishable from
+     * "initialization finished" -- the caller then saw the shield as uninitialized, took
+     * its early return, and the request went out with no token and no pin check.
+     * {@code ConnectionRequest} does not consult the interrupt flag either, so nothing
+     * further down stopped it. The one request that must never leave unprotected is
+     * exactly this one.</p>
+     */
+    @Test
+    void anInterruptedWaitStillRefusesAFailClosedRequest() throws Exception {
+        Thread init = initOnAnotherThread();
+        assertTrue(engine.entered.await(GENEROUS_TIMEOUT_MS, TimeUnit.MILLISECONDS),
+                "the engine should have been asked to initialize");
+
+        final NetworkGuard guard = NetworkManager.getNetworkGuard();
+        final RecordingRequest request = new RecordingRequest();
+        request.setUrl("https://api.example.com/secure");
+        final CountDownLatch done = new CountDownLatch(1);
+        final AtomicReference<Throwable> outcome = new AtomicReference<Throwable>();
+        Thread caller = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    guard.beforeRequest(request);
+                } catch (Throwable t) {
+                    outcome.set(t);
+                }
+                done.countDown();
+            }
+        }, "shield-interrupted-request");
+        caller.setDaemon(true);
+        caller.start();
+
+        // Let it park in the wait, then interrupt it there.
+        assertFalse(done.await(BLOCKED_OBSERVATION_MS, TimeUnit.MILLISECONDS));
+        caller.interrupt();
+
+        assertTrue(done.await(GENEROUS_TIMEOUT_MS, TimeUnit.MILLISECONDS),
+                "the interrupt has to end the wait");
+        assertNull(request.attached(),
+                "nothing can be attached without an initialized shield");
+        assertTrue(outcome.get() instanceof ShieldException,
+                "a fail-closed host must refuse the request rather than let it go out "
+                + "unprotected, got: " + outcome.get());
+        assertEquals(ShieldStatus.NOT_INITIALIZED,
+                ((ShieldException) outcome.get()).getStatus());
+
+        engine.release();
+        init.join(GENEROUS_TIMEOUT_MS);
+    }
+
+    /**
+     * Renaming the token header does not leave the previous one on a reused request.
+     *
+     * <p>{@code ShieldConfig} is mutable and {@code getConfig()} hands out the live
+     * instance, so the name that has to be cleared is the one the header was SET under,
+     * which may no longer be the configured one. Clearing only the current name left a
+     * bearer token in the request under its old name -- and a redirect to an unprotected
+     * host carried it there, which is precisely what the clearing exists to prevent.</p>
+     */
+    @Test
+    void renamingTheTokenHeaderStillClearsTheOneAlreadyAttached() throws Exception {
+        Thread init = initOnAnotherThread();
+        engine.release();
+        init.join(GENEROUS_TIMEOUT_MS);
+        assertFalse(init.isAlive());
+
+        RecordingRequest request = new RecordingRequest();
+        request.setUrl("https://api.example.com/secure");
+        AppShield.attach(request);
+        assertEquals("token-from-a-fully-initialized-engine", request.attached(),
+                "the fixture must actually attach something, or this proves nothing");
+
+        // The app renames its header between attempts, then the request is redirected to
+        // a host the shield does not protect.
+        AppShield.getConfig().tokenHeader("X-Other-Attest");
+        request.setUrl("https://unprotected.example.com/elsewhere");
+        AppShield.attach(request);
+
+        assertNull(request.headerValue("X-CN1-Attest"),
+                "the token attached under the old name must not survive to another host");
+        assertNull(request.headerValue("X-Other-Attest"));
+    }
+
     private Thread initOnAnotherThread() {
         ShieldEngineRegistry.setEngine(engine);
         Thread t = new Thread(new Runnable() {
@@ -174,26 +260,27 @@ class ShieldInitOrderTest extends UITestBase {
      */
     private static final class RecordingRequest extends ConnectionRequest {
 
-        private String token;
+        private final java.util.Map<String, String> headers =
+                new java.util.LinkedHashMap<String, String>();
 
         @Override
         public void addRequestHeader(String key, String value) {
             super.addRequestHeader(key, value);
-            if ("X-CN1-Attest".equals(key)) {
-                token = value;
-            }
+            headers.put(key, value);
         }
 
         @Override
         public void removeRequestHeader(String key) {
             super.removeRequestHeader(key);
-            if ("X-CN1-Attest".equals(key)) {
-                token = null;
-            }
+            headers.remove(key);
         }
 
         String attached() {
-            return token;
+            return headers.get("X-CN1-Attest");
+        }
+
+        String headerValue(String name) {
+            return headers.get(name);
         }
     }
 

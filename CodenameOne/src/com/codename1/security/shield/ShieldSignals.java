@@ -47,6 +47,9 @@ public final class ShieldSignals {
 
     /// Records an observation. Repeat reports of an id already present update that entry in place.
     /// Safe to call from any thread; listeners are notified on the EDT.
+    ///
+    /// An identical repeat still updates the stored entry -- the snapshot is meant to hold
+    /// the most recent observation of each signal -- but does not notify again.
     public static void add(ShieldSignal signal) {
         if (signal == null || signal.getId() == null) {
             return;
@@ -63,12 +66,21 @@ public final class ShieldSignals {
                     // without that, a detector polling on a timer queued a runnable per
                     // poll per signal onto the EDT -- an unbounded queue behind a bus
                     // whose whole selling point is that it is bounded.
-                    if (existing.getSeverity() == signal.getSeverity()
-                            && sameDetail(existing.getDetail(), signal.getDetail())) {
-                        return;
-                    }
+                    boolean sameObservation = existing.getSeverity() == signal.getSeverity()
+                            && sameDetail(existing.getDetail(), signal.getDetail());
+                    // The entry is replaced either way, and only the NOTIFICATION is
+                    // suppressed. Keeping the old object was a second bug hiding behind
+                    // the first: this bus documents itself as holding the most recent
+                    // observation of each signal, and a persistent one -- a root, a
+                    // hooking framework -- is re-reported on every poll, so the entry the
+                    // engine and the server were shown kept the timestamp of the first
+                    // sighting hours after the fact. "When did this device last look
+                    // compromised" is a question the answer is used for.
                     signals.setElementAt(signal, i);
                     replaced = true;
+                    if (sameObservation) {
+                        return;
+                    }
                     break;
                 }
             }

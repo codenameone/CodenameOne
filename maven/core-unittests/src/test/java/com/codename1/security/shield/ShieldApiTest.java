@@ -512,6 +512,56 @@ class ShieldApiTest {
         assertTrue(interesting.length > 0);
     }
 
+    /**
+     * An identical repeat refreshes the stored observation even though it notifies
+     * nobody.
+     *
+     * <p>The bus documents itself as holding the most recent observation of each signal,
+     * and a persistent one -- a root, a hooking framework -- is re-reported on every
+     * poll. Keeping the first object meant the timestamp the engine and the server were
+     * shown stayed at the first sighting, hours after the fact, while the device was
+     * still compromised. "When did this device last look compromised" is a question the
+     * answer is used for.</p>
+     */
+    @Test
+    void anIdenticalRepeatRefreshesTheStoredObservationWithoutNotifying() {
+        ShieldSignals.clear();
+        final int[] notifications = {0};
+        ShieldListener counter = new ShieldListener() {
+            public void signalRaised(ShieldSignal signal) {
+                notifications[0]++;
+            }
+
+            public void tokenRefreshed(ShieldToken token) {
+            }
+
+            public void statusChanged(ShieldStatus status) {
+            }
+        };
+        ShieldSignals.addListener(counter);
+        try {
+            ShieldSignal first = new ShieldSignal(ShieldSignal.ROOT, 70, "su");
+            ShieldSignals.add(first);
+            assertEquals(1, notifications[0]);
+
+            ShieldSignal later = new ShieldSignal(ShieldSignal.ROOT, 70, "su");
+            ShieldSignals.add(later);
+            assertEquals(1, notifications[0],
+                    "an identical repeat must not notify again");
+
+            ShieldSignal[] snapshot = ShieldSignals.snapshot();
+            assertEquals(1, snapshot.length);
+            // Identity rather than the timestamp value: two observations a moment apart
+            // can carry the same millisecond, and what matters is which object the bus
+            // is holding.
+            assertSame(later, snapshot[0],
+                    "the snapshot has to hold the most recent observation");
+        } finally {
+            ShieldSignals.removeListener(counter);
+            ShieldSignals.clear();
+        }
+    }
+
     @Test
     void hasSignalAtLeastReflectsRecordedSeverities() {
         ShieldSignals.clear();
