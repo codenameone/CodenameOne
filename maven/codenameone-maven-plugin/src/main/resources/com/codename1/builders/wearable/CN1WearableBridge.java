@@ -123,6 +123,10 @@ public class CN1WearableBridge implements WearableBridge {
         this.nodeClient = Wearable.getNodeClient(this.context);
         this.capabilityClient = Wearable.getCapabilityClient(this.context);
         current = this;
+        // Sweep at startup as well as after each publish. An app that sends a few files and then
+        // stops would otherwise never run the sweep again, leaving its last transfers published
+        // indefinitely -- the post-publish sweep only helps an app that keeps transferring.
+        expireOwnTransfers();
     }
 
     // --- state --------------------------------------------------------------
@@ -1085,7 +1089,26 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
-    private static final Map<String, Long> deliveredSequences = new HashMap<String, Long>();
+    /**
+     * Delivery stamps, bounded.
+     *
+     * <p>Replicated paths are few, but every transfer contributes a key -- transfers are addressed
+     * by a sequence-suffixed URI so that repeated sends queue instead of replacing each other, which
+     * means their keys are all distinct and none is ever superseded. Left unbounded this map grows
+     * for the life of the process on a phone that receives files regularly.
+     *
+     * <p>Access-ordered with an eviction cap: the only cost of evicting a transfer claim is that a
+     * re-synced copy of a very old transfer could be delivered twice, and the sender's own sweep
+     * removes those items long before that many newer ones accumulate.
+     */
+    private static final Map<String, Long> deliveredSequences =
+            new java.util.LinkedHashMap<String, Long>(64, 0.75f, true) {
+                protected boolean removeEldestEntry(Map.Entry<String, Long> eldest) {
+                    return size() > MAX_DELIVERY_KEYS;
+                }
+            };
+
+    private static final int MAX_DELIVERY_KEYS = 2048;
 
     /**
      * The value a path still resolves to, or null when nothing is left under it.

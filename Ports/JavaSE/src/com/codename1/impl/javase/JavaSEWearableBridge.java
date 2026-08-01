@@ -619,7 +619,10 @@ class JavaSEWearableBridge implements WearableBridge {
     private long nextStamp(File f) {
         synchronized (JavaSEWearableBridge.class) {
             long now = System.currentTimeMillis();
-            long floor = Math.max(f.lastModified(), lastStamp);
+            // The file already carries an ENCODED stamp (base * 2 + sideBit), so decode it before
+            // using it as a floor. Feeding the encoded value straight back in doubled the base on
+            // every publish, which runs away exponentially within a few dozen writes.
+            long floor = Math.max(f.lastModified() / 2, lastStamp);
             long base = now > floor ? now : floor + 1;
             // Put the two JVMs in disjoint residue classes. lastStamp and this lock are process
             // local, so both halves publishing the same path in the same millisecond could otherwise
