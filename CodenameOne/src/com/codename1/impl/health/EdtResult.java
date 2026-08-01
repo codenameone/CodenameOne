@@ -50,7 +50,8 @@ import com.codename1.ui.Display;
 /// completes another resource does not queue a runnable per link.
 public final class EdtResult<T> extends OneShot<T> {
 
-    /// Late registration is delivered on the EDT too.
+    /// EVERY off-EDT registration is marshalled, not only one that finds the resource
+    /// already settled.
     ///
     /// `AsyncResource.ready` runs the callback immediately, on the registering thread,
     /// when the resource has already settled -- so the guarantee this class exists to
@@ -61,6 +62,18 @@ public final class EdtResult<T> extends OneShot<T> {
     /// Off the EDT on a busy machine, on it on an idle one -- a callback that is usually
     /// on the EDT is exactly the thing the class doc calls not-a-design.
     ///
+    /// Testing `isDone()` first reproduced that in miniature: a background caller that
+    /// found the resource unfinished fell through to the synchronous path, and a
+    /// completion landing in the gap before it registered made `AsyncResource.ready`
+    /// deliver on the background thread after all. The window is small and the failure it
+    /// produces -- a health callback touching a form off the EDT -- is a repaint glitch or
+    /// a corrupted layout that nobody traces back to here. Hopping unconditionally has no
+    /// such gap: registration and completion then both happen on the EDT, so they are
+    /// ordered by the EDT rather than by a check.
+    ///
+    /// Already on the EDT still registers inline, which is what keeps a callback chain
+    /// from queueing a runnable per link.
+    ///
     /// Deliberately NOT done for `except`. Reading the error out of an already-failed
     /// resource by registering a callback and looking at what it captured is an
     /// established idiom here -- `HealthFallbackTest.errorOf` and `BtTestUtil` both do
@@ -70,7 +83,7 @@ public final class EdtResult<T> extends OneShot<T> {
     /// happened is not that.
     @Override
     public AsyncResource<T> ready(SuccessCallback<T> callback, EasyThread t) {
-        if (isDone() && !isCancelled() && Display.isInitialized()
+        if (!isCancelled() && Display.isInitialized()
                 && !Display.getInstance().isEdt()) {
             final SuccessCallback<T> target = callback;
             final EasyThread thread = t;
