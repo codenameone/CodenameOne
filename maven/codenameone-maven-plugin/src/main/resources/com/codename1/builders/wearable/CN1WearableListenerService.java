@@ -243,15 +243,25 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // getData() would immediately disagree. Resolve the actual winner instead.
                 try {
                     CN1WearableBridge.ResolvedValue winner =
-                            CN1WearableBridge.resolveValue(this, appPath);
+                            CN1WearableBridge.resolveValueWithRetry(this, appPath);
                     if (winner != null && CN1WearableBridge.setDeliveredSequence(
                             appPath, winner.sequence, winner.node)) {
                         WearableConnection.deliverDataChanged(appPath, winner.payload);
                     }
                     continue;
                 } catch (java.io.IOException couldNotResolve) {
-                    // Fall through and use the event itself: delivering the item we were actually
-                    // handed beats delivering nothing at all.
+                    // Every attempt failed. Deliver the event we were handed so the app is not left
+                    // with nothing -- but do NOT record it as the baseline: it may be a lower-ranked
+                    // replica, and the winning item, being unchanged, may never produce another
+                    // callback. Leaving the path unstamped means the next event for it resolves
+                    // properly instead of being judged against a value we are not sure of.
+                    com.google.android.gms.wearable.DataMap fallback =
+                            CN1WearableBridge.valueMap(event.getDataItem());
+                    if (fallback != null) {
+                        WearableConnection.deliverDataChanged(
+                                appPath, CN1WearableBridge.payloadOf(fallback));
+                    }
+                    continue;
                 }
             }
             if (!CN1WearableBridge.isNewerThanDelivered(

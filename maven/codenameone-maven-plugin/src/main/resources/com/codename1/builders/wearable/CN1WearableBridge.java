@@ -316,9 +316,11 @@ public class CN1WearableBridge implements WearableBridge {
             // companion for a full cache lifetime because one query timed out.
             return cachedBonded;
         }
-        cachedBonded = out;
-        bondedStamp = System.currentTimeMillis();
-        bondedKnown = true;
+        synchronized (bondedLock) {
+            cachedBonded = out;
+            bondedStamp = System.currentTimeMillis();
+            bondedKnown = true;
+        }
         return out;
     }
 
@@ -331,6 +333,39 @@ public class CN1WearableBridge implements WearableBridge {
      * {@link #fanOut}, and treating the second as the first sends to a watch that cannot receive.
      */
     private volatile boolean bondedKnown;
+    /** Guards the {@link #cachedBonded} / {@link #bondedKnown} pair so they can be read together. */
+    private final Object bondedLock = new Object();
+
+    /**
+     * The capability cache read as ONE value.
+     *
+     * <p>Two independent volatile reads cannot express "these belong together": reading the flag
+     * first let a completed query leave a true flag beside a stale empty list, and reading the list
+     * first let a query that completes during the read leave a populated list beside a false flag --
+     * so the filter was skipped even though the answer was known. Both fields are written and read
+     * under one lock instead, so a caller always sees a consistent pair.
+     *
+     * @return the snapshot; {@code known} false means no query has completed yet
+     */
+    private BondedSnapshot bondedSnapshot() {
+        // Take the list outside the lock: bondedNodeIds() may block on Play services, and holding
+        // the lock across that would stall every other reader.
+        List<String> ids = bondedNodeIds();
+        synchronized (bondedLock) {
+            return new BondedSnapshot(bondedKnown, bondedKnown ? cachedBonded : ids);
+        }
+    }
+
+    /** A consistent view of the capability cache. */
+    private static final class BondedSnapshot {
+        final boolean known;
+        final List<String> ids;
+
+        BondedSnapshot(boolean known, List<String> ids) {
+            this.known = known;
+            this.ids = ids;
+        }
+    }
 
     /// Accepts a capability set pushed by Play services, so the cache tracks an install or
     /// uninstall that happens while the device stays connected.
@@ -349,10 +384,13 @@ public class CN1WearableBridge implements WearableBridge {
         for (Node n : info.getNodes()) {
             out.add(n.getId());
         }
-        boolean changed = !sameIds(b.cachedBonded, out);
-        b.cachedBonded = out;
-        b.bondedStamp = System.currentTimeMillis();
-        b.bondedKnown = true;
+        boolean changed;
+        synchronized (b.bondedLock) {
+            changed = !sameIds(b.cachedBonded, out);
+            b.cachedBonded = out;
+            b.bondedStamp = System.currentTimeMillis();
+            b.bondedKnown = true;
+        }
         if (changed) {
             WearableConnection.notifyStateChanged();
         }
@@ -423,10 +461,13 @@ public class CN1WearableBridge implements WearableBridge {
                         for (Node n : task.getResult().getNodes()) {
                             out.add(n.getId());
                         }
-                        boolean changed = !sameIds(cachedBonded, out);
-                        cachedBonded = out;
-                        bondedStamp = System.currentTimeMillis();
-                        bondedKnown = true;
+                        boolean changed;
+                        synchronized (bondedLock) {
+                            changed = !sameIds(cachedBonded, out);
+                            cachedBonded = out;
+                            bondedStamp = System.currentTimeMillis();
+                            bondedKnown = true;
+                        }
                         refreshingBonded = false;
                         if (changed) {
                             WearableConnection.notifyStateChanged();
@@ -587,21 +628,17 @@ public class CN1WearableBridge implements WearableBridge {
         // Only once a capability query has actually completed. Before that an empty set means "not
         // asked yet", not "nobody runs the app", and refusing to send on it would break the first
         // send after a cold start -- so bondedKnown, not emptiness, is what gates the filter.
-        // Read the readiness flag BEFORE the list, and treat the pair as one snapshot. Reading the
-        // list first let an async capability query complete in between: the flag would then be true
-        // while withApp was still the stale empty list, so every nearby node was filtered out and
-        // the send reached nobody.
-        //
-        // This ordering is safe because every path that fills the cache assigns cachedBonded BEFORE
-        // setting bondedKnown, so a flag observed true is always accompanied by a list at least as
-        // new. Keep those assignments in that order.
-        boolean knownWhenSampled = bondedKnown;
-        List<String> withApp = bondedNodeIds();
+        // One consistent (known, ids) pair -- see bondedSnapshot(). Sampling the two fields
+        // independently is wrong in both orders: flag-then-list can pair a true flag with a stale
+        // empty list (filtering out every node, so the send reaches nobody), and list-then-flag can
+        // pair a populated list with a false flag (skipping the filter although the answer is
+        // known, so a send goes to a watch without the app).
+        BondedSnapshot bonded = bondedSnapshot();
         for (Node n : nodes) {
             if (!n.isNearby()) {
                 continue;
             }
-            if (knownWhenSampled && !withApp.contains(n.getId())) {
+            if (bonded.known && !bonded.ids.contains(n.getId())) {
                 continue;
             }
             // The peer needs both the CN1 path and, when an answer is wanted, the token to answer
@@ -1353,6 +1390,43 @@ public class CN1WearableBridge implements WearableBridge {
      * @return the winner, or null when nothing is published there
      * @throws java.io.IOException when the query failed, which is NOT the same as an empty path
      */
+    /**
+     * {@link #resolveValue} with a couple of retries.
+     *
+     * <p>For the first event after a restart the answer matters more than the latency: falling back
+     * to the delivered item can hand the app a lower-ranked replica, and the winning item -- being
+     * unchanged -- may never produce another callback, so the listener would stay wrong while
+     * {@code getData()} said otherwise. Callers are Play services callback threads, never the EDT.
+     *
+     * @param context any context
+     * @param path the application path
+     * @return the winner, or null when the path is genuinely empty
+     * @throws java.io.IOException when every attempt failed
+     */
+    static ResolvedValue resolveValueWithRetry(Context context, String path)
+            throws java.io.IOException {
+        java.io.IOException last = null;
+        for (int attempt = 0; attempt <= RESOLVE_RETRIES; attempt++) {
+            if (attempt > 0) {
+                try {
+                    Thread.sleep(RESOLVE_RETRY_MILLIS);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            try {
+                return resolveValue(context, path);
+            } catch (java.io.IOException failed) {
+                last = failed;
+            }
+        }
+        throw last == null ? new java.io.IOException("could not resolve " + path) : last;
+    }
+
+    private static final int RESOLVE_RETRIES = 2;
+    private static final long RESOLVE_RETRY_MILLIS = 500;
+
     static ResolvedValue resolveValue(Context context, String path) throws java.io.IOException {
         try {
             Uri uri = new Uri.Builder().scheme("wear").authority("*").path(dataPath(path)).build();
