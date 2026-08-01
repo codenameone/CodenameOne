@@ -392,6 +392,47 @@ class ShieldApiTest {
         assertEquals(0, new ShieldSignal("x", -5, null).getSeverity());
     }
 
+    /// Re-reporting an identical observation notifies nobody.
+    ///
+    /// AppShield.getSignals() re-adds everything collectSignals() returns, so a listener
+    /// that refreshes its view by calling getSignals() notified itself -- forever. And
+    /// a detector polling on a timer queued a runnable per poll per signal onto the EDT,
+    /// which is an unbounded queue behind a bus whose selling point is that it is
+    /// bounded. A repeat carries no information; a change does.
+    @Test
+    void anUnchangedSignalDoesNotNotifyAgain() {
+        final int[] notified = {0};
+        ShieldListener listener = new ShieldListener() {
+            public void signalRaised(ShieldSignal signal) {
+                notified[0]++;
+            }
+            public void tokenRefreshed(ShieldToken token) {
+            }
+            public void statusChanged(ShieldStatus status) {
+            }
+        };
+        AppShield.addListener(listener);
+        try {
+            String id = "test.repeat." + System.nanoTime();
+            ShieldSignals.add(id, 50, "same");
+            int afterFirst = notified[0];
+            assertTrue(afterFirst >= 1, "the first observation has to be reported");
+
+            ShieldSignals.add(id, 50, "same");
+            ShieldSignals.add(id, 50, "same");
+            assertEquals(afterFirst, notified[0],
+                    "an identical repeat says nothing new and must not notify");
+
+            // A changed severity or detail IS a new observation.
+            ShieldSignals.add(id, 90, "same");
+            assertEquals(afterFirst + 1, notified[0], "a raised severity is news");
+            ShieldSignals.add(id, 90, "different");
+            assertEquals(afterFirst + 2, notified[0], "and so is a changed detail");
+        } finally {
+            AppShield.removeListener(listener);
+        }
+    }
+
     @Test
     void contentTypeIsRefusedAsTheTokenHeader() {
         // ConnectionRequest.addRequestHeader special-cases Content-Type into the

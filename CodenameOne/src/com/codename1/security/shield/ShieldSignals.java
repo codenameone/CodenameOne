@@ -54,7 +54,19 @@ public final class ShieldSignals {
         synchronized (signals) {
             boolean replaced = false;
             for (int i = 0; i < signals.size(); i++) {
-                if (((ShieldSignal) signals.elementAt(i)).getId().equals(signal.getId())) {
+                ShieldSignal existing = (ShieldSignal) signals.elementAt(i);
+                if (existing.getId().equals(signal.getId())) {
+                    // Nothing new to say. Re-reporting an identical observation is the
+                    // normal case, not an edge one: AppShield.getSignals() re-adds
+                    // everything collectSignals() returns, so a listener that refreshes
+                    // its view by calling getSignals() notified itself, forever. Even
+                    // without that, a detector polling on a timer queued a runnable per
+                    // poll per signal onto the EDT -- an unbounded queue behind a bus
+                    // whose whole selling point is that it is bounded.
+                    if (existing.getSeverity() == signal.getSeverity()
+                            && sameDetail(existing.getDetail(), signal.getDetail())) {
+                        return;
+                    }
                     signals.setElementAt(signal, i);
                     replaced = true;
                     break;
@@ -71,6 +83,14 @@ public final class ShieldSignals {
         // inline when the EDT is not up yet, so a listener that calls back into
         // snapshot() would deadlock on the monitor we were still holding.
         notifyListeners(signal);
+    }
+
+    /// Whether two observations of one signal say the same thing.
+    ///
+    /// The detail is what distinguishes "accessibility service X" from "service Y" under
+    /// one id, so a change in it is a new observation and a repeat of it is not.
+    private static boolean sameDetail(String a, String b) {
+        return a == null ? b == null : a.equals(b);
     }
 
     /// Convenience overload for the common case.

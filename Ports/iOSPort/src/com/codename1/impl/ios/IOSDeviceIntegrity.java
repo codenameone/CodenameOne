@@ -788,8 +788,20 @@ final class IOSDeviceIntegrity {
                 // registrationGraceRemaining() reads the window as already expired, so
                 // the very next request promotes the key to attested and asserts against
                 // a key no backend has acknowledged -- the first-use rejection and
-                // pointless key reset this state exists to prevent. Roll back to new so
-                // the key is attested again rather than used prematurely.
+                // pointless key reset this state exists to prevent.
+                //
+                // The start marker goes FIRST, and that ordering is the whole fix. Apple
+                // has already accepted this attestation, so the key is good; rolling the
+                // state back to new while KEY_ATTEST_STARTED was still there made the
+                // next request read it as an interrupted attestation of unknown outcome
+                // -- which discards the key and generates another rate-limited one. A
+                // deadline write that keeps failing then burns a fresh hardware key on
+                // every single attempt, which is the opposite of what a rollback is for.
+                // Clearing it first means the worst case is re-attesting a key we still
+                // hold, not replacing it.
+                store.remove(KEY_ATTEST_STARTED);
+                // Roll back to new so the key is attested again rather than used
+                // prematurely.
                 if (!store.set(KEY_STATE, STATE_NEW)) {
                     // The rollback failed too, so the key would sit pending with no
                     // deadline and be promoted on the next request. Discard the identity
