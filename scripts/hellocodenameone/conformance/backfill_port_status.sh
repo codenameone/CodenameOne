@@ -101,6 +101,11 @@ while IFS= read -r workflow; do
   # Newest first, and a failed run counts: a suite that fails still uploads the
   # normalized report, and a report that records real failures is the result
   # the table is supposed to show.
+  #
+  # workflow_dispatch counts too. The producers declare dispatch and schedule
+  # rather than push, so a maintainer rerunning one on master to repair a port
+  # the scheduled run missed is exactly the recovery this sweep exists to pick
+  # up -- and filtering it out meant the manual fix could never reach the table.
   # Every run still inside the staleness horizon is a candidate, rather than a
   # fixed newest-five slice. A workflow whose matrix legs fail independently --
   # the Linux producer especially, whose reports are not reliably published by
@@ -112,7 +117,7 @@ while IFS= read -r workflow; do
     || date -u -v-"${sweep_stale_days}"d +%Y-%m-%dT%H:%M:%SZ)"
   candidates="$(gh run list --workflow "${workflow}" --branch master --limit 100 \
     --json databaseId,event,conclusion,updatedAt \
-    --jq --arg horizon "${horizon}" '[.[] | select((.event == "push" or .event == "schedule") and
+    --jq --arg horizon "${horizon}" '[.[] | select((.event == "push" or .event == "schedule" or .event == "workflow_dispatch") and
           (.conclusion == "success" or .conclusion == "failure") and
           (.updatedAt >= $horizon))]
           | sort_by(.updatedAt) | reverse | .[].databaseId')"

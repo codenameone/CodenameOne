@@ -54,6 +54,11 @@
 
 #define CN1_GCM_TAG_BYTES 16
 
+/* Key families, named so that "not EC" can never stand in for RSA. */
+#define CN1_KEY_OTHER 0
+#define CN1_KEY_RSA 1
+#define CN1_KEY_EC 2
+
 /* Per-thread: crypto failures on different threads would otherwise overwrite
  * each other and lastCryptoError() could answer with an unrelated call's
  * message. */
@@ -330,15 +335,15 @@ static BCRYPT_KEY_HANDLE cn1PublicKey(const unsigned char* der, int length) {
  * EC with one path; *isEc reports which arrived so the caller can pick the
  * matching padding.
  */
-static NCRYPT_KEY_HANDLE cn1PrivateKey(const unsigned char* der, int length, int* isEc) {
+static NCRYPT_KEY_HANDLE cn1PrivateKey(const unsigned char* der, int length, int* family) {
     NCRYPT_PROV_HANDLE provider = 0;
     NCRYPT_KEY_HANDLE key = 0;
     SECURITY_STATUS status;
     WCHAR algorithm[64];
     DWORD algorithmBytes = 0;
 
-    if (isEc != 0) {
-        *isEc = 0;
+    if (family != 0) {
+        *family = CN1_KEY_OTHER;
     }
     status = NCryptOpenStorageProvider(&provider, MS_KEY_STORAGE_PROVIDER, 0);
     if (status != ERROR_SUCCESS) {
@@ -362,27 +367,41 @@ static NCRYPT_KEY_HANDLE cn1PrivateKey(const unsigned char* der, int length, int
         }
         return 0;
     }
-    if (isEc != 0 &&
+    if (family != 0 &&
         NCryptGetProperty(key, NCRYPT_ALGORITHM_GROUP_PROPERTY, (PBYTE) algorithm,
                           sizeof(algorithm), &algorithmBytes, 0) == ERROR_SUCCESS) {
-        *isEc = wcscmp(algorithm, NCRYPT_ECDSA_ALGORITHM_GROUP) == 0
-                || wcscmp(algorithm, NCRYPT_ECDH_ALGORITHM_GROUP) == 0;
+        /* Name both families rather than reporting "EC or not": anything else
+         * -- DSA in particular -- would otherwise be indistinguishable from RSA
+         * and would sign a SHA256withRSA request with whatever it actually is. */
+        if (wcscmp(algorithm, NCRYPT_ECDSA_ALGORITHM_GROUP) == 0
+                || wcscmp(algorithm, NCRYPT_ECDH_ALGORITHM_GROUP) == 0) {
+            *family = CN1_KEY_EC;
+        } else if (wcscmp(algorithm, NCRYPT_RSA_ALGORITHM_GROUP) == 0) {
+            *family = CN1_KEY_RSA;
+        }
     }
     return key;
 }
 
-/* True when an X.509 SubjectPublicKeyInfo carries an elliptic-curve key. */
-static int cn1PublicKeyIsEc(const unsigned char* der, int length) {
+/* The family an X.509 SubjectPublicKeyInfo carries. Named explicitly for the
+ * same reason as the private-key side: treating every non-EC key as RSA lets a
+ * DSA key verify an RSA request. */
+static int cn1PublicKeyFamily(const unsigned char* der, int length) {
     CERT_PUBLIC_KEY_INFO* info = 0;
     DWORD infoLength = 0;
-    int isEc = 0;
+    int family = CN1_KEY_OTHER;
     if (CryptDecodeObjectEx(X509_ASN_ENCODING, X509_PUBLIC_KEY_INFO, der, (DWORD) length,
                             CRYPT_DECODE_ALLOC_FLAG, NULL, &info, &infoLength)) {
-        isEc = info->Algorithm.pszObjId != 0
-                && strcmp(info->Algorithm.pszObjId, szOID_ECC_PUBLIC_KEY) == 0;
+        if (info->Algorithm.pszObjId != 0) {
+            if (strcmp(info->Algorithm.pszObjId, szOID_ECC_PUBLIC_KEY) == 0) {
+                family = CN1_KEY_EC;
+            } else if (strcmp(info->Algorithm.pszObjId, szOID_RSA_RSA) == 0) {
+                family = CN1_KEY_RSA;
+            }
+        }
         LocalFree(info);
     }
-    return isEc;
+    return family;
 }
 
 /* The digest half of Signature's six advertised algorithms; NULL for anything
@@ -899,10 +918,11 @@ done:
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_signData___java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT algorithm, JAVA_OBJECT keyArray, JAVA_OBJECT dataArray) {
     const char* name = algorithm == JAVA_NULL ? "" : stringToUTF8(threadStateData, algorithm);
-    int keyLength = 0, dataLength = 0, isEc = 0;
+    int keyLength = 0, dataLength = 0, keyFamily = CN1_KEY_OTHER;
     unsigned char* keyDer = cn1Bytes(keyArray, &keyLength);
     unsigned char* data = cn1Bytes(dataArray, &dataLength);
-    NCRYPT_KEY_HANDLE key = cn1PrivateKey(keyDer, keyLength, &isEc);
+    NCRYPT_KEY_HANDLE key = cn1PrivateKey(keyDer, keyLength, &keyFamily);
+    int isEc = keyFamily == CN1_KEY_EC;
     LPCWSTR digestAlgorithm = cn1DigestAlgorithm(name);
     unsigned char digest[64];
     int digestLength = cn1DigestLength(digestAlgorithm);
@@ -930,7 +950,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_signData___java_lang_String
      * it against the bytes, so the Java-side comparison can be satisfied while
      * the encoded key is a different family -- and NCrypt would then answer an
      * "RSA" request with an ECDSA signature. */
-    if ((strstr(name, "ECDSA") != 0) != (isEc != 0)) {
+    if (keyFamily != (strstr(name, "ECDSA") != 0 ? CN1_KEY_EC : CN1_KEY_RSA)) {
         cn1CryptoFail("the signature algorithm does not match the key", 0);
         goto done;
     }
@@ -987,7 +1007,8 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_verifyData___java_lang_Str
     unsigned char* signature = cn1Bytes(signatureArray, &signatureLength);
     /* CryptImportPublicKeyInfoEx2 handles both key kinds; only the padding
      * differs, so read the algorithm out of the SubjectPublicKeyInfo. */
-    int isEc = cn1PublicKeyIsEc(keyDer, keyLength);
+    int keyFamily = cn1PublicKeyFamily(keyDer, keyLength);
+    int isEc = keyFamily == CN1_KEY_EC;
     BCRYPT_KEY_HANDLE key = cn1PublicKey(keyDer, keyLength);
     LPCWSTR digestAlgorithm = cn1DigestAlgorithm(name);
     unsigned char digest[64];
@@ -1003,7 +1024,7 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_verifyData___java_lang_Str
         BCryptDestroyKey(key);
         return JAVA_FALSE;
     }
-    if ((strstr(name, "ECDSA") != 0) != (isEc != 0)) {
+    if (keyFamily != (strstr(name, "ECDSA") != 0 ? CN1_KEY_EC : CN1_KEY_RSA)) {
         cn1CryptoFail("the signature algorithm does not match the key", 0);
         BCryptDestroyKey(key);
         return JAVA_FALSE;

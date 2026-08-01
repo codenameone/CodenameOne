@@ -379,9 +379,15 @@ done:
  * satisfied while the encoded key is a different family entirely -- and the
  * primitive below would then sign an "RSA" request with ECDSA. */
 static int cn1KeyFamilyMatches(const char* algorithm, EVP_PKEY* key) {
-    int wantsEc = strstr(algorithm, "ECDSA") != 0;
-    int keyIsEc = EVP_PKEY_base_id(key) == EVP_PKEY_EC;
-    return wantsEc == keyIsEc;
+    /* Name the family that is required rather than testing "not EC": every
+     * other key type would otherwise pass as RSA, so DSA bytes carrying an
+     * "RSA" label would reach EVP_DigestSign and come back as a DSA signature
+     * under a SHA256withRSA request. */
+    int id = EVP_PKEY_base_id(key);
+    if (strstr(algorithm, "ECDSA") != 0) {
+        return id == EVP_PKEY_EC;
+    }
+    return id == EVP_PKEY_RSA;
 }
 
 
