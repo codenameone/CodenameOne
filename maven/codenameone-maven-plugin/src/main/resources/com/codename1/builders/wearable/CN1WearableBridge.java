@@ -933,12 +933,22 @@ public class CN1WearableBridge implements WearableBridge {
                     Wearable.getDataClient(context.getApplicationContext()).getFdForAsset(asset),
                     TIMEOUT_SECONDS, TimeUnit.SECONDS).getInputStream();
             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) > 0) {
-                out.write(buf, 0, n);
+            try {
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    out.write(buf, 0, n);
+                }
+            } finally {
+                // The stream is backed by a ParcelFileDescriptor. A read that throws part way --
+                // an interrupted or corrupt transfer -- used to skip the close and go straight to
+                // the retry, so a file that kept failing leaked a descriptor per attempt.
+                try {
+                    in.close();
+                } catch (java.io.IOException alreadyBroken) {
+                    // Nothing useful to do; the descriptor is released either way.
+                }
             }
-            in.close();
             // The caller's own path, not the namespaced DataItem one; returned alongside the payload
             // because the delivery path routes on the path it is given, which would otherwise be the
             // filename-suffixed storage path.
