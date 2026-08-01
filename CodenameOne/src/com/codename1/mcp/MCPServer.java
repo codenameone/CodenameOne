@@ -327,8 +327,7 @@ public class MCPServer {
 
     private Object acquireOpenLock(MCPTransport t) {
         synchronized (openLocks) {
-            for (int i = 0; i < openLocks.size(); i++) {
-                Object[] entry = openLocks.get(i);
+            for (Object[] entry : openLocks) {
                 if (entry[0] == t) { // NOPMD identity: one lock per transport INSTANCE
                     ((int[]) entry[2])[0]++;
                     return entry[1];
@@ -342,13 +341,14 @@ public class MCPServer {
 
     private void releaseOpenLock(MCPTransport t) {
         synchronized (openLocks) {
-            for (int i = 0; i < openLocks.size(); i++) {
-                Object[] entry = openLocks.get(i);
+            for (Object[] entry : openLocks) {
                 if (entry[0] == t) { // NOPMD identity: one lock per transport INSTANCE
                     int[] users = (int[]) entry[2];
                     users[0]--;
                     if (users[0] <= 0) {
-                        openLocks.remove(i);
+                        // Safe to remove while iterating only because this returns
+                        // immediately afterwards.
+                        openLocks.remove(entry);
                     }
                     return;
                 }
