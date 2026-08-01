@@ -78,17 +78,53 @@ public final class ShieldConfig {
     /// @throws IllegalArgumentException if the name cannot carry a token safely
     public ShieldConfig tokenHeader(String name) {
         if (name != null && name.length() > 0) {
-            if ("content-type".equals(ShieldHosts.normalize(name))) {
+            String normalized = ShieldHosts.normalize(name);
+            if ("content-type".equals(normalized)) {
                 throw new IllegalArgumentException("Content-Type cannot carry the "
                         + "attestation token: it is not stored as an ordinary header, so it "
                         + "cannot be cleared when a request redirects off a protected host, "
                         + "and the token would follow the redirect. Use a header of your "
                         + "own, or leave the default " + DEFAULT_TOKEN_HEADER + ".");
             }
+            for (int i = 0; i < TRANSPORT_HEADERS.length; i++) {
+                if (TRANSPORT_HEADERS[i].equals(normalized)) {
+                    throw new IllegalArgumentException(name + " cannot carry the "
+                            + "attestation token: it is connection or framing metadata, "
+                            + "which the HTTP transport owns. Depending on the platform it "
+                            + "is overwritten, refused, or acted on -- so attach() would "
+                            + "report success while the backend received a request with no "
+                            + "token, or a malformed one. Use a header of your own, or "
+                            + "leave the default " + DEFAULT_TOKEN_HEADER + ".");
+                }
+            }
             this.tokenHeader = name;
         }
         return this;
     }
+
+    /// Header names the transport owns, so an attestation token put in one does not
+    /// arrive as a header at all.
+    ///
+    /// Three families, all lower-cased for comparison because header names are
+    /// case-insensitive:
+    ///
+    /// - framing (`content-length`, `transfer-encoding`) -- the transport computes these
+    ///   from the body it is about to send, and a value that disagrees is either
+    ///   discarded or produces a request the server rejects outright;
+    /// - routing (`host`) -- this selects the virtual host, so overwriting it sends the
+    ///   request somewhere else entirely;
+    /// - hop-by-hop (`connection`, `keep-alive`, `proxy-connection`, `te`, `trailer`,
+    ///   `upgrade`) -- defined to be consumed by the next hop and not forwarded, so the
+    ///   token would be stripped in transit by a proxy that is behaving correctly.
+    ///
+    /// Refused rather than warned about, because the failure has no symptom on the
+    /// client: `attach()` returns having set the header, and the request reaches the
+    /// backend without a usable token. The developer sees a working call and a backend
+    /// that says they are unauthenticated.
+    private static final String[] TRANSPORT_HEADERS = {
+        "host", "content-length", "transfer-encoding", "connection",
+        "keep-alive", "proxy-connection", "te", "trailer", "upgrade"
+    };
 
     /// The failure mode applied to hosts registered without an explicit one.
     public ShieldConfig defaultFailureMode(FailureMode mode) {

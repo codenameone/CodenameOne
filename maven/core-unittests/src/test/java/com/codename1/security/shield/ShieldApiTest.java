@@ -410,6 +410,35 @@ class ShieldApiTest {
                 new ShieldConfig().getTokenHeader());
     }
 
+    /// Headers the transport owns are refused too.
+    ///
+    /// Framing and routing values are computed by the platform from the request it is
+    /// about to send, and hop-by-hop names are defined to be consumed by the next hop
+    /// and not forwarded. A token in any of them is overwritten, refused, or stripped in
+    /// transit -- and none of that is visible on the client, where attach() returns
+    /// having set the header. The developer sees a working call and a backend insisting
+    /// they are unauthenticated, which is a long way from the cause.
+    @Test
+    void transportOwnedHeadersAreRefusedAsTheTokenHeader() {
+        String[] refused = {
+            "Host", "Content-Length", "Transfer-Encoding", "Connection",
+            "Keep-Alive", "Proxy-Connection", "TE", "Trailer", "Upgrade"
+        };
+        for (int i = 0; i < refused.length; i++) {
+            final String name = refused[i];
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ShieldConfig().tokenHeader(name),
+                    name + " is transport metadata and cannot carry the token");
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ShieldConfig().tokenHeader(name.toLowerCase()),
+                    "and the check is case-insensitive, like the header itself");
+        }
+        // A name that merely looks similar is not refused: the list is exact, not a
+        // prefix match, or an app's own X-Connection-Id would be rejected for no reason.
+        assertEquals("X-Connection-Id",
+                new ShieldConfig().tokenHeader("X-Connection-Id").getTokenHeader());
+    }
+
     // --- guard composition ----------------------------------------------
 
     @Test
