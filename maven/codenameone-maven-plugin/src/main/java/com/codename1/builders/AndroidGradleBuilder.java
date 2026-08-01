@@ -5623,13 +5623,16 @@ public class AndroidGradleBuilder extends Executor {
         if (legacyGplayServicesMode) {
             additionalDependencies += " "+compile+" 'com.google.android.gms:play-services:6.5.87'\n";
             if (playServicesWear) {
-                // The 6.5.87 monolith predates the Wearable Data Layer split, so it does NOT carry
-                // MessageClient/DataClient. An app that references com.codename1.wearable while
-                // keeping android.includeGPlayServices=true would compile the injected bridge
-                // against classes that are not on the classpath, so add the wearable artifact
-                // alongside the monolith rather than leaving the build to fail.
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-wearable:"
-                        + getDefaultPlayServiceVersion("wearable") + "'\n";
+                // The 6.5.87 monolith predates the Wearable Data Layer split, so it carries no
+                // MessageClient/DataClient -- but it DOES carry older copies of the shared wearable
+                // classes, so adding the modern artifact beside it produces duplicate classes at
+                // dex time rather than a working build. There is no combination of the two that
+                // works, so say which setting to drop instead of failing later and obscurely.
+                throw new BuildException("android.includeGPlayServices=true pins the legacy "
+                        + "play-services 6.5.87 bundle, which predates the Wearable Data Layer and "
+                        + "conflicts with the modern play-services-wearable that "
+                        + "com.codename1.wearable needs. Remove android.includeGPlayServices to "
+                        + "build the wearable API, or remove the com.codename1.wearable usage.");
             }
         } else {
             if(playServicesPlus){

@@ -257,10 +257,19 @@ public class IOSWidgetExtensionBuilder {
         }
         // WidgetBundleBuilder composes at most 10 widgets per bundle body; keeping the
         // generator single-bundle is simpler and 9 kinds is far beyond practical use.
-        if (kinds.size() > (liveActivitiesEnabled ? 9 : 10)) {
+        // Only the kinds that actually reach the bundle count against the limit. Watch-only kinds
+        // are skipped when it is generated, so counting them here would reject a manifest that
+        // produces a perfectly legal bundle -- ten complications plus one iOS widget is one widget.
+        int emitted = 0;
+        for (Kind kind : kinds) {
+            if (!isWatchOnly(kind)) {
+                emitted++;
+            }
+        }
+        if (emitted > (liveActivitiesEnabled ? 9 : 10)) {
             throw new IllegalStateException("surfaces.json declares more than "
-                    + (liveActivitiesEnabled ? 9 : 10) + " widget kinds; a single WidgetBundle "
-                    + "supports at most 10 widgets");
+                    + (liveActivitiesEnabled ? 9 : 10) + " widget kinds with an iOS surface; a "
+                    + "single WidgetBundle supports at most 10 widgets");
         }
         for (Kind kind : kinds) {
             if (kind.getId() == null || !isKindId(kind.getId())) {

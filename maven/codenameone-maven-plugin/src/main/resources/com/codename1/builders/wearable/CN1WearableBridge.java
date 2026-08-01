@@ -453,12 +453,17 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     private void refreshNodesNow() {
+        List<Node> fresh;
         try {
-            cachedNodes = Tasks.await(nodeClient.getConnectedNodes(),
+            fresh = Tasks.await(nodeClient.getConnectedNodes(),
                     TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (Throwable unavailable) {
-            cachedNodes = new ArrayList<Node>();
+            // Keep the previous snapshot, exactly as the asynchronous and send-time refreshes do.
+            // Clearing it here would report every peer gone -- and stamp that fresh -- because one
+            // blocking query happened to time out.
+            return;
         }
+        cachedNodes = fresh;
         cachedNodesStamp = System.currentTimeMillis();
         rememberAll(cachedNodes);
     }
@@ -832,6 +837,50 @@ public class CN1WearableBridge implements WearableBridge {
         req.getDataMap().putLong(SEQUENCE_KEY, sequence);
         req.getDataMap().putAsset("asset", Asset.createFromBytes(body));
         dataClient.putDataItem(req.asPutDataRequest().setUrgent());
+        expireOwnTransfers();
+    }
+
+    /** How long one of our own published transfer items is kept before it is swept. */
+    private static final long TRANSFER_RETENTION_MILLIS = 24 * 60 * 60 * 1000L;
+
+    /**
+     * Deletes transfer items this device published long enough ago that the peer has had every
+     * reasonable chance to take them.
+     *
+     * <p>Putting the sequence in the item path is what stops a second transfer replacing a first
+     * that has not synced yet -- but it also means nothing ever reuses a URI, so without a sweep an
+     * app that transfers regularly would grow its Data Layer storage without bound. Only our own
+     * items are touched, and only old ones: a receiver still never deletes, because that would
+     * propagate and rob a second watch of the file.
+     */
+    private void expireOwnTransfers() {
+        final long cutoff = System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                try {
+                    DataItemBuffer items = Tasks.await(dataClient.getDataItems(),
+                            TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    try {
+                        for (DataItem item : items) {
+                            String p = item.getUri().getPath();
+                            if (p == null || !isTransferPath(p)) {
+                                continue;
+                            }
+                            DataMap map = valueOrTransferMap(item);
+                            long seq = sequenceOf(map);
+                            // The stamp is wall-clock millis, so it doubles as the publication time.
+                            if (seq != Long.MIN_VALUE && seq < cutoff) {
+                                dataClient.deleteDataItems(item.getUri());
+                            }
+                        }
+                    } finally {
+                        items.release();
+                    }
+                } catch (Throwable unavailable) {
+                    // Best effort: the next transfer sweeps again.
+                }
+            }
+        }, 0);
     }
 
     /**
