@@ -10,6 +10,8 @@ feed_html: '<img src="https://www.codenameone.com/blog/seamless-crash-protection
 
 ![Seamless Crash Protection That Symbolicates Native Crashes](/blog/seamless-crash-protection.jpg)
 
+_Editor note (2026-07-31): the original "Turning it on" section listed only the two runtime calls and omitted the `codename1.arg.crashProtection.enabled=true` build hint. The hint is required: without it the build server never uploads the build's symbols, and crash reports from that build are dropped on arrival. The section below has been corrected._
+
 [Friday's release post](/blog/native-linux-apple-watch-game-builder-crash-protection/) introduced the new crash-protection system. This post is the detailed version: why it exists, what it does on the device, and how to turn it on.
 
 The motivation is portability. Every port we add widens the set of platforms an app can break on, and testing across all of them by hand does not scale. The old crash-protection tool emailed you a stack trace; that worked, but it did not symbolicate native crashes, and a busy app could bury you in mail. The new `com.codename1.crash` package replaces it with something seamless, and the seam it removes is the work you used to do yourself.
@@ -86,7 +88,17 @@ CrashProtection.setScrubber(new MyScrubber());
 
 ## Turning it on
 
-Crash protection is opt-in and off by default, and the choice is yours to make: it is persisted in `Preferences`. Install the handler during startup and enable uploads:
+Crash protection is opt-in and off by default, and turning it on takes two steps: one build hint and two lines of code.
+
+Start with the build hint. Add this to your `codenameone_settings.properties`:
+
+```
+codename1.arg.crashProtection.enabled=true
+```
+
+The `codename1.arg.` prefix ships the property to the build server as a build hint, and it is what tells a successful release build to upload its symbol artifacts, `mapping.txt` on Android or the dSYM on iOS, alongside the normal binary. Those symbols are also what the server matches an incoming report against, so a build that never uploaded them has its reports dropped on arrival. If you set the two calls below but skip this line, nothing will ever reach your repository.
+
+Then install the handler during startup and enable uploads. That choice is yours to make, and it is persisted in `Preferences`:
 
 ```java
 CrashProtection.install();
@@ -94,6 +106,8 @@ CrashProtection.setEnabled(true);
 ```
 
 `install()` registers the crash handler and, on the next launch, drains any reports that were stored but not yet uploaded. In the simulator uploads are skipped, so you can call both methods unconditionally without sending test crashes to the cloud. `setEnabled(false)` stops uploads later without uninstalling.
+
+One consequence of tying reports to symbols is worth planning around: symbol bundles are retained for three weeks on Pro and six on Enterprise, so crash protection covers the window right after a release, when a regression is most likely to surface. It is not a permanent watch on a build you shipped months ago. Ship a fresh build and its own symbols start the window again.
 
 A few details worth knowing. The endpoint is fixed to the Codename One cloud, so there is nothing to configure there. On Android the new handler runs alongside the legacy `Log.bindCrashProtection` path, guarded so a bug in one cannot suppress the other, which means you can adopt the new system without losing the old behavior while you migrate.
 
