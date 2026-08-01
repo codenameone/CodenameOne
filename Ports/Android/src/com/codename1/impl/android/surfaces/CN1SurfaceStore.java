@@ -280,8 +280,10 @@ public final class CN1SurfaceStore {
                     .getPackageInfo(ctx.getPackageName(), 0).firstInstallTime;
         } catch (Throwable t) {
             // unknown: 0 matches the default of an unstamped preference, so a count written
-            // under a known stamp is discarded rather than trusted
-            stamp = 0;
+            // under a known stamp is discarded rather than trusted. Deliberately not cached --
+            // pinning a transient lookup failure would disable the per-install scoping for the
+            // rest of the process and quietly hand every count back as zero.
+            return 0;
         }
         installStamp = stamp;
         return stamp;

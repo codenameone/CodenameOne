@@ -68,6 +68,8 @@ public final class CN1LiveActivityManager {
     private static final int DECLARED_MISSING = 2;
     /// Cached manifest verdict: 0 not looked up yet, otherwise one of the DECLARED_ constants.
     private static volatile int permissionDeclaredState;
+    private static volatile boolean loggedMissingManifest;
+    private static volatile boolean loggedBudgetExhausted;
 
     private CN1LiveActivityManager() {
     }
@@ -102,15 +104,28 @@ public final class CN1LiveActivityManager {
                 return false;
             }
             // From API 33 notifications also read as disabled while POST_NOTIFICATIONS is merely
-            // ungranted, which is the state of every fresh install. Granted-but-disabled is the
-            // settled choice again; ungranted is supported while the permission is one the app
-            // can actually ask for and a prompt attempt remains. The manifest test is what keeps
-            // an app that publishes widgets but never set "liveActivities": true from reporting
-            // supported forever: no declaration means no prompt, so no attempt is ever spent and
-            // the count alone would never settle.
-            return !hasPostNotificationsPermission(ctx)
-                    && !isPermissionMissing(ctx)
-                    && canPromptAgain(ctx);
+            // ungranted, which is the state of every fresh install.
+            if (hasPostNotificationsPermission(ctx)) {
+                // held, and notifications are still off: a deliberate choice, not a pending
+                // prompt, so there is nothing to ask for
+                return false;
+            }
+            // Every settled "no" below has to explain itself right here. `LiveActivity.start`
+            // preflights on this method and returns an inert handle when it is false, so the
+            // manager's own start -- and the diagnostics in `ensureNotificationPermission` -- are
+            // never reached for these states. This is the last point a developer's logcat sees.
+            // Once per process per reason, since apps call this per screen or per frame.
+            if (isPermissionMissing(ctx)) {
+                // no declaration means no prompt, so no attempt is ever spent and the count
+                // alone would never settle this into false
+                logMissingManifestOnce();
+                return false;
+            }
+            if (!canPromptAgain(ctx)) {
+                logBudgetExhaustedOnce();
+                return false;
+            }
+            return true;
         } catch (Throwable t) {
             return false;
         }
@@ -120,11 +135,13 @@ public final class CN1LiveActivityManager {
     /// Raises the `POST_NOTIFICATIONS` prompt first when Android 13+ needs it, blocking the
     /// calling thread until the user answers.
     public static String start(Context ctx, String descriptorJson, Map<String, byte[]> images) {
-        // permission first: `isSupported` reports false once the prompt budget is spent, so
-        // testing it first would short-circuit past the one place that logs *why* a start was
-        // refused -- precisely the case a developer needs to see. Nothing is prompted that
-        // `isSupported` would have rejected on capability grounds either, since the permission
-        // only exists from API 33 and live activities need API 24.
+        // Permission first so that a direct call here still raises the prompt before the
+        // capability check refuses on a budget this very call might replenish. Note the public
+        // API does not arrive this way when support is already settled: `LiveActivity.start`
+        // preflights on `isLiveActivitySupported`, which is why the settled-state diagnostics
+        // live in `isSupported` rather than below. Nothing is prompted that `isSupported` would
+        // have rejected on capability grounds, since POST_NOTIFICATIONS only exists from API 33
+        // and live activities need API 24.
         if (!ensureNotificationPermission(ctx) || !isSupported(ctx)) {
             return null;
         }
@@ -228,9 +245,7 @@ public final class CN1LiveActivityManager {
                 return true;
             }
             if (!canPromptAgain(ctx)) {
-                Log.w(TAG, "Live activities are unavailable: POST_NOTIFICATIONS was refused "
-                        + "twice. LiveActivity.isSupported() reports false until the user enables "
-                        + "notifications for this app in the system settings.");
+                logBudgetExhaustedOnce();
                 return false;
             }
             if (!hasForegroundActivity()) {
@@ -245,9 +260,7 @@ public final class CN1LiveActivityManager {
             if (isPermissionMissing(ctx)) {
                 // requesting an undeclared permission is auto-denied without any UI; not counted
                 // as an attempt either, so fixing the manifest is all it takes
-                Log.e(TAG, "Cannot start a live activity: POST_NOTIFICATIONS is missing from the "
-                        + "manifest. The build declares it for apps whose surfaces.json sets "
-                        + "\"liveActivities\": true -- add that and rebuild.");
+                logMissingManifestOnce();
                 return false;
             }
             boolean granted;
@@ -272,6 +285,29 @@ public final class CN1LiveActivityManager {
                     + " of " + MAX_NOTIFICATION_PROMPTS + ").");
             return false;
         }
+    }
+
+    /// The two settled reasons live activities can be unavailable, each reported once per
+    /// process. `isSupported` is polled -- per screen, sometimes per frame -- so an unguarded log
+    /// would bury the rest of logcat. A duplicated line under a race is harmless.
+    private static void logMissingManifestOnce() {
+        if (loggedMissingManifest) {
+            return;
+        }
+        loggedMissingManifest = true;
+        Log.e(TAG, "Live activities are unavailable: POST_NOTIFICATIONS is missing from the "
+                + "manifest. The build declares it for apps whose surfaces.json sets "
+                + "\"liveActivities\": true -- add that and rebuild.");
+    }
+
+    private static void logBudgetExhaustedOnce() {
+        if (loggedBudgetExhausted) {
+            return;
+        }
+        loggedBudgetExhausted = true;
+        Log.w(TAG, "Live activities are unavailable: POST_NOTIFICATIONS was refused twice. "
+                + "LiveActivity.isSupported() reports false until the user enables notifications "
+                + "for this app in the system settings.");
     }
 
     /// True while a prompt attempt remains; see
