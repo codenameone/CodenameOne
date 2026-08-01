@@ -593,7 +593,7 @@ If you want to use a font other than the built-in fonts, you'll need to define t
 include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-028,indent=0]
 ----
 
-IMPORTANT: Only TrueType (`.ttf`) files are supported. OpenType (`.otf`) files compile without an error, but the runtime rejects any font file whose name doesn't end in `.ttf`, and the iOS build registers only `.ttf` files with the operating system. Convert an OpenType font to TrueType before referencing it.
+IMPORTANT: Only TrueType (`.ttf`) files are supported. The runtime rejects any font file whose name doesn't end in `.ttf`, and the iOS build registers only `.ttf` files with the operating system, so the CSS compiler fails the build on anything else rather than letting it reach the device. Convert an OpenType (`.otf`) font to TrueType before referencing it.
 
 Then you'll be able to reference the font using the specified `font-family` in any CSS element. For example:
 
@@ -610,6 +610,8 @@ A relative `src` URL is resolved against the directory that holds the CSS file. 
 ----
 include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-044,indent=0]
 ----
+
+The font does have to live somewhere under that directory, because only that directory is copied into the build. A font reached through `../`, or one that doesn't exist, fails the build rather than producing an app whose text falls back to the system font. Two `@font-face` rules naming different files that share a file name also fail, since fonts are deployed by file name alone and one would overwrite the other. Pointing two families at the same file is fine.
 
 ===== Family names, weights and styles
 

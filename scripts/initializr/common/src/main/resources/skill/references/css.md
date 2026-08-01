@@ -333,9 +333,9 @@ For the full Lottie feature matrix and troubleshooting, point users to `docs/dev
 
 ### Custom TTF fonts
 
-**TrueType only.** A `.otf` compiles without an error but is rejected at runtime — `Font.createTrueTypeFont` throws unless the file name ends in `.ttf`, and the iOS build registers only `.ttf` files with the OS. Convert OpenType fonts to TrueType first.
+**TrueType only.** `Font.createTrueTypeFont` throws unless the file name ends in `.ttf`, and the iOS build registers only `.ttf` files with the OS, so the CSS compiler **fails the build** on a `.otf` instead of letting it reach the device. Convert OpenType fonts to TrueType first.
 
-Drop the `.ttf` anywhere under `common/src/main/css/` — relative `src:` URLs resolve against the directory holding `theme.css`, so both `url("Inter-Regular.ttf")` beside the CSS and `url("fonts/Inter-Regular.ttf")` in a subdirectory work. Then reference its **font name (not file name)** in `font-family`:
+Drop the `.ttf` anywhere under `common/src/main/css/` — relative `src:` URLs resolve against the directory holding `theme.css`, so both `url("Inter-Regular.ttf")` beside the CSS and `url("fonts/Inter-Regular.ttf")` in a subdirectory work. It must be somewhere under that directory though: only that directory is copied into the build, so a `../` reference, a missing file, or two rules naming different files that share a file name all fail the build. Then reference its **font name (not file name)** in `font-family`:
 
 ```css
 @font-face {
@@ -560,7 +560,8 @@ Painters are for **drawing** (custom backgrounds, decorations), not for animatin
 | New CSS only takes effect after restart | The build cache may be stale — `mvn -pl common clean compile`. |
 | 9-piece border looks blurry on iPhone Pro | Expected — 9-piece images are rasterized at the bundled resolution. Use a vector border (`RoundBorder`/`RoundRectBorder`) instead. |
 | Custom TTF doesn't render on device but works in simulator | The `@font-face` `src:` filename and the JS-side `Font.createTrueTypeFont(name, file)` filename must match exactly, and the file must end up packaged with the app. Re-check spelling and confirm the file is under `common/src/main/css/` (beside `theme.css` or in a subdirectory of it). |
-| Custom font is ignored entirely, no error | Either the file is an `.otf` (only `.ttf` works), or the family name has an unquoted space, or `theme.css` isn't at `common/src/main/css/theme.css` — the compiler looks for a `css` directory that is a sibling of a compile source root, and silently does nothing if it isn't there. |
+| Build fails with "Invalid @font-face rules" | Read the listed reasons — a `.otf` (convert to `.ttf`), an upper-case `.TTF` (the runtime check is case-sensitive), a font outside `common/src/main/css/`, a missing file, or two rules whose files share a name. |
+| Custom font is ignored entirely, no error | The family name has an unquoted space, or `theme.css` isn't at `common/src/main/css/theme.css` — the compiler looks for a `css` directory that is a sibling of a compile source root, and silently does nothing if it isn't there. |
 
 ## Reaching beyond the compiler
 

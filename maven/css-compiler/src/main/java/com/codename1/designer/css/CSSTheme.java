@@ -2115,7 +2115,160 @@ public class CSSTheme {
         res.setThemeProperty(themeName, "@cn1-bind:" + themeKey, varName);
     }
 
+    /// Fails the compile for `@font-face` rules the runtime cannot honor.
+    ///
+    /// Without this the errors are invisible until the app runs, because the
+    /// compiler and the device disagree about what a "true type font" is. The
+    /// compiler loads fonts through `java.awt.Font.createFont(TRUETYPE_FONT, ...)`,
+    /// which also parses OpenType/CFF, so an `.otf` compiles clean and then
+    /// `Font.createTrueTypeFont` throws on device because the name doesn't end
+    /// in `.ttf` -- and the iOS build never registered it with the OS anyway.
+    /// A font outside the CSS directory fails the same way: merge mode syncs
+    /// only that directory, so the reference resolves on the authoring machine
+    /// and breaks in a real build.
+    ///
+    /// Checks every declared rule rather than only the referenced ones, so a
+    /// typo surfaces on the build that introduced it instead of on the build
+    /// that first uses the family. Remote URLs are checked by name only -- this
+    /// never downloads a font just to validate it.
+    void validateFontFaces() {
+        List<String> errors = new ArrayList<String>();
+        // file name -> the source it was first seen at, so two families sharing
+        // one file stay legal and only genuinely different files collide.
+        Map<String, String> sourceByFileName = new HashMap<String, String>();
+        Map<String, String> familyByFileName = new HashMap<String, String>();
+        for (FontFace face : fontFaces) {
+            String family = face.fontFamily == null ? "(no font-family)" : face.fontFamily.getStringValue();
+            URL url;
+            try {
+                url = face.getURL();
+            } catch (RuntimeException ex) {
+                errors.add("@font-face \"" + family + "\" has an unreadable src URL: " + ex.getMessage());
+                continue;
+            }
+            if (url == null) {
+                errors.add("@font-face \"" + family + "\" has no usable src; "
+                        + "Codename One only supports src: url(...) pointing at a .ttf file");
+                continue;
+            }
+
+            String fileName = fontFileName(url);
+            if (!fileName.endsWith(".ttf")) {
+                errors.add("@font-face \"" + family + "\" points at " + fileName + ". "
+                        + fontExtensionAdvice(fileName));
+                continue;
+            }
+
+            String source = canonicalSource(url);
+            String previousSource = sourceByFileName.put(fileName, source);
+            String previousFamily = familyByFileName.put(fileName, family);
+            if (previousSource != null && !previousSource.equals(source)) {
+                errors.add("@font-face \"" + family + "\" and \"" + previousFamily + "\" resolve to different "
+                        + "files that are both named " + fileName + ". Fonts are deployed next to the theme "
+                        + "resource by file name alone, so one would overwrite the other; rename one of them");
+            }
+
+            if (!"file".equals(url.getProtocol())) {
+                // Remote fonts are downloaded into the CSS directory, so only the name matters here.
+                continue;
+            }
+            File fontFile;
+            try {
+                fontFile = new File(url.toURI());
+            } catch (URISyntaxException ex) {
+                errors.add("@font-face \"" + family + "\" has an unreadable src path: " + url);
+                continue;
+            }
+            if (!fontFile.exists()) {
+                errors.add("@font-face \"" + family + "\" refers to " + fontFile + ", which doesn't exist");
+                continue;
+            }
+            if (!isInsideCssDirectory(fontFile)) {
+                errors.add("@font-face \"" + family + "\" refers to " + fontFile + ", which is outside the "
+                        + "directory holding the CSS file. Only that directory is copied into the build, so "
+                        + "move the font beside the CSS file or into a subdirectory of it");
+            }
+        }
+        if (!errors.isEmpty()) {
+            StringBuilder message = new StringBuilder("Invalid @font-face rules in ")
+                    .append(baseURL == null ? "the stylesheet" : baseURL.toString())
+                    .append(':');
+            for (String error : errors) {
+                message.append("\n  - ").append(error);
+            }
+            throw new IllegalArgumentException(message.toString());
+        }
+    }
+
+    /// The file name the runtime will see, which is what `Font.createTrueTypeFont`
+    /// validates and what the deploy copy is keyed on. Percent-escapes are decoded
+    /// because the downloaded file lands under the decoded name.
+    private static String fontFileName(URL url) {
+        String path = url.getPath();
+        try {
+            path = java.net.URLDecoder.decode(path, "UTF-8");
+        } catch (UnsupportedEncodingException ex) {
+            // UTF-8 is always present; fall through with the raw path.
+        }
+        int slash = path.lastIndexOf('/');
+        return slash < 0 ? path : path.substring(slash + 1);
+    }
+
+    /// Identity of the file a rule points at, used to tell a genuine name
+    /// collision apart from two families deliberately sharing one font file.
+    private static String canonicalSource(URL url) {
+        if ("file".equals(url.getProtocol())) {
+            try {
+                return new File(url.toURI()).getCanonicalPath();
+            } catch (URISyntaxException ex) {
+                return url.toString();
+            } catch (IOException ex) {
+                return url.toString();
+            }
+        }
+        return url.toString();
+    }
+
+    private static String fontExtensionAdvice(String fileName) {
+        String lower = fileName.toLowerCase();
+        if (lower.endsWith(".otf")) {
+            return "OpenType fonts aren't supported -- convert it to TrueType (.ttf) first. "
+                    + "It would compile but fail at runtime, and the iOS build wouldn't register it at all";
+        }
+        if (lower.endsWith(".ttf")) {
+            return "the extension must be lower-case .ttf; the runtime check is case-sensitive";
+        }
+        return "only TrueType (.ttf) fonts are supported";
+    }
+
+    /// Containment is judged against `baseURL`, the stylesheet relative `src`
+    /// URLs are resolved against, rather than `cssFile` -- the latter is a
+    /// placeholder unless a caller sets it, so using it would reject every
+    /// perfectly good font.
+    private boolean isInsideCssDirectory(File fontFile) {
+        if (baseURL == null || !"file".equals(baseURL.getProtocol())) {
+            return true;
+        }
+        File cssDir;
+        try {
+            cssDir = new File(baseURL.toURI()).getAbsoluteFile().getParentFile();
+        } catch (URISyntaxException ex) {
+            return true;
+        }
+        if (cssDir == null) {
+            return true;
+        }
+        try {
+            String root = cssDir.getCanonicalPath() + File.separator;
+            return fontFile.getCanonicalPath().startsWith(root);
+        } catch (IOException ex) {
+            // Can't prove it's outside, so don't fail the build on it.
+            return true;
+        }
+    }
+
     public void updateResources() {
+        validateFontFaces();
         if (res != null) {
             Map<String, Object> themeData = res.getTheme(themeName);
             if (themeData != null) {
