@@ -24,22 +24,6 @@
       "queued_at": "2026-07-31T15:14:58+00:00"
     },
     {
-      "id": "linkedin:2026-07-31-1200-shai-push-v3-new-cloud",
-      "site": "linkedin",
-      "kind": "social",
-      "slug": "2026-07-31-1200-shai-push-v3-new-cloud",
-      "source_slug": "push-v3-new-cloud",
-      "account": "shai",
-      "title": "Please test the new Codename One push server",
-      "canonical": "https://www.codenameone.com/blog/push-v3-new-cloud/",
-      "cover_image_url": "https://www.codenameone.com/blog/push-v3-new-cloud.jpg",
-      "body_text": "If your Codename One application uses push, I have one request:\n\nChange `push.codenameone.com` to `cloud.codenameone.com` on your server and send a real notification through your existing code.\n\nNext week we plan to bring the old service down and direct its traffic to a completely new implementation. The compatibility endpoint accepts the classic request format, so it should be seamless.\n\n\u201cShould\u201d is why I want people to test now.\n\nPush V3 is also in the core. It adds typed messages, managed APNs and FCM credentials, durable queues, server-side segments, campaigns, operational analytics, and commands for widgets and Live Activities.\n\nSending and managed credentials are available on every plan, including Free. Higher plans increase volume and add persistent campaign tooling.\n\nThe article includes the exact test, client code, plan limits, privacy boundaries, and the rest of this week's release series.\n\nhttps://www.codenameone.com/blog/push-v3-new-cloud/",
-      "scheduled_at": "2026-07-31T09:00:00+00:00",
-      "scheduled_local": "2026-07-31T12:00+03:00",
-      "timezone": "Asia/Jerusalem",
-      "queued_at": "2026-07-31T15:14:58+00:00"
-    },
-    {
       "id": "linkedin:2026-08-01-1200-codenameone-health-api-false-certainty",
       "site": "linkedin",
       "kind": "social",
