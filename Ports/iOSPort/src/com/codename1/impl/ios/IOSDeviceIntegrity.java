@@ -249,6 +249,25 @@ final class IOSDeviceIntegrity {
     private String attestAnsweredForKey;
 
     /**
+     * The one-time attestation nobody took delivery of, and the request it was made for.
+     *
+     * <p>A caller can cancel the {@code AsyncResource} while Apple is working. The
+     * callback still records the key as pending, but the attestation object -- the one
+     * thing here that cannot be produced twice -- was on its way to a caller that is no
+     * longer listening, and was simply dropped. The grace window then promoted a key the
+     * backend had never seen, so every assertion was rejected, which reset and spent
+     * another rate-limited key.</p>
+     *
+     * <p>Held so a retry can still take delivery. The nonce is part of it because an
+     * attestation is made over one challenge: handing it to a request carrying a
+     * different nonce would produce a token the backend rejects, which is the failure
+     * this exists to avoid rather than a way out of it.</p>
+     */
+    private String undeliveredAttestKeyId;
+    private String undeliveredAttestNonce;
+    private String undeliveredAttestToken;
+
+    /**
      * Set when the keychain refused to delete part of a discarded identity.
      *
      * <p>Attestation refuses outright while it is set. The alternative is worse than a
@@ -349,6 +368,9 @@ final class IOSDeviceIntegrity {
             store.remove(KEY_ATTEST_ACCEPTED);
             attestAnsweredForKey = null;
             // The identity is gone, so anything this process remembered about it is too.
+            undeliveredAttestKeyId = null;
+            undeliveredAttestNonce = null;
+            undeliveredAttestToken = null;
             inMemoryStateKeyId = null;
             inMemoryState = null;
             pendingSinceInMemory = 0L;
@@ -561,6 +583,33 @@ final class IOSDeviceIntegrity {
             if (keyId != null && !STATE_ATTESTED.equals(state)
                     && keyId.equals(store.get(KEY_ATTEST_ACCEPTED))) {
                 state = STATE_PENDING;
+            }
+            if (STATE_PENDING.equals(state) && keyId != null && keyId.length() > 0
+                    && keyId.equals(undeliveredAttestKeyId)) {
+                // An attestation was produced for this key and nobody took it -- the
+                // caller cancelled while Apple was working. It cannot be produced again,
+                // so it is handed to the retry that asks for the same challenge.
+                if (nonce.equals(undeliveredAttestNonce)) {
+                    String token = undeliveredAttestToken;
+                    undeliveredAttestKeyId = null;
+                    undeliveredAttestNonce = null;
+                    undeliveredAttestToken = null;
+                    r.complete(token);
+                    return r;
+                }
+                // A different challenge, so the retained object is worthless: an
+                // attestation is made over one nonce and the backend checks it. What must
+                // NOT happen is the grace window promoting this key -- the backend has
+                // never seen it, so every assertion would be rejected, and the reset that
+                // follows costs a rate-limited key anyway on top of the failures. Discard
+                // it here instead: one key, once, deterministically, with the next lines
+                // generating its replacement.
+                undeliveredAttestKeyId = null;
+                undeliveredAttestNonce = null;
+                undeliveredAttestToken = null;
+                resetLocked();
+                keyId = null;
+                state = null;
             }
             if (STATE_PENDING.equals(state) && keyId != null && keyId.length() > 0) {
                 if (registrationGraceRemaining() > 0) {
@@ -1005,8 +1054,22 @@ final class IOSDeviceIntegrity {
             instance.failBootstrapWaiters("App Attest is completing first-run "
                     + "registration for this device; retry shortly");
         }
-        succeed(pending, TOKEN_PREFIX + ":attest:" + base64(bytes(pending.keyId))
-                + ":" + attestationB64);
+        String attestToken = TOKEN_PREFIX + ":attest:" + base64(bytes(pending.keyId))
+                + ":" + attestationB64;
+        if (instance != null) {
+            // Retained until somebody takes delivery. The caller may have cancelled while
+            // Apple was working, and succeed() correctly declines to complete a resource
+            // that is already done -- but the attestation object is the one thing here
+            // that cannot be produced again, so dropping it left a key the backend could
+            // never register, which the grace window then promoted into assertions that
+            // are rejected and a reset that costs another rate-limited key.
+            synchronized (instance.flowLock) {
+                instance.undeliveredAttestKeyId = pending.keyId;
+                instance.undeliveredAttestNonce = pending.nonce;
+                instance.undeliveredAttestToken = attestToken;
+            }
+        }
+        succeed(pending, attestToken, true);
     }
 
     /** Called from native with an assertion over an already attested key. */
@@ -1249,6 +1312,16 @@ final class IOSDeviceIntegrity {
      * generation is therefore checked again at the moment of publication.</p>
      */
     private static void succeed(final PendingRequest pending, final String token) {
+        succeed(pending, token, false);
+    }
+
+    /// @param attestation true when `token` carries the one-time attestation object, so
+    ///        the retained copy can be released once a caller has actually taken it. A
+    ///        caller that cancelled never does, and the copy is what lets the next
+    ///        request finish the registration instead of promoting a key the backend has
+    ///        never seen.
+    private static void succeed(final PendingRequest pending, final String token,
+            final boolean attestation) {
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 if (pending.result.isDone()) {
@@ -1273,6 +1346,13 @@ final class IOSDeviceIntegrity {
                         pending.result.error(new RuntimeException("App Attest state was "
                                 + "reset while this request was in flight"));
                         return;
+                    }
+                    if (attestation && token.equals(instance.undeliveredAttestToken)) {
+                        // Somebody is taking delivery, so there is nothing left to
+                        // retain. Released under the lock the retry path reads it under.
+                        instance.undeliveredAttestKeyId = null;
+                        instance.undeliveredAttestNonce = null;
+                        instance.undeliveredAttestToken = null;
                     }
                 }
                 pending.result.complete(token);
