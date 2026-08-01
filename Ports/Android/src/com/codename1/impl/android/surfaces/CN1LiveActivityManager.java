@@ -120,11 +120,14 @@ public final class CN1LiveActivityManager {
             }
             if (targetSdkVersion(ctx) < 33) {
                 // Legacy target on a modern device: the platform owns this prompt and raises it
-                // when the first notification channel is created, not when an app asks. So
-                // areNotificationsEnabled is the whole answer -- false here means the system
-                // already asked and the user declined. None of the budget below applies, because
-                // this app never gets to spend it.
-                return false;
+                // when the app creates its first notification channel, not when an app asks. On a
+                // fresh install nothing has been asked yet, so notifications read as disabled for
+                // want of a question -- and returning false here would hand back an inert handle
+                // from LiveActivity.start, so notifyActivity would never reach ensureChannel and
+                // the prompt could never appear at all. Stay supported until a channel exists to
+                // show the user was actually asked; once one does, disabled means declined. None
+                // of the budget below applies either way, since such an app never spends it.
+                return !hasNotificationChannels(nm);
             }
             // From API 33 notifications also read as disabled while POST_NOTIFICATIONS is merely
             // ungranted, which is the state of every fresh install.
@@ -476,6 +479,18 @@ public final class CN1LiveActivityManager {
             }
             permissionDeclaredState = missing ? DECLARED_MISSING : DECLARED_PRESENT;
             return missing;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /// True once the app owns at least one notification channel, which for a legacy target is
+    /// the evidence that the platform has had its chance to raise the prompt. An unreadable
+    /// answer counts as "no channels yet", erring toward letting the prompt happen.
+    private static boolean hasNotificationChannels(NotificationManager nm) {
+        try {
+            java.util.List<NotificationChannel> channels = nm.getNotificationChannels();
+            return channels != null && !channels.isEmpty();
         } catch (Throwable t) {
             return false;
         }
