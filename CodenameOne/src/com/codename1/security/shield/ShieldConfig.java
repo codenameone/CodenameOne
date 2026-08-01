@@ -123,7 +123,14 @@ public final class ShieldConfig {
     /// that says they are unauthenticated.
     private static final String[] TRANSPORT_HEADERS = {
         "host", "content-length", "transfer-encoding", "connection",
-        "keep-alive", "proxy-connection", "te", "trailer", "upgrade"
+        "keep-alive", "proxy-connection", "te", "trailer", "upgrade",
+        // Cookie is not transport framing, but it fails the same way and worse.
+        // ConnectionRequest emits userHeaders first and THEN calls setHeader("Cookie",
+        // ...) with the generated cookie string, so with cookie handling on and any
+        // stored cookie the token is overwritten by the request itself -- after
+        // attach() has reported success. A fail-closed host would then send a protected
+        // request with no token and no indication anything went wrong.
+        "cookie"
     };
 
     /// The failure mode applied to hosts registered without an explicit one.

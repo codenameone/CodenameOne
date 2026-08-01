@@ -463,7 +463,10 @@ class ShieldApiTest {
     void transportOwnedHeadersAreRefusedAsTheTokenHeader() {
         String[] refused = {
             "Host", "Content-Length", "Transfer-Encoding", "Connection",
-            "Keep-Alive", "Proxy-Connection", "TE", "Trailer", "Upgrade"
+            "Keep-Alive", "Proxy-Connection", "TE", "Trailer", "Upgrade",
+            // Not framing, but overwritten by the request itself: ConnectionRequest
+            // emits userHeaders and then sets Cookie from its own cookie store.
+            "Cookie"
         };
         for (int i = 0; i < refused.length; i++) {
             final String name = refused[i];

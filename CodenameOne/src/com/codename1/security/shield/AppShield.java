@@ -106,23 +106,57 @@ public final class AppShield {
     /// inert. Calling it twice is a no-op.
     public static void init(ShieldConfig cfg) {
         synchronized (AppShield.class) {
+            // A concurrent caller WAITS rather than returning early.
+            //
+            // `initialized` used to be published before the engine was initialized and
+            // before the guard was installed, so a second init() returned as though
+            // setup were complete -- and, worse, a ConnectionRequest starting in that
+            // window found no network guard at all and sent a protected request with
+            // neither a token nor a pin check, including for a host configured to fail
+            // closed. The flag now means what its name says, and the window is closed by
+            // making anyone who arrives during setup wait for it rather than by making
+            // them guess.
+            while (initializing) {
+                try {
+                    AppShield.class.wait();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
             if (initialized) {
                 return;
             }
             config = cfg == null ? new ShieldConfig() : cfg;
-            initialized = true;
+            initializing = true;
         }
-        ShieldEngine engine = ShieldEngineRegistry.getEngine();
         try {
-            engine.initialize(contextForEngine(), config);
-            setStatus(engine.isAvailable() ? ShieldStatus.OK : ShieldStatus.UNPROTECTED);
-        } catch (Throwable t) {
-            // A failure inside the engine must not stop the app from starting.
-            Log.e(t);
-            setStatus(ShieldStatus.UNPROTECTED);
+            ShieldEngine engine = ShieldEngineRegistry.getEngine();
+            try {
+                engine.initialize(contextForEngine(), config);
+                setStatus(engine.isAvailable() ? ShieldStatus.OK : ShieldStatus.UNPROTECTED);
+            } catch (Throwable t) {
+                // A failure inside the engine must not stop the app from starting.
+                Log.e(t);
+                setStatus(ShieldStatus.UNPROTECTED);
+            }
+            // Installed BEFORE initialization is published, so there is no instant at
+            // which the shield claims to be up and a request can slip past unprotected.
+            installNetworkGuard();
+        } finally {
+            synchronized (AppShield.class) {
+                initializing = false;
+                initialized = true;
+                AppShield.class.notifyAll();
+            }
         }
-        installNetworkGuard();
     }
+
+    /// True while [#init(ShieldConfig)] is between taking the job and finishing it.
+    ///
+    /// Separate from `initialized` because the two answer different questions, and
+    /// conflating them is what let a caller act on a half-built shield.
+    private static boolean initializing;
 
     /// Hooks the shield into the network stack, which is what makes
     /// [ShieldConfig#protect(String, HostPolicy)] take effect on ordinary requests. Without it a
