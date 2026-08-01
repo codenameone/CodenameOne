@@ -190,9 +190,10 @@ public class CN1WearableListenerService extends WearableListenerService {
             String appPath = CN1WearableBridge.decode(
                     path.substring(CN1WearableBridge.pathPrefix().length()));
             if (event.getType() == DataEvent.TYPE_DELETED) {
-                // Forget the ordering stamp too, or a value republished at this path with a lower
-                // stamp than the removed one carried would be filtered out as "older".
-                CN1WearableBridge.forgetDeliveredSequence(appPath);
+                // The ordering stamp is dropped only once we know the path is genuinely empty --
+                // see the branches below. Dropping it here, before the query, meant a query that
+                // then FAILED left the path with no stamp at all, so an older item from another
+                // authority arriving next would pass the newer-than-delivered test and win.
                 // One authority's item going away does not mean the path is gone: both nodes may
                 // have published it, and the other item can still be there. Reporting a removal on
                 // the strength of this event alone would tell the listener the value disappeared
@@ -208,6 +209,9 @@ public class CN1WearableListenerService extends WearableListenerService {
                                 appPath, remaining.sequence, remaining.node);
                         WearableConnection.deliverDataChanged(appPath, remaining.payload);
                     } else {
+                        // Genuinely empty, so the stamp can go: a value republished here later with
+                        // a lower stamp than the removed one carried must not be filtered as older.
+                        CN1WearableBridge.forgetDeliveredSequence(appPath);
                         WearableConnection.deliverDataRemoved(appPath);
                     }
                 } catch (java.io.IOException couldNotResolve) {

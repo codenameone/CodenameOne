@@ -830,57 +830,14 @@ public class CN1WearableBridge implements WearableBridge {
     private static long lastSequence;
 
     public byte[] getData(String path) {
+        // Deliberately the same resolution the listener uses. This used to have its own loop, which
+        // kept whichever item the buffer yielded first -- so once resolveValue() gained the
+        // publisher tie-break, getData() could return a different value than the listener had just
+        // delivered for the same path. One implementation, one answer.
         try {
-            // The authority is required: a wear:// Uri without one matches nothing. "*" means
-            // "any node", which is what a reader wants -- the value may have come from either side.
-            Uri uri = new Uri.Builder().scheme("wear").authority("*").path(dataPath(path)).build();
-            DataItemBuffer items = Tasks.await(dataClient.getDataItems(uri),
-                    TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            try {
-                byte[] best = null;
-                long bestSeq = Long.MIN_VALUE;
-                for (DataItem item : items) {
-                    DataMap map = valueMap(item);
-                    if (map == null) {
-                        continue;
-                    }
-                    long seq = map.getLong(SEQUENCE_KEY, Long.MIN_VALUE);
-                    if (best == null || seq > bestSeq) {
-                        best = map.getByteArray(PAYLOAD_KEY);
-                        bestSeq = seq;
-                    }
-                }
-                return best;
-            } finally {
-                items.release();
-            }
-        } catch (Throwable unavailable) {
-            return null;
-        }
-    }
-
-    /**
-     * The DataMap of an ordinary published value, or null when the item is not one -- a file transfer
-     * (which carries an Asset instead of a payload) or something not written by this API at all.
-     * This is what keeps transfers out of {@link #getDataPaths()} and out of {@link #getData}.
-     *
-     * @param item a received or queried data item
-     * @return the value's DataMap, or null
-     */
-    /// The payload bytes out of a value's DataMap, never null.
-    ///
-    /// @param value a map obtained from {@link #valueMap}
-    /// @return the published bytes
-    static byte[] payloadOf(DataMap value) {
-        byte[] payload = value.getByteArray(PAYLOAD_KEY);
-        return payload == null ? new byte[0] : payload;
-    }
-
-    static DataMap valueMap(DataItem item) {
-        try {
-            DataMap map = DataMapItem.fromDataItem(item).getDataMap();
-            return map.containsKey(PAYLOAD_KEY) ? map : null;
-        } catch (Throwable notADataMap) {
+            ResolvedValue v = resolveValue(context, path);
+            return v == null ? null : v.payload;
+        } catch (java.io.IOException unavailable) {
             return null;
         }
     }
