@@ -283,7 +283,15 @@ final class IOSDeviceIntegrity {
         // asked us to discard -- and keeps asserting with it. Better to leave the state
         // visibly unchanged so the caller fails and can retry.
         boolean idGone = store.remove(KEY_ID);
-        boolean stateGone = store.remove(KEY_STATE);
+        // The state goes only once the identifier is confirmed gone, and the ordering is
+        // the whole point. Deleted unconditionally, a keychain that refused KEY_ID and
+        // accepted KEY_STATE left an already-attested key behind with no state at all --
+        // and the in-memory terminal flag that covers this does not survive a restart.
+        // On the next launch requestToken() reads a key with no state as freshly
+        // generated and submits it to Apple, which is a rate-limited attestation of a
+        // key Apple has already attested, once per launch, forever. Leaving the state in
+        // place keeps the surviving key readable as what it actually is.
+        boolean stateGone = idGone && store.remove(KEY_STATE);
         store.remove(KEY_RETRY_AFTER);
         store.remove(KEY_PENDING_SINCE);
         // The markers that make a surviving key terminal are cleared only once the key
@@ -293,14 +301,36 @@ final class IOSDeviceIntegrity {
         // whose attestation never began, and submits to Apple. Every request after it
         // does the same, against a rate limit, with the one-shot recovery marker also
         // gone so nothing stops the loop.
+        boolean markerGone = true;
         if (idGone && stateGone) {
             store.remove(KEY_ATTEST_STARTED);
             attestAnsweredForKey = null;
             discardFailed = false;
             if (!keepSpentMarker) {
-                store.remove(KEY_RECOVERY_SPENT);
-                recoverySpentInMemory = false;
+                // Checked, and the in-memory flag follows what the keychain actually
+                // did. Clearing it regardless reported a successful reset while the
+                // persisted marker survived -- so the next invalidKey found the recovery
+                // already spent and refused the one replacement it is allowed, which is
+                // precisely what resetAttestation() was called to restore. A reset that
+                // does not restore the thing it promises has to say so.
+                markerGone = store.remove(KEY_RECOVERY_SPENT);
+                recoverySpentInMemory = !markerGone;
             }
+        }
+        if (idGone && stateGone && !markerGone) {
+            // The identity is gone, so requests can proceed and a fresh key will be
+            // generated -- deliberately NOT the terminal discardFailed state, which
+            // would refuse every request over a marker. What is wrong is narrower: the
+            // one-shot recovery still reads as spent, which is the documented behaviour
+            // of that marker rather than a new failure. The caller is told the reset
+            // did not do everything it was asked to, and can retry it.
+            generation++;
+            bootstrapInFlight = false;
+            failBootstrapWaiters("App Attest could not clear its recovery marker");
+            throw new IllegalStateException("App Attest discarded its stored key but "
+                    + "could not clear the spent-recovery marker; the keychain refused "
+                    + "the deletion, so a replacement key would still be refused its "
+                    + "one recovery attempt");
         }
         if (!idGone || !stateGone) {
             // The identity survives in part, and there may be nothing left to make it

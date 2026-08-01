@@ -12624,15 +12624,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         String[] signals = deviceIntegrity().jailbreakSignals();
         java.util.ArrayList<String> out = new java.util.ArrayList<String>();
         boolean jailbreakReported = false;
-        if (signals.length == 0) {
-            // The native probes found nothing, but an app that declares the
-            // cydia scheme can still detect one this way. Dropping it here would
-            // regress isDeviceCompromised() for exactly those apps.
-            if (cydiaProbe()) {
-                out.add("jailbreak");
-            }
-            return out.toArray(new String[out.size()]);
-        }
         for (int i = 0; i < signals.length; i++) {
             String s = signals[i];
             if ("hookLib".equals(s) || "dyldInsert".equals(s)) {
@@ -12647,6 +12638,16 @@ public class IOSImplementation extends CodenameOneImplementation {
                 jailbreakReported = true;
                 out.add("jailbreak");
             }
+        }
+        // Always, not only when the native probes found nothing. Those two sets of
+        // evidence are independent: the native side checks hard-coded paths and dyld,
+        // and the cydia scheme catches installs those miss -- so gating one on the other
+        // being empty meant a single unrelated signal suppressed it. A debugger alone
+        // was enough: `traced` made the list non-empty, the probe was skipped, and a
+        // jailbreak only cydia could see went unreported. Which is how a developer
+        // running under Xcode ends up being told their jailbroken device is clean.
+        if (!jailbreakReported && cydiaProbe()) {
+            out.add("jailbreak");
         }
         return out.toArray(new String[out.size()]);
     }
