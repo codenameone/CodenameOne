@@ -363,10 +363,15 @@ public final class Character implements Comparable<Character>{
             case CURRENCY_SYMBOL:
                 return true;
             default:
-                return isIdentifierIgnorable(codePoint);
+                // No ignorable fallback here, unlike isJavaIdentifierPart. An
+                // identifier-ignorable character is allowed inside a name but
+                // never as its first character, and with getType now answering
+                // CONTROL for the ASCII controls, the old fallback let
+                // U+0000 through U+0008 start an identifier.
+                return false;
         }
     }
-    
+
     public static boolean isJavaIdentifierPart(char ch) {
         return isJavaIdentifierPart((int) ch);
     }
