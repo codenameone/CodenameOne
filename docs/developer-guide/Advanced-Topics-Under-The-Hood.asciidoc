@@ -782,7 +782,7 @@ a specific permission came up. This maps Android permissions to the methods/clas
 
 `android.permission.READ_CONTACTS` - requested when accessing the device address book through `Display.getAllContacts()` and related APIs.
 
-`android.permission.READ_MEDIA_VIDEO` & `android.permission.READ_MEDIA_AUDIO` - added on API 33 and above when the app plays a URI through `MediaManager.createMedia(String, boolean)` or `createMediaAsync(String, boolean, Runnable)`, since that URI can point at the shared media store. The `InputStream` overloads do not add them: the Android port copies the stream into app private storage and reads nothing shared. Block them with `android.blockReadMediaPermissions=true`.
+`android.permission.READ_MEDIA_VIDEO` & `android.permission.READ_MEDIA_AUDIO` - added on API 33 and above when the app plays a URI through `MediaManager.createMedia(String, boolean)` or `createMediaAsync(String, boolean, Runnable)`, since that URI can point at the shared media store. The `InputStream` overloads don't add them: the Android port copies the stream into app private storage and reads nothing shared. Block them with `android.blockReadMediaPermissions=true`.
 
 `android.permission.READ_MEDIA_IMAGES` - never added by media playback, because no Codename One API requests it at runtime. Declaring it alongside `READ_MEDIA_VIDEO` places the app under Google Play's Photo and Video Permissions policy, so ask for it only when you need it, with `android.requestReadMediaPermissions=true`.
 
