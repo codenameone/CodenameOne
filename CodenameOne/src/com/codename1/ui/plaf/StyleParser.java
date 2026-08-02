@@ -661,10 +661,8 @@ public abstract class StyleParser {
         return out;
     }
 
-    /**
-     * True when the argument already names a font file rather than a bare
-     * family, for either of the container extensions the runtime loads.
-     */
+    /// True when the argument already names a font file rather than a bare
+    /// family, for either of the container extensions the runtime loads.
     private static boolean hasFontFileSuffix(String arg) {
         String lower = arg.toLowerCase();
         return lower.indexOf(".ttf") == lower.length() - 4
