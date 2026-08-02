@@ -81,36 +81,15 @@ class WatchNativeBuilder {
     // decision can read it too -- a workout session is HealthKit.
     private String workoutProcessingHint;
 
-    // GL/Metal-only source files with no watchOS substitute. Excluded from the
-    // watch target; the CG backend (CN1CGGraphics/CN1WatchRenderingView) and the
-    // per-op TARGET_OS_WATCH branches replace them. Kept in sync with
-    // Ports/iOSPort/nativeSources/WATCHOS_PORT.md.
+    // Files the watch target cannot take at all -- not a policy list, a mechanical
+    // one. Everything that CAN be guarded is guarded in the source instead, with
+    // `#if !TARGET_OS_WATCH` wrapping the whole file, so a new GL/Metal/UIKit
+    // source carries its own exclusion and cannot silently break the watch build
+    // by being forgotten here. These five have no preprocessor to run:
+    // a .metal shader is compiled by the Metal compiler (absent on watchOS) and a
+    // .xib is Interface Builder data.
     private static final String[] EXCLUDED_WATCH_SOURCES = {
-        "EAGLView.m", "METALView.m",
-        "CN1ES1compat.m", "CN1ES2compat.m", "CN1GL3D.m",
-        "CN1Metalcompat.m", "CN1MetalGlyphAtlas.m", "CN1MetalPipelineCache.m",
         "CN1MetalShaders.metal",
-        "DrawGradientTextureCache.m", "DrawStringTextureCache.m",
-        "CodenameOne_GLSceneDelegate.m",
-        // The UIApplication delegate is UIApplication/UIApplicationMain based
-        // (unavailable on watchOS) and is replaced by the SwiftUI @main shell
-        // (CN1WatchApp.swift) / CN1WatchHost. CodenameOne_GLViewController.m is
-        // NOT excluded: it carries the shared CGContext/op-based graphics
-        // primitives (createImage, fonts, the *Impl drawing entry points) that
-        // the watch slice reuses. Its UIViewController class + UIKit event code
-        // are guarded with #if !TARGET_OS_WATCH, and the watch render-driver
-        // class (CodenameOne_GLViewController as an NSObject) lives in
-        // CN1WatchViewController.m.
-        "CodenameOne_GLAppDelegate.m",
-        // UIWebView-based legacy browser peer (UIWebView + UIApplication
-        // networkActivityIndicator are unavailable on watchOS).
-        "UIWebViewEventDelegate.m",
-        // UIKit peer components unavailable on watchOS: tap gesture
-        // (UIGestureRecognizer), inline text editors (UITextField/UITextView),
-        // and the low-level AudioQueue recorder (AudioToolbox). Their headers
-        // are empty under #if !TARGET_OS_WATCH so importers still compile.
-        "CN1TapGestureRecognizer.m", "CN1UITextField.m", "CN1UITextView.m",
-        "CN1AudioUnit.m",
         "CodenameOne_GLViewController.xib", "MainWindow.xib",
         "CodenameOne_METALViewController.xib", "MainWindowMETAL.xib"
     };

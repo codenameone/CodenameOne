@@ -20,6 +20,9 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+#include "TargetConditionals.h"
+#if !TARGET_OS_WATCH
+
 #import "CN1ES2compat.h"
 #ifdef CN1_USE_METAL
 #import <QuartzCore/QuartzCore.h>
@@ -1482,3 +1485,10 @@ extern BOOL currentlyReturnExitsEditing;
 
 @end
 #endif
+
+#else
+// Compiled out on watchOS: this file is OpenGL ES / Metal / UIKit-only and the watch
+// slice renders through the Core Graphics backend instead. The typedef keeps the
+// translation unit non-empty, which ISO C requires.
+typedef int cn1_metalview_unused_on_watch;
+#endif // !TARGET_OS_WATCH

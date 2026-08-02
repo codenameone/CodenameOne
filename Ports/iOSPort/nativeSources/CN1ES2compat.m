@@ -1,3 +1,6 @@
+#include "TargetConditionals.h"
+#if !TARGET_OS_WATCH
+
 #import "CN1ES2compat.h"
 #import "CodenameOne_GLViewController.h"
 #ifdef USE_ES2
@@ -805,3 +808,10 @@ void glDisableCN1StateES2(enum CN1GLenum state){
 
 
 #endif
+
+#else
+// Compiled out on watchOS: this file is OpenGL ES / Metal / UIKit-only and the watch
+// slice renders through the Core Graphics backend instead. The typedef keeps the
+// translation unit non-empty, which ISO C requires.
+typedef int cn1_cn1es2compat_unused_on_watch;
+#endif // !TARGET_OS_WATCH
