@@ -1584,6 +1584,74 @@ public class CN1WearableBridge implements WearableBridge {
     private static final int RESOLVE_RETRIES = 2;
     private static final long RESOLVE_RETRY_MILLIS = 500;
 
+    /** Deferred winner resolution: attempts after the inline ones, and the gap between them. */
+    private static final int WINNER_RETRIES = 4;
+    private static final long WINNER_RETRY_MILLIS = 3000;
+
+    /**
+     * Paths with a deferred resolution already in flight. Several events can arrive for one path
+     * while the Data Layer is unreachable -- each would otherwise start its own retry chain against
+     * the same path.
+     */
+    private static final java.util.Set<String> pendingWinnerPaths = new java.util.HashSet<String>();
+
+    /**
+     * Resolves the winning item for a path later, after the inline attempts have all failed.
+     *
+     * <p>The alternative -- handing the app the event we happened to receive -- is not safe here.
+     * That event may be a lower-ranked replica, and the winning item, being unchanged, may never
+     * produce another callback: the listener would then disagree with {@link #getData} for the life
+     * of the process, with nothing to correct it. Waiting delivers late; guessing delivers wrong and
+     * stays wrong.
+     *
+     * <p>Runs on the transfer timer rather than {@link #replyTimer} for the reason given there: each
+     * attempt blocks on a Data Layer query, and the reply timer also owns every pending reply
+     * deadline.
+     */
+    static void scheduleWinnerResolution(Context context, String path) {
+        if (context == null || path == null) {
+            return;
+        }
+        synchronized (pendingWinnerPaths) {
+            if (!pendingWinnerPaths.add(path)) {
+                return;
+            }
+        }
+        scheduleWinnerResolution(context, path, 1);
+    }
+
+    private static void scheduleWinnerResolution(final Context context, final String path,
+            final int attempt) {
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                try {
+                    ResolvedValue winner = resolveValue(context, path);
+                    // setDeliveredSequence is the same guard the inline path uses, so a normal event
+                    // that arrived and stamped this path while we were waiting is not re-announced.
+                    if (winner != null
+                            && setDeliveredSequence(path, winner.sequence, winner.node)) {
+                        WearableConnection.deliverDataChanged(path, winner.payload);
+                    }
+                    forgetPendingWinner(path);
+                } catch (Throwable stillUnavailable) {
+                    if (attempt >= WINNER_RETRIES) {
+                        // Give up rather than deliver something unverified. The path stays unstamped,
+                        // so the next event for it resolves from scratch.
+                        forgetPendingWinner(path);
+                        return;
+                    }
+                    scheduleWinnerResolution(context, path, attempt + 1);
+                }
+            }
+        }, WINNER_RETRY_MILLIS * attempt);
+    }
+
+    private static void forgetPendingWinner(String path) {
+        synchronized (pendingWinnerPaths) {
+            pendingWinnerPaths.remove(path);
+        }
+    }
+
     static ResolvedValue resolveValue(Context context, String path) throws java.io.IOException {
         try {
             Uri uri = new Uri.Builder().scheme("wear").authority("*").path(dataPath(path)).build();

@@ -254,17 +254,15 @@ public class CN1WearableListenerService extends WearableListenerService {
                     }
                     continue;
                 } catch (java.io.IOException couldNotResolve) {
-                    // Every attempt failed. Deliver the event we were handed so the app is not left
-                    // with nothing -- but do NOT record it as the baseline: it may be a lower-ranked
-                    // replica, and the winning item, being unchanged, may never produce another
-                    // callback. Leaving the path unstamped means the next event for it resolves
-                    // properly instead of being judged against a value we are not sure of.
-                    com.google.android.gms.wearable.DataMap fallback =
-                            CN1WearableBridge.valueMap(event.getDataItem());
-                    if (fallback != null) {
-                        WearableConnection.deliverDataChanged(
-                                appPath, CN1WearableBridge.payloadOf(fallback));
-                    }
+                    // Every inline attempt failed. Do NOT fall back to the event we were handed: it
+                    // may be a lower-ranked replica, and the winning item, being unchanged, may
+                    // never produce another callback -- so the listener would disagree with
+                    // getData() for the life of the process, with nothing left to correct it. That
+                    // is the one outcome worse than a late delivery.
+                    //
+                    // Resolve it later instead, on a backoff, and leave the path unstamped so the
+                    // next event for it still resolves from scratch.
+                    CN1WearableBridge.scheduleWinnerResolution(this, appPath);
                     continue;
                 }
             }
