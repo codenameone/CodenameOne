@@ -23,6 +23,7 @@
 package com.codename1.impl.health;
 
 import com.codename1.util.AsyncResource;
+import com.codename1.util.AsyncResult;
 import com.codename1.util.SuccessCallback;
 import com.codename1.util.EasyThread;
 import com.codename1.ui.Display;
@@ -96,6 +97,35 @@ public final class EdtResult<T> extends OneShot<T> {
             return this;
         }
         return super.ready(callback, t);
+    }
+
+    /// The combined registration is marshalled whole, error branch included.
+    ///
+    /// `AsyncResource.onResult` is `ready(...)` followed by `except(...)`, and only the
+    /// first of those is overridden here -- so a worker thread registering on a resource
+    /// that had already failed ran the error half immediately, on that worker. This is the
+    /// application-facing form of the callback, so the failure it produces is an app
+    /// handling an error by touching a form off the EDT: the exact thing the class exists
+    /// to prevent, reached through the other half of the same method.
+    ///
+    /// `except` on its own stays synchronous, which is what the exemption above is about.
+    /// Reading the error out of an already-failed resource by registering a callback and
+    /// looking at what it captured depends on it, and introspecting a failure is not the
+    /// same act as handling one.
+    @Override
+    public void onResult(AsyncResult<T> onResult) {
+        if (!isCancelled() && Display.isInitialized()
+                && !Display.getInstance().isEdt()) {
+            final AsyncResult<T> target = onResult;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    EdtResult.super.onResult(target);
+                }
+            });
+            return;
+        }
+        super.onResult(onResult);
     }
 
     @Override

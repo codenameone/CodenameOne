@@ -366,6 +366,55 @@ class HealthEdtDeliveryTest extends UITestBase {
                 + "after it settled");
     }
 
+    /// And a listener attached after a FAILURE arrives on the EDT too.
+    ///
+    /// `onResult` is `ready` followed by `except`, and only the first was marshalled --
+    /// so this exact sequence, a worker registering on a resource that had already
+    /// failed, ran the error half synchronously on that worker. An app handling a health
+    /// error by showing a dialog or updating a label was then touching the UI off the
+    /// EDT, which is what this class exists to prevent, reached through the other half of
+    /// the same method.
+    @Test
+    void aListenerAttachedAfterAFailureAlsoArrivesOnTheEdt() {
+        final FakeHealthStore store = new FakeHealthStore();
+        store.holdRead = true;
+        final Landing<List<HealthSample>> landing =
+                new Landing<List<HealthSample>>();
+        CN.invokeAndBlock(new Runnable() {
+            public void run() {
+                assertFalse(CN.isEdt(), "the operation must start off the EDT");
+                AsyncResource<List<HealthSample>> failed = store.readSamples(
+                        new SampleQuery()
+                                .addType(HealthDataType.STEPS)
+                                .setTimeRange(HealthTimeRange.between(0L, 1000L)));
+                store.heldRead.error(new IllegalStateException("the backend said no"));
+                long deadline = System.currentTimeMillis() + 10_000L;
+                while (!failed.isDone() && System.currentTimeMillis() < deadline) {
+                    try {
+                        Thread.sleep(10L);
+                    } catch (InterruptedException ex) {
+                        return;
+                    }
+                }
+                assertTrue(failed.isDone(), "the fixture needs a settled failure");
+                failed.onResult(landing);
+                deadline = System.currentTimeMillis() + 10_000L;
+                while (!landing.arrived.get() && System.currentTimeMillis() < deadline) {
+                    try {
+                        Thread.sleep(10L);
+                    } catch (InterruptedException ex) {
+                        return;
+                    }
+                }
+            }
+        });
+        assertTrue(landing.arrived.get(), "the callback must arrive");
+        assertTrue(landing.failed.get(), "and it must be the error half");
+        assertTrue(landing.onEdt.get(),
+                "an error delivered to a late listener is still a callback an app "
+                + "handles by touching the UI, so it belongs on the EDT");
+    }
+
     @Test
     void aDeleteDeliversOnTheEdt() {
         final FakeHealthStore store = new FakeHealthStore();
