@@ -121,7 +121,7 @@ jobs:
     name: build + run suite (${{ matrix.arch }})
     needs: prepare-suite
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    timeout-minutes: 130
     strategy:
       fail-fast: false
       matrix:

@@ -420,7 +420,7 @@ class CleanTargetLinuxIntegrationTest {
 
             // Finish once the bulk of screenshots have landed and none has arrived
             // for a stabilization window (the trailing non-rendering API tests burn
-            // their per-test timeout after the last image). 40-minute hard cap.
+            // their per-test timeout after the last image). 70-minute hard cap.
             int minPngs = 100;
             // The stability window must outlast the suite's longest legitimate
             // no-new-screenshot stretch: the ~30 non-rendering API tests between
@@ -430,9 +430,22 @@ class CleanTargetLinuxIntegrationTest {
             // (the suite was force-killed mid-run, gate rc=17). Healthy runs
             // never wait this out: SUITE:FINISHED breaks the loop first. Only a
             // genuinely wedged suite pays the longer window, bounded by the
-            // 40-minute hard cap either way.
+            // 70-minute hard cap either way.
             long stableMs = 300_000L;
-            long deadline = System.currentTimeMillis() + 40L * 60 * 1000;
+            // 70 minutes, not 40. The suite is not hanging: the stage markers show
+            // the cut-off point moving forward as earlier tests get faster (it was
+            // Base64NativePerformanceTest, now MutableImageReadbackTest, ~165 of
+            // 170), and prepare() is an empty method that cannot block. The app is
+            // simply still running when the harness gives up and kills it.
+            //
+            // It needs the room because the tests this branch repaired now do real
+            // work instead of failing in milliseconds -- CryptoApiTest generates an
+            // RSA-2048 key pair, AudioMixerApiTest mixes actual audio,
+            // SurfacesPublishTest rasterizes, BrowserComponentScreenshotTest starts
+            // WebKit. That is the suite getting more honest, not slower for no
+            // reason, and the budget has to cover it. The job timeout above bounds
+            // this in turn.
+            long deadline = System.currentTimeMillis() + 70L * 60 * 1000;
             // Screenshot stabilization is a weak completion signal: DesktopMode,
             // the VideoIO grid, the VR scene and the 360 panorama all capture
             // AFTER the non-rendering API tail, so a slow tail trips the window
