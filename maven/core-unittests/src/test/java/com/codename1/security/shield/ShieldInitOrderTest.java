@@ -285,6 +285,46 @@ class ShieldInitOrderTest extends UITestBase {
     }
 
     /**
+     * A cancelled fetch stays cancelled, whatever the engine answers afterwards.
+     *
+     * <p>{@code AsyncResource.complete()} does not consult the cancelled flag -- it stores
+     * the value, marks the resource done and runs the success callback regardless -- so a
+     * caller that gave up while the attestation round trip was in flight still had its
+     * {@code ready} callback invoked when the answer arrived. Cancelling means the caller
+     * has stopped listening, and this is the one place in the shield where the late
+     * callback lands on a screen that has gone.</p>
+     */
+    @Test
+    void aCancelledTokenFetchNeverDeliversItsResult() throws Exception {
+        Thread init = initOnAnotherThread();
+        assertTrue(engine.entered.await(GENEROUS_TIMEOUT_MS, TimeUnit.MILLISECONDS),
+                "the engine should have been asked to initialize");
+
+        AsyncResource<ShieldToken> handle = AppShield.fetchToken();
+        final CountDownLatch delivered = new CountDownLatch(1);
+        handle.ready(new com.codename1.util.SuccessCallback<ShieldToken>() {
+            public void onSucess(ShieldToken value) {
+                delivered.countDown();
+            }
+        });
+        handle.except(new com.codename1.util.SuccessCallback<Throwable>() {
+            public void onSucess(Throwable value) {
+                delivered.countDown();
+            }
+        });
+
+        assertTrue(handle.cancel(true), "the caller gives up before the engine answers");
+
+        // And now the engine answers, which is the whole point: the token arrives, and
+        // nobody is told.
+        engine.release();
+        init.join(GENEROUS_TIMEOUT_MS);
+        assertFalse(delivered.await(500L, TimeUnit.MILLISECONDS),
+                "a cancelled fetch must deliver neither a value nor an error");
+        assertTrue(handle.isCancelled(), "and it stays cancelled rather than completing");
+    }
+
+    /**
      * The cleanup only touches the request the shield actually decorated.
      *
      * <p>The remembered names were process-global, so every request lost them -- and an

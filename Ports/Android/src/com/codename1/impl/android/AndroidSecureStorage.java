@@ -148,11 +148,14 @@ public final class AndroidSecureStorage extends SecureStorage {
             SharedPreferences sp = AndroidNativeUtil.getActivity()
                     .getApplicationContext()
                     .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-            sp.edit()
+            // commit(), so the Boolean this hands back is a statement about the disk. The
+            // pair of entries is also all-or-nothing that way: apply() could persist a
+            // ciphertext whose IV had not landed, which decrypts to nothing on the next
+            // launch and looks to the caller like a value it successfully stored.
+            return Boolean.valueOf(sp.edit()
                     .putString("v_" + account, Base64.encodeToString(enc, Base64.DEFAULT))
                     .putString("iv_" + account, Base64.encodeToString(c.getIV(), Base64.DEFAULT))
-                    .apply();
-            return Boolean.TRUE;
+                    .commit());
         }
     }
 
@@ -197,8 +200,12 @@ public final class AndroidSecureStorage extends SecureStorage {
         SharedPreferences sp = AndroidNativeUtil.getActivity()
                 .getApplicationContext()
                 .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        sp.edit().remove("v_" + account).remove("iv_" + account).apply();
-        result.complete(Boolean.TRUE);
+        // And the prompting tier deletes durably too. This is the credential a logout
+        // clears; reporting it gone while the removal sits in memory means it comes back
+        // if the process is killed before the write lands, which on Android is how a
+        // process usually ends.
+        result.complete(Boolean.valueOf(
+                sp.edit().remove("v_" + account).remove("iv_" + account).commit()));
         return result;
     }
 
@@ -347,8 +354,18 @@ public final class AndroidSecureStorage extends SecureStorage {
         if (prefs == null) {
             return false;
         }
-        prefs.edit().remove(account).apply();
-        return true;
+        // commit(), and its answer is this method's answer. apply() persists on a
+        // background thread, so returning true said the credential was gone while the
+        // deletion was still in memory: an app that removes a token on logout and is then
+        // killed -- which is the ordinary way an Android process ends -- finds it back on
+        // the next launch. A removal that reports success has to have happened, and this
+        // is the one operation where the caller cannot verify it later by reading.
+        //
+        // Under the same lock as the write and the reset, so a removal cannot be
+        // interleaved with a set that recreates the entry it was clearing.
+        synchronized (PLAIN_KEY_LOCK) {
+            return prefs.edit().remove(account).commit();
+        }
     }
 
     /**
@@ -442,11 +459,14 @@ public final class AndroidSecureStorage extends SecureStorage {
             if (prefs == null) {
                 return false;
             }
-            prefs.edit()
+            // Same reason the encrypted tier commits: this returns whether the value was
+            // stored, and with apply() it returned that before it was true. The legacy
+            // path is weaker on confidentiality by construction; it does not get to be
+            // weaker on the one thing the API actually promises.
+            return prefs.edit()
                     .putString(account, Base64.encodeToString(
                             value.getBytes("UTF-8"), Base64.NO_WRAP))
-                    .apply();
-            return true;
+                    .commit();
         } catch (IOException e) {
             Log.e(e);
             return false;

@@ -347,7 +347,7 @@ public final class AppShield {
     ///
     /// @param bindingData the data to bind to, typically a digest of the request body
     public static AsyncResource<ShieldToken> fetchToken(final String bindingData) {
-        final AsyncResource<ShieldToken> result = new AsyncResource<ShieldToken>();
+        final AsyncResource<ShieldToken> result = new TokenResource();
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             @Override
             public void run() {
@@ -856,6 +856,58 @@ public final class AppShield {
             listeners.copyInto(copy);
         }
         Display.getInstance().callSerially(new StatusDispatch(copy, status));
+    }
+
+    /// The token handle handed back to callers, where exactly one of cancellation and
+    /// delivery wins.
+    ///
+    /// [AsyncResource#complete(Object)] does not consult the cancelled flag: it stores the
+    /// value, marks the resource done and runs the success callback regardless. So a
+    /// caller that cancelled -- the screen was closed, the user backed out -- still had
+    /// its `ready` callback invoked when the attestation round trip finished a moment
+    /// later, and the error branches did the same through [AsyncResource#error(Throwable)].
+    /// That contradicts the contract the rest of the framework is built on and tests, and
+    /// this is the one place where a late callback fires against a screen that has gone.
+    ///
+    /// The claim is taken by whichever arrives first, and the loser does nothing. Both
+    /// entry points are overridden rather than only the internal ones, because this object
+    /// is handed to application code that can call either.
+    private static final class TokenResource extends AsyncResource<ShieldToken> {
+        private boolean claimed;
+
+        private boolean claim() {
+            synchronized (this) {
+                if (claimed) {
+                    return false;
+                }
+                claimed = true;
+                return true;
+            }
+        }
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            if (!claim()) {
+                // Already delivered. The base class answers false for a resource that is
+                // done, and so does this.
+                return false;
+            }
+            return super.cancel(mayInterruptIfRunning);
+        }
+
+        @Override
+        public void complete(ShieldToken value) {
+            if (claim()) {
+                super.complete(value);
+            }
+        }
+
+        @Override
+        public void error(Throwable t) {
+            if (claim()) {
+                super.error(t);
+            }
+        }
     }
 
     private static final class StatusDispatch implements Runnable {
