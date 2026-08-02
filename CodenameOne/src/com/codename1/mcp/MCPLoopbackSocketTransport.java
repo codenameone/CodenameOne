@@ -119,21 +119,24 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
             active = this;
         }
         // open() runs on the server's reader thread, so a stop() from another thread can
-        // already have closed this transport before we got here. close() clears the
-        // registration only if it is still ours, and at that point it was not ours yet --
-        // so claiming it now would strand the process-wide slot on a transport that never
-        // listens, and every later open() would be refused with "already open on port N"
-        // for the lifetime of the process. Release it and fail instead.
-        boolean closedBeforeListening;
-        synchronized (lock) {
-            closedBeforeListening = closed;
-        }
-        if (closedBeforeListening) {
-            clearActiveIfOurs();
-            throw new IOException("This MCP socket transport was closed before it began listening");
-        }
+        // already have closed this transport, or close it while we are binding. Two
+        // things have to be true afterwards whichever order those land in: the
+        // process-wide registration must not stay claimed by a transport that never
+        // listens (every later open() would then be refused with "already open on port
+        // N" for the life of the process), and no listener may be left bound with
+        // nobody holding a reference to stop it -- an orphan keeps the port and its
+        // connection callbacks still consult `active`, so it could hand a connection to
+        // a later transport.
+        //
+        // Publishing `listening` under the same lock close() uses is what makes that
+        // decidable. The bind itself stays outside the lock -- Socket.listenLoopback is
+        // a platform call and holding a lock the connection callback also takes across
+        // it invites a deadlock -- so the check is "did close() win?" immediately after,
+        // and the loser cleans up. Either close() sees a published listener and stops
+        // it, or we see closed and stop it ourselves.
+        Socket.StopListening bound;
         try {
-            listening = Socket.listenLoopback(port, Connection.class);
+            bound = Socket.listenLoopback(port, Connection.class);
         } catch (RuntimeException ex) {
             // Two things go wrong if this escapes. The process-wide registration would stay
             // pointing at a transport that never started listening, so every later open()
@@ -145,6 +148,20 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
             IOException failure = new IOException("Failed to listen on loopback port " + port);
             failure.initCause(ex);
             throw failure;
+        }
+        boolean closedWhileBinding;
+        synchronized (lock) {
+            closedWhileBinding = closed;
+            if (!closedWhileBinding) {
+                listening = bound;
+            }
+        }
+        if (closedWhileBinding) {
+            clearActiveIfOurs();
+            if (bound != null) {
+                bound.stop();
+            }
+            throw new IOException("This MCP socket transport was closed before it began listening");
         }
     }
 
