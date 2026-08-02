@@ -34,7 +34,19 @@ import com.codename1.util.SuccessCallback;
 
 public class BrowserComponentScreenshotTest extends BaseTest {
     private static final int VISUAL_RETRY_MS = 250;
-    private static final int VISUAL_TIMEOUT_MS = 12000;
+    /**
+     * Wall-clock budget for WebKit to composite its native peer into the
+     * capture.
+     *
+     * Generous on purpose. This is not a correctness threshold -- the
+     * assertion is that the peer composites at all, and
+     * {@link #containsRenderedBrowserContent} still decides that -- it is only
+     * how long a loaded CI runner is allowed to take getting there. When the
+     * budget is too tight the test emits no screenshot at all, so the suite
+     * reports "actual screenshot missing", which reads like a lost capture
+     * rather than a slow one.
+     */
+    private static final long VISUAL_TIMEOUT_MS = 45000L;
 
     private BrowserComponent browser;
     private boolean loaded;
@@ -117,12 +129,21 @@ public class BrowserComponentScreenshotTest extends BaseTest {
             // guarantee that the native peer has reached the Metal surface.
             // Verify the exact screen image that will be emitted instead of
             // relying on a fixed delay and then taking an unrelated capture.
-            awaitRenderedBrowserFrame(0);
+            awaitRenderedBrowserFrame(System.currentTimeMillis() + VISUAL_TIMEOUT_MS);
         }
         readyRunnable = null;
     }
 
-    private void awaitRenderedBrowserFrame(final int waitedMs) {
+    /**
+     * @param deadline wall-clock instant to give up at, rather than a count of
+     *      the retry delays. Each attempt also performs a full
+     *      {@code Display.screenshot()}, and on a loaded runner that capture
+     *      costs far more than the 250ms delay between attempts -- summing the
+     *      delays alone therefore under-counted real time by roughly 2x, so a
+     *      nominal 12s budget gave up after 24s of wall clock. Timing out
+     *      against the clock makes the number mean what it says.
+     */
+    private void awaitRenderedBrowserFrame(final long deadline) {
         browser.repaint();
         form.repaint();
         markCaptureStarted();
@@ -136,12 +157,13 @@ public class BrowserComponentScreenshotTest extends BaseTest {
                 return;
             }
             screen.dispose();
-            if (waitedMs >= VISUAL_TIMEOUT_MS) {
-                fail("BrowserComponent DOM loaded, but its native peer was not composited into the screen capture");
+            if (System.currentTimeMillis() >= deadline) {
+                fail("BrowserComponent DOM loaded, but its native peer was not composited"
+                        + " into the screen capture within " + VISUAL_TIMEOUT_MS + "ms");
                 return;
             }
             UITimer.timer(VISUAL_RETRY_MS, false, form,
-                    () -> awaitRenderedBrowserFrame(waitedMs + VISUAL_RETRY_MS));
+                    () -> awaitRenderedBrowserFrame(deadline));
         });
     }
 
