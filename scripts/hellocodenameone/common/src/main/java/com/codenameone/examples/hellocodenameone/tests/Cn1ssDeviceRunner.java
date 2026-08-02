@@ -546,15 +546,24 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         CN.callSerially(() -> {
             Cn1ssDeviceRunnerHelper.clearTransportFailure();
             log("CN1SS:INFO:suite starting test=" + testName);
+            // Stage markers. When a suite stops dead the log ends on the
+            // "starting" line and says nothing about which call did not come
+            // back -- prepare(), runTest(), or the poll that follows. Naming
+            // each boundary costs one line per test and turns "stopped in X"
+            // into "stopped inside X's runTest", which is the difference
+            // between reading a stack and guessing at one.
             try {
                 testClass.prepare();
+                log("CN1SS:INFO:stage=prepared test=" + testName);
                 testClass.runTest();
+                log("CN1SS:INFO:stage=ran test=" + testName);
             } catch (Throwable t) {
                 log("CN1SS:ERR:suite test=" + testName + " failed=" + t);
                 t.printStackTrace();
                 logThrowable("runTest:" + testName, t);
                 testClass.fail(String.valueOf(t));
             }
+            log("CN1SS:INFO:stage=awaiting test=" + testName);
             awaitTestCompletion(index, testClass, testName, System.currentTimeMillis() + testTimeoutMs(testClass));
         });
     }
