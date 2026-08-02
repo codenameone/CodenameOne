@@ -500,6 +500,34 @@ public abstract class Executor {
         public default void usesClassMethodWithBooleanArgument(String cls,
                 String method, Boolean value) {
         }
+
+        /**
+         * Reports a call together with the descriptor of the method it
+         * resolves to.
+         *
+         * <p>{@link #usesClassMethod(String, String)} reports the name
+         * alone, which cannot separate overloads. That is not a detail
+         * where the overloads do different things:
+         * {@code MediaManager.createMedia(String,boolean)} plays a URI
+         * that may point at the MediaStore, while
+         * {@code createMedia(InputStream,String)} copies the stream into
+         * app-private storage and reads no shared media at all. Keyed on
+         * the name, an app doing the second was built asking for
+         * {@code READ_MEDIA_VIDEO}, which costs its author a Play Console
+         * Photo and Video Permissions declaration for a permission the
+         * app never uses.</p>
+         *
+         * <p>{@code descriptor} is the call site's descriptor, so it is
+         * what the compiler resolved rather than what runs -- close
+         * enough for overload selection, which is all it is for. It is
+         * null when the scan could not recover one; a caller must treat
+         * null as "may be the overload that needs the permission",
+         * because under-declaring costs a SecurityException on a user's
+         * device.</p>
+         */
+        public default void usesClassMethodWithDescriptor(String cls,
+                String method, String descriptor) {
+        }
     }
 
     public static interface InternalClassRemapper {
@@ -755,7 +783,7 @@ public abstract class Executor {
                                 }
 
                                 @Override
-                                public void visitMethodInsn(int i, String owner, String name, String string2) {
+                                public void visitMethodInsn(int i, String owner, String name, String descriptor) {
                                     Boolean arg = pushedBoolean;
                                     pushedBoolean = null;
                                     scanner.usesClass(owner);
@@ -763,6 +791,8 @@ public abstract class Executor {
                                         scanner.usesClassMethod(owner, name);
                                         scanner.usesClassMethodWithBooleanArgument(
                                                 owner, name, arg);
+                                        scanner.usesClassMethodWithDescriptor(
+                                                owner, name, descriptor);
                                     }
                                 }
 
@@ -775,6 +805,8 @@ public abstract class Executor {
                                         scanner.usesClassMethod(owner, name);
                                         scanner.usesClassMethodWithBooleanArgument(
                                                 owner, name, arg);
+                                        scanner.usesClassMethodWithDescriptor(
+                                                owner, name, descriptor);
                                     }
                                 }
 
@@ -823,6 +855,16 @@ public abstract class Executor {
                                             scanner.usesClassMethodWithBooleanArgument(
                                                     h.getOwner(), h.getName(),
                                                     null);
+                                            // The Handle does carry the
+                                            // descriptor of the exact
+                                            // overload the reference was
+                                            // resolved against, so a
+                                            // MediaManager::createMedia
+                                            // reference is as selectable
+                                            // as a direct call.
+                                            scanner.usesClassMethodWithDescriptor(
+                                                    h.getOwner(), h.getName(),
+                                                    h.getDesc());
                                         }
                                     }
                                 }
