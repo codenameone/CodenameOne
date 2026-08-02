@@ -546,7 +546,10 @@ static int cn1OaepEncode(LPCWSTR labelDigest, LPCWSTR maskDigest, const unsigned
     unsigned char seed[64];
     unsigned char mask[1024];
     int i;
-    if (dbLength <= 0 || dbLength > (int) sizeof(mask)) {
+    /* An OAEP block cannot be shorter than 2*hLen+2. A 512-bit key leaves a DB
+     * shorter than the label hash itself, and the hash would then be written
+     * and compared past the end of the block. */
+    if (blockLength < 2 * hashLength + 2 || dbLength > (int) sizeof(mask)) {
         cn1CryptoFail("RSA-OAEP block does not fit the key", 0);
         return 0;
     }
@@ -614,7 +617,10 @@ static int cn1OaepDecode(LPCWSTR labelDigest, LPCWSTR maskDigest, unsigned char*
     unsigned int bad = 0;
     unsigned int seenDelimiter = 0;
     unsigned int messageStart = 0;
-    if (dbLength <= 0 || dbLength > (int) sizeof(mask)) {
+    /* An OAEP block cannot be shorter than 2*hLen+2. A 512-bit key leaves a DB
+     * shorter than the label hash itself, and the hash would then be written
+     * and compared past the end of the block. */
+    if (blockLength < 2 * hashLength + 2 || dbLength > (int) sizeof(mask)) {
         cn1CryptoFail("RSA-OAEP block does not fit the key", 0);
         return 0;
     }

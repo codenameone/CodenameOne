@@ -336,7 +336,10 @@ static int cn1_oaep_encode(const uint8_t* message, int messageLen,
     uint8_t seed[CC_SHA256_DIGEST_LENGTH];
     uint8_t* mask;
     int i;
-    if (dbLen <= 0 || messageLen > dbLen - hashLen - 1) {
+    /* An OAEP block cannot be shorter than 2*hLen+2; a 512-bit key leaves a DB
+     * shorter than the label hash, and the label hash would then be written and
+     * compared past the end of the block. */
+    if (blockLen < 2 * hashLen + 2 || messageLen > dbLen - hashLen - 1) {
         return 0;
     }
     mask = (uint8_t*) malloc((size_t) dbLen);
@@ -378,7 +381,7 @@ static int cn1_oaep_decode(uint8_t* block, int blockLen, uint8_t* message, int* 
     uint32_t bad = 0;
     uint32_t seenDelimiter = 0;
     uint32_t messageStart = 0;
-    if (dbLen <= 0) {
+    if (blockLen < 2 * hashLen + 2) {
         return 0;
     }
     mask = (uint8_t*) malloc((size_t) dbLen);

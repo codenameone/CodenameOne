@@ -118,6 +118,20 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
             }
             active = this;
         }
+        // open() runs on the server's reader thread, so a stop() from another thread can
+        // already have closed this transport before we got here. close() clears the
+        // registration only if it is still ours, and at that point it was not ours yet --
+        // so claiming it now would strand the process-wide slot on a transport that never
+        // listens, and every later open() would be refused with "already open on port N"
+        // for the lifetime of the process. Release it and fail instead.
+        boolean closedBeforeListening;
+        synchronized (lock) {
+            closedBeforeListening = closed;
+        }
+        if (closedBeforeListening) {
+            clearActiveIfOurs();
+            throw new IOException("This MCP socket transport was closed before it began listening");
+        }
         try {
             listening = Socket.listenLoopback(port, Connection.class);
         } catch (RuntimeException ex) {
