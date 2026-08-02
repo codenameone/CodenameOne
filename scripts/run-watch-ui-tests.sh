@@ -151,6 +151,13 @@ xcrun simctl spawn "$WATCH_UDID" log stream --style compact \
   --predicate 'processImagePath CONTAINS "'"$WATCH_TARGET"'"' \
   > "$ARTIFACTS_DIR/app-console.log" 2>&1 &
 APP_CONSOLE_PID=$!
+# simctl opens these in APPEND mode, so a previous run's output survives here.
+# That matters because the completion/crash checks below grep these files: a
+# stale "CN1SS:SUITE:FINISHED" makes the very first poll believe the suite is
+# already done, and the WebSocket sink is torn down mid-suite. Truncate first,
+# as run-ios-ui-tests.sh and run-tv-ui-tests.sh already do for their logs.
+: > "$ARTIFACTS_DIR/app-stdout.log"
+: > "$ARTIFACTS_DIR/app-stderr.log"
 xcrun simctl launch --stdout="$ARTIFACTS_DIR/app-stdout.log" --stderr="$ARTIFACTS_DIR/app-stderr.log" \
   "$WATCH_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || { rw_log "launch failed"; exit 6; }
 rw_log "Launched watch app; waiting for the suite to stream screenshots..."

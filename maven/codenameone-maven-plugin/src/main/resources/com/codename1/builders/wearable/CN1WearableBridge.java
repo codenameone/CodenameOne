@@ -73,6 +73,14 @@ import java.util.concurrent.TimeUnit;
 public class CN1WearableBridge implements WearableBridge {
     /** Data Layer paths must start with a slash, and so do Codename One paths by convention. */
     private static final String PATH_PREFIX = "/cn1";
+    /**
+     * The capability this app advertises to say the counterpart is installed, declared in
+     * res/values/cn1_wearable.xml by the build. Named, rather than repeated as a literal, because
+     * the manifest filters CAPABILITY_CHANGED on the "/cn1" path prefix and Play services matches a
+     * capability name as the path -- so an app that declares any other capability starting with
+     * "cn1" is delivered here too, and the name is what tells the two apart.
+     */
+    static final String CAPABILITY_NAME = "cn1_wearable";
     /** The key the payload bytes live under inside a DataItem. */
     private static final String PAYLOAD_KEY = "cn1.payload";
     /** The publication order of a value or transfer, so the newer of two items wins. */
@@ -346,7 +354,7 @@ public class CN1WearableBridge implements WearableBridge {
         List<String> out = new ArrayList<String>();
         try {
             CapabilityInfo info = Tasks.await(
-                    capabilityClient.getCapability("cn1_wearable", CapabilityClient.FILTER_ALL),
+                    capabilityClient.getCapability(CAPABILITY_NAME, CapabilityClient.FILTER_ALL),
                     TIMEOUT_SECONDS, TimeUnit.SECONDS);
             for (Node n : info.getNodes()) {
                 out.add(n.getId());
@@ -428,6 +436,14 @@ public class CN1WearableBridge implements WearableBridge {
     /// Accepts a capability set pushed by Play services, so the cache tracks an install or
     /// uninstall that happens while the device stays connected.
     static void capabilityChanged(CapabilityInfo info) {
+        if (info != null && !CAPABILITY_NAME.equals(info.getName())) {
+            // Another of the app's capabilities whose name also begins with "cn1" (the manifest
+            // filters on that prefix and the capability name IS the path). Its node set says
+            // nothing about whether the counterpart app is installed, so adopting it would corrupt
+            // the cache behind isCompanionAppInstalled(); and no state of ours changed, so this
+            // must not notify either.
+            return;
+        }
         CN1WearableBridge b = current;
         if (b == null || info == null) {
             // No bridge to update the cache on, but listeners are held by WearableConnection rather
@@ -520,7 +536,7 @@ public class CN1WearableBridge implements WearableBridge {
         synchronized (bondedLock) {
             startedAt = bondedGeneration;
         }
-        capabilityClient.getCapability("cn1_wearable", CapabilityClient.FILTER_ALL)
+        capabilityClient.getCapability(CAPABILITY_NAME, CapabilityClient.FILTER_ALL)
                 .addOnCompleteListener(new com.google.android.gms.tasks.OnCompleteListener<CapabilityInfo>() {
                     public void onComplete(com.google.android.gms.tasks.Task<CapabilityInfo> task) {
                         if (!task.isSuccessful() || task.getResult() == null) {
