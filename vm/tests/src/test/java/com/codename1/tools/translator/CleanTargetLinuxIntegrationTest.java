@@ -376,6 +376,13 @@ class CleanTargetLinuxIntegrationTest {
             // Set by the suite watchdog when a test blocks the event dispatch thread;
             // the run cannot progress past that point, so stop instead of waiting.
             final java.util.concurrent.atomic.AtomicReference<String> wedged = new java.util.concurrent.atomic.AtomicReference<>();
+            // The last test the suite announced. The in-app watchdog names a wedging
+            // test itself, but it cannot always get the message out: a test that blocks
+            // the event dispatch thread in a tight loop also blocks the collector, so
+            // the watchdog's own log call can be stuck waiting to allocate. Reading the
+            // announcement from outside the process always works, and "stopped in X" is
+            // the difference between a diagnosable failure and a silent one.
+            final java.util.concurrent.atomic.AtomicReference<String> lastStarted = new java.util.concurrent.atomic.AtomicReference<>();
             final Process appF = app;
             Thread areader = new Thread(() -> {
                 // Tee the app's merged stdout/stderr to CN1_APP_LOG_TEE when
@@ -399,6 +406,11 @@ class CleanTargetLinuxIntegrationTest {
                         if (tee != null) { tee.println(line); }
                         if (line.contains("CN1SS:SUITE:FINISHED")) { finished.set(true); }
                         if (line.contains("CN1SS:SUITE:WEDGED")) { wedged.set(line); }
+                        int startedAt = line.indexOf("CN1SS:INFO:suite starting test=");
+                        if (startedAt >= 0) {
+                            lastStarted.set(line.substring(
+                                    startedAt + "CN1SS:INFO:suite starting test=".length()).trim());
+                        }
                     }
                 } catch (IOException ignore) {
                 }
@@ -454,15 +466,19 @@ class CleanTargetLinuxIntegrationTest {
             }
             pngs = CleanTargetIntegrationTest.countPngFiles(outDir);
             if (!finished.get()) {
+                String stoppedIn = lastStarted.get();
                 System.out.println("CN1SS:HARNESS: suite never emitted CN1SS:SUITE:FINISHED; pngs=" + pngs
-                        + " -- every test after the last logged one is reported as never run.");
+                        + "; stopped in " + (stoppedIn == null ? "<no test announced>" : stoppedIn)
+                        + " -- that test and every one after it is reported as never run.");
             }
             assertTrue(wedged.get() == null,
                     "the suite stopped because a test blocked the event dispatch thread: "
                     + wedged.get());
             assertTrue(finished.get() || (!requireSuite && pngs >= minPngs),
                     "hello suite capture incomplete: pngs=" + pngs + " (need " + minPngs + ")"
-                    + " suiteFinished=" + finished.get() + "\n" + serverLog);
+                    + " suiteFinished=" + finished.get()
+                    + " stoppedIn=" + (lastStarted.get() == null ? "<none>" : lastStarted.get())
+                    + "\n" + serverLog);
 
             String outEnv = System.getenv("CN1_SHOT_OUTPUT_DIR");
             if (outEnv != null) {
