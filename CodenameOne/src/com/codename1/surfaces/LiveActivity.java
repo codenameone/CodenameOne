@@ -51,7 +51,10 @@ public final class LiveActivity {
         this.active = id != null;
     }
 
-    /// Returns true when this platform can present live activities.
+    /// Returns true when this platform can present live activities, including when doing so still
+    /// depends on a permission the user has not been asked for yet (Android 13+ raises that prompt
+    /// from [#start(LiveActivityDescriptor, Map)]). It turns false once the user has refused that
+    /// prompt as often as `start` will raise it, or has switched notifications off for the app.
     ///
     /// #### Returns
     ///
@@ -63,6 +66,13 @@ public final class LiveActivity {
 
     /// Starts a live activity. On unsupported platforms (or when the platform refuses, e.g. the
     /// user disabled live activities) this returns an inert handle rather than throwing.
+    ///
+    /// On Android 13 and newer the ongoing notification a live activity lowers to needs the
+    /// `POST_NOTIFICATIONS` permission, so the first start on a fresh install raises the system
+    /// prompt and blocks until the user answers. Start that first activity with your app in the
+    /// foreground: a background service or push handler has no UI to prompt from and the start is
+    /// refused. The prompt is raised at most twice across an install, after which [#isSupported()]
+    /// reports false.
     ///
     /// #### Threading
     ///

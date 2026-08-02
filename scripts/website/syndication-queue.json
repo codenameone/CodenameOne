@@ -2,22 +2,6 @@
   "_comment": "Queue of browser-only syndication tasks (Medium, DZone, Hashnode) drained by a local syndication tool that runs on the maintainer's machine inside an already-signed-in browser session. Tasks are appended by scripts/website/queue_browser_syndication.py which is invoked by the daily blog-syndication workflow, and the local tool writes the resulting URLs back into syndication-state.json.",
   "tasks": [
     {
-      "id": "linkedin:2026-08-02-1200-shai-on-device-ai-mcp-loopback",
-      "site": "linkedin",
-      "kind": "social",
-      "slug": "2026-08-02-1200-shai-on-device-ai-mcp-loopback",
-      "source_slug": "on-device-ai-mcp-loopback",
-      "account": "shai",
-      "title": "Loopback is local, not private",
-      "canonical": "https://www.codenameone.com/blog/on-device-ai-mcp-loopback/",
-      "cover_image_url": "https://www.codenameone.com/blog/on-device-ai-mcp-loopback.jpg",
-      "body_text": "Loopback is local. It is not private.\n\nWe added a loopback socket transport so an MCP client can inspect and drive a Codename One application on mobile and desktop ports.\n\nThis is a powerful debugging loop. An LLM can read the semantic UI tree, find a button by role and text, activate it, set text, and inspect the state that follows. No screenshot coordinates are required.\n\nBinding to loopback prevents the control channel from appearing on office Wi-Fi. It does not stop another local process from trying to connect.\n\nThat is why `MCP.startSocketServer(...)` refuses to run in a release build by default. There is an explicit override for controlled test labs, but it should feel serious because it is serious.\n\nThe same release also moves on-device vision, language, and LiteRT inference into the core. OCR, barcode recognition, pose detection, translation, and application-owned models now have a selective cross-platform API with no surprise cloud fallback.\n\nThe article separates those two AI stories and explains the threat boundary.\n\nhttps://www.codenameone.com/blog/on-device-ai-mcp-loopback/",
-      "scheduled_at": "2026-08-02T09:00:00+00:00",
-      "scheduled_local": "2026-08-02T12:00+03:00",
-      "timezone": "Asia/Jerusalem",
-      "queued_at": "2026-07-31T15:14:58+00:00"
-    },
-    {
       "id": "linkedin:2026-08-03-1200-codenameone-road-following-map-routing",
       "site": "linkedin",
       "kind": "social",

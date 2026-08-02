@@ -399,6 +399,87 @@ public class AndroidGradleBuilder extends Executor {
                 + "        }, this);\n";
     }
 
+    /**
+     * Whether a createMedia call reads media the app does not own, and so
+     * needs the READ_MEDIA_* permissions on API 33 and up.
+     *
+     * <p>Only the URI overloads can: {@code createMedia(String,boolean)}
+     * and {@code createMediaAsync(String,boolean,Runnable)} hand the
+     * string to the platform, which may resolve it against the
+     * MediaStore. The InputStream overloads cannot -- the Android
+     * implementation either plays an already-open FileInputStream's
+     * descriptor or copies the stream into a temp file in app-private
+     * storage, and asks for no permission at any point.</p>
+     *
+     * <p>They were told apart by name alone, so they were not told apart
+     * at all, and an app playing a bundled resource through a stream was
+     * built asking to read the user's photos and videos. That is not
+     * merely a spurious permission: READ_MEDIA_IMAGES and
+     * READ_MEDIA_VIDEO put the app under Play's Photo and Video
+     * Permissions policy, so the author gets a declaration form and a
+     * compliance deadline for something the app never does (issue
+     * #5507).</p>
+     *
+     * <p>A null descriptor is treated as the URI overload. Over-declaring
+     * costs a permission; under-declaring costs a SecurityException on a
+     * user's device.</p>
+     */
+    static boolean readsSharedMediaForPlayback(String cls, String method,
+            String descriptor) {
+        if (cls == null || method == null) {
+            return false;
+        }
+        if (cls.indexOf("com/codename1/media/MediaManager") != 0
+                && cls.indexOf("com/codename1/ui/Display") != 0) {
+            return false;
+        }
+        if (method.indexOf("createMedia") < 0
+                || method.indexOf("createMediaRecorder") > -1) {
+            return false;
+        }
+        return descriptor == null
+                || descriptor.startsWith("(Ljava/lang/String;");
+    }
+
+    /**
+     * The READ_MEDIA_* permissions the manifest should declare, in
+     * manifest order.
+     *
+     * <p>Images are declared only when the app asked for them outright
+     * with {@code android.requestReadMediaPermissions}, never because
+     * media playback was detected. Playback cannot read an image: the one
+     * runtime request site in the Android port passes
+     * {@code PERMISSION_READ_VIDEO} or {@code PERMISSION_READ_AUDIO}, and
+     * nothing anywhere in the port passes
+     * {@code PERMISSION_READ_IMAGES}, so an inferred READ_MEDIA_IMAGES
+     * was a permission the app had no way to use.</p>
+     *
+     * <p>It was not free either. READ_MEDIA_IMAGES together with
+     * READ_MEDIA_VIDEO is what puts an app under Play's Photo and Video
+     * Permissions policy, so an app that only plays audio was handed a
+     * declaration form and a compliance deadline for a capability it does
+     * not have (issue #5507).</p>
+     *
+     * <p>Video and audio stay paired because the runtime picks between
+     * them on the {@code isVideo} flag of the call, which is a value this
+     * scan does not read.</p>
+     */
+    static List<String> readMediaPermissionNames(boolean blocked,
+            int targetSdkVersion, boolean mediaPlayback,
+            boolean requestedOutright) {
+        List<String> out = new ArrayList<String>();
+        if (blocked || targetSdkVersion < 33
+                || (!mediaPlayback && !requestedOutright)) {
+            return out;
+        }
+        if (requestedOutright) {
+            out.add("android.permission.READ_MEDIA_IMAGES");
+        }
+        out.add("android.permission.READ_MEDIA_VIDEO");
+        out.add("android.permission.READ_MEDIA_AUDIO");
+        return out;
+    }
+
     private boolean wakeLock;
     private boolean recordAudio;
     private boolean mediaPlaybackPermission;
@@ -1768,6 +1849,15 @@ public class AndroidGradleBuilder extends Executor {
                 }
 
                 @Override
+                public void usesClassMethodWithDescriptor(String cls,
+                        String method, String descriptor) {
+                    if (readsSharedMediaForPlayback(cls, method,
+                            descriptor)) {
+                        mediaPlaybackPermission = true;
+                    }
+                }
+
+                @Override
                 public void usesClassMethod(String cls, String method) {
                     // The catalog first: it decides frameworks, gradle
                     // dependencies and plist entries for every feature,
@@ -1968,12 +2058,10 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("createMediaRecorder") > -1) {
                         recordAudio = true;
                     }
-                    if (cls.indexOf("com/codename1/media/MediaManager") == 0 && method.indexOf("createMedia") > -1 && method.indexOf("createMediaRecorder") < 0) {
-                        mediaPlaybackPermission = true;
-                    }
-                    if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("createMedia") > -1 && method.indexOf("createMediaRecorder") < 0) {
-                        mediaPlaybackPermission = true;
-                    }
+                    // createMedia is handled in
+                    // usesClassMethodWithDescriptor: which overload was
+                    // called decides whether any shared media is read,
+                    // and the name alone cannot say.
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("createContact") > -1) {
                         contactsWritePermission = true;
                     }
@@ -4137,10 +4225,12 @@ public class AndroidGradleBuilder extends Executor {
         boolean blockReadMediaPermissions = request.getArg("android.blockReadMediaPermissions", blockExternalStoragePermission ? "true" : "false").equals("true");
         boolean requestReadMediaPermissions = request.getArg("android.requestReadMediaPermissions", "false").equals("true");
         String readMediaPermissions = "";
-        if (!blockReadMediaPermissions && targetSDKVersionInt >= 33 && (mediaPlaybackPermission || requestReadMediaPermissions)) {
-            readMediaPermissions += permissionAdd(request, "\"android.permission.READ_MEDIA_IMAGES\"", "    <uses-permission android:name=\"android.permission.READ_MEDIA_IMAGES\" android:required=\"false\" />\n");
-            readMediaPermissions += permissionAdd(request, "\"android.permission.READ_MEDIA_VIDEO\"", "    <uses-permission android:name=\"android.permission.READ_MEDIA_VIDEO\" android:required=\"false\" />\n");
-            readMediaPermissions += permissionAdd(request, "\"android.permission.READ_MEDIA_AUDIO\"", "    <uses-permission android:name=\"android.permission.READ_MEDIA_AUDIO\" android:required=\"false\" />\n");
+        for (String p : readMediaPermissionNames(blockReadMediaPermissions,
+                targetSDKVersionInt, mediaPlaybackPermission,
+                requestReadMediaPermissions)) {
+            readMediaPermissions += permissionAdd(request, "\"" + p + "\"",
+                    "    <uses-permission android:name=\"" + p
+                            + "\" android:required=\"false\" />\n");
         }
         String xmlizedDisplayName = xmlize(request.getDisplayName());
 

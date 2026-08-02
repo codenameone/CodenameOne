@@ -1410,6 +1410,27 @@
         "canonical_set": true,
         "syndicated_at": "2026-08-01T15:06:46+00:00"
       }
+    },
+    "bluetooth-beyond-ble": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmsambk0700000ai85hq4a2xq",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a6e261fd0b9e3ee6a6f6056",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-01T17:01:12+00:00"
+      }
+    },
+    "2026-08-02-1200-shai-on-device-ai-mcp-loopback": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-08-02T10:00:48+00:00",
+        "account": "shai",
+        "source_slug": "on-device-ai-mcp-loopback",
+        "scheduled_at": "2026-08-02T09:00:00+00:00"
+      }
     }
   }
 }
