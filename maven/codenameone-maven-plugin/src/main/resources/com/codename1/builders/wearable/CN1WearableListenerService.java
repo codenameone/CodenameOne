@@ -227,10 +227,19 @@ public class CN1WearableListenerService extends WearableListenerService {
                         WearableConnection.deliverDataRemoved(appPath);
                     }
                 } catch (java.io.IOException couldNotResolve) {
-                    // The follow-up query failed rather than answering "nothing here". Reporting a
-                    // removal on that would tell the app a path had gone when another node may still
-                    // be publishing it -- and a removal is not recoverable from the app's side. Say
-                    // nothing; the next sync re-reports whatever is actually there.
+                    // The follow-up query failed rather than answering "nothing here". Still do not
+                    // report a removal on that: it would tell the app a path had gone while another
+                    // node may be publishing it, and a removal is not recoverable from the app's
+                    // side.
+                    //
+                    // But staying silent is not safe either, which is what this used to do. A
+                    // deletion is the ONLY callback for this state -- if the path is now empty, or
+                    // an unchanged lower-ranked replica is the survivor, nothing else is guaranteed
+                    // to fire, and the listener stays wrong for the life of the process while
+                    // getData() reports otherwise. Resolve it later instead, and pass
+                    // afterDeletion so an empty result is delivered as the removal it is rather
+                    // than being read as "nothing to announce".
+                    CN1WearableBridge.scheduleWinnerResolution(this, appPath, true);
                 }
                 continue;
             }

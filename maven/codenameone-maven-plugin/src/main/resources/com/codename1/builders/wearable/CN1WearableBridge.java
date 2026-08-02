@@ -1609,6 +1609,16 @@ public class CN1WearableBridge implements WearableBridge {
      * deadline.
      */
     static void scheduleWinnerResolution(Context context, String path) {
+        scheduleWinnerResolution(context, path, false);
+    }
+
+    /**
+     * @param afterDeletion the pending event was a deletion, so "nothing there" is itself the
+     *      answer and has to be delivered as a removal. On the first-sight path an empty result
+     *      means only that there is nothing to announce, and announcing a removal for a path the
+     *      app was never told about would invent an event.
+     */
+    static void scheduleWinnerResolution(Context context, String path, boolean afterDeletion) {
         if (context == null || path == null) {
             return;
         }
@@ -1617,6 +1627,7 @@ public class CN1WearableBridge implements WearableBridge {
                 return;
             }
         }
+        pendingDeletions(path, afterDeletion);
         scheduleWinnerResolution(context, path, 1);
     }
 
@@ -1628,9 +1639,16 @@ public class CN1WearableBridge implements WearableBridge {
                     ResolvedValue winner = resolveValue(context, path);
                     // setDeliveredSequence is the same guard the inline path uses, so a normal event
                     // that arrived and stamped this path while we were waiting is not re-announced.
-                    if (winner != null
-                            && setDeliveredSequence(path, winner.sequence, winner.node)) {
-                        WearableConnection.deliverDataChanged(path, winner.payload);
+                    if (winner != null) {
+                        if (setDeliveredSequence(path, winner.sequence, winner.node)) {
+                            WearableConnection.deliverDataChanged(path, winner.payload);
+                        }
+                    } else if (wasAfterDeletion(path)) {
+                        // The deletion really did empty the path. Report it now, and drop the stamp
+                        // for the same reason the inline path does: a value republished later with a
+                        // lower sequence than the removed one must not be filtered as older.
+                        forgetDeliveredSequence(path);
+                        WearableConnection.deliverDataRemoved(path);
                     }
                     forgetPendingWinner(path);
                 } catch (Throwable stillUnavailable) {
@@ -1649,6 +1667,29 @@ public class CN1WearableBridge implements WearableBridge {
     private static void forgetPendingWinner(String path) {
         synchronized (pendingWinnerPaths) {
             pendingWinnerPaths.remove(path);
+            deletionPaths.remove(path);
+        }
+    }
+
+    /**
+     * Paths whose pending resolution came from a deletion. Kept beside
+     * {@link #pendingWinnerPaths} and under the same monitor so the flag cannot outlive the
+     * resolution that owns it.
+     */
+    private static final java.util.Set<String> deletionPaths = new java.util.HashSet<String>();
+
+    private static void pendingDeletions(String path, boolean afterDeletion) {
+        if (!afterDeletion) {
+            return;
+        }
+        synchronized (pendingWinnerPaths) {
+            deletionPaths.add(path);
+        }
+    }
+
+    private static boolean wasAfterDeletion(String path) {
+        synchronized (pendingWinnerPaths) {
+            return deletionPaths.contains(path);
         }
     }
 
