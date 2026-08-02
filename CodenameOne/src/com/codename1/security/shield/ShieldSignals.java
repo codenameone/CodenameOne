@@ -178,13 +178,11 @@ public final class ShieldSignals {
         Display.getInstance().callSerially(new SignalDispatch(copy, signal));
     }
 
-    /**
-     * Whether this is still the observation the bus holds for its id.
-     *
-     * <p>Identity, not equality: the entry is replaced by the object that superseded it,
-     * so anything else under that id means a newer report has been stored and has queued
-     * its own notification.</p>
-     */
+    /// Whether this is still the observation the bus holds for its id.
+    ///
+    /// Identity, not equality: the entry is replaced by the object that superseded it, so
+    /// anything else under that id means a newer report has been stored and has queued its
+    /// own notification.
     static boolean isCurrentObservation(ShieldSignal signal) {
         synchronized (signals) {
             for (int i = 0; i < signals.size(); i++) {
