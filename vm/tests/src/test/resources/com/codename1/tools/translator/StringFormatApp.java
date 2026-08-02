@@ -93,6 +93,19 @@ public class StringFormatApp {
         f("literal.mixed", "%s-%d-%c%%", "cn1", Integer.valueOf(7), Character.valueOf('A'));
         f("index.explicit", "%2$s %1$s %2$s", "one", "two");
         f("index.previous", "%s %<s %<s", "echo");
+        // A null varargs array is not an empty argument list: the JVM feeds every
+        // specifier a null instead of reporting a missing argument. "%<" is the one
+        // exception, because it reuses an argument that has to have existed.
+        f("nullArray.s", "[%s]", (Object[]) null);
+        f("nullArray.twoArgs", "[%s %s]", (Object[]) null);
+        f("nullArray.d", "[%d]", (Object[]) null);
+        f("nullArray.floatWidth", "[%5.2f]", (Object[]) null);
+        f("nullArray.upper", "[%S]", (Object[]) null);
+        f("nullArray.boolean", "[%b]", (Object[]) null);
+        f("nullArray.explicitIndex", "[%2$s]", (Object[]) null);
+        f("nullArray.previousAfterArg", "[%s %<s]", (Object[]) null);
+        f("nullArray.previousFirst", "%<s", (Object[]) null);
+        f("emptyArray.s", "%s", new Object[0]);
     }
 
     private static void integers() {
@@ -207,6 +220,11 @@ public class StringFormatApp {
         f("bad.wrongTypeForC", "%c", Double.valueOf(1.0));
         f("bad.precisionOnD", "%.2d", Integer.valueOf(1));
         f("bad.uppercaseD", "%D", Integer.valueOf(1));
+        // '<' is a flag like any other, so repeating it is a duplicate flag.
+        f("bad.repeatedPrevious", "%s %<<s", "a");
+        f("bad.repeatedPreviousAlone", "%<<s", "a");
+        f("bad.repeatedMinus", "%--5s", "a");
+        f("bad.repeatedComma", "%,,d", Integer.valueOf(1));
         // A '.' with no digits after it is a malformed specifier, not a precision of
         // zero: every supported JDK reports the '.' as an unknown conversion.
         f("bad.emptyPrecision", "%.s", "x");

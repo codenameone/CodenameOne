@@ -130,7 +130,6 @@ final class StringFormatter {
             }
 
             int flags = 0;
-            boolean previous = false;
             while (pos < len) {
                 char f = format.charAt(pos);
                 int flag;
@@ -149,9 +148,7 @@ final class StringFormatter {
                 } else if (f == '#') {
                     flag = FLAG_HASH;
                 } else if (f == '<') {
-                    previous = true;
-                    pos++;
-                    continue;
+                    flag = FLAG_PREVIOUS;
                 } else {
                     break;
                 }
@@ -161,6 +158,7 @@ final class StringFormatter {
                 flags |= flag;
                 pos++;
             }
+            boolean previous = (flags & FLAG_PREVIOUS) != 0;
 
             int width = -1;
             int widthStart = pos;
@@ -192,29 +190,32 @@ final class StringFormatter {
             pos++;
 
             if (conversion == '%' || conversion == 'n') {
-                checkTextFlags(conversion, previous ? flags | FLAG_PREVIOUS : flags, width, precision);
+                checkTextFlags(conversion, flags, width, precision);
                 out.append(conversion == '%' ? pad("%", width, flags) : "\n");
                 continue;
             }
 
+            // format(fmt, (Object[]) null) is not an empty argument list: the JVM skips
+            // the bounds checks and hands every specifier a null. "%<" is the exception
+            // -- it reuses the previous argument, so there must have been one either way.
             Object arg;
             if (previous) {
-                if (lastArg < 0) {
+                if (lastArg < 0 || (args != null && lastArg >= args.length)) {
                     throw new MissingFormatArgumentException(format.substring(specStart, pos));
                 }
-                arg = args[lastArg];
+                arg = args == null ? null : args[lastArg];
             } else if (argIndex > 0) {
-                if (args == null || argIndex > args.length) {
+                if (args != null && argIndex > args.length) {
                     throw new MissingFormatArgumentException(format.substring(specStart, pos));
                 }
                 lastArg = argIndex - 1;
-                arg = args[lastArg];
+                arg = args == null ? null : args[lastArg];
             } else {
-                if (args == null || nextArg >= args.length) {
+                if (args != null && nextArg >= args.length) {
                     throw new MissingFormatArgumentException(format.substring(specStart, pos));
                 }
                 lastArg = nextArg;
-                arg = args[nextArg];
+                arg = args == null ? null : args[nextArg];
                 nextArg++;
             }
             out.append(convert(conversion, arg, flags, width, precision));
