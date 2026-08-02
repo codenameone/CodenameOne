@@ -608,4 +608,5 @@ class ShieldApiTest {
         assertFalse(ShieldSignals.hasSignalAtLeast(31));
         ShieldSignals.clear();
     }
+
 }

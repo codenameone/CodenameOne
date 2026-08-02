@@ -306,6 +306,20 @@ final class IOSDeviceIntegrity {
     private String undeliveredAttestToken;
 
     /**
+     * The resource the retained attestation was produced FOR, while its delivery is still
+     * undecided.
+     *
+     * <p>The retained copy is meant for the caller that walked away, and "walked away"
+     * has to be a decided fact. Delivery is queued onto the EDT, so between the callback
+     * and that runnable the token is retained and the original caller may still get it --
+     * a second request arriving in that window used to take the copy and hand it to
+     * itself, and both callers then submitted the same replay-protected attestation. The
+     * duplicate is rejected, and an app that treats a rejection as a bad key resets one
+     * the backend had just registered.</p>
+     */
+    private OneShotResource undeliveredAttestResult;
+
+    /**
      * Set when the keychain refused to delete part of a discarded identity.
      *
      * <p>Attestation refuses outright while it is set. The alternative is worse than a
@@ -409,6 +423,7 @@ final class IOSDeviceIntegrity {
             undeliveredAttestKeyId = null;
             undeliveredAttestNonce = null;
             undeliveredAttestToken = null;
+            undeliveredAttestResult = null;
             deliveredAttestKeyId = null;
             inMemoryStateKeyId = null;
             inMemoryState = null;
@@ -565,6 +580,7 @@ final class IOSDeviceIntegrity {
         undeliveredAttestKeyId = null;
         undeliveredAttestNonce = null;
         undeliveredAttestToken = null;
+        undeliveredAttestResult = null;
         attestAnsweredForKey = null;
         recoverySpentInMemory = !store.remove(KEY_RECOVERY_SPENT);
     }
@@ -657,6 +673,24 @@ final class IOSDeviceIntegrity {
                 // so it is handed to the retry that asks for the same challenge.
                 if (undeliveredAttestToken != null
                         && nonce.equals(undeliveredAttestNonce)) {
+                    // Only once the delivery it was produced for has actually lost.
+                    //
+                    // Retaining and delivering are not simultaneous: the callback retains
+                    // the copy and queues the handover onto the EDT, so for the length of
+                    // that hop the token is retained AND still reachable by its original
+                    // caller. A request arriving in that window took the copy, and both
+                    // callers then submitted the same attestation -- which is
+                    // replay-protected, so the second submission is rejected, and an app
+                    // that reads a rejection as a bad key resets one the backend had just
+                    // registered. Asking the resource itself makes this a fact about a
+                    // decided claim rather than a guess about an undecided one.
+                    if (undeliveredAttestResult != null
+                            && !undeliveredAttestResult.lostItsClaim()) {
+                        r.error(new RuntimeException("an App Attest attestation for this "
+                                + "challenge is being handed to another caller; retry "
+                                + "once it has finished"));
+                        return r;
+                    }
                     // Through the one-shot claim, like the scheduled delivery. Calling
                     // the inherited complete() left the claim unspent, so a caller that
                     // cancelled the resource it had just been handed still won -- while
@@ -669,6 +703,7 @@ final class IOSDeviceIntegrity {
                     undeliveredAttestKeyId = null;
                     undeliveredAttestNonce = null;
                     undeliveredAttestToken = null;
+                    undeliveredAttestResult = null;
                     // The same promotion the scheduled delivery does, including what to
                     // do when the keychain refuses it: this caller is walking away with
                     // the attestation, so a persisted state still saying nobody received
@@ -693,6 +728,7 @@ final class IOSDeviceIntegrity {
                 undeliveredAttestKeyId = null;
                 undeliveredAttestNonce = null;
                 undeliveredAttestToken = null;
+                undeliveredAttestResult = null;
                 resetLocked();
                 keyId = null;
                 state = null;
@@ -1055,6 +1091,10 @@ final class IOSDeviceIntegrity {
             instance.undeliveredAttestKeyId = pending.keyId;
             instance.undeliveredAttestNonce = pending.nonce;
             instance.undeliveredAttestToken = attestToken;
+            // And who it is for, until that is decided. Delivery is queued onto the EDT,
+            // so the copy is retained for a stretch during which the original caller can
+            // still receive it.
+            instance.undeliveredAttestResult = pending.result;
             if (!store.set(KEY_STATE, STATE_PENDING_UNDELIVERED)) {
                 // The key is attested with Apple and the keychain will not record it.
                 //
@@ -1179,6 +1219,27 @@ final class IOSDeviceIntegrity {
         private final java.util.concurrent.atomic.AtomicBoolean claimed =
                 new java.util.concurrent.atomic.AtomicBoolean();
 
+        /**
+         * Whether the claim was spent by a DELIVERY, as opposed to a cancellation or a
+         * failure. Written before the value is published and read from another thread, so
+         * volatile.
+         */
+        private volatile boolean delivered;
+
+        /**
+         * True once this resource can never receive the attestation: its claim is spent
+         * and it was not spent by handing the value over.
+         *
+         * <p>What the retained-attestation branch needs to know. An attestation cannot be
+         * produced twice, so the retained copy exists for the caller that cancelled --
+         * but "cancelled" has to mean the delivery LOST, not merely that a delivery is
+         * still queued. Asking this way makes the answer a fact about a claim that has
+         * already been decided rather than a guess about one that has not.</p>
+         */
+        boolean lostItsClaim() {
+            return claimed.get() && !delivered;
+        }
+
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
             if (!claimed.compareAndSet(false, true)) {
@@ -1194,6 +1255,9 @@ final class IOSDeviceIntegrity {
             if (!claimed.compareAndSet(false, true)) {
                 return false;
             }
+            // Before the value is published, so a thread that sees the claim spent never
+            // sees it as a loss when it was a win.
+            delivered = true;
             super.complete(value);
             return true;
         }
@@ -1499,6 +1563,7 @@ final class IOSDeviceIntegrity {
                             instance.undeliveredAttestKeyId = null;
                             instance.undeliveredAttestNonce = null;
                             instance.undeliveredAttestToken = null;
+                            instance.undeliveredAttestResult = null;
                             // Somebody has it, so the key is pending registration rather
                             // than pending delivery. A refused write leaves the persisted
                             // state saying nobody received it, which would have the next

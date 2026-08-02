@@ -486,4 +486,87 @@ class ShieldInitOrderTest extends UITestBase {
         public void shutdown() {
         }
     }
+
+    /**
+     * A status transition and the notification for it are one step, not two.
+     *
+     * <p>Storing the status and enqueueing its callback used to be separate, so two
+     * network threads could interleave as: A stores, B stores, B enqueues, A enqueues.
+     * Listeners then finished on A while {@link AppShield#getStatus()} already answered
+     * B -- a UI left saying "service down" for a shield that is fine, with nothing to
+     * correct it until the next transition.</p>
+     *
+     * <p>Staged rather than stressed. The window is between two statements inside one
+     * method, and a loop racing two threads at it did not reproduce the old behaviour
+     * here even once in three runs -- a test that cannot fail on the unfixed code is not
+     * a regression test. Holding the listener monitor stops the first transition exactly
+     * where the enqueue happens, which makes the question "has the second one stored its
+     * status yet" answerable rather than probable.</p>
+     */
+    @Test
+    void aStatusIsNotStoredWhileAnEarlierOneIsStillBeingDispatched() throws Exception {
+        AppShield.addListener(new RecordingListener());
+        java.lang.reflect.Field listenersField =
+                AppShield.class.getDeclaredField("listeners");
+        listenersField.setAccessible(true);
+        Object listenerLock = listenersField.get(null);
+        java.lang.reflect.Field statusField =
+                AppShield.class.getDeclaredField("lastStatus");
+        statusField.setAccessible(true);
+
+        final CountDownLatch firstEntered = new CountDownLatch(1);
+        final CountDownLatch secondStarted = new CountDownLatch(1);
+        Thread first;
+        Thread second;
+        synchronized (listenerLock) {
+            first = new Thread(new Runnable() {
+                public void run() {
+                    firstEntered.countDown();
+                    AppShield.setStatusForTesting(ShieldStatus.SERVICE_DOWN);
+                }
+            }, "shield-status-first");
+            first.setDaemon(true);
+            first.start();
+            assertTrue(firstEntered.await(GENEROUS_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+            // It is now inside setStatus, blocked where the notification is enqueued.
+            Thread.sleep(BLOCKED_OBSERVATION_MS);
+
+            second = new Thread(new Runnable() {
+                public void run() {
+                    secondStarted.countDown();
+                    AppShield.setStatusForTesting(ShieldStatus.OK);
+                }
+            }, "shield-status-second");
+            second.setDaemon(true);
+            second.start();
+            assertTrue(secondStarted.await(GENEROUS_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+            Thread.sleep(BLOCKED_OBSERVATION_MS);
+
+            // Read directly rather than through getStatus(), which would block on the
+            // monitor the first thread is holding and deadlock this test.
+            assertEquals(ShieldStatus.SERVICE_DOWN, statusField.get(null),
+                    "the second transition must not be stored while the first one has "
+                    + "not finished announcing itself -- that is the reordering: "
+                    + "listeners end on the older status while getStatus reports the "
+                    + "newer one");
+        }
+
+        first.join(GENEROUS_TIMEOUT_MS);
+        second.join(GENEROUS_TIMEOUT_MS);
+        assertEquals(ShieldStatus.OK, AppShield.getStatus(),
+                "and both transitions still happen, in order");
+    }
+
+    /** Records nothing; its presence is what makes setStatus reach the dispatch. */
+    private static final class RecordingListener implements ShieldListener {
+
+        public void signalRaised(ShieldSignal signal) {
+        }
+
+        public void tokenRefreshed(ShieldToken token) {
+        }
+
+        public void statusChanged(ShieldStatus status) {
+        }
+    }
 }

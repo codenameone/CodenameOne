@@ -837,25 +837,45 @@ public final class AppShield {
     // Internals
     // -----------------------------------------------------------------
 
+    /// Test hook: drives a status transition, so the ordering between the transition and
+    /// the notification can be asserted from a test rather than only reasoned about.
+    static void setStatusForTesting(ShieldStatus status) {
+        setStatus(status);
+    }
+
     private static void setStatus(ShieldStatus status) {
         if (status == null) {
             return;
         }
-        ShieldListener[] copy;
+        // The transition and its dispatch happen under one lock, so the order listeners
+        // are told in is the order the transitions happened in.
+        //
+        // Storing the status and enqueueing the notification as two steps let two network
+        // threads interleave: A stores, B stores and enqueues, A enqueues. Listeners then
+        // finished on A while getStatus() already answered B -- a UI showing "service
+        // down" for a shield that is fine, or the reverse, with nothing further to correct
+        // it because the next transition is the one after that.
+        //
+        // Holding the monitor across callSerially is safe and deliberate: it only appends
+        // to the EDT queue, and nothing on that path calls back into this class. The
+        // alternative -- sequence numbers and dropped stale dispatches -- gives listeners
+        // the right final state but silently swallows intermediate ones, and a listener
+        // that logs or counts transitions has every reason to want them all.
         synchronized (AppShield.class) {
             if (status.equals(lastStatus)) {
                 return;
             }
             lastStatus = status;
-        }
-        synchronized (listeners) {
-            if (listeners.isEmpty()) {
-                return;
+            ShieldListener[] copy;
+            synchronized (listeners) {
+                if (listeners.isEmpty()) {
+                    return;
+                }
+                copy = new ShieldListener[listeners.size()];
+                listeners.copyInto(copy);
             }
-            copy = new ShieldListener[listeners.size()];
-            listeners.copyInto(copy);
+            Display.getInstance().callSerially(new StatusDispatch(copy, status));
         }
-        Display.getInstance().callSerially(new StatusDispatch(copy, status));
     }
 
     /// The token handle handed back to callers, where exactly one of cancellation and
