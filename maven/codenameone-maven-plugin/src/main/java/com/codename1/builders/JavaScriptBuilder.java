@@ -836,6 +836,7 @@ public class JavaScriptBuilder extends Executor {
                 }
                 String lower = rf.getName().toLowerCase();
                 boolean relocate = lower.endsWith(".ttf")
+                        || lower.endsWith(".otf")
                         || lower.endsWith(".zip")
                         || lower.endsWith("-pom.xml");
                 if (relocate) {

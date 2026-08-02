@@ -4502,8 +4502,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     e = z.getNextEntry();
                     continue;
                 }
-                if (name.endsWith(".ttf")) {
+                if (isBundledFontFile(name)) {
                     try {
+                        // TRUETYPE_FONT covers the whole SFNT family, OpenType included.
                         java.awt.Font result = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, z);
                         GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(result);
                     } catch (FontFormatException ex) {
@@ -12073,6 +12074,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         return nativeFontNameForIOS(fontName, getAvailableFontNamesLowercase());
     }
     
+    /**
+     * True for a font file bundled with the app. java.awt's TRUETYPE_FONT
+     * reads the whole SFNT family, so an OpenType file registers exactly like
+     * a TrueType one.
+     */
+    private static boolean isBundledFontFile(String fileName) {
+        if (fileName == null) {
+            return false;
+        }
+        String lower = fileName.toLowerCase();
+        return lower.endsWith(".ttf") || lower.endsWith(".otf");
+    }
+
     @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
         File fontFile = null;

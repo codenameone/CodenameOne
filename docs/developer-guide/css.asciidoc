@@ -560,7 +560,7 @@ CN1 resource files support both PNG and JPEG images, but PNG is the default. Mul
 
 === Fonts
 
-This library supports the https://developer.mozilla.org/en/docs/Web/CSS/font[font], https://developer.mozilla.org/en/docs/Web/CSS/font-size[font-size], https://developer.mozilla.org/en/docs/Web/CSS/font-family[font-family], https://developer.mozilla.org/en/docs/Web/CSS/font-style[font-style], https://developer.mozilla.org/en/docs/Web/CSS/font-weight[font-weight], and https://developer.mozilla.org/en/docs/Web/CSS/text-decoration[text-decoration] properties, as well at the https://developer.mozilla.org/en/docs/Web/CSS/@font-face[@font-face] CSS "at" rule for including TTF fonts.
+This library supports the https://developer.mozilla.org/en/docs/Web/CSS/font[font], https://developer.mozilla.org/en/docs/Web/CSS/font-size[font-size], https://developer.mozilla.org/en/docs/Web/CSS/font-family[font-family], https://developer.mozilla.org/en/docs/Web/CSS/font-style[font-style], https://developer.mozilla.org/en/docs/Web/CSS/font-weight[font-weight], and https://developer.mozilla.org/en/docs/Web/CSS/text-decoration[text-decoration] properties, as well at the https://developer.mozilla.org/en/docs/Web/CSS/@font-face[@font-face] CSS "at" rule for including TrueType and OpenType fonts.
 
 ==== `font-family`
 
@@ -584,7 +584,7 @@ If you omit the `font-family` directive altogether, it will use `native:MainRegu
 . `native:ItalicBold`
 . `native:ItalicBlack`
 
-===== Using TTF fonts
+===== Using bundled fonts
 
 If you want to use a font other than the built-in fonts, you'll need to define the font using the `@font-face` rule. For example:
 
@@ -593,7 +593,9 @@ If you want to use a font other than the built-in fonts, you'll need to define t
 include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-028,indent=0]
 ----
 
-IMPORTANT: Only TrueType (`.ttf`) files are supported. The runtime loads a font by a file name ending in `.ttf` and the iOS build registers only those files with the operating system, so the CSS compiler fails the build on anything else rather than letting it reach the device. Convert an OpenType (`.otf`) font to TrueType before referencing it. The compiler also reads each font at build time, so a file it can't parse, or one with no PostScript name, fails the build too -- iOS resolves fonts by their PostScript name, so a font without one would render everywhere except on an iOS device.
+Both TrueType (`.ttf`) and OpenType (`.otf`) files work, upper-case or lower-case. Every platform loads both formats through its own font API, so an OpenType font needs no conversion before you bundle it. Web-only formats such as `.woff` aren't supported, and the CSS compiler fails the build on one rather than letting it reach the device.
+
+IMPORTANT: The compiler reads each font at build time, so a file it can't parse, or one with no PostScript name, fails the build. That second case is worth knowing about: iOS resolves fonts by their PostScript name, so a font without one renders everywhere except on an iOS device.
 
 Then you'll be able to reference the font using the specified `font-family` in any CSS element. For example:
 

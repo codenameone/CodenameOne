@@ -1775,7 +1775,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
         // executable via the DirectWrite in-memory loader so there is no file
         // next to the exe. Falls back to the file-based loader (a font staged
         // beside the exe) when the resource isn't embedded.
-        if (fileName != null && fileName.toLowerCase().endsWith(".ttf")) {
+        if (fileName != null && isBundledFontFile(fileName)) {
             byte[] data = readResourceFully("/" + fileName);
             if (data != null) {
                 font = LinuxNative.loadTrueTypeFontFromMemory(fontName, data);
@@ -1788,6 +1788,16 @@ public class LinuxImplementation extends CodenameOneImplementation {
             return null;
         }
         return Long.valueOf(font);
+    }
+
+    /**
+     * True for a font the app bundles. FontConfig and FreeType read the SFNT
+     * container whether the outlines are glyf or CFF, so OpenType is as
+     * loadable as TrueType here.
+     */
+    private static boolean isBundledFontFile(String fileName) {
+        String lower = fileName.toLowerCase();
+        return lower.endsWith(".ttf") || lower.endsWith(".otf");
     }
 
     /** Reads an embedded classpath resource fully into a byte[], or null. */

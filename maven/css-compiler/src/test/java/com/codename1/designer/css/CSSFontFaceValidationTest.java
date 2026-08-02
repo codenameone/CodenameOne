@@ -53,14 +53,34 @@ public class CSSFontFaceValidationTest {
         HeadlessTestSupport.installHeadlessImplementation();
     }
 
+    /**
+     * OpenType is loadable on every port, so the file name must not be what
+     * rejects it. Only the name is under test here -- the fixture's bytes are
+     * TrueType, which keeps the test hermetic while still driving the .otf
+     * branch of the name check.
+     */
     @Test
-    void testOpenTypeFontIsRejected() throws Exception {
+    void testOpenTypeFontNameIsAccepted() throws Exception {
+        assertCompiles("@font-face { font-family: \"TestFont\"; src: url(TestFont-Regular.otf); }"
+                + "Label { font-family: \"TestFont\"; font-size: 3mm; }", "TestFont-Regular.otf");
+    }
+
+    /** Capitalisation says nothing about whether a font loads. */
+    @Test
+    void testUpperCaseExtensionIsAccepted() throws Exception {
+        assertCompiles("@font-face { font-family: \"TestFont\"; src: url(TestFont-Regular.TTF); }"
+                + "Label { font-family: \"TestFont\"; font-size: 3mm; }", "TestFont-Regular.TTF");
+    }
+
+    /** An extension no port can load is still refused. */
+    @Test
+    void testUnknownFontExtensionIsRejected() throws Exception {
         String message = assertCompileFails(
-                "@font-face { font-family: \"TestFont\"; src: url(TestFont-Regular.otf); }"
+                "@font-face { font-family: \"TestFont\"; src: url(TestFont-Regular.woff); }"
                         + "Label { font-family: \"TestFont\"; }",
-                "TestFont-Regular.otf");
-        assertContains(message, "an .otf never reaches the device");
-        assertContains(message, "TestFont-Regular.otf");
+                "TestFont-Regular.woff");
+        assertContains(message, "loads fonts from a file named .ttf or .otf");
+        assertContains(message, "TestFont-Regular.woff");
     }
 
     /**
@@ -92,25 +112,12 @@ public class CSSFontFaceValidationTest {
      * whichever later build first referenced it.
      */
     @Test
-    void testUnreferencedOpenTypeFontIsRejected() throws Exception {
+    void testUnreferencedBadFontIsRejected() throws Exception {
         String message = assertCompileFails(
-                "@font-face { font-family: \"TestFont\"; src: url(TestFont-Regular.otf); }"
+                "@font-face { font-family: \"TestFont\"; src: url(TestFont-Regular.woff); }"
                         + "Label { color: #ff0000; }",
-                "TestFont-Regular.otf");
-        assertContains(message, "an .otf never reaches the device");
-    }
-
-    /**
-     * The runtime's {@code endsWith(".ttf")} is case-sensitive, so an upper-case
-     * extension fails on device even though the file really is TrueType.
-     */
-    @Test
-    void testUpperCaseExtensionIsRejected() throws Exception {
-        String message = assertCompileFails(
-                "@font-face { font-family: \"TestFont\"; src: url(TestFont-Regular.TTF); }"
-                        + "Label { font-family: \"TestFont\"; }",
-                "TestFont-Regular.TTF");
-        assertContains(message, "case-sensitive");
+                "TestFont-Regular.woff");
+        assertContains(message, "loads fonts from a file named .ttf or .otf");
     }
 
     @Test
@@ -206,13 +213,13 @@ public class CSSFontFaceValidationTest {
      * the compile reaching out to the network.
      */
     @Test
-    void testRemoteOpenTypeFontIsRejectedWithoutDownloading() throws Exception {
+    void testRemoteUnknownExtensionIsRejectedWithoutDownloading() throws Exception {
         String message = assertCompileFails(
                 "@font-face { font-family: \"TestFont\"; "
-                        + "src: url(https://example.invalid/fonts/TestFont.otf); }"
+                        + "src: url(https://example.invalid/fonts/TestFont.woff); }"
                         + "Label { font-family: \"TestFont\"; }",
                 null);
-        assertContains(message, "an .otf never reaches the device");
+        assertContains(message, "loads fonts from a file named .ttf or .otf");
     }
 
     /** A well-formed sheet must still compile, or the check is worthless. */
@@ -253,6 +260,26 @@ public class CSSFontFaceValidationTest {
             Path cssFile = cssDir.resolve("theme.css");
             Files.write(cssFile, css.getBytes(StandardCharsets.UTF_8));
             return compileExpectingFailure(cssFile, outDir.resolve("theme.res"));
+        } finally {
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
+    }
+
+    /** Compiles the sheet with the fixture written out under {@code fontFile}. */
+    private static void assertCompiles(String css, String fontFile) throws Exception {
+        Path cssDir = Files.createTempDirectory("cn1-font-valid");
+        Path outDir = Files.createTempDirectory("cn1-font-valid-out");
+        try {
+            copyFixture(cssDir.resolve(fontFile));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, css.getBytes(StandardCharsets.UTF_8));
+
+            CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
+            theme.resourceFile = outDir.resolve("theme.res").toFile();
+            theme.res = new com.codename1.ui.util.EditableResourcesForCSS(theme.resourceFile);
+            theme.res.setTheme("Theme", new Hashtable());
+            theme.updateResources();
         } finally {
             deleteTree(cssDir);
             deleteTree(outDir);

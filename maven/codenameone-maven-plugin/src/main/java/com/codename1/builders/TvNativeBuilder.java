@@ -186,7 +186,10 @@ class TvNativeBuilder {
         File[] fontFiles = resDir == null ? null : resDir.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
-                return name.toLowerCase().endsWith(".ttf");
+                // Core Text handles OpenType as readily as TrueType, so both
+                // belong in UIAppFonts.
+                String lower = name.toLowerCase();
+                return lower.endsWith(".ttf") || lower.endsWith(".otf");
             }
         });
         if (fontFiles != null && fontFiles.length > 0) {

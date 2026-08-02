@@ -2148,14 +2148,14 @@ public class CSSTheme {
             }
             if (url == null) {
                 errors.add("@font-face \"" + family + "\" has no usable src; "
-                        + "Codename One only supports src: url(...) pointing at a .ttf file");
+                        + "Codename One only supports src: url(...) pointing at a .ttf or .otf file");
                 continue;
             }
 
             String fileName = fontFileName(url);
-            if (!fileName.endsWith(".ttf")) {
-                errors.add("@font-face \"" + family + "\" points at " + fileName + ". "
-                        + fontExtensionAdvice(fileName));
+            if (!isSupportedFontFileName(fileName)) {
+                errors.add("@font-face \"" + family + "\" points at " + fileName + ", and Codename One "
+                        + "loads fonts from a file named .ttf or .otf");
                 continue;
             }
 
@@ -2263,21 +2263,13 @@ public class CSSTheme {
         return url.toString();
     }
 
-    /// The constraint is the file NAME, not the outline format: the runtime
-    /// check is `fileName.endsWith(".ttf")` and the iOS build only registers
-    /// files matching that. Worth being precise about, because "convert to
-    /// TrueType" and "rename the file" are different amounts of work and only
-    /// one of them is actually required.
-    private static String fontExtensionAdvice(String fileName) {
+    /// Both SFNT container extensions are accepted, case insensitively. Every
+    /// port loads fonts through an API that reads the container regardless of
+    /// whether the outlines are glyf or CFF, so there is no reason to make an
+    /// author convert an OpenType file or rename it.
+    private static boolean isSupportedFontFileName(String fileName) {
         String lower = fileName.toLowerCase();
-        if (lower.endsWith(".otf")) {
-            return "Codename One loads fonts by a file name ending in .ttf, so an .otf never reaches "
-                    + "the device -- convert it to TrueType";
-        }
-        if (lower.endsWith(".ttf")) {
-            return "the extension has to be lower-case .ttf; the runtime check is case-sensitive";
-        }
-        return "Codename One loads fonts by a file name ending in .ttf";
+        return lower.endsWith(".ttf") || lower.endsWith(".otf");
     }
 
     /// Containment is judged against `baseURL`, the stylesheet relative `src`

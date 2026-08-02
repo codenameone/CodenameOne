@@ -661,6 +661,16 @@ public abstract class StyleParser {
         return out;
     }
 
+    /**
+     * True when the argument already names a font file rather than a bare
+     * family, for either of the container extensions the runtime loads.
+     */
+    private static boolean hasFontFileSuffix(String arg) {
+        String lower = arg.toLowerCase();
+        return lower.indexOf(".ttf") == lower.length() - 4
+                || lower.indexOf(".otf") == lower.length() - 4;
+    }
+
     private static FontInfo parseFontFile(FontInfo out, String arg) {
         arg = arg.trim();
         if (arg.indexOf('/') != -1) {
@@ -669,9 +679,12 @@ public abstract class StyleParser {
         if (arg.length() > 0 && arg.charAt(0) == '/') {
             arg = arg.substring(1);
         } else {
+            // A bare family name gets the default .ttf suffix, but an explicit
+            // .ttf/.otf is left alone -- appending to "Foo.otf" would ask for
+            // "Foo.otf.ttf" and lose the font.
             arg = arg.indexOf("native:") == 0 ? arg :
-                    arg.indexOf(".ttf") != arg.length() - 4 ? arg + ".ttf" :
-                            arg;
+                    hasFontFileSuffix(arg) ? arg :
+                            arg + ".ttf";
         }
         out.setFile(arg);
         return out;

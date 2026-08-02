@@ -4986,7 +4986,12 @@ public class IPhoneBuilder extends Executor {
 
             @Override
             public boolean accept(File file, String string) {
-                return string.toLowerCase().endsWith(".ttf");
+                // Core Text reads the SFNT container whether the outlines are
+                // glyf or CFF, so OpenType registers through UIAppFonts exactly
+                // like TrueType. Leaving .otf out here is what made a bundled
+                // OpenType font fall back to the system font on the device.
+                String lower = string.toLowerCase();
+                return lower.endsWith(".ttf") || lower.endsWith(".otf");
             }
         });
         
