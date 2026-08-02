@@ -2141,7 +2141,16 @@ public class CSSTheme {
         Map<String, String> sourceByFileName = new HashMap<String, String>();
         Map<String, String> familyByFileName = new HashMap<String, String>();
         for (FontFace face : fontFaces) {
-            String family = face.fontFamily == null ? "(no font-family)" : face.fontFamily.getStringValue();
+            String family = face.fontFamily == null ? null : face.fontFamily.getStringValue();
+            if (family == null || family.trim().length() == 0) {
+                // findFontFace() matches on the family name, so a rule without
+                // one can never be referenced: the custom font would be dropped
+                // and the app would fall back to a native font, which is the
+                // failure this validation exists to surface.
+                errors.add("An @font-face rule has no usable font-family, so nothing can reference it"
+                        + (face.src == null ? "" : " (src: " + face.src.getStringValue() + ")"));
+                continue;
+            }
             URL url;
             try {
                 url = face.getURL();

@@ -120,6 +120,21 @@ public class CSSFontFaceValidationTest {
         assertContains(message, "loads fonts from a file named .ttf or .otf");
     }
 
+    /**
+     * A rule with no {@code font-family} can never be referenced, because
+     * {@code findFontFace} matches on the family name. The custom font would be
+     * dropped and the app would fall back to a native font -- the exact silent
+     * failure this validation exists to surface.
+     */
+    @Test
+    void testFontFaceWithoutFamilyIsRejected() throws Exception {
+        String message = assertCompileFails(
+                "@font-face { src: url(TestFont-Regular.ttf); }"
+                        + "Label { color: #ff0000; }",
+                "TestFont-Regular.ttf");
+        assertContains(message, "no usable font-family");
+    }
+
     @Test
     void testMissingFontFileIsRejected() throws Exception {
         String message = assertCompileFails(

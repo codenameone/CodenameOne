@@ -194,7 +194,10 @@ class TvNativeBuilder {
         if (fontFiles != null && fontFiles.length > 0) {
             sb.append("    <key>UIAppFonts</key>\n    <array>\n");
             for (File f : fontFiles) {
-                sb.append("        <string>").append(f.getName()).append("</string>\n");
+                // Escaped for the same reason as the iOS plist: an XML
+                // metacharacter in a font's file name would otherwise produce a
+                // malformed Info.plist.
+                sb.append("        <string>").append(IPhoneBuilder.plistEscape(f.getName())).append("</string>\n");
             }
             sb.append("    </array>\n");
         }
