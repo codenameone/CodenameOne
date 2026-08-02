@@ -183,8 +183,7 @@ public class AddThemeEntry extends javax.swing.JPanel {
                     // both container extensions, in any case. A .ttf-only filter
                     // here left resource-based themes unable to pick an OpenType
                     // font the API otherwise accepts.
-                    String lower = string.toLowerCase();
-                    return lower.endsWith(".ttf") || lower.endsWith(".otf");
+                    return endsWithIgnoreCase(string, ".ttf") || endsWithIgnoreCase(string, ".otf");
                 }
             });
             if(fontFiles == null) {
@@ -3101,4 +3100,10 @@ private void trueTypeFontSizeValueStateChanged(javax.swing.event.ChangeEvent evt
     private javax.swing.JSpinner trueTypeFontSizeValue;
     private javax.swing.JButton videoTutorial;
     // End of variables declaration//GEN-END:variables
+
+    /** Locale-independent case-insensitive suffix test. */
+    static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value != null && value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
+    }
 }

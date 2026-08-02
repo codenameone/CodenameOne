@@ -1799,8 +1799,13 @@ public class WindowsImplementation extends CodenameOneImplementation {
      * TrueType here.
      */
     private static boolean isBundledFontFile(String fileName) {
-        String lower = fileName.toLowerCase();
-        return lower.endsWith(".ttf") || lower.endsWith(".otf");
+        return endsWithIgnoreCase(fileName, ".ttf") || endsWithIgnoreCase(fileName, ".otf");
+    }
+
+    /** Locale-independent case-insensitive suffix test. */
+    private static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value != null && value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
     }
 
     /** Reads an embedded classpath resource fully into a byte[], or null. */

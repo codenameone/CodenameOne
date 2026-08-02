@@ -312,13 +312,15 @@ public class Font extends CN {
     /// glyf or CFF (Core Text on iOS, Typeface on Android, DirectWrite on Windows,
     /// FreeType on Linux, java.awt on the simulator and FontFace in the browser).
     /// The comparison is case insensitive so a file named `.TTF` isn't rejected
-    /// for its capitalisation alone.
+    /// for its capitalisation alone. It goes through regionMatches rather than
+    /// toLowerCase so the answer can't depend on the default locale.
     static boolean isSupportedFontFile(String fileName) {
-        if (fileName == null) {
-            return false;
-        }
-        String lower = fileName.toLowerCase();
-        return lower.endsWith(".ttf") || lower.endsWith(".otf");
+        return endsWithIgnoreCase(fileName, ".ttf") || endsWithIgnoreCase(fileName, ".otf");
+    }
+
+    private static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value != null && value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
     }
 
     /// Creates a true type font with the given name/filename (font name might be different from the file name

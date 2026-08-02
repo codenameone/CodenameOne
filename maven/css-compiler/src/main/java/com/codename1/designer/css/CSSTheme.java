@@ -1190,8 +1190,11 @@ public class CSSTheme {
                     if (url.getProtocol().startsWith("http")) {
                         // If it is remote, check so see if we've already downloaded
                         // the font to the current directory.
-                        String fontName = java.net.URLDecoder.decode(url.getPath(), "UTF-8");
-                        
+                        // Same decoding the validator uses, so the file that
+                        // lands here is the name it checked -- URLDecoder alone
+                        // would turn a font named "A+B.ttf" into "A B.ttf".
+                        String fontName = decodeUrlPath(url.getPath());
+
                         if (fontName.indexOf("/") != -1) {
                             fontName = fontName.substring(fontName.lastIndexOf("/")+1);
                         }
@@ -2159,12 +2162,14 @@ public class CSSTheme {
                 continue;
             }
 
-            // Key on the lower-cased name. The fonts are flattened into one
+            // Key on the case-folded name. The fonts are flattened into one
             // directory, and on a case-insensitive target -- Windows, or an
             // Apple bundle -- "Body.TTF" and "body.ttf" are the same file there
             // even when the authoring host kept them apart, so one would
-            // overwrite the other.
-            String deployKey = fileName.toLowerCase();
+            // overwrite the other. Locale.ROOT because the default locale would
+            // make the answer depend on the build machine: under Turkish rules
+            // "I.ttf" folds to "ı.ttf" and stops matching "i.ttf".
+            String deployKey = fileName.toLowerCase(java.util.Locale.ROOT);
             String source = canonicalSource(url);
             String previousSource = sourceByFileName.put(deployKey, source);
             String previousFamily = familyByFileName.put(deployKey, family);
@@ -2217,14 +2222,26 @@ public class CSSTheme {
     /// validates and what the deploy copy is keyed on. Percent-escapes are decoded
     /// because the downloaded file lands under the decoded name.
     private static String fontFileName(URL url) {
-        String path = url.getPath();
-        try {
-            path = java.net.URLDecoder.decode(path, "UTF-8");
-        } catch (UnsupportedEncodingException ex) {
-            // UTF-8 is always present; fall through with the raw path.
-        }
+        String path = decodeUrlPath(url.getPath());
         int slash = path.lastIndexOf('/');
         return slash < 0 ? path : path.substring(slash + 1);
+    }
+
+    /// Decodes percent escapes in a URL path **without** treating `+` as a
+    /// space. `URLDecoder` implements form decoding, where `+` means a space, so
+    /// a font legitimately named `A+B.ttf` would come back as `A B.ttf` -- the
+    /// validator would then compare a name that never exists on disk, and could
+    /// report a collision against an unrelated `A B.ttf`.
+    private static String decodeUrlPath(String path) {
+        try {
+            return java.net.URLDecoder.decode(path.replace("+", "%2B"), "UTF-8");
+        } catch (UnsupportedEncodingException ex) {
+            // UTF-8 is always present; fall through with the raw path.
+            return path;
+        } catch (IllegalArgumentException ex) {
+            // Malformed escape: keep the path as written rather than guessing.
+            return path;
+        }
     }
 
     /// Reads the font the way the rest of the toolchain will, so a file that
@@ -2275,8 +2292,14 @@ public class CSSTheme {
     /// whether the outlines are glyf or CFF, so there is no reason to make an
     /// author convert an OpenType file or rename it.
     private static boolean isSupportedFontFileName(String fileName) {
-        String lower = fileName.toLowerCase();
-        return lower.endsWith(".ttf") || lower.endsWith(".otf");
+        return endsWithIgnoreCase(fileName, ".ttf") || endsWithIgnoreCase(fileName, ".otf");
+    }
+
+    /// Case-insensitive suffix test that doesn't route through toLowerCase, so
+    /// the result can't depend on the build machine's locale.
+    private static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value != null && value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
     }
 
     /// Containment is judged against `baseURL`, the stylesheet relative `src`

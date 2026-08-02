@@ -12080,11 +12080,13 @@ public class JavaSEPort extends CodenameOneImplementation {
      * a TrueType one.
      */
     private static boolean isBundledFontFile(String fileName) {
-        if (fileName == null) {
-            return false;
-        }
-        String lower = fileName.toLowerCase();
-        return lower.endsWith(".ttf") || lower.endsWith(".otf");
+        return endsWithIgnoreCase(fileName, ".ttf") || endsWithIgnoreCase(fileName, ".otf");
+    }
+
+    /** Locale-independent case-insensitive suffix test. */
+    private static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value != null && value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
     }
 
     @Override

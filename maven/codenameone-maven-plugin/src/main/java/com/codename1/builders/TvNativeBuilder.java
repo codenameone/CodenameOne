@@ -188,8 +188,7 @@ class TvNativeBuilder {
             public boolean accept(File dir, String name) {
                 // Core Text handles OpenType as readily as TrueType, so both
                 // belong in UIAppFonts.
-                String lower = name.toLowerCase();
-                return lower.endsWith(".ttf") || lower.endsWith(".otf");
+                return endsWithIgnoreCase(name, ".ttf") || endsWithIgnoreCase(name, ".otf");
             }
         });
         if (fontFiles != null && fontFiles.length > 0) {
@@ -331,5 +330,11 @@ class TvNativeBuilder {
         } catch (Exception ex) {
             throw new BuildException("Failed to apply tvNative Xcode settings", ex);
         }
+    }
+
+    /** Locale-independent case-insensitive suffix test. */
+    static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value != null && value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
     }
 }

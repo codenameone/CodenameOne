@@ -4990,8 +4990,7 @@ public class IPhoneBuilder extends Executor {
                 // glyf or CFF, so OpenType registers through UIAppFonts exactly
                 // like TrueType. Leaving .otf out here is what made a bundled
                 // OpenType font fall back to the system font on the device.
-                String lower = string.toLowerCase();
-                return lower.endsWith(".ttf") || lower.endsWith(".otf");
+                return endsWithIgnoreCase(string, ".ttf") || endsWithIgnoreCase(string, ".otf");
             }
         });
         
@@ -6164,4 +6163,10 @@ public class IPhoneBuilder extends Executor {
                 || "com/codename1/ai/language/SmartReply".equals(cls);
     }
 
+
+    /** Locale-independent case-insensitive suffix test. */
+    static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value != null && value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
+    }
 }

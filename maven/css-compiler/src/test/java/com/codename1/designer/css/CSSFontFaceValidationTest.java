@@ -208,6 +208,72 @@ public class CSSFontFaceValidationTest {
     }
 
     /**
+     * The collision check must not depend on the build machine's locale. Under
+     * Turkish rules the default {@code toLowerCase()} folds {@code I} to a
+     * dotless {@code ı}, so {@code I.ttf} would stop matching {@code i.ttf} and
+     * two files that really do collide on the target would both be accepted.
+     */
+    @Test
+    void testCaseCollisionIsDetectedUnderATurkishLocale() throws Exception {
+        java.util.Locale previous = java.util.Locale.getDefault();
+        Path cssDir = Files.createTempDirectory("cn1-font-tr");
+        Path outDir = Files.createTempDirectory("cn1-font-tr-out");
+        try {
+            java.util.Locale.setDefault(new java.util.Locale("tr", "TR"));
+            // "I" and "i" specifically: Turkish folds "I" to a dotless "i", so
+            // these two names case-fold apart under the default locale and
+            // together under Locale.ROOT. Separate directories because the
+            // authoring filesystem may itself be case-insensitive.
+            Path nested = cssDir.resolve("bold");
+            Files.createDirectories(nested);
+            copyFixture(cssDir.resolve("I.ttf"));
+            copyFixture(nested.resolve("i.ttf"));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, ("@font-face { font-family: \"Upper\"; src: url(I.ttf); }"
+                    + "@font-face { font-family: \"Lower\"; src: url(bold/i.ttf); }"
+                    + "Label { font-family: \"Upper\"; }").getBytes(StandardCharsets.UTF_8));
+
+            String message = compileExpectingFailure(cssFile, outDir.resolve("theme.res"));
+            assertContains(message, "deploy under the same name");
+        } finally {
+            java.util.Locale.setDefault(previous);
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
+    }
+
+    /**
+     * A {@code +} in a font name is a literal, not a space. URLDecoder applies
+     * form-decoding rules, so validating a decoded name would compare
+     * {@code A B.ttf} against a file that is really called {@code A+B.ttf} --
+     * and could report a collision with an unrelated font of that name.
+     */
+    @Test
+    void testPlusInFontNameIsNotDecodedAsSpace() throws Exception {
+        Path cssDir = Files.createTempDirectory("cn1-font-plus");
+        Path outDir = Files.createTempDirectory("cn1-font-plus-out");
+        try {
+            copyFixture(cssDir.resolve("A+B.ttf"));
+            copyFixture(cssDir.resolve("A B.ttf"));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, ("@font-face { font-family: \"Plus\"; src: url(A+B.ttf); }"
+                    + "@font-face { font-family: \"Space\"; src: url(A%20B.ttf); }"
+                    + "Label { font-family: \"Plus\"; font-size: 3mm; }"
+                    + "Title { font-family: \"Space\"; font-size: 4mm; }")
+                    .getBytes(StandardCharsets.UTF_8));
+
+            CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
+            theme.resourceFile = outDir.resolve("theme.res").toFile();
+            theme.res = new com.codename1.ui.util.EditableResourcesForCSS(theme.resourceFile);
+            theme.res.setTheme("Theme", new Hashtable());
+            theme.updateResources();
+        } finally {
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
+    }
+
+    /**
      * Two families pointing at the SAME file is a legitimate alias, not a
      * collision -- the deploy copy is idempotent, so nothing is overwritten.
      * Only genuinely different files sharing a name are an error.

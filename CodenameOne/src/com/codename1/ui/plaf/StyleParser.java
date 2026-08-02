@@ -669,8 +669,14 @@ public abstract class StyleParser {
     /// family like "Foo" would look as though it already carried an extension
     /// and would be left without one.
     private static boolean hasFontFileSuffix(String arg) {
-        String lower = arg.toLowerCase();
-        return lower.endsWith(".ttf") || lower.endsWith(".otf");
+        return endsWithIgnoreCase(arg, ".ttf") || endsWithIgnoreCase(arg, ".otf");
+    }
+
+    /// Case-insensitive suffix test that doesn't route through toLowerCase, so
+    /// the result can't depend on the default locale.
+    private static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value != null && value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
     }
 
     private static FontInfo parseFontFile(FontInfo out, String arg) {
