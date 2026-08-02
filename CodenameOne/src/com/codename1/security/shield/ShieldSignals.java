@@ -91,9 +91,19 @@ public final class ShieldSignals {
                 signals.addElement(signal);
             }
         }
-        // Outside the lock on every path. Display.callSerially runs the task
-        // inline when the EDT is not up yet, so a listener that calls back into
-        // snapshot() would deadlock on the monitor we were still holding.
+        // Outside the lock on every path. Display.callSerially runs the task inline when
+        // the EDT is not up yet, so notifying in here would run application listeners
+        // while holding the signal monitor -- and a listener that waits on anything which
+        // needs that monitor deadlocks.
+        //
+        // Which is why the ordering problem is solved at the far end instead. Two workers
+        // reporting different observations of one id could interleave as: A stores, B
+        // stores over it, B enqueues, A enqueues -- and listeners then finished on A while
+        // snapshot() already answered B, with nothing later guaranteed to correct them.
+        // The dispatch checks on arrival whether it still describes the current
+        // observation and drops itself if it does not, so the last thing a listener is
+        // told is always what the bus holds. A superseded observation is not worth
+        // announcing: it was already wrong when it was queued.
         notifyListeners(signal);
     }
 
@@ -168,6 +178,30 @@ public final class ShieldSignals {
         Display.getInstance().callSerially(new SignalDispatch(copy, signal));
     }
 
+    /**
+     * Whether this is still the observation the bus holds for its id.
+     *
+     * <p>Identity, not equality: the entry is replaced by the object that superseded it,
+     * so anything else under that id means a newer report has been stored and has queued
+     * its own notification.</p>
+     */
+    static boolean isCurrentObservation(ShieldSignal signal) {
+        synchronized (signals) {
+            for (int i = 0; i < signals.size(); i++) {
+                ShieldSignal existing = (ShieldSignal) signals.elementAt(i);
+                if (existing.getId().equals(signal.getId())) {
+                    // NOPMD identity is the question: a newer report REPLACES the entry,
+                    // so anything but the same object means this one has been superseded.
+                    // Equality would call two distinct reports of the same observation
+                    // current, which is the case this exists to tell apart.
+                    return existing == signal; // NOPMD
+                }
+            }
+        }
+        // Cleared, or evicted by the bound. Either way nothing is claiming it now.
+        return false;
+    }
+
     private static final class SignalDispatch implements Runnable {
         private final ShieldListener[] targets;
         private final ShieldSignal signal;
@@ -179,6 +213,13 @@ public final class ShieldSignals {
 
         @Override
         public void run() {
+            // Checked here rather than at enqueue time, because the point is the state
+            // at delivery: a report that has been superseded between being queued and
+            // arriving would otherwise leave listeners holding an observation the bus
+            // itself no longer has.
+            if (!isCurrentObservation(signal)) {
+                return;
+            }
             for (ShieldListener target : targets) {
                 target.signalRaised(signal);
             }

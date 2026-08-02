@@ -70,6 +70,13 @@ NSString *cn1JailbreakSignals(void) {
         }
     }
 
+    // The two filesystem probes below describe an iOS sandbox that has been broken out
+    // of, and a Mac is not that sandbox. /bin/bash and /usr/sbin/sshd ship with macOS and
+    // /private is writable there, so on Mac Catalyst both fire on a stock machine -- and
+    // an app that asks isJailbrokenDevice() at startup, as ours does, refuses to launch on
+    // every Mac. The instrumentation probes on either side of this stay, because an
+    // injected dylib or a hooking library means the same thing wherever it is loaded.
+#if !TARGET_OS_MACCATALYST && !TARGET_OS_OSX
     // Files that only exist once the sandbox has been broken out of.
     NSArray *restrictedPaths = @[
         @"/Applications/Cydia.app",
@@ -96,6 +103,7 @@ NSString *cn1JailbreakSignals(void) {
         [fileManager removeItemAtPath:testPath error:nil];
         [signals addObject:@"restrictedWrite"];
     }
+#endif
 
     // A debugger or instrumentation tool attached to the process.
     struct kinfo_proc info;

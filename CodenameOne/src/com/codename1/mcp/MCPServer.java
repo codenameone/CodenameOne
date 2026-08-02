@@ -325,6 +325,87 @@ public class MCPServer {
     /// at all.
     private final List<Object[]> openLocks = new ArrayList<Object[]>();
 
+    /// Transports with a reader still inside their loop, and which generation it belongs
+    /// to.
+    ///
+    /// A restart over the SAME transport instance is the case this exists for. Both
+    /// production transports clear their closed flag in open(), so a reader still parked
+    /// in readMessage() from the previous generation is looking at a live stream again the
+    /// moment the replacement opens -- and it can take a frame the new client sent. The
+    /// frame is then handled by a loop that belongs to a stopped server, or dropped
+    /// entirely; the new session simply never sees it, which reads as a client that hangs.
+    ///
+    /// stop() closes the transport before any of this, so the stale read unwinds
+    /// immediately and the wait below is measured in the time that takes rather than in
+    /// anything the client controls.
+    private final List<Object[]> activeReaders = new ArrayList<Object[]>();
+
+    /// How long a replacement waits for the previous reader of the same transport before
+    /// opening anyway.
+    ///
+    /// Bounded rather than indefinite, and the bound is the whole design. `stop()` closes
+    /// the transport first, so a reader blocked on a real socket unwinds in microseconds
+    /// and this wait is never observed. [MCPTransport] is a public interface, though, and
+    /// an implementation is entitled to a `readMessage()` that parks until something other
+    /// than `close()` releases it -- the loopback test transport is exactly that. Waiting
+    /// forever for such a reader deadlocks the restart against a thread only the caller
+    /// can end, which is worse than the overlap this is guarding against: the loop already
+    /// re-checks `isCurrent` after every read, so a stale reader cannot HANDLE anything,
+    /// and what is left is a frame it might swallow.
+    private static final long READER_HANDOVER_WAIT_MS = 2000L;
+
+    /// Registers this generation as the reader of {@code t}, waiting out any older one.
+    private void awaitSoleReader(MCPTransport t, int generation) {
+        synchronized (activeReaders) {
+            long deadline = System.currentTimeMillis() + READER_HANDOVER_WAIT_MS;
+            for (;;) {
+                Object[] found = null;
+                for (Object[] entry : activeReaders) {
+                    if (entry[0] == t) { // NOPMD identity: one reader per INSTANCE
+                        found = entry;
+                        break;
+                    }
+                }
+                if (found == null) {
+                    activeReaders.add(new Object[] {t, Integer.valueOf(generation)});
+                    return;
+                }
+                if (((Integer) found[1]).intValue() == generation) {
+                    return;
+                }
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0L) {
+                    // The previous reader is not coming back on its own. Taking the
+                    // registration over rather than leaving it to the departed generation
+                    // keeps a third restart waiting for THIS thread, which is the one
+                    // actually on the transport.
+                    found[1] = Integer.valueOf(generation);
+                    return;
+                }
+                try {
+                    activeReaders.wait(remaining);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
+    }
+
+    private void releaseReader(MCPTransport t, int generation) {
+        synchronized (activeReaders) {
+            for (java.util.Iterator<Object[]> it = activeReaders.iterator(); it.hasNext();) {
+                Object[] entry = it.next();
+                if (entry[0] == t // NOPMD identity: one reader per INSTANCE
+                        && ((Integer) entry[1]).intValue() == generation) {
+                    it.remove();
+                    break;
+                }
+            }
+            activeReaders.notifyAll();
+        }
+    }
+
     private Object acquireOpenLock(MCPTransport t) {
         synchronized (openLocks) {
             for (Object[] entry : openLocks) {
@@ -370,14 +451,40 @@ public class MCPServer {
         if (!isCurrent(t, generation)) {
             return;
         }
-        if (!openSerialized(t, generation)) {
-            return;
+        // Before opening, not after: a reader from the previous generation of this same
+        // transport instance may still be parked in readMessage(), and open() clears the
+        // flag that would have ended it. Opening first would put two readers on one
+        // stream, and the frame the new client sends can go to the one that no longer
+        // belongs to anybody.
+        awaitSoleReader(t, generation);
+        try {
+            if (!isCurrent(t, generation)) {
+                return;
+            }
+            if (!openSerialized(t, generation)) {
+                return;
+            }
+            readUntilClosed(t, generation);
+        } finally {
+            releaseReader(t, generation);
         }
+        releaseAndCloseIfCurrent(t, generation);
+    }
+
+    private void readUntilClosed(MCPTransport t, int generation) {
         while (isCurrent(t, generation)) {
             String line;
             try {
                 line = t.readMessage();
             } catch (IOException ex) {
+                break;
+            }
+            // Re-checked on the far side of the read as well as the near side. A read
+            // blocks for as long as the client is quiet, which is most of the time, so
+            // "was this server current when the read started" says nothing about whether
+            // it still is when the read returns -- and handling a request for a server
+            // that has been stopped answers on a transport somebody else may now own.
+            if (!isCurrent(t, generation)) {
                 break;
             }
             if (line == null) {
@@ -395,7 +502,6 @@ public class MCPServer {
                 }
             }
         }
-        releaseAndCloseIfCurrent(t, generation);
     }
 
     /// Handles one inbound JSON-RPC message and returns the response line, or null
