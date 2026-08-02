@@ -224,7 +224,13 @@ jobs:
           # the VideoIO grid, the VR scene and the 360 panorama were still queued
           # behind the slow non-rendering API tail, so the suite was force-killed
           # and every trailing test was published as "never run".
-          CN1_REQUIRE_SUITE: '1'
+          #
+          # This is read with Boolean.parseBoolean, which answers false for '1',
+          # so the gate it describes has never actually been armed -- the suite
+          # could be force-killed with trailing tests unrun and nothing failed.
+          # The Windows pipeline passes a real boolean, which is why its gate
+          # works. 'true' arms it here.
+          CN1_REQUIRE_SUITE: 'true'
           # Build the native ELF (and the demo) against an old glibc for portability.
           CN1_CC: /usr/local/bin/cn1-zig-cc
           # After the suite runs, the capture test relinks the same objects into a
@@ -326,7 +332,7 @@ jobs:
             -v "$GITHUB_WORKSPACE":/cn1 -w /cn1 \
             -e CN1_SHOT_OUTPUT_DIR=/cn1/artifacts/linux-port/raw-musl \
             -e CN1_APP_LOG_TEE=/cn1/artifacts/linux-port/raw-musl/app-output.log \
-            -e CN1_REQUIRE_SUITE=1 \
+            -e CN1_REQUIRE_SUITE=true \
             -e LIBGL_ALWAYS_SOFTWARE=1 \
             docker.io/library/alpine:3.20 sh -ec '
               sed -i "s|^#\(.*/community\)|\1|" /etc/apk/repositories
@@ -422,6 +428,13 @@ jobs:
           # Gate the Linux port (both arches): fail on any mismatch/error or a new
           # screenshot that has no committed golden (missing_expected).
           export CN1SS_FAIL_ON_MISMATCH=1
+          # A test that fails an assertion, or never runs at all, has to fail
+          # this workflow the way it already does on iOS, JavaScript and Mac.
+          # Without it a suite that stopped early published its trailing tests
+          # as "never run" and the job stayed green -- a result that reads as
+          # success while hiding both the tests that failed and the fact that
+          # they stopped running.
+          export CN1SS_FAIL_ON_TEST_PROBLEMS=1
           export CN1SS_ALLOWED_MISSING=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then export CN1SS_SKIP_COMMENT=1; fi
           for arch in x64 arm64; do
