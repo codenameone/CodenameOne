@@ -320,6 +320,56 @@ class HealthEdtDeliveryTest extends UITestBase {
         }, true);
     }
 
+    /**
+     * The same guarantee when the listener attaches AFTER the resource has
+     * settled.
+     *
+     * <p>{@code aFacadeActionDeliversOnTheEdt} above only catches this by
+     * luck. {@code openHealthSettings} completes before it returns, so
+     * off the EDT it schedules delivery and then races the caller's
+     * {@code onResult} across two adjacent statements. Win the race and the
+     * callback is registered before completion and arrives on the EDT; lose it
+     * and {@code AsyncResource.ready} sees a settled resource and runs the
+     * callback inline, on the caller's thread. Intermittent, and it read as a
+     * flaky test rather than the contract breaking.</p>
+     *
+     * <p>This forces the losing side: wait for the resource to settle, THEN
+     * attach. Before the fix this failed every run rather than one in
+     * many.</p>
+     */
+    @Test
+    void aLateListenerStillDeliversOnTheEdt() {
+        final Landing<Boolean> landing = new Landing<Boolean>();
+        CN.invokeAndBlock(new Runnable() {
+            public void run() {
+                assertFalse(CN.isEdt(), "the operation must start off the EDT");
+                AsyncResource<Boolean> r = Health.getInstance().openHealthSettings();
+                long deadline = System.currentTimeMillis() + 10_000L;
+                while (!r.isDone() && System.currentTimeMillis() < deadline) {
+                    try {
+                        Thread.sleep(10L);
+                    } catch (InterruptedException ex) {
+                        return;
+                    }
+                }
+                assertTrue(r.isDone(), "the resource must settle before we attach");
+                r.onResult(landing);
+                deadline = System.currentTimeMillis() + 10_000L;
+                while (!landing.arrived.get()
+                        && System.currentTimeMillis() < deadline) {
+                    try {
+                        Thread.sleep(10L);
+                    } catch (InterruptedException ex) {
+                        return;
+                    }
+                }
+            }
+        });
+        assertTrue(landing.arrived.get(), "the callback must arrive");
+        assertTrue(landing.onEdt.get(),
+                "a listener attached after completion must still land on the EDT");
+    }
+
     @Test
     void aDeleteDeliversOnTheEdt() {
         final FakeHealthStore store = new FakeHealthStore();

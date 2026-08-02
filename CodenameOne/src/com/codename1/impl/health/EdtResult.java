@@ -98,4 +98,72 @@ public final class EdtResult<T> extends OneShot<T> {
     void superError(Throwable t) {
         super.error(t);
     }
+
+    /// Marshalling `complete` is not enough on its own: a listener attached
+    /// *after* the resource has settled is run by
+    /// `AsyncResource.ready`/`except` inline, on whichever thread attaches it.
+    ///
+    /// That is the whole contract leaking back out. The window is small but
+    /// entirely reachable -- `openHealthSettings` and `openProviderSetup`
+    /// complete before they return, so an off-EDT caller writing the ordinary
+    /// `openHealthSettings().onResult(cb)` races the `callSerially` above
+    /// between two adjacent statements. Win the race and the callback arrives
+    /// on the EDT; lose it and the same line of app code delivers off the EDT.
+    /// It is exactly the "may or may not be on the EDT" asymmetry this class
+    /// exists to remove, and it fails intermittently, which is worse than
+    /// failing always.
+    ///
+    /// So the guarantee is applied where the callback is *invoked* rather than
+    /// where the resource is completed: whatever thread gets here, delivery
+    /// hops to the EDT if it is not already on it. Already on the EDT still
+    /// runs inline, so the no-runnable-per-link property above is kept.
+    @Override
+    public com.codename1.util.AsyncResource<T> ready(
+            final com.codename1.util.SuccessCallback<T> callback,
+            com.codename1.util.EasyThread t) {
+        if (t != null) {
+            // An explicit thread is the caller overriding the default on
+            // purpose; honouring the request beats honouring the default.
+            return super.ready(callback, t);
+        }
+        return super.ready(new OnEdt<T>(callback), null);
+    }
+
+    /// `except` is deliberately NOT wrapped the same way.
+    ///
+    /// A late `except` on an already-failed resource fires synchronously, and
+    /// that is relied on to read an error back without waiting -- see
+    /// `HealthFallbackTest.errorOf`, which documents the trick and shares it
+    /// with `BtTestUtil`. Hopping the error to the EDT breaks every such
+    /// reader: the callback has not run yet when the value is read, so the
+    /// error reads as null and a failing call looks like a succeeding one.
+    ///
+    /// So the asymmetry is left in place on purpose rather than overlooked.
+    /// Closing it means changing that read pattern everywhere it is used,
+    /// which is a wider behavioural change than the delivery bug this fixes
+    /// and belongs in its own change.
+
+    /// Named, not anonymous, for the same SpotBugs reason as `Deliver`.
+    private static final class OnEdt<X> implements com.codename1.util.SuccessCallback<X> {
+
+        private final com.codename1.util.SuccessCallback<X> delegate;
+
+        OnEdt(com.codename1.util.SuccessCallback<X> delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void onSucess(final X value) {
+            if (Display.getInstance().isEdt()) {
+                delegate.onSucess(value);
+                return;
+            }
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    delegate.onSucess(value);
+                }
+            });
+        }
+    }
 }
