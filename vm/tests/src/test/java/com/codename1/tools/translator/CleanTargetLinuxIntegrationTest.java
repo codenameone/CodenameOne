@@ -589,6 +589,27 @@ class CleanTargetLinuxIntegrationTest {
         s = s.substring(0, start) + body + s.substring(end);
         Files.write(launcherC, s.getBytes(StandardCharsets.UTF_8));
     }
+    private static int runGdbAttach(java.io.File out, String pid, boolean viaSudo) throws Exception {
+        java.util.List<String> cmd = new java.util.ArrayList<>();
+        if (viaSudo) {
+            cmd.add("sudo");
+            cmd.add("-n");
+        }
+        cmd.add("gdb");
+        cmd.add("-p");
+        cmd.add(pid);
+        cmd.add("-batch");
+        cmd.add("-ex");
+        cmd.add("set pagination off");
+        cmd.add("-ex");
+        cmd.add("thread apply all bt");
+        Process gdb = new ProcessBuilder(cmd)
+                .redirectErrorStream(true)
+                .redirectOutput(ProcessBuilder.Redirect.appendTo(out))
+                .start();
+        return gdb.waitFor();
+    }
+
     /// Dumps every thread's native stack from the still-running suite process.
     ///
     /// Best effort by design: gdb may be absent and ptrace may be restricted, and
@@ -613,13 +634,13 @@ class CleanTargetLinuxIntegrationTest {
             }
             java.io.File out = new java.io.File(
                     new java.io.File(teePath).getParentFile(), "hang-stacks.txt");
-            Process gdb = new ProcessBuilder("gdb", "-p", pid.trim(), "-batch",
-                    "-ex", "set pagination off",
-                    "-ex", "thread apply all bt")
-                    .redirectErrorStream(true)
-                    .redirectOutput(ProcessBuilder.Redirect.appendTo(out))
-                    .start();
-            gdb.waitFor();
+            // Plain gdb first; if yama still refuses the attach, retry through sudo,
+            // which the runner allows passwordless. Either way a refusal must not
+            // become a second failure.
+            int rc = runGdbAttach(out, pid.trim(), false);
+            if (rc != 0) {
+                runGdbAttach(out, pid.trim(), true);
+            }
             System.out.println("CN1SS:HARNESS: wrote live thread stacks for pid " + pid.trim()
                     + " to " + out);
         } catch (Exception ignore) {

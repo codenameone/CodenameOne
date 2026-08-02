@@ -10020,24 +10020,17 @@ JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int
     [comps setHour:timeOfDayMillis/3600000];
     [comps setMinute:(timeOfDayMillis/60000)%60];
     [comps setSecond:(timeOfDayMillis/1000)%60];
-    // These fields are local STANDARD time, not UTC: GregorianCalendar adds the
-    // zone's raw offset to the epoch before calling getOffset. Building the date
-    // in UTC and asking about that instant is therefore off by the raw offset,
-    // which around a transition returns the previous offset for its whole span
-    // -- America/New_York keeps reporting EST for the first five hours of EDT.
-    //
-    // Reading them in the device's own zone is wrong for a different reason (it
-    // shifts by the device offset instead), so the calendar stays on UTC and the
-    // raw offset is subtracted explicitly.
+    // The fields are UTC, not local standard time. That is this native's contract
+    // across every port -- the POSIX implementation resolves them with timegm()
+    // and the JavaScript and Android ports match -- and TimeApiTest pins it:
+    // asking about the local-standard instant instead resolves 2020-03-08T01:30
+    // EST as 02:30 EDT, jumping the spring transition. Reading them in the
+    // device's own zone (currentCalendar) is wrong for a different reason: it
+    // moves the instant by the device offset.
     NSCalendar* cal = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
     [cal setTimeZone:[NSTimeZone timeZoneWithAbbreviation:@"UTC"]];
-    NSDate *nominal = [cal dateFromComponents:comps];
-    NSInteger rawOffset = [tzone secondsFromGMTForDate:nominal];
-    if ([tzone isDaylightSavingTimeForDate:nominal]) {
-        rawOffset -= (NSInteger)[tzone daylightSavingTimeOffsetForDate:nominal];
-    }
-    NSDate *date = [nominal dateByAddingTimeInterval:-(NSTimeInterval)rawOffset];
-    JAVA_INT result = (JAVA_INT)([tzone secondsFromGMTForDate:date] * 1000);
+    NSDate *date = [cal dateFromComponents:comps];
+    JAVA_INT result = [tzone secondsFromGMTForDate:date] * 1000;
     [comps release];
     POOL_END();
     return result;

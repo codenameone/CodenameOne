@@ -250,6 +250,12 @@ jobs:
           # Enable core dumps and post-mortem them into the artifact.
           ulimit -c unlimited
           echo '/tmp/cn1-cores/core.%e.%p' | sudo tee /proc/sys/kernel/core_pattern >/dev/null
+          # Let the harness attach gdb to the still-running suite when it gives up
+          # waiting. Ubuntu ships yama ptrace_scope=1, which restricts attaching to
+          # descendants, and the harness is a sibling of the app -- so without this
+          # the hang dump comes back "Could not attach to process" and a hang (as
+          # opposed to a crash, which leaves a core) yields no evidence at all.
+          echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope >/dev/null 2>&1 || true
           mkdir -p /tmp/cn1-cores
           rc=0
           mvn -B clean package -pl JavaAPI -am -DskipTests

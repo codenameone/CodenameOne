@@ -2751,21 +2751,16 @@ JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int
     cn1_timezone_offset_ctx ctx;
 #ifdef _WIN32
     {
-        /* These fields are local STANDARD time, which is what GregorianCalendar
-         * hands down (it adds the raw offset to the epoch before calling). The
-         * instant they name is therefore fields - rawOffset, not the fields read
-         * as UTC: asking about the wrong instant makes the calendar keep the old
-         * offset for roughly the zone's raw-offset span either side of a
-         * transition, so America/New_York entering DST reports EST for the first
-         * five hours of EDT. */
-        int rawOffset = 0;
-        long long nominal = cn1WinUtcMillis(year, month, day, timeOfDayMillis);
-        if (cn1WinZoneOffsetMillis(buffer, nominal, 0, 0, &rawOffset)) {
-            int offset = 0;
-            if (cn1WinZoneOffsetMillis(buffer, nominal - (long long) rawOffset,
-                                       &offset, 0, 0)) {
-                return offset;
-            }
+        /* The fields are UTC, matching the POSIX path below (timegm) and every
+         * other port. Reading them as local standard time instead -- which is
+         * what java.util.TimeZone.getOffset's signature suggests -- moves the
+         * instant by the raw offset and jumps DST transitions: TimeApiTest
+         * resolves 2020-03-08T01:30 EST as 02:30 EDT. The contract this native
+         * actually has is the one its callers and that test rely on. */
+        int offset = 0;
+        if (cn1WinZoneOffsetMillis(buffer, cn1WinUtcMillis(year, month, day, timeOfDayMillis),
+                                   &offset, 0, 0)) {
+            return offset;
         }
     }
 #endif
