@@ -560,7 +560,7 @@ CN1 resource files support both PNG and JPEG images, but PNG is the default. Mul
 
 === Fonts
 
-This library supports the https://developer.mozilla.org/en/docs/Web/CSS/font[font], https://developer.mozilla.org/en/docs/Web/CSS/font-size[font-size], https://developer.mozilla.org/en/docs/Web/CSS/font-family[font-family], https://developer.mozilla.org/en/docs/Web/CSS/font-style[font-style], https://developer.mozilla.org/en/docs/Web/CSS/font-weight[font-weight], and https://developer.mozilla.org/en/docs/Web/CSS/text-decoration[text-decoration] properties, as well at the https://developer.mozilla.org/en/docs/Web/CSS/@font-face[@font-face] CSS "at" rule for including TrueType and OpenType fonts.
+This library supports the https://developer.mozilla.org/en/docs/Web/CSS/font[font], https://developer.mozilla.org/en/docs/Web/CSS/font-size[font-size], https://developer.mozilla.org/en/docs/Web/CSS/font-family[font-family], https://developer.mozilla.org/en/docs/Web/CSS/font-style[font-style], https://developer.mozilla.org/en/docs/Web/CSS/font-weight[font-weight], and https://developer.mozilla.org/en/docs/Web/CSS/text-decoration[text-decoration] properties, as well as the https://developer.mozilla.org/en/docs/Web/CSS/@font-face[@font-face] CSS "at" rule for including TrueType and OpenType fonts.
 
 ==== `font-family`
 

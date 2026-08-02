@@ -179,7 +179,12 @@ public class AddThemeEntry extends javax.swing.JPanel {
             String[] fontFiles = ResourceEditorView.getLoadedFile().getParentFile().list(new FilenameFilter() {
                 @Override
                 public boolean accept(File file, String string) {
-                    return string.endsWith(".ttf");
+                    // Same set the runtime loads (see Font.isSupportedFontFile):
+                    // both container extensions, in any case. A .ttf-only filter
+                    // here left resource-based themes unable to pick an OpenType
+                    // font the API otherwise accepts.
+                    String lower = string.toLowerCase();
+                    return lower.endsWith(".ttf") || lower.endsWith(".otf");
                 }
             });
             if(fontFiles == null) {

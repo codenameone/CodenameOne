@@ -172,7 +172,35 @@ public class CSSFontFaceValidationTest {
                     + "Label { font-family: \"TestFont\"; }").getBytes(StandardCharsets.UTF_8));
 
             String message = compileExpectingFailure(cssFile, outDir.resolve("theme.res"));
-            assertContains(message, "resolve to different files that are both named TestFont.ttf");
+            assertContains(message, "resolve to different files that deploy under the same name, TestFont.ttf");
+        } finally {
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
+    }
+
+    /**
+     * Names differing only in case collide too. The authoring host may keep
+     * {@code Body.TTF} and {@code body.ttf} apart, but they are flattened into
+     * one directory and a Windows target or an Apple bundle treats them as the
+     * same file, so one silently wins.
+     */
+    @Test
+    void testFontFileNamesDifferingOnlyInCaseAreRejected() throws Exception {
+        Path cssDir = Files.createTempDirectory("cn1-font-case");
+        Path outDir = Files.createTempDirectory("cn1-font-case-out");
+        try {
+            Path nested = cssDir.resolve("bold");
+            Files.createDirectories(nested);
+            copyFixture(cssDir.resolve("Body.ttf"));
+            copyFixture(nested.resolve("BODY.TTF"));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, ("@font-face { font-family: \"Body\"; src: url(Body.ttf); }"
+                    + "@font-face { font-family: \"Body Bold\"; src: url(bold/BODY.TTF); }"
+                    + "Label { font-family: \"Body\"; }").getBytes(StandardCharsets.UTF_8));
+
+            String message = compileExpectingFailure(cssFile, outDir.resolve("theme.res"));
+            assertContains(message, "deploy under the same name");
         } finally {
             deleteTree(cssDir);
             deleteTree(outDir);
@@ -185,7 +213,7 @@ public class CSSFontFaceValidationTest {
      * Only genuinely different files sharing a name are an error.
      */
     @Test
-    void testTwoFamiliesMaySharedOneFontFile() throws Exception {
+    void testTwoFamiliesMayShareOneFontFile() throws Exception {
         Path cssDir = Files.createTempDirectory("cn1-font-alias");
         Path outDir = Files.createTempDirectory("cn1-font-alias-out");
         try {

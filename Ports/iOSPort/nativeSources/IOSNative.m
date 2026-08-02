@@ -9808,24 +9808,30 @@ static void cn1RegisterBundledFontsOnce() {
     }
     cn1FontsRegistered = YES;
     @autoreleasepool {
-        // Both container extensions, in either case. Core Text reads OpenType
-        // as readily as TrueType, and this scan is the only thing registering
-        // bundled fonts on watchOS -- its plist carries no UIAppFonts array -- so
-        // anything missing here falls back to the system font on the watch even
-        // though it renders everywhere else. pathsForResourcesOfType matches the
-        // extension exactly, hence the upper-case variants.
-        NSArray *fontTypes = @[@"ttf", @"otf", @"TTF", @"OTF"];
-        for (NSString *fontType in fontTypes) {
-            NSArray *fontPaths = [[NSBundle mainBundle] pathsForResourcesOfType:fontType inDirectory:nil];
-            for (NSString *fontPath in fontPaths) {
-                NSURL *url = [NSURL fileURLWithPath:fontPath];
-                CFErrorRef error = NULL;
-                // A font already registered by UIAppFonts errors here; that is
-                // expected on iOS/tvOS and the error is discarded.
-                CTFontManagerRegisterFontsForURL((BRIDGE_CAST CFURLRef)url, kCTFontManagerScopeProcess, &error);
-                if (error != NULL) {
-                    CFRelease(error);
-                }
+        // Core Text reads OpenType as readily as TrueType, and this scan is the
+        // only thing registering bundled fonts on watchOS -- its plist carries no
+        // UIAppFonts array -- so anything missed here falls back to the system
+        // font on the watch even though it renders everywhere else.
+        //
+        // Enumerate every resource and compare the lower-cased extension rather
+        // than calling pathsForResourcesOfType: per spelling. That call matches
+        // the extension exactly, so a per-spelling list can only ever cover the
+        // spellings someone thought to write down, while Font.isSupportedFontFile
+        // and the builders accept any case -- ".TtF" would be bundled and then
+        // never registered.
+        NSArray *resourcePaths = [[NSBundle mainBundle] pathsForResourcesOfType:nil inDirectory:nil];
+        for (NSString *resourcePath in resourcePaths) {
+            NSString *ext = [[resourcePath pathExtension] lowercaseString];
+            if (![ext isEqualToString:@"ttf"] && ![ext isEqualToString:@"otf"]) {
+                continue;
+            }
+            NSURL *url = [NSURL fileURLWithPath:resourcePath];
+            CFErrorRef error = NULL;
+            // A font already registered by UIAppFonts errors here; that is
+            // expected on iOS/tvOS and the error is discarded.
+            CTFontManagerRegisterFontsForURL((BRIDGE_CAST CFURLRef)url, kCTFontManagerScopeProcess, &error);
+            if (error != NULL) {
+                CFRelease(error);
             }
         }
     }

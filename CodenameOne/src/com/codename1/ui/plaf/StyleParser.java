@@ -663,10 +663,14 @@ public abstract class StyleParser {
 
     /// True when the argument already names a font file rather than a bare
     /// family, for either of the container extensions the runtime loads.
+    ///
+    /// Uses endsWith rather than comparing indexOf against length - 4: for a
+    /// name shorter than the suffix both sides are -1, so a three character
+    /// family like "Foo" would look as though it already carried an extension
+    /// and would be left without one.
     private static boolean hasFontFileSuffix(String arg) {
         String lower = arg.toLowerCase();
-        return lower.indexOf(".ttf") == lower.length() - 4
-                || lower.indexOf(".otf") == lower.length() - 4;
+        return lower.endsWith(".ttf") || lower.endsWith(".otf");
     }
 
     private static FontInfo parseFontFile(FontInfo out, String arg) {

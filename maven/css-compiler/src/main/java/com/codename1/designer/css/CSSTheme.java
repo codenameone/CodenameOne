@@ -2159,13 +2159,20 @@ public class CSSTheme {
                 continue;
             }
 
+            // Key on the lower-cased name. The fonts are flattened into one
+            // directory, and on a case-insensitive target -- Windows, or an
+            // Apple bundle -- "Body.TTF" and "body.ttf" are the same file there
+            // even when the authoring host kept them apart, so one would
+            // overwrite the other.
+            String deployKey = fileName.toLowerCase();
             String source = canonicalSource(url);
-            String previousSource = sourceByFileName.put(fileName, source);
-            String previousFamily = familyByFileName.put(fileName, family);
+            String previousSource = sourceByFileName.put(deployKey, source);
+            String previousFamily = familyByFileName.put(deployKey, family);
             if (previousSource != null && !previousSource.equals(source)) {
                 errors.add("@font-face \"" + family + "\" and \"" + previousFamily + "\" resolve to different "
-                        + "files that are both named " + fileName + ". Fonts are deployed next to the theme "
-                        + "resource by file name alone, so one would overwrite the other; rename one of them");
+                        + "files that deploy under the same name, " + fileName + ". Fonts are deployed next to "
+                        + "the theme resource by file name alone, and that name is matched without regard to "
+                        + "case, so one would overwrite the other; rename one of them");
             }
 
             if (!"file".equals(url.getProtocol())) {

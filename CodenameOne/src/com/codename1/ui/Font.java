@@ -357,7 +357,7 @@ public class Font extends CN {
             }
         } else {
             if (fileName != null && (fileName.indexOf('/') > -1 || fileName.indexOf('\\') > -1 || !isSupportedFontFile(fileName))) {
-                throw new IllegalArgumentException("The font file name must be relative to the root and end with ttf or otf: " + fileName);
+                throw new IllegalArgumentException("The font file name must be relative to the root and end with .ttf or .otf: " + fileName);
             }
         }
         Object font = Display.impl.loadTrueTypeFont(fontName, fileName);
