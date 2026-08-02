@@ -157,10 +157,10 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
             }
         }
         if (closedWhileBinding) {
+            // No null check on `bound`: the only way past the try above is with a
+            // listener in hand, and SpotBugs flags the redundant test.
             clearActiveIfOurs();
-            if (bound != null) {
-                bound.stop();
-            }
+            bound.stop();
             throw new IOException("This MCP socket transport was closed before it began listening");
         }
     }

@@ -304,14 +304,16 @@ static int cn1ApplyRsaPadding(EVP_PKEY_CTX* ctx, const char* transformation) {
     }
     if (strstr(transformation, "OAEP") != 0) {
         const EVP_MD* md = EVP_sha256();
-        // The mask function stays on SHA-1 even when the OAEP digest is
-        // SHA-256. That is what the JCE providers behind the JavaSE and
-        // Android ports do for this transformation name, and ciphertext has to
-        // stay readable across ports; naming the digest for both halves would
-        // make anything sealed here undecryptable there.
+        // SHA-256 for the label hash AND the mask. The JCE transformation name
+        // leaves MGF1 on SHA-1 by default, but no other backend in this project
+        // can reproduce that: Web Crypto's RSA-OAEP takes a single hash and uses
+        // it for both, and so does Apple's SecKey. SHA-256 for both is the only
+        // pairing every port can produce, so it is the one the portable constant
+        // means -- the JavaSE and Android ports name it explicitly rather than
+        // inheriting their provider's default.
         if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0 ||
             EVP_PKEY_CTX_set_rsa_oaep_md(ctx, md) <= 0 ||
-            EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, EVP_sha1()) <= 0) {
+            EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, md) <= 0) {
             return 0;
         }
         return 1;

@@ -465,6 +465,15 @@ class CleanTargetLinuxIntegrationTest {
                 Thread.sleep(3000);
             }
             pngs = CleanTargetIntegrationTest.countPngFiles(outDir);
+            if (!finished.get() && app.isAlive()) {
+                // The suite is still running and has stopped saying anything. The
+                // post-mortem in the workflow only fires on a core file, so a HANG --
+                // as opposed to the crash that comment describes -- has so far produced
+                // no evidence at all. Attach to the live process and take every thread's
+                // stack before killing it; that is the difference between knowing which
+                // call is stuck and guessing at it.
+                dumpLiveThreadStacks();
+            }
             if (!finished.get()) {
                 String stoppedIn = lastStarted.get();
                 System.out.println("CN1SS:HARNESS: suite never emitted CN1SS:SUITE:FINISHED; pngs=" + pngs
@@ -580,4 +589,42 @@ class CleanTargetLinuxIntegrationTest {
         s = s.substring(0, start) + body + s.substring(end);
         Files.write(launcherC, s.getBytes(StandardCharsets.UTF_8));
     }
+    /// Dumps every thread's native stack from the still-running suite process.
+    ///
+    /// Best effort by design: gdb may be absent and ptrace may be restricted, and
+    /// neither should turn a diagnostic into a second failure. Output goes next to
+    /// the app log so it is uploaded with the screenshot artifact.
+    private static void dumpLiveThreadStacks() {
+        try {
+            String teePath = System.getenv("CN1_APP_LOG_TEE");
+            if (teePath == null) {
+                return;
+            }
+            Process pgrep = new ProcessBuilder("pgrep", "-f", "LinuxHelloMain")
+                    .redirectErrorStream(true).start();
+            String pid;
+            try (BufferedReader r = new BufferedReader(
+                    new InputStreamReader(pgrep.getInputStream(), StandardCharsets.UTF_8))) {
+                pid = r.readLine();
+            }
+            pgrep.waitFor();
+            if (pid == null || pid.trim().isEmpty()) {
+                return;
+            }
+            java.io.File out = new java.io.File(
+                    new java.io.File(teePath).getParentFile(), "hang-stacks.txt");
+            Process gdb = new ProcessBuilder("gdb", "-p", pid.trim(), "-batch",
+                    "-ex", "set pagination off",
+                    "-ex", "thread apply all bt")
+                    .redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.appendTo(out))
+                    .start();
+            gdb.waitFor();
+            System.out.println("CN1SS:HARNESS: wrote live thread stacks for pid " + pid.trim()
+                    + " to " + out);
+        } catch (Exception ignore) {
+            // A missing gdb or a denied ptrace must not mask the real failure.
+        }
+    }
+
 }

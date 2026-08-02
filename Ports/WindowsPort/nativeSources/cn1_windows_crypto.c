@@ -462,13 +462,12 @@ static int cn1Digest(LPCWSTR algorithm, const unsigned char* data, int length,
  *
  * Two shapes CNG cannot produce on its own:
  *
- * OAEP -- BCRYPT_OAEP_PADDING_INFO carries one digest, which CNG uses for both
- * the label hash and the mask function. The JCE providers behind the JavaSE and
- * Android ports pair a SHA-256 label hash with a SHA-1 mask for
- * "OAEPWithSHA-256AndMGF1Padding", and the Linux port matches them, so
- * ciphertext has to use that pairing to stay readable across ports. Naming one
- * digest for both halves either weakens the label hash or breaks interop, so
- * the padding is built here and the key operation runs unpadded.
+ * OAEP -- the padding is built here rather than handed to CNG so the block can
+ * be validated and reported on our own terms (see cn1OaepDecode's single
+ * generic failure). Both halves use SHA-256: the JCE transformation name
+ * leaves MGF1 on SHA-1 by default, but Web Crypto and Apple's SecKey each take
+ * one hash and use it for label and mask alike, so SHA-256 for both is the only
+ * pairing every port in this project can produce.
  *
  * ECDSA -- NCryptSignHash answers the fixed-width r||s of P1363, while the
  * portable Signature contract (and Jwt.derToJoseEcdsa) expects ASN.1 DER, so
@@ -847,7 +846,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_rsaCrypt___java_lang_String
             goto done;
         }
         if (encrypt) {
-            if (!cn1OaepEncode(labelDigest, BCRYPT_SHA1_ALGORITHM, data, dataLength, block,
+            if (!cn1OaepEncode(labelDigest, labelDigest, data, dataLength, block,
                                (int) modulusBytes)) {
                 goto done;
             }
@@ -875,7 +874,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_rsaCrypt___java_lang_String
                 cn1CryptoFail("out of memory", 0);
                 goto done;
             }
-            if (!cn1OaepDecode(labelDigest, BCRYPT_SHA1_ALGORITHM, block, (int) modulusBytes,
+            if (!cn1OaepDecode(labelDigest, labelDigest, block, (int) modulusBytes,
                                out, &messageLength)) {
                 goto done;
             }
