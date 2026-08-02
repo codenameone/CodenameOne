@@ -670,14 +670,28 @@ XCODE_BUILD_CMD=(
 )
 if [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ] || [ "$FORCE_SIMULATOR_ARCH" = "true" ]; then
   ri_log "Forcing simulator ARCHS=$BUILD_ARCH"
-  # Scoped to the simulator SDK: an unscoped ARCHS is forced on every target,
-  # including the watch app a companion project embeds, whose device ABI is
-  # arm64_32. That matters most for the Rosetta case, where
+  # The override has to be scoped to the simulator SDK: unscoped, it is forced on
+  # every target including the watch app a companion project embeds, whose device
+  # ABI is arm64_32. That matters most for the Rosetta case, where
   # SIMULATOR_EXCLUDED_ARCHS excludes arm64 outright.
+  #
+  # It must go through an xcconfig rather than a command-line override, because
+  # xcodebuild does NOT honour per-SDK conditionals in command-line settings --
+  # "ARCHS[sdk=iphonesimulator*]=x" parses as ARCHS with the literal value
+  # "iphonesimulator*]=x", every target then warns "None of the architectures in
+  # ARCHS are valid", and the build silently compiles NOTHING while still copying
+  # resources. An xcconfig is where the conditional syntax is actually evaluated,
+  # and it sits below target-level settings, so the watch target's own
+  # ARCHS[sdk=watchos*]=arm64_32 still wins where it applies.
+  ARCH_XCCONFIG="$(mktemp -t cn1-ios-archs).xcconfig"
+  {
+    printf 'ARCHS[sdk=iphonesimulator*] = %s\n' "$BUILD_ARCH"
+    printf 'EXCLUDED_ARCHS[sdk=iphonesimulator*] = %s\n' "$SIMULATOR_EXCLUDED_ARCHS"
+  } > "$ARCH_XCCONFIG"
+  ri_log "Simulator arch xcconfig -> $ARCH_XCCONFIG"
   XCODE_BUILD_CMD+=(
-    "ARCHS[sdk=iphonesimulator*]=$BUILD_ARCH"
+    -xcconfig "$ARCH_XCCONFIG"
     "ONLY_ACTIVE_ARCH=YES"
-    "EXCLUDED_ARCHS[sdk=iphonesimulator*]=$SIMULATOR_EXCLUDED_ARCHS"
   )
 fi
 # Optimize the translated C (Xcode's Debug config defaults to -O0). With -O0 the

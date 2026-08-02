@@ -117,11 +117,22 @@ XCODE_BUILD_CMD=(
   -destination 'generic/platform=iOS'
   -destination-timeout 120
   -derivedDataPath "$DERIVED_DATA_DIR"
-  # Scoped per-SDK: the watch device ABI is arm64_32, so an unscoped ARCHS=arm64
-  # cannot build the watch target a companion project embeds.
-  "ARCHS[sdk=iphoneos*]=arm64"
+  # No ARCHS / EXCLUDED_ARCHS override at all, deliberately.
+  #
+  # An unscoped ARCHS=arm64 is wrong here: this invocation spans two platforms,
+  # and the watch device ABI is arm64_32. The obvious repair -- scoping it as
+  # "ARCHS[sdk=iphoneos*]=arm64" -- is worse, because xcodebuild does NOT accept
+  # per-SDK conditionals in command-line overrides; that syntax is only honoured
+  # in xcconfig files and project settings. On the command line it parses as the
+  # setting ARCHS with the literal value "iphoneos*]=arm64", so EVERY target
+  # warns "None of the architectures in ARCHS are valid" and compiles nothing.
+  # The build then does only resource copies and plist processing, and the first
+  # step to demand a binary (embedding CN1Widgets.appex) is what fails.
+  #
+  # Each target's own $(ARCHS_STANDARD) already resolves correctly per platform
+  # (arm64 for iphoneos, arm64_32 for watchos), which is exactly what we want,
+  # and armv7/armv7s are long gone from VALID_ARCHS. So the right override is none.
   "ONLY_ACTIVE_ARCH=NO"
-  "EXCLUDED_ARCHS[sdk=iphoneos*]=armv7 armv7s"
   "CODE_SIGN_IDENTITY="
   "CODE_SIGNING_REQUIRED=NO"
   "CODE_SIGNING_ALLOWED=NO"
