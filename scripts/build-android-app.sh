@@ -192,7 +192,11 @@ export JAVA_HOME="${JDK_HOME:-$JAVA17_HOME}"
     yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" >/dev/null 2>&1 || ba_log "Warning: unable to install Android SDK 36 components"
     yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
   fi
-  ./gradlew --no-daemon assembleDebug
+  # --stacktrace: packageDebug has failed intermittently on CI reporting only
+  # "A failure occurred while executing PackageAndroidArtifact$IncrementalSplitterRunnable"
+  # with no cause, which is not enough to fix anything. The flag costs nothing on
+  # a successful build and prints the actual exception when it does happen.
+  ./gradlew --no-daemon --stacktrace assembleDebug
 )
 export JAVA_HOME="$ORIGINAL_JAVA_HOME"
 
