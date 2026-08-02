@@ -657,7 +657,21 @@ public class ConnectionRequest implements IOProgressListener {
     /// headers: anything scoped to the original host has to be removable before
     /// the retry, or it follows the redirect to wherever it points.
     public void removeRequestHeader(String key) {
-        if (userHeaders == null || key == null) {
+        if (key == null) {
+            return;
+        }
+        if ("content-type".equalsIgnoreCase(key)) {
+            // addRequestHeader routes this one to a dedicated field rather than the
+            // header map, so scanning the map alone left it set and initConnection went
+            // on emitting it -- a removal that removed nothing, which is worse than an
+            // unsupported one because the caller has been told otherwise. Back to the
+            // default value and the not-explicitly-set flag, which is the state a request
+            // that never mentioned it is in.
+            contentType = "application/x-www-form-urlencoded; charset=UTF-8";
+            contentTypeSetExplicitly = false;
+            return;
+        }
+        if (userHeaders == null) {
             return;
         }
         userHeaders.remove(key);

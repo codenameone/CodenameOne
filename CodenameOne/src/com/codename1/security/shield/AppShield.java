@@ -472,6 +472,14 @@ public final class AppShield {
             setStatus(token == null ? ShieldStatus.SERVICE_DOWN : token.getStatus());
             if (token != null && token.isValid()) {
                 String header = getConfig().getTokenHeader();
+                // Any spelling of it the app may already have set goes first. Header
+                // names are case-insensitive, so adding ours beside an existing
+                // "x-cn1-attest" leaves two fields on the wire and lets the backend or an
+                // intermediary pick the stale one -- while attach() reports success.
+                // Done HERE rather than in the general cleanup, which must not touch a
+                // request the shield is not attaching to: this is the one request that is
+                // about to receive a token under this name.
+                request.removeRequestHeader(header);
                 // Re-checked here, not only at configuration time: the cookie header name
                 // is a runtime setting, so an app can rename it AFTER choosing a token
                 // header and land on the same name. The cookie string is written after

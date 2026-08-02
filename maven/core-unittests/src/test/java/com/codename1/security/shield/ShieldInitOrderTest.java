@@ -315,6 +315,31 @@ class ShieldInitOrderTest extends UITestBase {
                 "the shield must not strip a header it did not attach to this request");
     }
 
+    /**
+     * A differently-cased copy of the token header does not survive beside the real one.
+     *
+     * <p>Header names are case-insensitive, so adding ours next to an app's existing
+     * {@code x-cn1-attest} leaves two fields on the wire and lets the backend or an
+     * intermediary pick the stale one -- while {@code attach()} reports success and a
+     * fail-closed host is satisfied.</p>
+     */
+    @Test
+    void aDifferentlyCasedTokenHeaderIsReplacedRatherThanDuplicated() throws Exception {
+        Thread init = initOnAnotherThread();
+        engine.release();
+        init.join(GENEROUS_TIMEOUT_MS);
+
+        RecordingRequest request = new RecordingRequest();
+        request.setUrl("https://api.example.com/secure");
+        request.addRequestHeader("x-cn1-attest", "a-stale-value-the-app-set");
+
+        AppShield.attach(request);
+
+        assertNull(request.headerValue("x-cn1-attest"),
+                "the app's spelling must not survive beside the shield's");
+        assertEquals("token-from-a-fully-initialized-engine", request.attached());
+    }
+
     private Thread initOnAnotherThread() {
         ShieldEngineRegistry.setEngine(engine);
         Thread t = new Thread(new Runnable() {
@@ -346,7 +371,16 @@ class ShieldInitOrderTest extends UITestBase {
         @Override
         public void removeRequestHeader(String key) {
             super.removeRequestHeader(key);
-            headers.remove(key);
+            // Case-insensitively, like the real one. A double that only removes the exact
+            // spelling reports a header still present that the request no longer holds,
+            // which is a test failing for a property the code has.
+            java.util.Iterator<String> it = headers.keySet().iterator();
+            while (it.hasNext()) {
+                String existing = it.next();
+                if (existing != null && existing.equalsIgnoreCase(key)) {
+                    it.remove();
+                }
+            }
         }
 
         String attached() {
