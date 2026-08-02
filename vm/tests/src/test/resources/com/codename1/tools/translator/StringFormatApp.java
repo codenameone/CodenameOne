@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 /**
  * Exercises java.lang.String.format and prints one line per case so the JDK's
  * output and ParparVM's output can be diffed line by line.
@@ -185,6 +207,11 @@ public class StringFormatApp {
         f("bad.wrongTypeForC", "%c", Double.valueOf(1.0));
         f("bad.precisionOnD", "%.2d", Integer.valueOf(1));
         f("bad.uppercaseD", "%D", Integer.valueOf(1));
+        // A '.' with no digits after it is a malformed specifier, not a precision of
+        // zero: every supported JDK reports the '.' as an unknown conversion.
+        f("bad.emptyPrecision", "%.s", "x");
+        f("bad.emptyPrecisionOnD", "%.d", Integer.valueOf(1));
+        f("bad.emptyPrecisionOnF", "%.f", Double.valueOf(1.0));
     }
 
     /**
@@ -195,6 +222,9 @@ public class StringFormatApp {
     private static void unsupported() {
         g("hexFloat", "%a", Double.valueOf(2.5));
         g("dateTime", "%tY", Long.valueOf(0L));
+        // Argument indexes are 1-based. JDK 16 and later reject index zero; JDK 11 still
+        // accepts it, so this cannot go through the shared diff.
+        g("zeroArgumentIndex", "%0$s", "A");
     }
 
     private static void g(String label, String format, Object... args) {

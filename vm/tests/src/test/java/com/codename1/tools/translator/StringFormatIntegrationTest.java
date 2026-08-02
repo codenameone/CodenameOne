@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.tools.translator;
 
 import org.junit.jupiter.api.Test;
@@ -131,16 +153,19 @@ class StringFormatIntegrationTest {
                 "ParparVM String.format diverged from the JDK in " + differences.size()
                         + " case(s):\n" + String.join("\n", differences));
 
-        // %a and %t are the two JDK conversions ParparVM does not implement. They must
-        // surface as a catchable Java exception -- the point of issue #5482 was that a
-        // formatting problem took the whole process down instead.
+        // Cases that cannot go through the shared diff, because the JDK either formats
+        // them (%a, %t, which ParparVM does not implement) or because the JDK's own
+        // answer moved between versions (%0$s is accepted on 11, rejected from 16 on).
+        // Either way the requirement is the same: a catchable Java exception, since the
+        // point of issue #5482 was that a formatting problem took the whole process down.
+        Map<String, String> expectedCn1Only = new LinkedHashMap<>();
+        expectedCn1Only.put("hexFloat", "EX|java.util.UnknownFormatConversionException");
+        expectedCn1Only.put("dateTime", "EX|java.util.UnknownFormatConversionException");
+        expectedCn1Only.put("zeroArgumentIndex", "EX|java.util.IllegalFormatArgumentIndexException");
+
         Map<String, String> unsupported = parseCases(parparOutput, "CN1ONLY|");
-        assertEquals(2, unsupported.size(),
-                "Expected the unsupported-conversion cases. Output: " + parparOutput);
-        for (Map.Entry<String, String> entry : unsupported.entrySet()) {
-            assertEquals("EX|java.util.UnknownFormatConversionException", entry.getValue(),
-                    "Unsupported conversion '" + entry.getKey() + "' should throw, not crash or guess");
-        }
+        assertEquals(expectedCn1Only, unsupported,
+                "Unsupported and version-dependent specifiers must throw, not crash or guess");
     }
 
     private Map<String, String> parseCases(String output, String prefix) {

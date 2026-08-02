@@ -24,6 +24,7 @@ package java.lang;
 
 import java.util.DuplicateFormatFlagsException;
 import java.util.FormatFlagsConversionMismatchException;
+import java.util.IllegalFormatArgumentIndexException;
 import java.util.IllegalFormatCodePointException;
 import java.util.IllegalFormatConversionException;
 import java.util.IllegalFormatFlagsException;
@@ -121,6 +122,10 @@ final class StringFormatter {
             }
             if (digitsEnd > pos && digitsEnd < len && format.charAt(digitsEnd) == '$') {
                 argIndex = parseNumber(format, pos, digitsEnd);
+                if (argIndex == 0) {
+                    // Argument indexes are 1-based; "%0$s" has no argument to select.
+                    throw new IllegalFormatArgumentIndexException(argIndex);
+                }
                 pos = digitsEnd + 1;
             }
 
@@ -173,7 +178,11 @@ final class StringFormatter {
                 while (pos < len && isDigit(format.charAt(pos))) {
                     pos++;
                 }
-                precision = pos > precisionStart ? parseNumber(format, precisionStart, pos) : 0;
+                if (pos == precisionStart) {
+                    // "%.s" is malformed; the JVM reports the '.' as the conversion.
+                    throw new UnknownFormatConversionException(".");
+                }
+                precision = parseNumber(format, precisionStart, pos);
             }
 
             if (pos >= len) {
