@@ -491,86 +491,25 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 logThrowable("EDT", (Throwable)e.getSource());
             });
         });
-        startWedgeWatchdog();
         runNextTest(0);
     }
 
-    /// Name of the test the event dispatch thread is inside, and the wall clock
-    /// at which it stops being plausible that it is still working. Written on
-    /// the EDT, read by the watchdog thread.
-    private volatile String activeTestName;
-    private volatile long activeTestDeadline;
-
-    /// Grace on top of a test's own timeout before the watchdog concludes the
-    /// EDT is not coming back. The per-test timeout is itself enforced by an
-    /// EDT callback, so a test that blocks the thread outright can never be
-    /// timed out by it -- the suite simply stops, and every remaining test is
-    /// published as "never run" with nothing saying why.
-    private static final long WEDGE_GRACE_MS = 30000L;
-
-    /// The watchdog body.
+    /// Which test wedged the suite is reported by the capture harness, not from
+    /// in here.
     ///
-    /// This is a named class and MUST NOT be rewritten as a lambda. The
-    /// JavaScript port hand-binds three of this class's Runnable lambdas by
-    /// translated id -- Cn1ssDeviceRunner_lambda_1_run through _3_run, see
-    /// bindCiFallback in port.js -- and the translator numbers lambdas in their
-    /// declaration order within the class. A lambda declared here, ahead of the
-    /// ones in runNextTest, shifts every one of those ids by one, so the bridge
-    /// that polls for a test's completion gets handed the lambda that starts a
-    /// test instead. The ids still resolve, so nothing reports an error: the
-    /// suite simply stops advancing after its first test. A named class has its
-    /// own method namespace and leaves that numbering alone.
-    private final class WedgeWatchdog implements Runnable {
-        public void run() {
-            while (!suiteFinished) {
-                try {
-                    Thread.sleep(1000L);
-                } catch (InterruptedException interrupted) {
-                    return;
-                }
-                String name = activeTestName;
-                long deadline = activeTestDeadline;
-                if (name == null || deadline <= 0L) {
-                    continue;
-                }
-                long overrun = System.currentTimeMillis() - (deadline + WEDGE_GRACE_MS);
-                if (overrun < 0L) {
-                    continue;
-                }
-                // Report against the test rather than the suite: this is the
-                // one line that says which test stopped the run.
-                log("CN1SS:ERR:suite test=" + name + " failed: the event dispatch thread has not"
-                        + " returned from this test " + overrun + "ms past its deadline; the suite"
-                        + " cannot continue and every later test is unreached");
-                log("CN1SS:SUITE:WEDGED test=" + name);
-                // Nothing here can end the process: exitApplication would have
-                // to run on the very thread that is stuck, and the raw exit
-                // calls are not part of the API the ports support. The marker
-                // above is the contract instead -- the capture harness watches
-                // for it and stops the run, having been told which test to
-                // blame.
-                return;
-            }
-        }
-    }
-
-    private void startWedgeWatchdog() {
-        // Not on HTML5. That port drives the suite from the browser's single
-        // thread through the bridges described on WedgeWatchdog, and its harness
-        // already bounds the run and force-advances a stalled dispatch. The
-        // wedges this watchdog exists to name are on the native desktop ports.
-        if ("HTML5".equals(Display.getInstance().getPlatformName())) {
-            return;
-        }
-        // Display.startThread rather than a bare Thread: the ports only support
-        // the thread surface the bytecode compliance gate allows, and this hands
-        // back a CodenameOneThread that the platform names and reaps for us.
-        Display.getInstance().startThread(new WedgeWatchdog(), "cn1ss-wedge-watchdog").start();
-    }
-
-    /// Set once the suite is over so the watchdog thread returns instead of
-    /// outliving the run.
-    private volatile boolean suiteFinished;
+    /// This used to be an in-process watchdog thread. It could not do the job and
+    /// it caused a worse one. A test that blocks the event dispatch thread in a
+    /// tight compute loop also stops the collector, so the watchdog's own log
+    /// call -- which allocates, to build its message -- parks waiting for a
+    /// collection that cannot happen until the EDT yields. It reported nothing
+    /// across a 47 minute wedge for exactly that reason. Worse, merely asking to
+    /// allocate from a second thread during Base64NativePerformanceTest's
+    /// benchmark loops was enough to deadlock the pair, and the Linux suite --
+    /// which completes on master -- stopped dead on that test.
+    ///
+    /// The harness reads the suite's output from outside the process, so it can
+    /// name the last announced test whatever state the app is in, and cannot
+    /// perturb it. See lastStarted in CleanTargetLinuxIntegrationTest.
 
     private void runNextTest(int index) {
         int offset = prependedTest != null ? 1 : 0;
@@ -607,8 +546,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         CN.callSerially(() -> {
             Cn1ssDeviceRunnerHelper.clearTransportFailure();
             log("CN1SS:INFO:suite starting test=" + testName);
-            activeTestName = testName;
-            activeTestDeadline = System.currentTimeMillis() + testTimeoutMs(testClass);
             try {
                 testClass.prepare();
                 testClass.runTest();
@@ -646,7 +583,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     }
 
     private void finalizeTest(int index, BaseTest testClass, String testName, boolean timedOut) {
-        activeTestName = null;
         final Runnable continueToNext = () -> {
             log("CN1SS:INFO:suite finished test=" + testName);
             runNextTest(index + 1);
@@ -756,7 +692,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             }
             log("CN1SS:INFO:swift_diag_status=" + status);
         } finally {
-            suiteFinished = true;
             log("CN1SS:SUITE:FINISHED");
         }
         try {
