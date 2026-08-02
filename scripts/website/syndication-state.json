@@ -1421,6 +1421,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-08-01T17:01:12+00:00"
+      },
+      "devto": {
+        "id": 4293450,
+        "url": "https://dev.to/codenameone/bluetooth-support-across-every-codename-one-target-4om5",
+        "syndicated_at": "2026-08-02T14:25:15+00:00"
       }
     },
     "2026-08-02-1200-shai-on-device-ai-mcp-loopback": {
