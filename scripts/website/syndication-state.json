@@ -1436,6 +1436,18 @@
         "source_slug": "on-device-ai-mcp-loopback",
         "scheduled_at": "2026-08-02T09:00:00+00:00"
       }
+    },
+    "text-input-without-native-overlay": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmsc1rlfl00000ajk9achehzr",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a6f77a685fd397e8cbf0281",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-02T17:01:21+00:00"
+      }
     }
   }
 }
