@@ -472,6 +472,21 @@ public final class AppShield {
             setStatus(token == null ? ShieldStatus.SERVICE_DOWN : token.getStatus());
             if (token != null && token.isValid()) {
                 String header = getConfig().getTokenHeader();
+                // Re-checked here, not only at configuration time: the cookie header name
+                // is a runtime setting, so an app can rename it AFTER choosing a token
+                // header and land on the same name. The cookie string is written after
+                // the request's own headers, so the token would be overwritten and this
+                // method would report success anyway.
+                if (ShieldHosts.normalize(header).equals(
+                        ShieldHosts.normalize(ConnectionRequest.getCookieHeader()))) {
+                    Log.p("AppShield: the token header " + header + " is now this app's "
+                            + "cookie header, so the token would be overwritten before "
+                            + "the request goes out. Change one of the two.");
+                    failOrContinue(policy, new ShieldException(ShieldStatus.REJECTED,
+                            "AppShield: the token header collides with the cookie "
+                            + "header, so no token can be attached for " + host));
+                    return;
+                }
                 rememberAttachedHeader(request, header);
                 request.addRequestHeader(header, token.getValue());
                 return;

@@ -657,7 +657,15 @@ final class IOSDeviceIntegrity {
                 // so it is handed to the retry that asks for the same challenge.
                 if (undeliveredAttestToken != null
                         && nonce.equals(undeliveredAttestNonce)) {
-                    String token = undeliveredAttestToken;
+                    // Through the one-shot claim, like the scheduled delivery. Calling
+                    // the inherited complete() left the claim unspent, so a caller that
+                    // cancelled the resource it had just been handed still won -- while
+                    // this branch had already cleared the only retained copy and promoted
+                    // the key. Nobody registers it, and the grace window then starts
+                    // asserting against a key the backend has never seen.
+                    if (!r.deliver(undeliveredAttestToken)) {
+                        return r;
+                    }
                     undeliveredAttestKeyId = null;
                     undeliveredAttestNonce = null;
                     undeliveredAttestToken = null;
@@ -673,7 +681,6 @@ final class IOSDeviceIntegrity {
                     if (STATE_PENDING_UNDELIVERED.equals(inMemoryState)) {
                         inMemoryState = STATE_PENDING;
                     }
-                    r.complete(token);
                     return r;
                 }
                 // A different challenge, or a restart that lost the object entirely. Either

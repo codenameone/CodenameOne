@@ -474,6 +474,9 @@ class ShieldApiTest {
             // fallback. Conditional on the method and the platform, so a token in one of
             // them survives every test that does not use that exact shape.
             "Accept-Encoding", "X-HTTP-Method-Override",
+            // JavaSEPort rewrites User-Agent to a fixed BlackBerry string for any URL
+            // containing facebook.com, which makes the loss conditional on the host.
+            "User-Agent",
             // Not framing, but overwritten by the request itself: ConnectionRequest
             // emits userHeaders and then sets Cookie from its own cookie store.
             "Cookie"
@@ -491,6 +494,35 @@ class ShieldApiTest {
         // prefix match, or an app's own X-Connection-Id would be rejected for no reason.
         assertEquals("X-Connection-Id",
                 new ShieldConfig().tokenHeader("X-Connection-Id").getTokenHeader());
+    }
+
+    /**
+     * The cookie header's NAME is a runtime setting, so the refusal cannot be a constant.
+     *
+     * <p>{@code ConnectionRequest.setCookieHeader} renames it app-wide. An app that
+     * renames it and then picks the same name for the token loses the token to its own
+     * cookie string, which is written after the request's headers -- the same way the
+     * default name loses it, and just as silently.</p>
+     */
+    @Test
+    void aRenamedCookieHeaderIsRefusedTooAndTheDefaultIsRestored() {
+        String original = com.codename1.io.ConnectionRequest.getCookieHeader();
+        try {
+            com.codename1.io.ConnectionRequest.setCookieHeader("X-App-Session");
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ShieldConfig().tokenHeader("X-App-Session"),
+                    "the configured cookie header cannot carry the token either");
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ShieldConfig().tokenHeader("x-app-session"),
+                    "and the comparison is case-insensitive like the header");
+            // The literal Cookie header stays refused whatever the app renamed its own
+            // to: it is a header with its own meaning, and the static entry covers it.
+            // The dynamic check is in addition to that list, not instead of it.
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ShieldConfig().tokenHeader("Cookie"));
+        } finally {
+            com.codename1.io.ConnectionRequest.setCookieHeader(original);
+        }
     }
 
     // --- guard composition ----------------------------------------------

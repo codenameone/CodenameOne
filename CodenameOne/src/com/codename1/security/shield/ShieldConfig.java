@@ -22,6 +22,7 @@
  */
 package com.codename1.security.shield;
 
+import com.codename1.io.ConnectionRequest;
 import java.util.Enumeration;
 import java.util.Hashtable;
 
@@ -86,6 +87,20 @@ public final class ShieldConfig {
                         + "and the token would follow the redirect. Use a header of your "
                         + "own, or leave the default " + DEFAULT_TOKEN_HEADER + ".");
             }
+            // The cookie header NAME is configurable at runtime
+            // (ConnectionRequest.setCookieHeader), so a hard-coded "cookie" in the list
+            // below is only the default. An app that renames it and then picks the same
+            // name for the token loses the token to its own cookie string -- written
+            // after the request's own headers, exactly as the default name is.
+            if (ShieldHosts.normalize(ConnectionRequest.getCookieHeader())
+                    .equals(normalized)) {
+                throw new IllegalArgumentException(name + " cannot carry the "
+                        + "attestation token: it is this app's cookie header, which "
+                        + "ConnectionRequest writes from its own cookie store after the "
+                        + "request's headers are in place -- so the token would be "
+                        + "overwritten after attach() reported success. Use a header of "
+                        + "your own, or leave the default " + DEFAULT_TOKEN_HEADER + ".");
+            }
             for (String reserved : TRANSPORT_HEADERS) {
                 if (reserved.equals(normalized)) {
                     throw new IllegalArgumentException(name + " cannot carry the "
@@ -145,6 +160,11 @@ public final class ShieldConfig {
         // method, one platform -- so it would pass every test that did not happen to use
         // that shape.
         "accept-encoding", "x-http-method-override",
+        // And User-Agent, which JavaSEPort rewrites to a fixed BlackBerry string for any
+        // URL containing facebook.com -- an old patch for getting a readable login page.
+        // Conditional on the HOST, so a token there works everywhere until the one
+        // request that matters.
+        "user-agent",
         // Cookie is not transport framing, but it fails the same way and worse.
         // ConnectionRequest emits userHeaders first and THEN calls setHeader("Cookie",
         // ...) with the generated cookie string, so with cookie handling on and any
