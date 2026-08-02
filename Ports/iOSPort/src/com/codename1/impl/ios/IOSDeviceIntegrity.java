@@ -1497,8 +1497,16 @@ final class IOSDeviceIntegrity {
                             // state saying nobody received it, which would have the next
                             // request discard a key the backend may already know -- so
                             // this process remembers what it did.
+                            // Attempted whatever the stored state currently says, short
+                            // of already-attested. Conditioning it on finding
+                            // pendingUndelivered there meant the case where that write
+                            // had ALSO failed -- storage still on "new", the acceptance
+                            // recorded in its own item -- skipped the promotion and the
+                            // in-memory note both. A restart then rehydrated the
+                            // acceptance as undelivered with no retained object left, and
+                            // discarded a key the backend may have registered.
                             SecureStorage store = SecureStorage.getInstance();
-                            if (STATE_PENDING_UNDELIVERED.equals(store.get(KEY_STATE))
+                            if (!STATE_ATTESTED.equals(store.get(KEY_STATE))
                                     && !store.set(KEY_STATE, STATE_PENDING)) {
                                 instance.deliveredAttestKeyId = keyId;
                             }
