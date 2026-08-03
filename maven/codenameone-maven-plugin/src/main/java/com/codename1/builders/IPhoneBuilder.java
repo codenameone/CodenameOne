@@ -434,6 +434,48 @@ public class IPhoneBuilder extends Executor {
     }
 
 
+    /**
+     * The Facebook SDK pods, at whatever version the request asked for.
+     *
+     * <p>Its own method so the validation below has a caller a test can reach.</p>
+     */
+    String facebookPods(BuildRequest request) {
+        String v = podVersionRequirement(
+                request.getArg("ios.facebook.version", "~>5.6.0"), "~>5.6.0");
+        return "FBSDKCoreKit " + v + ",FBSDKLoginKit " + v + ",FBSDKShareKit " + v;
+    }
+
+    /**
+     * A CocoaPods version requirement, or the default when the hint is not one.
+     *
+     * <p>This value is appended to the pod list and interpolated into the generated
+     * Podfile unescaped, and a Podfile is Ruby that {@code pod install} executes -- so a
+     * hint carrying a quote and a newline is code running in the build workspace, which
+     * holds signing material. Version requirements are a tiny language ("~> 5.6.0",
+     * "&gt;= 5.0", "5.6.0"), so anything outside it is refused rather than escaped:
+     * escaping invites the next value that needs a different escape.</p>
+     */
+    private String podVersionRequirement(String hint, String fallback) {
+        if (hint == null || hint.length() == 0) {
+            return fallback;
+        }
+        for (int i = 0; i < hint.length(); i++) {
+            char c = hint.charAt(i);
+            boolean ok = (c >= '0' && c <= '9')
+                    || (c >= 'a' && c <= 'z')
+                    || (c >= 'A' && c <= 'Z')
+                    || c == '.' || c == '-' || c == '+'
+                    || c == '~' || c == '>' || c == '<' || c == '=' || c == ' ';
+            if (!ok) {
+                log("ios.facebook.version '" + hint + "' is not a CocoaPods version "
+                        + "requirement; using " + fallback);
+                return fallback;
+            }
+        }
+        return hint;
+    }
+
+
 
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
@@ -564,9 +606,8 @@ public class IPhoneBuilder extends Executor {
         String facebookAppId = request.getArg("facebook.appId", null);
         boolean usePodsForFacebook = !request.getArg("ios.facebook.usePods", "true").equals("false") && facebookAppId != null && facebookAppId.length() > 0;
         if (usePodsForFacebook) {
-            String fbPodsVersion = request.getArg("ios.facebook.version", "~>5.6.0");
             addMinDeploymentTarget("10.0");
-            iosPods += (((iosPods.length() > 0) ? ",":"") + "FBSDKCoreKit "+fbPodsVersion+",FBSDKLoginKit "+fbPodsVersion+",FBSDKShareKit "+fbPodsVersion);
+            iosPods += (((iosPods.length() > 0) ? ",":"") + facebookPods(request));
         }
 
         String googleAdUnitId = request.getArg("ios.googleAdUnitId", request.getArg("google.adUnitId", null));
