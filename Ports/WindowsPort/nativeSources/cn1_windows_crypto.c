@@ -836,8 +836,8 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_rsaCrypt___java_lang_String
     int keyLength = 0, dataLength = 0;
     unsigned char* keyDer = cn1Bytes(keyArray, &keyLength);
     unsigned char* data = cn1Bytes(dataArray, &dataLength);
-    BCRYPT_KEY_HANDLE publicKey = encrypt ? cn1PublicKey(keyDer, keyLength) : NULL;
-    NCRYPT_KEY_HANDLE privateKey = encrypt ? 0 : cn1PrivateKey(keyDer, keyLength, 0);
+    BCRYPT_KEY_HANDLE publicKey = NULL;
+    NCRYPT_KEY_HANDLE privateKey = 0;
     int oaepMode = strstr(mode, "OAEP") != 0;
     LPCWSTR labelDigest = BCRYPT_SHA256_ALGORITHM;
     unsigned char* out = 0;
@@ -851,6 +851,12 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_rsaCrypt___java_lang_String
         cn1CryptoFail("unsupported cipher transformation", 0);
         return JAVA_NULL;
     }
+    /* Import only once the transformation is known good. Importing first and
+     * then rejecting the mode returned without reaching the `done` cleanup, so
+     * every rejected call leaked a BCrypt/NCrypt key handle -- unbounded in a
+     * long-running app that keeps retrying a bad transformation. */
+    publicKey = encrypt ? cn1PublicKey(keyDer, keyLength) : NULL;
+    privateKey = encrypt ? 0 : cn1PrivateKey(keyDer, keyLength, 0);
     if (encrypt ? (publicKey == NULL) : (privateKey == 0)) {
         return JAVA_NULL;
     }

@@ -115,9 +115,11 @@ while IFS= read -r workflow; do
   # wider net costs nothing when the newest run is complete.
   horizon="$(date -u -d "${sweep_stale_days} days ago" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
     || date -u -v-"${sweep_stale_days}"d +%Y-%m-%dT%H:%M:%SZ)"
+  # gh's --jq takes one expression and forwards no jq CLI options, so --arg has
+  # to go to a separate jq invocation rather than being smuggled in after --jq.
   candidates="$(gh run list --workflow "${workflow}" --branch master --limit 100 \
     --json databaseId,event,conclusion,updatedAt \
-    --jq --arg horizon "${horizon}" '[.[] | select((.event == "push" or .event == "schedule" or .event == "workflow_dispatch") and
+    | jq -r --arg horizon "${horizon}" '[.[] | select((.event == "push" or .event == "schedule" or .event == "workflow_dispatch") and
           (.conclusion == "success" or .conclusion == "failure") and
           (.updatedAt >= $horizon))]
           | sort_by(.updatedAt) | reverse | .[].databaseId')"
