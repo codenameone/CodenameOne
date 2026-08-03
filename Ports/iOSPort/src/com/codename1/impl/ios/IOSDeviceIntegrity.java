@@ -1211,20 +1211,41 @@ final class IOSDeviceIntegrity {
      * attestation while this class concluded delivery had lost and kept it for a retry,
      * or the reverse. A claim taken once decides it.</p>
      *
+     * <p>The claim and its outcome are one word, not a claim followed by a verdict. Two
+     * fields are two publications, and between them the resource reads as
+     * claimed-but-not-delivered -- which is the state that tells the retained-attestation
+     * branch delivery has lost. Whoever asks has to see the answer or see nothing.</p>
+     *
      * <p>Only this class's own results are of this type, so nothing outside it can be
      * affected by the stricter cancel().</p>
      */
     static final class OneShotResource extends AsyncResource<String> {
 
-        private final java.util.concurrent.atomic.AtomicBoolean claimed =
-                new java.util.concurrent.atomic.AtomicBoolean();
+        /** Nobody has taken the claim; every outcome is still possible. */
+        private static final int OPEN = 0;
+
+        /** The claim was spent by handing the value to this resource's caller. */
+        private static final int DELIVERED = 1;
+
+        /** The claim was spent by a cancellation or a failure, so delivery lost. */
+        private static final int LOST = 2;
 
         /**
-         * Whether the claim was spent by a DELIVERY, as opposed to a cancellation or a
-         * failure. Written before the value is published and read from another thread, so
-         * volatile.
+         * The claim AND what it was spent on, in one word.
+         *
+         * <p>Two fields could not express this, however carefully they were ordered.
+         * Taking the claim and recording the outcome were separate publications, so
+         * between them the resource read as claimed-but-not-delivered -- which is exactly
+         * how {@code lostItsClaim()} spells "delivery lost". A same-nonce retry landing in
+         * that window took the retained attestation while the delivery it had just
+         * misread went on to complete, so two callers held one attestation. It is
+         * replay-protected, so the second submission is rejected, and an app that reads a
+         * rejection as a bad key resets one the backend had just registered. Deciding the
+         * outcome in the same compare-and-set that takes the claim leaves no interval to
+         * observe.</p>
          */
-        private volatile boolean delivered;
+        private final java.util.concurrent.atomic.AtomicInteger state =
+                new java.util.concurrent.atomic.AtomicInteger(OPEN);
 
         /**
          * True once this resource can never receive the attestation: its claim is spent
@@ -1233,16 +1254,17 @@ final class IOSDeviceIntegrity {
          * <p>What the retained-attestation branch needs to know. An attestation cannot be
          * produced twice, so the retained copy exists for the caller that cancelled --
          * but "cancelled" has to mean the delivery LOST, not merely that a delivery is
-         * still queued. Asking this way makes the answer a fact about a claim that has
-         * already been decided rather than a guess about one that has not.</p>
+         * still queued or in progress. Asking this way makes the answer a fact about a
+         * claim that has already been decided rather than a guess about one that has
+         * not.</p>
          */
         boolean lostItsClaim() {
-            return claimed.get() && !delivered;
+            return state.get() == LOST;
         }
 
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
-            if (!claimed.compareAndSet(false, true)) {
+            if (!state.compareAndSet(OPEN, LOST)) {
                 // Delivery got here first. Reporting the cancellation as refused is the
                 // truth -- the caller's success callback has run or is about to.
                 return false;
@@ -1252,19 +1274,16 @@ final class IOSDeviceIntegrity {
 
         /** True when this call is the one that delivered. */
         boolean deliver(String value) {
-            if (!claimed.compareAndSet(false, true)) {
+            if (!state.compareAndSet(OPEN, DELIVERED)) {
                 return false;
             }
-            // Before the value is published, so a thread that sees the claim spent never
-            // sees it as a loss when it was a win.
-            delivered = true;
             super.complete(value);
             return true;
         }
 
         /** True when this call is the one that failed it. */
         boolean fail(Throwable t) {
-            if (!claimed.compareAndSet(false, true)) {
+            if (!state.compareAndSet(OPEN, LOST)) {
                 return false;
             }
             super.error(t);
