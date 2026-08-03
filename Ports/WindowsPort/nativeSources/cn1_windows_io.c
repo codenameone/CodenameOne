@@ -88,9 +88,27 @@ static JAVA_OBJECT cn1WinWideToJavaString(CODENAME_ONE_THREAD_STATE, const WCHAR
 /* Per-thread: two threads failing an open at once would otherwise overwrite
  * each other and lastIoError() could report the wrong reason. */
 static __declspec(thread) DWORD cn1WinLastIoError;
+/* Set when the open failed before CreateFileW was ever reached, so the thread's
+ * last-error value belongs to some earlier unrelated call. Reporting that value
+ * would name a plausible but wrong reason, which is worse than saying nothing:
+ * the whole point of this record is to explain a failure without another run. */
+static __declspec(thread) int cn1WinLastIoHadNoPath;
+
+static void cn1WinRecordIoError(DWORD error) {
+    cn1WinLastIoHadNoPath = 0;
+    cn1WinLastIoError = error;
+}
+
+static void cn1WinRecordMissingPath(void) {
+    cn1WinLastIoHadNoPath = 1;
+    cn1WinLastIoError = 0;
+}
 
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_lastIoError___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
     char buffer[256];
+    if (cn1WinLastIoHadNoPath) {
+        return newStringFromCString(threadStateData, "no path supplied");
+    }
     _snprintf(buffer, sizeof(buffer), "Windows error %lu", (unsigned long) cn1WinLastIoError);
     buffer[sizeof(buffer) - 1] = 0;
     return newStringFromCString(threadStateData, buffer);
@@ -100,14 +118,18 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_fileOpenRead___java_lang_Stri
     UINT32 len = 0;
     WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);
     HANDLE h;
+    DWORD error;
     if (path == NULL) {
+        cn1WinRecordMissingPath();
         return 0;
     }
     h = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL,
                     OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    /* Captured before free(), which is free to clobber the thread's last error. */
+    error = GetLastError();
     free(path);
     if (h == INVALID_HANDLE_VALUE) {
-        cn1WinLastIoError = GetLastError();
+        cn1WinRecordIoError(error);
         return 0;
     }
     return (JAVA_LONG)(intptr_t)h;
@@ -117,7 +139,9 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_fileOpenWrite___java_lang_Str
     UINT32 len = 0;
     WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);
     HANDLE h;
+    DWORD error;
     if (path == NULL) {
+        cn1WinRecordMissingPath();
         return 0;
     }
     if (__cn1Arg2) {
@@ -132,9 +156,10 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_fileOpenWrite___java_lang_Str
         h = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ, NULL,
                         CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     }
+    error = GetLastError();
     free(path);
     if (h == INVALID_HANDLE_VALUE) {
-        cn1WinLastIoError = GetLastError();
+        cn1WinRecordIoError(error);
         return 0;
     }
     return (JAVA_LONG)(intptr_t)h;

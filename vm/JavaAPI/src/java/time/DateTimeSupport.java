@@ -223,7 +223,14 @@ final class DateTimeSupport {
         LocalDate utcDate = LocalDate.ofEpochDay(epochDay);
         // Calendar.SUNDAY is 1 and epoch day 0 was a Thursday.
         int dayOfWeek = (int) floorMod(epochDay + 4, 7) + 1;
-        int offsetMillis = tz.getOffset(1 /* GregorianCalendar.AD */, utcDate.getYear(),
+        // getOffset takes an era plus a year *of that era*, not a proleptic ISO
+        // year. Passing AD with a non-positive year described a date that does
+        // not exist, so instants before 1 CE resolved against the wrong year.
+        // ISO 0 is 1 BC, ISO -1 is 2 BC, hence 1 - isoYear.
+        int isoYear = utcDate.getYear();
+        int era = isoYear > 0 ? 1 /* GregorianCalendar.AD */ : 0 /* GregorianCalendar.BC */;
+        int yearOfEra = isoYear > 0 ? isoYear : 1 - isoYear;
+        int offsetMillis = tz.getOffset(era, yearOfEra,
                 utcDate.getMonthValue() - 1, utcDate.getDayOfMonth(), dayOfWeek, millisOfDay);
         return ZoneOffset.ofTotalSeconds(offsetMillis / 1000);
     }

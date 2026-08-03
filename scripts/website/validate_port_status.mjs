@@ -191,10 +191,23 @@ function validate() {
             fail(`a cell claims a documented skip the errata do not cover: ${cell}`);
         }
     }
+    // Counted inside each documented-skip cell, not across the whole page. A
+    // page-wide tally also picks up the legend's own marker, so a cell that had
+    // lost its <sup> was masked by the legend and the check passed while the
+    // reader saw a green cell with nothing pointing at its explanation.
+    //
     // The production build minifies, which drops the quotes around attribute
     // values, so match the class without assuming them.
-    if (countMatches(page, /<sup\b[^>]*\bcn1-port-status__note\b/g) < notedCells.length) {
-        fail("documented-skip cells must carry a visible note marker");
+    const notedCellBodies = Array.from(
+        page.matchAll(/<td\b(?=[^>]*\bdata-feature-cell\b)(?=[^>]*\bhas-documented-skip\b)[^>]*>([\s\S]*?)<\/td>/gi),
+        (match) => match[1]);
+    if (notedCellBodies.length !== notedCells.length) {
+        fail(`could not read the body of every documented-skip cell: ${notedCellBodies.length} of ${notedCells.length}`);
+    }
+    const unmarked = notedCellBodies.filter(
+        (body) => !/<sup\b[^>]*\bcn1-port-status__note\b/.test(body)).length;
+    if (unmarked > 0) {
+        fail(`${unmarked} documented-skip cell(s) carry no visible note marker`);
     }
 
     const manualRows = countMatches(page, /\bdata-manual-feature-row(?:=|\s|>)/g);

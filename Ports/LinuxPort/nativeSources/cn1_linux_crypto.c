@@ -309,7 +309,13 @@ static EVP_PKEY* cn1PrivateKey(const unsigned char* der, int length) {
         PKCS8_PRIV_KEY_INFO_free(info);
     }
     if (key == 0) {
-        /* Tolerate a bare PKCS#1/SEC1 key as well; some callers keep those. */
+        /* Tolerate a bare PKCS#1/SEC1 key as well; some callers keep those.
+         * The PKCS#8 attempt above queued its failure on this thread's OpenSSL
+         * error queue. For a valid PKCS#1/SEC1 key that failure is expected and
+         * the fallback succeeds, but the stale entry stays queued and the next
+         * unrelated operation to read the queue reports it -- so drop it before
+         * trying again. */
+        ERR_clear_error();
         cursor = der;
         key = d2i_AutoPrivateKey(0, &cursor, (long) length);
     }

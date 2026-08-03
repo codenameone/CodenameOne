@@ -43,6 +43,28 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 MANIFEST="${REPO_ROOT}/docs/website/data/port_status.json"
 DATA_BRANCH="port-status-data"
 
+# port_status.py accept distinguishes "built against an older contract, wait for
+# the next run" from "the report is broken". Both keep the checked-in fallback,
+# but only the second is a defect worth shouting about, so the two get different
+# messages rather than one blanket "not usable".
+ACCEPT_CONTRACT_DRIFT=11
+ACCEPT_UNUSABLE=12
+
+# GNU coreutils spells it --decode, BSD (macOS) spells it -D. This script has a
+# BSD `date` fallback already, so it is meant to run in both places.
+decode_base64() {
+  base64 --decode 2>/dev/null || base64 -D
+}
+
+# Explains a non-zero `accept` status without pretending drift is corruption.
+describe_accept_status() {
+  case "$1" in
+    "${ACCEPT_CONTRACT_DRIFT}") echo "built against a different test contract; waiting for a run on the current one" ;;
+    "${ACCEPT_UNUSABLE}") echo "not usable by the website" ;;
+    *) echo "rejected by the publication gate (status $1)" ;;
+  esac
+}
+
 for tool in gh jq python3; do
   if ! command -v "${tool}" >/dev/null 2>&1; then
     echo "backfill-port-status: ${tool} is required." >&2
@@ -157,7 +179,10 @@ while IFS= read -r workflow; do
         # on its report would otherwise be published straight over that port's
         # entry -- Linux evidence replacing Android's genuine result, with both
         # the gate and the freshness check satisfied.
-        case " ${owned} " in
+        # owned is newline-separated (one id per jq row); normalise to spaces
+        # so the space-delimited membership test below actually matches the ids
+        # in the middle of the list rather than only the first and last.
+        case " $(printf '%s ' ${owned}) " in
           *" ${found} "*) ;;
           *)
             echo "Ignoring a report naming ${found}: ${workflow} does not produce that port." >&2
@@ -169,9 +194,11 @@ while IFS= read -r workflow; do
         # the older candidates from being consulted, so the sweep would keep
         # serving stale data -- or fail its closing freshness assertion --
         # while a perfectly good report sat in the run behind it.
-        if ! python3 "${SCRIPT_DIR}/port_status.py" accept \
-            --port "${found}" --report "${downloaded}" >/dev/null 2>&1; then
-          echo "Ignoring the ${found} report from run ${candidate}: not usable by the website." >&2
+        accept_status=0
+        python3 "${SCRIPT_DIR}/port_status.py" accept \
+            --port "${found}" --report "${downloaded}" >/dev/null 2>&1 || accept_status=$?
+        if [ "${accept_status}" -ne 0 ]; then
+          echo "Ignoring the ${found} report from run ${candidate}: $(describe_accept_status "${accept_status}")." >&2
           continue
         fi
         cp "${downloaded}" "${download_dir}/port-status-${found}.json"
@@ -194,14 +221,16 @@ while IFS= read -r workflow; do
     # an older contract passes the freshness check below but is rejected by the
     # sync, which would leave the public column on its stale fallback while
     # this sweep reported success.
-    if ! python3 "${SCRIPT_DIR}/port_status.py" accept --port "${port}" --report "${report}"; then
-      echo "Not publishing the ${port} report from run ${run_id}: it is not usable by the website." >&2
+    accept_status=0
+    python3 "${SCRIPT_DIR}/port_status.py" accept --port "${port}" --report "${report}" || accept_status=$?
+    if [ "${accept_status}" -ne 0 ]; then
+      echo "Not publishing the ${port} report from run ${run_id}: $(describe_accept_status "${accept_status}")." >&2
       continue
     fi
     generated="$(jq -r '.generated_at // empty' "${report}")"
     current=""
     if gh api "repos/${GITHUB_REPOSITORY}/contents/ports/${port}.json?ref=${DATA_BRANCH}" \
-        --jq '.content' 2>/dev/null | base64 --decode > "${tmp_dir}/current.json" 2>/dev/null; then
+        --jq '.content' 2>/dev/null | decode_base64 > "${tmp_dir}/current.json" 2>/dev/null; then
       current="$(jq -r '.generated_at // empty' "${tmp_dir}/current.json" 2>/dev/null || true)"
     fi
     # Compare instants rather than strings. The gate accepts any timezone-aware
@@ -227,15 +256,17 @@ stale_days="$(jq -r '.stale_after_days' "${MANIFEST}")"
 problems=()
 while IFS= read -r port; do
   if ! gh api "repos/${GITHUB_REPOSITORY}/contents/ports/${port}.json?ref=${DATA_BRANCH}" \
-      --jq '.content' 2>/dev/null | base64 --decode > "${tmp_dir}/check.json" 2>/dev/null; then
+      --jq '.content' 2>/dev/null | decode_base64 > "${tmp_dir}/check.json" 2>/dev/null; then
     problems+=("${port}: no published report")
     continue
   fi
   # Freshness alone is not enough: a published report the website rejects
   # leaves the column on its checked-in fallback, which is the state this
   # sweep exists to detect.
-  if ! python3 "${SCRIPT_DIR}/port_status.py" accept --port "${port}" --report "${tmp_dir}/check.json" >/dev/null; then
-    problems+=("${port}: published report is not usable by the website")
+  accept_status=0
+  python3 "${SCRIPT_DIR}/port_status.py" accept --port "${port}" --report "${tmp_dir}/check.json" >/dev/null || accept_status=$?
+  if [ "${accept_status}" -ne 0 ]; then
+    problems+=("${port}: published report is $(describe_accept_status "${accept_status}")")
     continue
   fi
   generated="$(jq -r '.generated_at // empty' "${tmp_dir}/check.json" 2>/dev/null || true)"
@@ -260,8 +291,9 @@ AGE
   # The publication gate deliberately tolerates an hour of clock skew, so a
   # report it accepted can legitimately carry a timestamp a little ahead of
   # now. Calling that unreadable here would fail the nightly job over a report
-  # the same run just published, until wall time caught up. Unparseable stays
-  # -1 from the helper above and is still a problem.
+  # the same run just published, until wall time caught up. An unparseable or
+  # zone-less stamp prints "unreadable" from the helper above and is still a
+  # problem.
   if [ "${age_seconds}" = "unreadable" ]; then
     problems+=("${port}: unreadable generated_at ${generated:-<missing>}")
   elif [ "${age_seconds}" -lt "-${future_skew_seconds}" ]; then

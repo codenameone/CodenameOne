@@ -591,6 +591,22 @@ def strict_report_errors(report: dict) -> list[str]:
     return errors
 
 
+def describe_workload_gap(seen: list[str], expected: list[str]) -> str:
+    """Name what is missing or extra, not what happens to be fine.
+
+    Printing the workloads that *are* covered leaves the reader to diff two
+    ten-item lists by eye to find the one that is not.
+    """
+    absent = sorted(set(expected) - set(seen))
+    unexpected = sorted(set(seen) - set(expected))
+    parts = []
+    if absent:
+        parts.append("missing " + ", ".join(absent))
+    if unexpected:
+        parts.append("unexpected " + ", ".join(unexpected))
+    return "; ".join(parts) if parts else "counts differ"
+
+
 def publishable_report_problems(
     manifest: dict, port_id: str, report: dict
 ) -> tuple[list[str], list[str]]:
@@ -662,7 +678,12 @@ def publishable_report_problems(
     expected_summary = {
         key: statuses.get(key, 0) for key in ("pass", "fail", "skip", "not-run")
     }
-    if report.get("summary") != expected_summary and not drift:
+    # Checked even under drift. The summary counts the results the report
+    # actually carries, so it stays self-consistent whether or not the report
+    # predates a test -- suppressing this whenever any drift was seen let a
+    # genuinely malformed report be filed as mere drift and fall back quietly,
+    # which is the outcome the loud/quiet split exists to avoid.
+    if report.get("summary") != expected_summary:
         malformed.append("summary does not match the test results")
 
     expected_benchmarks = manifest.get("performance_benchmarks", [])
@@ -700,6 +721,15 @@ def publishable_report_problems(
         malformed.append("performance results are not objects")
         return drift, malformed
 
+    # A workload is measured or skipped, never both. Unioning the keys let a
+    # report claim both for the same workload and still look complete, which
+    # hides the producer bug that wrote it twice.
+    both = sorted(set(benchmarks) & set(skipped))
+    if both:
+        malformed.append(
+            "performance workloads both measured and skipped: " + ", ".join(both)
+        )
+
     # A port may legitimately skip a workload (the iOS simulator skips the
     # GC-footprint workloads); measured plus skipped has to cover the contract.
     accounted = sorted(set(benchmarks) | set(skipped))
@@ -707,7 +737,7 @@ def publishable_report_problems(
         if accounted != sorted(expected_benchmarks):
             malformed.append(
                 "performance workloads do not match the contract: "
-                + ", ".join(accounted)
+                + describe_workload_gap(accounted, expected_benchmarks)
             )
     else:
         # A crashed suite is allowed to leave workloads unrun, but not to lose
@@ -724,7 +754,8 @@ def publishable_report_problems(
             covered = sorted(set(accounted) | set(declared_missing))
             if covered != sorted(expected_benchmarks):
                 malformed.append(
-                    "performance workloads unaccounted for: " + ", ".join(covered)
+                    "performance workloads unaccounted for: "
+                    + describe_workload_gap(covered, expected_benchmarks)
                 )
     for name, measurement in benchmarks.items():
         duration = measurement.get("duration_ns") if isinstance(measurement, dict) else None

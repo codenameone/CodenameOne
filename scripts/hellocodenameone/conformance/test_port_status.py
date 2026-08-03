@@ -331,11 +331,46 @@ class PortStatusTest(unittest.TestCase):
     def test_publishable_separates_contract_drift_from_a_broken_report(self):
         report = self.publishable_report("android")
         del report["tests"]["CameraApiTest"]
+        # The summary counts the results the report carries, so dropping a test
+        # means dropping its count too. Leaving it stale would now -- correctly
+        # -- be a malformed report rather than pure drift.
+        report["summary"]["pass"] -= 1
         drift, malformed = port_status.publishable_report_problems(
             self.manifest, "android", report
         )
         self.assertEqual([], malformed)
         self.assertIn("CameraApiTest", drift[0])
+
+    def test_publishable_rejects_a_stale_summary_even_under_drift(self):
+        # Drift used to suppress the summary check entirely, so a genuinely
+        # broken report could be filed as drift and fall back quietly.
+        report = self.publishable_report("android")
+        del report["tests"]["CameraApiTest"]
+
+        _, malformed = port_status.publishable_report_problems(
+            self.manifest, "android", report
+        )
+        self.assertTrue(any("summary" in item for item in malformed), malformed)
+
+    def test_publishable_rejects_a_workload_both_measured_and_skipped(self):
+        report = self.publishable_report("linux-x64")
+        report["performance"]["skipped"]["quicksort"] = "some-reason"
+
+        _, malformed = port_status.publishable_report_problems(
+            self.manifest, "linux-x64", report
+        )
+        self.assertTrue(
+            any("both measured and skipped" in item for item in malformed), malformed
+        )
+
+    def test_workload_gap_message_names_the_offender(self):
+        # The message must point at the workload that is wrong, not list the
+        # nine that are fine.
+        message = port_status.describe_workload_gap(
+            ["a", "c"], ["a", "b"]
+        )
+        self.assertIn("missing b", message)
+        self.assertIn("unexpected c", message)
 
     def test_publishable_rejects_unaccounted_and_unmeasured_workloads(self):
         report = self.publishable_report("linux-x64")

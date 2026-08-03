@@ -32,13 +32,18 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.util.UITimer;
 
 /// Native Linux BrowserComponent peer backed by a WebKitGTK WebView (the native
-/// lifecycle lives in cn1_linux_browser.c). The component is rendered from a
-/// cached image: the native side captures the view to PNG bytes after each
-/// navigation, which `generatePeerImage()` turns into the peer image that
-/// `PeerComponent.paint()` draws, so it appears in the offscreen screenshot
-/// where the live WebKit widget would not. The peer polls the native event
+/// lifecycle lives in cn1_linux_browser.c). The peer polls the native event
 /// queue to fire `onLoad` and to route the JS return-value bridge into the
 /// BrowserComponent's navigation callbacks.
+///
+/// `generatePeerImage()` is wired to a native PNG capture so the view can be
+/// drawn into an offscreen screenshot, where the live WebKit widget would not
+/// appear. That capture is **not implemented yet**: WebKit snapshots are async
+/// (webkit_web_view_get_snapshot) and `browserCapturePng` currently returns
+/// null pending that bridge, so `generatePeerImage()` returns null and the peer
+/// falls back to the live widget. Do not read this as a description of working
+/// behaviour -- it is the shape the capture will take once the snapshot bridge
+/// lands.
 ///
 /// (This description previously named WebView2, Direct2D and a .cpp file, none
 /// of which exist here -- it had been copied from the Windows port.)
