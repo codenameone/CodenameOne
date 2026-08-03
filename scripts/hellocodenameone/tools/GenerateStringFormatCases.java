@@ -31,7 +31,7 @@ import java.util.Locale;
  * than something hand-written.
  *
  * <pre>
- *   java scripts/hellocodenameone/tools/generate-string-format-cases.java
+ *   java scripts/hellocodenameone/tools/GenerateStringFormatCases.java
  * </pre>
  *
  * Paste the emitted block over the corresponding block in StringFormatTest.java.
@@ -233,6 +233,9 @@ public class GenerateStringFormatCases {
         c("f.tiny", "%f", Double.valueOf(1e-10));
         c("f.float", "%f", Float.valueOf(1.5f));
         c("f.floatImprecise", "%f", Float.valueOf(1.1f));
+        // A float must format at its binary32 value, which only shows past six decimals.
+        c("f.floatTenDecimals", "%.10f", Float.valueOf(1.1f));
+        c("f.floatSeventh", "%.10f", Float.valueOf(1.0f / 7.0f));
         c("f.nan", "%f", Double.valueOf(Double.NaN));
         c("f.infinity", "%f", Double.valueOf(Double.POSITIVE_INFINITY));
         c("f.negativeInfinity", "%f", Double.valueOf(Double.NEGATIVE_INFINITY));
@@ -296,6 +299,9 @@ public class GenerateStringFormatCases {
         LINES.add("");
         LINES.add("            // ---- malformed formats must raise the same exception everywhere ----");
         bad("bad.unknownConversion", "%q", "x");
+        // The conversion is validated before an argument is looked for.
+        bad("bad.unknownConversionNoArgs", "%q");
+        bad("bad.groupingOnHexNoArgs", "%,x");
         bad("bad.trailingPercent", "abc%");
         bad("bad.missingArgument", "%s %s", "only");
         bad("bad.noArguments", "%s");

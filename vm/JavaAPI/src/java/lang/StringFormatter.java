@@ -198,6 +198,11 @@ final class StringFormatter {
             // format(fmt, (Object[]) null) is not an empty argument list: the JVM skips
             // the bounds checks and hands every specifier a null. "%<" is the exception
             // -- it reuses the previous argument, so there must have been one either way.
+            // The JVM validates the specifier before it looks for an argument: "%q" with
+            // no arguments is an unknown conversion, not a missing argument.
+            boolean upper = conversion >= 'A' && conversion <= 'Z';
+            char lower = validateSpecifier(conversion, upper, flags, width, precision);
+
             Object arg;
             if (previous) {
                 if (lastArg < 0 || (args != null && lastArg >= args.length)) {
@@ -218,13 +223,17 @@ final class StringFormatter {
                 arg = args == null ? null : args[nextArg];
                 nextArg++;
             }
-            out.append(convert(conversion, arg, flags, width, precision));
+            out.append(convert(conversion, lower, upper, arg, flags, width, precision));
         }
         return out.toString();
     }
 
-    private static String convert(char conversion, Object arg, int flags, int width, int precision) {
-        boolean upper = conversion >= 'A' && conversion <= 'Z';
+    /**
+     * Everything the JVM rejects before it selects an argument. Returns the lowercase
+     * conversion so the caller does not recompute it.
+     */
+    private static char validateSpecifier(char conversion, boolean upper, int flags,
+                                          int width, int precision) {
         if (upper && "SBHCXEG".indexOf(conversion) < 0) {
             // 'D' and 'O' have no uppercase form in java.util.Formatter.
             throw new UnknownFormatConversionException(String.valueOf(conversion));
@@ -236,8 +245,18 @@ final class StringFormatter {
             throw new UnknownFormatConversionException(String.valueOf(conversion));
         }
         checkFlags(conversion, lower, flags, width, precision);
+        return lower;
+    }
+
+    private static String convert(char conversion, char lower, boolean upper, Object arg,
+                                  int flags, int width, int precision) {
         switch (lower) {
             case 's':
+                // '#' on a string is a print-time check on the JVM, so a missing argument
+                // outranks it while a null argument does not.
+                if ((flags & FLAG_HASH) != 0) {
+                    throw new FormatFlagsConversionMismatchException("#", conversion);
+                }
                 return text(arg == null ? "null" : arg.toString(), upper, flags, width, precision);
             case 'b': {
                 String value;
@@ -316,14 +335,13 @@ final class StringFormatter {
     private static void checkFlags(char conversion, char lower, int flags, int width, int precision) {
         if (lower == 's' || lower == 'b' || lower == 'h') {
             // '#' on a boolean or hash code is reported ahead of the width check; on a
-            // string it is reported after the other flags.
+            // string it is deferred to print time (see convert).
             if ((flags & FLAG_HASH) != 0 && lower != 's') {
                 throw new FormatFlagsConversionMismatchException("#", conversion);
             }
             failMissingWidth(conversion, flags, width, FLAG_MINUS);
             failMismatch(conversion, flags,
                     FLAG_PLUS | FLAG_SPACE | FLAG_ZERO | FLAG_COMMA | FLAG_PAREN);
-            failMismatch(conversion, flags, FLAG_HASH);
             return;
         }
         if (lower == 'c') {
@@ -464,7 +482,10 @@ final class StringFormatter {
         if (arg instanceof Double) {
             value = ((Double) arg).doubleValue();
         } else if (arg instanceof Float) {
-            value = ((Float) arg).floatValue();
+            // The JavaScript backend treats D2F as a no-op, so a float there is still an
+            // unrounded double until it goes through the bit conversions. On every other
+            // target this round trip is the identity.
+            value = Float.intBitsToFloat(Float.floatToIntBits(((Float) arg).floatValue()));
         } else {
             throw new IllegalFormatConversionException(conversion, arg.getClass());
         }

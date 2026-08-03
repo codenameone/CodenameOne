@@ -36,7 +36,7 @@ package com.codenameone.examples.hellocodenameone.tests;
  *
  * <p>Every expected value below was produced by a real Java SE
  * {@code java.util.Formatter} rather than written by hand, and the generator is checked
- * in at {@code scripts/hellocodenameone/tools/generate-string-format-cases.java}. The
+ * in at {@code scripts/hellocodenameone/tools/GenerateStringFormatCases.java}. The
  * table is byte-identical when generated on JDK 8, 11, 17, 21 and 25, so it pins
  * behaviour that does not drift with the JDK the suite happens to build against.</p>
  *
@@ -139,6 +139,8 @@ public class StringFormatTest extends BaseTest {
             check("f.tiny", "0.000000", String.format("%f", Double.valueOf(1.0E-10)));
             check("f.float", "1.500000", String.format("%f", Float.valueOf(1.5f)));
             check("f.floatImprecise", "1.100000", String.format("%f", Float.valueOf(1.1f)));
+            check("f.floatTenDecimals", "1.1000000238", String.format("%.10f", Float.valueOf(1.1f)));
+            check("f.floatSeventh", "0.1428571492", String.format("%.10f", Float.valueOf(0.14285715f)));
             check("f.nan", "NaN", String.format("%f", Double.valueOf(Double.NaN)));
             check("f.infinity", "Infinity", String.format("%f", Double.valueOf(Double.POSITIVE_INFINITY)));
             check("f.negativeInfinity", "-Infinity", String.format("%f", Double.valueOf(Double.NEGATIVE_INFINITY)));
@@ -189,6 +191,8 @@ public class StringFormatTest extends BaseTest {
 
             // ---- malformed formats must raise the same exception everywhere ----
             checkThrows("bad.unknownConversion", "java.util.UnknownFormatConversionException", () -> String.format("%q", "x"));
+            checkThrows("bad.unknownConversionNoArgs", "java.util.UnknownFormatConversionException", () -> String.format("%q"));
+            checkThrows("bad.groupingOnHexNoArgs", "java.util.FormatFlagsConversionMismatchException", () -> String.format("%,x"));
             checkThrows("bad.trailingPercent", "java.util.UnknownFormatConversionException", () -> String.format("abc%"));
             checkThrows("bad.missingArgument", "java.util.MissingFormatArgumentException", () -> String.format("%s %s", "only"));
             checkThrows("bad.noArguments", "java.util.MissingFormatArgumentException", () -> String.format("%s"));

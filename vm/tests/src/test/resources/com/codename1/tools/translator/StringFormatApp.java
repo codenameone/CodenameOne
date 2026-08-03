@@ -157,6 +157,10 @@ public class StringFormatApp {
         f("f.tiny", "%f", Double.valueOf(1e-10));
         f("f.float", "%f", Float.valueOf(1.5f));
         f("f.floatImprecise", "%f", Float.valueOf(1.1f));
+        // A Float must format at its binary32 value; the divergence only shows past six
+        // decimals, which is why the six-decimal default hid it.
+        f("f.floatTenDecimals", "%.10f", Float.valueOf(1.1f));
+        f("f.floatSeventh", "%.10f", Float.valueOf(1.0f / 7.0f));
         f("f.nan", "%f", Double.valueOf(Double.NaN));
         f("f.infinity", "%f", Double.valueOf(Double.POSITIVE_INFINITY));
         f("f.negativeInfinity", "%f", Double.valueOf(Double.NEGATIVE_INFINITY));
@@ -212,6 +216,12 @@ public class StringFormatApp {
 
     private static void failures() {
         f("bad.unknownConversion", "%q", "x");
+        // The conversion is validated before an argument is looked for, so a bad
+        // conversion with no arguments is an unknown conversion, not a missing argument.
+        f("bad.unknownConversionNoArgs", "%q");
+        f("bad.groupingOnHexNoArgs", "%,x");
+        f("bad.zeroPadOnStringNoArgs", "%08s");
+        f("bad.precisionOnDNoArgs", "%.2d");
         f("bad.trailingPercent", "abc%");
         f("bad.missingArgument", "%s %s", "only");
         f("bad.noArguments", "%s");
