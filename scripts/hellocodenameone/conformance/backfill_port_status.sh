@@ -203,6 +203,11 @@ while IFS= read -r workflow; do
         fi
         cp "${downloaded}" "${download_dir}/port-status-${found}.json"
         : > "${download_dir}/covered-${found}"
+        # Remember which run this port's report actually came from. Reports are
+        # merged across candidates on purpose, so a single run_id would credit
+        # every port to whichever candidate happened to be examined last --
+        # misleading exactly when someone is chasing down a bad report.
+        printf '%s' "${candidate}" > "${download_dir}/source-run-${found}"
       done < <(find "${download_dir}/run-${candidate}" -type f -name 'port-status-*.json' | sort)
     fi
   done
@@ -217,6 +222,10 @@ while IFS= read -r workflow; do
       echo "Ignoring ${report}: it names no port." >&2
       continue
     fi
+    source_run="${run_id}"
+    if [ -f "${download_dir}/source-run-${port}" ]; then
+      source_run="$(cat "${download_dir}/source-run-${port}")"
+    fi
     # Publish only what the website will actually serve. A report built against
     # an older contract passes the freshness check below but is rejected by the
     # sync, which would leave the public column on its stale fallback while
@@ -224,7 +233,7 @@ while IFS= read -r workflow; do
     accept_status=0
     python3 "${SCRIPT_DIR}/port_status.py" accept --port "${port}" --report "${report}" || accept_status=$?
     if [ "${accept_status}" -ne 0 ]; then
-      echo "Not publishing the ${port} report from run ${run_id}: $(describe_accept_status "${accept_status}")." >&2
+      echo "Not publishing the ${port} report from run ${source_run}: $(describe_accept_status "${accept_status}")." >&2
       continue
     fi
     generated="$(jq -r '.generated_at // empty' "${report}")"
@@ -241,7 +250,7 @@ while IFS= read -r workflow; do
       skipped=$((skipped + 1))
       continue
     fi
-    echo "Publishing ${port} from run ${run_id} of ${workflow} (${generated})."
+    echo "Publishing ${port} from run ${source_run} of ${workflow} (${generated})."
     PORT_STATUS_PUBLISH=1 "${SCRIPT_DIR}/publish_port_status.sh" "${report}"
     published=$((published + 1))
   done < <(find "${download_dir}" -maxdepth 1 -type f -name 'port-status-*.json' | sort)
