@@ -661,6 +661,11 @@ class CleanTargetLinuxIntegrationTest {
             }
             java.io.File out = new java.io.File(
                     new java.io.File(teePath).getParentFile(), "hang-stacks.txt");
+            try (java.io.PrintWriter header = new java.io.PrintWriter(
+                    new java.io.FileWriter(out, true), true)) {
+                header.println("===== sample at " + new java.util.Date()
+                        + " (pid " + pid.trim() + ") =====");
+            }
             // Plain gdb first; if yama still refuses the attach, retry through sudo,
             // which the runner allows passwordless. Either way a refusal must not
             // become a second failure.
