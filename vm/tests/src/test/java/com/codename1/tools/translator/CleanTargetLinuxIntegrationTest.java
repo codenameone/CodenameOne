@@ -500,15 +500,12 @@ class CleanTargetLinuxIntegrationTest {
                         + "; stopped in " + (stoppedIn == null ? "<no test announced>" : stoppedIn)
                         + " -- that test and every one after it is reported as never run.");
             }
-            assertTrue(wedged.get() == null,
-                    "the suite stopped because a test blocked the event dispatch thread: "
-                    + wedged.get());
-            assertTrue(finished.get() || (!requireSuite && pngs >= minPngs),
-                    "hello suite capture incomplete: pngs=" + pngs + " (need " + minPngs + ")"
-                    + " suiteFinished=" + finished.get()
-                    + " stoppedIn=" + (lastStarted.get() == null ? "<none>" : lastStarted.get())
-                    + "\n" + serverLog);
-
+            // Copy the capture out BEFORE asserting on it, for the same reason as
+            // the Windows harness: these assertions fire precisely when the suite
+            // came up short, and throwing first left whatever screenshots it did
+            // manage stranded in the temporary directory. The partial capture is
+            // what normalization reads to report which tests ran and which never
+            // did, so losing it is how a failed run ends up with no report at all.
             String outEnv = System.getenv("CN1_SHOT_OUTPUT_DIR");
             if (outEnv != null) {
                 Path dest = Paths.get(outEnv);
@@ -521,6 +518,16 @@ class CleanTargetLinuxIntegrationTest {
                     }
                 }
             }
+
+            assertTrue(wedged.get() == null,
+                    "the suite stopped because a test blocked the event dispatch thread: "
+                    + wedged.get());
+            assertTrue(finished.get() || (!requireSuite && pngs >= minPngs),
+                    "hello suite capture incomplete: pngs=" + pngs + " (need " + minPngs + ")"
+                    + " suiteFinished=" + finished.get()
+                    + " stoppedIn=" + (lastStarted.get() == null ? "<none>" : lastStarted.get())
+                    + "\n" + serverLog);
+
             System.out.println("CN1_HELLO_SUITE_PNGS=" + pngs);
         } finally {
             if (app != null) { app.destroyForcibly(); }
