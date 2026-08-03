@@ -145,6 +145,55 @@ class ShieldSignalOrderTest extends UITestBase {
         }
     }
 
+    /**
+     * And an identical repeat arriving mid-flight does not swallow the first notification.
+     *
+     * <p>The two rules meet here. An identical repeat replaces the stored entry -- so the
+     * timestamp is the latest sighting -- and deliberately queues nothing, because a
+     * detector polling on a timer would otherwise put a runnable on the EDT per poll. The
+     * pending notification for the first report then failed a currency test asking about
+     * object identity, and dropped itself: nobody was told, while the signal sat in
+     * {@code snapshot()}. A detector on a timer is the normal case, and the sighting that
+     * went unannounced is the FIRST one, which is the whole reason a listener is
+     * attached.</p>
+     */
+    @Test
+    void anIdenticalRepeatDoesNotSwallowTheNotificationAlreadyInFlight() throws Exception {
+        java.lang.reflect.Field listenersField =
+                ShieldSignals.class.getDeclaredField("listeners");
+        listenersField.setAccessible(true);
+        Object listenerLock = listenersField.get(null);
+
+        final CountDownLatch firstIn = new CountDownLatch(1);
+        Thread first;
+        synchronized (listenerLock) {
+            first = new Thread(new Runnable() {
+                public void run() {
+                    firstIn.countDown();
+                    ShieldSignals.add(ShieldSignal.ROOT, 70, "su");
+                }
+            }, "shield-signal-first-sighting");
+            first.setDaemon(true);
+            first.start();
+            assertTrue(firstIn.await(GENEROUS_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+            // Parked at the notification, with the signal already stored.
+            Thread.sleep(200L);
+
+            // The next poll of the same detector, on this thread: identical, so it replaces
+            // the entry and returns without ever reaching the listener lock.
+            ShieldSignals.add(ShieldSignal.ROOT, 70, "su");
+        }
+        first.join(GENEROUS_TIMEOUT_MS);
+        drainTheEventQueue();
+
+        synchronized (seen) {
+            assertEquals(1, countFor(ShieldSignal.ROOT),
+                    "the device is rooted and the bus knows it -- a listener that is "
+                    + "never told is the bug: " + seen);
+            assertEquals(70, lastFor(ShieldSignal.ROOT));
+        }
+    }
+
     private int countFor(String id) {
         int n = 0;
         for (ShieldSignal s : seen) {

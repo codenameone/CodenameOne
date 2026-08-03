@@ -178,21 +178,29 @@ public final class ShieldSignals {
         Display.getInstance().callSerially(new SignalDispatch(copy, signal));
     }
 
-    /// Whether this is still the observation the bus holds for its id.
+    /// Whether this still says what the bus holds for its id.
     ///
-    /// Identity, not equality: the entry is replaced by the object that superseded it, so
-    /// anything else under that id means a newer report has been stored and has queued its
-    /// own notification.
+    /// What matters at delivery is the OBSERVATION, not the object. Identity alone was the
+    /// obvious reading -- a newer report replaces the entry, so a different object means
+    /// this one was superseded -- and it dropped notifications that nothing else was going
+    /// to send. An identical repeat replaces the entry too, and deliberately queues
+    /// nothing; a detector polling on a timer therefore silenced the first sighting of a
+    /// signal whenever its second poll landed while the first notification was still in
+    /// flight. That first sighting is the notification listeners exist for, and the signal
+    /// sat in [#snapshot()] with nobody told.
+    ///
+    /// So the question is whether the entry still says the same thing. A superseded report
+    /// -- a different severity or detail -- is still dropped, which is what this exists
+    /// for; the cost is that two reports of the same observation can both be announced,
+    /// and being told twice about a signal that is genuinely there is not a defect.
     static boolean isCurrentObservation(ShieldSignal signal) {
         synchronized (signals) {
             for (int i = 0; i < signals.size(); i++) {
                 ShieldSignal existing = (ShieldSignal) signals.elementAt(i);
                 if (existing.getId().equals(signal.getId())) {
-                    // NOPMD identity is the question: a newer report REPLACES the entry,
-                    // so anything but the same object means this one has been superseded.
-                    // Equality would call two distinct reports of the same observation
-                    // current, which is the case this exists to tell apart.
-                    return existing == signal; // NOPMD
+                    return existing == signal // NOPMD identity: the ordinary case
+                            || (existing.getSeverity() == signal.getSeverity()
+                            && sameDetail(existing.getDetail(), signal.getDetail()));
                 }
             }
         }
