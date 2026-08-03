@@ -164,39 +164,65 @@ static int cn1LoadGeoclue(void) {
 
 /* ----------------------------------------------------------- clipboard */
 
-JAVA_VOID com_codename1_impl_linux_LinuxNative_clipboardSetText___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT text) {
-    const char* t = text == JAVA_NULL ? "" : stringToUTF8(threadStateData, text);
+/* Every GtkClipboard call below runs on the GTK main thread via
+ * cn1LinuxRunOnMainAndWait, never inline on the calling (EDT) thread.
+ *
+ * This is not defensive style, it is required: the retrieval calls
+ * (gtk_clipboard_wait_for_text / _image / _uris) and gtk_clipboard_store all
+ * pump a nested main loop until the selection owner answers. Pumping the
+ * default GMainContext from a second thread while the GTK thread owns it makes
+ * the caller block in g_main_context_wait() for an acquire that only completes
+ * when the GTK thread happens to release the context -- so the EDT wedges for
+ * good whenever the timing lines up. It usually does not, which is exactly why
+ * this presented as an intermittent suite hang (the EDT stack was parked in
+ * gtk_clipboard_wait_for_text under ClipboardRoundTripTest).
+ *
+ * The GTK work therefore happens in the *OnMain helpers over plain C structs;
+ * every JAVA_OBJECT conversion stays on the calling thread, matching the file
+ * dialog / notification pattern used elsewhere in this file. */
+
+typedef struct { const char* text; } CN1ClipSetText;
+
+static void cn1ClipSetTextOnMain(void* p) {
+    CN1ClipSetText* r = (CN1ClipSetText*) p;
     GtkClipboard* cb = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
-    gtk_clipboard_set_text(cb, t, -1);
+    gtk_clipboard_set_text(cb, r->text, -1);
     gtk_clipboard_store(cb);
 }
 
+JAVA_VOID com_codename1_impl_linux_LinuxNative_clipboardSetText___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT text) {
+    CN1ClipSetText r;
+    r.text = text == JAVA_NULL ? "" : stringToUTF8(threadStateData, text);
+    cn1LinuxRunOnMainAndWait(cn1ClipSetTextOnMain, &r);
+}
+
+typedef struct { gchar* text; } CN1ClipGetText;
+
+static void cn1ClipGetTextOnMain(void* p) {
+    CN1ClipGetText* r = (CN1ClipGetText*) p;
+    r->text = gtk_clipboard_wait_for_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
+}
+
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_clipboardGetText___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
-    GtkClipboard* cb = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
-    gchar* text = gtk_clipboard_wait_for_text(cb);
-    JAVA_OBJECT result = text ? newStringFromCString(threadStateData, text) : JAVA_NULL;
-    if (text) {
-        g_free(text);
+    CN1ClipGetText r;
+    JAVA_OBJECT result;
+    r.text = NULL;
+    cn1LinuxRunOnMainAndWait(cn1ClipGetTextOnMain, &r);
+    result = r.text ? newStringFromCString(threadStateData, r.text) : JAVA_NULL;
+    if (r.text) {
+        g_free(r.text);
     }
     return result;
 }
 
-JAVA_VOID com_codename1_impl_linux_LinuxNative_clipboardSetImage___byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT png) {
-    unsigned char* bytes;
-    int len;
-    GdkPixbufLoader* loader;
+typedef struct { const unsigned char* bytes; int len; } CN1ClipSetImage;
+
+static void cn1ClipSetImageOnMain(void* p) {
+    CN1ClipSetImage* r = (CN1ClipSetImage*) p;
+    GdkPixbufLoader* loader = gdk_pixbuf_loader_new();
     GdkPixbuf* pix;
     GtkClipboard* cb;
-    if (png == JAVA_NULL) {
-        return;
-    }
-    bytes = (unsigned char*) (*(JAVA_ARRAY) png).data;
-    len = (int) (*(JAVA_ARRAY) png).length;
-    if (len <= 0) {
-        return;
-    }
-    loader = gdk_pixbuf_loader_new();
-    if (!gdk_pixbuf_loader_write(loader, bytes, (gsize) len, NULL)) {
+    if (!gdk_pixbuf_loader_write(loader, r->bytes, (gsize) r->len, NULL)) {
         gdk_pixbuf_loader_close(loader, NULL);
         g_object_unref(loader);
         return;
@@ -212,25 +238,48 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_clipboardSetImage___byte_1ARRAY(C
     g_object_unref(loader);
 }
 
-JAVA_OBJECT com_codename1_impl_linux_LinuxNative_clipboardGetImage___R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE) {
-    GtkClipboard* cb = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
-    GdkPixbuf* pix = gtk_clipboard_wait_for_image(cb);
-    gchar* buf = NULL;
-    gsize len = 0;
-    JAVA_OBJECT result;
+JAVA_VOID com_codename1_impl_linux_LinuxNative_clipboardSetImage___byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT png) {
+    CN1ClipSetImage r;
+    if (png == JAVA_NULL) {
+        return;
+    }
+    /* The array stays reachable from this (blocked) frame for the whole call. */
+    r.bytes = (const unsigned char*) (*(JAVA_ARRAY) png).data;
+    r.len = (int) (*(JAVA_ARRAY) png).length;
+    if (r.len <= 0) {
+        return;
+    }
+    cn1LinuxRunOnMainAndWait(cn1ClipSetImageOnMain, &r);
+}
+
+typedef struct { gchar* buf; gsize len; } CN1ClipGetImage;
+
+static void cn1ClipGetImageOnMain(void* p) {
+    CN1ClipGetImage* r = (CN1ClipGetImage*) p;
+    GdkPixbuf* pix = gtk_clipboard_wait_for_image(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
     if (!pix) {
-        return JAVA_NULL;
+        return;
     }
-    if (!gdk_pixbuf_save_to_buffer(pix, &buf, &len, "png", NULL, NULL) || buf == NULL) {
-        if (buf) {
-            g_free(buf);
+    if (!gdk_pixbuf_save_to_buffer(pix, &r->buf, &r->len, "png", NULL, NULL) || r->buf == NULL) {
+        if (r->buf) {
+            g_free(r->buf);
+            r->buf = NULL;
         }
-        g_object_unref(pix);
+    }
+    g_object_unref(pix);
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_clipboardGetImage___R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE) {
+    CN1ClipGetImage r;
+    JAVA_OBJECT result;
+    r.buf = NULL;
+    r.len = 0;
+    cn1LinuxRunOnMainAndWait(cn1ClipGetImageOnMain, &r);
+    if (!r.buf) {
         return JAVA_NULL;
     }
-    result = cn1LinuxNewByteArray(threadStateData, buf, (int) len);
-    g_free(buf);
-    g_object_unref(pix);
+    result = cn1LinuxNewByteArray(threadStateData, r.buf, (int) r.len);
+    g_free(r.buf);
     return result;
 }
 
@@ -258,14 +307,32 @@ static void cn1UriListClear(GtkClipboard* cb, gpointer userData) {
     }
 }
 
+/* Takes ownership of the CN1UriListData: either the clipboard holds it (and the
+ * clear-func frees it later) or it is released here. */
+static void cn1ClipSetFilesOnMain(void* p) {
+    CN1UriListData* data = (CN1UriListData*) p;
+    GtkClipboard* cb = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
+    GtkTargetList* tl = gtk_target_list_new(NULL, 0);
+    GtkTargetEntry* targets;
+    gint nTargets = 0;
+    gtk_target_list_add_uri_targets(tl, 0);
+    targets = gtk_target_table_new_from_list(tl, &nTargets);
+    if (!gtk_clipboard_set_with_data(cb, targets, nTargets, cn1UriListGet, cn1UriListClear, data)) {
+        cn1UriListClear(cb, data);
+    } else {
+        gtk_clipboard_set_can_store(cb, targets, nTargets);
+        gtk_clipboard_store(cb);
+    }
+    if (targets) {
+        gtk_target_table_free(targets, nTargets);
+    }
+    gtk_target_list_unref(tl);
+}
+
 JAVA_VOID com_codename1_impl_linux_LinuxNative_clipboardSetFiles___java_lang_String_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT paths) {
     int n, i;
     JAVA_OBJECT* elements;
     CN1UriListData* data;
-    GtkClipboard* cb;
-    GtkTargetList* tl;
-    GtkTargetEntry* targets;
-    gint nTargets = 0;
     if (paths == JAVA_NULL) {
         return;
     }
@@ -287,29 +354,26 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_clipboardSetFiles___java_lang_Str
     }
     data->uris[n] = NULL;
 
-    cb = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
-    tl = gtk_target_list_new(NULL, 0);
-    gtk_target_list_add_uri_targets(tl, 0);
-    targets = gtk_target_table_new_from_list(tl, &nTargets);
-    if (!gtk_clipboard_set_with_data(cb, targets, nTargets, cn1UriListGet, cn1UriListClear, data)) {
-        cn1UriListClear(cb, data);
-    } else {
-        gtk_clipboard_set_can_store(cb, targets, nTargets);
-        gtk_clipboard_store(cb);
-    }
-    if (targets) {
-        gtk_target_table_free(targets, nTargets);
-    }
-    gtk_target_list_unref(tl);
+    cn1LinuxRunOnMainAndWait(cn1ClipSetFilesOnMain, data);
+}
+
+typedef struct { gchar** uris; } CN1ClipGetFiles;
+
+static void cn1ClipGetFilesOnMain(void* p) {
+    CN1ClipGetFiles* r = (CN1ClipGetFiles*) p;
+    r->uris = gtk_clipboard_wait_for_uris(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
 }
 
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_clipboardGetFiles___R_java_lang_String_1ARRAY(CODENAME_ONE_THREAD_STATE) {
-    GtkClipboard* cb = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
-    gchar** uris = gtk_clipboard_wait_for_uris(cb);
+    CN1ClipGetFiles r;
+    gchar** uris;
     int n = 0;
     int i;
     JAVA_OBJECT arr;
     JAVA_OBJECT* elements;
+    r.uris = NULL;
+    cn1LinuxRunOnMainAndWait(cn1ClipGetFilesOnMain, &r);
+    uris = r.uris;
     if (!uris) {
         return JAVA_NULL;
     }
