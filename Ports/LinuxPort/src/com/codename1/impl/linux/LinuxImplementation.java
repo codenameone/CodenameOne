@@ -2813,7 +2813,22 @@ public class LinuxImplementation extends CodenameOneImplementation {
     public boolean cryptoVerify(String algorithm, String keyAlgorithm, byte[] publicKeyX509,
             byte[] data, byte[] signature) {
         checkKeyFamily(algorithm, keyAlgorithm);
-        return LinuxNative.verifyData(algorithm, publicKeyX509, data, signature);
+        // An invalid signature and an unusable algorithm or key both come back
+        // as false from the native. Only the second is a configuration error,
+        // and JavaSE and Android raise it -- Signature.verify turns the throw
+        // into a CryptoException -- so answering plain false here would let a
+        // mistyped algorithm or malformed key read as "someone tampered with
+        // this". Clearing the slot first is what makes the two distinguishable.
+        LinuxNative.clearCryptoError();
+        boolean verified = LinuxNative.verifyData(algorithm, publicKeyX509, data, signature);
+        if (!verified) {
+            String failure = LinuxNative.lastCryptoError();
+            if (failure != null && failure.length() > 0
+                    && !"unknown crypto error".equals(failure)) {
+                throw new RuntimeException("verify failed: " + failure);
+            }
+        }
+        return verified;
     }
 
     /// The portable contract pairs an algorithm with a key of its own family,

@@ -430,6 +430,10 @@ public final class WindowsNative {
     /** Why the most recent crypto call failed, for the CryptoException message. */
     public static native String lastCryptoError();
 
+    /// Empties the last-error slot so a following call's failure can be told
+    /// apart from a stale message.
+    public static native void clearCryptoError();
+
     public static native int fileRead(long handle, byte[] buffer, int offset, int length);
 
     public static native int fileWrite(long handle, byte[] buffer, int offset, int length);

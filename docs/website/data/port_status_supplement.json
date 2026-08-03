@@ -42,6 +42,16 @@
           ]
         },
         {
+          "prefix": "no-video-encoder-on-",
+          "ports": [
+            "ios-gl",
+            "ios-metal",
+            "mac-native",
+            "tvos",
+            "watchos"
+          ]
+        },
+        {
           "prefix": "encode-write-failed-on-",
           "ports": [
             "ios-gl",

@@ -68,6 +68,16 @@ static void cn1CryptoFail(const char* what) {
     ERR_clear_error();
 }
 
+/* Clears the per-thread message so a caller can tell whether the operation it
+ * just ran recorded one. verifyData answers false for an invalid signature --
+ * an ordinary result -- and also for an unusable algorithm or key, which is a
+ * configuration error the caller deserves to see. The only difference between
+ * them is whether an error was recorded, and that is only readable if the slot
+ * was empty beforehand. */
+JAVA_VOID com_codename1_impl_linux_LinuxNative_clearCryptoError__(CODENAME_ONE_THREAD_STATE) {
+    cn1CryptoError[0] = 0;
+}
+
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_lastCryptoError___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
     return newStringFromCString(threadStateData,
                                 cn1CryptoError[0] ? cn1CryptoError : "unknown crypto error");
@@ -269,11 +279,23 @@ failed:
 
 /* ------------------------------------------------------------ keys */
 
+/* d2i_* stops at the end of the first object it recognises and reports how far
+ * it got, so a buffer holding a valid key followed by extra bytes -- a
+ * mis-sliced concatenation, say -- parses happily and the trailing data is
+ * never seen. JavaSE and Android refuse that through KeyFactory, so accepting
+ * it here would mean the same bytes validate on one port and not another. The
+ * whole input has to be the key. */
 static EVP_PKEY* cn1PublicKey(const unsigned char* der, int length) {
     const unsigned char* cursor = der;
     EVP_PKEY* key = d2i_PUBKEY(0, &cursor, (long) length);
     if (key == 0) {
         cn1CryptoFail("public key is not X.509 SubjectPublicKeyInfo DER");
+        return 0;
+    }
+    if (cursor != der + length) {
+        cn1CryptoFail("public key has trailing data after the SubjectPublicKeyInfo");
+        EVP_PKEY_free(key);
+        return 0;
     }
     return key;
 }
@@ -293,6 +315,13 @@ static EVP_PKEY* cn1PrivateKey(const unsigned char* der, int length) {
     }
     if (key == 0) {
         cn1CryptoFail("private key is not PKCS#8 DER");
+        return 0;
+    }
+    /* Same rule as the public side: the whole buffer has to be the key. */
+    if (cursor != der + length) {
+        cn1CryptoFail("private key has trailing data after the PKCS#8 structure");
+        EVP_PKEY_free(key);
+        return 0;
     }
     return key;
 }

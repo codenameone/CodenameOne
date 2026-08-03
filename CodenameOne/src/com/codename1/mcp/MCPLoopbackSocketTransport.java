@@ -158,9 +158,10 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         }
         if (closedWhileBinding) {
             // No null check on `bound`: the only way past the try above is with a
-            // listener in hand, and SpotBugs flags the redundant test.
-            clearActiveIfOurs();
+            // listener in hand, and SpotBugs flags the redundant test. Stop before
+            // releasing the slot, for the reason close() gives.
             bound.stop();
+            clearActiveIfOurs();
             throw new IOException("This MCP socket transport was closed before it began listening");
         }
     }
@@ -180,10 +181,21 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         InputStream previousIn; // NOPMD closed below, deliberately outside the lock
         OutputStream previousOut; // NOPMD closed below, outside the lock
         synchronized (lock) {
-            previousIn = in;
-            previousOut = out;
-            in = is;
-            out = os;
+            if (closed) {
+                // A listener retired by close() can still have a connection in
+                // flight. Adopting it would serve a client that dialled a port
+                // this transport no longer owns, so hand the streams back to be
+                // closed rather than wiring them to a dead session.
+                previousIn = is;
+                previousOut = os;
+                is = null;
+                os = null;
+            } else {
+                previousIn = in;
+                previousOut = out;
+                in = is;
+                out = os;
+            }
             lock.notifyAll();
         }
         // Dropping the previous client means closing its streams, not just forgetting
@@ -400,11 +412,17 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
             out = null;
             lock.notifyAll();
         }
-        // Only if it is still ours: a transport opened after this one keeps its slot.
-        clearActiveIfOurs();
+        // Stop the listener BEFORE releasing the registration, not after. A
+        // connection this listener already accepted resolves `active` inside its
+        // callback, so releasing first leaves a window where a replacement
+        // transport has taken the slot and the retired listener hands it a client
+        // that dialled the old port. Stopping first means any in-flight callback
+        // still finds this transport, and attach() below refuses it because we
+        // are closed.
         if (l != null) {
             l.stop();
         }
+        clearActiveIfOurs();
         // Closing the output as well as the input: forgetting the field is not enough,
         // because a writer that already captured it would go on writing to a session that
         // has ended, and the socket would stay open until the connection callback unwound.

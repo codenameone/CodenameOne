@@ -74,6 +74,13 @@ static void cn1CryptoFailLast(const char* what) {
     cn1CryptoFail(what, (NTSTATUS) GetLastError());
 }
 
+/* Clears the per-thread message; see the Linux port's note. verifyData reports
+ * an invalid signature and an unusable algorithm or key the same way, and only
+ * a cleared slot makes the difference readable. */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_clearCryptoError__(CODENAME_ONE_THREAD_STATE) {
+    cn1WinCryptoError[0] = 0;
+}
+
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_lastCryptoError___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
     return newStringFromCString(threadStateData,
                                 cn1WinCryptoError[0] ? cn1WinCryptoError : "unknown crypto error");
@@ -543,22 +550,34 @@ static int cn1OaepEncode(LPCWSTR labelDigest, LPCWSTR maskDigest, const unsigned
     int hashLength = cn1DigestLength(labelDigest);
     int dbLength = blockLength - hashLength - 1;
     unsigned char seed[64];
-    unsigned char mask[1024];
+    unsigned char* mask;
     int i;
     /* An OAEP block cannot be shorter than 2*hLen+2. A 512-bit key leaves a DB
      * shorter than the label hash itself, and the hash would then be written
      * and compared past the end of the block. */
-    if (blockLength < 2 * hashLength + 2 || dbLength > (int) sizeof(mask)) {
+    if (blockLength < 2 * hashLength + 2) {
         cn1CryptoFail("RSA-OAEP block does not fit the key", 0);
+        return 0;
+    }
+    /* Sized from the modulus, not a fixed array. A 1KB mask capped OAEP at
+     * about 8456-bit keys, and KeyGenerator.rsa() accepts every byte-aligned
+     * size from 1024 bits up while callers can import larger ones still -- so
+     * a key that works on every other port was refused here as though the
+     * block did not fit it. */
+    mask = (unsigned char*) malloc((size_t) dbLength);
+    if (mask == 0) {
+        cn1CryptoFail("out of memory", 0);
         return 0;
     }
     if (messageLength > dbLength - hashLength - 1) {
         cn1CryptoFail("RSA-OAEP message is too long for the key", 0);
+        free(mask);
         return 0;
     }
     memset(block, 0, (size_t) blockLength);
     /* DB = lHash || PS || 0x01 || M, with an empty label. */
     if (!cn1Digest(labelDigest, (const unsigned char*) "", 0, block + 1 + hashLength, hashLength)) {
+        free(mask);
         return 0;
     }
     block[blockLength - messageLength - 1] = 0x01;
@@ -568,20 +587,24 @@ static int cn1OaepEncode(LPCWSTR labelDigest, LPCWSTR maskDigest, const unsigned
     if (BCryptGenRandom(NULL, seed, (ULONG) hashLength, BCRYPT_USE_SYSTEM_PREFERRED_RNG)
             != STATUS_SUCCESS) {
         cn1CryptoFail("RSA-OAEP seed", 0);
+        free(mask);
         return 0;
     }
     if (!cn1Mgf1(maskDigest, seed, hashLength, mask, dbLength)) {
+        free(mask);
         return 0;
     }
     for (i = 0; i < dbLength; i++) {
         block[1 + hashLength + i] ^= mask[i];
     }
     if (!cn1Mgf1(maskDigest, block + 1 + hashLength, dbLength, mask, hashLength)) {
+        free(mask);
         return 0;
     }
     for (i = 0; i < hashLength; i++) {
         block[1 + i] = (unsigned char) (seed[i] ^ mask[i]);
     }
+    free(mask);
     return 1;
 }
 
@@ -609,7 +632,7 @@ static int cn1OaepDecode(LPCWSTR labelDigest, LPCWSTR maskDigest, unsigned char*
                          int blockLength, unsigned char* message, int* messageLength) {
     int hashLength = cn1DigestLength(labelDigest);
     int dbLength = blockLength - hashLength - 1;
-    unsigned char mask[1024];
+    unsigned char* mask;
     unsigned char labelHash[64];
     unsigned char seed[64];
     int i;
@@ -619,25 +642,38 @@ static int cn1OaepDecode(LPCWSTR labelDigest, LPCWSTR maskDigest, unsigned char*
     /* An OAEP block cannot be shorter than 2*hLen+2. A 512-bit key leaves a DB
      * shorter than the label hash itself, and the hash would then be written
      * and compared past the end of the block. */
-    if (blockLength < 2 * hashLength + 2 || dbLength > (int) sizeof(mask)) {
+    if (blockLength < 2 * hashLength + 2) {
         cn1CryptoFail("RSA-OAEP block does not fit the key", 0);
+        return 0;
+    }
+    /* Sized from the modulus, not a fixed array. A 1KB mask capped OAEP at
+     * about 8456-bit keys, and KeyGenerator.rsa() accepts every byte-aligned
+     * size from 1024 bits up while callers can import larger ones still -- so
+     * a key that works on every other port was refused here as though the
+     * block did not fit it. */
+    mask = (unsigned char*) malloc((size_t) dbLength);
+    if (mask == 0) {
+        cn1CryptoFail("out of memory", 0);
         return 0;
     }
     /* The leading byte must be zero; fold it in rather than returning here. */
     bad |= (unsigned int) block[0];
     if (!cn1Mgf1(maskDigest, block + 1 + hashLength, dbLength, mask, hashLength)) {
+        free(mask);
         return 0;
     }
     for (i = 0; i < hashLength; i++) {
         seed[i] = (unsigned char) (block[1 + i] ^ mask[i]);
     }
     if (!cn1Mgf1(maskDigest, seed, hashLength, mask, dbLength)) {
+        free(mask);
         return 0;
     }
     for (i = 0; i < dbLength; i++) {
         block[1 + hashLength + i] ^= mask[i];
     }
     if (!cn1Digest(labelDigest, (const unsigned char*) "", 0, labelHash, hashLength)) {
+        free(mask);
         return 0;
     }
     for (i = 0; i < hashLength; i++) {
@@ -658,12 +694,14 @@ static int cn1OaepDecode(LPCWSTR labelDigest, LPCWSTR maskDigest, unsigned char*
     bad |= ~seenDelimiter; /* no delimiter anywhere in the block */
     if (bad != 0) {
         cn1CryptoFail("RSA-OAEP decryption failed", 0);
+        free(mask);
         return 0;
     }
     *messageLength = blockLength - (int) messageStart;
     if (*messageLength > 0) {
         memcpy(message, block + messageStart, (size_t) *messageLength);
     }
+    free(mask);
     return 1;
 }
 
