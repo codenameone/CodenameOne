@@ -1438,21 +1438,24 @@ public class AndroidGradleBuilder extends Executor {
         // 23 floor and the standalone marker from a manifest that used to have them -- turning a
         // working Wear app into a phone APK with no error. android.wear alone implied standalone,
         // which is why it maps to the standalone branch.
-        boolean legacyWear = "true".equals(request.getArg("android.wear", "false"))
-                || "true".equals(request.getArg("android.wear.standalone", "false"));
-        // ...but android.wear.standalone=false is an explicit opt-OUT, and honouring android.wear
-        // while ignoring it would flip a project that deliberately configured a companion app into
-        // a standalone one. The two settings are separable: the watch feature and the API floor say
-        // "this is a Wear build", the standalone marker says "it runs without a phone".
-        boolean legacyStandaloneOptOut =
-                "false".equals(request.getArg("android.wear.standalone", "").trim());
+        //
+        // Keyed on android.wear ALONE. android.wear.standalone is a sub-hint that only ever
+        // applied inside android.wear=true, so treating it as an independent trigger inverts the
+        // relationship: android.wear implied standalone, standalone never implied wear. A legacy
+        // phone project carrying a stray android.wear.standalone=true would otherwise be given the
+        // API 23 floor and a REQUIRED android.hardware.type.watch feature, and Play would filter
+        // that APK off every phone -- a working phone app made undeliverable, with no error.
+        boolean legacyWear = legacyWearMode(request.getArg("android.wear", "false"));
+        boolean legacyStandaloneStillOn = legacyWearStandalone(
+                request.getArg("android.wear", "false"),
+                request.getArg("android.wear.standalone", ""));
         if (legacyWear) {
             log("[wearable] android.wear is superseded by codename1.watchMain plus "
                     + "codename1.watchStandalone; still honoured, but the new settings also build "
                     + "the Apple Watch app from the same declaration.");
         }
         boolean standaloneWatchBuild =
-                (watchMain.length() > 0 && watchStandalone) || (legacyWear && !legacyStandaloneOptOut);
+                (watchMain.length() > 0 && watchStandalone) || legacyStandaloneStillOn;
         if ((watchMain.length() > 0 && watchStandalone) || legacyWear) {
             // Wear OS 2.0 (the standalone-app baseline) is API 23.
             minSDK = maxInt("23", minSDK);
@@ -7404,6 +7407,36 @@ public class AndroidGradleBuilder extends Executor {
                 playServiceVersions.put(playServiceKey, playServiceValue);
             }
         }
+    }
+
+    /**
+     * Whether the legacy {@code android.wear} hints put this build in Wear mode.
+     *
+     * <p>Package-private for direct unit testing; not part of the builder API. Extracted because
+     * the relationship between the two hints is directional and easy to invert:
+     * {@code android.wear} implied standalone, but {@code android.wear.standalone} is a SUB-hint
+     * that only ever applied inside {@code android.wear=true} and never implied Wear on its own.
+     * Getting that backwards gives a legacy phone project the API 23 floor and a required
+     * {@code android.hardware.type.watch} feature, and Play filters the APK off every phone.</p>
+     */
+    static boolean legacyWearMode(String androidWear) {
+        return "true".equals(androidWear);
+    }
+
+    /**
+     * Whether the legacy hints ask for a standalone (phone-less) Wear app.
+     *
+     * <p>Only meaningful in Wear mode. {@code android.wear=true} implied standalone, so the
+     * sub-hint reads as an explicit opt-OUT: an empty or absent value keeps the historical
+     * standalone behaviour, and only {@code false} turns it off, which is what lets a project that
+     * deliberately configured a companion app stay a companion.</p>
+     */
+    static boolean legacyWearStandalone(String androidWear, String androidWearStandalone) {
+        if (!legacyWearMode(androidWear)) {
+            return false;
+        }
+        String optOut = androidWearStandalone == null ? "" : androidWearStandalone.trim();
+        return !"false".equals(optOut);
     }
 
     // Package-private for direct unit testing; this is not part of the builder API.

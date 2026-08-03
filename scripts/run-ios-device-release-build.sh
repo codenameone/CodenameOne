@@ -162,6 +162,15 @@ if ! "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
       esac
       RETRY_CMD+=("$arg")
     done
+    # Actually pass it. The loop above only STRIPS the destination pair; without this the retry
+    # ran with neither a destination nor an SDK, which is not what the message above claims and
+    # not a build of anything in particular.
+    #
+    # -sdk does override SDKROOT for every target, so in this fallback an embedded watch target is
+    # compiled against the iOS SDK and will fail the link. That is deliberate for a last-resort
+    # retry: failing loudly beats the silent mis-build, and the primary path above (destination,
+    # no -sdk) is the one that builds a companion project correctly.
+    RETRY_CMD+=(-sdk iphoneos)
     if "${RETRY_CMD[@]}" | tee "$BUILD_LOG"; then
       rd_log "Retry without destination succeeded"
     else
