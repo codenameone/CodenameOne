@@ -670,13 +670,24 @@ def publishable_report_problems(
     if not isinstance(performance, dict):
         malformed.append("report has no performance section")
         return drift, malformed
-    if performance.get("status") != "complete":
-        malformed.append(f"performance run is {performance.get('status')!r}")
-    if performance.get("missing"):
-        malformed.append(
-            "performance workloads never reported: "
-            + ", ".join(performance["missing"])
-        )
+    # CommonWorkloadBenchmarkTest runs late in Cn1ssDeviceRunner, so a suite that
+    # crashed or timed out never reaches it and its performance section is
+    # partial by construction. Rejecting the report for that would throw away the
+    # very evidence the page needs -- the fail / not-run counts -- and leave the
+    # table serving the last green run, which is the failure-masked-as-pass shape
+    # this gate exists to prevent. Completeness is therefore only required of a
+    # suite that actually finished; a partial section simply is not presentable
+    # as performance. Structural defects below stay loud either way, because
+    # those are producer bugs whatever the suite did.
+    suite_finished = bool(report.get("suite_finished"))
+    if suite_finished:
+        if performance.get("status") != "complete":
+            malformed.append(f"performance run is {performance.get('status')!r}")
+        if performance.get("missing"):
+            malformed.append(
+                "performance workloads never reported: "
+                + ", ".join(performance["missing"])
+            )
 
     benchmarks = performance.get("benchmarks")
     skipped = performance.get("skipped") or {}
@@ -687,7 +698,7 @@ def publishable_report_problems(
     # A port may legitimately skip a workload (the iOS simulator skips the
     # GC-footprint workloads); measured plus skipped has to cover the contract.
     accounted = sorted(set(benchmarks) | set(skipped))
-    if accounted != sorted(expected_benchmarks):
+    if suite_finished and accounted != sorted(expected_benchmarks):
         malformed.append(
             "performance workloads do not match the contract: "
             + ", ".join(accounted)

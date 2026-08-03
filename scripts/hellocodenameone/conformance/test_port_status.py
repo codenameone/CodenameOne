@@ -364,6 +364,62 @@ class PortStatusTest(unittest.TestCase):
                 )
                 self.assertTrue(any(expected in item for item in malformed), malformed)
 
+    def test_publishable_accepts_a_crashed_suite_with_partial_performance(self):
+        # A suite that dies before CommonWorkloadBenchmarkTest (which runs late)
+        # cannot produce a complete performance section. That report is exactly
+        # the one the page must publish -- refusing it leaves the table serving
+        # the previous green run, hiding the failure behind a stale pass.
+        report = self.publishable_report("linux-x64")
+        report["suite_finished"] = False
+        report["performance"].update({
+            "status": "partial",
+            "missing": sorted(self.manifest["performance_benchmarks"])[3:],
+            "benchmarks": {
+                benchmark: {"duration_ns": 12000000, "checksum": "42"}
+                for benchmark in sorted(self.manifest["performance_benchmarks"])[:3]
+            },
+        })
+        failed, not_run = "ClipboardRoundTripTest", "MutableImageReadbackTest"
+        report["tests"][failed]["status"] = "fail"
+        report["tests"][not_run]["status"] = "not-run"
+        report["summary"] = {
+            "pass": len(report["tests"]) - 2, "fail": 1, "skip": 0, "not-run": 1
+        }
+
+        self.assertEqual(([], []), port_status.publishable_report_problems(
+            self.manifest, "linux-x64", report
+        ))
+
+    def test_publishable_still_rejects_partial_performance_when_the_suite_finished(self):
+        # The concession above is scoped to a suite that did not finish. A run
+        # that claims completion may not quietly drop workloads.
+        report = self.publishable_report("linux-x64")
+        report["performance"]["status"] = "partial"
+        del report["performance"]["benchmarks"]["quicksort"]
+
+        _, malformed = port_status.publishable_report_problems(
+            self.manifest, "linux-x64", report
+        )
+        self.assertTrue(any("partial" in item for item in malformed), malformed)
+        self.assertTrue(
+            any("do not match the contract" in item for item in malformed), malformed
+        )
+
+    def test_publishable_still_rejects_structural_defects_from_a_crashed_suite(self):
+        # Producer bugs stay loud whatever the suite did: an unmeasured workload
+        # and a reasonless skip are defects, not consequences of crashing.
+        report = self.publishable_report("linux-x64")
+        report["suite_finished"] = False
+        report["performance"]["benchmarks"]["recursion"]["duration_ns"] = None
+        del report["performance"]["benchmarks"]["quicksort"]
+        report["performance"]["skipped"]["quicksort"] = ""
+
+        _, malformed = port_status.publishable_report_problems(
+            self.manifest, "linux-x64", report
+        )
+        self.assertTrue(any("recursion" in item for item in malformed), malformed)
+        self.assertTrue(any("quicksort" in item for item in malformed), malformed)
+
     def test_publishable_matches_every_report_the_site_serves(self):
         for port in self.manifest["ports"]:
             report_path = port_status.REPO_ROOT / self.manifest["report_directory"] / (
