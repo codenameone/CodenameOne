@@ -1462,6 +1462,18 @@
         "source_slug": "road-following-map-routing",
         "scheduled_at": "2026-08-03T09:00:00+00:00"
       }
+    },
+    "rich-text-without-webview": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmsdh8tug00000akq9eut89ns",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a70c96701a7d21b3a3d1554",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-03T17:02:29+00:00"
+      }
     }
   }
 }
