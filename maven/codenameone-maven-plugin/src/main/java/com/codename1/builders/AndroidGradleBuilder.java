@@ -5947,11 +5947,23 @@ public class AndroidGradleBuilder extends Executor {
         if(useGradle8 || request.getArg("android.forceJava8Builder", "false").equals("true")) {
             gradlePropertiesObject.setProperty("org.gradle.java.home", getGradleJavaHome());
         }
+        // 4096m rather than 2048m. Packaging runs the zipflinger splitter inside a
+        // Gradle worker that inherits these args, and it holds each entry's bytes in
+        // memory -- an app carrying the larger native libraries (ARCore, barhopper,
+        // the face and image detectors) exhausted 2048m and failed :app:packageDebug
+        // with a bare "A failure occurred while executing
+        // PackageAndroidArtifact$IncrementalSplitterRunnable". The underlying
+        // "java.lang.OutOfMemoryError: Java heap space" only appears with
+        // --stacktrace, which is why this read as an unexplained intermittent build
+        // failure. -Xmx is a ceiling, not a reservation, so raising it costs nothing
+        // on builds that never needed the headroom.
+        String heapArgs = "-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8";
         if (useGradle8) {
-            gradlePropertiesObject.setProperty("org.gradle.jvmargs", "-Xmx2048m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8");
+            gradlePropertiesObject.setProperty("org.gradle.jvmargs", heapArgs);
             gradleWrapperPropertiesObject.setProperty("distributionUrl", gradle8DistributionUrl);
         } else {
-            gradlePropertiesObject.setProperty("org.gradle.jvmargs", "-Xmx2048m -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8");
+            gradlePropertiesObject.setProperty("org.gradle.jvmargs",
+                    "-Xmx4096m -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8");
             gradleWrapperPropertiesObject.setProperty("distributionUrl", gradleDistributionUrl);
         }
         if (useAndroidX) {
