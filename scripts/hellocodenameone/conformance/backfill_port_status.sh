@@ -174,7 +174,16 @@ while IFS= read -r workflow; do
       run_id="${candidate}"
       while IFS= read -r downloaded; do
         found="$(jq -r '.port // empty' "${downloaded}" 2>/dev/null || true)"
-        if [ -z "${found}" ] || [ -f "${download_dir}/covered-${found}" ]; then
+        if [ -z "${found}" ]; then
+          # Invalid JSON, or an object with no "port": the artifact names nothing,
+          # so it cannot be matched to a port or gated. Skipping quietly let an
+          # older valid artifact cover the workflow and the sweep finish green
+          # while the newest producer output was malformed.
+          echo "Ignoring $(basename "${downloaded}") from run ${candidate}: it names no port." >&2
+          unusable+=("${workflow}: run ${candidate} uploaded $(basename "${downloaded}") with no readable port id")
+          continue
+        fi
+        if [ -f "${download_dir}/covered-${found}" ]; then
           continue
         fi
         # Only ports this workflow is declared to produce. The port is read from

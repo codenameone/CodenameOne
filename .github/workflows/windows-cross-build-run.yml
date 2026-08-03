@@ -319,8 +319,18 @@ jobs:
             done
           fi
           if [ ${#entries[@]} -eq 0 ]; then
-            echo "No screenshots were produced; skipping PR comment."
-            exit 0
+            # A run that died before its first PNG still persists app-output.log,
+            # and that log is what normalization reads to produce the fail /
+            # not-run counts. Bailing out here left the failed capture with no
+            # port-status artifact at all, so the nightly sweep fell back to an
+            # older report and the table kept showing it. Carry on with an empty
+            # entry list when there is a log; only a run with neither has nothing
+            # to say. (Same handling as linux-build-run.yml.)
+            if [ ! -f "$ART/raw-x64/app-output.log" ]; then
+              echo "No screenshots and no app log; nothing to normalize."
+              exit 0
+            fi
+            echo "No screenshots were produced; normalizing from the app log so the failure reaches the table."
           fi
           echo "Posting ${#entries[@]} screenshot(s)"
           mkdir -p "$ART/previews"
@@ -349,7 +359,7 @@ jobs:
             "Native Windows port (cross-compiled)" \
             "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
             "$REF_DIR" "$ART/previews" "$ART" \
-            "${entries[@]}"
+            ${entries[@]+"${entries[@]}"}
           gate_rc=$?
           set -e
           fail=0
