@@ -80,7 +80,8 @@ Then translate sizes. A web design is in **px**; CN1 sizes in **mm** (density
 independent). At the desktop/browser scale CN1 effectively renders ~3.78 px/mm, so
 `16px ~= 4.2mm`, `24px ~= 6.3mm`. Borders/radii in `px` stay crisp; size text and
 spacing in `mm`. **Bundle the real font** if you want to match the typeface: drop
-the `.ttf` files under `common/src/main/css/fonts/` and reference them with
+the `.ttf` files anywhere under `common/src/main/css/` (beside `theme.css` or in a
+subdirectory of it) and reference them with
 `@font-face { font-family: "Inter"; src: url("fonts/Inter-Regular.ttf"); }` (one
 `@font-face` per weight, distinct family names like `"Inter SemiBold"`).
 

@@ -186,13 +186,18 @@ class TvNativeBuilder {
         File[] fontFiles = resDir == null ? null : resDir.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
-                return name.toLowerCase().endsWith(".ttf");
+                // Core Text handles OpenType as readily as TrueType, so both
+                // belong in UIAppFonts.
+                return endsWithIgnoreCase(name, ".ttf") || endsWithIgnoreCase(name, ".otf");
             }
         });
         if (fontFiles != null && fontFiles.length > 0) {
             sb.append("    <key>UIAppFonts</key>\n    <array>\n");
             for (File f : fontFiles) {
-                sb.append("        <string>").append(f.getName()).append("</string>\n");
+                // Escaped for the same reason as the iOS plist: an XML
+                // metacharacter in a font's file name would otherwise produce a
+                // malformed Info.plist.
+                sb.append("        <string>").append(IPhoneBuilder.plistEscape(f.getName())).append("</string>\n");
             }
             sb.append("    </array>\n");
         }
@@ -328,5 +333,11 @@ class TvNativeBuilder {
         } catch (Exception ex) {
             throw new BuildException("Failed to apply tvNative Xcode settings", ex);
         }
+    }
+
+    /** Locale-independent case-insensitive suffix test. */
+    static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value != null && value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
     }
 }

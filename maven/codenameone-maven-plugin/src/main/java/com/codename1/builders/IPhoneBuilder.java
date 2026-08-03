@@ -4986,7 +4986,11 @@ public class IPhoneBuilder extends Executor {
 
             @Override
             public boolean accept(File file, String string) {
-                return string.toLowerCase().endsWith(".ttf");
+                // Core Text reads the SFNT container whether the outlines are
+                // glyf or CFF, so OpenType registers through UIAppFonts exactly
+                // like TrueType. Leaving .otf out here is what made a bundled
+                // OpenType font fall back to the system font on the device.
+                return endsWithIgnoreCase(string, ".ttf") || endsWithIgnoreCase(string, ".otf");
             }
         });
         
@@ -5484,8 +5488,11 @@ public class IPhoneBuilder extends Executor {
                 if(fontFiles != null && fontFiles.length > 0) {
                     b.append("    <key>UIAppFonts</key>\n    <array>\n");
                     for(File f : fontFiles) {
+                        // Escaped: a font name is an arbitrary file name, and an
+                        // XML metacharacter in it (e.g. "A&B.ttf") would produce
+                        // a malformed Info.plist and fail the Xcode build.
                         b.append("        <string>");
-                        b.append(f.getName());
+                        b.append(plistEscape(f.getName()));
                         b.append("</string>\n");
                     }
                     b.append("    </array>\n");
@@ -6159,4 +6166,18 @@ public class IPhoneBuilder extends Executor {
                 || "com/codename1/ai/language/SmartReply".equals(cls);
     }
 
+
+    /** Locale-independent case-insensitive suffix test. */
+    static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value != null && value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
+    }
+
+    /** Escapes a value for inclusion in a plist/XML text node. */
+    static String plistEscape(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
 }

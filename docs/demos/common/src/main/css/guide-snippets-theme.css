@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 /**
  * Compiled developer-guide CSS snippets.
  * Complete examples that do not require external assets or generated image borders live here.
@@ -418,6 +441,34 @@ MyLabel {
     font-family: "GuideDemoFont";
 }
 /* end::css-css-029[] */
+
+/* A relative src URL resolves against the directory holding this CSS file, so
+   GuideRootFont.ttf sits beside it and GuideDemoFont-Bold.ttf sits in res/.
+   Both forms compile, which is the point the guide makes with this snippet. */
+/* tag::css-css-044[] */
+@font-face {
+    font-family: "GuideRootFont";
+    src: url(GuideRootFont.ttf);
+}
+
+@font-face {
+    font-family: "GuideDemoFont Bold";
+    src: url(res/GuideDemoFont-Bold.ttf);
+}
+/* end::css-css-044[] */
+
+/* Both families come from the snippet above, so this fixture also proves the
+   root-level font actually resolves and ships: a @font-face is only copied to
+   the build output when some style references it. */
+/* tag::css-css-045[] */
+Default {
+    font-family: "GuideRootFont";
+}
+
+Title {
+    font-family: "GuideDemoFont Bold";
+}
+/* end::css-css-045[] */
 
 /* tag::css-css-030[] */
 @font-face {

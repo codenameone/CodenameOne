@@ -9808,10 +9808,34 @@ static void cn1RegisterBundledFontsOnce() {
     }
     cn1FontsRegistered = YES;
     @autoreleasepool {
-        NSArray *fontPaths = [[NSBundle mainBundle] pathsForResourcesOfType:@"ttf" inDirectory:nil];
-        for (NSString *fontPath in fontPaths) {
-            NSURL *url = [NSURL fileURLWithPath:fontPath];
+        // Core Text reads OpenType as readily as TrueType, and this scan is the
+        // only thing registering bundled fonts on watchOS -- its plist carries no
+        // UIAppFonts array -- so anything missed here falls back to the system
+        // font on the watch even though it renders everywhere else.
+        //
+        // List the resource directory once and compare the lower-cased extension,
+        // rather than calling pathsForResourcesOfType: per spelling: that call
+        // matches the extension exactly, so a per-spelling list only ever covers
+        // the spellings someone thought to write down while the rest of the stack
+        // accepts any case, and ".TtF" would be bundled and never registered.
+        //
+        // A shallow listing of the resource root is deliberate. Fonts are
+        // deployed flat next to theme.res -- that is why createTrueTypeFont
+        // forbids a path separator in the name -- so nothing is missed, and it
+        // avoids walking every resource in the bundle (pods, map assets, models)
+        // on the way to the first glyph.
+        NSString *resourceRoot = [[NSBundle mainBundle] resourcePath];
+        NSArray *resourceNames = resourceRoot == nil ? nil
+                : [[NSFileManager defaultManager] contentsOfDirectoryAtPath:resourceRoot error:NULL];
+        for (NSString *resourceName in resourceNames) {
+            NSString *ext = [[resourceName pathExtension] lowercaseString];
+            if (![ext isEqualToString:@"ttf"] && ![ext isEqualToString:@"otf"]) {
+                continue;
+            }
+            NSURL *url = [NSURL fileURLWithPath:[resourceRoot stringByAppendingPathComponent:resourceName]];
             CFErrorRef error = NULL;
+            // A font already registered by UIAppFonts errors here; that is
+            // expected on iOS/tvOS and the error is discarded.
             CTFontManagerRegisterFontsForURL((BRIDGE_CAST CFURLRef)url, kCTFontManagerScopeProcess, &error);
             if (error != NULL) {
                 CFRelease(error);
