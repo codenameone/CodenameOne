@@ -520,13 +520,25 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_verifyData___java_lang_String_
         EVP_PKEY_free(key);
         return JAVA_FALSE;
     }
-    if (EVP_DigestVerifyInit(ctx, 0, cn1SignatureDigest(name), 0, key) > 0 &&
-        EVP_DigestVerify(ctx, signature, (size_t) signatureLength, data, (size_t) dataLength) == 1) {
-        result = JAVA_TRUE;
+    if (EVP_DigestVerifyInit(ctx, 0, cn1SignatureDigest(name), 0, key) <= 0) {
+        /* Setup failed, so nothing was verified. Returning a bare false here
+         * said "that signature is invalid" about a signature never examined. */
+        cn1CryptoFail("could not initialise signature verification");
     } else {
-        /* A rejected signature is a normal answer, not a fault; clear the
-         * queue so it cannot be reported against a later operation. */
-        ERR_clear_error();
+        /* EVP_DigestVerify is tri-state: 1 verified, 0 rejected, negative an
+         * internal error. Folding negative in with zero reported a broken
+         * verifier as an ordinary bad signature. */
+        int verified = EVP_DigestVerify(ctx, signature, (size_t) signatureLength,
+                                        data, (size_t) dataLength);
+        if (verified == 1) {
+            result = JAVA_TRUE;
+        } else if (verified < 0) {
+            cn1CryptoFail("signature verification failed to run");
+        } else {
+            /* A rejected signature is a normal answer, not a fault; clear the
+             * queue so it cannot be reported against a later operation. */
+            ERR_clear_error();
+        }
     }
     EVP_MD_CTX_free(ctx);
     EVP_PKEY_free(key);

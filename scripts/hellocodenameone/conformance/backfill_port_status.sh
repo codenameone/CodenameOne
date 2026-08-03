@@ -82,6 +82,9 @@ trap cleanup EXIT
 
 published=0
 skipped=0
+# Ports whose newest report was rejected as malformed. Collected rather than
+# fatal on the spot so the older, usable report is still published first.
+unusable=()
 
 # Mirrors port_status.py's FUTURE_STAMP_TOLERANCE. The gate publishes a report
 # stamped slightly ahead of now, so the closing assertion has to accept the same
@@ -199,6 +202,17 @@ while IFS= read -r workflow; do
             --port "${found}" --report "${downloaded}" >/dev/null 2>&1 || accept_status=$?
         if [ "${accept_status}" -ne 0 ]; then
           echo "Ignoring the ${found} report from run ${candidate}: $(describe_accept_status "${accept_status}")." >&2
+          # A malformed report is a producer defect, and falling back to an older
+          # run hides it: the fallback is still inside the freshness window, so the
+          # closing assertion passes and the sweep goes green while the newest run
+          # is broken. Remember it and fail at the end -- after the older report has
+          # been preserved, so the table keeps showing something rather than
+          # nothing. Contract drift stays quiet, because waiting for a run on the
+          # current contract is the intended behaviour there, not a defect.
+          if [ "${accept_status}" -eq "${ACCEPT_UNUSABLE}" ] \
+              && [ ! -f "${download_dir}/covered-${found}" ]; then
+            unusable+=("${found}: run ${candidate} uploaded a report the website cannot use")
+          fi
           continue
         fi
         cp "${downloaded}" "${download_dir}/port-status-${found}.json"
@@ -316,6 +330,13 @@ if [ ${#problems[@]} -gt 0 ]; then
   echo "Ports without a current compliance report:" >&2
   printf '  %s\n' "${problems[@]}" >&2
   echo "Fix the producing workflow; the public table cannot report a port it never hears from." >&2
+  exit 1
+fi
+
+if [ ${#unusable[@]} -gt 0 ]; then
+  echo "Ports whose newest report was unusable (an older one is still being served):" >&2
+  printf '  %s\n' "${unusable[@]}" >&2
+  echo "The table is current, but the producer is emitting reports the website cannot read." >&2
   exit 1
 fi
 

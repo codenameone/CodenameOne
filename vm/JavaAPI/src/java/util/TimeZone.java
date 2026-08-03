@@ -260,7 +260,12 @@ public abstract class TimeZone{
         }
         char sign = ID.charAt(index);
         if (sign == 'Z' && index + 1 == ID.length()) {
-            return new SimpleTimeZone(0, ID);
+            // "GMTZ" / "UTCZ" / "UTZ" name no zone. Manufacturing a SimpleTimeZone
+            // that keeps the spelling made getID() and equals() disagree with
+            // JavaSE and Android, which take the unknown-ID fallback and answer a
+            // zone whose ID is "GMT" -- the raw offset matched, so the difference
+            // only surfaced in a serialized configuration or an ID comparison.
+            return GMT;
         }
         if (sign != '+' && sign != '-') {
             return null;

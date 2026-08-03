@@ -38,16 +38,24 @@ public class CustomTimeZoneApp {
         // answers GMT+01:30 for it, so it cannot serve as a stable oracle. The
         // documented syntax has no seconds field and this port rejects it.
         // Each of these is malformed and must not become an offset.
-        "GMT+1:2", "GMT+05:0", "GMT+013000", "GMT+00000", "GMT+12345",
+        "GMT+1:2", "GMT+05:0", "GMT+013000", "GMT+12345",
+        // "GMT+00000" is deliberately absent. Five digits are undefined by the
+        // documented syntax and the JDKs disagree: 11 and 17 answer GMT+00:00,
+        // 21 and 25 answer GMT. It cannot be a stable oracle, so this port
+        // follows the documented form and rejects it.
         "GMT+24", "GMT+1:60", "GMT+23:60", "GMT+01:30:99", "GMT+01:30xyz",
-        "GMT+1x", "GMT+", "UTC+5", "UT+5"
+        "GMT+1x", "GMT+", "UTC+5", "UT+5",
+        // Z-suffixed pseudo ids name no zone; the JDK takes the unknown-id
+        // fallback, so the id has to be GMT and not the spelling asked for.
+        "GMTZ", "UTCZ", "UTZ"
     };
 
     public static void main(String[] args) {
         StringBuilder sb = new StringBuilder("RESULT=");
         for (int i = 0; i < IDS.length; i++) {
             java.util.TimeZone tz = java.util.TimeZone.getTimeZone(IDS[i]);
-            sb.append(IDS[i]).append('=').append(tz.getRawOffset()).append(';');
+            sb.append(IDS[i]).append('=').append(tz.getRawOffset())
+              .append('/').append(tz.getID()).append(';');
         }
         System.out.println(sb.toString());
     }

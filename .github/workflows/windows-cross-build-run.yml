@@ -265,7 +265,17 @@ jobs:
   compare-comment:
     name: cross-compiled screenshot-comment
     needs: run-on-windows
-    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # !cancelled(), for the same reason as linux-build-run.yml: without it GitHub
+    # skips this job whenever run-on-windows fails, so the run that most needs
+    # reporting uploads raw evidence but no port-status artifact. The nightly
+    # sweep then falls back to an older run, and while that one is still inside
+    # the freshness window the public table keeps showing it -- the current
+    # Windows failure masked by a stale pass. The workflow still goes red because
+    # run-on-windows itself failed.
+    if: >-
+      !cancelled() &&
+      (github.event_name == 'pull_request' || github.event_name == 'push' ||
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: read

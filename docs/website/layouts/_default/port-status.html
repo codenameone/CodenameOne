@@ -261,10 +261,24 @@
             <th scope="row"><strong>{{ .name }}</strong><p>{{ .description }}</p><small>Best measured duration</small></th>
             {{- range $contract.ports }}
               {{- $report := index $reports .id -}}
+              {{- /* Only a complete benchmark run is presented as a measurement.
+                     A suite that crashed partway through CommonWorkloadBenchmarkTest
+                     publishes whatever workloads it reached -- that report is
+                     deliberately still published, because its fail / not-run counts
+                     are the evidence this page exists to show -- but rendering those
+                     partial timings identically to a finished run would put an
+                     unfinished measurement beside complete ones with nothing to tell
+                     them apart. */ -}}
+              {{- $measurement := "" -}}
+              {{- with $report -}}{{- with .performance -}}
+                {{- if eq .status "complete" -}}
+                  {{- with .benchmarks -}}{{- with (index . $benchmark.id) -}}
+                    {{- $measurement = printf "%.2f ms" (div (float .duration_ns) 1000000.0) -}}
+                  {{- end -}}{{- end -}}
+                {{- end -}}
+              {{- end -}}{{- end -}}
               <td data-performance-cell data-port="{{ .id }}" title="{{ .name }}: {{ $benchmark.name }} best measured duration">
-                {{- with $report -}}{{- with .performance -}}{{- with .benchmarks -}}{{- with (index . $benchmark.id) -}}
-                  {{- printf "%.2f ms" (div (float .duration_ns) 1000000.0) -}}
-                {{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}
+                {{- if $measurement -}}{{ $measurement }}{{- else -}}Awaiting nightly{{- end -}}
               </td>
             {{- end }}
           </tr>
