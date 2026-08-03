@@ -420,6 +420,32 @@ class PortStatusTest(unittest.TestCase):
         self.assertTrue(any("recursion" in item for item in malformed), malformed)
         self.assertTrue(any("quicksort" in item for item in malformed), malformed)
 
+    def test_publishable_rejects_a_crashed_suite_that_loses_a_workload(self):
+        # The crashed-suite concession is not a hole: normalize derives
+        # `missing` from the contract, so measured + skipped + missing must
+        # still name every workload even when the suite died.
+        report = self.publishable_report("linux-x64")
+        report["suite_finished"] = False
+        report["performance"]["status"] = "partial"
+        del report["performance"]["benchmarks"]["quicksort"]
+        report["performance"]["missing"] = []
+
+        _, malformed = port_status.publishable_report_problems(
+            self.manifest, "linux-x64", report
+        )
+        self.assertTrue(any("unaccounted for" in item for item in malformed), malformed)
+
+    def test_publishable_rejects_a_wrongly_typed_skipped_section(self):
+        # "skipped": [] is malformed, not "no skips" -- `or {}` used to coerce
+        # it past the type check.
+        report = self.publishable_report("linux-x64")
+        report["performance"]["skipped"] = []
+
+        _, malformed = port_status.publishable_report_problems(
+            self.manifest, "linux-x64", report
+        )
+        self.assertTrue(any("not objects" in item for item in malformed), malformed)
+
     def test_publishable_matches_every_report_the_site_serves(self):
         for port in self.manifest["ports"]:
             report_path = port_status.REPO_ROOT / self.manifest["report_directory"] / (

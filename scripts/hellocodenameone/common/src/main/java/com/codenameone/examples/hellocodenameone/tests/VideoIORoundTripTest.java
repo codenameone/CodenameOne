@@ -187,7 +187,20 @@ public class VideoIORoundTripTest extends BaseTest {
                 }
             }
             writer.close();
+            writer = null;
         } catch (Throwable t) {
+            // The writer is still open whenever the throw came from a write
+            // rather than from close(). Leaving it open leaks the native
+            // encoder into the rest of the suite, which shares this process;
+            // best-effort close, and ignore a secondary failure because we are
+            // already reporting the first one.
+            if (writer != null) {
+                try {
+                    writer.close();
+                } catch (Throwable ignored) {
+                    // reporting the original failure below
+                }
+            }
             cleanup(path);
             // Still a skip, with its own reason code. The Apple simulators
             // obtain a writer and then fail to finalize the file, which is the

@@ -690,7 +690,12 @@ def publishable_report_problems(
             )
 
     benchmarks = performance.get("benchmarks")
-    skipped = performance.get("skipped") or {}
+    skipped = performance.get("skipped")
+    if skipped is None:
+        # Absent is tolerated; a wrong type is not. `or {}` coerced a falsy
+        # non-dict -- "skipped": [] -- into {} and walked it straight past the
+        # isinstance check below.
+        skipped = {}
     if not isinstance(benchmarks, dict) or not isinstance(skipped, dict):
         malformed.append("performance results are not objects")
         return drift, malformed
@@ -698,11 +703,29 @@ def publishable_report_problems(
     # A port may legitimately skip a workload (the iOS simulator skips the
     # GC-footprint workloads); measured plus skipped has to cover the contract.
     accounted = sorted(set(benchmarks) | set(skipped))
-    if suite_finished and accounted != sorted(expected_benchmarks):
-        malformed.append(
-            "performance workloads do not match the contract: "
-            + ", ".join(accounted)
-        )
+    if suite_finished:
+        if accounted != sorted(expected_benchmarks):
+            malformed.append(
+                "performance workloads do not match the contract: "
+                + ", ".join(accounted)
+            )
+    else:
+        # A crashed suite is allowed to leave workloads unrun, but not to lose
+        # them silently: normalize computes `missing` as the contract minus what
+        # was measured or skipped, so measured + skipped + missing still has to
+        # name every workload. Dropping that check entirely would let a
+        # structurally broken section through unnoticed.
+        declared_missing = performance.get("missing")
+        if declared_missing is None:
+            declared_missing = []
+        if not isinstance(declared_missing, list):
+            malformed.append("performance missing list is not an array")
+        else:
+            covered = sorted(set(accounted) | set(declared_missing))
+            if covered != sorted(expected_benchmarks):
+                malformed.append(
+                    "performance workloads unaccounted for: " + ", ".join(covered)
+                )
     for name, measurement in benchmarks.items():
         duration = measurement.get("duration_ns") if isinstance(measurement, dict) else None
         if isinstance(duration, bool) or not isinstance(duration, int) or duration < 0:

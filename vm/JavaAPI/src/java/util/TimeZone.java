@@ -165,7 +165,17 @@ public abstract class TimeZone{
      * Gets the TimeZone for the given ID.
      */
     public static java.util.TimeZone getTimeZone(final java.lang.String ID){
-        if(ID != null && ID.equalsIgnoreCase("gmt")) {
+        if (ID == null) {
+            // Fail here rather than three statements down, where the first
+            // unguarded equalsIgnoreCase used to throw from the middle of the
+            // method. NullPointerException is the right answer rather than GMT:
+            // the JDK throws for a null ID and reserves GMT for an ID it merely
+            // cannot parse, and the JavaSE and Android ports reach that JDK
+            // behaviour directly -- so answering GMT here would put this port
+            // out of step with them.
+            throw new NullPointerException("ID");
+        }
+        if(ID.equalsIgnoreCase("gmt")) {
             return GMT;
         }
         TimeZone custom = customTimeZone(ID);

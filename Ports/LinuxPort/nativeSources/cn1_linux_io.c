@@ -177,8 +177,16 @@ static const char* cn1JStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s) {
 static __thread char cn1LastIoError[512];
 
 static void cn1RecordIoError(const char* path) {
+    if (path == 0) {
+        /* No fopen was attempted, so errno belongs to some earlier unrelated
+         * call and strerror would name a plausible-looking wrong reason --
+         * worse than saying nothing, since the whole point of this buffer is
+         * to explain a failure without another CI round trip. */
+        snprintf(cn1LastIoError, sizeof(cn1LastIoError), "%s",
+                 "no path supplied");
+        return;
+    }
     snprintf(cn1LastIoError, sizeof(cn1LastIoError), "%s", strerror(errno));
-    (void) path;
 }
 
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_lastIoError___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
