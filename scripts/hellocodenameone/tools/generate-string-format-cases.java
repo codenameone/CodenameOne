@@ -50,6 +50,12 @@ import java.util.Locale;
  * Everything is generated with Locale.ROOT and written with '.' as the decimal separator
  * and ',' as the grouping separator; StringFormatTest re-localises before comparing,
  * because on JavaSE and Android the platform formatter follows the default locale.
+ *
+ * <p>The exception <em>type</em> recorded for a malformed format is what Java SE raises.
+ * StringFormatTest only requires that some IllegalArgumentException is raised, because
+ * Android's libcore does not always agree with OpenJDK on the subtype -- {@code "%.s"}
+ * raises IllegalFormatPrecisionException there and UnknownFormatConversionException on
+ * OpenJDK. ParparVM's exact subtypes are pinned against the JDK in vm/tests instead.</p>
  */
 public class GenerateStringFormatCases {
 
@@ -61,7 +67,7 @@ public class GenerateStringFormatCases {
                 + ", String.format(" + literal(format) + argList(args) + "));");
     }
 
-    /** A case whose format string is malformed; both sides must raise the same exception. */
+    /** A case whose format string is malformed and must be rejected on every port. */
     private static void bad(String label, String format, Object... args) {
         String type;
         try {

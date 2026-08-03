@@ -57,6 +57,8 @@ public class StringFormatTest extends BaseTest {
     private char decimalSeparator = '.';
     private char groupingSeparator = ',';
     private int checked;
+    private int problemCount;
+    private final StringBuilder problems = new StringBuilder();
 
     @Override
     public boolean runTest() {
@@ -205,8 +207,26 @@ public class StringFormatTest extends BaseTest {
             fail("String.format conformance failed: " + t);
             return false;
         }
+        if (problemCount > 0) {
+            fail(problemCount + " String.format divergence(s) out of " + checked + " cases:\n" + problems);
+            return false;
+        }
         done();
         return true;
+    }
+
+    /**
+     * Records a divergence instead of throwing, so one run of the suite reports every
+     * case that disagrees rather than only the first. A port that diverges usually
+     * diverges in more than one place, and each device round trip is expensive.
+     */
+    private void problem(String text) {
+        problemCount++;
+        if (problemCount <= 12) {
+            problems.append(problemCount).append(") ").append(text).append('\n');
+        } else if (problemCount == 13) {
+            problems.append("... further divergences suppressed\n");
+        }
     }
 
     /**
@@ -244,31 +264,40 @@ public class StringFormatTest extends BaseTest {
     private void check(String label, String expected, String actual) {
         checked++;
         String localised = localise(expected);
-        assertEqual(localised, actual,
-                "String.format case '" + label + "' expected " + describe(localised)
-                        + " but was " + describe(actual));
+        if (!localised.equals(actual)) {
+            problem("case '" + label + "' expected " + describe(localised)
+                    + " but was " + describe(actual));
+        }
     }
 
-    private void checkThrows(String label, String expectedType, FormatCall call) {
+    /**
+     * Asserts that a malformed format is rejected rather than quietly producing something,
+     * which is the behaviour issue #5482 was about.
+     *
+     * <p>Only the exception family is pinned here, not the exact subtype: Android's
+     * libcore and OpenJDK genuinely disagree on some of them -- {@code "%.s"} raises
+     * IllegalFormatPrecisionException on Android and UnknownFormatConversionException on
+     * OpenJDK, for instance. Neither is Codename One's to change. The exact subtype
+     * ParparVM raises is pinned against the JDK in
+     * vm/tests StringFormatIntegrationTest, which covers every port that runs Codename
+     * One's own formatter; {@code javaSeType} is carried here only to make a failure
+     * message say what Java SE does.</p>
+     */
+    private void checkThrows(String label, String javaSeType, FormatCall call) {
         checked++;
         String result;
         try {
             result = call.run();
         } catch (Throwable t) {
-            // Every java.util format exception extends IllegalArgumentException. The
-            // package is not pinned because a port may mangle class names; the specific
-            // exception is, because picking the wrong one is the bug this catches.
-            assertTrue(t instanceof IllegalArgumentException,
-                    "String.format case '" + label + "' should raise an IllegalArgumentException, raised "
-                            + t.getClass().getName());
-            String simple = simpleName(expectedType);
-            assertTrue(simpleName(t.getClass().getName()).equals(simple),
-                    "String.format case '" + label + "' should raise " + simple
-                            + ", raised " + t.getClass().getName());
+            if (!(t instanceof IllegalArgumentException)) {
+                problem("case '" + label + "' raised " + t.getClass().getName()
+                        + " instead of an IllegalArgumentException (Java SE raises "
+                        + simpleName(javaSeType) + ")");
+            }
             return;
         }
-        fail("String.format case '" + label + "' should have raised " + simpleName(expectedType)
-                + " but returned " + describe(result));
+        problem("case '" + label + "' returned " + describe(result)
+                + " instead of rejecting the format (Java SE raises " + simpleName(javaSeType) + ")");
     }
 
     private static String simpleName(String className) {
