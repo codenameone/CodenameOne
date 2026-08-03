@@ -724,6 +724,12 @@ public final class AppShield {
 
     /// Registers a protected host after [#init(ShieldConfig)], for a backend discovered at
     /// runtime.
+    ///
+    /// Takes the same patterns as [ShieldConfig#protect(String, HostPolicy)] -- an exact
+    /// host or a leading `*.` wildcard covering its subdomains -- and resolves them the same
+    /// way, most specific first. A registration made here wins over a configured one for the
+    /// same pattern, being the later statement of intent, but does not override a more
+    /// specific configured host.
     public static void addProtectedHost(String host, HostPolicy policy) {
         if (host != null && host.length() > 0) {
             // Same rule as ShieldConfig.protect: an omitted policy has to pick up
@@ -783,11 +789,29 @@ public final class AppShield {
         if (host == null) {
             return HostPolicy.UNPROTECTED;
         }
-        Object runtime = runtimeHosts.get(ShieldHosts.normalize(host));
-        if (runtime != null) {
-            return (HostPolicy) runtime;
+        // Runtime registrations resolve exactly as configured ones do, wildcards included.
+        // An exact-name lookup meant addProtectedHost("*.example.com") covered nothing:
+        // api.example.com missed it, fell through to a configuration that had never heard
+        // of the host, and went out with no token and no pin check -- while
+        // protectedHosts() published the wildcard to the engine, so the pin set was built
+        // for a host the request path treated as unprotected.
+        //
+        // Key by key rather than one table before the other, so specificity decides first:
+        // a configured secure.example.com is not overridden by a later runtime
+        // *.example.com, and at the same key the runtime registration wins because it is
+        // the more recent statement of intent.
+        ShieldConfig cfg = getConfig();
+        for (String key : ShieldHosts.lookupKeys(host)) {
+            Object runtime = runtimeHosts.get(key);
+            if (runtime != null) {
+                return (HostPolicy) runtime;
+            }
+            HostPolicy configured = cfg.policyForKey(key);
+            if (configured != null) {
+                return configured;
+            }
         }
-        return getConfig().policyFor(host);
+        return HostPolicy.UNPROTECTED;
     }
 
     // -----------------------------------------------------------------

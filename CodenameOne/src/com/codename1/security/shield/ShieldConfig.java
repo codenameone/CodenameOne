@@ -266,25 +266,22 @@ public final class ShieldConfig {
         if (host == null) {
             return HostPolicy.UNPROTECTED;
         }
-        String h = ShieldHosts.normalize(host);
-        HostPolicy exact = policyForKey(h);
-        if (exact != null) {
-            return exact;
-        }
-        int dot = h.indexOf('.');
-        while (dot >= 0 && dot < h.length() - 1) {
-            HostPolicy wild = policyForKey("*." + h.substring(dot + 1));
-            if (wild != null) {
-                return wild;
+        for (String key : ShieldHosts.lookupKeys(host)) {
+            HostPolicy match = policyForKey(key);
+            if (match != null) {
+                return match;
             }
-            dot = h.indexOf('.', dot + 1);
         }
         return HostPolicy.UNPROTECTED;
     }
 
     /// The policy registered for an exact key, or null. Implicit registrations resolve against the
     /// default as it stands now, not as it stood when they were registered.
-    private HostPolicy policyForKey(String key) {
+    ///
+    /// Reachable from [AppShield] so runtime registrations can be resolved against the
+    /// configured ones key by key, most specific first, rather than one table entirely
+    /// before the other.
+    HostPolicy policyForKey(String key) {
         Object explicit = hostPolicies.get(key);
         if (explicit != null) {
             return (HostPolicy) explicit;

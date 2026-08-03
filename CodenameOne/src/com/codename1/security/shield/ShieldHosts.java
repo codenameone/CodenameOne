@@ -72,6 +72,36 @@ final class ShieldHosts {
         return sb == null ? s : sb.toString();
     }
 
+    /// The keys a host can match, most specific first: the host itself, then a `*.` wildcard
+    /// for each parent domain outward.
+    ///
+    /// One generator, because two resolutions are one bug. Runtime registrations went into a
+    /// table looked up by exact name only, so `addProtectedHost("*.example.com")` covered
+    /// nothing at all: `api.example.com` missed it, fell through to the startup configuration
+    /// which had never heard of the host, and went out with no token and no pin check -- the
+    /// host the app went out of its way to protect being the one host unprotected.
+    ///
+    /// The apex is deliberately absent: `*.example.com` is subdomains, and `example.com`
+    /// itself has to be registered on its own. Nothing here can escape the name either --
+    /// the wildcards are built from the suffixes of the host being resolved, so
+    /// `example.com.evil.test` produces `*.com.evil.test` and never `*.example.com`.
+    static String[] lookupKeys(String host) {
+        String h = normalize(host);
+        if (h == null || h.length() == 0) {
+            return new String[0];
+        }
+        java.util.Vector keys = new java.util.Vector();
+        keys.addElement(h);
+        int dot = h.indexOf('.');
+        while (dot >= 0 && dot < h.length() - 1) {
+            keys.addElement("*." + h.substring(dot + 1));
+            dot = h.indexOf('.', dot + 1);
+        }
+        String[] out = new String[keys.size()];
+        keys.copyInto(out);
+        return out;
+    }
+
     /// True when the URL carries the given lowercase ASCII scheme prefix, whatever case it is in.
     static boolean startsWithIgnoreCase(String value, String lowerPrefix) {
         if (value == null || lowerPrefix == null || value.length() < lowerPrefix.length()) {

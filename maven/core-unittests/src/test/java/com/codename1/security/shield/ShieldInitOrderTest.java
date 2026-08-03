@@ -44,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -412,6 +413,62 @@ class ShieldInitOrderTest extends UITestBase {
         assertNull(request.headerValue("x-cn1-attest"),
                 "the app's spelling must not survive beside the shield's");
         assertEquals("token-from-a-fully-initialized-engine", request.attached());
+    }
+
+    /**
+     * A wildcard registered at runtime protects its subdomains, like a configured one.
+     *
+     * <p>The runtime table was looked up by exact name, so
+     * {@code addProtectedHost("*.discovered.example")} covered nothing: a request to
+     * {@code api.discovered.example} missed it, fell through to a configuration that had
+     * never heard of the host, and went out with no token and no certificate check. And
+     * {@code protectedHosts()} published the wildcard to the engine, so the pin set was
+     * built for a host the request path had already decided was unprotected -- the host the
+     * app went out of its way to register being the one host unprotected.</p>
+     */
+    @Test
+    void aWildcardRegisteredAtRuntimeCoversItsSubdomains() throws Exception {
+        Thread init = initOnAnotherThread();
+        engine.release();
+        init.join(GENEROUS_TIMEOUT_MS);
+
+        AppShield.addProtectedHost("*.discovered.example", HostPolicy.ENFORCED);
+        assertSame(HostPolicy.ENFORCED, AppShield.policyFor("api.discovered.example"),
+                "a runtime wildcard has to resolve the way a configured one does");
+        assertSame(HostPolicy.UNPROTECTED, AppShield.policyFor("discovered.example"),
+                "the apex is not a subdomain, here as in ShieldConfig");
+        assertSame(HostPolicy.UNPROTECTED,
+                AppShield.policyFor("discovered.example.evil.test"),
+                "and a name that merely contains it is somebody else's host");
+
+        // The consequence, through the path that matters rather than the lookup alone.
+        RecordingRequest request = new RecordingRequest();
+        request.setUrl("https://api.discovered.example/thing");
+        AppShield.attach(request);
+        assertEquals("token-from-a-fully-initialized-engine", request.attached(),
+                "the request to the registered host has to carry a token");
+    }
+
+    /**
+     * And specificity decides between the two tables, rather than one table winning whole.
+     *
+     * <p>A runtime registration is the later statement of intent, so it wins for the same
+     * pattern -- but a configured exact host is more specific than a runtime wildcard, and
+     * quietly relaxing it from ENFORCED to something weaker is a downgrade nobody asked
+     * for.</p>
+     */
+    @Test
+    void aRuntimeWildcardDoesNotRelaxAMoreSpecificConfiguredHost() throws Exception {
+        Thread init = initOnAnotherThread();
+        engine.release();
+        init.join(GENEROUS_TIMEOUT_MS);
+
+        AppShield.addProtectedHost("*.example.com", HostPolicy.PROTECTED);
+
+        assertSame(HostPolicy.ENFORCED, AppShield.policyFor("api.example.com"),
+                "api.example.com is configured ENFORCED, which is the more specific rule");
+        assertSame(HostPolicy.PROTECTED, AppShield.policyFor("other.example.com"),
+                "and the wildcard still covers everything the configuration does not name");
     }
 
     private Thread initOnAnotherThread() {
