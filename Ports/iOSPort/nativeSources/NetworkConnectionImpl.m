@@ -193,7 +193,17 @@ int connections = 0;
                 [certs appendString:spki];
             }
         }
+    // Released first, and only under manual retain/release. The delegate is entered once
+    // per challenge and a connection can face several -- a redirect to another host
+    // presents its own chain -- so overwriting the field leaked the previous string. The
+    // rest of this file already keeps its retains behind this guard; an unconditional one
+    // here does not compile under ARC at all.
+#ifdef CN1_USE_ARC
+    sslCertificates = [NSString stringWithString:certs];
+#else
+    [sslCertificates release];
     sslCertificates = [[NSString stringWithString:certs] retain];
+#endif
     if (!com_codename1_io_NetworkManager_checkCertificatesNativeCallback___int_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG connectionId)) {
         // Java rejected the chain -- a per-request check or a guard pin mismatch.
         // That veto applies to insecure requests too.
