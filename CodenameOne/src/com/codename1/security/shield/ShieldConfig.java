@@ -80,6 +80,20 @@ public final class ShieldConfig {
     public ShieldConfig tokenHeader(String name) {
         if (name != null && name.length() > 0) {
             String normalized = ShieldHosts.normalize(name);
+            // Before every reserved-name check, because folding case does not make a
+            // malformed name comparable: "Cookie " normalizes to "cookie ", matches
+            // nothing on any list below, and walks straight past the checks written for
+            // exactly that name. The name then goes on the wire -- HttpURLConnection
+            // accepts a trailing space -- where an intermediary is entitled to reject the
+            // malformed field or read it as something else, so a fail-closed host ends up
+            // with attach() reporting success and a backend that received no token.
+            if (!isFieldNameToken(name)) {
+                throw new IllegalArgumentException(name + " is not a legal HTTP header "
+                        + "name, so it cannot carry the attestation token: field names are "
+                        + "tokens, with no spaces and no separators. Whatever survives on "
+                        + "the wire is not what was asked for. Use a header of your own, "
+                        + "or leave the default " + DEFAULT_TOKEN_HEADER + ".");
+            }
             if ("content-type".equals(normalized)) {
                 throw new IllegalArgumentException("Content-Type cannot carry the "
                         + "attestation token: it is not stored as an ordinary header, so it "
@@ -115,6 +129,29 @@ public final class ShieldConfig {
             this.tokenHeader = name;
         }
         return this;
+    }
+
+    /// Whether this is a legal HTTP field name -- an RFC 9110 token, so no spaces, no
+    /// separators, nothing outside printable ASCII.
+    ///
+    /// Rejecting rather than trimming, for the same reason the websocket handshake does:
+    /// a caller that wrote a trailing space meant one header and a lenient server would
+    /// read another, and quietly repairing the difference is how the two ends stop
+    /// agreeing about what was sent.
+    private static boolean isFieldNameToken(String name) {
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c <= 0x20 || c >= 0x7f) {
+                return false;
+            }
+            if (c == '(' || c == ')' || c == '<' || c == '>' || c == '@' || c == ','
+                    || c == ';' || c == ':' || c == '\\' || c == '"' || c == '/'
+                    || c == '[' || c == ']' || c == '?' || c == '=' || c == '{'
+                    || c == '}') {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Header names the transport owns, so an attestation token put in one does not

@@ -451,6 +451,34 @@ class ShieldApiTest {
                 new ShieldConfig().getTokenHeader());
     }
 
+    /// A name that is not a header name is refused before anything asks what it means.
+    ///
+    /// Folding case does not make a malformed name comparable: `Cookie ` normalizes to
+    /// `cookie `, matches nothing on any reserved list, and walks past the checks written
+    /// for exactly that name. It then goes on the wire -- `HttpURLConnection` accepts a
+    /// trailing space -- where an intermediary may drop the malformed field or read it as
+    /// transport metadata, so a fail-closed host gets attach() reporting success and a
+    /// backend that received no token.
+    @Test
+    void aNameThatIsNotAnHttpTokenIsRefused() {
+        String[] refused = {
+            // The two that slip past the reserved lists by a single character.
+            "Cookie ", "Content-Length ",
+            // And the shapes that are not field names at all.
+            "X Attest", "X-Attest:", "X-Attest\r\nInjected", "X-Attest\u00e9",
+            "(comment)", "X-Attest=1", "X@Attest",
+        };
+        for (String name : refused) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ShieldConfig().tokenHeader(name),
+                    name + " is not a legal header name and must not reach the wire");
+        }
+
+        // The punctuation RFC 9110 does allow in a token stays allowed.
+        assertEquals("X-CN1_Attest.1",
+                new ShieldConfig().tokenHeader("X-CN1_Attest.1").getTokenHeader());
+    }
+
     /// Headers the transport owns are refused too.
     ///
     /// Framing and routing values are computed by the platform from the request it is
