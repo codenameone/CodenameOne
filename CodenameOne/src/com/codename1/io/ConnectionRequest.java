@@ -699,6 +699,60 @@ public class ConnectionRequest implements IOProgressListener {
         }
     }
 
+    /// Removes a header previously added with [#addRequestHeader(String, String)], but only
+    /// while it still holds `value`.
+    ///
+    /// A layer that decorates a request it does not own -- an interceptor attaching a
+    /// credential -- has to take its header back off before the request is reused for
+    /// somewhere else. By name alone that removes whatever is under the name by then, and
+    /// the app itself gets a turn in between: [#onRedirect(String)] runs between the
+    /// response and the retry, and it is exactly where an app installs the headers the
+    /// redirect target needs. If the two pick the same name, removing by name deletes the
+    /// app's credential rather than the decorator's. The value is what tells them apart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the header key, matched without regard to case as HTTP requires
+    ///
+    /// - `value`: the value the header must still have; anything else is left alone
+    public void removeRequestHeaderIfUnchanged(String key, String value) {
+        if (key == null || value == null) {
+            return;
+        }
+        if ("content-type".equalsIgnoreCase(key)) {
+            // addRequestHeader routes this one to a field rather than the header map, so
+            // it has to be compared and reset there or the removal removes nothing.
+            if (contentTypeSetExplicitly && value.equals(contentType)) {
+                contentType = "application/x-www-form-urlencoded; charset=UTF-8";
+                contentTypeSetExplicitly = false;
+            }
+            return;
+        }
+        if (userHeaders == null) {
+            return;
+        }
+        // Every spelling of the name, for the reason removeRequestHeader gives: a value
+        // set as "X-Api-Key" and removed as "x-api-key" would otherwise go out anyway.
+        Vector matches = null;
+        Enumeration keys = userHeaders.keys();
+        while (keys.hasMoreElements()) {
+            String existing = (String) keys.nextElement();
+            if (existing != null && existing.length() == key.length()
+                    && equalsIgnoreAsciiCase(existing, key)
+                    && value.equals(userHeaders.get(existing))) {
+                if (matches == null) {
+                    matches = new Vector();
+                }
+                matches.addElement(existing);
+            }
+        }
+        if (matches != null) {
+            for (int i = 0; i < matches.size(); i++) {
+                userHeaders.remove(matches.elementAt(i));
+            }
+        }
+    }
+
     /// ASCII-only case-insensitive comparison, so the result never depends on the device locale --
     /// under the Turkish locale an uppercase `I` does not fold to `i`.
     private static boolean equalsIgnoreAsciiCase(String a, String b) {

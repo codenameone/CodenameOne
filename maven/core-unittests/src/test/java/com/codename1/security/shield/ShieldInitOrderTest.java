@@ -356,6 +356,40 @@ class ShieldInitOrderTest extends UITestBase {
     }
 
     /**
+     * And a header the app installed for the redirect TARGET is equally not the shield's.
+     *
+     * <p>Same request, so scoping the cleanup to the request does not separate them. The
+     * request is reused across a redirect and {@code performOperationComplete()} calls
+     * {@code onRedirect()} in between -- the hook where an app sets up what the new target
+     * needs. An app whose target expects its own key under the name the shield uses for its
+     * token had that key deleted on the way out, because the record held the request and
+     * the name and not the value that says whose header it is.</p>
+     */
+    @Test
+    void aKeyTheRedirectHookInstalledUnderTheSameNameIsNotTheShieldsToRemove()
+            throws Exception {
+        Thread init = initOnAnotherThread();
+        engine.release();
+        init.join(GENEROUS_TIMEOUT_MS);
+
+        RecordingRequest request = new RecordingRequest();
+        request.setUrl("https://api.example.com/secure");
+        AppShield.attach(request);
+        assertEquals("token-from-a-fully-initialized-engine", request.attached(),
+                "the fixture must actually attach something, or this proves nothing");
+
+        // The redirect, and the app's hook putting the target's own credential under the
+        // same name -- which replaces the token, so there is nothing left to strip.
+        request.setUrl("https://unprotected.example.com/elsewhere");
+        request.addRequestHeader("X-CN1-Attest", "the-targets-own-api-key");
+        AppShield.attach(request);
+
+        assertEquals("the-targets-own-api-key", request.headerValue("X-CN1-Attest"),
+                "the shield's token is already gone -- what is left is the app's, and "
+                + "removing it breaks the call the redirect was for");
+    }
+
+    /**
      * A differently-cased copy of the token header does not survive beside the real one.
      *
      * <p>Header names are case-insensitive, so adding ours next to an app's existing
@@ -418,6 +452,19 @@ class ShieldInitOrderTest extends UITestBase {
             while (it.hasNext()) {
                 String existing = it.next();
                 if (existing != null && existing.equalsIgnoreCase(key)) {
+                    it.remove();
+                }
+            }
+        }
+
+        @Override
+        public void removeRequestHeaderIfUnchanged(String key, String value) {
+            super.removeRequestHeaderIfUnchanged(key, value);
+            java.util.Iterator<String> it = headers.keySet().iterator();
+            while (it.hasNext()) {
+                String existing = it.next();
+                if (existing != null && existing.equalsIgnoreCase(key)
+                        && value != null && value.equals(headers.get(existing))) {
                     it.remove();
                 }
             }

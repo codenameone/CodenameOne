@@ -495,7 +495,7 @@ public final class AppShield {
                             + "header, so no token can be attached for " + host));
                     return;
                 }
-                rememberAttachedHeader(request, header);
+                rememberAttachedHeader(request, header, token.getValue());
                 request.addRequestHeader(header, token.getValue());
                 return;
             }
@@ -516,7 +516,7 @@ public final class AppShield {
         }
     }
 
-    /// The header name a token was attached under, per REQUEST.
+    /// The header name a token was attached under, and the token, per REQUEST.
     ///
     /// A single "current name" is not enough: [ShieldConfig] is mutable and
     /// [#getConfig()] hands out the live instance, so the name that has to be removed on
@@ -533,15 +533,24 @@ public final class AppShield {
     /// without bound in a long-lived app.
     private static final Vector attachedHeaderNames = new Vector();
 
-    /// One remembered attachment: which request, and the name used.
+    /// One remembered attachment: which request, the name used, and the token put there.
+    ///
+    /// The value is part of the identity of what has to be removed, not bookkeeping. The
+    /// request is reused across a redirect, and `ConnectionRequest.performOperationComplete()`
+    /// calls [ConnectionRequest#onRedirect(String)] in between -- the hook an app uses to
+    /// set up the headers the redirect target needs. If the app installs its own credential
+    /// under the same name there, the header at cleanup time is no longer the shield's, and
+    /// removing it by name deletes the app's.
     private static final class AttachedHeader {
 
         private final java.lang.ref.WeakReference request;
         private final String name;
+        private final String value;
 
-        AttachedHeader(ConnectionRequest request, String name) {
+        AttachedHeader(ConnectionRequest request, String name, String value) {
             this.request = new java.lang.ref.WeakReference(request);
             this.name = name;
+            this.value = value;
         }
 
         ConnectionRequest get() {
@@ -549,28 +558,40 @@ public final class AppShield {
         }
     }
 
-    private static void rememberAttachedHeader(ConnectionRequest request, String name) {
+    private static void rememberAttachedHeader(ConnectionRequest request, String name,
+            String value) {
         if (request == null || name == null || name.length() == 0) {
             return;
         }
         synchronized (attachedHeaderNames) {
             sweepAttachedHeaders();
-            for (int i = 0; i < attachedHeaderNames.size(); i++) {
+            for (int i = attachedHeaderNames.size() - 1; i >= 0; i--) {
                 AttachedHeader entry = (AttachedHeader) attachedHeaderNames.elementAt(i);
                 if (entry.get() == request && name.equals(entry.name)) { // NOPMD identity
-                    return;
+                    // Same request, same name, newer token: the entry has to carry the
+                    // value that is actually on the request now, or the next cleanup
+                    // compares against a token that was replaced and leaves this one on.
+                    attachedHeaderNames.removeElementAt(i);
                 }
             }
-            attachedHeaderNames.addElement(new AttachedHeader(request, name));
+            attachedHeaderNames.addElement(new AttachedHeader(request, name, value));
         }
     }
 
     private static void clearAttachedHeaders(ConnectionRequest request) {
-        // ONLY what this request was given. Clearing the configured name unconditionally
-        // was the same mistake one step smaller: it reached every request, so an app whose
-        // token header is also one an unprotected service expects lost that service's
-        // header on a call the shield has nothing to do with. A header the shield did not
-        // attach is the app's, whatever it is called.
+        // ONLY what this request was given, and only while it is still what was given.
+        //
+        // Clearing the configured name unconditionally was the same mistake one step
+        // larger: it reached every request, so an app whose token header is also one an
+        // unprotected service expects lost that service's header on a call the shield has
+        // nothing to do with. Narrowing it to this request left the smaller version of it,
+        // because the request is not untouched in between: onRedirect() runs between the
+        // attachment and this cleanup, and an app whose redirect target needs its own key
+        // under the same name installs it there. A header the shield did not attach is the
+        // app's, whatever it is called -- including one that replaced the shield's own.
+        //
+        // The entry goes either way. Once the value has changed the header belongs to the
+        // app, and there is nothing left here for the shield to take back.
         synchronized (attachedHeaderNames) {
             for (int i = attachedHeaderNames.size() - 1; i >= 0; i--) {
                 AttachedHeader entry = (AttachedHeader) attachedHeaderNames.elementAt(i);
@@ -578,7 +599,13 @@ public final class AppShield {
                 if (owner == null) {
                     attachedHeaderNames.removeElementAt(i);
                 } else if (owner == request) { // NOPMD identity: this request, not an equal one
-                    request.removeRequestHeader(entry.name);
+                    if (entry.value == null) {
+                        // Nothing to compare against, so the safe answer is the one that
+                        // cannot leak a token: remove it.
+                        request.removeRequestHeader(entry.name);
+                    } else {
+                        request.removeRequestHeaderIfUnchanged(entry.name, entry.value);
+                    }
                     attachedHeaderNames.removeElementAt(i);
                 }
             }
