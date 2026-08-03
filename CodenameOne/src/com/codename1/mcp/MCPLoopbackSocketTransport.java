@@ -147,36 +147,67 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         try {
             bound = Socket.listenLoopback(port, Connection.class);
         } catch (RuntimeException ex) {
-            synchronized (lock) {
-                binding = false;
-            }
+            clearActiveIfOurs();
+            settleBind();
             // Two things go wrong if this escapes. The process-wide registration would stay
             // pointing at a transport that never started listening, so every later open()
             // would refuse, believing an agent is already served. And the server's reader
             // thread only handles IOException around open(), so a runtime exception would
             // kill that thread before it could clear its running flag, leaving the server
             // permanently "running" with nothing behind it.
-            clearActiveIfOurs();
             IOException failure = new IOException("Failed to listen on loopback port " + port);
             failure.initCause(ex);
             throw failure;
         }
         boolean closedWhileBinding;
         synchronized (lock) {
-            binding = false;
             closedWhileBinding = closed;
             if (!closedWhileBinding) {
                 listening = bound;
+                settleBind();
             }
         }
         if (closedWhileBinding) {
             // No null check on `bound`: the only way past the try above is with a
             // listener in hand, and SpotBugs flags the redundant test. Stop before
-            // releasing the slot, for the reason close() gives. close() deliberately
-            // left the slot claimed for us precisely so this stop() happens first.
+            // releasing the slot, for the reason close() gives -- and only mark the
+            // bind settled afterwards, because a close() waiting on it treats that
+            // as "the listener this transport produced is dealt with".
             bound.stop();
             clearActiveIfOurs();
+            settleBind();
             throw new IOException("This MCP socket transport was closed before it began listening");
+        }
+    }
+
+    /// How long close() will wait for an in-flight bind to resolve. Bounded so a wedged
+    /// platform bind cannot hang the caller of stop() indefinitely; on expiry close()
+    /// carries on and releases the slot, which is the old behaviour.
+    private static final long BIND_SETTLE_TIMEOUT_MS = 5000;
+
+    /// Marks the in-flight bind resolved and wakes any close() waiting on it. Call only
+    /// once the listener the bind produced has been published or stopped.
+    private void settleBind() {
+        synchronized (lock) {
+            binding = false;
+            lock.notifyAll();
+        }
+    }
+
+    /// Waits for an in-flight bind to resolve. Caller must hold `lock`.
+    private void awaitBindSettled() {
+        long deadline = System.currentTimeMillis() + BIND_SETTLE_TIMEOUT_MS;
+        while (binding) {
+            long remaining = deadline - System.currentTimeMillis();
+            if (remaining <= 0) {
+                return;
+            }
+            try {
+                lock.wait(remaining);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 
@@ -416,10 +447,18 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         // takes the lock on its way out.
         InputStream is; // NOPMD closed below, deliberately outside the lock
         OutputStream os; // NOPMD closed below, outside the lock
-        boolean bindInFlight;
         synchronized (lock) {
             closed = true;
-            bindInFlight = binding;
+            // Wait out an in-flight bind before touching the registration. The listener
+            // does not exist yet, so there is nothing to stop and nothing `listening` can
+            // record; releasing the slot now would let a replacement claim it while a
+            // listener nobody has stopped is about to start accepting, and a connection
+            // it accepted would resolve `active` to that replacement -- which is not
+            // closed, so its attach() would adopt these streams. open() marks the bind
+            // settled only after it has stopped the listener and released the slot, so
+            // waiting here keeps close() synchronous: the slot really is free when it
+            // returns, which MCP.stop() and every test that restarts a server rely on.
+            awaitBindSettled();
             l = listening;
             listening = null;
             is = in;
@@ -438,14 +477,7 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         if (l != null) {
             l.stop();
         }
-        if (!bindInFlight) {
-            clearActiveIfOurs();
-        }
-        // Otherwise the slot stays claimed until the in-flight open() has stopped the
-        // listener it is about to receive. Releasing it here would let a replacement
-        // transport take the slot first, and a connection the old listener accepts in
-        // that window resolves `active` to the replacement -- which is not closed, so
-        // its attach() would adopt the retired listener's streams.
+        clearActiveIfOurs();
         // Closing the output as well as the input: forgetting the field is not enough,
         // because a writer that already captured it would go on writing to a session that
         // has ended, and the socket would stay open until the connection callback unwound.
