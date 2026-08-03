@@ -1414,12 +1414,91 @@ public class CN1WearableBridge implements WearableBridge {
      * @param node the surviving item's publishing node
      * @return true when this differs from what was last delivered, and so is worth delivering
      */
+    /**
+     * Records a delivery stamp unconditionally, reporting whether it changed.
+     *
+     * <p>Unconditional on purpose, and only correct where the stamp being replaced describes an
+     * item that is now GONE -- the deletion-survivor path, where the survivor routinely carries a
+     * lower sequence than the winner just removed. Anywhere the recorded stamp may still describe
+     * a live newer value, use {@link #setDeliveredSequenceIfOutranks} instead: this method will
+     * happily overwrite newer state with older.</p>
+     */
     static boolean setDeliveredSequence(String path, long sequence, String node) {
         String stamp = sequence + "|" + (node == null ? "" : node);
         synchronized (deliveredSequences) {
             String previous = deliveredSequences.put(path, stamp);
             return !stamp.equals(previous);
         }
+    }
+
+    /**
+     * Records a delivery stamp only when it outranks the one recorded now, atomically.
+     *
+     * <p>This is what a resolution that BLOCKED needs. Between {@code resolveValue()} returning and
+     * the caller acting on it, an ordinary Data Layer callback can deliver a newer publication for
+     * the same path; replacing the stamp then hands the app an older payload and leaves the older
+     * stamp recorded, so the newer value stays hidden behind it. The compare and the replace have
+     * to happen under one lock, or the check is just a smaller window.</p>
+     *
+     * @return true when the stamp was taken and the payload should be delivered
+     */
+    static boolean setDeliveredSequenceIfOutranks(String path, long sequence, String node) {
+        String stamp = sequence + "|" + (node == null ? "" : node);
+        synchronized (deliveredSequences) {
+            String previous = deliveredSequences.get(path);
+            if (previous != null && !outranks(sequence, node,
+                    stampSequence(previous), stampNode(previous))) {
+                return false;
+            }
+            String old = deliveredSequences.put(path, stamp);
+            return !stamp.equals(old);
+        }
+    }
+
+    /** The recorded stamp for a path, or null -- an opaque snapshot for {@link #forgetDeliveredSequenceIfUnchanged}. */
+    static String deliveredStamp(String path) {
+        synchronized (deliveredSequences) {
+            return deliveredSequences.get(path);
+        }
+    }
+
+    /**
+     * Drops a path's stamp only if it still matches {@code expected}.
+     *
+     * <p>Guards the other half of the same race: a resolution that came back empty may be reporting
+     * a path that a concurrent publication has since refilled, and announcing a removal for it
+     * would be wrong in the one direction the app cannot recover from.</p>
+     *
+     * @return true when the stamp was unchanged and has now been dropped
+     */
+    static boolean forgetDeliveredSequenceIfUnchanged(String path, String expected) {
+        synchronized (deliveredSequences) {
+            String current = deliveredSequences.get(path);
+            boolean unchanged = current == null ? expected == null : current.equals(expected);
+            if (unchanged) {
+                deliveredSequences.remove(path);
+            }
+            return unchanged;
+        }
+    }
+
+    private static long stampSequence(String stamp) {
+        int bar = stamp.indexOf('|');
+        try {
+            return Long.parseLong(bar < 0 ? stamp : stamp.substring(0, bar));
+        } catch (RuntimeException unparsable) {
+            // Treat an unreadable stamp as the weakest possible, so a real value outranks it rather
+            // than being refused by a record nobody can interpret.
+            return Long.MIN_VALUE;
+        }
+    }
+
+    private static String stampNode(String stamp) {
+        int bar = stamp.indexOf('|');
+        if (bar < 0 || bar + 1 >= stamp.length()) {
+            return null;
+        }
+        return stamp.substring(bar + 1);
     }
 
     /**
@@ -1636,18 +1715,25 @@ public class CN1WearableBridge implements WearableBridge {
         transferTimer.schedule(new java.util.TimerTask() {
             public void run() {
                 try {
+                    // Snapshot BEFORE the query. resolveValue() blocks, and an ordinary callback can
+                    // deliver a newer publication for this path while it does; both branches below
+                    // have to notice that rather than act on a view of the world that has expired.
+                    String before = deliveredStamp(path);
                     ResolvedValue winner = resolveValue(context, path);
-                    // setDeliveredSequence is the same guard the inline path uses, so a normal event
-                    // that arrived and stamped this path while we were waiting is not re-announced.
                     if (winner != null) {
-                        if (setDeliveredSequence(path, winner.sequence, winner.node)) {
+                        // Compare-and-replace under one lock. A plain replace would overwrite the
+                        // newer stamp with this older one and hand the app the older payload, and
+                        // the newer value would then stay hidden behind the stamp it just lost to.
+                        if (setDeliveredSequenceIfOutranks(path, winner.sequence, winner.node)) {
                             WearableConnection.deliverDataChanged(path, winner.payload);
                         }
-                    } else if (wasAfterDeletion(path)) {
-                        // The deletion really did empty the path. Report it now, and drop the stamp
-                        // for the same reason the inline path does: a value republished later with a
-                        // lower sequence than the removed one must not be filtered as older.
-                        forgetDeliveredSequence(path);
+                    } else if (wasAfterDeletion(path)
+                            && forgetDeliveredSequenceIfUnchanged(path, before)) {
+                        // Empty AND nothing landed while we were asking. Announcing a removal for a
+                        // path a concurrent publication has since refilled is the one error the app
+                        // cannot recover from, so it is conditional on the stamp being untouched.
+                        // Dropping the stamp stays coupled to the removal: a value republished later
+                        // with a lower sequence must not then be filtered as older.
                         WearableConnection.deliverDataRemoved(path);
                     }
                     forgetPendingWinner(path);

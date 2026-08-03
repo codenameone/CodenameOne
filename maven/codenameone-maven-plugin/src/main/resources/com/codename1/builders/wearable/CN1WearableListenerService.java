@@ -211,7 +211,12 @@ public class CN1WearableListenerService extends WearableListenerService {
                         // survivor carries a lower sequence than the winner just deleted (which is
                         // ordinary: the winner is gone precisely because it was removed), leaving
                         // the dead item's higher stamp recorded and filtering out any later item
-                        // that falls between the two.
+                        // that falls between the two. So this is the ONE caller that deliberately
+                        // keeps the unconditional setDeliveredSequence rather than the
+                        // outranks-guarded form the resolution paths use: the stamp being replaced
+                        // describes an item that no longer exists, so there is no newer live value
+                        // to protect here.
+                        //
                         // Only when the winner actually changed. Deleting a lower-ranked SHADOW
                         // replica leaves the same item winning, and re-announcing a value the app
                         // already holds is a spurious change -- listeners re-render, and anything
@@ -257,7 +262,11 @@ public class CN1WearableListenerService extends WearableListenerService {
                 try {
                     CN1WearableBridge.ResolvedValue winner =
                             CN1WearableBridge.resolveValueWithRetry(this, appPath);
-                    if (winner != null && CN1WearableBridge.setDeliveredSequence(
+                    // Compare-and-replace, not a plain replace: resolveValueWithRetry blocks (and
+                    // retries), so another callback can stamp this path with a NEWER publication
+                    // while it runs. Overwriting that would deliver the older payload and leave the
+                    // older stamp recorded, hiding the newer value behind it.
+                    if (winner != null && CN1WearableBridge.setDeliveredSequenceIfOutranks(
                             appPath, winner.sequence, winner.node)) {
                         WearableConnection.deliverDataChanged(appPath, winner.payload);
                     }
