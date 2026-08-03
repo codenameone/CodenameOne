@@ -33,6 +33,7 @@ import com.codename1.util.AsyncResult;
 
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.prefs.BackingStoreException;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
