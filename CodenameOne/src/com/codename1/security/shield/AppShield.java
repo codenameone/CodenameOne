@@ -847,26 +847,26 @@ public final class AppShield {
         if (status == null) {
             return;
         }
-        // The transition and its dispatch happen under one lock, so the order listeners
-        // are told in is the order the transitions happened in.
+        // The transition happens under the lock; the dispatch is queued outside it.
         //
-        // Storing the status and enqueueing the notification as two steps let two network
-        // threads interleave: A stores, B stores and enqueues, A enqueues. Listeners then
-        // finished on A while getStatus() already answered B -- a UI showing "service
-        // down" for a shield that is fine, or the reverse, with nothing further to correct
-        // it because the next transition is the one after that.
+        // Both halves matter. Storing the status and enqueueing its notification as two
+        // unsynchronized steps let two network threads interleave -- A stores, B stores
+        // and enqueues, A enqueues -- and listeners then finished on A while getStatus()
+        // already answered B, with nothing later to correct them. But holding the monitor
+        // across callSerially is not the fix: callSerially runs the task INLINE when the
+        // EDT is not up, so it would run application listeners under this class's monitor,
+        // and a listener that touches the shield -- or waits on a thread that does --
+        // deadlocks against attach(), which waits on the same monitor for initialization.
         //
-        // Holding the monitor across callSerially is safe and deliberate: it only appends
-        // to the EDT queue, and nothing on that path calls back into this class. The
-        // alternative -- sequence numbers and dropped stale dispatches -- gives listeners
-        // the right final state but silently swallows intermediate ones, and a listener
-        // that logs or counts transitions has every reason to want them all.
+        // So staleness is settled at delivery instead, exactly as ShieldSignals does it: a
+        // dispatch that no longer describes the current status drops itself. A superseded
+        // status was already wrong when it was queued.
+        ShieldListener[] copy;
         synchronized (AppShield.class) {
             if (status.equals(lastStatus)) {
                 return;
             }
             lastStatus = status;
-            ShieldListener[] copy;
             synchronized (listeners) {
                 if (listeners.isEmpty()) {
                     return;
@@ -874,7 +874,17 @@ public final class AppShield {
                 copy = new ShieldListener[listeners.size()];
                 listeners.copyInto(copy);
             }
-            Display.getInstance().callSerially(new StatusDispatch(copy, status));
+        }
+        Display.getInstance().callSerially(new StatusDispatch(copy, status));
+    }
+
+    /// Whether this is still the status the shield holds.
+    ///
+    /// Read under the same monitor the transition is written under, so a dispatch either
+    /// sees the value it was queued for or a newer one -- never a half-written state.
+    static boolean isCurrentStatus(ShieldStatus status) {
+        synchronized (AppShield.class) {
+            return status.equals(lastStatus);
         }
     }
 
@@ -941,6 +951,12 @@ public final class AppShield {
 
         @Override
         public void run() {
+            // Checked here rather than at enqueue time, because what matters is the state
+            // at delivery: a transition superseded between being queued and arriving would
+            // otherwise leave listeners holding a status the shield itself no longer has.
+            if (!isCurrentStatus(status)) {
+                return;
+            }
             for (ShieldListener target : targets) {
                 target.statusChanged(status);
             }

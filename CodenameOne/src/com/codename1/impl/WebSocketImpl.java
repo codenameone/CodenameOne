@@ -120,14 +120,49 @@ public abstract class WebSocketImpl {
             String[] pair = (String[]) requestHeaders.get(key);
             String name = pair[0];
             String value = pair[1];
+            // The NAME is checked for being a legal field-name token before anything is
+            // decided about it. Screening only for CR and LF let "Sec-WebSocket-Extensions "
+            // -- one trailing space -- past the reserved-name comparison, and a lenient
+            // server trims that and negotiates the extension anyway. These readers do not
+            // process RSV1 or inflate payloads, so a compressed frame arrives as garbage:
+            // the reserved list exists precisely to stop that being negotiable, and a
+            // comparison that any non-token character walks around is not a list.
+            if (!isFieldNameToken(name)) {
+                continue;
+            }
             if (isReservedHandshakeHeader(name)) {
                 continue;
             }
-            if (containsCrLf(name) || containsCrLf(value)) {
+            if (containsCrLf(value)) {
                 continue;
             }
             req.append(name).append(": ").append(value).append("\r\n");
         }
+    }
+
+    /// Whether this is a legal HTTP field name -- RFC 9110 token, so no spaces, no
+    /// separators, nothing outside printable ASCII.
+    ///
+    /// Rejecting rather than trimming: a caller that wrote a trailing space meant one
+    /// header and a lenient server would read another, and quietly repairing the
+    /// difference is how the two ends stop agreeing about what was sent.
+    private static boolean isFieldNameToken(String name) {
+        if (name == null || name.length() == 0) {
+            return false;
+        }
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c <= 0x20 || c >= 0x7f) {
+                return false;
+            }
+            if (c == '(' || c == ')' || c == '<' || c == '>' || c == '@' || c == ','
+                    || c == ';' || c == ':' || c == '\\' || c == '"' || c == '/'
+                    || c == '[' || c == ']' || c == '?' || c == '=' || c == '{'
+                    || c == '}') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isReservedHandshakeHeader(String name) {

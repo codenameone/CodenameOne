@@ -239,6 +239,48 @@ class WebSocketTest {
                 "and an ordinary header still goes out: " + emitted);
     }
 
+    /**
+     * A reserved header cannot be smuggled past the list by adding a space.
+     *
+     * <p>The comparison screened names only for CR and LF, so
+     * {@code "Sec-WebSocket-Extensions "} did not match the reserved name and was
+     * emitted. Lenient servers trim that and negotiate the extension -- and these readers
+     * neither look at RSV1 nor inflate anything, so every compressed frame afterwards is
+     * garbage. A list that any non-token character walks around is not a list.</p>
+     */
+    @Test
+    void aReservedHeaderWithTrailingSpaceIsNotEmitted() {
+        MockImpl impl = new MockImpl("wss://example.com/socket");
+        impl.setRequestHeader("Sec-WebSocket-Extensions ", "permessage-deflate");
+        impl.setRequestHeader("Sec-WebSocket-Extensions\t", "permessage-deflate");
+        impl.setRequestHeader("X-Fine", "yes");
+
+        String emitted = impl.testHandshakeHeaders();
+
+        assertFalse(emitted.toLowerCase().contains("permessage-deflate"),
+                "a compression extension these readers cannot decode must not reach the "
+                + "wire, whatever the name was padded with: " + emitted);
+        assertTrue(emitted.contains("X-Fine: yes"),
+                "and an ordinary header is unaffected: " + emitted);
+    }
+
+    /** Names that are not field tokens are refused rather than repaired. */
+    @Test
+    void aHeaderNameThatIsNotATokenIsRefused() {
+        MockImpl impl = new MockImpl("wss://example.com/socket");
+        impl.setRequestHeader("X Bad", "1");
+        impl.setRequestHeader("X:Bad", "2");
+        impl.setRequestHeader("X\u00e9", "3");
+        impl.setRequestHeader("X-Good", "4");
+
+        String emitted = impl.testHandshakeHeaders();
+
+        assertFalse(emitted.contains("X Bad"), emitted);
+        assertFalse(emitted.contains("X:Bad"), emitted);
+        assertFalse(emitted.contains("3"), emitted);
+        assertTrue(emitted.contains("X-Good: 4"), emitted);
+    }
+
     private final class WebSocketingImpl extends TestCodenameOneImplementation {
         boolean supported = true;
 

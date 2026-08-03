@@ -138,6 +138,13 @@ public final class JavaSESecureStorage extends SecureStorage {
             Base64.Encoder b64 = Base64.getEncoder();
             plainPrefs.put(VALUE_PREFIX + account,
                     b64.encodeToString(c.getIV()) + ":" + b64.encodeToString(enc));
+            // flush(), and its outcome is this method's answer. Preferences writes back
+            // on its own schedule, so returning true said the secret was stored while it
+            // was still only in memory -- and the simulator is killed abruptly all the
+            // time, by the run button and by the IDE. The same reasoning as the Android
+            // tier committing rather than applying: a write that reports success has to
+            // have happened.
+            plainPrefs.flush();
             return true;
         } catch (Exception e) {
             Log.e(e);
@@ -177,6 +184,14 @@ public final class JavaSESecureStorage extends SecureStorage {
             return false;
         }
         plainPrefs.remove(VALUE_PREFIX + account);
+        try {
+            // Same for the removal, and it matters more: this is the credential a logout
+            // clears, so an unflushed deletion is one that comes back on the next launch.
+            plainPrefs.flush();
+        } catch (BackingStoreException e) {
+            Log.e(e);
+            return false;
+        }
         return true;
     }
 
