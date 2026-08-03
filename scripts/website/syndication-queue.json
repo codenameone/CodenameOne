@@ -2,22 +2,6 @@
   "_comment": "Queue of browser-only syndication tasks (Medium, DZone, Hashnode) drained by a local syndication tool that runs on the maintainer's machine inside an already-signed-in browser session. Tasks are appended by scripts/website/queue_browser_syndication.py which is invoked by the daily blog-syndication workflow, and the local tool writes the resulting URLs back into syndication-state.json.",
   "tasks": [
     {
-      "id": "linkedin:2026-08-03-1200-codenameone-road-following-map-routing",
-      "site": "linkedin",
-      "kind": "social",
-      "slug": "2026-08-03-1200-codenameone-road-following-map-routing",
-      "source_slug": "road-following-map-routing",
-      "account": "codenameone",
-      "title": "A polyline is not a route",
-      "canonical": "https://www.codenameone.com/blog/road-following-map-routing/",
-      "cover_image_url": "https://www.codenameone.com/blog/road-following-map-routing.jpg",
-      "body_text": "A polyline joins the coordinates you already have. It cannot discover the road between them.\n\nThe new `com.codename1.maps.routing` API turns an origin, destination, and optional waypoints into road-following geometry, distance, duration, alternatives, legs, and steps.\n\nThe small path is two lines: create a map and call `Routing.showRoute(...)`.\n\nThe controlled path returns portable `Route` objects so the application can style the line, frame the bounds, show distance and ETA, compare alternatives, or retain encoded geometry.\n\nThe default OSRM service is keyless and useful for a first run. Its public demo endpoint has no production SLA and uses a car profile, so asking it for walking or cycling does not make the underlying road graph change.\n\nProduction applications can point at a controlled OSRM instance or install another `RouteService`.\n\nhttps://www.codenameone.com/blog/road-following-map-routing/",
-      "scheduled_at": "2026-08-03T09:00:00+00:00",
-      "scheduled_local": "2026-08-03T12:00+03:00",
-      "timezone": "Asia/Jerusalem",
-      "queued_at": "2026-07-31T15:14:58+00:00"
-    },
-    {
       "id": "linkedin:2026-08-04-1200-shai-maven-central-cloudflare-r2",
       "site": "linkedin",
       "kind": "social",
