@@ -154,6 +154,18 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         }
     }
 
+    /// Test hook: makes this transport the one a freshly constructed [Connection] binds
+    /// to, without binding a real socket.
+    ///
+    /// The binding is what a test needs to reach -- `open()` requires loopback server
+    /// sockets, which not every environment running these tests has -- and the field it
+    /// sets is the same one `open()` sets.
+    static void setActiveForTesting(MCPLoopbackSocketTransport t) {
+        synchronized (MCPLoopbackSocketTransport.class) {
+            active = t;
+        }
+    }
+
     /// Releases the process-wide registration, but only when it is still this transport's.
     private void clearActiveIfOurs() {
         synchronized (MCPLoopbackSocketTransport.class) {
@@ -416,6 +428,26 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         /// instead of once per retry. Only ever touched from the listener thread.
         private static String lastReportedError;
 
+        /// The transport whose listener accepted THIS connection.
+        ///
+        /// Captured when the socket API constructs the callback, which happens on the
+        /// listener thread as the connection is accepted -- not when the callback body
+        /// later runs, which is where it used to be read. Between those two moments a
+        /// transport can close and another can take the process-wide slot, and the
+        /// already-accepted streams were then attached to the new one: a client of the
+        /// listener that has stopped replaces the session of the server that has just
+        /// started. Binding the callback to its own acceptor makes that impossible to
+        /// express.
+        private final MCPLoopbackSocketTransport acceptedBy;
+
+        /// Public and no-argument because [Socket#listenLoopback] constructs this
+        /// reflectively; the binding above is what the constructor exists for.
+        public Connection() {
+            synchronized (MCPLoopbackSocketTransport.class) {
+                acceptedBy = active;
+            }
+        }
+
         @Override
         public void connectionError(int errorCode, String message) {
             // Without this the failure is silent: startSocketServer returns, the server
@@ -438,12 +470,22 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
 
         @Override
         public void connectionEstablished(InputStream is, OutputStream os) {
-            MCPLoopbackSocketTransport transport;
-            synchronized (MCPLoopbackSocketTransport.class) {
-                transport = active;
-            }
+            MCPLoopbackSocketTransport transport = acceptedBy;
             if (transport == null) {
+                closeQuietly(is);
+                closeQuietly(os);
                 return;
+            }
+            // Closed between accepting this connection and running this callback. The
+            // streams belong to a session nobody is serving, so they are closed rather
+            // than handed to whichever transport is open now -- which would let a client
+            // of the stopped listener take over the new server's session.
+            synchronized (transport.lock) {
+                if (transport.closed) {
+                    closeQuietly(is);
+                    closeQuietly(os);
+                    return;
+                }
             }
             transport.attach(is, os);
             // Hold this callback thread for the life of the session: the socket API closes

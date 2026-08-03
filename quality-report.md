@@ -1,8 +1,8 @@
 ## ✅ Continuous Quality Report
 
 ### Test & Coverage
-- ✅ **Tests:** 4743 total, 0 failed, 0 skipped
-- 📊 **Line coverage:** 58.86%
+- ✅ **Tests:** 4744 total, 0 failed, 0 skipped
+- 📊 **Line coverage:** 58.91%
   - **Lowest covered classes**
     - `com.codename1.gaming.level.GameSceneView` – 0.00%
     - `com.codename1.crash.CrashProtection` – 0.00%
@@ -11,9 +11,9 @@
     - `com.codename1.crash.CrashReportPayload` – 0.00%
     - `com.codename1.vr.VRView` – 0.00%
     - `com.codename1.appreview.RatingDialog` – 0.00%
-    - `com.codename1.security.shield.ShieldSignals` – 0.00%
     - `com.codename1.calendar.DefaultCalendarHttpTransport` – 0.00%
     - `com.codename1.security.Secrets` – 0.00%
+    - `com.codename1.calendar.OidcCalendarTokenProvider` – 0.00%
 
 ### Static Analysis
 - **SpotBugs**

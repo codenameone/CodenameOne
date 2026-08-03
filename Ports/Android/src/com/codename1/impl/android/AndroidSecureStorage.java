@@ -51,6 +51,7 @@ import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 
 import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
@@ -110,7 +111,6 @@ public final class AndroidSecureStorage extends SecureStorage {
 
     private KeyStore keyStore;
     private KeyGenerator keyGenerator;
-    private Cipher cipher;
     private boolean keyRevoked;
     private CancellationSignal cancellationSignal;
 
@@ -537,9 +537,13 @@ public final class AndroidSecureStorage extends SecureStorage {
                 return;
             }
         }
-        if (!initCipher(mode, account)) {
+        Cipher operationCipher = initCipher(mode, account);
+        if (operationCipher == null) {
             if (mode == Cipher.ENCRYPT_MODE) {
-                if (!createKey() || !initCipher(mode, account)) {
+                if (createKey()) {
+                    operationCipher = initCipher(mode, account);
+                }
+                if (operationCipher == null) {
                     failResult(result, BiometricError.UNKNOWN, "Failed to initialise cipher");
                     return;
                 }
@@ -549,15 +553,19 @@ public final class AndroidSecureStorage extends SecureStorage {
                 return;
             }
         }
+        // Carried as a parameter from here on. It belongs to this operation and to no
+        // other, which is what stops a concurrent call from handing its cipher to this
+        // prompt.
         if (Build.VERSION.SDK_INT >= 29) {
-            promptBiometric29(reason, mode, account, result, work);
+            promptBiometric29(reason, mode, account, result, work, operationCipher);
         } else {
-            promptBiometricLegacy(mode, account, result, work);
+            promptBiometricLegacy(mode, account, operationCipher, result, work);
         }
     }
 
     private <V> void promptBiometric29(final String reason, final int mode, final String account,
-                                       final AsyncResource<V> result, final CipherWork<V> work) {
+                                       final AsyncResource<V> result, final CipherWork<V> work,
+                                       final Cipher operationCipher) {
         AndroidBiometrics.runOnUi(new Runnable() {
             @Override
             public void run() {
@@ -570,7 +578,7 @@ public final class AndroidSecureStorage extends SecureStorage {
                         AndroidNativeUtil.getActivity(),
                         reason == null ? "Authenticate" : reason,
                         null, null, "Cancel",
-                        cipher,
+                        operationCipher,
                         cs,
                         new BiometricsApi29.CipherAuthCallback() {
                             @Override
@@ -591,6 +599,7 @@ public final class AndroidSecureStorage extends SecureStorage {
     }
 
     private <V> void promptBiometricLegacy(final int mode, final String account,
+                                           final Cipher operationCipher,
                                            final AsyncResource<V> result, final CipherWork<V> work) {
         AndroidBiometrics.runOnUi(new Runnable() {
             @Override
@@ -608,7 +617,7 @@ public final class AndroidSecureStorage extends SecureStorage {
                 final CancellationSignal cs = new CancellationSignal();
                 cancellationSignal = cs;
                 FingerprintManager.CryptoObject crypto =
-                        new FingerprintManager.CryptoObject(cipher);
+                        new FingerprintManager.CryptoObject(operationCipher);
                 fpm.authenticate(crypto, cs, 0, new FingerprintManager.AuthenticationCallback() {
                     int failures;
 
@@ -643,14 +652,24 @@ public final class AndroidSecureStorage extends SecureStorage {
             V v = work.run(authedCipher);
             succeedResult(result, v);
         } catch (Throwable t) {
-            // Samsung 8.0.0 quirk: the cipher passes init but doFinal fails
-            // with a key-invalidated error. Delete the key and let the caller
-            // retry the entire operation.
-            // https://issuetracker.google.com/u/0/issues/65578763
-            removePermanentlyInvalidatedKey();
-            cipher = null;
-            failResult(result, BiometricError.KEY_REVOKED,
-                    "Cipher operation failed; key invalidated: " + t.getMessage());
+            // Only a failure that says the KEY is finished deletes the key.
+            //
+            // There is one keystore key behind every biometric account, so this catch
+            // used to answer a malformed stored value, or an Activity that went away
+            // mid-prompt, by destroying every other entry in the store -- permanently,
+            // and while telling the caller its key had been revoked when it had not.
+            // The Samsung 8.0.0 quirk this was written for is still handled: a cipher
+            // that initialises and then fails inside doFinal with a keystore error
+            // underneath is that case, and isKeyInvalidation recognises it.
+            if (isKeyInvalidation(t)) {
+                removePermanentlyInvalidatedKey();
+                failResult(result, BiometricError.KEY_REVOKED,
+                        "Cipher operation failed; key invalidated: " + t.getMessage());
+            } else {
+                Log.e(t);
+                failResult(result, BiometricError.UNKNOWN,
+                        "Cipher operation failed: " + t.getMessage());
+            }
         }
     }
 
@@ -762,56 +781,99 @@ public final class AndroidSecureStorage extends SecureStorage {
         return null;
     }
 
-    private Cipher cipher() {
-        if (cipher == null) {
-            try {
-                cipher = Cipher.getInstance(KeyProperties.KEY_ALGORITHM_AES
-                        + "/" + KeyProperties.BLOCK_MODE_CBC
-                        + "/" + KeyProperties.ENCRYPTION_PADDING_PKCS7);
-            } catch (NoSuchAlgorithmException e) {
-                throw new RuntimeException("Cipher init failed", e);
-            } catch (NoSuchPaddingException e) {
-                throw new RuntimeException("Cipher init failed", e);
-            }
+    /**
+     * A NEW cipher every time, never a shared field.
+     *
+     * <p>The prompt is raised from a UI runnable, so an operation is in flight from the
+     * moment it initialises its cipher until that runnable runs. With one instance field,
+     * a second {@code set()} or {@code get()} starting in that window re-initialised the
+     * same object and the first prompt was handed the second operation's cipher -- wrong
+     * mode, or the wrong account's IV. The work then failed, and the failure handler read
+     * that as an invalidated key and deleted the one key every biometric entry shares.</p>
+     */
+    private Cipher newCipher() {
+        try {
+            return Cipher.getInstance(KeyProperties.KEY_ALGORITHM_AES
+                    + "/" + KeyProperties.BLOCK_MODE_CBC
+                    + "/" + KeyProperties.ENCRYPTION_PADDING_PKCS7);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Cipher init failed", e);
+        } catch (NoSuchPaddingException e) {
+            throw new RuntimeException("Cipher init failed", e);
         }
-        return cipher;
     }
 
-    private boolean initCipher(int mode, String account) {
+    /** The initialised cipher for this one operation, or null if it could not be made. */
+    private Cipher initCipher(int mode, String account) {
         try {
             SecretKey key = getSecretKey();
             if (key == null) {
-                return false;
+                return null;
             }
+            Cipher c = newCipher();
             if (mode == Cipher.ENCRYPT_MODE) {
-                cipher().init(mode, key);
+                c.init(mode, key);
             } else {
                 SharedPreferences sp = AndroidNativeUtil.getActivity()
                         .getApplicationContext()
                         .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
                 byte[] iv = Base64.decode(sp.getString("iv_" + account, ""), Base64.DEFAULT);
-                cipher().init(mode, key, new IvParameterSpec(iv));
+                c.init(mode, key, new IvParameterSpec(iv));
             }
-            return true;
+            return c;
         } catch (KeyPermanentlyInvalidatedException e) {
             removePermanentlyInvalidatedKey();
-            return false;
+            return null;
         } catch (InvalidKeyException e) {
             Log.e(e);
-            return false;
+            return null;
         } catch (InvalidAlgorithmParameterException e) {
             Log.e(e);
-            return false;
+            return null;
         }
     }
 
     private void removePermanentlyInvalidatedKey() {
         try {
             keyStore().deleteEntry(KEY_ID);
-            cipher = null;
         } catch (KeyStoreException e) {
             Log.e(e);
         }
+    }
+
+    /**
+     * Whether a failure means the keystore key is gone, as opposed to this one operation
+     * having failed.
+     *
+     * <p>The distinction is the whole point. There is ONE key behind every biometric
+     * account, so deleting it on any failure -- a malformed stored value, an Activity that
+     * went away mid-prompt, a null passed into the work -- made every other entry
+     * permanently unreadable, and told the caller its key had been revoked when it had
+     * not. Only two shapes say the key itself is finished: the exception Android raises
+     * for it, and the Samsung 8.0.0 quirk where a cipher initialises and then fails inside
+     * doFinal with a keystore error underneath.</p>
+     *
+     * <p>https://issuetracker.google.com/u/0/issues/65578763</p>
+     */
+    private static boolean isKeyInvalidation(Throwable t) {
+        // Bounded rather than while(cause != null): a self-referential cause is rare and
+        // a hang inside a failure handler is worse than a missed classification.
+        Throwable c = t;
+        for (int depth = 0; c != null && depth < 8; depth++) {
+            if (c instanceof KeyPermanentlyInvalidatedException) {
+                return true;
+            }
+            if (c instanceof IllegalBlockSizeException
+                    && c.getCause() instanceof KeyStoreException) {
+                return true;
+            }
+            Throwable next = c.getCause();
+            if (next == c) {
+                break;
+            }
+            c = next;
+        }
+        return false;
     }
 
     /** Lambda-stand-in for Java 5 source level: cipher op that may throw. */
