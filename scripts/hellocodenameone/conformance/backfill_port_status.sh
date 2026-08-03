@@ -189,6 +189,12 @@ while IFS= read -r workflow; do
           *" ${found} "*) ;;
           *)
             echo "Ignoring a report naming ${found}: ${workflow} does not produce that port." >&2
+            # Same standing as a malformed report, and for the same reason: the
+            # sweep can still find an older, correct artifact for the port this
+            # workflow really owns, and while that one stays fresh the closing
+            # check passes and the job goes green over a producer that is
+            # emitting misidentified data. Preserve the good report, then fail.
+            unusable+=("${workflow}: run ${candidate} uploaded a report naming ${found}, which it does not produce")
             continue
             ;;
         esac

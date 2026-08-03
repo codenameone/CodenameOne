@@ -51,6 +51,9 @@
 #ifndef STATUS_AUTH_TAG_MISMATCH
 #define STATUS_AUTH_TAG_MISMATCH ((NTSTATUS) 0xC000A002L)
 #endif
+#ifndef STATUS_INVALID_SIGNATURE
+#define STATUS_INVALID_SIGNATURE ((NTSTATUS) 0xC000A000L)
+#endif
 
 #define CN1_GCM_TAG_BYTES 16
 
@@ -1104,12 +1107,24 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_verifyData___java_lang_Str
                 toVerifyLength = (ULONG) (half * 2);
             }
         }
-        /* A rejected signature is a normal answer here, not a fault. */
-        if (usable && BCryptVerifySignature(key, isEc ? NULL : &padding, digest,
-                                            (ULONG) digestLength, (PUCHAR) toVerify,
-                                            toVerifyLength,
-                                            isEc ? 0 : BCRYPT_PAD_PKCS1) == STATUS_SUCCESS) {
-            result = JAVA_TRUE;
+        if (!usable) {
+            cn1CryptoFail("could not read the signature for verification", 0);
+        } else {
+            NTSTATUS verifyStatus = BCryptVerifySignature(key, isEc ? NULL : &padding, digest,
+                                                          (ULONG) digestLength, (PUCHAR) toVerify,
+                                                          toVerifyLength,
+                                                          isEc ? 0 : BCRYPT_PAD_PKCS1);
+            if (verifyStatus == STATUS_SUCCESS) {
+                result = JAVA_TRUE;
+            } else if (verifyStatus != STATUS_INVALID_SIGNATURE) {
+                /* Only STATUS_INVALID_SIGNATURE means "this signature is bad".
+                 * An invalid handle, parameter or unsupported algorithm means
+                 * verification never ran, and answering a bare false for those
+                 * reported tampering where the real fault was configuration --
+                 * the same conflation the Linux port had. Recording the status
+                 * is what makes cryptoVerify raise a CryptoException instead. */
+                cn1CryptoFail("signature verification failed to run", verifyStatus);
+            }
         }
     }
     BCryptDestroyKey(key);
