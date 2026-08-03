@@ -381,7 +381,16 @@ jobs:
   compare-comment:
     name: screenshot-comment
     needs: build-run
-    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # !cancelled() rather than a plain event check: without it GitHub skips this
+    # job whenever a build-run leg fails, and skipping it is precisely the wrong
+    # response to a failing suite. Normalization is what publishes the fail /
+    # not-run counts, so being skipped leaves the public table showing the last
+    # green report -- a failure masked as a pass. The workflow still goes red
+    # because build-run itself failed; this only keeps the reporting honest.
+    if: >-
+      !cancelled() &&
+      (github.event_name == 'pull_request' || github.event_name == 'push' ||
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: read
