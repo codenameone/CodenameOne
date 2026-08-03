@@ -123,6 +123,18 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         // the very window the flag exists to cover. Raising it first makes the
         // interval from "the slot is ours" to "the bind is resolved" continuous.
         synchronized (lock) {
+            // Never claim the slot for a transport that is already closed. open()
+            // runs on the server's reader thread, so stop() routinely wins this
+            // race -- and claiming anyway meant the slot stayed held until the
+            // reader thread got as far as noticing `closed` and releasing it. That
+            // release is asynchronous, so a start() immediately after stop() could
+            // still find the slot taken ("already open on port N"), which is the
+            // order-dependent failure MCPLoopbackTransportOpenTest exists to pin.
+            // Refusing up front means there is nothing to release.
+            if (closed) {
+                throw new IOException(
+                        "This MCP socket transport was closed before it began listening");
+            }
             binding = true;
         }
         boolean claimed = false;
