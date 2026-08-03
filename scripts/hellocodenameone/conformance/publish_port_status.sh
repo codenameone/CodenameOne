@@ -17,10 +17,25 @@ if [ "${PORT_STATUS_PUBLISH:-}" != "1" ] && { [ "${GITHUB_ACTIONS:-}" != "true" 
 fi
 
 branch="port-status-data"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 port="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["port"])' "$report")"
-performance_status="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("performance", {}).get("status", "missing"))' "$report")"
-if [ "$performance_status" != "complete" ]; then
-  echo "Not publishing incomplete ${port} performance data (${performance_status}); preserving the last complete report."
+
+# One acceptance rule, shared with the backfill sweep, rather than a second
+# opinion here. This used to refuse anything whose performance run was not
+# "complete" -- but a suite that crashes never reaches the benchmark, so its
+# report is partial by construction and that rule dropped precisely the reports
+# carrying fail / not-run evidence, leaving the table on the last green one.
+# port_status.py decides; a partial performance section is simply not presented
+# as performance.
+accept_status=0
+python3 "${script_dir}/port_status.py" accept --port "${port}" --report "${report}" || accept_status=$?
+if [ "${accept_status}" -ne 0 ]; then
+  case "${accept_status}" in
+    11) reason="built against a different test contract; waiting for a run on the current one" ;;
+    12) reason="not usable by the website" ;;
+    *) reason="rejected by the publication gate (status ${accept_status})" ;;
+  esac
+  echo "Not publishing the ${port} report: ${reason}; preserving the last published one."
   exit 0
 fi
 

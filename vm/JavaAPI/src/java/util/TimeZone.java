@@ -182,6 +182,14 @@ public abstract class TimeZone{
         if (custom != null) {
             return custom;
         }
+        if (isOffsetIdAttempt(ID)) {
+            // A malformed offset ID resolves to GMT, as it does on every other
+            // port. Handing it to the platform instead was actively harmful:
+            // the POSIX tz syntax the natives speak reads the sign the other way
+            // round, so "UTC+5" came back as five hours *west* -- a ten-hour
+            // error against JavaSE for the same string.
+            return GMT;
+        }
         if (ID.equalsIgnoreCase(getTimezoneId())) {
             return getDefault();
         } else {
@@ -257,44 +265,108 @@ public abstract class TimeZone{
         if (sign != '+' && sign != '-') {
             return null;
         }
+        // Only "GMT" takes an offset suffix. java.util.TimeZone defines the
+        // custom-ID syntax on GMT alone, so JavaSE and Android answer plain GMT
+        // for "UTC+5" / "UT+5"; accepting them here gave the same ID a different
+        // offset depending on the port.
+        if (index != 3 || !ID.startsWith("GMT")) {
+            return null;
+        }
         String digits = ID.substring(index + 1);
+        String hourPart;
+        String minutePart;
         int colon = digits.indexOf(':');
-        String hourPart = colon < 0 ? digits : digits.substring(0, colon);
-        String rest = colon < 0 ? "" : digits.substring(colon + 1);
-        String minutePart = "0";
-        String secondPart = "0";
         if (colon < 0) {
-            // The colon-less forms are h, hh, hmm, hhmm and hhmmss: the last two
-            // digits are always the minutes once there are more than two, so a
-            // one-digit hour ("GMT+012" is UTC+00:12) splits the same way.
+            // Colon-less forms are h, hh, hmm and hhmm only. The five- and
+            // six-digit forms this used to accept ("GMT+013000") are not custom
+            // IDs at all -- the JDK falls back to GMT for them.
             int length = digits.length();
-            if (length == 3 || length == 4 || length == 6) {
-                int hourDigits = length == 6 ? 2 : length - 2;
-                hourPart = digits.substring(0, hourDigits);
-                minutePart = digits.substring(hourDigits, hourDigits + 2);
-                secondPart = length == 6 ? digits.substring(4, 6) : "0";
+            if (length == 1 || length == 2) {
+                hourPart = digits;
+                minutePart = "0";
+            } else if (length == 3 || length == 4) {
+                hourPart = digits.substring(0, length - 2);
+                minutePart = digits.substring(length - 2);
+            } else {
+                return null;
             }
         } else {
-            int secondColon = rest.indexOf(':');
-            minutePart = secondColon < 0 ? rest : rest.substring(0, secondColon);
-            secondPart = secondColon < 0 ? "0" : rest.substring(secondColon + 1);
+            String rest = digits.substring(colon + 1);
+            hourPart = digits.substring(0, colon);
+            // No seconds field. java.util.TimeZone documents the custom syntax
+            // as GMT Sign Hours [: Minutes] and nothing more, and JDKs disagree
+            // in practice -- "GMT+01:30:00" is GMT on 17 and GMT+01:30 on 25 --
+            // so honouring it would make this port track whichever JDK the
+            // JavaSE side happened to run. The documented form is the contract.
+            if (rest.indexOf(':') >= 0) {
+                return null;
+            }
+            minutePart = rest;
+            // Hours may be one or two digits, minutes must be exactly two --
+            // "GMT+1:2" is not a custom ID, and treating it as UTC+01:02 put
+            // this port an hour and two minutes away from every other one.
+            if (hourPart.length() < 1 || hourPart.length() > 2 || minutePart.length() != 2) {
+                return null;
+            }
+        }
+        if (!isDigits(hourPart) || !isDigits(minutePart)) {
+            return null;
         }
         int hours;
         int minutes;
-        int seconds;
         try {
             hours = Integer.parseInt(hourPart);
             minutes = Integer.parseInt(minutePart);
-            seconds = Integer.parseInt(secondPart);
         } catch (NumberFormatException notCustom) {
             return null;
         }
-        if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
+        if (hours > 23 || minutes > 59) {
             return null;
         }
-        int offset = ((hours * 60 + minutes) * 60 + seconds) * 1000;
-        return new SimpleTimeZone(sign == '-' ? -offset : offset, ID);
+        int offset = (hours * 60 + minutes) * 60 * 1000;
+        // Normalized like the JDK's, so the same custom ID reports the same
+        // getID() on every port rather than echoing whichever spelling was used.
+        String canonical = "GMT" + sign
+                + (hours < 10 ? "0" : "") + hours + ":"
+                + (minutes < 10 ? "0" : "") + minutes;
+        return new SimpleTimeZone(sign == '-' ? -offset : offset, canonical);
     }
+
+    /**
+     * True when the ID reads as an attempt at a GMT/UT/UTC offset ID, well
+     * formed or not. Those never name a zone in the platform database, so a
+     * malformed one is GMT rather than something for the natives to guess at.
+     */
+    private static boolean isOffsetIdAttempt(String ID) {
+        int index;
+        if (ID.regionMatches(true, 0, "GMT", 0, 3) || ID.regionMatches(true, 0, "UTC", 0, 3)) {
+            index = 3;
+        } else if (ID.regionMatches(true, 0, "UT", 0, 2)) {
+            index = 2;
+        } else {
+            return false;
+        }
+        if (index >= ID.length()) {
+            return false;
+        }
+        char sign = ID.charAt(index);
+        return sign == '+' || sign == '-';
+    }
+
+    /** True when every character is an ASCII digit and there is at least one. */
+    private static boolean isDigits(String value) {
+        if (value.length() == 0) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return true;
+    }
+
 
     /**
      * Queries if this time zone uses Daylight Savings Time.

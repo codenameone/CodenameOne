@@ -70,6 +70,12 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
     private final int port;
     private final Object lock = new Object();
     private Socket.StopListening listening;
+    /// True from just before Socket.listenLoopback is called until its result has been
+    /// published or stopped. `listening` cannot represent that interval -- the listener
+    /// does not exist yet -- but a close() landing inside it must still know a bind is
+    /// coming, or it releases the process-wide slot to a replacement while a listener
+    /// nobody has stopped is about to start accepting.
+    private boolean binding;
     private InputStream in;
     private OutputStream out;
     private boolean closed;
@@ -135,9 +141,15 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         // and the loser cleans up. Either close() sees a published listener and stops
         // it, or we see closed and stop it ourselves.
         Socket.StopListening bound;
+        synchronized (lock) {
+            binding = true;
+        }
         try {
             bound = Socket.listenLoopback(port, Connection.class);
         } catch (RuntimeException ex) {
+            synchronized (lock) {
+                binding = false;
+            }
             // Two things go wrong if this escapes. The process-wide registration would stay
             // pointing at a transport that never started listening, so every later open()
             // would refuse, believing an agent is already served. And the server's reader
@@ -151,6 +163,7 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         }
         boolean closedWhileBinding;
         synchronized (lock) {
+            binding = false;
             closedWhileBinding = closed;
             if (!closedWhileBinding) {
                 listening = bound;
@@ -159,7 +172,8 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         if (closedWhileBinding) {
             // No null check on `bound`: the only way past the try above is with a
             // listener in hand, and SpotBugs flags the redundant test. Stop before
-            // releasing the slot, for the reason close() gives.
+            // releasing the slot, for the reason close() gives. close() deliberately
+            // left the slot claimed for us precisely so this stop() happens first.
             bound.stop();
             clearActiveIfOurs();
             throw new IOException("This MCP socket transport was closed before it began listening");
@@ -402,8 +416,10 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         // takes the lock on its way out.
         InputStream is; // NOPMD closed below, deliberately outside the lock
         OutputStream os; // NOPMD closed below, outside the lock
+        boolean bindInFlight;
         synchronized (lock) {
             closed = true;
+            bindInFlight = binding;
             l = listening;
             listening = null;
             is = in;
@@ -422,7 +438,14 @@ public final class MCPLoopbackSocketTransport implements MCPTransport {
         if (l != null) {
             l.stop();
         }
-        clearActiveIfOurs();
+        if (!bindInFlight) {
+            clearActiveIfOurs();
+        }
+        // Otherwise the slot stays claimed until the in-flight open() has stopped the
+        // listener it is about to receive. Releasing it here would let a replacement
+        // transport take the slot first, and a connection the old listener accepts in
+        // that window resolves `active` to the replacement -- which is not closed, so
+        // its attach() would adopt the retired listener's streams.
         // Closing the output as well as the input: forgetting the field is not enough,
         // because a writer that already captured it would go on writing to a session that
         // has ended, and the socket would stay open until the connection callback unwound.
