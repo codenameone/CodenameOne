@@ -256,7 +256,15 @@ public abstract class TimeZone{
             return null;
         }
         if (index >= ID.length()) {
-            return new SimpleTimeZone(0, ID);
+            // Exact uppercase "UTC" is the only bare spelling that names a zone of
+            // its own. "UT", "utc", "ut" and the rest take the unknown-ID fallback
+            // on JavaSE and Android -- verified identical on JDK 17 and 25 -- so
+            // keeping the caller's spelling here made getID() and equals() differ
+            // across ports while the offset agreed.
+            if ("UTC".equals(ID)) {
+                return new SimpleTimeZone(0, ID);
+            }
+            return GMT;
         }
         char sign = ID.charAt(index);
         if (sign == 'Z' && index + 1 == ID.length()) {

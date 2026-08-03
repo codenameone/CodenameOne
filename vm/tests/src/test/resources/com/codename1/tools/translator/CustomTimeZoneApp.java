@@ -47,7 +47,10 @@ public class CustomTimeZoneApp {
         "GMT+1x", "GMT+", "UTC+5", "UT+5",
         // Z-suffixed pseudo ids name no zone; the JDK takes the unknown-id
         // fallback, so the id has to be GMT and not the spelling asked for.
-        "GMTZ", "UTCZ", "UTZ"
+        "GMTZ", "UTCZ", "UTZ",
+        // Bare prefixes: only exact uppercase UTC names a zone of its own; the
+        // rest take the unknown-id fallback and answer GMT.
+        "UTC", "UT", "utc", "ut", "gmt", "Utc"
     };
 
     public static void main(String[] args) {

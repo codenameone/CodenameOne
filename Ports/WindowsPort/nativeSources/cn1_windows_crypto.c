@@ -875,14 +875,19 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_rsaCrypt___java_lang_String
                 cn1CryptoFail("RSA key size", status);
                 goto done;
             }
-            modulusBytes = bits / 8;
+            /* Round up: a modulus whose bit length is not a multiple of eight
+             * still occupies a whole final octet, and bits / 8 sized the OAEP
+             * block one byte short of it. The DER key material comes from the
+             * caller, so an unusual strength is reachable, and the raw CNG
+             * operation then fails or produces a block no other port can read. */
+            modulusBytes = (bits + 7) / 8;
         } else {
             if (NCryptGetProperty(privateKey, NCRYPT_LENGTH_PROPERTY, (PBYTE) &bits,
                                   sizeof(bits), &propertyBytes, 0) != ERROR_SUCCESS) {
                 cn1CryptoFail("RSA key size", 0);
                 goto done;
             }
-            modulusBytes = bits / 8;
+            modulusBytes = (bits + 7) / 8;   /* see the public branch above */
         }
         block = (unsigned char*) malloc((size_t) modulusBytes + 1);
         if (block == 0) {
