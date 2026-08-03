@@ -383,6 +383,13 @@ class CleanTargetLinuxIntegrationTest {
             // announcement from outside the process always works, and "stopped in X" is
             // the difference between a diagnosable failure and a silent one.
             final java.util.concurrent.atomic.AtomicReference<String> lastStarted = new java.util.concurrent.atomic.AtomicReference<>();
+            // When the app last said anything at all. A stall is only diagnosable
+            // from the state it stalls IN: by the time the 40-minute cap expires
+            // the picture has settled and every thread looks idle. Sampling while
+            // it is stuck is what distinguishes "waiting for a callback that never
+            // came" from "still working".
+            final java.util.concurrent.atomic.AtomicLong lastOutputAt =
+                    new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis());
             final Process appF = app;
             Thread areader = new Thread(() -> {
                 // Tee the app's merged stdout/stderr to CN1_APP_LOG_TEE when
@@ -406,6 +413,7 @@ class CleanTargetLinuxIntegrationTest {
                         if (tee != null) { tee.println(line); }
                         if (line.contains("CN1SS:SUITE:FINISHED")) { finished.set(true); }
                         if (line.contains("CN1SS:SUITE:WEDGED")) { wedged.set(line); }
+                        lastOutputAt.set(System.currentTimeMillis());
                         int startedAt = line.indexOf("CN1SS:INFO:suite starting test=");
                         if (startedAt >= 0) {
                             lastStarted.set(line.substring(
@@ -442,6 +450,7 @@ class CleanTargetLinuxIntegrationTest {
             // suite's own completion marker instead.
             boolean requireSuite = Boolean.parseBoolean(System.getenv("CN1_REQUIRE_SUITE"));
             int pngs = 0, lastPngs = -1;
+            int stallSamples = 0;
             long lastChange = System.currentTimeMillis();
             while (System.currentTimeMillis() < deadline) {
                 if (finished.get()) { break; }
@@ -460,6 +469,17 @@ class CleanTargetLinuxIntegrationTest {
                 }
                 pngs = CleanTargetIntegrationTest.countPngFiles(outDir);
                 if (pngs != lastPngs) { lastPngs = pngs; lastChange = System.currentTimeMillis(); }
+                long silentMs = System.currentTimeMillis() - lastOutputAt.get();
+                if (silentMs >= STALL_SAMPLE_AFTER_MS && stallSamples < MAX_STALL_SAMPLES) {
+                    stallSamples++;
+                    System.out.println("CN1SS:HARNESS: no output for " + (silentMs / 1000)
+                            + "s after " + lastStarted.get() + "; sampling thread stacks ("
+                            + stallSamples + "/" + MAX_STALL_SAMPLES + ")");
+                    dumpLiveThreadStacks();
+                    // Re-arm so the next sample needs another quiet stretch rather
+                    // than firing on every poll.
+                    lastOutputAt.set(System.currentTimeMillis());
+                }
                 if (!requireSuite && pngs >= minPngs
                         && (System.currentTimeMillis() - lastChange) >= stableMs) { break; }
                 Thread.sleep(3000);
@@ -589,6 +609,13 @@ class CleanTargetLinuxIntegrationTest {
         s = s.substring(0, start) + body + s.substring(end);
         Files.write(launcherC, s.getBytes(StandardCharsets.UTF_8));
     }
+    /// How long the suite may say nothing before it is worth photographing, and
+    /// how many photographs to take. Two minutes is far longer than the gap
+    /// between any two tests in a healthy run, and a handful of samples spread
+    /// across the stall shows whether it is stuck or merely crawling.
+    private static final long STALL_SAMPLE_AFTER_MS = 120_000L;
+    private static final int MAX_STALL_SAMPLES = 6;
+
     private static int runGdbAttach(java.io.File out, String pid, boolean viaSudo) throws Exception {
         java.util.List<String> cmd = new java.util.ArrayList<>();
         if (viaSudo) {
