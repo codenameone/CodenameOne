@@ -1447,6 +1447,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-08-02T17:01:21+00:00"
+      },
+      "devto": {
+        "id": 4304034,
+        "url": "https://dev.to/codenameone/pure-codename-one-text-editing-without-native-overlays-2i9l",
+        "syndicated_at": "2026-08-03T15:39:51+00:00"
       }
     },
     "2026-08-03-1200-codenameone-road-following-map-routing": {
