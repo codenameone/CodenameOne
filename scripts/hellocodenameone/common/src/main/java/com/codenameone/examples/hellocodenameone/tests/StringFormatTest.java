@@ -193,6 +193,11 @@ public class StringFormatTest extends BaseTest {
             checkThrows("bad.unknownConversion", "java.util.UnknownFormatConversionException", () -> String.format("%q", "x"));
             checkThrows("bad.unknownConversionNoArgs", "java.util.UnknownFormatConversionException", () -> String.format("%q"));
             checkThrows("bad.groupingOnHexNoArgs", "java.util.FormatFlagsConversionMismatchException", () -> String.format("%,x"));
+            checkThrows("bad.charFlagBeforeWidth", "java.util.FormatFlagsConversionMismatchException", () -> String.format("%-0c", Character.valueOf('a')));
+            checkThrows("bad.charAltBeforeWidth", "java.util.FormatFlagsConversionMismatchException", () -> String.format("%-#c", Character.valueOf('a')));
+            checkThrows("bad.stringWidthBeforeFlag", "java.util.MissingFormatWidthException", () -> String.format("%-0s", "a"));
+            checkThrows("bad.hexWrongTypeBeforeFlag", "java.util.IllegalFormatConversionException", () -> String.format("%+x", "text"));
+            checkThrows("bad.octalWrongTypeBeforeFlag", "java.util.IllegalFormatConversionException", () -> String.format("%(o", Double.valueOf(1.5)));
             checkThrows("bad.trailingPercent", "java.util.UnknownFormatConversionException", () -> String.format("abc%"));
             checkThrows("bad.missingArgument", "java.util.MissingFormatArgumentException", () -> String.format("%s %s", "only"));
             checkThrows("bad.noArguments", "java.util.MissingFormatArgumentException", () -> String.format("%s"));

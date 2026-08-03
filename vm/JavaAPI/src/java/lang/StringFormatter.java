@@ -348,9 +348,12 @@ final class StringFormatter {
             if (precision >= 0) {
                 throw new IllegalFormatPrecisionException(precision);
             }
-            failMissingWidth(conversion, flags, width, FLAG_MINUS);
+            // Unlike every other conversion, the JVM reports an unsupported flag on a
+            // character ahead of the missing width: "%-0c" is a flag mismatch, not a
+            // missing width, even though '-' has no width to justify against.
             failMismatch(conversion, flags,
                     FLAG_PLUS | FLAG_SPACE | FLAG_ZERO | FLAG_COMMA | FLAG_PAREN | FLAG_HASH);
+            failMissingWidth(conversion, flags, width, FLAG_MINUS);
             return;
         }
         // Numeric conversions: zero padding is meaningful, so it needs a width too.
@@ -443,11 +446,6 @@ final class StringFormatter {
         if (arg == null) {
             return text("null", upper, flags, width, precision);
         }
-        // The JVM defers these to print time, so a null argument outranks them.
-        int printTimeIllegal = flags & (FLAG_PAREN | FLAG_SPACE | FLAG_PLUS);
-        if (printTimeIllegal != 0) {
-            throw new FormatFlagsConversionMismatchException(flagString(printTimeIllegal), conversion);
-        }
         long value;
         if (arg instanceof Long) {
             value = ((Long) arg).longValue();
@@ -459,6 +457,12 @@ final class StringFormatter {
             value = ((Byte) arg).byteValue() & 0xffL;
         } else {
             throw new IllegalFormatConversionException(conversion, arg.getClass());
+        }
+        // The JVM defers these to print time, after it has accepted the argument's type,
+        // so both a null and a wrong-typed argument outrank them.
+        int printTimeIllegal = flags & (FLAG_PAREN | FLAG_SPACE | FLAG_PLUS);
+        if (printTimeIllegal != 0) {
+            throw new FormatFlagsConversionMismatchException(flagString(printTimeIllegal), conversion);
         }
         String digits = unsigned(value, shift);
         String prefix = "";

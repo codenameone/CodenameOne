@@ -302,6 +302,14 @@ public class GenerateStringFormatCases {
         // The conversion is validated before an argument is looked for.
         bad("bad.unknownConversionNoArgs", "%q");
         bad("bad.groupingOnHexNoArgs", "%,x");
+        // The JVM reports an unsupported flag on a character ahead of the missing width,
+        // which is the opposite order from every other conversion.
+        bad("bad.charFlagBeforeWidth", "%-0c", Character.valueOf('a'));
+        bad("bad.charAltBeforeWidth", "%-#c", Character.valueOf('a'));
+        bad("bad.stringWidthBeforeFlag", "%-0s", "a");
+        // A wrong argument type outranks the deferred sign-flag check on %x and %o.
+        bad("bad.hexWrongTypeBeforeFlag", "%+x", "text");
+        bad("bad.octalWrongTypeBeforeFlag", "%(o", Double.valueOf(1.5));
         bad("bad.trailingPercent", "abc%");
         bad("bad.missingArgument", "%s %s", "only");
         bad("bad.noArguments", "%s");

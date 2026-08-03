@@ -220,6 +220,14 @@ public class StringFormatApp {
         // conversion with no arguments is an unknown conversion, not a missing argument.
         f("bad.unknownConversionNoArgs", "%q");
         f("bad.groupingOnHexNoArgs", "%,x");
+        // Validation order: a character reports an unsupported flag ahead of the missing
+        // width, the opposite of every other conversion, and a wrong argument type
+        // outranks the deferred sign-flag check on %x and %o.
+        f("bad.charFlagBeforeWidth", "%-0c", Character.valueOf('a'));
+        f("bad.charAltBeforeWidth", "%-#c", Character.valueOf('a'));
+        f("bad.stringWidthBeforeFlag", "%-0s", "a");
+        f("bad.hexWrongTypeBeforeFlag", "%+x", "text");
+        f("bad.octalWrongTypeBeforeFlag", "%(o", Double.valueOf(1.5));
         f("bad.zeroPadOnStringNoArgs", "%08s");
         f("bad.precisionOnDNoArgs", "%.2d");
         f("bad.trailingPercent", "abc%");
