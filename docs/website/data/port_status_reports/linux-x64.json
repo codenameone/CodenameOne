@@ -7,7 +7,7 @@
   "suite_finished": false,
   "summary": {
     "fail": 0,
-    "not-run": 5,
+    "not-run": 6,
     "pass": 165,
     "skip": 0
   },
@@ -547,6 +547,10 @@
     "StringApiTest": {
       "feature": "java-standard-apis",
       "status": "pass"
+    },
+    "StringFormatTest": {
+      "feature": "java-standard-apis",
+      "status": "not-run"
     },
     "StrokeTest": {
       "feature": "graphics-shapes-strokes",
