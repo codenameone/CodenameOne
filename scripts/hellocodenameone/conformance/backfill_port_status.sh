@@ -154,6 +154,8 @@ while IFS= read -r workflow; do
   fi
 
   run_id=""
+  # The newest candidate gets stricter treatment than the ones behind it.
+  first_candidate=1
   download_dir="${tmp_dir}/${workflow}"
   mkdir -p "${download_dir}"
   # Merge across candidate runs rather than stopping at the first with any
@@ -170,75 +172,87 @@ while IFS= read -r workflow; do
     if [ "${missing}" -eq 0 ]; then
       break
     fi
-    if gh run download "${candidate}" --pattern 'port-status-*' --dir "${download_dir}/run-${candidate}" >/dev/null 2>&1; then
-      run_id="${candidate}"
-      while IFS= read -r downloaded; do
-        found="$(jq -r '.port // empty' "${downloaded}" 2>/dev/null || true)"
-        if [ -z "${found}" ]; then
-          # Invalid JSON, or an object with no "port": the artifact names nothing,
-          # so it cannot be matched to a port or gated. Skipping quietly let an
-          # older valid artifact cover the workflow and the sweep finish green
-          # while the newest producer output was malformed.
-          echo "Ignoring $(basename "${downloaded}") from run ${candidate}: it names no port." >&2
-          unusable+=("${workflow}: run ${candidate} uploaded $(basename "${downloaded}") with no readable port id")
-          continue
-        fi
-        if [ -f "${download_dir}/covered-${found}" ]; then
-          continue
-        fi
-        # Only ports this workflow is declared to produce. The port is read from
-        # the artifact, so a misconfigured matrix that stamped someone else's id
-        # on its report would otherwise be published straight over that port's
-        # entry -- Linux evidence replacing Android's genuine result, with both
-        # the gate and the freshness check satisfied.
-        # owned is newline-separated (one id per jq row); normalise to spaces
-        # so the space-delimited membership test below actually matches the ids
-        # in the middle of the list rather than only the first and last.
-        case " $(printf '%s ' ${owned}) " in
-          *" ${found} "*) ;;
-          *)
-            echo "Ignoring a report naming ${found}: ${workflow} does not produce that port." >&2
-            # Same standing as a malformed report, and for the same reason: the
-            # sweep can still find an older, correct artifact for the port this
-            # workflow really owns, and while that one stays fresh the closing
-            # check passes and the job goes green over a producer that is
-            # emitting misidentified data. Preserve the good report, then fail.
-            unusable+=("${workflow}: run ${candidate} uploaded a report naming ${found}, which it does not produce")
-            continue
-            ;;
-        esac
-        # Gate before marking the port covered, not after. A newest run that
-        # uploaded an unusable report would otherwise claim the port and stop
-        # the older candidates from being consulted, so the sweep would keep
-        # serving stale data -- or fail its closing freshness assertion --
-        # while a perfectly good report sat in the run behind it.
-        accept_status=0
-        python3 "${SCRIPT_DIR}/port_status.py" accept \
-            --port "${found}" --report "${downloaded}" >/dev/null 2>&1 || accept_status=$?
-        if [ "${accept_status}" -ne 0 ]; then
-          echo "Ignoring the ${found} report from run ${candidate}: $(describe_accept_status "${accept_status}")." >&2
-          # A malformed report is a producer defect, and falling back to an older
-          # run hides it: the fallback is still inside the freshness window, so the
-          # closing assertion passes and the sweep goes green while the newest run
-          # is broken. Remember it and fail at the end -- after the older report has
-          # been preserved, so the table keeps showing something rather than
-          # nothing. Contract drift stays quiet, because waiting for a run on the
-          # current contract is the intended behaviour there, not a defect.
-          if [ "${accept_status}" -eq "${ACCEPT_UNUSABLE}" ] \
-              && [ ! -f "${download_dir}/covered-${found}" ]; then
-            unusable+=("${found}: run ${candidate} uploaded a report the website cannot use")
-          fi
-          continue
-        fi
-        cp "${downloaded}" "${download_dir}/port-status-${found}.json"
-        : > "${download_dir}/covered-${found}"
-        # Remember which run this port's report actually came from. Reports are
-        # merged across candidates on purpose, so a single run_id would credit
-        # every port to whichever candidate happened to be examined last --
-        # misleading exactly when someone is chasing down a bad report.
-        printf '%s' "${candidate}" > "${download_dir}/source-run-${found}"
-      done < <(find "${download_dir}/run-${candidate}" -type f -name 'port-status-*.json' | sort)
+    if ! gh run download "${candidate}" --pattern 'port-status-*' --dir "${download_dir}/run-${candidate}" >/dev/null 2>&1; then
+      # No report artifact at all. For the newest run that is a producer failure
+      # in its own right -- a job that died before normalization uploads nothing,
+      # so falling back to an older artifact covers every port, the closing
+      # freshness check passes, and the sweep goes green while the current run
+      # produced no evidence. Only the newest is reported: older candidates
+      # without artifacts are just how the merge walks back.
+      if [ "${first_candidate}" = "1" ]; then
+        unusable+=("${workflow}: newest run ${candidate} uploaded no port-status artifact")
+      fi
+      first_candidate=0
+      continue
     fi
+    first_candidate=0
+    run_id="${candidate}"
+    while IFS= read -r downloaded; do
+      found="$(jq -r '.port // empty' "${downloaded}" 2>/dev/null || true)"
+      if [ -z "${found}" ]; then
+        # Invalid JSON, or an object with no "port": the artifact names nothing,
+        # so it cannot be matched to a port or gated. Skipping quietly let an
+        # older valid artifact cover the workflow and the sweep finish green
+        # while the newest producer output was malformed.
+        echo "Ignoring $(basename "${downloaded}") from run ${candidate}: it names no port." >&2
+        unusable+=("${workflow}: run ${candidate} uploaded $(basename "${downloaded}") with no readable port id")
+        continue
+      fi
+      if [ -f "${download_dir}/covered-${found}" ]; then
+        continue
+      fi
+      # Only ports this workflow is declared to produce. The port is read from
+      # the artifact, so a misconfigured matrix that stamped someone else's id
+      # on its report would otherwise be published straight over that port's
+      # entry -- Linux evidence replacing Android's genuine result, with both
+      # the gate and the freshness check satisfied.
+      # owned is newline-separated (one id per jq row); normalise to spaces
+      # so the space-delimited membership test below actually matches the ids
+      # in the middle of the list rather than only the first and last.
+      case " $(printf '%s ' ${owned}) " in
+        *" ${found} "*) ;;
+        *)
+          echo "Ignoring a report naming ${found}: ${workflow} does not produce that port." >&2
+          # Same standing as a malformed report, and for the same reason: the
+          # sweep can still find an older, correct artifact for the port this
+          # workflow really owns, and while that one stays fresh the closing
+          # check passes and the job goes green over a producer that is
+          # emitting misidentified data. Preserve the good report, then fail.
+          unusable+=("${workflow}: run ${candidate} uploaded a report naming ${found}, which it does not produce")
+          continue
+          ;;
+      esac
+      # Gate before marking the port covered, not after. A newest run that
+      # uploaded an unusable report would otherwise claim the port and stop
+      # the older candidates from being consulted, so the sweep would keep
+      # serving stale data -- or fail its closing freshness assertion --
+      # while a perfectly good report sat in the run behind it.
+      accept_status=0
+      python3 "${SCRIPT_DIR}/port_status.py" accept \
+          --port "${found}" --report "${downloaded}" >/dev/null 2>&1 || accept_status=$?
+      if [ "${accept_status}" -ne 0 ]; then
+        echo "Ignoring the ${found} report from run ${candidate}: $(describe_accept_status "${accept_status}")." >&2
+        # A malformed report is a producer defect, and falling back to an older
+        # run hides it: the fallback is still inside the freshness window, so the
+        # closing assertion passes and the sweep goes green while the newest run
+        # is broken. Remember it and fail at the end -- after the older report has
+        # been preserved, so the table keeps showing something rather than
+        # nothing. Contract drift stays quiet, because waiting for a run on the
+        # current contract is the intended behaviour there, not a defect.
+        if [ "${accept_status}" -eq "${ACCEPT_UNUSABLE}" ] \
+            && [ ! -f "${download_dir}/covered-${found}" ]; then
+          unusable+=("${found}: run ${candidate} uploaded a report the website cannot use")
+        fi
+        continue
+      fi
+      cp "${downloaded}" "${download_dir}/port-status-${found}.json"
+      : > "${download_dir}/covered-${found}"
+      # Remember which run this port's report actually came from. Reports are
+      # merged across candidates on purpose, so a single run_id would credit
+      # every port to whichever candidate happened to be examined last --
+      # misleading exactly when someone is chasing down a bad report.
+      printf '%s' "${candidate}" > "${download_dir}/source-run-${found}"
+    done < <(find "${download_dir}/run-${candidate}" -type f -name 'port-status-*.json' | sort)
   done
   if [ -z "${run_id}" ]; then
     echo "No recent ${workflow} run has a port status artifact." >&2
