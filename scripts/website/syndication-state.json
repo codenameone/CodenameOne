@@ -1473,6 +1473,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-08-03T17:02:29+00:00"
+      },
+      "devto": {
+        "id": 4314093,
+        "url": "https://dev.to/codenameone/a-lightweight-rich-text-component-without-a-web-view-3ch0",
+        "syndicated_at": "2026-08-04T15:30:13+00:00"
       }
     },
     "2026-08-04-1200-shai-maven-central-cloudflare-r2": {
