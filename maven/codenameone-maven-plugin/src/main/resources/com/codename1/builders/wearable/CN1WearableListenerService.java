@@ -225,10 +225,16 @@ public class CN1WearableListenerService extends WearableListenerService {
                                 appPath, remaining.sequence, remaining.node)) {
                             WearableConnection.deliverDataChanged(appPath, remaining.payload);
                         }
-                    } else {
+                    } else if (CN1WearableBridge.forgetDeliveredSequenceIfPresent(appPath)) {
                         // Genuinely empty, so the stamp can go: a value republished here later with
                         // a lower stamp than the removed one carried must not be filtered as older.
-                        CN1WearableBridge.forgetDeliveredSequence(appPath);
+                        //
+                        // Announced only when that drop actually took a stamp. Deleting a
+                        // replicated path deletes every authority's copy, and one buffer can carry
+                        // a TYPE_DELETED event per item -- each would otherwise resolve empty and
+                        // announce the same logical removal again, so a listener that treats
+                        // removal as an event would act on it once per replica. The first event
+                        // takes the stamp and reports; the rest find nothing and stay quiet.
                         WearableConnection.deliverDataRemoved(appPath);
                     }
                 } catch (java.io.IOException couldNotResolve) {

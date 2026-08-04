@@ -1524,6 +1524,27 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     /**
+     * Drops a path's stamp and reports whether there was one, so a removal is announced exactly
+     * once.
+     *
+     * <p>Deleting a replicated path deletes every authority's copy, and the Data Layer can hand
+     * back one TYPE_DELETED event per item in a single buffer. Announcing per event repeats one
+     * logical removal N times, and a listener that treats removal as an event -- clearing a cache,
+     * cancelling something -- would act on it N times. Making the announcement conditional on this
+     * drop coalesces them: the first event takes the stamp, the rest find nothing and stay quiet.
+     *
+     * <p>It also refuses to invent removals. No recorded stamp means the app was never told this
+     * path had a value, and telling it the value went away would be an event that never happened.</p>
+     *
+     * @return true when a stamp was present and has now been dropped
+     */
+    static boolean forgetDeliveredSequenceIfPresent(String path) {
+        synchronized (deliveredSequences) {
+            return deliveredSequences.remove(path) != null;
+        }
+    }
+
+    /**
      * Delivery stamps, bounded.
      *
      * <p>Replicated paths are few, but every transfer contributes a key -- transfers are addressed
@@ -1727,8 +1748,11 @@ public class CN1WearableBridge implements WearableBridge {
                         if (setDeliveredSequenceIfOutranks(path, winner.sequence, winner.node)) {
                             WearableConnection.deliverDataChanged(path, winner.payload);
                         }
-                    } else if (wasAfterDeletion(path)
+                    } else if (wasAfterDeletion(path) && before != null
                             && forgetDeliveredSequenceIfUnchanged(path, before)) {
+                        // before != null for the same reason the inline path checks the drop took
+                        // something: with no recorded stamp the app was never told this path had a
+                        // value, so a removal would be an event that never happened.
                         // Empty AND nothing landed while we were asking. Announcing a removal for a
                         // path a concurrent publication has since refilled is the one error the app
                         // cannot recover from, so it is conditional on the stamp being untouched.
