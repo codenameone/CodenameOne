@@ -51,9 +51,11 @@ import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 
 import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 
 /**
@@ -76,6 +78,13 @@ import javax.crypto.spec.IvParameterSpec;
  *   key and recreate it on first failure to recover.
  *   See <a href="https://issuetracker.google.com/u/0/issues/65578763">Google issue 65578763</a>.
  * </ul>
+ *
+ * <p>The non-prompting tier ({@code set(account, value)} and friends) uses a
+ * <em>separate</em> keystore key ({@code CN1PlainKey}) and preferences file,
+ * created without {@code setUserAuthenticationRequired}, with AES/GCM. Keeping
+ * it separate matters: the biometric key is invalidated whenever the user
+ * re-enrols biometrics, and secrets read on every network call must survive
+ * that.</p>
  */
 public final class AndroidSecureStorage extends SecureStorage {
 
@@ -83,9 +92,25 @@ public final class AndroidSecureStorage extends SecureStorage {
     private static final String PREFS = "CN1BiometricSecureStorage";
     private static final String ANDROID_KEY_STORE = "AndroidKeyStore";
 
+    /**
+     * Deliberately distinct from {@link #KEY_ID}: the biometric key is created
+     * with {@code setUserAuthenticationRequired(true)} and is invalidated when
+     * the user re-enrols biometrics. The non-prompting tier must survive that,
+     * so it gets its own key and its own preferences file.
+     */
+    private static final String PLAIN_KEY_ID = "CN1PlainKey";
+    private static final String PLAIN_PREFS = "CN1PlainSecureStorage";
+
+    /**
+     * Serializes load-check-generate on the non-prompting key, and the shared
+     * AndroidKeyStore handle with it. Static because the keystore alias is
+     * process-wide, so two instances would race just as two threads would.
+     */
+    private static final Object PLAIN_KEY_LOCK = new Object();
+    private static final int GCM_TAG_BITS = 128;
+
     private KeyStore keyStore;
     private KeyGenerator keyGenerator;
-    private Cipher cipher;
     private boolean keyRevoked;
     private CancellationSignal cancellationSignal;
 
@@ -123,11 +148,14 @@ public final class AndroidSecureStorage extends SecureStorage {
             SharedPreferences sp = AndroidNativeUtil.getActivity()
                     .getApplicationContext()
                     .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-            sp.edit()
+            // commit(), so the Boolean this hands back is a statement about the disk. The
+            // pair of entries is also all-or-nothing that way: apply() could persist a
+            // ciphertext whose IV had not landed, which decrypts to nothing on the next
+            // launch and looks to the caller like a value it successfully stored.
+            return Boolean.valueOf(sp.edit()
                     .putString("v_" + account, Base64.encodeToString(enc, Base64.DEFAULT))
                     .putString("iv_" + account, Base64.encodeToString(c.getIV(), Base64.DEFAULT))
-                    .apply();
-            return Boolean.TRUE;
+                    .commit());
         }
     }
 
@@ -172,9 +200,316 @@ public final class AndroidSecureStorage extends SecureStorage {
         SharedPreferences sp = AndroidNativeUtil.getActivity()
                 .getApplicationContext()
                 .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        sp.edit().remove("v_" + account).remove("iv_" + account).apply();
-        result.complete(Boolean.TRUE);
+        // And the prompting tier deletes durably too. This is the credential a logout
+        // clears; reporting it gone while the removal sits in memory means it comes back
+        // if the process is killed before the write lands, which on Android is how a
+        // process usually ends.
+        result.complete(Boolean.valueOf(
+                sp.edit().remove("v_" + account).remove("iv_" + account).commit()));
         return result;
+    }
+
+    // --- Non-prompting tier ------------------------------------------------
+    //
+    // AES/GCM under a dedicated AndroidKeyStore key created *without*
+    // setUserAuthenticationRequired, so reads never raise a biometric prompt.
+    // Deliberately not androidx.security EncryptedSharedPreferences: that
+    // would force a transitive dependency on every Android build and it is
+    // itself deprecated. The value is stored as
+    // base64(iv) + ":" + base64(ciphertext) in a private preferences file.
+
+    @Override
+    public boolean set(String account, String value) {
+        if (account == null || value == null) {
+            return false;
+        }
+        if (Build.VERSION.SDK_INT < 23) {
+            return legacyPlainSet(account, value);
+        }
+        try {
+            // The whole use-and-persist runs under the same lock a reset takes.
+            // Releasing it after the lookup let a concurrent resetPlainKey() delete the
+            // alias and clear the preferences between here and the write, so this
+            // reported success while storing ciphertext under a key that no longer
+            // exists -- unreadable forever, and silently so.
+            synchronized (PLAIN_KEY_LOCK) {
+                // The invalid-key DECISION is taken in here too, not in a catch outside
+                // the lock. Deciding out there let a delayed caller reset a key that was
+                // no longer the one that failed it: another caller had already reset, a
+                // writer had created a fresh key and committed ciphertext under it, and
+                // this one then deleted that new key and wiped every stored value --
+                // destroying data written after the failure it was reacting to.
+                try {
+                    SecretKey key = plainKey(true);
+                    if (key == null) {
+                        return false;
+                    }
+                    Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+                    c.init(Cipher.ENCRYPT_MODE, key);
+                    byte[] enc = c.doFinal(value.getBytes("UTF-8"));
+                    SharedPreferences prefs = plainPrefs();
+                    if (prefs == null) {
+                        return false;
+                    }
+                    // commit(), not apply(): apply() is asynchronous, so the write could
+                    // land on disk after a reset that ran once this lock was released --
+                    // storing ciphertext under a key that had already been deleted.
+                    // Holding the lock is only atomic if the persist finishes inside it.
+                    return prefs.edit()
+                            .putString(account, Base64.encodeToString(c.getIV(), Base64.NO_WRAP)
+                                    + ":" + Base64.encodeToString(enc, Base64.NO_WRAP))
+                            .commit();
+                } catch (InvalidKeyException e) {
+                    // Includes KeyPermanentlyInvalidatedException.
+                    resetPlainKey();
+                    return false;
+                } catch (UnrecoverableKeyException e) {
+                    // Handled like an invalid key rather than falling into the generic
+                    // catch: leaving the unusable alias installed made every later write
+                    // return false for good, and only a read happened to clear it -- so
+                    // an app that only ever writes could never store anything again.
+                    resetPlainKey();
+                    return false;
+                }
+            }
+        } catch (Throwable t) {
+            Log.e(t);
+            return false;
+        }
+    }
+
+    @Override
+    public String get(String account) {
+        if (account == null) {
+            return null;
+        }
+        if (Build.VERSION.SDK_INT < 23) {
+            return legacyPlainGet(account);
+        }
+        SharedPreferences prefs = plainPrefs();
+        if (prefs == null) {
+            return null;
+        }
+        String stored = prefs.getString(account, null);
+        if (stored == null) {
+            return null;
+        }
+        int sep = stored.indexOf(':');
+        if (sep < 0) {
+            // No IV separator, so this was written by legacyPlainSet on API 22 or below
+            // and the device has since been upgraded to 23+. Reporting it missing would
+            // silently discard a cached credential across an OS upgrade the user did not
+            // choose to lose anything by. Decode it and re-store it encrypted, so this
+            // only happens once.
+            String legacy = decodeLegacyPlain(stored);
+            if (legacy != null) {
+                set(account, legacy);
+            }
+            return legacy;
+        }
+        try {
+            // Same reasoning as set(): a reset landing mid-read would otherwise
+            // invalidate the key between the lookup and the decrypt.
+            synchronized (PLAIN_KEY_LOCK) {
+                // The invalid-key DECISION is taken in here too, not in a catch
+                // outside the lock. Deciding out there let a delayed caller reset a key
+                // that was no longer the one that failed it: another caller had already
+                // reset, a writer had created a fresh key and committed ciphertext under
+                // it, and this one then deleted that new key and wiped every stored
+                // value -- destroying data written after the failure it was reacting to.
+                try {
+                    SecretKey key = plainKey(false);
+                    if (key == null) {
+                        return null;
+                    }
+                    byte[] iv = Base64.decode(stored.substring(0, sep), Base64.NO_WRAP);
+                    byte[] enc = Base64.decode(stored.substring(sep + 1), Base64.NO_WRAP);
+                    Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+                    c.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_BITS, iv));
+                    return new String(c.doFinal(enc), "UTF-8");
+                } catch (InvalidKeyException e) {
+                    // The key was invalidated out from under us (device-wide credential
+                    // change, or the Samsung 8.0.0 quirk documented on the biometric
+                    // tier). Everything encrypted under it is unrecoverable, so drop
+                    // the key and the ciphertexts rather than failing forever.
+                    resetPlainKey();
+                    return null;
+                } catch (UnrecoverableKeyException e) {
+                    resetPlainKey();
+                    return null;
+                }
+            }
+        } catch (Throwable t) {
+            Log.e(t);
+            return null;
+        }
+    }
+
+    @Override
+    public boolean remove(String account) {
+        if (account == null) {
+            return false;
+        }
+        SharedPreferences prefs = plainPrefs();
+        if (prefs == null) {
+            return false;
+        }
+        // commit(), and its answer is this method's answer. apply() persists on a
+        // background thread, so returning true said the credential was gone while the
+        // deletion was still in memory: an app that removes a token on logout and is then
+        // killed -- which is the ordinary way an Android process ends -- finds it back on
+        // the next launch. A removal that reports success has to have happened, and this
+        // is the one operation where the caller cannot verify it later by reading.
+        //
+        // Under the same lock as the write and the reset, so a removal cannot be
+        // interleaved with a set that recreates the entry it was clearing.
+        synchronized (PLAIN_KEY_LOCK) {
+            return prefs.edit().remove(account).commit();
+        }
+    }
+
+    /**
+     * The preferences file, resolved from the application context rather than an
+     * Activity.
+     *
+     * <p>A port initialized from a background service has no Activity but does
+     * have a context, and this tier exists precisely so a background caller can
+     * read a cached secret without prompting. Requiring an Activity would make
+     * {@code get()} throw there -- outside its try/catch, so the caller crashes
+     * rather than reading the value it asked for.</p>
+     */
+    private SharedPreferences plainPrefs() {
+        Context ctx = AndroidNativeUtil.getContext();
+        if (ctx == null) {
+            return null;
+        }
+        return ctx.getApplicationContext()
+                .getSharedPreferences(PLAIN_PREFS, Context.MODE_PRIVATE);
+    }
+
+    /**
+     * Loads the non-prompting keystore key, optionally creating it. Returns
+     * null when the key is absent and {@code create} is false, or when
+     * generation fails.
+     */
+    private SecretKey plainKey(boolean create) throws Exception {
+        // The whole load-check-generate sequence is serialized, not just the
+        // generation. Two first writers that each saw the alias absent would each
+        // generate under it, and the second generation replaces the key the first
+        // one had already encrypted with -- leaving that ciphertext permanently
+        // undecryptable. The shared KeyStore is not thread safe either.
+        synchronized (PLAIN_KEY_LOCK) {
+            // A KeyStore instance of this tier's own. The biometric tier touches the
+            // shared one without PLAIN_KEY_LOCK, and KeyStore is not thread safe, so
+            // sharing it here would trade a race inside this tier for a race across the
+            // two -- surfacing as intermittent keystore errors that neither tier's code
+            // would explain. Widening this lock into the biometric path would be worse.
+            KeyStore ks = KeyStore.getInstance(ANDROID_KEY_STORE);
+            ks.load(null);
+            SecretKey existing = (SecretKey) ks.getKey(PLAIN_KEY_ID, null);
+            if (existing != null || !create) {
+                return existing;
+            }
+            KeyGenerator gen = KeyGenerator.getInstance(
+                    KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEY_STORE);
+            gen.init(new KeyGenParameterSpec.Builder(PLAIN_KEY_ID,
+                    KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setKeySize(256)
+                    .setRandomizedEncryptionRequired(true)
+                    .build());
+            gen.generateKey();
+            return (SecretKey) ks.getKey(PLAIN_KEY_ID, null);
+        }
+    }
+
+    private void resetPlainKey() {
+        // Deleting the key and dropping the ciphertexts it protected are one step, under
+        // the same lock readers and writers hold. Clearing outside it left a window
+        // where a writer had already encrypted under the old key and was about to store
+        // a value this was about to wipe -- or worse, stored it just after.
+        synchronized (PLAIN_KEY_LOCK) {
+            try {
+                // Same reasoning as plainKey(): this tier does not touch the shared
+                // KeyStore instance.
+                KeyStore ks = KeyStore.getInstance(ANDROID_KEY_STORE);
+                ks.load(null);
+                ks.deleteEntry(PLAIN_KEY_ID);
+            } catch (Exception e) {
+                Log.e(e);
+            }
+            SharedPreferences prefs = plainPrefs();
+            if (prefs != null) {
+                // Also commit(), for the same reason: this method's whole purpose is to
+                // make the key deletion and the ciphertext deletion one step, and an
+                // asynchronous clear can be reordered after a writer's pending write.
+                prefs.edit().clear().commit();
+            }
+        }
+    }
+
+    // API 22 and below have no KeyGenParameterSpec. The preferences file is
+    // still app-private, but the value is only obfuscated, not encrypted --
+    // it is extractable from a rooted device or a backup.
+    private boolean legacyPlainSet(String account, String value) {
+        warnLegacyPlainStorage();
+        try {
+            SharedPreferences prefs = plainPrefs();
+            if (prefs == null) {
+                return false;
+            }
+            // Same reason the encrypted tier commits: this returns whether the value was
+            // stored, and with apply() it returned that before it was true. The legacy
+            // path is weaker on confidentiality by construction; it does not get to be
+            // weaker on the one thing the API actually promises.
+            return prefs.edit()
+                    .putString(account, Base64.encodeToString(
+                            value.getBytes("UTF-8"), Base64.NO_WRAP))
+                    .commit();
+        } catch (IOException e) {
+            Log.e(e);
+            return false;
+        }
+    }
+
+    /** The obfuscated-only form written on API 22 and below, or null if unreadable. */
+    private String decodeLegacyPlain(String stored) {
+        try {
+            return new String(Base64.decode(stored, Base64.NO_WRAP), "UTF-8");
+        } catch (Throwable t) {
+            Log.e(t);
+            return null;
+        }
+    }
+
+    private String legacyPlainGet(String account) {
+        warnLegacyPlainStorage();
+        SharedPreferences prefs = plainPrefs();
+        if (prefs == null) {
+            return null;
+        }
+        String stored = prefs.getString(account, null);
+        if (stored == null) {
+            return null;
+        }
+        try {
+            return new String(Base64.decode(stored, Base64.NO_WRAP), "UTF-8");
+        } catch (IOException e) {
+            Log.e(e);
+            return null;
+        }
+    }
+
+    private boolean legacyPlainWarned;
+
+    private void warnLegacyPlainStorage() {
+        if (!legacyPlainWarned) {
+            legacyPlainWarned = true;
+            Log.p("SecureStorage: this device predates Android API 23, so the "
+                    + "non-prompting tier stores values obfuscated rather than "
+                    + "encrypted. Do not use it for high-value secrets here.");
+        }
     }
 
     /**
@@ -202,9 +537,13 @@ public final class AndroidSecureStorage extends SecureStorage {
                 return;
             }
         }
-        if (!initCipher(mode, account)) {
+        Cipher operationCipher = initCipher(mode, account);
+        if (operationCipher == null) {
             if (mode == Cipher.ENCRYPT_MODE) {
-                if (!createKey() || !initCipher(mode, account)) {
+                if (createKey()) {
+                    operationCipher = initCipher(mode, account);
+                }
+                if (operationCipher == null) {
                     failResult(result, BiometricError.UNKNOWN, "Failed to initialise cipher");
                     return;
                 }
@@ -214,15 +553,19 @@ public final class AndroidSecureStorage extends SecureStorage {
                 return;
             }
         }
+        // Carried as a parameter from here on. It belongs to this operation and to no
+        // other, which is what stops a concurrent call from handing its cipher to this
+        // prompt.
         if (Build.VERSION.SDK_INT >= 29) {
-            promptBiometric29(reason, mode, account, result, work);
+            promptBiometric29(reason, mode, account, result, work, operationCipher);
         } else {
-            promptBiometricLegacy(mode, account, result, work);
+            promptBiometricLegacy(mode, account, operationCipher, result, work);
         }
     }
 
     private <V> void promptBiometric29(final String reason, final int mode, final String account,
-                                       final AsyncResource<V> result, final CipherWork<V> work) {
+                                       final AsyncResource<V> result, final CipherWork<V> work,
+                                       final Cipher operationCipher) {
         AndroidBiometrics.runOnUi(new Runnable() {
             @Override
             public void run() {
@@ -235,7 +578,7 @@ public final class AndroidSecureStorage extends SecureStorage {
                         AndroidNativeUtil.getActivity(),
                         reason == null ? "Authenticate" : reason,
                         null, null, "Cancel",
-                        cipher,
+                        operationCipher,
                         cs,
                         new BiometricsApi29.CipherAuthCallback() {
                             @Override
@@ -256,6 +599,7 @@ public final class AndroidSecureStorage extends SecureStorage {
     }
 
     private <V> void promptBiometricLegacy(final int mode, final String account,
+                                           final Cipher operationCipher,
                                            final AsyncResource<V> result, final CipherWork<V> work) {
         AndroidBiometrics.runOnUi(new Runnable() {
             @Override
@@ -273,7 +617,7 @@ public final class AndroidSecureStorage extends SecureStorage {
                 final CancellationSignal cs = new CancellationSignal();
                 cancellationSignal = cs;
                 FingerprintManager.CryptoObject crypto =
-                        new FingerprintManager.CryptoObject(cipher);
+                        new FingerprintManager.CryptoObject(operationCipher);
                 fpm.authenticate(crypto, cs, 0, new FingerprintManager.AuthenticationCallback() {
                     int failures;
 
@@ -308,14 +652,24 @@ public final class AndroidSecureStorage extends SecureStorage {
             V v = work.run(authedCipher);
             succeedResult(result, v);
         } catch (Throwable t) {
-            // Samsung 8.0.0 quirk: the cipher passes init but doFinal fails
-            // with a key-invalidated error. Delete the key and let the caller
-            // retry the entire operation.
-            // https://issuetracker.google.com/u/0/issues/65578763
-            removePermanentlyInvalidatedKey();
-            cipher = null;
-            failResult(result, BiometricError.KEY_REVOKED,
-                    "Cipher operation failed; key invalidated: " + t.getMessage());
+            // Only a failure that says the KEY is finished deletes the key.
+            //
+            // There is one keystore key behind every biometric account, so this catch
+            // used to answer a malformed stored value, or an Activity that went away
+            // mid-prompt, by destroying every other entry in the store -- permanently,
+            // and while telling the caller its key had been revoked when it had not.
+            // The Samsung 8.0.0 quirk this was written for is still handled: a cipher
+            // that initialises and then fails inside doFinal with a keystore error
+            // underneath is that case, and isKeyInvalidation recognises it.
+            if (isKeyInvalidation(t)) {
+                removePermanentlyInvalidatedKey();
+                failResult(result, BiometricError.KEY_REVOKED,
+                        "Cipher operation failed; key invalidated: " + t.getMessage());
+            } else {
+                Log.e(t);
+                failResult(result, BiometricError.UNKNOWN,
+                        "Cipher operation failed: " + t.getMessage());
+            }
         }
     }
 
@@ -427,56 +781,99 @@ public final class AndroidSecureStorage extends SecureStorage {
         return null;
     }
 
-    private Cipher cipher() {
-        if (cipher == null) {
-            try {
-                cipher = Cipher.getInstance(KeyProperties.KEY_ALGORITHM_AES
-                        + "/" + KeyProperties.BLOCK_MODE_CBC
-                        + "/" + KeyProperties.ENCRYPTION_PADDING_PKCS7);
-            } catch (NoSuchAlgorithmException e) {
-                throw new RuntimeException("Cipher init failed", e);
-            } catch (NoSuchPaddingException e) {
-                throw new RuntimeException("Cipher init failed", e);
-            }
+    /**
+     * A NEW cipher every time, never a shared field.
+     *
+     * <p>The prompt is raised from a UI runnable, so an operation is in flight from the
+     * moment it initialises its cipher until that runnable runs. With one instance field,
+     * a second {@code set()} or {@code get()} starting in that window re-initialised the
+     * same object and the first prompt was handed the second operation's cipher -- wrong
+     * mode, or the wrong account's IV. The work then failed, and the failure handler read
+     * that as an invalidated key and deleted the one key every biometric entry shares.</p>
+     */
+    private Cipher newCipher() {
+        try {
+            return Cipher.getInstance(KeyProperties.KEY_ALGORITHM_AES
+                    + "/" + KeyProperties.BLOCK_MODE_CBC
+                    + "/" + KeyProperties.ENCRYPTION_PADDING_PKCS7);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Cipher init failed", e);
+        } catch (NoSuchPaddingException e) {
+            throw new RuntimeException("Cipher init failed", e);
         }
-        return cipher;
     }
 
-    private boolean initCipher(int mode, String account) {
+    /** The initialised cipher for this one operation, or null if it could not be made. */
+    private Cipher initCipher(int mode, String account) {
         try {
             SecretKey key = getSecretKey();
             if (key == null) {
-                return false;
+                return null;
             }
+            Cipher c = newCipher();
             if (mode == Cipher.ENCRYPT_MODE) {
-                cipher().init(mode, key);
+                c.init(mode, key);
             } else {
                 SharedPreferences sp = AndroidNativeUtil.getActivity()
                         .getApplicationContext()
                         .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
                 byte[] iv = Base64.decode(sp.getString("iv_" + account, ""), Base64.DEFAULT);
-                cipher().init(mode, key, new IvParameterSpec(iv));
+                c.init(mode, key, new IvParameterSpec(iv));
             }
-            return true;
+            return c;
         } catch (KeyPermanentlyInvalidatedException e) {
             removePermanentlyInvalidatedKey();
-            return false;
+            return null;
         } catch (InvalidKeyException e) {
             Log.e(e);
-            return false;
+            return null;
         } catch (InvalidAlgorithmParameterException e) {
             Log.e(e);
-            return false;
+            return null;
         }
     }
 
     private void removePermanentlyInvalidatedKey() {
         try {
             keyStore().deleteEntry(KEY_ID);
-            cipher = null;
         } catch (KeyStoreException e) {
             Log.e(e);
         }
+    }
+
+    /**
+     * Whether a failure means the keystore key is gone, as opposed to this one operation
+     * having failed.
+     *
+     * <p>The distinction is the whole point. There is ONE key behind every biometric
+     * account, so deleting it on any failure -- a malformed stored value, an Activity that
+     * went away mid-prompt, a null passed into the work -- made every other entry
+     * permanently unreadable, and told the caller its key had been revoked when it had
+     * not. Only two shapes say the key itself is finished: the exception Android raises
+     * for it, and the Samsung 8.0.0 quirk where a cipher initialises and then fails inside
+     * doFinal with a keystore error underneath.</p>
+     *
+     * <p>https://issuetracker.google.com/u/0/issues/65578763</p>
+     */
+    private static boolean isKeyInvalidation(Throwable t) {
+        // Bounded rather than while(cause != null): a self-referential cause is rare and
+        // a hang inside a failure handler is worse than a missed classification.
+        Throwable c = t;
+        for (int depth = 0; c != null && depth < 8; depth++) {
+            if (c instanceof KeyPermanentlyInvalidatedException) {
+                return true;
+            }
+            if (c instanceof IllegalBlockSizeException
+                    && c.getCause() instanceof KeyStoreException) {
+                return true;
+            }
+            Throwable next = c.getCause();
+            if (next == c) {
+                break;
+            }
+            c = next;
+        }
+        return false;
     }
 
     /** Lambda-stand-in for Java 5 source level: cipher op that may throw. */

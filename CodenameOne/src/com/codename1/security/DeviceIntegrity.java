@@ -110,6 +110,46 @@ public final class DeviceIntegrity {
         return Display.getInstance().isAttestationSupported();
     }
 
+    /// Discards the cached platform attestation state, so the next [#requestIntegrityToken(String)]
+    /// attests from a fresh hardware key.
+    ///
+    /// Only iOS holds client-side attestation state. Apple's model is: generate a hardware key once,
+    /// attest it once, then produce cheap assertions against it for every subsequent request. Your
+    /// backend records the key when it accepts the attestation. If the backend later rejects a request
+    /// because it does not recognise the key -- the app was reinstalled, the device was restored from a
+    /// backup, or the OS invalidated the key -- call this, then request a token again. That is the only
+    /// correct recovery; retrying with the same key will keep failing.
+    ///
+    /// Do not call this on every failure. Attestation is rate limited by Apple, and re-attesting in a
+    /// loop will get the app throttled. No-op on Android, where Play Integrity keeps no client key, and
+    /// where attestation is unsupported.
+    public static void resetAttestation() {
+        Display.getInstance().resetAttestation();
+    }
+
+    /// Tells the attestation layer that your backend has recorded the attested key, so later requests
+    /// can use cheap assertions instead of attesting again.
+    ///
+    /// This matters on iOS. The first token of a device's life is an attestation, which carries the
+    /// public key; every token after it is an assertion, which carries only the key's identifier. An
+    /// assertion sent before the backend has stored that public key is unresolvable, and the natural
+    /// reading of that rejection -- the key is invalid -- would throw away a key that was perfectly
+    /// good and burn one of Apple's rate limited attestations replacing it. So requests made between
+    /// the attestation and this acknowledgement are refused with a retry hint rather than asserted.
+    ///
+    /// Call it once, after the response accepting the attestation token, passing the key that
+    /// response acknowledged. Not calling it is safe but slower: the client assumes registration
+    /// succeeded after a short grace period. No-op on Android and where attestation is
+    /// unsupported.
+    /// @param keyId the key identifier your backend recorded -- the middle field of the
+    ///        `cn1aa1:attest:<keyId>:<attestation>` token it accepted, base64-decoded.
+    ///        Naming it matters: a response for an earlier attestation can arrive after
+    ///        the key has already been replaced, and acknowledging that would mark a key
+    ///        attested which the backend has never seen.
+    public static void confirmAttestation(String keyId) {
+        Display.getInstance().confirmAttestation(keyId);
+    }
+
     /// Non-exiting RASP check. Returns true when the device shows signs of being rooted, jailbroken,
     /// running under dynamic instrumentation (e.g. Frida) or otherwise tampered. Unlike the
     /// `android.rootCheck` / `ios.detectJailbreak` launch gates this never terminates the app, so it is

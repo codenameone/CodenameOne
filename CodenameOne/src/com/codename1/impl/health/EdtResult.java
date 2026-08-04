@@ -22,6 +22,10 @@
  */
 package com.codename1.impl.health;
 
+import com.codename1.util.AsyncResource;
+import com.codename1.util.AsyncResult;
+import com.codename1.util.SuccessCallback;
+import com.codename1.util.EasyThread;
 import com.codename1.ui.Display;
 
 /// The resource every public health operation hands back: one outcome,
@@ -46,6 +50,83 @@ import com.codename1.ui.Display;
 /// Already on the EDT means completed inline, so a callback chain that
 /// completes another resource does not queue a runnable per link.
 public final class EdtResult<T> extends OneShot<T> {
+
+    /// EVERY off-EDT registration is marshalled, not only one that finds the resource
+    /// already settled.
+    ///
+    /// `AsyncResource.ready` runs the callback immediately, on the registering thread,
+    /// when the resource has already settled -- so the guarantee this class exists to
+    /// make held only for listeners attached before completion. Every facade action that
+    /// answers without a backend (`openHealthSettings`, `openProviderSetup`) completes
+    /// the resource before returning it, so the caller CANNOT attach in time, and which
+    /// thread the callback ran on came down to whether the EDT had drained the hop yet.
+    /// Off the EDT on a busy machine, on it on an idle one -- a callback that is usually
+    /// on the EDT is exactly the thing the class doc calls not-a-design.
+    ///
+    /// Testing `isDone()` first reproduced that in miniature: a background caller that
+    /// found the resource unfinished fell through to the synchronous path, and a
+    /// completion landing in the gap before it registered made `AsyncResource.ready`
+    /// deliver on the background thread after all. The window is small and the failure it
+    /// produces -- a health callback touching a form off the EDT -- is a repaint glitch or
+    /// a corrupted layout that nobody traces back to here. Hopping unconditionally has no
+    /// such gap: registration and completion then both happen on the EDT, so they are
+    /// ordered by the EDT rather than by a check.
+    ///
+    /// Already on the EDT still registers inline, which is what keeps a callback chain
+    /// from queueing a runnable per link.
+    ///
+    /// Deliberately NOT done for `except`. Reading the error out of an already-failed
+    /// resource by registering a callback and looking at what it captured is an
+    /// established idiom here -- `HealthFallbackTest.errorOf` and `BtTestUtil` both do
+    /// it, and it depends on that call being synchronous. The asymmetry is the honest
+    /// one: this contract exists so a callback that acts on a VALUE -- updates a label,
+    /// touches a form -- is on the EDT, and introspecting a failure that has already
+    /// happened is not that.
+    @Override
+    public AsyncResource<T> ready(SuccessCallback<T> callback, EasyThread t) {
+        if (!isCancelled() && Display.isInitialized()
+                && !Display.getInstance().isEdt()) {
+            final SuccessCallback<T> target = callback;
+            final EasyThread thread = t;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    EdtResult.super.ready(target, thread);
+                }
+            });
+            return this;
+        }
+        return super.ready(callback, t);
+    }
+
+    /// The combined registration is marshalled whole, error branch included.
+    ///
+    /// `AsyncResource.onResult` is `ready(...)` followed by `except(...)`, and only the
+    /// first of those is overridden here -- so a worker thread registering on a resource
+    /// that had already failed ran the error half immediately, on that worker. This is the
+    /// application-facing form of the callback, so the failure it produces is an app
+    /// handling an error by touching a form off the EDT: the exact thing the class exists
+    /// to prevent, reached through the other half of the same method.
+    ///
+    /// `except` on its own stays synchronous, which is what the exemption above is about.
+    /// Reading the error out of an already-failed resource by registering a callback and
+    /// looking at what it captured depends on it, and introspecting a failure is not the
+    /// same act as handling one.
+    @Override
+    public void onResult(AsyncResult<T> onResult) {
+        if (!isCancelled() && Display.isInitialized()
+                && !Display.getInstance().isEdt()) {
+            final AsyncResult<T> target = onResult;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    EdtResult.super.onResult(target);
+                }
+            });
+            return;
+        }
+        super.onResult(onResult);
+    }
 
     @Override
     public void complete(T value) {

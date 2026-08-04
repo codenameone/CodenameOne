@@ -631,3 +631,6 @@ BlueZ
 # Canonical 36 character Bluetooth UUID form, in case one appears
 # outside a code span (0000180d-0000-1000-8000-00805f9b34fb).
 [0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}
+# App Shield chapter (App-Shield.asciidoc). "quickstart" is the product's own
+# name for the backend integration snippets the build console renders.
+[Qq]uickstarts?

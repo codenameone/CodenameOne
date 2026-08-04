@@ -172,6 +172,17 @@ public class BrowserComponentScreenshotTest extends BaseTest {
 
         int bandWidth = right - left;
         int bandHeight = bottom - top;
+        // Both colours, not either one.
+        //
+        // The fixture is white and cyan text on a near-black background, and this
+        // originally looked only for the bright pixels because the case it was written
+        // for was iOS, where a peer that has not reached the Metal surface is BLACK --
+        // brightness alone separates the two there. On Android an unpainted WebView is
+        // WHITE, which passes a brightness test on its own the very first time it is
+        // asked, so the harness emitted a blank white frame and the run failed as a
+        // screenshot mismatch rather than waiting the further quarter-second the peer
+        // needed. Requiring the dark background as well describes the fixture instead of
+        // one platform's failure colour, and neither blank state can satisfy it.
         if (visualBand == null || visualBand.getWidth() != bandWidth
                 || visualBand.getHeight() != bandHeight) {
             visualBand = new RGBImage(new int[bandWidth * bandHeight], bandWidth, bandHeight);
@@ -179,7 +190,12 @@ public class BrowserComponentScreenshotTest extends BaseTest {
         screen.toRGB(visualBand, 0, 0, left, top, bandWidth, bandHeight);
         int[] rgb = visualBand.getRGB();
         int requiredBrightPixels = Math.max(32, bandWidth / 20);
+        // The text occupies a small part of the band and the background the rest, so a
+        // quarter of the pixels is a comfortable floor for a genuinely rendered page and
+        // unreachable for a white one.
+        int requiredDarkPixels = Math.max(32, (bandWidth * bandHeight) / 4);
         int brightPixels = 0;
+        int darkPixels = 0;
         for (int y = 0; y < bandHeight; y++) {
             int rowOffset = y * bandWidth;
             for (int x = 0; x < bandWidth; x++) {
@@ -188,12 +204,16 @@ public class BrowserComponentScreenshotTest extends BaseTest {
                 int g = (color >> 8) & 0xff;
                 int b = color & 0xff;
                 // The local fixture contains white and cyan text on a dark
-                // background. The black uncomposited peer contains neither.
+                // background. The black uncomposited peer has the dark and none of
+                // the text; the white unpainted one has neither.
                 if ((r > 160 && g > 160 && b > 160)
                         || (g > 120 && b > 160 && b > r + 30)) {
-                    if (++brightPixels >= requiredBrightPixels) {
-                        return true;
-                    }
+                    brightPixels++;
+                } else if (r < 48 && g < 48 && b < 48) {
+                    darkPixels++;
+                }
+                if (brightPixels >= requiredBrightPixels && darkPixels >= requiredDarkPixels) {
+                    return true;
                 }
             }
         }

@@ -106,8 +106,44 @@ jobs:
       - name: Build codename1-core + the Windows port (JDK 8)
         run: |
           cd maven
-          JAVA_HOME="$JDK_8_HOME" mvn -B -pl windows -am -DskipTests \
-            '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+          # Maven Central intermittently resets the connection or throttles the runner,
+          # and Maven treats that as a permanent resolution failure -- observed killing
+          # this job while resolving a build extension, before any project code compiled.
+          # The backoff grows because a flat retry lands inside the same window a 429 is
+          # still rate limiting in. A genuine build failure fails identically every time.
+          # Retried ONLY for that failure shape. A blanket loop lets an intermittent
+          # compiler, generator or packaging regression pass on a later attempt and turn
+          # a blocking gate green, which is worse than the flake it hides -- and the
+          # retries reuse the previous attempt's target directories, so a partial output
+          # can decide the result. Matching the output keeps a real failure terminal on
+          # its first occurrence, and the retry starts from clean.
+          resolution='status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies'
+          goal=install
+          for delay in 30 120 300 0; do
+            # PIPESTATUS, not the pipeline's status: tee succeeds even when mvn does not,
+            # and this step does not set pipefail. Reading the wrong one would make every
+            # attempt look successful, which is the opposite failure to the one being
+            # fixed and would hide everything.
+            JAVA_HOME="$JDK_8_HOME" mvn -B -pl windows -am -DskipTests \
+                 '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' $goal 2>&1 \
+                 | tee /tmp/windows-cross-build.log
+            status=${PIPESTATUS[0]}
+            if [ "$status" -eq 0 ]; then
+              break
+            fi
+            if ! grep -Eq "$resolution" /tmp/windows-cross-build.log; then
+              echo "core + Windows port build failed for a reason that is not a transient"
+              echo "dependency-resolution error; not retrying"
+              exit 1
+            fi
+            if [ "$delay" = "0" ]; then
+              echo "core + Windows port build failed after all retries"
+              exit 1
+            fi
+            echo "Maven Central looks flaky; retrying in ${delay}s from clean"
+            goal="clean install"
+            sleep "$delay"
+          done
           test -f core/target/classes/com/codename1/ui/Form.class
           test -f windows/target/classes/com/codename1/impl/windows/WindowsImplementation.class
 

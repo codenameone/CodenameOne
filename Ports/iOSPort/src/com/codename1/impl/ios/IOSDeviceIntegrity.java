@@ -22,8 +22,12 @@
  */
 package com.codename1.impl.ios;
 
+import com.codename1.io.Log;
+import com.codename1.security.Hash;
+import com.codename1.security.SecureStorage;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.Base64;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -32,87 +36,1647 @@ import java.util.Map;
  * iOS backing for App Attest (DeviceCheck.framework), surfaced through
  * {@link com.codename1.security.DeviceIntegrity#requestIntegrityToken(String)}.
  *
- * <p>The native side dispatches results back via the static
- * {@link #nativeAttestSuccess(int, String)} / {@link #nativeAttestError(int, String)}
- * methods. As with {@link IOSBiometrics}, the static initializer invokes each
- * with no-op values so the ParparVM dead-code eliminator does not strip the
- * native callback targets (no Java caller exists).</p>
+ * <h2>Attest once, assert many</h2>
+ *
+ * <p>Apple's model is: generate a Secure Enclave key <em>once</em>, attest it
+ * <em>once</em> so the server can record its public key, then produce cheap
+ * assertions against that key for every subsequent request. Key generation and
+ * attestation are both rate limited; assertions are not.</p>
+ *
+ * <p>This class implements that state machine over three keychain entries in
+ * {@link IOSSecureStorage}'s non-prompting tier, so the identity survives app
+ * restarts and updates:</p>
+ *
+ * <ul>
+ *   <li>{@code cn1.appattest.keyId} -- the key identifier
+ *   <li>{@code cn1.appattest.state} -- {@code new} or {@code attested}
+ *   <li>{@code cn1.appattest.retryAfter} -- backoff deadline after a throttle
+ * </ul>
+ *
+ * <h2>Token format</h2>
+ *
+ * <p>Tokens are prefixed so a backend can tell the two forms apart, which the
+ * bare {@code base64:base64} form could not:</p>
+ *
+ * <pre>
+ * cn1aa1:attest:&lt;b64 keyId&gt;:&lt;b64 attestationObject&gt;
+ * cn1aa1:assert:&lt;b64 keyId&gt;:&lt;b64 assertion&gt;:&lt;b64 clientData&gt;
+ * </pre>
+ *
+ * <p>The client data for an assertion is a small JSON object carrying the
+ * server nonce, so the server can recompute the hash the assertion signed.</p>
+ *
+ * <h2>ParparVM note</h2>
+ *
+ * <p>The native side dispatches results back through the static callbacks
+ * below. As with {@link IOSBiometrics}, the static initializer invokes each once
+ * so the dead-code eliminator does not strip them -- no Java caller exists, and
+ * without a reachable reference they become empty stubs and the native call
+ * silently does nothing. Each returns immediately while that is happening; see
+ * {@code dceGuard}.</p>
  */
 final class IOSDeviceIntegrity {
 
+    /**
+     * True only while the retention calls below are running, so each callback returns
+     * before it touches anything.
+     *
+     * <p>The same idiom as {@code IOSCarPlayCallbacks} and {@code IOSSurfaceCallbacks},
+     * and it is deliberately not the more obvious {@code if (neverTrue) { call(); }}:
+     * the call has to be unconditional for the eliminator to be certain to keep it,
+     * whereas a branch on a field nothing ever assigns is something an optimizer is
+     * entitled to fold away -- taking the reference with it, silently, and leaving the
+     * native dispatch calling an empty stub.</p>
+     */
+    private static boolean dceGuard;
+
     static {
-        // Prevents the iOS VM optimizer from eliding these native callbacks.
-        nativeAttestSuccess(-1, null);
-        nativeAttestError(-1, null);
+        // Prevents the iOS VM optimizer from eliding these native callbacks: no Java
+        // caller exists, and without a reference they translate to empty stubs and the
+        // native dispatch silently does nothing.
+        //
+        // The guard is what makes the calls harmless. Without it they ran their real
+        // bodies during class initialization -- before the static fields below this
+        // block were assigned, since static initializers run in textual order -- so
+        // take() synchronized on a null REQUESTS map and threw. This class initializes
+        // on the EDT, so that NPE reached Display's EDT handler, which shows a modal
+        // error dialog: the app hung at launch on a dialog nobody could dismiss, the
+        // first time anything asked about device integrity.
+        dceGuard = true;
+        nativeKeyGenerated(-1, null);
+        nativeAttestationReady(-1, null);
+        nativeAssertionReady(-1, null);
+        nativeAttestError(-1, -1, null);
+        dceGuard = false;
     }
 
-    private static final Map<Integer, AsyncResource<String>> REQUESTS =
-            new HashMap<Integer, AsyncResource<String>>();
+    static final String TOKEN_PREFIX = "cn1aa1";
+
+    private static final String KEY_ID = "cn1.appattest.keyId";
+    private static final String KEY_STATE = "cn1.appattest.state";
+    private static final String KEY_RETRY_AFTER = "cn1.appattest.retryAfter";
+
+    private static final String KEY_PENDING_SINCE = "cn1.appattest.pendingSince";
+    /**
+     * Set immediately before {@code attestKey}, cleared once the result is recorded.
+     *
+     * <p>Attestation is one-time and rate limited, so a key that has already been
+     * submitted must not be submitted again. Finding this marker on a later launch means
+     * the app died between Apple accepting the attestation and us persisting that fact
+     * -- and the key may well be spent, so the only safe move is a fresh one.</p>
+     */
+    private static final String KEY_ATTEST_STARTED = "cn1.appattest.attestStarted";
+    /**
+     * Marks the one-shot invalid-key recovery as already spent.
+     *
+     * <p>Persisted rather than carried on the in-flight request: {@code pending.retried}
+     * dies with that request, so the next caller was reconstructed as a first attempt
+     * and allowed to reset and burn another rate-limited key -- repeatedly, once the OS
+     * has decided it dislikes this device's keys.</p>
+     */
+    private static final String KEY_RECOVERY_SPENT = "cn1.appattest.recoverySpent";
+
+    /**
+     * The key Apple has ACCEPTED an attestation for, when the state write that should
+     * have recorded that failed.
+     *
+     * <p>Distinct from {@link #KEY_ATTEST_STARTED}, which means "submitted, outcome
+     * unknown", and from {@link #attestAnsweredForKey}, which means "Apple answered with
+     * an error that did not consume the key". This one means the opposite of both: the
+     * one-time attestation is spent and it succeeded.</p>
+     *
+     * <p>Written as a separate item precisely because the state write has just been
+     * refused -- a keychain can fail one item and take another, and the alternative is
+     * relying on process memory for a fact that costs a rate-limited hardware key every
+     * time it is forgotten. A restart with only the in-memory copy read an accepted key
+     * as an interrupted attempt and discarded it.</p>
+     */
+    private static final String KEY_ATTEST_ACCEPTED = "cn1.appattest.attestAccepted";
+
+    /**
+     * The key whose attestation was produced and never handed to anyone.
+     *
+     * <p>The attestation object itself is only worth keeping for this process: it is made
+     * over one challenge, and a later launch asks for a new one, so the retained copy
+     * cannot be used across a restart even if it were stored. What must survive is the
+     * FACT -- that this key's one-time attestation went nowhere, so the backend has never
+     * seen it. Without that, the next launch finds a pending key, waits out the grace
+     * window, promotes it, and asserts against a key nobody registered: rejected every
+     * time, then a reset, which costs another rate-limited key on top of the one already
+     * wasted.</p>
+     */
+    /**
+     * The state of a key whose attestation has been produced but not handed to anyone.
+     *
+     * <p>A VALUE of the state item rather than an item of its own, which is the whole
+     * point: the two facts -- Apple attested this key, and nobody has received the
+     * object -- move together or not at all. Written separately, a keychain that took the
+     * state and refused the marker left a key that reads as ordinary pending, so the next
+     * launch waited out the grace window and promoted a key the backend has never seen.
+     * One write cannot half-succeed.</p>
+     *
+     * <p>Promoted to {@link #STATE_PENDING} the moment a caller takes delivery.</p>
+     */
+    private static final String STATE_PENDING_UNDELIVERED = "pendingUndelivered";
+
+    private static final String STATE_NEW = "new";
+    private static final String STATE_ATTESTED = "attested";
+    /**
+     * Apple returned the attestation object, but no backend has acknowledged
+     * recording the key yet. See {@link #confirmAttestation()}.
+     */
+    private static final String STATE_PENDING = "pending";
+
+    /**
+     * How long a key may sit unacknowledged before it is treated as registered
+     * anyway.
+     *
+     * <p>Needed because acknowledgement is optional: a caller using
+     * {@code DeviceIntegrity.requestIntegrityToken} directly, without the shield
+     * engine, never calls {@link #confirmAttestation()}. Without an expiry such
+     * an app would sit in the pending state forever and re-attest on every
+     * request, which is exactly the rate-limit burn this class exists to avoid.
+     * A minute comfortably covers a registration round trip on a slow link.</p>
+     */
+    private static final long REGISTRATION_GRACE_MILLIS = 60L * 1000L;
+
+    // Ordinals from DeviceCheck's DCError enum, which declares no explicit
+    // values: unknownSystemFailure, featureUnsupported, invalidInput,
+    // invalidKey, serverUnavailable. Getting invalidKey wrong is quiet and
+    // expensive -- an invalidated key would never enter the reset-and-reattest
+    // branch, so the device would fail forever while malformed input would
+    // pointlessly burn a fresh key.
+    /** DCError.invalidKey -- the OS no longer recognises this key. */
+    private static final int DC_ERROR_INVALID_KEY = 3;
+    /** DCError.serverUnavailable -- Apple is throttling or unreachable. */
+    private static final int DC_ERROR_SERVER_UNAVAILABLE = 4;
+
+    private static final long MIN_BACKOFF_MILLIS = 30L * 1000L;
+    private static final long MAX_BACKOFF_MILLIS = 60L * 60L * 1000L;
+
+    private static final Map<Integer, PendingRequest> REQUESTS =
+            new HashMap<Integer, PendingRequest>();
     private static int nextRequestId = 1;
 
+    private static IOSDeviceIntegrity instance;
+
     private final IOSNative nativeInstance;
+    /** Guards the whole attest flow so concurrent callers cannot each burn a key. */
+    private final Object flowLock = new Object();
+    private long currentBackoff = MIN_BACKOFF_MILLIS;
+    /**
+     * When this key's attestation was accepted, held here as well as in the keychain.
+     *
+     * <p>The keychain copy is what survives a restart; this one is what survives the
+     * keychain refusing the write. Without it an accepted key looked unregistered, and
+     * every route out of that state cost a rate-limited hardware key.</p>
+     */
+    private long pendingSinceInMemory;
+    /**
+     * The key whose state this process holds in memory, when the keychain refused to
+     * hold it.
+     *
+     * <p>Apple accepts an attestation once. If the write recording that fact fails, the
+     * persisted state still describes a key that has never been submitted -- and acting
+     * on it re-submits an already-consumed one-time key, which Apple answers with
+     * invalidKey, which spends the one-shot recovery and mints a replacement. Every
+     * route out of a failed state write costs a rate-limited hardware key unless
+     * something remembers what actually happened.</p>
+     */
+    private String inMemoryStateKeyId;
+    /** The state {@link #inMemoryStateKeyId} is really in. */
+    private String inMemoryState;
+    /**
+     * The throttle deadline, held in memory as well as in the keychain.
+     *
+     * <p>{@code requestToken} reads the deadline from storage, so a refused write left
+     * the backoff existing only as a duration nobody consulted -- and the next caller
+     * went straight back to a throttled App Attest service, which is how a suspension
+     * gets extended rather than waited out. This survives at least until the process
+     * dies, which is the case the keychain was covering.</p>
+     */
+    private long retryAfterFallback;
+    /// Mirrors [#KEY_RECOVERY_SPENT] in memory, so a refused keychain write still bounds the
+    /// one-shot recovery for the life of the process rather than letting it repeat per request.
+    private boolean recoverySpentInMemory;
+
+    /**
+     * The key whose attestation Apple has already answered, when the keychain refused to
+     * drop its start marker.
+     *
+     * <p>The marker means "submitted, outcome unknown", and clearing it is what stops the
+     * next request discarding a perfectly good key. A refused removal therefore puts the
+     * device straight back into burning one rate-limited hardware key per request -- the
+     * failure the clearing was added to prevent, reached through the storage layer
+     * instead. Held in memory so at least the life of this process is covered; a restart
+     * still reads the marker and discards the key once, which is the pre-existing
+     * behaviour and bounded.</p>
+     */
+    private String attestAnsweredForKey;
+
+    /**
+     * The one-time attestation nobody took delivery of, and the request it was made for.
+     *
+     * <p>A caller can cancel the {@code AsyncResource} while Apple is working. The
+     * callback still records the key as pending, but the attestation object -- the one
+     * thing here that cannot be produced twice -- was on its way to a caller that is no
+     * longer listening, and was simply dropped. The grace window then promoted a key the
+     * backend had never seen, so every assertion was rejected, which reset and spent
+     * another rate-limited key.</p>
+     *
+     * <p>Held so a retry can still take delivery. The nonce is part of it because an
+     * attestation is made over one challenge: handing it to a request carrying a
+     * different nonce would produce a token the backend rejects, which is the failure
+     * this exists to avoid rather than a way out of it.</p>
+     */
+    /**
+     * The key this process knows was delivered, when the keychain refused to record it.
+     *
+     * <p>Delivery promotes {@link #STATE_PENDING_UNDELIVERED} to {@link #STATE_PENDING}.
+     * If that write is refused, the persisted state still says nobody received the
+     * attestation -- and the next request would discard a key the backend may already
+     * have registered, on the strength of a fact this process knows to be out of date.
+     * Same shape as every other in-memory override here: the keychain copy survives a
+     * restart, this one survives the keychain saying no.</p>
+     */
+    private String deliveredAttestKeyId;
+
+    private String undeliveredAttestKeyId;
+    private String undeliveredAttestNonce;
+    private String undeliveredAttestToken;
+
+    /**
+     * The resource the retained attestation was produced FOR, while its delivery is still
+     * undecided.
+     *
+     * <p>The retained copy is meant for the caller that walked away, and "walked away"
+     * has to be a decided fact. Delivery is queued onto the EDT, so between the callback
+     * and that runnable the token is retained and the original caller may still get it --
+     * a second request arriving in that window used to take the copy and hand it to
+     * itself, and both callers then submitted the same replay-protected attestation. The
+     * duplicate is rejected, and an app that treats a rejection as a bad key resets one
+     * the backend had just registered.</p>
+     */
+    private OneShotResource undeliveredAttestResult;
+
+    /**
+     * Set when the keychain refused to delete part of a discarded identity.
+     *
+     * <p>Attestation refuses outright while it is set. The alternative is worse than a
+     * failing app: half an identity with no markers reads as a fresh key whose
+     * attestation never began, so every request would spend a rate-limited attempt on a
+     * key that is already attested and already rejected. Cleared by a reset that
+     * succeeds, and not persisted -- there is nowhere to persist it, since the failure
+     * being recorded is that persistence is not working.</p>
+     */
+    private boolean discardFailed;
+    /** True while a generate-then-attest bootstrap is running. */
+    private boolean bootstrapInFlight;
+    /**
+     * Bumped by every reset. A callback carrying an older generation belongs to a
+     * bootstrap that was abandoned, and acting on it would repopulate the key a
+     * reset just deleted -- racing whatever flow started afterwards to persist a
+     * different key.
+     */
+    private int generation;
+    /** Callers that arrived mid-bootstrap and will assert once it completes. */
+    private final java.util.Vector waitingForBootstrap = new java.util.Vector();
 
     IOSDeviceIntegrity(IOSNative nativeInstance) {
         this.nativeInstance = nativeInstance;
+        instance = this;
     }
 
     boolean isSupported() {
         return nativeInstance.isAppAttestSupported();
     }
 
+    /**
+     * Discards the stored key so the next request attests afresh. Called when the
+     * backend reports it does not recognise the key -- after a reinstall, a
+     * restore to a new device, or an OS-side invalidation.
+     */
+    void resetAttestation() {
+        // The lock is taken BEFORE the removals, so deleting the state and invalidating
+        // the generation are one step. Removing first left a window in which a callback
+        // could take the lock, pass its staleness check -- the generation had not been
+        // bumped yet -- and write the discarded key straight back. The reset would then
+        // mark only that callback stale and leave the resurrected key behind for the
+        // next bootstrap to find.
+        synchronized (flowLock) {
+            try {
+                resetLocked();
+            } catch (IllegalStateException e) {
+                // Public API entry point, so the failure is logged rather than thrown at
+                // an app that asked us to forget a key. The state is untouched, so the
+                // next attempt can retry it.
+                Log.e(e);
+            }
+        }
+    }
+
+    /// The reset itself, for callers that must not release the lock between discarding
+    /// the old identity and starting the replacement. Caller holds `flowLock`.
+    private void resetLocked() {
+        resetLocked(false);
+    }
+
+    /// @param keepSpentMarker true when this reset is the discard step of a recovery
+    ///        that has already recorded itself as spent. Clearing the marker there would
+    ///        undo the one-shot limit at the exact moment it starts applying -- the
+    ///        replacement key would look like a first recovery all over again.
+    private void resetLocked(boolean keepSpentMarker) {
+        SecureStorage store = SecureStorage.getInstance();
+        // The two that carry the identity are checked. If the keychain refuses to
+        // delete them the reset has not happened, and advancing the generation anyway
+        // would report success while the next request reloads the very key the backend
+        // asked us to discard -- and keeps asserting with it. Better to leave the state
+        // visibly unchanged so the caller fails and can retry.
+        boolean idGone = store.remove(KEY_ID);
+        // The state goes only once the identifier is confirmed gone, and the ordering is
+        // the whole point. Deleted unconditionally, a keychain that refused KEY_ID and
+        // accepted KEY_STATE left an already-attested key behind with no state at all --
+        // and the in-memory terminal flag that covers this does not survive a restart.
+        // On the next launch requestToken() reads a key with no state as freshly
+        // generated and submits it to Apple, which is a rate-limited attestation of a
+        // key Apple has already attested, once per launch, forever. Leaving the state in
+        // place keeps the surviving key readable as what it actually is.
+        boolean stateGone = idGone && store.remove(KEY_STATE);
+        store.remove(KEY_RETRY_AFTER);
+        store.remove(KEY_PENDING_SINCE);
+        // The markers that make a surviving key terminal are cleared only once the key
+        // itself is confirmed gone. Clearing them first meant a keychain that deleted
+        // KEY_STATE and refused KEY_ID left a known-invalid key behind with no state and
+        // no start marker -- which the next request reads as a freshly generated key
+        // whose attestation never began, and submits to Apple. Every request after it
+        // does the same, against a rate limit, with the one-shot recovery marker also
+        // gone so nothing stops the loop.
+        boolean markerGone = true;
+        if (idGone && stateGone) {
+            store.remove(KEY_ATTEST_STARTED);
+            // The acceptance belonged to the identity that has just gone with it. Left
+            // behind, it would name a key that no longer exists -- harmless while the
+            // identifier is absent, and wrong the moment a replacement is generated.
+            store.remove(KEY_ATTEST_ACCEPTED);
+            attestAnsweredForKey = null;
+            // The identity is gone, so anything this process remembered about it is too.
+            undeliveredAttestKeyId = null;
+            undeliveredAttestNonce = null;
+            undeliveredAttestToken = null;
+            undeliveredAttestResult = null;
+            deliveredAttestKeyId = null;
+            inMemoryStateKeyId = null;
+            inMemoryState = null;
+            pendingSinceInMemory = 0L;
+            discardFailed = false;
+            if (!keepSpentMarker) {
+                // Checked, and the in-memory flag follows what the keychain actually
+                // did. Clearing it regardless reported a successful reset while the
+                // persisted marker survived -- so the next invalidKey found the recovery
+                // already spent and refused the one replacement it is allowed, which is
+                // precisely what resetAttestation() was called to restore. A reset that
+                // does not restore the thing it promises has to say so.
+                markerGone = store.remove(KEY_RECOVERY_SPENT);
+                recoverySpentInMemory = !markerGone;
+            }
+        }
+        if (idGone && stateGone && !markerGone) {
+            // The identity is gone, so requests can proceed and a fresh key will be
+            // generated -- deliberately NOT the terminal discardFailed state, which
+            // would refuse every request over a marker. What is wrong is narrower: the
+            // one-shot recovery still reads as spent, which is the documented behaviour
+            // of that marker rather than a new failure. The caller is told the reset
+            // did not do everything it was asked to, and can retry it.
+            generation++;
+            bootstrapInFlight = false;
+            failBootstrapWaiters("App Attest could not clear its recovery marker");
+            throw new IllegalStateException("App Attest discarded its stored key but "
+                    + "could not clear the spent-recovery marker; the keychain refused "
+                    + "the deletion, so a replacement key would still be refused its "
+                    + "one recovery attempt");
+        }
+        if (!idGone || !stateGone) {
+            // The identity survives in part, and there may be nothing left to make it
+            // terminal: a successfully attested key has no start marker and no spent
+            // marker, by design, so the next request would read the retained key as
+            // never submitted and attest it again -- a rate-limited attempt on a key
+            // Apple has already attested, repeated per request. Nothing persisted can
+            // express "this key is finished" once the keychain is refusing writes, so
+            // the state is held in memory and requestToken refuses until a reset
+            // succeeds or the process restarts.
+            discardFailed = true;
+            // The two deletions are not atomic, so a partial failure leaves half the
+            // identity gone. Treating that as "untouched" would let a callback from the
+            // rejected identity still pass its staleness check and act on inconsistent
+            // state, so the generation is advanced first: whatever the keychain did, no
+            // outstanding callback belongs to the current flow any more.
+            generation++;
+            bootstrapInFlight = false;
+            failBootstrapWaiters("App Attest could not fully discard its stored key");
+            throw new IllegalStateException("App Attest could not discard its stored key; "
+                    + "the keychain refused the deletion");
+        }
+        currentBackoff = MIN_BACKOFF_MILLIS;
+        retryAfterFallback = 0L;
+        bootstrapInFlight = false;
+        // Any callback still outstanding now belongs to an abandoned flow.
+        generation++;
+        failBootstrapWaiters("App Attest state was reset while a bootstrap was in flight");
+    }
+
+    /**
+     * Acknowledges that a backend has recorded this device's attested public key,
+     * moving it from {@code pending} to {@code attested} so subsequent requests
+     * take the cheap assertion path.
+     *
+     * <p>Until this is called -- or the grace window expires -- requests are
+     * refused with a retry hint rather than asserting. An assertion references a
+     * key by identifier only, so one sent before the server has the public key is
+     * simply unknown to it: the server rejects it, the app reads that as an
+     * invalid key, and resets a key that was in fact perfectly good. The whole
+     * point of attest-once is not to burn keys that way.</p>
+     */
+    void confirmAttestation(String keyId) {
+        if (keyId == null || keyId.length() == 0) {
+            return;
+        }
+        synchronized (flowLock) {
+            // Re-read inside the lock. Checking first and transitioning afterwards let a
+            // reset and a replacement key land in between, so this would stamp
+            // STATE_ATTESTED over a STATE_NEW key Apple has not attested yet -- and the
+            // next request would assert against it.
+            SecureStorage store = SecureStorage.getInstance();
+            // It must acknowledge THIS key. A response for an earlier attestation can
+            // arrive after a reset has already replaced the identity, and promoting on
+            // that would mark a key attested that the backend has never seen -- so the
+            // next assertion is rejected and costs another reset, which is the loop this
+            // state exists to break. The in-memory identity counts as much as the
+            // persisted one: both are only ever set for the key this process is actually
+            // holding, and a reset clears both together.
+            boolean pendingInMemory = keyId.equals(inMemoryStateKeyId)
+                    && (STATE_PENDING.equals(inMemoryState)
+                        || STATE_PENDING_UNDELIVERED.equals(inMemoryState));
+            if (!keyId.equals(store.get(KEY_ID)) && !pendingInMemory) {
+                return;
+            }
+            // What this process knows wins over what the keychain managed to store, the
+            // same rule the request path follows.
+            //
+            // When the write recording the attestation was refused, storage still says
+            // "new" -- so reading it alone dropped the backend's acknowledgement of a key
+            // Apple had already attested, and dropped it permanently: the acceptance is
+            // never re-sent. The key then sat until the grace window promoted it, or, if
+            // the app restarted first, was read as an interrupted attestation (the start
+            // marker is still there, because the path that clears it never ran) and
+            // discarded for another rate-limited key. Honouring the in-memory state costs
+            // nothing when the keychain is healthy and is the whole point of holding it.
+            // Either spelling. A backend confirming the key is proof somebody took
+            // delivery, whatever this device managed to record about it.
+            String persisted = store.get(KEY_STATE);
+            if (!pendingInMemory && !STATE_PENDING.equals(persisted)
+                    && !STATE_PENDING_UNDELIVERED.equals(persisted)) {
+                return;
+            }
+            promoteToAttested(store, keyId, pendingInMemory);
+        }
+    }
+
+    /**
+     * Records that {@code keyId} is registered, and finishes everything that follows
+     * from it.
+     *
+     * <p>One method because there are two ways to arrive: the backend acknowledging the
+     * attestation, and the grace window expiring without an acknowledgement -- which is a
+     * documented, supported outcome, not an error path. They had drifted apart, and every
+     * step missing from one of them costs a rate-limited hardware key:</p>
+     *
+     * <ul>
+     * <li>the in-memory copy, because the request path prefers what this process knows
+     *     over what the keychain holds -- so a leftover {@code STATE_PENDING} outvotes a
+     *     write that has just succeeded and keeps answering "registration in progress" on
+     *     a key that is registered;</li>
+     * <li>the pending deadline, or {@code registrationGraceRemaining()} reports a window
+     *     that has already been resolved;</li>
+     * <li>the start marker, or the next launch reads an attested key as an interrupted
+     *     attestation and discards it for a replacement;</li>
+     * <li>the recovery marker, or the next time iOS legitimately invalidates this key the
+     *     one-shot replacement is refused as already spent, and every assertion fails
+     *     until the app resets attestation by hand.</li>
+     * </ul>
+     *
+     * <p>Harmless on the healthy path: it removes entries that are already gone.</p>
+     */
+    private void promoteToAttested(SecureStorage store, String keyId, boolean holdInMemory) {
+        if (!store.set(KEY_STATE, STATE_ATTESTED) || holdInMemory) {
+            inMemoryStateKeyId = keyId;
+            inMemoryState = STATE_ATTESTED;
+        }
+        pendingSinceInMemory = 0L;
+        store.remove(KEY_PENDING_SINCE);
+        store.remove(KEY_ATTEST_STARTED);
+        store.remove(KEY_ATTEST_ACCEPTED);
+        // Registered, so whatever happened to the delivery no longer matters.
+        deliveredAttestKeyId = null;
+        undeliveredAttestKeyId = null;
+        undeliveredAttestNonce = null;
+        undeliveredAttestToken = null;
+        undeliveredAttestResult = null;
+        attestAnsweredForKey = null;
+        recoverySpentInMemory = !store.remove(KEY_RECOVERY_SPENT);
+    }
+
+    String[] jailbreakSignals() {
+        try {
+            String signals = nativeInstance.iosJailbreakSignals();
+            if (signals == null || signals.length() == 0) {
+                return new String[0];
+            }
+            return com.codename1.io.Util.split(signals, ",");
+        } catch (Throwable t) {
+            return new String[0];
+        }
+    }
+
     AsyncResource<String> requestToken(String nonce) {
-        AsyncResource<String> r = new AsyncResource<String>();
+        OneShotResource r = new OneShotResource();
         if (!nativeInstance.isAppAttestSupported()) {
             r.error(new UnsupportedOperationException(
                     "App Attest is not supported on this device"));
             return r;
         }
-        int rid;
-        synchronized (REQUESTS) {
-            rid = nextRequestId++;
-            REQUESTS.put(Integer.valueOf(rid), r);
+        if (nonce == null || nonce.length() == 0) {
+            r.error(new IllegalArgumentException(
+                    "App Attest requires a server-issued nonce; a client-generated "
+                    + "one is not replay-safe"));
+            return r;
         }
-        nativeInstance.requestAppAttestToken(rid, nonce);
+        synchronized (flowLock) {
+            if (discardFailed) {
+                // A previous discard left half an identity behind because the keychain
+                // refused a deletion. Attesting from here spends a rate-limited attempt
+                // on a key that is already attested and already rejected, once per
+                // request, so the app is told plainly instead. resetAttestation() clears
+                // it if the keychain recovers.
+                r.error(new RuntimeException("App Attest could not discard a rejected key "
+                        + "and cannot safely generate another; call "
+                        + "DeviceIntegrity.resetAttestation() once the device's keychain "
+                        + "is writable again"));
+                return r;
+            }
+            long retryAfter = Math.max(readRetryAfter(), retryAfterFallback);
+            if (retryAfter > System.currentTimeMillis()) {
+                r.error(new RuntimeException("App Attest is backing off after a throttle; "
+                        + "retry in " + ((retryAfter - System.currentTimeMillis()) / 1000)
+                        + "s"));
+                return r;
+            }
+            SecureStorage store = SecureStorage.getInstance();
+            String keyId = store.get(KEY_ID);
+            String state = store.get(KEY_STATE);
+            // What this process knows wins over what the keychain managed to store. The
+            // keychain copy is what survives a restart; this one is what survives the
+            // keychain refusing the write, and without it an accepted key reads as one
+            // that was never submitted.
+            if (keyId != null && keyId.equals(inMemoryStateKeyId) && inMemoryState != null) {
+                state = inMemoryState;
+            }
+            // And the durable record of an acceptance whose state write was refused. This
+            // is what makes the in-memory copy above survive a restart: without it the
+            // next launch finds STATE_NEW plus a start marker, reads an accepted key as
+            // an interrupted attempt, and discards it for another rate-limited one --
+            // every launch, for as long as the keychain stays unwilling.
+            //
+            // It rehydrates as UNDELIVERED, not as pending. This marker is written in
+            // exactly one place: the branch where the state write was refused, which is
+            // before anyone could have taken delivery. Reading it back as ordinary
+            // pending asserted the opposite -- and with the pending deadline also lost
+            // with the process, the grace window was already over, so the next request
+            // promoted the key immediately and started asserting against something the
+            // backend has never seen. A persisted STATE_PENDING wins over it, because
+            // that value is only ever written once a caller has the attestation.
+            if (keyId != null && !STATE_ATTESTED.equals(state)
+                    && !STATE_PENDING.equals(state)
+                    && keyId.equals(store.get(KEY_ATTEST_ACCEPTED))) {
+                state = STATE_PENDING_UNDELIVERED;
+            }
+            // Delivery that the keychain refused to record still happened. Without this
+            // the state says nobody received the attestation and the branch below
+            // discards a key the backend may already have registered.
+            if (STATE_PENDING_UNDELIVERED.equals(state) && keyId != null
+                    && keyId.equals(deliveredAttestKeyId)) {
+                state = STATE_PENDING;
+            }
+            if (STATE_PENDING_UNDELIVERED.equals(state) && keyId != null
+                    && keyId.length() > 0) {
+                // An attestation was produced for this key and nobody took it -- the
+                // caller cancelled while Apple was working. It cannot be produced again,
+                // so it is handed to the retry that asks for the same challenge.
+                if (undeliveredAttestToken != null
+                        && nonce.equals(undeliveredAttestNonce)) {
+                    // Only once the delivery it was produced for has actually lost.
+                    //
+                    // Retaining and delivering are not simultaneous: the callback retains
+                    // the copy and queues the handover onto the EDT, so for the length of
+                    // that hop the token is retained AND still reachable by its original
+                    // caller. A request arriving in that window took the copy, and both
+                    // callers then submitted the same attestation -- which is
+                    // replay-protected, so the second submission is rejected, and an app
+                    // that reads a rejection as a bad key resets one the backend had just
+                    // registered. Asking the resource itself makes this a fact about a
+                    // decided claim rather than a guess about an undecided one.
+                    if (undeliveredAttestResult != null
+                            && !undeliveredAttestResult.lostItsClaim()) {
+                        r.error(new RuntimeException("an App Attest attestation for this "
+                                + "challenge is being handed to another caller; retry "
+                                + "once it has finished"));
+                        return r;
+                    }
+                    // Through the one-shot claim, like the scheduled delivery. Calling
+                    // the inherited complete() left the claim unspent, so a caller that
+                    // cancelled the resource it had just been handed still won -- while
+                    // this branch had already cleared the only retained copy and promoted
+                    // the key. Nobody registers it, and the grace window then starts
+                    // asserting against a key the backend has never seen.
+                    if (!r.deliver(undeliveredAttestToken)) {
+                        return r;
+                    }
+                    undeliveredAttestKeyId = null;
+                    undeliveredAttestNonce = null;
+                    undeliveredAttestToken = null;
+                    undeliveredAttestResult = null;
+                    // The same promotion the scheduled delivery does, including what to
+                    // do when the keychain refuses it: this caller is walking away with
+                    // the attestation, so a persisted state still saying nobody received
+                    // it would have the NEXT request discard a key the backend may
+                    // already have registered. Two paths hand this object over, and both
+                    // have to record that they did.
+                    if (!store.set(KEY_STATE, STATE_PENDING)) {
+                        deliveredAttestKeyId = keyId;
+                    }
+                    if (STATE_PENDING_UNDELIVERED.equals(inMemoryState)) {
+                        inMemoryState = STATE_PENDING;
+                    }
+                    return r;
+                }
+                // A different challenge, or a restart that lost the object entirely. Either
+                // way the retained copy cannot help: an attestation is made over one nonce
+                // and the backend checks it. What must NOT happen is the grace window
+                // promoting this key -- the backend has never seen it, so every assertion
+                // would be rejected, and the reset that follows costs a rate-limited key
+                // anyway on top of the failures. Discard it here instead: one key, once,
+                // deterministically, with the next lines generating its replacement.
+                undeliveredAttestKeyId = null;
+                undeliveredAttestNonce = null;
+                undeliveredAttestToken = null;
+                undeliveredAttestResult = null;
+                resetLocked();
+                keyId = null;
+                state = null;
+            }
+            if (STATE_PENDING.equals(state) && keyId != null && keyId.length() > 0) {
+                if (registrationGraceRemaining() > 0) {
+                    // The key is attested with Apple but no backend has confirmed
+                    // recording it. Asserting now would present a key identifier
+                    // the server cannot resolve, which reads as an invalid key and
+                    // costs a needless reset -- so refuse briefly instead.
+                    r.error(new RuntimeException("App Attest is completing first-run "
+                            + "registration for this device; retry shortly"));
+                    return r;
+                }
+                // Nobody acknowledged within the window. Either the consumer does
+                // not participate in acknowledgement at all, or its registration
+                // call was lost. Assume registered rather than re-attesting on
+                // every request forever.
+                // The same promotion confirmAttestation() performs, through the same
+                // method. Written out here, it kept only the state and the deadline --
+                // so a replacement key that reached this branch (its pending metadata
+                // write having failed, and no backend acknowledging) was promoted with
+                // the recovery marker from the attempt that produced it still set. The
+                // next time iOS legitimately invalidated that key, its replacement was
+                // refused as already spent and every assertion failed until the app
+                // reset attestation by hand.
+                promoteToAttested(store, keyId, keyId.equals(inMemoryStateKeyId));
+                state = STATE_ATTESTED;
+            }
+            boolean attested = STATE_ATTESTED.equals(state);
+            if (keyId == null || keyId.length() == 0 || !attested) {
+                // Checked before branching on the key state, not after: between
+                // key generation persisting the id and its attestation
+                // completing, the key exists but is not yet attested, and a
+                // caller arriving in that window would otherwise attest the same
+                // key a second time. Attestation is rate limited, so that costs
+                // real budget and races its own result.
+                PendingRequest pending =
+                        new PendingRequest(r, nonce, PendingRequest.OP_GENERATE_KEY, null);
+                if (bootstrapInFlight) {
+                    // Key generation is asynchronous, so holding the lock only
+                    // until the native call is issued is not enough: a second
+                    // caller would still see no key and generate its own,
+                    // burning a second hardware key against Apple's per-device
+                    // budget. Queue instead, and assert once the first bootstrap
+                    // lands -- assertions are unlimited.
+                    waitingForBootstrap.addElement(pending);
+                    return r;
+                }
+                bootstrapInFlight = true;
+                if (keyId != null && keyId.length() > 0
+                        && (store.get(KEY_ATTEST_STARTED) == null
+                            || keyId.equals(attestAnsweredForKey))) {
+                    // A key exists but attestation was never started for it -- the
+                    // previous attempt died between generating and submitting. Attest
+                    // that key rather than burning another.
+                    attestKey(r, nonce, keyId);
+                } else if (keyId != null && keyId.length() > 0
+                        && (recoverySpentInMemory
+                            || store.get(KEY_RECOVERY_SPENT) != null)) {
+                    // The interrupted key belongs to a recovery that has already been
+                    // used once. Discarding it here would generate yet another
+                    // rate-limited key, and would do so on every subsequent request --
+                    // the exact loop the spent marker exists to stop. Report instead.
+                    bootstrapInFlight = false;
+                    failResource(r, "App Attest could not establish a usable key on this "
+                            + "device; call DeviceIntegrity.resetAttestation() to try again");
+                    return r;
+                } else if (keyId != null && keyId.length() > 0) {
+                    // Attestation WAS started for this key and we never recorded the
+                    // outcome, so Apple may already have consumed it. Re-submitting a
+                    // spent key is rejected and the failure repeats on every request
+                    // until something resets, so discard it and start clean. One
+                    // rate-limited key is spent either way; this way the device recovers.
+                    // Ordered like resetLocked, and for the same reason: the markers
+                    // that make a surviving key terminal go only once the key itself is
+                    // confirmed gone. Removing KEY_ATTEST_STARTED while the keychain
+                    // refused KEY_ID left an outcome-unknown key looking like one that
+                    // was never submitted, so the next request handed it to attestKey
+                    // again -- and if Apple had already consumed the original submission
+                    // that burns another rate-limited attempt and drops the device into
+                    // invalid-key recovery for a reason that was never true.
+                    if (!store.remove(KEY_ID)) {
+                        bootstrapInFlight = false;
+                        failResource(r, "App Attest could not discard the key whose "
+                                + "attestation was interrupted; the keychain refused the "
+                                + "deletion");
+                        return r;
+                    }
+                    store.remove(KEY_STATE);
+                    store.remove(KEY_ATTEST_STARTED);
+                    store.remove(KEY_ATTEST_ACCEPTED);
+                    // The discarded key is the one the in-memory marker named.
+                    attestAnsweredForKey = null;
+                    PendingRequest fresh = new PendingRequest(r, nonce,
+                            PendingRequest.OP_GENERATE_KEY, null);
+                    int rid = register(fresh);
+                    nativeInstance.appAttestGenerateKey(rid);
+                } else {
+                    int rid = register(pending);
+                    nativeInstance.appAttestGenerateKey(rid);
+                }
+                return r;
+            }
+            assertWithKey(r, nonce, keyId);
+        }
         return r;
     }
 
+    /**
+     * Milliseconds left in the registration grace window, or 0 once it has run
+     * out. A pending timestamp from the future -- a clock the user moved back --
+     * is treated as expired rather than as an unbounded wait.
+     */
+    private static long registrationGraceRemaining() {
+        String since = SecureStorage.getInstance().get(KEY_PENDING_SINCE);
+        if (since == null || since.length() == 0) {
+            // The keychain refused the timestamp, and this process remembers when the
+            // key was accepted. Falling through to 0 here is what made the accepted key
+            // look unregistered and sent it back through attestation.
+            IOSDeviceIntegrity live = instance;
+            if (live != null && live.pendingSinceInMemory > 0) {
+                long left = REGISTRATION_GRACE_MILLIS
+                        - (System.currentTimeMillis() - live.pendingSinceInMemory);
+                return left > 0 ? left : 0;
+            }
+            return 0;
+        }
+        long started;
+        try {
+            started = Long.parseLong(since);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+        long elapsed = System.currentTimeMillis() - started;
+        if (elapsed < 0 || elapsed >= REGISTRATION_GRACE_MILLIS) {
+            return 0;
+        }
+        return REGISTRATION_GRACE_MILLIS - elapsed;
+    }
+
+    // --- flow steps ------------------------------------------------------
+
+    private void attestKey(OneShotResource r, String nonce, String keyId) {
+        attestKey(r, nonce, keyId, false);
+    }
+
+    private void attestKey(OneShotResource r, String nonce, String keyId, boolean retried) {
+        // The attestation binds to SHA-256 of the raw nonce. Hashing here rather
+        // than natively keeps a single hash implementation across both paths.
+        String hash = base64(Hash.sha256(bytes(nonce)));
+        // Recorded BEFORE the call, so a crash between here and the result is
+        // distinguishable from never having tried -- and the write is checked, because
+        // proceeding without the marker recreates exactly the case it exists to catch:
+        // the app dies after Apple consumes the one-time attestation, the next launch
+        // sees a key with no marker, and submits the spent key again.
+        if (!SecureStorage.getInstance().set(KEY_ATTEST_STARTED, "1")) {
+            bootstrapInFlight = false;
+            failBootstrapWaiters("App Attest could not record that attestation had started");
+            failResource(r, "App Attest could not record that attestation had started, so it "
+                    + "was not attempted rather than risk spending the key untracked");
+            return;
+        }
+        PendingRequest pending = new PendingRequest(r, nonce, PendingRequest.OP_ATTEST, keyId);
+        pending.retried = retried;
+        int rid = register(pending);
+        nativeInstance.appAttestAttestKey(rid, keyId, hash);
+    }
+
+    private void assertWithKey(OneShotResource r, String nonce, String keyId) {
+        String clientData = clientDataJson(nonce, keyId);
+        String hash = base64(Hash.sha256(bytes(clientData)));
+        PendingRequest pending =
+                new PendingRequest(r, nonce, PendingRequest.OP_ASSERT, keyId);
+        pending.clientData = clientData;
+        int rid = register(pending);
+        nativeInstance.appAttestGenerateAssertion(rid, keyId, hash);
+    }
+
+    /**
+     * Minimal JSON, hand-built rather than pulled from a parser: it has to be
+     * byte-identical to what the server recomputes the hash over, so its exact
+     * serialization is part of the wire contract.
+     */
+    private static String clientDataJson(String nonce, String keyId) {
+        return "{\"n\":\"" + escapeJson(nonce) + "\",\"k\":\"" + escapeJson(keyId) + "\"}";
+    }
+
+    /**
+     * JSON string escaping that is reversible.
+     *
+     * <p>Control characters are escaped, not replaced. Substituting a space for them
+     * lost information: a nonce containing a newline and the same nonce containing a
+     * space produced identical clientData, so the assertion no longer bound the exact
+     * challenge the server issued -- and the server, recomputing the hash over what it
+     * sent, would not match it either. The one-to-one binding between a challenge and
+     * the bytes signed over it is the whole point of the nonce.</p>
+     */
+    private static String escapeJson(String s) {
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '"' || c == '\\') {
+                sb.append('\\').append(c);
+            } else if (c == '\n') {
+                sb.append("\\n");
+            } else if (c == '\r') {
+                sb.append("\\r");
+            } else if (c == '\t') {
+                sb.append("\\t");
+            } else if (c == '\b') {
+                sb.append("\\b");
+            } else if (c == '\f') {
+                sb.append("\\f");
+            } else if (c < 0x20) {
+                // Everything else below 0x20 has no short form and must be \\u-escaped.
+                // Hand-rolled rather than String.format, which the CLDC-era core does
+                // not have -- and the exact serialization is part of the wire contract,
+                // so it has to be predictable rather than locale-dependent.
+                sb.append("\\u00");
+                sb.append(HEX[(c >> 4) & 0xf]);
+                sb.append(HEX[c & 0xf]);
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    private static final char[] HEX = {
+        '0', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+    };
+
     // ---- Callbacks invoked from native code (do not rename) ----------------
 
-    /** Called from native when attestation succeeds with the opaque token. */
-    public static void nativeAttestSuccess(final int requestId, final String token) {
-        final AsyncResource<String> r = take(requestId);
-        if (r == null) {
+    /**
+     * Fails a request and the bootstrap it was driving.
+     *
+     * <p>For the branches that give up before touching storage. Failing only the
+     * initiating request there left {@code bootstrapInFlight} set, so every caller
+     * already queued behind it -- and every caller that arrived afterwards and was queued
+     * because a bootstrap looked live -- waited on a bootstrap that had already stopped,
+     * with nothing left to release them. The mid-flow storage failures got this right;
+     * these two did not.</p>
+     *
+     * <p>A stale request only fails itself: a reset has already cleared the flag and
+     * failed the waiters, and clearing it again would clear the flag belonging to the
+     * replacement bootstrap that reset started.</p>
+     */
+    private static void failBootstrapAttempt(PendingRequest pending, String msg) {
+        if (instance == null) {
+            fail(pending, msg);
             return;
         }
-        Display.getInstance().callSerially(new Runnable() {
-            @Override
-            public void run() {
-                if (!r.isDone()) {
-                    r.complete(token);
-                }
+        synchronized (instance.flowLock) {
+            if (isStale(pending)) {
+                fail(pending, "App Attest state was reset while this request was in flight");
+                return;
             }
-        });
+            instance.bootstrapInFlight = false;
+            fail(pending, msg);
+            instance.failBootstrapWaiters(msg);
+        }
     }
 
-    /** Called from native when key generation or attestation fails. */
-    public static void nativeAttestError(final int requestId, final String msg) {
-        final AsyncResource<String> r = take(requestId);
-        if (r == null) {
+    /** Called from native once a fresh hardware key exists. */
+    public static void nativeKeyGenerated(final int requestId, final String keyId) {
+        if (dceGuard) {
             return;
         }
-        Display.getInstance().callSerially(new Runnable() {
-            @Override
-            public void run() {
-                if (!r.isDone()) {
-                    r.error(new RuntimeException(msg == null ? "App Attest failed" : msg));
-                }
+        PendingRequest pending = take(requestId);
+        if (pending == null || instance == null) {
+            return;
+        }
+        if (keyId == null || keyId.length() == 0) {
+            failBootstrapAttempt(pending,
+                    "App Attest key generation returned no identifier");
+            return;
+        }
+        // The staleness check and the writes it guards happen under the same lock a
+        // reset takes. Split apart, a reset landing between them would delete the key
+        // and bump the generation, and these writes would then put the deleted key
+        // back -- registered under the new generation, so every later staleness check
+        // would accept the bootstrap that was supposed to have been abandoned.
+        // fail() only schedules onto the EDT, so it is safe to call while holding this.
+        synchronized (instance.flowLock) {
+            if (isStale(pending)) {
+                fail(pending, "App Attest state was reset while this request was in flight");
+                return;
             }
-        });
+            SecureStorage store = SecureStorage.getInstance();
+            if (!store.set(KEY_ID, keyId) || !store.set(KEY_STATE, STATE_NEW)) {
+                // The keychain refused the write. Attesting anyway would burn a
+                // rate-limited attestation on a key the next request cannot find, so it
+                // would generate another, and another. Give up on this attempt instead
+                // and leave nothing half-written behind.
+                store.remove(KEY_ID);
+                store.remove(KEY_STATE);
+                store.remove(KEY_ATTEST_STARTED);
+                instance.attestAnsweredForKey = null;
+                instance.bootstrapInFlight = false;
+                fail(pending, "App Attest could not store its key identifier");
+                instance.failBootstrapWaiters(
+                        "App Attest could not store its key identifier");
+                return;
+            }
+            // Carry the marker forward: without it a recovery attempt whose
+            // replacement key also reports invalidKey would recover again, and
+            // again, instead of surfacing the failure.
+            instance.attestKey(pending.result, pending.nonce, keyId, pending.retried);
+        }
     }
 
-    private static AsyncResource<String> take(int requestId) {
+    /** Called from native with the attestation object for a newly attested key. */
+    public static void nativeAttestationReady(final int requestId, final String attestationB64) {
+        if (dceGuard) {
+            return;
+        }
+        PendingRequest pending = take(requestId);
+        if (pending == null) {
+            return;
+        }
+        if (attestationB64 == null) {
+            // Same cleanup as key generation returning nothing: this bootstrap is over,
+            // and the queue behind it has to be told.
+            failBootstrapAttempt(pending, "App Attest attestation returned no data");
+            return;
+        }
+        if (instance == null) {
+            return;
+        }
+        // Apple accepted the attestation, but only the backend can confirm it
+        // recorded the key, so the key becomes pending rather than attested.
+        // Every caller -- queued or newly arriving -- is told to retry until
+        // confirmAttestation() lands or the grace window expires; otherwise a
+        // caller arriving right after this callback would sail past the queue and
+        // assert against a key the server has never seen. If the backend later
+        // rejects it, the app calls DeviceIntegrity.resetAttestation() instead.
+        // Same lock as the reset, for the same reason as nativeKeyGenerated: the
+        // staleness check and the state it writes have to move together.
+        // Labelled so the storage-failure branches can leave the critical section and
+        // still hand the caller its attestation, which is the one thing in here that
+        // cannot be produced a second time.
+        String attestToken = TOKEN_PREFIX + ":attest:" + base64(bytes(pending.keyId))
+                + ":" + attestationB64;
+        shieldAttestState:
+        synchronized (instance.flowLock) {
+            if (isStale(pending)) {
+                fail(pending, "App Attest state was reset while this request was in flight");
+                return;
+            }
+            SecureStorage store = SecureStorage.getInstance();
+            // Retained in the SAME critical section that publishes the undelivered state,
+            // and before it. Split across two, a request arriving in the gap read
+            // "attested, nobody has it" with no object to hand over -- and answered the
+            // only way that state allows, by discarding a key Apple had just accepted.
+            // The two facts are one fact, so anything that can observe either has to
+            // observe both.
+            instance.undeliveredAttestKeyId = pending.keyId;
+            instance.undeliveredAttestNonce = pending.nonce;
+            instance.undeliveredAttestToken = attestToken;
+            // And who it is for, until that is decided. Delivery is queued onto the EDT,
+            // so the copy is retained for a stretch during which the original caller can
+            // still receive it.
+            instance.undeliveredAttestResult = pending.result;
+            if (!store.set(KEY_STATE, STATE_PENDING_UNDELIVERED)) {
+                // The key is attested with Apple and the keychain will not record it.
+                //
+                // Reporting success would leave the next request attesting the same key
+                // again -- but so did simply failing, because the persisted state still
+                // says "new" with a start marker, which is read as an interrupted
+                // attestation and discards the key for another rate-limited one. Every
+                // route out of here spent a key until something remembered that Apple
+                // had already answered. So the state is held in memory for this process,
+                // exactly as the deadline below is, and this request is failed so the
+                // caller retries into a state that now describes the key correctly.
+                instance.inMemoryStateKeyId = pending.keyId;
+                instance.inMemoryState = STATE_PENDING_UNDELIVERED;
+                instance.pendingSinceInMemory = System.currentTimeMillis();
+                // And durably, in a DIFFERENT item, because process memory does not
+                // survive the restart this is most likely to be followed by: storage
+                // still says "new" with a start marker, which the next launch reads as an
+                // interrupted attestation and answers by discarding the key -- spending
+                // another rate-limited one on a key Apple has already accepted. A
+                // keychain that refused the state write can still take an item it has
+                // never seen; if it refuses this too, the in-memory copy is what is left
+                // and the loss is bounded to one key rather than one per launch.
+                store.set(KEY_ATTEST_ACCEPTED, pending.keyId);
+                instance.bootstrapInFlight = false;
+                instance.failBootstrapWaiters("App Attest is completing first-run "
+                        + "registration for this device; retry shortly");
+                // The caller still gets the attestation, because it is the ONE thing
+                // here that cannot be produced again. Apple attests a key once; failing
+                // this request threw that object away, so the backend never received the
+                // key to register -- and after the grace window the client promotes it
+                // locally and starts asserting against a key the backend has never seen,
+                // which is rejected, which resets, which spends another rate-limited
+                // key. Discarding an irreplaceable result to report a storage problem
+                // costs strictly more than reporting nothing.
+                //
+                // Falls through to the same succeed() the normal path uses. The state is
+                // pending in memory, so later callers take the registration-in-progress
+                // path exactly as they would have.
+                break shieldAttestState;
+            }
+            long pendingSince = System.currentTimeMillis();
+            // Held in memory whatever the keychain does, and set BEFORE the write is
+            // attempted so the fallback is already in place if it fails.
+            instance.pendingSinceInMemory = pendingSince;
+            if (!store.set(KEY_PENDING_SINCE, Long.toString(pendingSince))) {
+                // The key is KEPT, in the pending state it is already in. Nothing is
+                // rolled back and nothing is discarded.
+                //
+                // Two earlier attempts here were both wrong in the same direction --
+                // they sent an accepted key back through attestation. Rolling the state
+                // to new while KEY_ATTEST_STARTED was present made it read as an
+                // interrupted attestation, which discards the key and mints another;
+                // clearing that marker first only moved the failure, because a key in
+                // STATE_NEW is submitted to attestKey again and Apple answers invalidKey
+                // for a one-time key it has already consumed -- which triggers recovery
+                // and burns a replacement anyway. Apple accepted this attestation. The
+                // key is good. The only thing missing is a timestamp.
+                //
+                // So the timestamp lives in memory for this process (set above, before
+                // the write was attempted) and registrationGraceRemaining() falls back
+                // to it. Across a restart the key is found PENDING with no deadline,
+                // which the request path already handles: it promotes to attested and
+                // uses it, the same fallback applied when a consumer never acknowledges.
+                // That is right here too -- the key IS attested with Apple; only the
+                // backend's confirmation is unknown -- and it costs no rate-limited key.
+                store.remove(KEY_ATTEST_STARTED);
+                instance.bootstrapInFlight = false;
+                instance.failBootstrapWaiters("App Attest is completing first-run "
+                        + "registration for this device; retry shortly");
+                // Same reasoning as the state write above: the attestation object is
+                // one-time, so it goes to the caller rather than being discarded to
+                // report that a timestamp could not be stored.
+                break shieldAttestState;
+            }
+            // The recovery this key came from, if any, is now complete. Leaving the
+            // marker would refuse a future replacement when iOS legitimately invalidates
+            // THIS key, and every later assertion would fail until the app reset by hand.
+            store.remove(KEY_ATTEST_STARTED);
+            // Attested, so there is no interrupted attestation left to remember.
+            instance.attestAnsweredForKey = null;
+            // The in-memory copy is cleared unconditionally, but the persisted marker is
+            // only forgotten once the keychain confirms the deletion. A stale marker
+            // would refuse the one-shot replacement the next time iOS legitimately
+            // invalidates this key, leaving every assertion failing until the app reset
+            // by hand -- so if the delete fails, the marker stays true here too and the
+            // process keeps behaving as though the recovery were spent, which is the
+            // conservative direction.
+            instance.recoverySpentInMemory = !store.remove(KEY_RECOVERY_SPENT);
+            instance.currentBackoff = MIN_BACKOFF_MILLIS;
+            instance.bootstrapInFlight = false;
+            // Deliberately NOT asserted here, for the reason above. Queued callers
+            // are told to retry; by then the key is registered and their request
+            // costs one cheap assertion.
+            instance.failBootstrapWaiters("App Attest is completing first-run "
+                    + "registration for this device; retry shortly");
+        }
+        // The retention above is what a concurrent request needs; the durable half is the
+        // state the block wrote. Only the fact is persisted, never the object -- an
+        // attestation covers one challenge and a later launch asks for a new one, so a
+        // stored copy could not be used across a restart anyway, whereas knowing nobody
+        // received it is what stops the next launch promoting a key the backend has never
+        // seen.
+        succeed(pending, attestToken, true);
+    }
+
+    /**
+     * The resource handed to a caller, where cancelling and delivering cannot both win.
+     *
+     * <p>{@link AsyncResource#complete} does not refuse an already-cancelled resource --
+     * it writes the value and fires the success callback -- and {@code cancel()} does not
+     * refuse an already-completed one either. Checking one before doing the other narrows
+     * the window without closing it, and what falls into it is the one object here that
+     * cannot be produced again: the application may have received and submitted an
+     * attestation while this class concluded delivery had lost and kept it for a retry,
+     * or the reverse. A claim taken once decides it.</p>
+     *
+     * <p>The claim and its outcome are one word, not a claim followed by a verdict. Two
+     * fields are two publications, and between them the resource reads as
+     * claimed-but-not-delivered -- which is the state that tells the retained-attestation
+     * branch delivery has lost. Whoever asks has to see the answer or see nothing.</p>
+     *
+     * <p>Only this class's own results are of this type, so nothing outside it can be
+     * affected by the stricter cancel().</p>
+     */
+    static final class OneShotResource extends AsyncResource<String> {
+
+        /** Nobody has taken the claim; every outcome is still possible. */
+        private static final int OPEN = 0;
+
+        /** The claim was spent by handing the value to this resource's caller. */
+        private static final int DELIVERED = 1;
+
+        /** The claim was spent by a cancellation or a failure, so delivery lost. */
+        private static final int LOST = 2;
+
+        /**
+         * The claim AND what it was spent on, in one word.
+         *
+         * <p>Two fields could not express this, however carefully they were ordered.
+         * Taking the claim and recording the outcome were separate publications, so
+         * between them the resource read as claimed-but-not-delivered -- which is exactly
+         * how {@code lostItsClaim()} spells "delivery lost". A same-nonce retry landing in
+         * that window took the retained attestation while the delivery it had just
+         * misread went on to complete, so two callers held one attestation. It is
+         * replay-protected, so the second submission is rejected, and an app that reads a
+         * rejection as a bad key resets one the backend had just registered. Deciding the
+         * outcome in the same compare-and-set that takes the claim leaves no interval to
+         * observe.</p>
+         */
+        private final java.util.concurrent.atomic.AtomicInteger state =
+                new java.util.concurrent.atomic.AtomicInteger(OPEN);
+
+        /**
+         * True once this resource can never receive the attestation: its claim is spent
+         * and it was not spent by handing the value over.
+         *
+         * <p>What the retained-attestation branch needs to know. An attestation cannot be
+         * produced twice, so the retained copy exists for the caller that cancelled --
+         * but "cancelled" has to mean the delivery LOST, not merely that a delivery is
+         * still queued or in progress. Asking this way makes the answer a fact about a
+         * claim that has already been decided rather than a guess about one that has
+         * not.</p>
+         */
+        boolean lostItsClaim() {
+            return state.get() == LOST;
+        }
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            if (!state.compareAndSet(OPEN, LOST)) {
+                // Delivery got here first. Reporting the cancellation as refused is the
+                // truth -- the caller's success callback has run or is about to.
+                return false;
+            }
+            return super.cancel(mayInterruptIfRunning);
+        }
+
+        /** True when this call is the one that delivered. */
+        boolean deliver(String value) {
+            if (!state.compareAndSet(OPEN, DELIVERED)) {
+                return false;
+            }
+            super.complete(value);
+            return true;
+        }
+
+        /** True when this call is the one that failed it. */
+        boolean fail(Throwable t) {
+            if (!state.compareAndSet(OPEN, LOST)) {
+                return false;
+            }
+            super.error(t);
+            return true;
+        }
+    }
+
+    /** Called from native with an assertion over an already attested key. */
+    public static void nativeAssertionReady(final int requestId, final String assertionB64) {
+        if (dceGuard) {
+            return;
+        }
+        PendingRequest pending = take(requestId);
+        if (pending == null) {
+            return;
+        }
+        if (assertionB64 == null) {
+            fail(pending, "App Attest assertion returned no data");
+            return;
+        }
+        if (instance != null) {
+            // ONE acquisition covering the staleness check and everything it guards, for
+            // the reason spelled out on nativeAttestError. Split in two, a reset landing
+            // between them let this callback clear the throttle state belonging to the
+            // replacement generation: if that replacement had already recorded a
+            // serverUnavailable, its deadline was erased here while succeed() went on to
+            // reject this token as stale anyway -- so the next request went straight back
+            // at a service Apple had just told us to stay away from, which is how an app
+            // gets its whole attestation budget suspended.
+            synchronized (instance.flowLock) {
+                if (isStale(pending)) {
+                    // A reset landed while this assertion was in flight -- typically
+                    // because a concurrent request learned the backend does not
+                    // recognise the key. Handing back an assertion for the key that was
+                    // just discarded would send the server what it already rejected.
+                    fail(pending,
+                            "App Attest state was reset while this request was in flight");
+                    return;
+                }
+                // A working assertion means Apple is answering again, so the throttle
+                // sequence starts over. Without this the doubling only ever accumulated:
+                // outages separated by months of successful requests would compound
+                // until one transient failure imposed the full hour.
+                instance.currentBackoff = MIN_BACKOFF_MILLIS;
+                instance.retryAfterFallback = 0L;
+                SecureStorage.getInstance().remove(KEY_RETRY_AFTER);
+            }
+        }
+        succeed(pending, TOKEN_PREFIX + ":assert:" + base64(bytes(pending.keyId))
+                + ":" + assertionB64
+                + ":" + base64(bytes(pending.clientData)));
+    }
+
+    /** Called from native when any step fails. errorCode is the raw DCError code. */
+    public static void nativeAttestError(final int requestId, final int errorCode,
+            final String msg) {
+        if (dceGuard) {
+            return;
+        }
+        PendingRequest pending = take(requestId);
+        if (pending == null) {
+            return;
+        }
+        if (instance != null) {
+            // The staleness check and every mutation this callback performs sit inside
+            // ONE acquisition. Checking under the lock and then releasing it let a reset
+            // bump the generation and start a replacement in between, and this callback
+            // would then discard that replacement -- or, for a non-invalid-key error,
+            // clear the in-flight flag and waiters belonging to it.
+            synchronized (instance.flowLock) {
+                if (isStale(pending)) {
+                    fail(pending,
+                            "App Attest state was reset while this request was in flight");
+                    return;
+                }
+                boolean recoverySpent = pending.retried || instance.recoverySpentInMemory
+                        || SecureStorage.getInstance().get(KEY_RECOVERY_SPENT) != null;
+                if (errorCode == DC_ERROR_INVALID_KEY && !recoverySpent) {
+                    // The key is gone or was never valid. Wipe it and try once from
+                    // scratch; a second failure is reported rather than looped.
+                    //
+                    // The spent marker is written BEFORE the identity is discarded, which
+                    // is the ordering the whole one-shot limit rests on. Discarding first
+                    // and then failing to record left no key at all AND no record that a
+                    // recovery had happened -- so the next request took the plain
+                    // generate-key path, which consults neither marker, and every request
+                    // (and every launch, since the in-memory copy does not survive one)
+                    // burned another rate-limited hardware key. Writing first means a
+                    // refusal costs one request and changes nothing else: the rejected
+                    // key is still there, and the terminal flag below stops it being
+                    // attested again in this process.
+                    instance.recoverySpentInMemory = true;
+                    if (!SecureStorage.getInstance().set(KEY_RECOVERY_SPENT, "1")) {
+                        instance.discardFailed = true;
+                        instance.bootstrapInFlight = false;
+                        fail(pending, "App Attest could not record that its one-time "
+                                + "recovery had been used, so it was not attempted");
+                        instance.failBootstrapWaiters("App Attest could not record that "
+                                + "its one-time recovery had been used");
+                        return;
+                    }
+                    try {
+                        // Keeps the marker written a moment ago: this reset IS the
+                        // recovery, so clearing it here would let the replacement look
+                        // like a first recovery all over again.
+                        instance.resetLocked(true);
+                    } catch (IllegalStateException e) {
+                        // Nothing was discarded, so starting a replacement would leave
+                        // two identities and the old one still usable. Fail the caller.
+                        instance.bootstrapInFlight = false;
+                        fail(pending, "App Attest could not discard the rejected key");
+                        instance.failBootstrapWaiters(
+                                "App Attest could not discard the rejected key");
+                        return;
+                    }
+                    PendingRequest retry = new PendingRequest(pending.result, pending.nonce,
+                            PendingRequest.OP_GENERATE_KEY, null);
+                    retry.retried = true;
+                    // resetLocked() clears the flag, so set it again before starting the
+                    // replacement -- still under the same lock, so nothing observes the
+                    // cleared state.
+                    instance.bootstrapInFlight = true;
+                    int rid = register(retry);
+                    instance.nativeInstance.appAttestGenerateKey(rid);
+                    return;
+                }
+                if (errorCode == DC_ERROR_SERVER_UNAVAILABLE) {
+                    // Never retry a throttle in a loop -- that is what gets an app's
+                    // whole attestation budget suspended. Recorded in memory as well as
+                    // in the keychain, because a refused write must not mean no backoff.
+                    long backoff = instance.currentBackoff;
+                    long deadline = System.currentTimeMillis() + backoff;
+                    instance.retryAfterFallback = Math.max(instance.retryAfterFallback,
+                            deadline);
+                    SecureStorage.getInstance().set(KEY_RETRY_AFTER,
+                            Long.toString(deadline));
+                    instance.currentBackoff = Math.min(backoff * 2, MAX_BACKOFF_MILLIS);
+                }
+                if (pending.op == PendingRequest.OP_ATTEST
+                        && errorCode != DC_ERROR_INVALID_KEY) {
+                    // invalidKey is excluded. Reaching here with it means the reset
+                    // branch above declined -- the one-shot recovery is already spent --
+                    // so this key is known bad and known unreplaceable. Clearing the
+                    // marker would make the next request read it as a reusable key with
+                    // an unstarted attestation and submit it to Apple again, once per
+                    // request, instead of reporting the exhausted recovery the caller
+                    // needs to see. Terminal has to stay terminal.
+                    //
+                    // The marker means "submitted, outcome unknown", and the
+                    // interrupted-attestation branch answers an unknown outcome by
+                    // discarding the key, because a spent one-time attestation cannot be
+                    // resubmitted. But reaching this callback at all means Apple
+                    // answered: the outcome is known, and for anything other than
+                    // invalidKey -- which is handled above by resetting -- the key was
+                    // not consumed. Leaving the marker set therefore burned a
+                    // rate-limited hardware key on every request for as long as the
+                    // condition lasted, whether that was an outage or a persistently
+                    // invalid input.
+                    //
+                    // unknownSystemFailure is the one code that could in principle have
+                    // landed after Apple consumed the attestation. It is cleared anyway:
+                    // resubmitting a consumed key is answered with invalidKey, which
+                    // routes into the one-shot recovery above and self-corrects, whereas
+                    // keeping the marker costs a fresh hardware key per request with
+                    // nothing bounding it.
+                    //
+                    // The removal is checked. If the keychain refuses it, the marker
+                    // stays and the next request reads it as an unknown outcome -- back
+                    // to discarding a reusable key and generating another, which is the
+                    // whole failure this clearing exists to prevent. Remembering the
+                    // answered key in memory covers the life of this process; a restart
+                    // still reads the marker and discards once, which is where this
+                    // branch started and is bounded.
+                    if (!SecureStorage.getInstance().remove(KEY_ATTEST_STARTED)) {
+                        instance.attestAnsweredForKey = pending.keyId;
+                    }
+                }
+                if (pending.op != PendingRequest.OP_ASSERT) {
+                    // Still the same acquisition: releasing here and reacquiring would
+                    // reopen the window on this mutation alone, clearing the in-flight
+                    // flag of whatever bootstrap had started meanwhile.
+                    instance.bootstrapInFlight = false;
+                    instance.failBootstrapWaiters(
+                            msg == null ? "App Attest failed (code " + errorCode + ")" : msg);
+                }
+            }
+        }
+        String message = msg == null ? "App Attest failed (code " + errorCode + ")" : msg;
+        fail(pending, message);
+    }
+
+    /** Caller holds flowLock. Leaving these unresolved would hang the callers. */
+    private void failBootstrapWaiters(String message) {
+        while (!waitingForBootstrap.isEmpty()) {
+            PendingRequest waiting = (PendingRequest) waitingForBootstrap.elementAt(0);
+            waitingForBootstrap.removeElementAt(0);
+            fail(waiting, message);
+        }
+    }
+
+    // --- helpers ---------------------------------------------------------
+
+    private static long readRetryAfter() {
+        try {
+            String v = SecureStorage.getInstance().get(KEY_RETRY_AFTER);
+            return v == null ? 0 : Long.parseLong(v);
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    private static int register(PendingRequest pending) {
+        if (instance != null) {
+            pending.generation = instance.generation;
+        }
+        synchronized (REQUESTS) {
+            int rid = nextRequestId++;
+            REQUESTS.put(Integer.valueOf(rid), pending);
+            return rid;
+        }
+    }
+
+    /**
+     * True when this callback belongs to a flow a reset has since abandoned. Its
+     * results must be discarded rather than written back, or it would resurrect
+     * the key the reset deleted.
+     */
+    private static boolean isStale(PendingRequest pending) {
+        return instance != null && pending.generation != instance.generation;
+    }
+
+    private static PendingRequest take(int requestId) {
         synchronized (REQUESTS) {
             return REQUESTS.remove(Integer.valueOf(requestId));
+        }
+    }
+
+    /**
+     * Completes a caller with a token, unless a reset overtook it.
+     *
+     * <p>Completion is scheduled onto the EDT, so between the callback deciding the
+     * token is good and the caller receiving it, another request can reset attestation
+     * -- and the caller would then be handed an assertion for the key that was just
+     * discarded, which is exactly what the staleness checks exist to suppress. The
+     * generation is therefore checked again at the moment of publication.</p>
+     */
+    private static void succeed(final PendingRequest pending, final String token) {
+        succeed(pending, token, false);
+    }
+
+    /// @param attestation true when `token` carries the one-time attestation object, so
+    ///        the retained copy can be released once a caller has actually taken it. A
+    ///        caller that cancelled never does, and the copy is what lets the next
+    ///        request finish the registration instead of promoting a key the backend has
+    ///        never seen.
+    private static void succeed(final PendingRequest pending, final String token,
+            final boolean attestation) {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                if (pending.result.isDone()) {
+                    return;
+                }
+                if (instance == null) {
+                    pending.result.deliver(token);
+                    return;
+                }
+                // The staleness check happens under the lock; the completion itself does
+                // not, and that is deliberate. complete() runs the app's own listeners
+                // synchronously, and holding the attestation lock across arbitrary
+                // application code is how the deadlock earlier in this class happened.
+                //
+                // The residual window is a reset landing between the check and the
+                // handover. What the caller then holds is an assertion for a key the
+                // backend no longer knows, which it rejects; the app resets and retries,
+                // which is the recovery path that already exists. A deadlocked EDT has
+                // no such recovery, so the trade runs this way round.
+                synchronized (instance.flowLock) {
+                    if (isStale(pending)) {
+                        pending.result.fail(new RuntimeException("App Attest state was "
+                                + "reset while this request was in flight"));
+                        return;
+                    }
+                }
+                // One claim decides it. A check followed by a completion left a window
+                // where a cancellation could win the check and the completion could
+                // happen anyway -- AsyncResource.complete() does not refuse a cancelled
+                // resource -- so the application received the attestation while this
+                // class concluded delivery had lost and kept it for a retry.
+                if (!pending.result.deliver(token)) {
+                    return;
+                }
+                if (attestation) {
+                    synchronized (instance.flowLock) {
+                        if (token.equals(instance.undeliveredAttestToken)) {
+                            String keyId = instance.undeliveredAttestKeyId;
+                            instance.undeliveredAttestKeyId = null;
+                            instance.undeliveredAttestNonce = null;
+                            instance.undeliveredAttestToken = null;
+                            instance.undeliveredAttestResult = null;
+                            // Somebody has it, so the key is pending registration rather
+                            // than pending delivery. A refused write leaves the persisted
+                            // state saying nobody received it, which would have the next
+                            // request discard a key the backend may already know -- so
+                            // this process remembers what it did.
+                            // Attempted whatever the stored state currently says, short
+                            // of already-attested. Conditioning it on finding
+                            // pendingUndelivered there meant the case where that write
+                            // had ALSO failed -- storage still on "new", the acceptance
+                            // recorded in its own item -- skipped the promotion and the
+                            // in-memory note both. A restart then rehydrated the
+                            // acceptance as undelivered with no retained object left, and
+                            // discarded a key the backend may have registered.
+                            SecureStorage store = SecureStorage.getInstance();
+                            if (!STATE_ATTESTED.equals(store.get(KEY_STATE))
+                                    && !store.set(KEY_STATE, STATE_PENDING)) {
+                                instance.deliveredAttestKeyId = keyId;
+                            }
+                            if (STATE_PENDING_UNDELIVERED.equals(instance.inMemoryState)) {
+                                instance.inMemoryState = STATE_PENDING;
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+        });
+    }
+
+    /**
+     * Fails a caller that has no PendingRequest yet, on the EDT.
+     *
+     * <p>Static, and not merely for tidiness: the callers are instance methods, so an
+     * anonymous Runnable written inline there captures the enclosing IOSDeviceIntegrity.
+     * That reference outlives the call for as long as the EDT queue holds the Runnable,
+     * and it is a reference nothing here needs.</p>
+     */
+    private static void failResource(final OneShotResource r, final String msg) {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                r.fail(new RuntimeException(msg));
+            }
+        });
+    }
+
+    private static void fail(final PendingRequest pending, final String msg) {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                pending.result.fail(new RuntimeException(msg));
+            }
+        });
+    }
+
+    private static byte[] bytes(String s) {
+        if (s == null) {
+            return new byte[0];
+        }
+        try {
+            return s.getBytes("UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            // Every JVM is required to support UTF-8, so this cannot happen. Falling
+            // back to the platform default would be worse than failing: these bytes are
+            // hashed and the server recomputes the same hash over UTF-8, so a silent
+            // re-encode would produce an attestation that never verifies and no
+            // indication of why.
+            throw new IllegalStateException("UTF-8 is unavailable on this VM", e);
+        }
+    }
+
+    private static String base64(byte[] data) {
+        return Base64.encodeNoNewline(data);
+    }
+
+    /** One in-flight native operation and the state needed to finish or resume it. */
+    private static final class PendingRequest {
+        static final int OP_GENERATE_KEY = 0;
+        static final int OP_ATTEST = 1;
+        static final int OP_ASSERT = 2;
+
+        final OneShotResource result;
+        final String nonce;
+        final int op;
+        final String keyId;
+        String clientData;
+        boolean retried;
+        /// Which reset generation this request was registered under. A callback
+        /// carrying an older one belongs to an abandoned flow.
+        int generation;
+
+        PendingRequest(OneShotResource result, String nonce, int op, String keyId) {
+            this.result = result;
+            this.nonce = nonce;
+            this.op = op;
+            this.keyId = keyId;
         }
     }
 }

@@ -4572,10 +4572,33 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public com.codename1.util.AsyncResource<String> requestIntegrityToken(String nonce) {
+        return deviceIntegrity().requestToken(nonce);
+    }
+
+    @Override
+    public void resetAttestation() {
+        deviceIntegrity().resetAttestation();
+    }
+
+    @Override
+    public void confirmAttestation(String keyId) {
+        deviceIntegrity().confirmAttestation(keyId);
+    }
+
+    /**
+     * The App Attest coordinator, created once.
+     *
+     * <p>Synchronized because two concurrent first requests would otherwise each build
+     * one. Each carries its own {@code flowLock} and {@code bootstrapInFlight}, so
+     * neither would see the other's bootstrap -- two rate-limited hardware keys, and
+     * two sets of callbacks racing to persist an identity -- while the constructor
+     * overwrites the shared static the native callbacks dispatch through.</p>
+     */
+    private synchronized IOSDeviceIntegrity deviceIntegrity() {
         if (deviceIntegrity == null) {
             deviceIntegrity = new IOSDeviceIntegrity(nativeInstance);
         }
-        return deviceIntegrity.requestToken(nonce);
+        return deviceIntegrity;
     }
 
     @Override
@@ -9879,11 +9902,45 @@ public class IOSImplementation extends CodenameOneImplementation {
     public String[] getSSLCertificates(Object connection, String url) throws IOException {
         NetworkConnection conn =  (NetworkConnection)connection;
         //conn.ensureConnection();
-        return conn.getSSLCertificates(url);
+        return stripExtendedCertificateEntries(conn.getSSLCertificates(url));
+    }
+
+    /**
+     * The native side always emits the chain-grouping and public-key entries,
+     * because the certificate string is built once during the TLS handshake and
+     * cannot be regenerated on demand. Callers of the legacy flat form must not
+     * see them, or an existing checkSSLCertificates override that rejects on any
+     * unrecognised entry would start failing every request.
+     */
+    private static String[] stripExtendedCertificateEntries(String[] entries) {
+        if (entries == null || entries.length == 0) {
+            return new String[0];
+        }
+        java.util.ArrayList<String> out = new java.util.ArrayList<String>(entries.length);
+        for (int i = 0; i < entries.length; i++) {
+            String e = entries[i];
+            if (e == null || e.startsWith("CHAIN:") || e.startsWith("SPKI-SHA-256:")) {
+                continue;
+            }
+            out.add(e);
+        }
+        return out.toArray(new String[out.size()]);
+    }
+
+    @Override
+    public String[] getSSLCertificatesEx(Object connection, String url) throws IOException {
+        NetworkConnection conn = (NetworkConnection)connection;
+        String[] certs = conn.getSSLCertificates(url);
+        return certs == null ? new String[0] : certs;
     }
 
     @Override
     public boolean canGetSSLCertificates() {
+        return true;
+    }
+
+    @Override
+    public boolean canGetPublicKeyDigests() {
         return true;
     }
 
@@ -12574,10 +12631,88 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    /**
+     * The documented jailbreak/root check, and only that.
+     *
+     * <p>Deliberately not "any compromise reason". {@code getCompromiseReasons()} also
+     * reports a debugger, and a clean device with Xcode attached emits {@code traced} --
+     * so a plain debug session made this return true. That is a specifically documented
+     * jailbreak API with callers that branch on it, and telling them a developer's own
+     * device is jailbroken every time they hit Run is a regression, not extra vigilance.
+     * Aggregating the rest is {@link #isDeviceCompromised()}'s job.</p>
+     *
+     * <p>Hooking is left out for the same reason it is reported separately: a hooking
+     * framework is evidence of instrumentation, which usually accompanies a jailbreak but
+     * is not one, and callers that want the broader question have the broader method.</p>
+     */
     @Override
     public boolean isJailbrokenDevice() {
-        Boolean b = canExecute("cydia://package/com.example.package");
-        return b != null && b.booleanValue();
+        String[] reasons = getCompromiseReasons();
+        for (int i = 0; i < reasons.length; i++) {
+            if ("jailbreak".equals(reasons[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The legacy probe. Only ever returns true when the app also declares cydia
+     * in ios.applicationQueriesSchemes -- on iOS 9 and up canOpenURL returns
+     * false for undeclared schemes regardless of what is installed. That is why
+     * it cannot be the primary signal, but apps that do declare it would
+     * regress if it were dropped.
+     */
+    private boolean cydiaProbe() {
+        try {
+            Boolean b = canExecute("cydia://package/com.example.package");
+            return b != null && b.booleanValue();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Real jailbreak and instrumentation signals, from the same native probes the
+     * {@code ios.detectJailbreak} launch gate uses -- but reported rather than
+     * fatal, so an app can degrade gracefully instead of being killed at launch.
+     */
+    @Override
+    public String[] getCompromiseReasons() {
+        String[] signals = deviceIntegrity().jailbreakSignals();
+        java.util.ArrayList<String> out = new java.util.ArrayList<String>();
+        boolean jailbreakReported = false;
+        for (int i = 0; i < signals.length; i++) {
+            String s = signals[i];
+            if ("hookLib".equals(s) || "dyldInsert".equals(s)) {
+                if (!out.contains("frida")) {
+                    // Reported under the cross-platform name for a hooking
+                    // framework so app code does not need a per-platform branch.
+                    out.add("frida");
+                }
+            } else if ("traced".equals(s)) {
+                out.add("debugger");
+            } else if (!jailbreakReported) {
+                jailbreakReported = true;
+                out.add("jailbreak");
+            }
+        }
+        // Always, not only when the native probes found nothing. Those two sets of
+        // evidence are independent: the native side checks hard-coded paths and dyld,
+        // and the cydia scheme catches installs those miss -- so gating one on the other
+        // being empty meant a single unrelated signal suppressed it. A debugger alone
+        // was enough: `traced` made the list non-empty, the probe was skipped, and a
+        // jailbreak only cydia could see went unreported. Which is how a developer
+        // running under Xcode ends up being told their jailbroken device is clean.
+        if (!jailbreakReported && cydiaProbe()) {
+            out.add("jailbreak");
+        }
+        return out.toArray(new String[out.size()]);
+    }
+
+    @Override
+    public boolean isDeviceCompromised() {
+        return getCompromiseReasons().length > 0;
     }
 
     @Override

@@ -90,6 +90,14 @@ jobs:
         with:
           node-version: '20'
       - name: Run Unit Tests
+        # Maven Central answers 429 from the runner CDN edge often enough to kill
+        # this step outright -- it dies reading the root POM, before a line is
+        # compiled, so nothing about the branch is being tested when it happens.
+        # Retried through the shared helper, but ONLY for that failure shape:
+        # RETRY_ONLY_MATCHING keeps a failing test failing on the first attempt
+        # rather than letting a re-run launder a flake into a pass.
+        env:
+          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM'
         run: |
           MVN_GOAL="verify"
           MVN_ARGS=""
@@ -98,7 +106,7 @@ jobs:
             MVN_ARGS="-Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true -Djacoco.skip=true"
           fi
           cd maven
-          mvn clean "$MVN_GOAL" -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase $MVN_ARGS
+          bash ../scripts/ci/retry.sh mvn clean "$MVN_GOAL" -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase $MVN_ARGS
           cd ..
       - name: Run push service-worker contract
         if: ${{ matrix.java-version == 8 }}

@@ -131,6 +131,8 @@ include::Advanced-Topics-Under-The-Hood.asciidoc[]
 
 include::security.asciidoc[]
 
+include::App-Shield.asciidoc[]
+
 include::Biometric-Authentication.asciidoc[]
 
 include::Authentication-And-Identity.asciidoc[]

@@ -152,6 +152,7 @@ public final class WindowsWebSocketImpl extends WebSocketImpl {
         req.append("Connection: Upgrade\r\n");
         req.append("Sec-WebSocket-Key: ").append(key).append("\r\n");
         req.append("Sec-WebSocket-Version: 13\r\n");
+        appendRequestHeaders(req);
         req.append("\r\n");
         out.write(bytes(req.toString()));
         out.flush();
