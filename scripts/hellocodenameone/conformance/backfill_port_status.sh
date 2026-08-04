@@ -156,6 +156,7 @@ while IFS= read -r workflow; do
   run_id=""
   # The newest candidate gets stricter treatment than the ones behind it.
   first_candidate=1
+  newest_candidate="$(printf '%s\n' ${candidates} | head -1)"
   download_dir="${tmp_dir}/${workflow}"
   mkdir -p "${download_dir}"
   # Merge across candidate runs rather than stopping at the first with any
@@ -247,6 +248,9 @@ while IFS= read -r workflow; do
       fi
       cp "${downloaded}" "${download_dir}/port-status-${found}.json"
       : > "${download_dir}/covered-${found}"
+      if [ "${candidate}" = "${newest_candidate}" ]; then
+        : > "${download_dir}/newest-covered-${found}"
+      fi
       # Remember which run this port's report actually came from. Reports are
       # merged across candidates on purpose, so a single run_id would credit
       # every port to whichever candidate happened to be examined last --
@@ -257,6 +261,21 @@ while IFS= read -r workflow; do
   if [ -z "${run_id}" ]; then
     echo "No recent ${workflow} run has a port status artifact." >&2
     continue
+  fi
+
+  # A multi-port producer (the iOS suite emits four, Linux two) can upload some
+  # of its ports and lose the rest when one leg dies before normalization. The
+  # merge then fills those from an older run and everything looks current, so
+  # the newest leg's failure is masked. Only reported when the newest run
+  # produced something: a newest run with no artifact at all is already recorded
+  # above, and saying both would be the same defect twice.
+  if [ -d "${download_dir}/run-${newest_candidate}" ]; then
+    for port in ${owned}; do
+      if [ -f "${download_dir}/covered-${port}" ] \
+          && [ ! -f "${download_dir}/newest-covered-${port}" ]; then
+        unusable+=("${workflow}: newest run ${newest_candidate} did not report ${port}; an older run supplied it")
+      fi
+    done
   fi
 
   while IFS= read -r report; do

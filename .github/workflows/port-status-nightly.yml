@@ -101,28 +101,39 @@ jobs:
   publish-browser-evidence:
     # Ordered after the report sweep (and tolerant of it failing) so the site
     # rebuild at the end of this job picks up everything published tonight.
-    if: always() && needs.build-javascript-app.result == 'success'
+    # Runs whatever happened upstream. The browser-evidence steps still need the
+    # JavaScript build, and stay gated on it -- but the site rebuild at the end is
+    # the only thing in this workflow that dispatches website-docs.yml, and gating
+    # the whole job meant a failed JS build left every report the sweep had just
+    # published sitting on the data branch, absent from the public table until
+    # some later deployment. The two concerns are now separated.
+    if: always()
     needs: [build-javascript-app, browser-lifecycle, publish-latest-port-reports]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v4
+        if: needs.build-javascript-app.result == 'success'
         with:
           pattern: browser-evidence-*
           path: artifacts/browser-evidence
       - name: Assemble static browser evidence
+        if: needs.build-javascript-app.result == 'success'
         run: node scripts/website/collect_browser_evidence.mjs artifacts/browser-evidence artifacts/port-status-environment.json
       - uses: actions/upload-artifact@v4
+        if: needs.build-javascript-app.result == 'success'
         with:
           name: port-status-environment
           path: artifacts/port-status-environment.json
           retention-days: 30
       - name: Publish master evidence to the data branch
-        if: github.ref == 'refs/heads/master'
+        if: needs.build-javascript-app.result == 'success' && github.ref == 'refs/heads/master'
         env:
           GH_TOKEN: ${{ github.token }}
         run: scripts/hellocodenameone/conformance/publish_port_status_environment.sh artifacts/port-status-environment.json
       - name: Rebuild the static website snapshot
+        # Deliberately not gated on the JavaScript build: the reports published
+        # tonight reach the public table only through this dispatch.
         if: github.ref == 'refs/heads/master'
         env:
           GH_TOKEN: ${{ github.token }}

@@ -481,6 +481,20 @@ class PortStatusTest(unittest.TestCase):
         )
         self.assertTrue(any("not objects" in item for item in malformed), malformed)
 
+    def test_publishable_rejects_a_malformed_missing_field(self):
+        # "missing": true used to raise TypeError out of the join, and main()
+        # catches only ContractError -- so the gate crashed with a status the
+        # sweep does not treat as unusable, and it fell back quietly.
+        for bad in (True, 7, "quicksort", ["quicksort", 3]):
+            with self.subTest(bad=bad):
+                report = self.publishable_report("linux-x64")
+                report["performance"]["missing"] = bad
+                _, malformed = port_status.publishable_report_problems(
+                    self.manifest, "linux-x64", report
+                )
+                self.assertTrue(
+                    any("missing list" in item for item in malformed), malformed)
+
     def test_publishable_matches_every_report_the_site_serves(self):
         for port in self.manifest["ports"]:
             report_path = port_status.REPO_ROOT / self.manifest["report_directory"] / (

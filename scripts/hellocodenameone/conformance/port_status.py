@@ -701,13 +701,27 @@ def publishable_report_problems(
     # as performance. Structural defects below stay loud either way, because
     # those are producer bugs whatever the suite did.
     suite_finished = bool(report.get("suite_finished"))
+
+    # Validated before anything joins or iterates it. A producer emitting
+    # "missing": true or a number raised TypeError out of the join below, and
+    # main() only catches ContractError -- so the gate crashed instead of
+    # answering ACCEPT_UNUSABLE, the sweep saw a status it does not treat as
+    # unusable, fell back to an older report and finished green.
+    declared_missing = performance.get("missing")
+    if declared_missing is None:
+        declared_missing = []
+    if not isinstance(declared_missing, list) or not all(
+        isinstance(item, str) for item in declared_missing
+    ):
+        malformed.append("performance missing list is not an array of workload names")
+        declared_missing = []
+
     if suite_finished:
         if performance.get("status") != "complete":
             malformed.append(f"performance run is {performance.get('status')!r}")
-        if performance.get("missing"):
+        if declared_missing:
             malformed.append(
-                "performance workloads never reported: "
-                + ", ".join(performance["missing"])
+                "performance workloads never reported: " + ", ".join(declared_missing)
             )
 
     benchmarks = performance.get("benchmarks")
@@ -745,18 +759,12 @@ def publishable_report_problems(
         # was measured or skipped, so measured + skipped + missing still has to
         # name every workload. Dropping that check entirely would let a
         # structurally broken section through unnoticed.
-        declared_missing = performance.get("missing")
-        if declared_missing is None:
-            declared_missing = []
-        if not isinstance(declared_missing, list):
-            malformed.append("performance missing list is not an array")
-        else:
-            covered = sorted(set(accounted) | set(declared_missing))
-            if covered != sorted(expected_benchmarks):
-                malformed.append(
-                    "performance workloads unaccounted for: "
-                    + describe_workload_gap(covered, expected_benchmarks)
-                )
+        covered = sorted(set(accounted) | set(declared_missing))
+        if covered != sorted(expected_benchmarks):
+            malformed.append(
+                "performance workloads unaccounted for: "
+                + describe_workload_gap(covered, expected_benchmarks)
+            )
     for name, measurement in benchmarks.items():
         duration = measurement.get("duration_ns") if isinstance(measurement, dict) else None
         if isinstance(duration, bool) or not isinstance(duration, int) or duration < 0:
