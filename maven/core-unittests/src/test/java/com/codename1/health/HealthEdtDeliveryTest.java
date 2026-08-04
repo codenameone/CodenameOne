@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -330,14 +331,23 @@ class HealthEdtDeliveryTest extends UITestBase {
                 CN.callSerially(new Runnable() {
                     public void run() {
                         try {
-                            attached.await();
+                            // Bounded on purpose: a blocker that outlived its
+                            // release would park the EDT for the rest of the
+                            // suite, turning one failure into a hang.
+                            attached.await(10, TimeUnit.SECONDS);
                         } catch (InterruptedException ex) {
                             Thread.currentThread().interrupt();
                         }
                     }
                 });
-                Health.getInstance().openHealthSettings().onResult(landing);
-                attached.countDown();
+                try {
+                    Health.getInstance().openHealthSettings()
+                            .onResult(landing);
+                } finally {
+                    // In a finally so a throw above surfaces as itself rather
+                    // than as a suite-wide hang behind a still-parked EDT.
+                    attached.countDown();
+                }
             }
         }, true);
     }
