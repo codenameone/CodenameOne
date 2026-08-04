@@ -2,22 +2,6 @@
   "_comment": "Queue of browser-only syndication tasks (Medium, DZone, Hashnode) drained by a local syndication tool that runs on the maintainer's machine inside an already-signed-in browser session. Tasks are appended by scripts/website/queue_browser_syndication.py which is invoked by the daily blog-syndication workflow, and the local tool writes the resulting URLs back into syndication-state.json.",
   "tasks": [
     {
-      "id": "linkedin:2026-08-04-1200-shai-maven-central-cloudflare-r2",
-      "site": "linkedin",
-      "kind": "social",
-      "slug": "2026-08-04-1200-shai-maven-central-cloudflare-r2",
-      "source_slug": "maven-central-cloudflare-r2",
-      "account": "shai",
-      "title": "Why Codename One is moving beyond Maven Central",
-      "canonical": "https://www.codenameone.com/blog/maven-central-cloudflare-r2/",
-      "cover_image_url": "https://www.codenameone.com/blog/maven-central-cloudflare-r2.jpg",
-      "body_text": "Codename One is starting a staged move from Maven Central to a repository we operate on Cloudflare R2.\n\nI do not think Maven Central is doing something wrong by setting commercial usage limits. We are simply a terrible fit for them.\n\nOur dashboard reports 2.12 GB against an 80 MB guideline, 19,962 files against 1,000, and 27 releases against 7.\n\nThe first thing we found was our own waste. A real release publishes 229.5 MB. After removing unused fat JAR attachments, freezing stable packages, and extracting a 28 KB CSS command from the 43.5 MB Resource Editor JAR, that falls to 76.9 MB.\n\nThis week we start dual publishing. Next week new projects will include the Codename One repository. Three weeks later, if the observation period is clean, new versions will stop going to Central.\n\nCoordinates and normal Maven resolution stay the same. Existing projects will need a small `<repositories>` and `<pluginRepositories>` addition for future updates.\n\nThe article includes the POM block, exact dates, retention guarantee, release integrity design, known risks, and why this is not an attack on Sonatype.\n\nhttps://www.codenameone.com/blog/maven-central-cloudflare-r2/",
-      "scheduled_at": "2026-08-04T09:00:00+00:00",
-      "scheduled_local": "2026-08-04T12:00+03:00",
-      "timezone": "Asia/Jerusalem",
-      "queued_at": "2026-07-31T15:14:58+00:00"
-    },
-    {
       "id": "medium:bluetooth-beyond-ble",
       "site": "medium",
       "slug": "bluetooth-beyond-ble",
