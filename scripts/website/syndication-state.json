@@ -1488,6 +1488,18 @@
         "source_slug": "maven-central-cloudflare-r2",
         "scheduled_at": "2026-08-04T09:00:00+00:00"
       }
+    },
+    "compact-strings-parparvm": {
+      "hashnode": {
+        "url": "https://hashnode.com/draft/6a721af9dd3e6285f360a9b7",
+        "published": false,
+        "draft_url": "https://hashnode.com/draft/6a721af9dd3e6285f360a9b7",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": false,
+        "canonical_set": false,
+        "syndicated_at": "2026-08-04T17:03:22+00:00"
+      }
     }
   }
 }
