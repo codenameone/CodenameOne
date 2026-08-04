@@ -127,6 +127,52 @@ class AdapterError(RuntimeError):
     """Raised when an adapter cannot complete its flow."""
 
 
+def _retryable_failed_draft(state: State, slug: str, platform: str) -> bool:
+    """Return True only for an explicitly recorded unpublished draft.
+
+    Older versions recorded a Hashnode draft URL as if it completed the
+    platform.  An explicit ``--post-slug`` recovery may retry that draft, but
+    normal rotation keeps its existing cadence and does not unexpectedly dump
+    every historical draft in one run.
+    """
+    post = state.raw.get("posts", {}).get(slug, {})
+    if not isinstance(post, dict):
+        return False
+    entry = post.get(platform, {})
+    return bool(
+        isinstance(entry, dict)
+        and entry.get("published") is False
+        and entry.get("draft_url")
+    )
+
+
+def _completed_hashnode_result(
+    *,
+    published_url: str | None,
+    draft_url: str,
+    cover_set: bool,
+    subheading_set: bool,
+    tags_set: bool,
+    canonical_set: bool,
+) -> dict[str, Any]:
+    """Build persisted Hashnode state only after a public publish succeeds."""
+    if published_url is None:
+        raise AdapterError(
+            "Hashnode retained the article as an unpublished draft; "
+            f"retry required: {draft_url}"
+        )
+    return {
+        "url": published_url,
+        "published": True,
+        "draft_url": draft_url,
+        "cover_set": cover_set,
+        "subheading_set": subheading_set,
+        "tags_set": tags_set,
+        "canonical_set": canonical_set,
+        "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+    }
+
+
 def _find_first(page, selectors: list[str], *, timeout: int = 15000):
     """Try each selector in turn; return the first that becomes visible.
 
@@ -752,16 +798,14 @@ class HashnodeAdapter:
             except Exception:  # noqa: BLE001
                 pass
 
-        return {
-            "url": published_url or draft_url,
-            "published": published_url is not None,
-            "draft_url": draft_url,
-            "cover_set": cover_set,
-            "subheading_set": subheading_set,
-            "tags_set": tags_set,
-            "canonical_set": canonical_set,
-            "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-        }
+        return _completed_hashnode_result(
+            published_url=published_url,
+            draft_url=draft_url,
+            cover_set=cover_set,
+            subheading_set=subheading_set,
+            tags_set=tags_set,
+            canonical_set=canonical_set,
+        )
 
     # ------------------------------------------------------------------ #
     # Step helpers — each returns True on success and False on a
@@ -1128,6 +1172,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help=f"Minimum post age in days (default: {MIN_AGE_DAYS}).")
     parser.add_argument("--blog-dir", default=str(BLOG_DIR))
     parser.add_argument("--state-file", default=str(STATE_FILE))
+    parser.add_argument(
+        "--post-slug",
+        help=(
+            "Process one exact eligible post. This may retry an explicitly "
+            "recorded unpublished draft without changing normal rotation."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -1181,8 +1232,30 @@ def main(argv: list[str]) -> int:
     state = State.load(state_file)
     platform_names = [a.name for a in adapters]
     platform_filters = {a.name: a.accepts for a in adapters if hasattr(a, "accepts")}
-    candidate = select_candidate(posts, state, platform_names, today, floor, args.min_age_days,
-                                 platform_filters=platform_filters)
+    candidate = None
+    if args.post_slug:
+        candidate = next((post for post in posts if post.slug == args.post_slug), None)
+        if candidate is None:
+            print(f"Unknown post slug: {args.post_slug}", file=sys.stderr)
+            return 1
+        cutoff = today - dt.timedelta(days=args.min_age_days)
+        if candidate.date <= floor or candidate.date > cutoff:
+            print(
+                f"Post {candidate.slug} is not eligible on {today.isoformat()} "
+                f"with a {args.min_age_days}-day delay.",
+                file=sys.stderr,
+            )
+            return 1
+    else:
+        candidate = select_candidate(
+            posts,
+            state,
+            platform_names,
+            today,
+            floor,
+            args.min_age_days,
+            platform_filters=platform_filters,
+        )
     if candidate is None and not args.validate_only:
         print("No syndication candidate found today.")
         return 0
@@ -1205,8 +1278,14 @@ def main(argv: list[str]) -> int:
                   f"(published {candidate.date.strftime('%A')}); skipping.")
             continue
         if state.is_syndicated(candidate.slug, adapter.name) and not args.validate_only:
-            print(f"  [{adapter.name}] already syndicated; skipping.")
-            continue
+            retry_failed_draft = bool(
+                args.post_slug
+                and _retryable_failed_draft(state, candidate.slug, adapter.name)
+            )
+            if not retry_failed_draft:
+                print(f"  [{adapter.name}] already syndicated; skipping.")
+                continue
+            print(f"  [{adapter.name}] retrying explicitly recorded unpublished draft.")
         if args.dry_run:
             print(f"  [{adapter.name}] dry run — would publish {len(body_markdown)} chars, "
                   f"canonical {candidate.canonical_url}")
@@ -1229,7 +1308,7 @@ def main(argv: list[str]) -> int:
 
         state.record(candidate.slug, adapter.name, result)
         any_change = True
-        print(f"  [{adapter.name}] published draft: {result['url']}")
+        print(f"  [{adapter.name}] published: {result['url']}")
 
     if any_change:
         state.save(state_file)
