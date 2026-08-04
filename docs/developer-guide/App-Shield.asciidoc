@@ -1,0 +1,384 @@
+[[app-shield]]
+== App Shield
+
+The security chapter covers a lot of ground that ends at the same place: every check runs on the device, and a device the attacker fully controls is a device where every check can be patched out. Root detection returns false. The pinning code is skipped. The jailbreak probe is stubbed. None of it reaches your server, which is where the money is.
+
+App Shield closes that loop. The app obtains a short-lived, Codename One-signed *attestation token* backed by a server-side verification of Apple's App Attest and Google's Play Integrity statements, and your own API refuses to serve a request that doesn't carry a valid one. The statement that matters is made by a party the attacker doesn't control, and your backend can check it in about twenty lines of middleware.
+
+WARNING: App Shield doesn't make an app unhackable, and no product does. What it changes is the cost: scripted abuse of your API goes from "curl in an afternoon" to "reverse-engineer a native binary, and start again after every rotation," and your backend gets a cryptographically verifiable statement it can act on. Be careful not to promise more than that, internally or in marketing.
+
+This is an *Enterprise* feature. The public API in `com.codename1.security.shield` ships in the open-source core and is safe to call in any build -- in a build without the attestation engine it degrades to a documented no-op rather than failing -- but tokens are only ever minted for entitled accounts.
+
+=== How it fits together
+
+....
+  app  --(1) request a challenge --------> Codename One attestation service
+       <-(2) server nonce ---------------
+       --(3) App Attest / Play Integrity token + nonce + RASP signals -->
+                                           verifies with Apple / Google,
+                                           applies your policy
+       <-(4) signed token (ES256 JWT) + pin set
+       --(5) X-CN1-Attest: <token> -----> YOUR OWN API
+                                           verifies the signature against
+                                           the published JWKS
+....
+
+Steps 1 through 4 are the framework's job and happen on the network thread. Step 5 is automatic for every `ConnectionRequest` to a host you registered. The decision -- what to do about a device the service declined -- is yours, and it belongs on your server.
+
+=== Turning it on
+
+Two things have to be true: the account has to be entitled, and the build has to ask for it.
+
+[cols="2,1,4"]
+|===
+|Build hint |Default |Description
+
+|`shield.enabled`
+|`false`
+|Master switch. The build server injects the hardening engine and wires it into the app's startup. A build that asks for it without an Enterprise subscription, or on a server where the engine is unavailable, *fails with an explanation* rather than producing an unprotected app and saying nothing.
+
+|`shield.policyVersion`
+|_(service default)_
+|The policy generation this build was compiled against.
+
+|`shield.pins`
+|_(none)_
+|The initial pin set, so the first launch on a new install is pinned before it has ever reached the service. Comma-separated base64 SHA-256 SPKI digests.
+
+|`shield.jwksPin`
+|_(none)_
+|Pins the key that signs the tokens, so a compromised DNS answer can't introduce a signing key the app will trust.
+
+|`shield.attestationVerifyUrl`
+|_(Codename One cloud)_
+|Override for a private deployment of the verification service.
+
+|`shield.hardFail`
+|`false`
+|The hardening engine's own failure policy: `false` reports a problem inside the engine as a signal and lets the app run, `true` makes it fatal. Leave the default unless support advises otherwise.
+
+|`ios.appAttest.environment`
+|`development` for debug builds, `production` for release
+|The App Attest environment written into the entitlement.
+|===
+
+NOTE: The engine is injected at build time and isn't present in a source checkout, in the simulator, or in an unentitled build. That's deliberate: the detection logic is the part an attacker most wants to read. Everything in this chapter that's *API* is open source; only the engine behind it isn't.
+
+=== Protecting hosts
+
+Registration is the whole configuration. A host you don't register is never touched -- no header, no certificate check, no behaviour change of any kind.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AppShieldSnippets.java[tag=shield-init,indent=0]
+----
+
+`HostPolicy` is two independent decisions plus what to do when the shield can't deliver:
+
+[cols="1,1,1,3"]
+|===
+|Policy |Token |Pins |When no token can be obtained
+
+|`HostPolicy.UNPROTECTED`
+|no
+|no
+|Not applicable. This is what an unregistered host gets.
+
+|`HostPolicy.PROTECTED`
+|yes
+|yes
+|*Fail open.* The request goes out without a token and your backend decides. Right for most hosts.
+
+|`HostPolicy.ENFORCED`
+|yes
+|yes
+|*Fail closed.* `ShieldException` is thrown and nothing is sent. Right for the handful of endpoints that move money or read personal data.
+|===
+
+Fail-closed is a promise that a request without a valid token never leaves the device, so it applies to the awkward cases too: a protected host reached over plain `http` is refused rather than handed the bearer token in clear text, and a shield that was interrupted before it finished starting refuses rather than guessing.
+
+If most of your hosts want the same failure mode, set it once and register them the short way:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AppShieldSnippets.java[tag=shield-fail-closed-default,indent=0]
+----
+
+TIP: The default failure mode is read when a host's policy is *resolved*, not when it's registered, so `.protect(h).defaultFailureMode(CLOSED)` and the same two calls in the other order mean the same thing.
+
+==== Wildcards and hosts discovered at runtime
+
+A pattern may be an exact host or a leading `*.` wildcard covering its subdomains -- `*.example.com` matches `api.example.com` and `a.b.example.com`, but not the apex `example.com` and not `example.com.somewhere-else.test`. The most specific rule wins, so an exact registration is never relaxed by a wildcard.
+
+Backends the app only learns about after it starts -- a regional endpoint chosen at login, a tenant-specific host -- are registered the same way, with the same matching:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AppShieldSnippets.java[tag=shield-runtime-host,indent=0]
+----
+
+=== What happens to a request
+
+Once `init()` has run, `ConnectionRequest`, `Rest`, `RequestBuilder` and anything else built on `NetworkManager` are covered without further code. For a request to a protected host, on the network thread:
+
+* It waits for initialization to finish if a cold start is still in progress, rather than treating "not ready yet" as "not protected."
+* Any token the shield attached earlier is taken back off before the request is reused -- a redirect reuses the same request object, and a bearer token that follows a redirect off a protected host has been handed to whoever the redirect points at. A header your own `onRedirect()` installed under the same name is left alone: the shield removes its token only while the value is still the token it attached.
+* The token is added under the token header, unless the URL isn't `https`, in which case the host's failure mode decides.
+* The certificate chain is collected and checked against the pin set, before any request body is written.
+
+The response side is just as narrow: the guard sees the status code and the headers it asked for, which is how a backend tells the app its *token* was refused as opposed to the user's credentials.
+
+==== The token header
+
+The default is `X-CN1-Attest`. It isn't `Authorization`, by design: that slot belongs to your own user authentication, and the two answer different questions -- who the user is, versus whether this is a genuine unmodified app on an uncompromised device. Your backend needs both, so they have to compose.
+
+`ShieldConfig.tokenHeader(String)` changes it, and refuses names that can't carry a token rather than accepting them and failing out of sight later:
+
+* Anything that isn't a legal HTTP field name. A name with a space or a separator in it isn't the header you asked for by the time it reaches the server -- and it also slips past every check below, because `Cookie ` isn't `Cookie`.
+* `Content-Type`, which `ConnectionRequest` routes to the request's media type rather than the header map, so the token would replace the content type and survive the redirect cleanup.
+* Your app's cookie header, whatever it has been renamed to, because the cookie string is written after the request's own headers and would overwrite the token after `attach()` reported success.
+* Headers the transport owns -- framing, routing, and the hop-by-hop names a correctly behaving proxy consumes and doesn't forward.
+
+=== Status, and what to do about it
+
+The most important distinction in the API is between "the shield couldn't be reached" and "the shield looked at this device and said no." Reacting to the first the way you react to the second is how an app locks a paying customer out on a train.
+
+[cols="2,1,4"]
+|===
+|Status |Transient |Meaning
+
+|`OK`
+|-
+|A valid token is in hand.
+
+|`UNPROTECTED`
+|no
+|This build has no attestation engine. Nothing is enforced.
+
+|`NOT_INITIALIZED`
+|no
+|`init()` hasn't run, or was interrupted.
+
+|`NO_NETWORK`, `POOR_NETWORK`
+|yes
+|The service couldn't be reached.
+
+|`SERVICE_DOWN`
+|yes
+|The service answered with an error.
+
+|`RATE_LIMITED`
+|yes
+|This device is being throttled. Retry after a backoff.
+
+|`REJECTED`
+|no
+|The service evaluated this device and declined to mint a token.
+
+|`PIN_MISMATCH`
+|no
+|A pinned host presented a chain matching none of its pins. Nothing was sent.
+|===
+
+`ShieldStatus` is a constant *object* rather than an enum on purpose: the vocabulary is visible on the wire and the service must be able to add a status without breaking apps built against an older release. Compare with `equals`, branch on `isSuccess()` and `isTransient()`, and treat an id you don't recognise as a non-success.
+
+Listeners are delivered on the EDT, so they may touch the UI directly. The framework never shows a dialog and never terminates the app over a shield event -- what the user sees is entirely your decision:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AppShieldSnippets.java[tag=shield-listener,indent=0]
+----
+
+=== Getting a token yourself
+
+For anything the guard doesn't cover -- a third-party HTTP client, a payload you sign yourself, a handshake -- ask for the token directly. `fetchToken()` is asynchronous and returns immediately, including during a cold start:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AppShieldSnippets.java[tag=shield-fetch-token,indent=0]
+----
+
+Pass a binding value to tie the token to one specific request, so a token lifted from it can't be replayed onto another:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AppShieldSnippets.java[tag=shield-bound-token,indent=0]
+----
+
+`AppShield.attach(ConnectionRequest)` does the same work synchronously for a request you are about to send. It blocks on a network round trip, so it must not be called on the EDT:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AppShieldSnippets.java[tag=shield-attach,indent=0]
+----
+
+Token lifetime is measured from a monotonic clock, never from `exp` against the device clock, because on a rooted device the wall clock is whatever the attacker wants it to be. `getCachedToken()` returns the current token without any network access, and `invalidateToken()` discards it so the next request re-attests -- which is what to call when your backend tells you the token itself was refused:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AppShieldSnippets.java[tag=shield-reject-header,indent=0]
+----
+
+TIP: `AppShield.REJECT_HEADER` is `X-CN1-Attest-Reject`. Have your middleware set it only when the *token* was the problem: a protected API normally carries your own user authentication too, and an app that reads every 401 as an attestation failure re-attests its way through a wrong password.
+
+=== Certificate pinning
+
+Pins are published by the service and refreshed with the token, so rotating a certificate is a console action rather than an app store release. They're pinned over the *subject public key info*, so renewing a certificate on the same key pair doesn't invalidate the pin, and a chain matches if any certificate in it matches any pin for the host -- which is what makes it safe to pin an issuing CA as the backup.
+
+Pinning is the one part of the shield that can take an app offline for a reason the developer can't fix remotely, so the failure behaviour is asymmetric by design:
+
+[cols="2,3"]
+|===
+|Condition |Behaviour
+
+|Host has no pins
+|Never enforced. Covers first run, a cold start with no network, and any host the service hasn't published pins for.
+
+|Pin fetch failed
+|Never fails a request. The last known set is kept.
+
+|Set past its soft expiry
+|Still enforced; a refresh is attempted.
+
+|Set past its hard expiry
+|Dropped, and enforcement stops. A device offline for weeks loses pinning, not the app.
+
+|Chain matches a pin
+|Request proceeds.
+
+|Host has pins, chain matches none
+|*Fail closed.* `ShieldException` with `PIN_MISMATCH`, before any body is written.
+|===
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AppShieldSnippets.java[tag=shield-pins,indent=0]
+----
+
+IMPORTANT: A pin mismatch surfaces as an exception on the request, not as a silent empty response. If you swallow `IOException` at your call sites you won't see it, and an intercepted connection is the one failure worth telling the user about.
+
+=== Runtime signals
+
+The framework's own detections -- root, jailbreak, hooking frameworks, emulators, debuggers, repackaging, untrusted accessibility services -- are reported to `ShieldSignals` rather than acted on locally, and ride along with the next token fetch. There is no separate beacon to block and no extra battery cost.
+
+This is a deliberate inversion of the older `exit(0)` style checks. Terminating the app is trivially patched out, destroys the telemetry that makes the feature useful, and turns a detection into a crash report. *The client reports; the service decides.* An emulator signal is normal on a developer's machine; ten high-severity signals from one device in an hour is a device the service can keep flagging on its next clean-looking attestation.
+
+Your own code can report what only it can notice -- a server-side consistency check that failed, a sequence of actions no human performs:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AppShieldSnippets.java[tag=shield-custom-signal,indent=0]
+----
+
+The bus is bounded and repeat reports of an id collapse onto the existing entry, so a detector that trips on every frame can't exhaust memory. An identical repeat refreshes the entry without notifying listeners again; a changed severity or detail is a new observation and is announced.
+
+=== Transports the guard doesn't cover
+
+Being honest about coverage matters more here than anywhere else in this chapter, because the gap is invisible at the call site.
+
+[cols="2,3"]
+|===
+|Transport |Coverage
+
+|`ConnectionRequest`, `Rest`, `RequestBuilder`, `NetworkManager`
+|Token and pinning, automatically.
+
+|`WebSocket`
+|Token via `header()` on the opening handshake -- and only on Android, desktop, Windows and Linux. iOS and the browser hand the handshake to a platform socket that exposes no way to add a header, which drops it without reporting anything. Pinning isn't reachable through the WebSocket implementations at all.
+
+|`BrowserComponent`
+|The initial navigation only, through `setURL(url, headers)`. Requests the loaded page makes for itself are invisible to the framework: no token, no pinning.
+
+|A native or third-party HTTP client
+|Nothing automatic. Use `fetchToken()` and set the header yourself.
+|===
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AppShieldSnippets.java[tag=shield-other-transports,indent=0]
+----
+
+=== Composing with your own network guard
+
+`NetworkManager` holds exactly one guard and seals the slot after the first one is installed, so an app that needs its own interception has to delegate to the shield's rather than displace it:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AppShieldSnippets.java[tag=shield-compose-guard,indent=0]
+----
+
+WARNING: Don't "work around" the single slot by dropping the shield's guard and calling `attach()` by hand. That restores the token and drops the certificate callbacks with no error, so pinning stops being enforced while everything still looks like it's working -- the half of the shield whose absence looks exactly like success.
+
+=== Verifying the token in your backend
+
+The token is a compact ES256 JWT with `typ` of `cn1-attest+jwt`, signed by a key published at `/.well-known/cn1-attest-jwks.json` and named by the header's `kid`. Verification is ordinary JWT verification against a JWKS URL -- `NimbusJwtDecoder.withJwkSetUri` in Spring, `jose` in Node, `PyJWT[crypto]` in Python -- and the console renders a copy-paste quickstart for each, including a Cloudflare Worker for the zero-code-change case.
+
+Beyond the standard `iss`, `aud`, `sub`, `iat`, `exp` and `jti`, the claims your middleware acts on are:
+
+* `pkg` and `plat` -- the package name and platform the token was minted for. Check them against the app you expect.
+* `vrd` -- the verdict: `attested`, `monitored` or `unverified`.
+* `dec` -- the decision under the current policy: `allow`, or `would_deny` while the app is still in monitor mode.
+* `sig` -- the signals the device reported.
+* `pol` -- the policy version the decision was made under.
+* `ph` -- the payload binding, when the request asked for one.
+
+Roll it out in two stages, and keep the two sides independent. While the service is in *monitor* mode it mints a token for everyone and marks the ones it would have refused, so you can watch the would-deny rate against real traffic before anything breaks. Your middleware has its own switch: log and pass through, or reject. Move one at a time.
+
+TIP: Reject with an opaque `403`, not a `401`. A 401 invites the client to retry with fresh credentials, which is exactly the loop you don't want, and a detailed reason is an oracle for whoever is probing you.
+
+=== iOS App Attest specifics
+
+Apple's model is *one attestation, then many assertions*: the first token carries a hardware-backed public key and its attestation, and every later token is a small assertion naming the key. The framework manages the key, the state and the retry policy in the keychain, including recovery when iOS invalidates the key -- a restore to a new device, or a reinstall -- and Apple's rate limits, which are strict enough that attesting per request gets an app throttled.
+
+The one thing your code has to do is close the loop when the backend has stored the key, because a registration call that was lost leaves the device asserting against a key the server has never seen:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AppShieldSnippets.java[tag=shield-confirm-attestation,indent=0]
+----
+
+`DeviceIntegrity.resetAttestation()` throws the key away and starts again, which is the recovery path for a backend that no longer knows the key.
+
+NOTE: App Attest doesn't work in Apple's iOS simulator -- it needs the Secure Enclave. Test the iOS path on a real device, and use the simulator menu below for everything else.
+
+=== Testing it in the simulator
+
+None of this is testable against a real service on a developer's desktop, so the simulator ships a simulation engine behind *Simulate > App Shield*. Switching on any item installs it; leaving the menu alone leaves the shield inert.
+
+[cols="2,3"]
+|===
+|Menu item |What it makes reachable
+
+|*Attestation Supported*
+|Unchecking it simulates a platform with no attestation at all.
+
+|*Attestation Result*
+|`PASS`, or each failure in turn: `FAIL_REJECTED`, `FAIL_NO_NETWORK`, `FAIL_SERVICE_DOWN`, `FAIL_RATE_LIMITED`, `UNSUPPORTED`. This is how you exercise the transient-versus-final branch in your listener.
+
+|Device signal toggles
+|Rooted / jailbroken, hooking framework, emulator, debugger, repackaged, untrusted accessibility service -- each raising the signal your code reacts to.
+
+|*Serve Expired Token*
+|The refresh path, without waiting out a real token's lifetime.
+
+|*Force Pin Mismatch On Next Request*
+|The most valuable item here: a fail-closed pinning branch is otherwise only reachable by mis-pinning a live host on purpose. It's a one-shot that disarms itself once spent.
+
+|*Fail Pin Fetch*
+|Confirms that a failed pin refresh doesn't fail requests.
+
+|*Show Shield Status...*
+|What the simulation is currently set to, and whether the simulated engine is registered.
+|===
+
+The simulated token is stamped so it can't be mistaken for a real one, and the simulator's engine never contacts the service. A backend that accepts a simulated token is a backend that isn't verifying signatures.
+
+=== When there is no engine
+
+Every method in this chapter is safe to call in a build without the engine -- an open-source build, an unentitled account, the simulator with the menu untouched. The degradation contract is explicit, and it's the reason you don't need to guard your call sites:
+
+* `init()` succeeds and logs one line. `isProtected()` returns `false`.
+* `fetchToken()` always completes, with `UNPROTECTED`, and never hangs.
+* `attach()` does nothing. No header, no exception.
+* *No request is ever blocked*, including one to a host registered as `ENFORCED`. Fail-closed enforcement requires an engine to fail; with no engine there is nothing to enforce and the app must keep working.
+* `getSignals()` still returns real `DeviceIntegrity` data, so the free-tier detections described in the security chapter keep working.
