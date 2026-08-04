@@ -11,19 +11,15 @@ This is an *Enterprise* feature. The public API in `com.codename1.security.shiel
 
 === How it fits together
 
-....
-  app  --(1) request a challenge --------> Codename One attestation service
-       <-(2) server nonce ---------------
-       --(3) App Attest / Play Integrity token + nonce + RASP signals -->
-                                           verifies with Apple / Google,
-                                           applies your policy
-       <-(4) signed token (ES256 JWT) + pin set
-       --(5) X-CN1-Attest: <token> -----> YOUR OWN API
-                                           verifies the signature against
-                                           the published JWKS
-....
+Three parties are involved: the app, the Codename One attestation service, and your own API. A protected request goes through five steps.
 
-Steps 1 through 4 are the framework's job and happen on the network thread. Step 5 is automatic for every `ConnectionRequest` to a host you registered. The decision -- what to do about a device the service declined -- is yours, and it belongs on your server.
+. The app asks the attestation service for a challenge, and the service answers with a nonce it generated. The nonce is what stops a token captured once from being replayed later.
+. The app asks the platform to attest itself against that nonce. Apple's App Attest or Google's Play Integrity produces a statement signed by hardware the app can't forge.
+. The app sends that statement to the attestation service, together with any runtime signals it has collected.
+. The service verifies the statement with Apple or Google, applies the policy you configured, and answers with a short-lived ES256 JWT and the current certificate pin set.
+. The app sends that token to *your* API in the `X-CN1-Attest` header, and your middleware verifies its signature against the public keys the service publishes.
+
+Steps 1 to 4 are the framework's job and happen on the network thread. Step 5 is automatic for every `ConnectionRequest` to a host you registered. The decision -- what to do about a device the service declined -- is yours, and it belongs in step 5, on your server.
 
 === Turning it on
 
@@ -274,7 +270,7 @@ The bus is bounded and repeat reports of an id collapse onto the existing entry,
 
 === Transports the guard doesn't cover
 
-Being honest about coverage matters more here than anywhere else in this chapter, because the gap is invisible at the call site.
+Coverage matters more here than anywhere else in this chapter, because a gap is invisible at the call site: the code compiles, the request succeeds, and no token was ever attached.
 
 [cols="2,3"]
 |===

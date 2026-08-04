@@ -665,8 +665,8 @@ public final class AppShield {
         // the length of a cold start, and an engine whose initialization dispatches
         // anything to the EDT deadlocked: the EDT parked on the initialization that was
         // waiting for the EDT. A synchronous method that returns a map has no way to say
-        // "later", so the only honest options are to answer now or to hang, and hanging
-        // the UI is not an option.
+        // "later", so the choice is between answering now and hanging the UI, and hanging
+        // the UI is not a choice.
         //
         // The cost is real and belongs in the log rather than in silence: a
         // BrowserComponent navigating a protected host during startup loads it without a
