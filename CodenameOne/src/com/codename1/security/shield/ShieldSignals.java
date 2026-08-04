@@ -178,7 +178,8 @@ public final class ShieldSignals {
         Display.getInstance().callSerially(new SignalDispatch(copy, signal));
     }
 
-    /// Whether this still says what the bus holds for its id.
+    /// The entry the bus holds for this report's id, when it still says the same thing --
+    /// and null when it does not.
     ///
     /// What matters at delivery is the OBSERVATION, not the object. Identity alone was the
     /// obvious reading -- a newer report replaces the entry, so a different object means
@@ -193,19 +194,29 @@ public final class ShieldSignals {
     /// -- a different severity or detail -- is still dropped, which is what this exists
     /// for; the cost is that two reports of the same observation can both be announced,
     /// and being told twice about a signal that is genuinely there is not a defect.
-    static boolean isCurrentObservation(ShieldSignal signal) {
+    ///
+    /// The ENTRY comes back, not a yes. Two reports that say the same thing are not the
+    /// same object: [ShieldSignal] stamps every instance, and the replacement is kept
+    /// precisely because its stamp is the latest sighting. Answering the question and then
+    /// announcing the object that asked it would hand a listener the older stamp for a
+    /// sighting the bus has already refreshed -- and no later notification is coming, since
+    /// the repeat that refreshed it queued nothing.
+    static ShieldSignal currentObservation(ShieldSignal signal) {
         synchronized (signals) {
             for (int i = 0; i < signals.size(); i++) {
                 ShieldSignal existing = (ShieldSignal) signals.elementAt(i);
                 if (existing.getId().equals(signal.getId())) {
-                    return existing == signal // NOPMD identity: the ordinary case
+                    if (existing == signal // NOPMD identity: the ordinary case
                             || (existing.getSeverity() == signal.getSeverity()
-                            && sameDetail(existing.getDetail(), signal.getDetail()));
+                            && sameDetail(existing.getDetail(), signal.getDetail()))) {
+                        return existing;
+                    }
+                    return null;
                 }
             }
         }
         // Cleared, or evicted by the bound. Either way nothing is claiming it now.
-        return false;
+        return null;
     }
 
     private static final class SignalDispatch implements Runnable {
@@ -219,15 +230,21 @@ public final class ShieldSignals {
 
         @Override
         public void run() {
-            // Checked here rather than at enqueue time, because the point is the state
+            // Resolved here rather than at enqueue time, because the point is the state
             // at delivery: a report that has been superseded between being queued and
             // arriving would otherwise leave listeners holding an observation the bus
             // itself no longer has.
-            if (!isCurrentObservation(signal)) {
+            //
+            // And what is announced is the entry, not the report that queued this. They
+            // say the same thing or the dispatch would have been dropped, but the entry
+            // is the one carrying the latest sighting's timestamp -- which is the whole
+            // reason an identical repeat replaces it.
+            ShieldSignal current = currentObservation(signal);
+            if (current == null) {
                 return;
             }
             for (ShieldListener target : targets) {
-                target.signalRaised(signal);
+                target.signalRaised(current);
             }
         }
     }

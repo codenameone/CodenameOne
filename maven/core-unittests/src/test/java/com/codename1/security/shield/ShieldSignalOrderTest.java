@@ -33,6 +33,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -191,7 +192,36 @@ class ShieldSignalOrderTest extends UITestBase {
                     "the device is rooted and the bus knows it -- a listener that is "
                     + "never told is the bug: " + seen);
             assertEquals(70, lastFor(ShieldSignal.ROOT));
+            // And it is the ENTRY that was announced, not the report that queued the
+            // notification. The two say the same thing, so severity cannot tell them
+            // apart -- but only one of them carries the latest sighting's timestamp, and
+            // the repeat that refreshed it queued no notification of its own. A listener
+            // left holding the older object is holding a sighting the bus has already
+            // superseded, with nothing coming to correct it.
+            assertSame(entryFor(ShieldSignal.ROOT), lastSeenFor(ShieldSignal.ROOT),
+                    "the listener has to be given what snapshot() holds");
         }
+    }
+
+    /** The object the bus currently holds for an id, or null. */
+    private ShieldSignal entryFor(String id) {
+        for (ShieldSignal s : ShieldSignals.snapshot()) {
+            if (id.equals(s.getId())) {
+                return s;
+            }
+        }
+        return null;
+    }
+
+    /** The last object a listener was handed for an id, or null. */
+    private ShieldSignal lastSeenFor(String id) {
+        ShieldSignal last = null;
+        for (ShieldSignal s : seen) {
+            if (id.equals(s.getId())) {
+                last = s;
+            }
+        }
+        return last;
     }
 
     private int countFor(String id) {
