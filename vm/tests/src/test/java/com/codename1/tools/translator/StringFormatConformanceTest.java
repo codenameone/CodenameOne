@@ -151,23 +151,52 @@ class StringFormatConformanceTest {
         assertTrue(legacyPercentWidth || skipped == 0,
                 "a modern JDK should not skip any case, skipped " + skipped);
 
-        // Numbers too large for an int are their own class of bug: an invented cap here
-        // once rejected "%1000001d", which the JVM formats quite happily.
-        String[] oversized = {
-            "%2147483648d", "%99999999999d", "%.2147483648f", "%.99999999999f",
-            "%2147483648$d", "%99999999999$d", "%1000001$d"
-        };
-        for (String spec : oversized) {
-            assertEquals(referenceOutcome(spec, Integer.valueOf(1)),
-                    actualOutcome(format, spec, Integer.valueOf(1)),
-                    "oversized numeric field " + spec + " should behave like the JVM");
-        }
         StringBuilder report = new StringBuilder();
         for (Map.Entry<String, String> entry : mismatches.entrySet()) {
             report.append("\n  ").append(entry.getKey()).append("  ").append(entry.getValue());
         }
         assertEquals("", report.toString(),
                 mismatches.size() + " of " + total + " single-specifier cases diverged from the JDK:");
+
+        checkOversizedNumericFields(format);
+    }
+
+    /**
+     * Numbers too large for an int are their own class of bug, and the sweep above cannot
+     * reach them because its widths stop at 12. An invented cap here once rejected
+     * {@code "%1000001d"}, which the JVM formats quite happily.
+     */
+    private void checkOversizedNumericFields(Method format) {
+        // Large but representable fields behave the same on every JDK.
+        String[] representable = { "%1000001d", "%12.1000001f", "%1000001$d" };
+        for (String spec : representable) {
+            assertEquals(referenceOutcome(spec, Integer.valueOf(1)),
+                    actualOutcome(format, spec, Integer.valueOf(1)),
+                    "large numeric field " + spec + " should behave like the JVM");
+        }
+
+        // A field too large for an int is silently dropped up to at least Java 11 and
+        // rejected from Java 17 on; this formatter follows the modern behaviour. Detect
+        // which one is running rather than pinning a version -- and note the probe itself
+        // throws on a modern JDK, so it has to be guarded.
+        boolean legacyOversized;
+        try {
+            legacyOversized = "1".equals(String.format("%2147483648d", Integer.valueOf(1)));
+        } catch (IllegalArgumentException rejected) {
+            legacyOversized = false;
+        }
+        if (legacyOversized) {
+            return;
+        }
+        String[] overflowing = {
+            "%2147483648d", "%99999999999d", "%.2147483648f", "%.99999999999f",
+            "%2147483648$d", "%99999999999$d"
+        };
+        for (String spec : overflowing) {
+            assertEquals(referenceOutcome(spec, Integer.valueOf(1)),
+                    actualOutcome(format, spec, Integer.valueOf(1)),
+                    "overflowing numeric field " + spec + " should behave like the JVM");
+        }
     }
 
     private static String describeArgument(Object argument) {
