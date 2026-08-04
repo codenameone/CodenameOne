@@ -358,6 +358,29 @@ class BorderAndPlafTest extends UITestBase {
         assertEquals(Component.LEFT, DefaultLookAndFeel.reverseAlignForBidi(component, Component.LEFT));
     }
 
+    /**
+     * A bare family name gets the default .ttf suffix; a name that already
+     * carries either container extension is left alone. The short-name case is
+     * the interesting one: a suffix check written as
+     * {@code indexOf(".ttf") == length() - 4} says "true" for anything shorter
+     * than the suffix, because both sides are -1, and the file would ship with
+     * no extension at all.
+     */
+    @FormTest
+    void testStyleParserFontFileSuffixes() {
+        assertEquals("Foo.ttf", parseFontFile("Foo"));
+        assertEquals("Handlee-Regular.ttf", parseFontFile("Handlee-Regular"));
+        assertEquals("Nexa.otf", parseFontFile("Nexa.otf"));
+        assertEquals("Nexa.ttf", parseFontFile("Nexa.ttf"));
+        assertEquals("Nexa.OTF", parseFontFile("Nexa.OTF"));
+        assertEquals("native:MainRegular", parseFontFile("native:MainRegular"));
+    }
+
+    private static String parseFontFile(String family) {
+        StyleParser.StyleInfo info = StyleParser.parseString("font: " + family);
+        return StyleParser.parseFont(new FontInfo(), info.values.get("font")).getFile();
+    }
+
     @FormTest
     void testStyleParserMergesFontDefinitions() {
         Font defaultFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);

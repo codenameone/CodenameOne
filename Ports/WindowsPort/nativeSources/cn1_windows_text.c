@@ -84,8 +84,10 @@ static int cn1WinExeRelativePath(const wchar_t* fileName, wchar_t* out, int outL
     return 1;
 }
 
-/* Case-insensitive ".ttf" suffix test. */
-static int cn1WinIsTtf(const wchar_t* name) {
+/* Case-insensitive ".ttf"/".otf" suffix test. DirectWrite reads the SFNT
+ * container whether the outlines are glyf or CFF, so both extensions name a
+ * font it can register. */
+static int cn1WinIsFontFile(const wchar_t* name) {
     if (name == NULL) {
         return 0;
     }
@@ -94,10 +96,13 @@ static int cn1WinIsTtf(const wchar_t* name) {
         return 0;
     }
     const wchar_t* ext = name + (len - 4);
-    return ext[0] == L'.'
-            && (ext[1] == L't' || ext[1] == L'T')
-            && (ext[2] == L't' || ext[2] == L'T')
-            && (ext[3] == L'f' || ext[3] == L'F');
+    if (ext[0] != L'.' || (ext[3] != L'f' && ext[3] != L'F')) {
+        return 0;
+    }
+    if ((ext[1] == L't' || ext[1] == L'T') && (ext[2] == L't' || ext[2] == L'T')) {
+        return 1;
+    }
+    return (ext[1] == L'o' || ext[1] == L'O') && (ext[2] == L't' || ext[2] == L'T');
 }
 
 /* Builds a CN1Font for an explicit family / pixel size / style. */
@@ -267,7 +272,7 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_loadTrueTypeFont___java_lang_
     float dpi = cn1Win.dpiScale > 0.0f ? cn1Win.dpiScale : 1.0f;
     CN1Font* font = NULL;
 
-    if (cn1WinIsTtf(fileName)) {
+    if (cn1WinIsFontFile(fileName)) {
         wchar_t fullPath[MAX_PATH];
         wchar_t registered[128];
         registered[0] = L'\0';

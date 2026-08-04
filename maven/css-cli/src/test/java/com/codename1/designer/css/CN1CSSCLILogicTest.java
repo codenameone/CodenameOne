@@ -88,4 +88,30 @@ class CN1CSSCLILogicTest {
         assertFalse((Boolean) invoke("contains", sig, root, sibling), "unrelated directory");
         assertFalse((Boolean) invoke("contains", sig, child, root), "containment is not symmetric");
     }
+
+    /**
+     * Merge mode re-anchors every relative url() at the synced copy of the CSS
+     * directory, so an @font-face src that names a file sitting directly in the
+     * CSS root is as valid as one under a fonts/ subdirectory. Absolute and
+     * remote URLs have to come through untouched.
+     */
+    @Test
+    void prefixesRootLevelFontUrlsAlongsideNestedOnes() throws Exception {
+        String css = "@font-face { font-family: \"A\"; src: url(A-Regular.ttf); }\n"
+                + "@font-face { font-family: \"B\"; src: url('fonts/B-Regular.ttf'); }\n"
+                + "@font-face { font-family: \"C\"; src: url(\"https://example.com/C.ttf\"); }\n"
+                + "@font-face { font-family: \"D\"; src: url(/opt/fonts/D.ttf); }\n";
+
+        String out = (String) invoke("prefixUrls", new Class<?>[]{String.class, String.class},
+                css, "cn1-merged-files/abc123/");
+
+        assertTrue(out.contains("url(\"cn1-merged-files/abc123/A-Regular.ttf\")"),
+                "font in the CSS root is prefixed, was: " + out);
+        assertTrue(out.contains("url(\"cn1-merged-files/abc123/fonts/B-Regular.ttf\")"),
+                "font in a subdirectory is prefixed, was: " + out);
+        assertTrue(out.contains("url(\"https://example.com/C.ttf\")"),
+                "remote URL is left alone, was: " + out);
+        assertTrue(out.contains("url(\"/opt/fonts/D.ttf\")"),
+                "absolute path is left alone, was: " + out);
+    }
 }

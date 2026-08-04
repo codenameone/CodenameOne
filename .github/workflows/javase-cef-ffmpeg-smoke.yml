@@ -67,28 +67,30 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install ffmpeg
 
-      # The community.chocolatey.org feed has failed mid-run more than once
-      # ("Failed to fetch results from V2 feed ... Chocolatey installed 0/0
-      # packages"), and choco exits 0 on that, so the failure only surfaced far
-      # downstream as a FileNotFoundError from the smoke script hunting for a
-      # binary that was never installed. Retry the transient outage, and if it
-      # really cannot be installed, fail here where the reason is legible.
       - name: Install ffmpeg on Windows
         if: runner.os == 'Windows'
         shell: powershell
         run: |
-          $ErrorActionPreference = 'Continue'
-          for ($attempt = 1; $attempt -le 3; $attempt++) {
-            choco install ffmpeg -y --no-progress
-            if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
-              Write-Host "ffmpeg is installed."
-              exit 0
+          # Retried, and then VERIFIED. The community feed answers 504 often enough to
+          # matter, and chocolatey can report success after failing to fetch -- so the
+          # first sign of trouble was the smoke test dying three steps later with
+          # "FileNotFoundError: [WinError 2] The system cannot find the file specified",
+          # which names neither ffmpeg nor the feed. An install step that does not
+          # confirm the tool it installed is how a transient upstream outage becomes an
+          # unreadable failure in somebody else's test.
+          $ok = $false
+          foreach ($delay in 0, 30, 90) {
+            if ($delay -gt 0) {
+              Write-Host "choco install ffmpeg failed; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
             }
-            Write-Host "ffmpeg not on PATH after attempt $attempt; retrying..."
-            Start-Sleep -Seconds (15 * $attempt)
+            choco install ffmpeg -y --no-progress
+            if (Get-Command ffmpeg -ErrorAction SilentlyContinue) { $ok = $true; break }
           }
-          Write-Error "ffmpeg could not be installed from chocolatey after three attempts."
-          exit 1
+          if (-not $ok) {
+            throw "ffmpeg is not on PATH after installing it. The chocolatey feed is the usual reason -- look for a 504 above."
+          }
+          ffmpeg -version
 
       - name: Run JavaSE CEF/FFmpeg smoke test
         env:

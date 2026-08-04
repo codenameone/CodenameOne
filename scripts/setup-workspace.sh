@@ -225,13 +225,41 @@ if [ ! -d "$CN1_BINARIES/.git" ]; then
   git clone --depth=1 --filter=blob:none https://github.com/codenameone/cn1-binaries "$CN1_BINARIES"
 fi
 
+# Both builds below run with -T 1C, so several modules install into the local
+# repository at once and contend for its lock. Maven's default wait is 30 seconds,
+# and on a cold cache under a loaded runner that is not always enough -- the build
+# then dies with "Could not acquire lock(s)" having compiled nothing wrong. Waiting
+# longer costs nothing when there is no contention.
+MVN_LOCK_ARGS="-Daether.syncContext.named.time=300 -Daether.syncContext.named.timeUnit=SECONDS"
+
+# Maven Central resets the connection or throttles a runner often enough to matter,
+# and Maven treats that as a PERMANENT resolution failure -- observed killing this
+# script while fetching a build plugin, before any project code compiled. The delay
+# grows because a flat retry lands inside the same window a 429 is still rate
+# limiting in. A real build failure fails identically every attempt, so this costs
+# one extra run of a broken build and rescues a green one.
+mvn_retry() {
+  local delay
+  for delay in 30 120 300 0; do
+    if "$MAVEN_HOME/bin/mvn" "$@"; then
+      return 0
+    fi
+    if [ "$delay" = "0" ]; then
+      log "maven failed after all retries"
+      return 1
+    fi
+    log "maven failed; retrying in ${delay}s in case Maven Central was flaky"
+    sleep "$delay"
+  done
+}
+
 log "Building Codename One core modules"
-"$MAVEN_HOME/bin/mvn" -f maven/pom.xml -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -DskipTests -Djava.awt.headless=true -Dcn1.binaries="$CN1_BINARIES" -Dcodename1.platform=javase -P local-dev-javase,compile-android,!download-cn1-binaries install "$@"
+mvn_retry -f maven/pom.xml $MVN_LOCK_ARGS -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -DskipTests -Djava.awt.headless=true -Dcn1.binaries="$CN1_BINARIES" -Dcodename1.platform=javase -P local-dev-javase,compile-android,!download-cn1-binaries install "$@"
 
 log "Building Codename One Maven plugin"
-"$MAVEN_HOME/bin/mvn" -f maven/pom.xml \
+mvn_retry -f maven/pom.xml \
   -pl codenameone-maven-plugin -am \
-  -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+  $MVN_LOCK_ARGS -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
   -DskipTests -Djava.awt.headless=true \
   -Dcn1.binaries="$CN1_BINARIES" \
   -P !download-cn1-binaries \

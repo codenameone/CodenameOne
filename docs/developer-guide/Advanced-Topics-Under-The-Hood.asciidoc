@@ -167,6 +167,12 @@ If none of the services are defined to true then plus, auth, base, analytics, gc
 |android.blockExternalStoragePermission
 |Boolean true/false defaults to false. Disables the external storage (SD card) permission
 
+|android.blockReadMediaPermissions
+|Boolean true/false, defaults to the value of `android.blockExternalStoragePermission`. Suppresses the `READ_MEDIA_VIDEO` and `READ_MEDIA_AUDIO` permissions that playing a URI adds on API 33 and above
+
+|android.requestReadMediaPermissions
+|Boolean true/false defaults to false. Declares `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO` and `READ_MEDIA_AUDIO` on API 33 and above even when the build detected no media playback. `READ_MEDIA_IMAGES` is only ever added by this hint
+
 |android.min_sdk_version
 |The least SDK required to run this app, the default value changes based on functionality but can be as low as 7. This corresponds to the XML attribute `android:minSdkVersion`.
 
@@ -775,6 +781,10 @@ a specific permission came up. This maps Android permissions to the methods/clas
 `package.permission.C2D_MESSAGE`, `com.google.android.c2dm.permission.RECEIVE`, and `android.permission.RECEIVE_BOOT_COMPLETED` - bundled with the push subsystem so Firebase Cloud Messaging can wake the app after device restarts.
 
 `android.permission.READ_CONTACTS` - requested when accessing the device address book through `Display.getAllContacts()` and related APIs.
+
+`android.permission.READ_MEDIA_VIDEO` & `android.permission.READ_MEDIA_AUDIO` - added on API 33 and above when the app plays a URI through `MediaManager.createMedia(String, boolean)` or `createMediaAsync(String, boolean, Runnable)`, since that URI can point at the shared media store. The `InputStream` overloads don't add them: the Android port copies the stream into app private storage and reads nothing shared. Block them with `android.blockReadMediaPermissions=true`.
+
+`android.permission.READ_MEDIA_IMAGES` - never added by media playback, because no Codename One API requests it at runtime. Declaring it alongside `READ_MEDIA_VIDEO` places the app under Google Play's Photo and Video Permissions policy, so ask for it only when you need it, with `android.requestReadMediaPermissions=true`.
 
 ==== Permissions under Marshmallow (Android 6+)
 

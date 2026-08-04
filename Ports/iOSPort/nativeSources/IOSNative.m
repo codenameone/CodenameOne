@@ -29,6 +29,7 @@
 #include "java_lang_String.h"
 #include <pthread.h>
 #import "CN1ES2compat.h"
+#import "CN1JailbreakDetector.h"
 #if TARGET_OS_WATCH
 #import "CN1CGGraphics.h"
 #import "CN1WatchHost.h"
@@ -9809,10 +9810,34 @@ static void cn1RegisterBundledFontsOnce() {
     }
     cn1FontsRegistered = YES;
     @autoreleasepool {
-        NSArray *fontPaths = [[NSBundle mainBundle] pathsForResourcesOfType:@"ttf" inDirectory:nil];
-        for (NSString *fontPath in fontPaths) {
-            NSURL *url = [NSURL fileURLWithPath:fontPath];
+        // Core Text reads OpenType as readily as TrueType, and this scan is the
+        // only thing registering bundled fonts on watchOS -- its plist carries no
+        // UIAppFonts array -- so anything missed here falls back to the system
+        // font on the watch even though it renders everywhere else.
+        //
+        // List the resource directory once and compare the lower-cased extension,
+        // rather than calling pathsForResourcesOfType: per spelling: that call
+        // matches the extension exactly, so a per-spelling list only ever covers
+        // the spellings someone thought to write down while the rest of the stack
+        // accepts any case, and ".TtF" would be bundled and never registered.
+        //
+        // A shallow listing of the resource root is deliberate. Fonts are
+        // deployed flat next to theme.res -- that is why createTrueTypeFont
+        // forbids a path separator in the name -- so nothing is missed, and it
+        // avoids walking every resource in the bundle (pods, map assets, models)
+        // on the way to the first glyph.
+        NSString *resourceRoot = [[NSBundle mainBundle] resourcePath];
+        NSArray *resourceNames = resourceRoot == nil ? nil
+                : [[NSFileManager defaultManager] contentsOfDirectoryAtPath:resourceRoot error:NULL];
+        for (NSString *resourceName in resourceNames) {
+            NSString *ext = [[resourceName pathExtension] lowercaseString];
+            if (![ext isEqualToString:@"ttf"] && ![ext isEqualToString:@"otf"]) {
+                continue;
+            }
+            NSURL *url = [NSURL fileURLWithPath:[resourceRoot stringByAppendingPathComponent:resourceName]];
             CFErrorRef error = NULL;
+            // A font already registered by UIAppFonts errors here; that is
+            // expected on iOS/tvOS and the error is discarded.
             CTFontManagerRegisterFontsForURL((BRIDGE_CAST CFURLRef)url, kCTFontManagerScopeProcess, &error);
             if (error != NULL) {
                 CFRelease(error);
@@ -14622,7 +14647,7 @@ void com_codename1_impl_ios_IOSNative_stopBiometricAuthentication__(CN1_THREAD_S
 #import <DeviceCheck/DeviceCheck.h>
 #import <CommonCrypto/CommonCrypto.h>
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAppAttestSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAppAttestSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 #if !TARGET_OS_TV && !TARGET_OS_WATCH
     if (@available(iOS 14.0, *)) {
         if (NSClassFromString(@"DCAppAttestService") == NULL) {
@@ -14636,65 +14661,163 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAppAttestSupported__(CN1_THREAD_
 #endif // !TARGET_OS_TV && !TARGET_OS_WATCH
 }
 
-void com_codename1_impl_ios_IOSNative_requestAppAttestToken___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT nonce) {
+// Reports a failure back to Java. errorCode carries the raw DCError value so the
+// Java side can tell "the key is invalid, throw it away and re-attest" (2) from
+// "Apple is throttling us, back off" (4) -- treating those the same is how an
+// app burns its attestation budget in a retry loop.
+static void cn1AppAttestFail(JAVA_INT requestId, NSError *err, NSString *fallback) {
+    NSString *m = err != nil ? err.localizedDescription : fallback;
+    JAVA_INT code = err != nil ? (JAVA_INT)err.code : -1;
+    JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), m);
+    com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_int_java_lang_String(getThreadLocalData(), requestId, code, jmsg);
+}
+
+// DCAppAttestService completion handlers run on an arbitrary dispatch queue.
+// Hopping to the main queue means every re-entry into the VM comes from a known
+// thread, matching what the biometrics block above does.
+#define CN1_APP_ATTEST_ON_MAIN(block) dispatch_async(dispatch_get_main_queue(), block)
+
+void com_codename1_impl_ios_IOSNative_appAttestGenerateKey___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId) {
 #if !TARGET_OS_TV && !TARGET_OS_WATCH
     POOL_BEGIN();
     if (@available(iOS 14.0, *)) {
         DCAppAttestService *service = [DCAppAttestService sharedService];
         if (!service.isSupported) {
-            JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), @"App Attest not supported");
-            com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, jmsg);
+            cn1AppAttestFail(requestId, nil, @"App Attest not supported");
             POOL_END();
             return;
         }
-        NSString *nsNonce = (nonce == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG nonce);
-        NSData *nonceData = [nsNonce dataUsingEncoding:NSUTF8StringEncoding];
-        unsigned char hashBytes[CC_SHA256_DIGEST_LENGTH];
-        CC_SHA256(nonceData.bytes, (CC_LONG)nonceData.length, hashBytes);
-        NSData *clientDataHash = [NSData dataWithBytes:hashBytes length:CC_SHA256_DIGEST_LENGTH];
         [service generateKeyWithCompletionHandler:^(NSString *keyId, NSError *genErr) {
-            if (genErr != nil || keyId == nil) {
-                NSString *m = genErr ? genErr.localizedDescription : @"App Attest key generation failed";
-                JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), m);
-                com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, jmsg);
-                return;
-            }
-            [service attestKey:keyId clientDataHash:clientDataHash completionHandler:^(NSData *attestationObject, NSError *attErr) {
-                if (attErr != nil || attestationObject == nil) {
-                    NSString *m = attErr ? attErr.localizedDescription : @"App Attest attestation failed";
-                    JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), m);
-                    com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, jmsg);
+            CN1_APP_ATTEST_ON_MAIN(^{
+                if (genErr != nil || keyId == nil) {
+                    cn1AppAttestFail(requestId, genErr, @"App Attest key generation failed");
                     return;
                 }
-                NSData *keyIdData = [keyId dataUsingEncoding:NSUTF8StringEncoding];
-                NSString *b64Key = [keyIdData base64EncodedStringWithOptions:0];
-                NSString *b64Att = [attestationObject base64EncodedStringWithOptions:0];
-                NSString *token = [NSString stringWithFormat:@"%@:%@", b64Key, b64Att];
-                JAVA_OBJECT jtoken = fromNSString(getThreadLocalData(), token);
-                com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestSuccess___int_java_lang_String(getThreadLocalData(), requestId, jtoken);
-            }];
+                JAVA_OBJECT jkey = fromNSString(getThreadLocalData(), keyId);
+                com_codename1_impl_ios_IOSDeviceIntegrity_nativeKeyGenerated___int_java_lang_String(getThreadLocalData(), requestId, jkey);
+            });
         }];
     } else {
-        JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), @"App Attest requires iOS 14+");
-        com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, jmsg);
+        cn1AppAttestFail(requestId, nil, @"App Attest requires iOS 14+");
     }
     POOL_END();
 #else
-    com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, JAVA_NULL);
+    cn1AppAttestFail(requestId, nil, @"App Attest not available on this platform");
+#endif // !TARGET_OS_TV && !TARGET_OS_WATCH
+}
+
+void com_codename1_impl_ios_IOSNative_appAttestAttestKey___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT keyId, JAVA_OBJECT clientDataHashB64) {
+#if !TARGET_OS_TV && !TARGET_OS_WATCH
+    POOL_BEGIN();
+    if (@available(iOS 14.0, *)) {
+        DCAppAttestService *service = [DCAppAttestService sharedService];
+        NSString *nsKeyId = (keyId == JAVA_NULL) ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG keyId);
+        NSString *nsHash = (clientDataHashB64 == JAVA_NULL) ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG clientDataHashB64);
+        NSData *clientDataHash = nsHash == nil ? nil
+            : [[NSData alloc] initWithBase64EncodedString:nsHash options:0];
+#ifndef CN1_USE_ARC
+        // initWithBase64EncodedString returns an owned object. The block below
+        // retains it for the duration of the call, so hand ownership to the pool
+        // rather than leaking one decoded hash per request. Guarded because ARC
+        // forbids an explicit autorelease, and this file builds both ways.
+        [clientDataHash autorelease];
+#endif
+        if (nsKeyId == nil || clientDataHash == nil) {
+            cn1AppAttestFail(requestId, nil, @"App Attest attestation missing key or hash");
+            POOL_END();
+            return;
+        }
+        [service attestKey:nsKeyId clientDataHash:clientDataHash completionHandler:^(NSData *attestationObject, NSError *attErr) {
+            CN1_APP_ATTEST_ON_MAIN(^{
+                if (attErr != nil || attestationObject == nil) {
+                    cn1AppAttestFail(requestId, attErr, @"App Attest attestation failed");
+                    return;
+                }
+                NSString *b64Att = [attestationObject base64EncodedStringWithOptions:0];
+                JAVA_OBJECT jatt = fromNSString(getThreadLocalData(), b64Att);
+                com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestationReady___int_java_lang_String(getThreadLocalData(), requestId, jatt);
+            });
+        }];
+    } else {
+        cn1AppAttestFail(requestId, nil, @"App Attest requires iOS 14+");
+    }
+    POOL_END();
+#else
+    cn1AppAttestFail(requestId, nil, @"App Attest not available on this platform");
+#endif // !TARGET_OS_TV && !TARGET_OS_WATCH
+}
+
+void com_codename1_impl_ios_IOSNative_appAttestGenerateAssertion___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT keyId, JAVA_OBJECT clientDataHashB64) {
+#if !TARGET_OS_TV && !TARGET_OS_WATCH
+    POOL_BEGIN();
+    if (@available(iOS 14.0, *)) {
+        DCAppAttestService *service = [DCAppAttestService sharedService];
+        NSString *nsKeyId = (keyId == JAVA_NULL) ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG keyId);
+        NSString *nsHash = (clientDataHashB64 == JAVA_NULL) ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG clientDataHashB64);
+        NSData *clientDataHash = nsHash == nil ? nil
+            : [[NSData alloc] initWithBase64EncodedString:nsHash options:0];
+#ifndef CN1_USE_ARC
+        // initWithBase64EncodedString returns an owned object. The block below
+        // retains it for the duration of the call, so hand ownership to the pool
+        // rather than leaking one decoded hash per request. Guarded because ARC
+        // forbids an explicit autorelease, and this file builds both ways.
+        [clientDataHash autorelease];
+#endif
+        if (nsKeyId == nil || clientDataHash == nil) {
+            cn1AppAttestFail(requestId, nil, @"App Attest assertion missing key or hash");
+            POOL_END();
+            return;
+        }
+        [service generateAssertion:nsKeyId clientDataHash:clientDataHash completionHandler:^(NSData *assertion, NSError *assertErr) {
+            CN1_APP_ATTEST_ON_MAIN(^{
+                if (assertErr != nil || assertion == nil) {
+                    cn1AppAttestFail(requestId, assertErr, @"App Attest assertion failed");
+                    return;
+                }
+                NSString *b64 = [assertion base64EncodedStringWithOptions:0];
+                JAVA_OBJECT jassert = fromNSString(getThreadLocalData(), b64);
+                com_codename1_impl_ios_IOSDeviceIntegrity_nativeAssertionReady___int_java_lang_String(getThreadLocalData(), requestId, jassert);
+            });
+        }];
+    } else {
+        cn1AppAttestFail(requestId, nil, @"App Attest requires iOS 14+");
+    }
+    POOL_END();
+#else
+    cn1AppAttestFail(requestId, nil, @"App Attest not available on this platform");
 #endif // !TARGET_OS_TV && !TARGET_OS_WATCH
 }
 #else // CN1_USE_APP_ATTEST
 
 // App Attest not enabled (ios.appAttest build hint off): DeviceCheck.framework
 // is neither imported nor linked. Report unsupported / fail the request.
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAppAttestSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAppAttestSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return JAVA_FALSE;
 }
 
-void com_codename1_impl_ios_IOSNative_requestAppAttestToken___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT nonce) {
-    com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_java_lang_String(getThreadLocalData(), requestId, JAVA_NULL);
+void com_codename1_impl_ios_IOSNative_appAttestGenerateKey___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId) {
+    com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_int_java_lang_String(getThreadLocalData(), requestId, -1, JAVA_NULL);
+}
+
+void com_codename1_impl_ios_IOSNative_appAttestAttestKey___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT keyId, JAVA_OBJECT clientDataHashB64) {
+    com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_int_java_lang_String(getThreadLocalData(), requestId, -1, JAVA_NULL);
+}
+
+void com_codename1_impl_ios_IOSNative_appAttestGenerateAssertion___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT keyId, JAVA_OBJECT clientDataHashB64) {
+    com_codename1_impl_ios_IOSDeviceIntegrity_nativeAttestError___int_int_java_lang_String(getThreadLocalData(), requestId, -1, JAVA_NULL);
 }
 #endif // CN1_USE_APP_ATTEST
+
+// Jailbreak/instrumentation signals. Always compiled, independent of both
+// CN1_USE_APP_ATTEST and CN1_DETECT_JAILBREAK, because DeviceIntegrity reports
+// these at runtime without terminating the app.
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_iosJailbreakSignals___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    NSString *signals = cn1JailbreakSignals();
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG (signals == nil ? @"" : signals));
+    POOL_END();
+    return result;
+}
 
 // --- CarPlay (CarPlay.framework) ------------------------------------------
 // Gated by CN1_USE_CARPLAY: the builder uncomments the define, links

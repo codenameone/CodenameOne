@@ -9018,11 +9018,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // which is not reachable from the worker and truncates the data URL
             // to 26 chars, so the old byte->dataURL approach 100% failed to load
             // the font.
-            loadTrueTypeFont_(resolvedFontName, resolvedFileName, "truetype");
+            loadTrueTypeFont_(resolvedFontName, resolvedFileName, fontFormatOf(resolvedFileName));
             loadedFonts.add(resolvedFontName);
         }
         return createFallbackTrueTypeFont(resolvedFontName, resolvedFileName);
 
+    }
+
+    /**
+     * The format hint handed to the FontFace constructor. Browsers treat
+     * "truetype" and "opentype" as the same SFNT container, but naming the
+     * actual one keeps the hint honest and leaves no room for a UA that decides
+     * to skip a source whose hint doesn't match.
+     */
+    private static String fontFormatOf(String fileName) {
+        return fileName != null && fileName.toLowerCase().endsWith(".otf") ? "opentype" : "truetype";
     }
 
     private NativeFont createFallbackTrueTypeFont(String fontName, String fileName) {

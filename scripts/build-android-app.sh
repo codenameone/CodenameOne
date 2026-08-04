@@ -150,6 +150,29 @@ grep -q '^android.useAndroidX=' "$GRADLE_PROPS" 2>/dev/null || echo 'android.use
 grep -q '^android.enableJetifier=' "$GRADLE_PROPS" 2>/dev/null || echo 'android.enableJetifier=true' >> "$GRADLE_PROPS"
 grep -q '^android.suppressUnsupportedCompileSdk=' "$GRADLE_PROPS" 2>/dev/null || echo 'android.suppressUnsupportedCompileSdk=36' >> "$GRADLE_PROPS"
 
+# More heap than the builder's generated default, for this script only.
+#
+# The generated project asks for -Xmx2048m, which was written for a build that
+# forks its heavy work out. This script runs --no-daemon, so resource merging,
+# dexing and packaging all happen in one single-use JVM, and packageDebug reads
+# each entry into a byte[] as it writes it -- the last allocation in the
+# sequence, on a heap the earlier steps have already filled and fragmented.
+# That is why the failure appeared as an intermittent OutOfMemoryError inside
+# PackageAndroidArtifact rather than a build that never worked: identical
+# inputs, decided by GC timing. Nothing here caps the JVM below the runner's
+# memory, so the headroom is free.
+#
+# Overwritten rather than appended: java.util.Properties would take the last
+# occurrence, but a file listing the same key twice with different values is a
+# trap for whoever reads it next.
+if grep -q '^org.gradle.jvmargs=' "$GRADLE_PROPS" 2>/dev/null; then
+  sed -i.bak 's/^org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8/' "$GRADLE_PROPS"
+  rm -f "$GRADLE_PROPS.bak"
+else
+  echo 'org.gradle.jvmargs=-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8' >> "$GRADLE_PROPS"
+fi
+ba_log "Gradle JVM args: $(grep '^org.gradle.jvmargs=' "$GRADLE_PROPS")"
+
 APP_BUILD_GRADLE="$GRADLE_PROJECT_DIR/app/build.gradle"
 ROOT_BUILD_GRADLE="$GRADLE_PROJECT_DIR/build.gradle"
 PATCH_GRADLE_SOURCE_PATH="$SCRIPT_DIR/android/lib"
@@ -192,10 +215,12 @@ export JAVA_HOME="${JDK_HOME:-$JAVA17_HOME}"
     yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" >/dev/null 2>&1 || ba_log "Warning: unable to install Android SDK 36 components"
     yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
   fi
-  # --stacktrace: packageDebug has failed intermittently on CI reporting only
-  # "A failure occurred while executing PackageAndroidArtifact$IncrementalSplitterRunnable"
-  # with no cause, which is not enough to fix anything. The flag costs nothing on
-  # a successful build and prints the actual exception when it does happen.
+  # --stacktrace, always. A packaging failure inside
+  # PackageAndroidArtifact$IncrementalSplitterRunnable reports only "a failure
+  # occurred while executing" without it, so the CI log names the task and nothing
+  # else -- and the workspace is gone by the time anyone reads it. It costs nothing
+  # on a successful build and is the difference between diagnosing the next
+  # occurrence and guessing at it.
   ./gradlew --no-daemon --stacktrace assembleDebug
 )
 export JAVA_HOME="$ORIGINAL_JAVA_HOME"

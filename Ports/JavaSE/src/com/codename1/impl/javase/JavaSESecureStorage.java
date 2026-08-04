@@ -27,23 +27,52 @@ import com.codename1.security.BiometricError;
 import com.codename1.security.BiometricException;
 import com.codename1.security.Biometrics;
 import com.codename1.security.SecureStorage;
+import com.codename1.io.Log;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
+
+import java.security.SecureRandom;
+import java.util.Base64;
+import java.util.prefs.BackingStoreException;
+
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Simulator backing for {@link SecureStorage}. Reads gate behind the
  * {@link Biometrics} prompt (which the simulator menu controls); writes
  * persist to {@code java.util.prefs} so values survive a JVM restart.
+ *
+ * <p>The non-prompting tier is <em>obfuscation, not security</em>. It encrypts
+ * with a key derived from the OS user account plus a per-node random salt, both
+ * of which live on the same machine as the ciphertext -- anything running as
+ * this user can recover the plaintext. Its job is to keep API keys out of
+ * cleartext in the project tree during simulator runs, which is exactly what
+ * the base-class contract promises for the desktop. Device platforms back the
+ * same API with real hardware-held keys.</p>
  */
 public final class JavaSESecureStorage extends SecureStorage {
 
     private static final String NODE = "com.codename1.simulator.secureStorage";
+    private static final String PLAIN_NODE = "com.codename1.simulator.secureStorage.plain";
+    private static final String SALT_KEY = "__cn1_salt";
+    private static final String VALUE_PREFIX = "v_";
+    private static final int GCM_TAG_BITS = 128;
+    private static final int PBKDF2_ROUNDS = 120000;
+
     private final java.util.prefs.Preferences prefs;
+    private final java.util.prefs.Preferences plainPrefs;
     private final JavaSEBiometrics biometrics;
+    private SecretKey plainKey;
 
     JavaSESecureStorage(JavaSEBiometrics biometrics) {
         this.biometrics = biometrics;
         this.prefs = java.util.prefs.Preferences.userRoot().node(NODE);
+        this.plainPrefs = java.util.prefs.Preferences.userRoot().node(PLAIN_NODE);
     }
 
     @Override
@@ -94,5 +123,124 @@ public final class JavaSESecureStorage extends SecureStorage {
     @Override
     public void setKeychainAccessGroup(String group) {
         // No-op in the simulator.
+    }
+
+    // --- Non-prompting tier ------------------------------------------------
+
+    @Override
+    public boolean set(String account, String value) {
+        if (account == null || value == null) {
+            return false;
+        }
+        try {
+            Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+            c.init(Cipher.ENCRYPT_MODE, plainKey());
+            byte[] enc = c.doFinal(value.getBytes("UTF-8"));
+            Base64.Encoder b64 = Base64.getEncoder();
+            plainPrefs.put(VALUE_PREFIX + account,
+                    b64.encodeToString(c.getIV()) + ":" + b64.encodeToString(enc));
+            // flush(), and its outcome is this method's answer. Preferences writes back
+            // on its own schedule, so returning true said the secret was stored while it
+            // was still only in memory -- and the simulator is killed abruptly all the
+            // time, by the run button and by the IDE. The same reasoning as the Android
+            // tier committing rather than applying: a write that reports success has to
+            // have happened.
+            plainPrefs.flush();
+            return true;
+        } catch (Exception e) {
+            Log.e(e);
+            return false;
+        }
+    }
+
+    @Override
+    public String get(String account) {
+        if (account == null) {
+            return null;
+        }
+        String stored = plainPrefs.get(VALUE_PREFIX + account, null);
+        if (stored == null) {
+            return null;
+        }
+        int sep = stored.indexOf(':');
+        if (sep < 0) {
+            return null;
+        }
+        try {
+            Base64.Decoder b64 = Base64.getDecoder();
+            byte[] iv = b64.decode(stored.substring(0, sep));
+            byte[] enc = b64.decode(stored.substring(sep + 1));
+            Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+            c.init(Cipher.DECRYPT_MODE, plainKey(), new GCMParameterSpec(GCM_TAG_BITS, iv));
+            return new String(c.doFinal(enc), "UTF-8");
+        } catch (Exception e) {
+            Log.e(e);
+            return null;
+        }
+    }
+
+    @Override
+    public boolean remove(String account) {
+        if (account == null) {
+            return false;
+        }
+        plainPrefs.remove(VALUE_PREFIX + account);
+        try {
+            // Same for the removal, and it matters more: this is the credential a logout
+            // clears, so an unflushed deletion is one that comes back on the next launch.
+            plainPrefs.flush();
+        } catch (BackingStoreException e) {
+            Log.e(e);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Derives (or returns) the key the non-prompting tier encrypts with.
+     *
+     * <p>Locked on the class, not on the instance. {@code JavaSEPort.getSecureStorage()}
+     * creates its singleton without synchronization, so two threads making the first call
+     * concurrently each get their own {@code JavaSESecureStorage} -- and an instance lock
+     * then serializes nothing. Both would find the shared salt missing, generate different
+     * ones, and write values encrypted under different keys before one salt overwrote the
+     * other in the same Preferences node; whichever lost is permanently undecryptable. The
+     * salt and the node are process-wide, so the lock has to be too.</p>
+     */
+    private SecretKey plainKey() throws Exception {
+        synchronized (KEY_LOCK) {
+            return plainKeyLocked();
+        }
+    }
+
+    /** The salt is shared by every instance in the process, so the lock is as well. */
+    private static final Object KEY_LOCK = new Object();
+
+    private SecretKey plainKeyLocked() throws Exception {
+        if (plainKey != null) {
+            return plainKey;
+        }
+        String saltB64 = plainPrefs.get(SALT_KEY, null);
+        byte[] salt;
+        if (saltB64 == null) {
+            salt = new byte[16];
+            new SecureRandom().nextBytes(salt);
+            plainPrefs.put(SALT_KEY, Base64.getEncoder().encodeToString(salt));
+        } else {
+            salt = Base64.getDecoder().decode(saltB64);
+        }
+        char[] material = (System.getProperty("user.name", "cn1")
+                // "\0", not a literal zero byte in the file. Java accepts the raw
+                // character, but git then classifies the whole source as binary: diffs
+                // report "- -" instead of lines, and grep stops matching it, so every
+                // later review of this file is blind. The octal escape rather than
+                // \u0000 because unicode escapes are processed before the source is
+                // tokenized, which is a footgun this line does not need to inherit.
+                + "\0" + System.getProperty("user.home", "")).toCharArray();
+        SecretKeyFactory f = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        byte[] derived = f.generateSecret(
+                new PBEKeySpec(material, salt, PBKDF2_ROUNDS, 256)).getEncoded();
+        plainKey = new SecretKeySpec(derived, "AES");
+        return plainKey;
     }
 }

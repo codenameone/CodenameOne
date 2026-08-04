@@ -163,6 +163,7 @@ class JavaSEWebSocketImpl extends WebSocketImpl {
             }
             req.append("\r\n");
         }
+        appendRequestHeaders(req);
         req.append("\r\n");
         out.write(req.toString().getBytes(StandardCharsets.ISO_8859_1));
         out.flush();

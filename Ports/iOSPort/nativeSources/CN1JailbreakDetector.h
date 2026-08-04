@@ -20,7 +20,25 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
+#import <Foundation/Foundation.h>
+
 //#define CN1_DETECT_JAILBREAK 1
+
+/**
+ * Runs every jailbreak / hooking probe and returns the ones that fired as a
+ * comma separated list of stable codes, or an empty string on a clean device.
+ * Codes: dyldInsert, hookLib, jailbreakFile, restrictedWrite, traced.
+ *
+ * Always compiled, independent of CN1_DETECT_JAILBREAK, because
+ * DeviceIntegrity.getCompromiseReasons() surfaces these at runtime without
+ * terminating the app. Returns an empty string on the simulator.
+ */
+NSString *cn1JailbreakSignals(void);
+
 #ifdef CN1_DETECT_JAILBREAK
-void cn1DetectJailbreakBypassesAndExit();
+/**
+ * Legacy hard gate kept for the ios.detectJailbreak build hint: runs
+ * cn1JailbreakSignals() and terminates the process if anything fired.
+ */
+void cn1DetectJailbreakBypassesAndExit(void);
 #endif

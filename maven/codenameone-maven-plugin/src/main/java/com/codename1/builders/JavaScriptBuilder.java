@@ -556,11 +556,29 @@ public class JavaScriptBuilder extends Executor {
     private File writeNativeInterfaceImpl(File genDir, Class<?> iface) throws IOException {
         String pkg = iface.getPackage() != null ? iface.getPackage().getName() : "";
         String simpleImpl = iface.getSimpleName() + "Impl";
-        String registryKey = iface.getName().replace('.', '_');
 
         File pkgDir = pkg.isEmpty() ? genDir : new File(genDir, pkg.replace('.', File.separatorChar));
         pkgDir.mkdirs();
         File out = new File(pkgDir, simpleImpl + ".java");
+
+        PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(out), StandardCharsets.UTF_8));
+        try {
+            pw.print(nativeInterfaceImplSource(iface));
+        } finally {
+            pw.close();
+        }
+        return out;
+    }
+
+    /**
+     * Java source of the generated {@code <Interface>Impl} that binds every method of
+     * {@code iface} to the host bridge. Package visible so the binding contract can be
+     * asserted without running a build.
+     */
+    static String nativeInterfaceImplSource(Class<?> iface) {
+        String pkg = iface.getPackage() != null ? iface.getPackage().getName() : "";
+        String simpleImpl = iface.getSimpleName() + "Impl";
+        String registryKey = iface.getName().replace('.', '_');
 
         StringBuilder sb = new StringBuilder();
         if (!pkg.isEmpty()) {
@@ -577,20 +595,40 @@ public class JavaScriptBuilder extends Executor {
             appendNativeInterfaceImplMethod(sb, m);
         }
         sb.append("}\n");
-
-        PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(out), StandardCharsets.UTF_8));
-        try {
-            pw.print(sb.toString());
-        } finally {
-            pw.close();
-        }
-        return out;
+        return sb.toString();
     }
 
-    private void appendNativeInterfaceImplMethod(StringBuilder sb, Method m) {
+    /**
+     * {@code isSupported()} is the contract's own "is this available here?" question, so it
+     * must answer rather than throw. An Impl is generated and registered for EVERY native
+     * interface in the app, so {@code NativeLookup.create()} never returns null on this port
+     * and {@code isSupported()} is the only signal the developer has. Without the guard, an
+     * app whose bundle carries no JS implementation for the interface got the bridge's
+     * "No native interface implementation registered for ..." rejection thrown straight
+     * through the standard {@code create(X.class) != null && x.isSupported()} check.
+     */
+    private static boolean isSupportedQuery(Method m) {
+        return "isSupported".equals(m.getName())
+                && m.getParameterTypes().length == 0
+                && m.getReturnType() == boolean.class;
+    }
+
+    private static void appendNativeInterfaceImplMethod(StringBuilder sb, Method m) {
         Class<?>[] params = m.getParameterTypes();
         Class<?> ret = m.getReturnType();
         String methodKey = nativeInterfaceMethodKey(m);
+
+        if (isSupportedQuery(m)) {
+            sb.append("    public boolean isSupported() {\n");
+            sb.append("        try {\n");
+            sb.append("            return com.codename1.impl.platform.js.NativeInterfaceBridge.callBoolean(__NI, \"")
+                    .append(methodKey).append("\", new Object[0]);\n");
+            sb.append("        } catch (Throwable __t) {\n");
+            sb.append("            return false;\n");
+            sb.append("        }\n");
+            sb.append("    }\n\n");
+            return;
+        }
 
         sb.append("    public ").append(ret.getCanonicalName()).append(" ").append(m.getName()).append("(");
         for (int i = 0; i < params.length; i++) {
@@ -836,6 +874,7 @@ public class JavaScriptBuilder extends Executor {
                 }
                 String lower = rf.getName().toLowerCase();
                 boolean relocate = lower.endsWith(".ttf")
+                        || lower.endsWith(".otf")
                         || lower.endsWith(".zip")
                         || lower.endsWith("-pom.xml");
                 if (relocate) {

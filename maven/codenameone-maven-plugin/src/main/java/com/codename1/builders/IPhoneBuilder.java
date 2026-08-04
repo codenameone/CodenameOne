@@ -434,6 +434,48 @@ public class IPhoneBuilder extends Executor {
     }
 
 
+    /**
+     * The Facebook SDK pods, at whatever version the request asked for.
+     *
+     * <p>Its own method so the validation below has a caller a test can reach.</p>
+     */
+    String facebookPods(BuildRequest request) {
+        String v = podVersionRequirement(
+                request.getArg("ios.facebook.version", "~>5.6.0"), "~>5.6.0");
+        return "FBSDKCoreKit " + v + ",FBSDKLoginKit " + v + ",FBSDKShareKit " + v;
+    }
+
+    /**
+     * A CocoaPods version requirement, or the default when the hint is not one.
+     *
+     * <p>This value is appended to the pod list and interpolated into the generated
+     * Podfile unescaped, and a Podfile is Ruby that {@code pod install} executes -- so a
+     * hint carrying a quote and a newline is code running in the build workspace, which
+     * holds signing material. Version requirements are a tiny language ("~> 5.6.0",
+     * "&gt;= 5.0", "5.6.0"), so anything outside it is refused rather than escaped:
+     * escaping invites the next value that needs a different escape.</p>
+     */
+    private String podVersionRequirement(String hint, String fallback) {
+        if (hint == null || hint.length() == 0) {
+            return fallback;
+        }
+        for (int i = 0; i < hint.length(); i++) {
+            char c = hint.charAt(i);
+            boolean ok = (c >= '0' && c <= '9')
+                    || (c >= 'a' && c <= 'z')
+                    || (c >= 'A' && c <= 'Z')
+                    || c == '.' || c == '-' || c == '+'
+                    || c == '~' || c == '>' || c == '<' || c == '=' || c == ' ';
+            if (!ok) {
+                log("ios.facebook.version '" + hint + "' is not a CocoaPods version "
+                        + "requirement; using " + fallback);
+                return fallback;
+            }
+        }
+        return hint;
+    }
+
+
 
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
@@ -564,9 +606,8 @@ public class IPhoneBuilder extends Executor {
         String facebookAppId = request.getArg("facebook.appId", null);
         boolean usePodsForFacebook = !request.getArg("ios.facebook.usePods", "true").equals("false") && facebookAppId != null && facebookAppId.length() > 0;
         if (usePodsForFacebook) {
-            String fbPodsVersion = request.getArg("ios.facebook.version", "~>5.6.0");
             addMinDeploymentTarget("10.0");
-            iosPods += (((iosPods.length() > 0) ? ",":"") + "FBSDKCoreKit "+fbPodsVersion+",FBSDKLoginKit "+fbPodsVersion+",FBSDKShareKit "+fbPodsVersion);
+            iosPods += (((iosPods.length() > 0) ? ",":"") + facebookPods(request));
         }
 
         String googleAdUnitId = request.getArg("ios.googleAdUnitId", request.getArg("google.adUnitId", null));
@@ -4986,7 +5027,11 @@ public class IPhoneBuilder extends Executor {
 
             @Override
             public boolean accept(File file, String string) {
-                return string.toLowerCase().endsWith(".ttf");
+                // Core Text reads the SFNT container whether the outlines are
+                // glyf or CFF, so OpenType registers through UIAppFonts exactly
+                // like TrueType. Leaving .otf out here is what made a bundled
+                // OpenType font fall back to the system font on the device.
+                return endsWithIgnoreCase(string, ".ttf") || endsWithIgnoreCase(string, ".otf");
             }
         });
         
@@ -5484,8 +5529,11 @@ public class IPhoneBuilder extends Executor {
                 if(fontFiles != null && fontFiles.length > 0) {
                     b.append("    <key>UIAppFonts</key>\n    <array>\n");
                     for(File f : fontFiles) {
+                        // Escaped: a font name is an arbitrary file name, and an
+                        // XML metacharacter in it (e.g. "A&B.ttf") would produce
+                        // a malformed Info.plist and fail the Xcode build.
                         b.append("        <string>");
-                        b.append(f.getName());
+                        b.append(plistEscape(f.getName()));
                         b.append("</string>\n");
                     }
                     b.append("    </array>\n");
@@ -6159,4 +6207,18 @@ public class IPhoneBuilder extends Executor {
                 || "com/codename1/ai/language/SmartReply".equals(cls);
     }
 
+
+    /** Locale-independent case-insensitive suffix test. */
+    static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value != null && value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
+    }
+
+    /** Escapes a value for inclusion in a plist/XML text node. */
+    static String plistEscape(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
 }

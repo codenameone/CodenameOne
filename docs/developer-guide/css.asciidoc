@@ -560,7 +560,7 @@ CN1 resource files support both PNG and JPEG images, but PNG is the default. Mul
 
 === Fonts
 
-This library supports the https://developer.mozilla.org/en/docs/Web/CSS/font[font], https://developer.mozilla.org/en/docs/Web/CSS/font-size[font-size], https://developer.mozilla.org/en/docs/Web/CSS/font-family[font-family], https://developer.mozilla.org/en/docs/Web/CSS/font-style[font-style], https://developer.mozilla.org/en/docs/Web/CSS/font-weight[font-weight], and https://developer.mozilla.org/en/docs/Web/CSS/text-decoration[text-decoration] properties, as well at the https://developer.mozilla.org/en/docs/Web/CSS/@font-face[@font-face] CSS "at" rule for including TTF/OTF fonts.
+This library supports the https://developer.mozilla.org/en/docs/Web/CSS/font[font], https://developer.mozilla.org/en/docs/Web/CSS/font-size[font-size], https://developer.mozilla.org/en/docs/Web/CSS/font-family[font-family], https://developer.mozilla.org/en/docs/Web/CSS/font-style[font-style], https://developer.mozilla.org/en/docs/Web/CSS/font-weight[font-weight], and https://developer.mozilla.org/en/docs/Web/CSS/text-decoration[text-decoration] properties, as well as the https://developer.mozilla.org/en/docs/Web/CSS/@font-face[@font-face] CSS "at" rule for including TrueType and OpenType fonts.
 
 ==== `font-family`
 
@@ -584,7 +584,7 @@ If you omit the `font-family` directive altogether, it will use `native:MainRegu
 . `native:ItalicBold`
 . `native:ItalicBlack`
 
-===== Using TTF fonts
+===== Using bundled fonts
 
 If you want to use a font other than the built-in fonts, you'll need to define the font using the `@font-face` rule. For example:
 
@@ -593,12 +593,42 @@ If you want to use a font other than the built-in fonts, you'll need to define t
 include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-028,indent=0]
 ----
 
+Both TrueType (`.ttf`) and OpenType (`.otf`) files work, upper-case or lower-case. Every platform loads both formats through its own font API, so an OpenType font needs no conversion before you bundle it. Web-only formats such as `.woff` aren't supported, and the CSS compiler fails the build on one rather than letting it reach the device.
+
+IMPORTANT: The compiler reads each font at build time, so a file it can't parse, or one with no PostScript name, fails the build. That second case is worth knowing about: iOS resolves fonts by their PostScript name, so a font without one renders everywhere except on an iOS device.
+
 Then you'll be able to reference the font using the specified `font-family` in any CSS element. For example:
 
 [source,css]
 ----
 include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-029,indent=0]
 ----
+
+===== Where to put the font file
+
+A relative `src` URL is resolved against the directory that holds the CSS file. You can keep font files directly beside `theme.css`, or in any subdirectory of it, whichever you prefer:
+
+[source,css]
+----
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-044,indent=0]
+----
+
+The font does have to live somewhere under that directory, because only that directory is copied into the build. A font reached through `../`, or one that doesn't exist, fails the build rather than producing an app whose text falls back to the system font. Two `@font-face` rules naming different files that share a file name also fail, since fonts are deployed by file name alone and one would overwrite the other. Pointing two families at the same file is fine.
+
+===== Family names, weights and styles
+
+A `font-family` name that contains spaces must be quoted, both in the `@font-face` rule and wherever you reference it. An unquoted name is parsed as a list of separate identifiers, so `font-family: GuideDemoFont Bold` registers the family as `GuideDemoFont` and collides with your regular weight.
+
+`font-weight` and `font-style` select between the built-in `native:` fonts, but they have no effect once `font-family` resolves to a `@font-face` rule. Declare one `@font-face` per weight and style you need, each with its own family name, as in the example above, then reference the right family from each UIID.
+
+To change the base font of an entire theme, set `font-family` on the special `Default` selector, then override the UIIDs that need a bold or italic face:
+
+[source,css]
+----
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-045,indent=0]
+----
+
+===== Remote and GitHub-hosted fonts
 
 The `@font-face` directive's `src` property will accept both local and remote URLs. The guide fixture below uses a local font so the demo build remains offline and repeatable; application CSS can replace the URL with an HTTPS font URL:
 
@@ -607,9 +637,9 @@ The `@font-face` directive's `src` property will accept both local and remote UR
 include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-030,indent=0]
 ----
 
-In this case, it will download the `myfont.ttf` file to the same directory as the CSS file. From then on it will use that locally downloaded version of the font so that it doesn't have to make a network request for each build.
+In this case, it will download the `myfont.ttf` file into the build directory alongside the merged CSS file, and reuse that copy on later builds so that it doesn't have to make a network request every time. A `mvn clean` discards the cache and the next build downloads the font again.
 
-Fonts are automatically copied to the project's "src" directory when the CSS file is compiled so that they will be distributed with the app and available at runtime.
+Fonts are automatically copied next to the compiled `theme.res` when the CSS file is compiled, so that they're distributed with the app and available at runtime. The copy uses the font's file name only, which means two `@font-face` rules that point at identically named files in different directories will collide. The copy is also skipped when a file of that name is already there, so run `mvn clean` after you replace a font file with a different one of the same name.
 
 **GitHub URLs**
 

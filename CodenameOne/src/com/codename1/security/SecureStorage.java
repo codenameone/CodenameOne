@@ -144,9 +144,10 @@ public class SecureStorage {
     //   `SecAccessControl`. Entries survive app updates and OS
     //   reboots; they are extracted only after the user unlocks the
     //   device at least once after each reboot.
-    // - Android: `EncryptedSharedPreferences` (Tink-backed AES-GCM)
-    //   without `setUserAuthenticationRequired(true)`. No biometric
-    //   prompt.
+    // - Android: AES-GCM under a dedicated AndroidKeyStore key created
+    //   without `setUserAuthenticationRequired(true)`, persisted to a
+    //   private preferences file. No biometric prompt. Devices below
+    //   API 23 fall back to obfuscated (not encrypted) storage.
     // - JavaSE simulator: `java.util.prefs.Preferences` encrypted
     //   with an AES key derived from the OS user account. Useful
     //   for round-tripping `LlmClient.openai(SecureStorage.getInstance().get("openai_key"))`

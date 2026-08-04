@@ -1779,7 +1779,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
         // executable via the DirectWrite in-memory loader so there is no file
         // next to the exe. Falls back to the file-based loader (a font staged
         // beside the exe) when the resource isn't embedded.
-        if (fileName != null && fileName.toLowerCase().endsWith(".ttf")) {
+        if (fileName != null && isBundledFontFile(fileName)) {
             byte[] data = readResourceFully("/" + fileName);
             if (data != null) {
                 font = WindowsNative.loadTrueTypeFontFromMemory(fontName, data);
@@ -1792,6 +1792,21 @@ public class WindowsImplementation extends CodenameOneImplementation {
             return null;
         }
         return Long.valueOf(font);
+    }
+
+    /**
+     * True for a font the app bundles. DirectWrite reads the SFNT container
+     * whether the outlines are glyf or CFF, so OpenType is as loadable as
+     * TrueType here.
+     */
+    private static boolean isBundledFontFile(String fileName) {
+        return endsWithIgnoreCase(fileName, ".ttf") || endsWithIgnoreCase(fileName, ".otf");
+    }
+
+    /** Locale-independent case-insensitive suffix test. */
+    private static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value != null && value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
     }
 
     /** Reads an embedded classpath resource fully into a byte[], or null. */

@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.io;
 
 import com.codename1.impl.WebSocketEventSink;
@@ -14,6 +36,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -190,6 +213,74 @@ class WebSocketTest {
         assertEquals(true, WebSocket.isSupported());
     }
 
+    /**
+     * Extension negotiation is ignored, like the other handshake-control headers.
+     *
+     * <p>Extensions change what the FRAMES mean, and no reader in this repo implements
+     * one. Emitting the header let a caller ask for permessage-deflate; a compliant
+     * server then agrees, sets RSV1 and sends compressed payloads -- and the readers mask
+     * off the opcode and pass the bytes through, so text arrives as mojibake and binary
+     * arrives compressed. The symptom shows up at the application, nowhere near the
+     * header that caused it, and only against servers that happen to offer the
+     * extension.</p>
+     */
+    @Test
+    void extensionNegotiationIsNotEmittedInTheHandshake() {
+        MockImpl impl = new MockImpl("wss://example.com/socket");
+        impl.setRequestHeader("Sec-WebSocket-Extensions", "permessage-deflate");
+        impl.setRequestHeader("SEC-WEBSOCKET-EXTENSIONS", "permessage-deflate");
+        impl.setRequestHeader("X-Mine", "kept");
+
+        String emitted = impl.testHandshakeHeaders();
+
+        assertFalse(emitted.toLowerCase().contains("sec-websocket-extensions"),
+                "an extension this client cannot decode must not be negotiated: " + emitted);
+        assertTrue(emitted.contains("X-Mine: kept"),
+                "and an ordinary header still goes out: " + emitted);
+    }
+
+    /**
+     * A reserved header cannot be smuggled past the list by adding a space.
+     *
+     * <p>The comparison screened names only for CR and LF, so
+     * {@code "Sec-WebSocket-Extensions "} did not match the reserved name and was
+     * emitted. Lenient servers trim that and negotiate the extension -- and these readers
+     * neither look at RSV1 nor inflate anything, so every compressed frame afterwards is
+     * garbage. A list that any non-token character walks around is not a list.</p>
+     */
+    @Test
+    void aReservedHeaderWithTrailingSpaceIsNotEmitted() {
+        MockImpl impl = new MockImpl("wss://example.com/socket");
+        impl.setRequestHeader("Sec-WebSocket-Extensions ", "permessage-deflate");
+        impl.setRequestHeader("Sec-WebSocket-Extensions\t", "permessage-deflate");
+        impl.setRequestHeader("X-Fine", "yes");
+
+        String emitted = impl.testHandshakeHeaders();
+
+        assertFalse(emitted.toLowerCase().contains("permessage-deflate"),
+                "a compression extension these readers cannot decode must not reach the "
+                + "wire, whatever the name was padded with: " + emitted);
+        assertTrue(emitted.contains("X-Fine: yes"),
+                "and an ordinary header is unaffected: " + emitted);
+    }
+
+    /** Names that are not field tokens are refused rather than repaired. */
+    @Test
+    void aHeaderNameThatIsNotATokenIsRefused() {
+        MockImpl impl = new MockImpl("wss://example.com/socket");
+        impl.setRequestHeader("X Bad", "1");
+        impl.setRequestHeader("X:Bad", "2");
+        impl.setRequestHeader("X\u00e9", "3");
+        impl.setRequestHeader("X-Good", "4");
+
+        String emitted = impl.testHandshakeHeaders();
+
+        assertFalse(emitted.contains("X Bad"), emitted);
+        assertFalse(emitted.contains("X:Bad"), emitted);
+        assertFalse(emitted.contains("3"), emitted);
+        assertTrue(emitted.contains("X-Good: 4"), emitted);
+    }
+
     private final class WebSocketingImpl extends TestCodenameOneImplementation {
         boolean supported = true;
 
@@ -258,6 +349,13 @@ class WebSocketTest {
         /// Test-only accessors for the subprotocol plumbing on the base.
         String[] testRequestedSubprotocols() {
             return super.requestedSubprotocols();
+        }
+
+        /// Test-only view of what the handshake would actually emit.
+        String testHandshakeHeaders() {
+            StringBuilder sb = new StringBuilder();
+            super.appendRequestHeaders(sb);
+            return sb.toString();
         }
 
         void testSelect(String protocol) {

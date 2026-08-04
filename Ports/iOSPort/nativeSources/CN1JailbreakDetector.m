@@ -22,25 +22,31 @@
  */
 
 #import "CN1JailbreakDetector.h"
-#ifdef CN1_DETECT_JAILBREAK
-#import <UIKit/UIKit.h>
+#import <TargetConditionals.h>
 #import <dlfcn.h>
 #import <sys/sysctl.h>
 #import <mach-o/dyld.h>
 #import <unistd.h>
 #import <stdlib.h>
 
-void cn1DetectJailbreakBypassesAndExit() {
+// Note: there is deliberately no fork() probe here. The classic form,
+// "if (fork() == 0) { exit(0); }", terminates the *child* and lets the parent
+// sail on, so it never did what it claimed. Reinstating it correctly would
+// mean calling a restricted syscall that trips App Review static analysis, for
+// a signal the dyld-image and restricted-path probes already carry.
+
+NSString *cn1JailbreakSignals(void) {
 #if (TARGET_IPHONE_SIMULATOR)
-    return;
-#endif
-    // Detect common dynamic library injection used by Frida/Objection and similar tools
+    return @"";
+#else
+    NSMutableArray *signals = [NSMutableArray array];
+
+    // Dynamic library injection, as used by Frida/Objection and friends.
     if (getenv("DYLD_INSERT_LIBRARIES") != NULL) {
-        NSLog(@"DYLD_INSERT_LIBRARIES detected.");
-        exit(0);
+        [signals addObject:@"dyldInsert"];
     }
 
-    // List of known libraries used by bypass tools like Liberty Lite and Substrate
+    // Known hooking / jailbreak-bypass libraries loaded into the process.
     NSArray *bypassLibraries = @[
         @"LibertyLite.dylib",
         @"Substrate.dylib",
@@ -49,23 +55,29 @@ void cn1DetectJailbreakBypassesAndExit() {
         @"tsProtector.dylib",
         @"FridaGadget"
     ];
-    
-    // Check all loaded dynamic libraries
-    for (int i = 0; i < _dyld_image_count(); i++) {
+    for (uint32_t i = 0; i < _dyld_image_count(); i++) {
         const char *imageName = _dyld_get_image_name(i);
+        if (imageName == NULL) {
+            continue;
+        }
         NSString *libraryName = [NSString stringWithUTF8String:imageName];
-        
-        // Check if the library name matches any known bypass tool libraries
         for (NSString *bypassLibrary in bypassLibraries) {
             if ([libraryName containsString:bypassLibrary]) {
-                // Jailbreak bypass detected, exit the app
-                NSLog(@"Bypass library detected: %@", bypassLibrary);
-                exit(0);  // Exit the app if a bypass tool is detected
+                [signals addObject:@"hookLib"];
+                i = _dyld_image_count();
+                break;
             }
         }
     }
-    
-    // Additional check for file access to system areas (indicates potential bypass)
+
+    // The two filesystem probes below describe an iOS sandbox that has been broken out
+    // of, and a Mac is not that sandbox. /bin/bash and /usr/sbin/sshd ship with macOS and
+    // /private is writable there, so on Mac Catalyst both fire on a stock machine -- and
+    // an app that asks isJailbrokenDevice() at startup, as ours does, refuses to launch on
+    // every Mac. The instrumentation probes on either side of this stay, because an
+    // injected dylib or a hooking library means the same thing wherever it is loaded.
+#if !TARGET_OS_MACCATALYST && !TARGET_OS_OSX
+    // Files that only exist once the sandbox has been broken out of.
     NSArray *restrictedPaths = @[
         @"/Applications/Cydia.app",
         @"/Library/MobileSubstrate/MobileSubstrate.dylib",
@@ -74,45 +86,68 @@ void cn1DetectJailbreakBypassesAndExit() {
         @"/etc/apt",
         @"/private/var/lib/apt/"
     ];
-    
     NSFileManager *fileManager = [NSFileManager defaultManager];
     for (NSString *path in restrictedPaths) {
         if ([fileManager fileExistsAtPath:path]) {
-            // Jailbreak files detected, exit the app
-            NSLog(@"Jailbreak-related file detected: %@", path);
-            exit(0);  // Exit the app if a jailbreak-related file is found
+            [signals addObject:@"jailbreakFile"];
+            break;
         }
     }
-    
-    // Check if we can write to a restricted area (bypasses may allow this)
-    NSString *testPath = @"/private/jailbreakTest.txt";
-    NSError *error;
-    BOOL wroteFile = [@"Test" writeToFile:testPath atomically:YES encoding:NSUTF8StringEncoding error:&error];
-    if (wroteFile && !error) {
+
+    // Writing outside the sandbox should be impossible.
+    NSString *testPath = @"/private/cn1JailbreakTest.txt";
+    NSError *error = nil;
+    BOOL wroteFile = [@"Test" writeToFile:testPath atomically:YES
+                                 encoding:NSUTF8StringEncoding error:&error];
+    if (wroteFile && error == nil) {
         [fileManager removeItemAtPath:testPath error:nil];
-        // Able to write to restricted area, exit the app
-        NSLog(@"Write access to restricted area detected.");
-        exit(0);  // Exit the app if write access to restricted areas is detected
+        [signals addObject:@"restrictedWrite"];
     }
-    
-    // Check for abnormal system behavior like successful fork()
-    if (fork() == 0) {
-        // fork() should not succeed on non-jailbroken devices, exit if it does
-        NSLog(@"Fork succeeded, indicating jailbreak bypass.");
-        exit(0);  // Exit the app if fork() succeeds
-    }
-    
-    // Check for process tracing (which could indicate Liberty Lite tampering)
+#endif
+
+    // A debugger or instrumentation tool attached to the process.
     struct kinfo_proc info;
     size_t size = sizeof(info);
     int name[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()};
-    if (sysctl(name, 4, &info, &size, NULL, 0) == 0 && (info.kp_proc.p_flag & P_TRACED) != 0) {
-        // Process is being traced, likely due to a jailbreak bypass
-        NSLog(@"Process tracing detected, indicating jailbreak bypass.");
-        exit(0);  // Exit the app if process tracing is detected
+    if (sysctl(name, 4, &info, &size, NULL, 0) == 0
+            && (info.kp_proc.p_flag & P_TRACED) != 0) {
+        [signals addObject:@"traced"];
     }
-    
-    // If no jailbreak bypass was detected, the app continues as normal
-    NSLog(@"No jailbreak bypass detected.");
+
+    return [signals componentsJoinedByString:@","];
+#endif
+}
+
+#ifdef CN1_DETECT_JAILBREAK
+/**
+ * Whether a signal says the DEVICE is compromised, as opposed to saying somebody is
+ * looking at the app.
+ *
+ * The probe list grew a `traced` signal so DeviceIntegrity could report a debugger,
+ * which is worth reporting -- attaching one is how a build gets instrumented. Exiting on
+ * it is a different matter: a clean physical device launched from Xcode is traced, so the
+ * launch gate terminated every ordinary debug session on a project that leaves
+ * ios.detectJailbreak on. That reads as "the app crashes on device", and the usual fix a
+ * developer reaches for is turning the protection off.
+ */
+static BOOL cn1IsJailbreakSignal(NSString *signal) {
+    return [signal isEqualToString:@"dyldInsert"]
+        || [signal isEqualToString:@"hookLib"]
+        || [signal isEqualToString:@"jailbreakFile"]
+        || [signal isEqualToString:@"restrictedWrite"];
+}
+
+void cn1DetectJailbreakBypassesAndExit(void) {
+    NSString *signals = cn1JailbreakSignals();
+    NSMutableArray *fatal = [NSMutableArray array];
+    for (NSString *signal in [signals componentsSeparatedByString:@","]) {
+        if (cn1IsJailbreakSignal(signal)) {
+            [fatal addObject:signal];
+        }
+    }
+    if (fatal.count > 0) {
+        NSLog(@"Jailbreak bypass detected: %@", [fatal componentsJoinedByString:@","]);
+        exit(0);
+    }
 }
 #endif

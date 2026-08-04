@@ -305,6 +305,24 @@ public class Font extends CN {
                 derive(Display.getInstance().convertToPixels(size, sizeUnit), STYLE_PLAIN);
     }
 
+    /// True when the file name carries an extension the bundled font loaders accept.
+    ///
+    /// Both TrueType and OpenType are supported: every port loads fonts through an
+    /// API that reads the SFNT container regardless of whether the outlines are
+    /// glyf or CFF (Core Text on iOS, Typeface on Android, DirectWrite on Windows,
+    /// FreeType on Linux, java.awt on the simulator and FontFace in the browser).
+    /// The comparison is case insensitive so a file named `.TTF` isn't rejected
+    /// for its capitalisation alone. It goes through regionMatches rather than
+    /// toLowerCase so the answer can't depend on the default locale.
+    static boolean isSupportedFontFile(String fileName) {
+        return endsWithIgnoreCase(fileName, ".ttf") || endsWithIgnoreCase(fileName, ".otf");
+    }
+
+    private static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value != null && value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());
+    }
+
     /// Creates a true type font with the given name/filename (font name might be different from the file name
     /// and is required by some devices e.g. iOS). The font file must reside in the src root of the project in
     /// order to be detectable. The file name should contain no slashes or any such value.
@@ -323,7 +341,8 @@ public class Font extends CN {
     ///
     /// - `fontName`: the name of the font
     ///
-    /// - `fileName`: the file name of the font as it appears in the src directory of the project, it MUST end with the .ttf extension!
+    /// - `fileName`: the file name of the font as it appears in the src directory of the project, it MUST end
+    /// with the .ttf or .otf extension!
     ///
     /// #### Returns
     ///
@@ -339,8 +358,8 @@ public class Font extends CN {
                 return null;
             }
         } else {
-            if (fileName != null && (fileName.indexOf('/') > -1 || fileName.indexOf('\\') > -1 || !fileName.endsWith(".ttf"))) {
-                throw new IllegalArgumentException("The font file name must be relative to the root and end with ttf: " + fileName);
+            if (fileName != null && (fileName.indexOf('/') > -1 || fileName.indexOf('\\') > -1 || !isSupportedFontFile(fileName))) {
+                throw new IllegalArgumentException("The font file name must be relative to the root and end with .ttf or .otf: " + fileName);
             }
         }
         Object font = Display.impl.loadTrueTypeFont(fontName, fileName);

@@ -1,0 +1,436 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.designer.css;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Hashtable;
+
+/**
+ * The compile has to reject an {@code @font-face} the runtime can't honor,
+ * because the two disagree about what a true type font is: the compiler parses
+ * fonts with {@code java.awt.Font.createFont(TRUETYPE_FONT, ...)}, which also
+ * accepts OpenType, while {@code Font.createTrueTypeFont} rejects any name not
+ * ending in {@code .ttf} and the iOS build registers only {@code .ttf} files.
+ * An OpenType font used to compile clean and fail on the device.
+ *
+ * @see CSSFontFaceLocationTest for the placements that must keep working
+ */
+public class CSSFontFaceValidationTest {
+
+    private static final String FIXTURE = "TestFont.ttf";
+
+    @BeforeAll
+    static void installHeadlessImplementation() throws Exception {
+        HeadlessTestSupport.installHeadlessImplementation();
+    }
+
+    /**
+     * OpenType is loadable on every port, so the file name must not be what
+     * rejects it. Only the name is under test here -- the fixture's bytes are
+     * TrueType, which keeps the test hermetic while still driving the .otf
+     * branch of the name check.
+     */
+    @Test
+    void testOpenTypeFontNameIsAccepted() throws Exception {
+        assertCompiles("@font-face { font-family: \"TestFont\"; src: url(TestFont-Regular.otf); }"
+                + "Label { font-family: \"TestFont\"; font-size: 3mm; }", "TestFont-Regular.otf");
+    }
+
+    /** Capitalisation says nothing about whether a font loads. */
+    @Test
+    void testUpperCaseExtensionIsAccepted() throws Exception {
+        assertCompiles("@font-face { font-family: \"TestFont\"; src: url(TestFont-Regular.TTF); }"
+                + "Label { font-family: \"TestFont\"; font-size: 3mm; }", "TestFont-Regular.TTF");
+    }
+
+    /** An extension no port can load is still refused. */
+    @Test
+    void testUnknownFontExtensionIsRejected() throws Exception {
+        String message = assertCompileFails(
+                "@font-face { font-family: \"TestFont\"; src: url(TestFont-Regular.woff); }"
+                        + "Label { font-family: \"TestFont\"; }",
+                "TestFont-Regular.woff");
+        assertContains(message, "loads fonts from a file named .ttf or .otf");
+        assertContains(message, "TestFont-Regular.woff");
+    }
+
+    /**
+     * A file the font parser rejects used to leave {@code EditorTTFFont.actualFont}
+     * null and then die as a bare NPE in {@code EditableResources.save} naming no
+     * rule, because {@code refresh()} swallows the Throwable.
+     */
+    @Test
+    void testUnreadableFontFileIsRejected() throws Exception {
+        Path cssDir = Files.createTempDirectory("cn1-font-corrupt");
+        Path outDir = Files.createTempDirectory("cn1-font-corrupt-out");
+        try {
+            Files.write(cssDir.resolve("Broken.ttf"), "this is not a font".getBytes(StandardCharsets.UTF_8));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, ("@font-face { font-family: \"Broken\"; src: url(Broken.ttf); }"
+                    + "Label { font-family: \"Broken\"; }").getBytes(StandardCharsets.UTF_8));
+
+            String message = compileExpectingFailure(cssFile, outDir.resolve("theme.res"));
+            assertContains(message, "isn't a font file Codename One can read");
+        } finally {
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
+    }
+
+    /**
+     * Declared but never referenced still fails. A rule is only resolved when
+     * some style uses the family, so without this the typo would surface on
+     * whichever later build first referenced it.
+     */
+    @Test
+    void testUnreferencedBadFontIsRejected() throws Exception {
+        String message = assertCompileFails(
+                "@font-face { font-family: \"TestFont\"; src: url(TestFont-Regular.woff); }"
+                        + "Label { color: #ff0000; }",
+                "TestFont-Regular.woff");
+        assertContains(message, "loads fonts from a file named .ttf or .otf");
+    }
+
+    /**
+     * A rule with no {@code font-family} can never be referenced, because
+     * {@code findFontFace} matches on the family name. The custom font would be
+     * dropped and the app would fall back to a native font -- the exact silent
+     * failure this validation exists to surface.
+     */
+    @Test
+    void testFontFaceWithoutFamilyIsRejected() throws Exception {
+        String message = assertCompileFails(
+                "@font-face { src: url(TestFont-Regular.ttf); }"
+                        + "Label { color: #ff0000; }",
+                "TestFont-Regular.ttf");
+        assertContains(message, "no usable font-family");
+    }
+
+    @Test
+    void testMissingFontFileIsRejected() throws Exception {
+        String message = assertCompileFails(
+                "@font-face { font-family: \"TestFont\"; src: url(NotThere.ttf); }"
+                        + "Label { font-family: \"TestFont\"; }",
+                null);
+        assertContains(message, "doesn't exist");
+    }
+
+    /**
+     * Merge mode syncs only the CSS directory, so a font reached through {@code ../}
+     * resolves for the author and breaks in a real build.
+     */
+    @Test
+    void testFontOutsideTheCssDirectoryIsRejected() throws Exception {
+        Path root = Files.createTempDirectory("cn1-font-outside");
+        Path outDir = Files.createTempDirectory("cn1-font-outside-out");
+        try {
+            Path cssDir = root.resolve("css");
+            Files.createDirectories(cssDir);
+            copyFixture(root.resolve("Stray.ttf"));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, ("@font-face { font-family: \"TestFont\"; src: url(../Stray.ttf); }"
+                    + "Label { font-family: \"TestFont\"; }").getBytes(StandardCharsets.UTF_8));
+
+            String message = compileExpectingFailure(cssFile, outDir.resolve("theme.res"));
+            assertContains(message, "outside the directory holding the CSS file");
+        } finally {
+            deleteTree(root);
+            deleteTree(outDir);
+        }
+    }
+
+    /**
+     * Fonts are deployed by file name alone, so two rules naming identically
+     * named files in different directories would silently clobber each other.
+     */
+    @Test
+    void testDuplicateFontFileNamesAreRejected() throws Exception {
+        Path cssDir = Files.createTempDirectory("cn1-font-dupe");
+        Path outDir = Files.createTempDirectory("cn1-font-dupe-out");
+        try {
+            Path nested = cssDir.resolve("bold");
+            Files.createDirectories(nested);
+            copyFixture(cssDir.resolve("TestFont.ttf"));
+            copyFixture(nested.resolve("TestFont.ttf"));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, ("@font-face { font-family: \"TestFont\"; src: url(TestFont.ttf); }"
+                    + "@font-face { font-family: \"TestFont Bold\"; src: url(bold/TestFont.ttf); }"
+                    + "Label { font-family: \"TestFont\"; }").getBytes(StandardCharsets.UTF_8));
+
+            String message = compileExpectingFailure(cssFile, outDir.resolve("theme.res"));
+            assertContains(message, "resolve to different files that deploy under the same name, TestFont.ttf");
+        } finally {
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
+    }
+
+    /**
+     * Names differing only in case collide too. The authoring host may keep
+     * {@code Body.TTF} and {@code body.ttf} apart, but they are flattened into
+     * one directory and a Windows target or an Apple bundle treats them as the
+     * same file, so one silently wins.
+     */
+    @Test
+    void testFontFileNamesDifferingOnlyInCaseAreRejected() throws Exception {
+        Path cssDir = Files.createTempDirectory("cn1-font-case");
+        Path outDir = Files.createTempDirectory("cn1-font-case-out");
+        try {
+            Path nested = cssDir.resolve("bold");
+            Files.createDirectories(nested);
+            copyFixture(cssDir.resolve("Body.ttf"));
+            copyFixture(nested.resolve("BODY.TTF"));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, ("@font-face { font-family: \"Body\"; src: url(Body.ttf); }"
+                    + "@font-face { font-family: \"Body Bold\"; src: url(bold/BODY.TTF); }"
+                    + "Label { font-family: \"Body\"; }").getBytes(StandardCharsets.UTF_8));
+
+            String message = compileExpectingFailure(cssFile, outDir.resolve("theme.res"));
+            assertContains(message, "deploy under the same name");
+        } finally {
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
+    }
+
+    /**
+     * The collision check must not depend on the build machine's locale. Under
+     * Turkish rules the default {@code toLowerCase()} folds {@code I} to a
+     * dotless {@code ı}, so {@code I.ttf} would stop matching {@code i.ttf} and
+     * two files that really do collide on the target would both be accepted.
+     */
+    @Test
+    void testCaseCollisionIsDetectedUnderATurkishLocale() throws Exception {
+        java.util.Locale previous = java.util.Locale.getDefault();
+        Path cssDir = Files.createTempDirectory("cn1-font-tr");
+        Path outDir = Files.createTempDirectory("cn1-font-tr-out");
+        try {
+            java.util.Locale.setDefault(new java.util.Locale("tr", "TR"));
+            // "I" and "i" specifically: Turkish folds "I" to a dotless "i", so
+            // these two names case-fold apart under the default locale and
+            // together under Locale.ROOT. Separate directories because the
+            // authoring filesystem may itself be case-insensitive.
+            Path nested = cssDir.resolve("bold");
+            Files.createDirectories(nested);
+            copyFixture(cssDir.resolve("I.ttf"));
+            copyFixture(nested.resolve("i.ttf"));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, ("@font-face { font-family: \"Upper\"; src: url(I.ttf); }"
+                    + "@font-face { font-family: \"Lower\"; src: url(bold/i.ttf); }"
+                    + "Label { font-family: \"Upper\"; }").getBytes(StandardCharsets.UTF_8));
+
+            String message = compileExpectingFailure(cssFile, outDir.resolve("theme.res"));
+            assertContains(message, "deploy under the same name");
+        } finally {
+            java.util.Locale.setDefault(previous);
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
+    }
+
+    /**
+     * A {@code +} in a font name is a literal, not a space. URLDecoder applies
+     * form-decoding rules, so validating a decoded name would compare
+     * {@code A B.ttf} against a file that is really called {@code A+B.ttf} --
+     * and could report a collision with an unrelated font of that name.
+     */
+    @Test
+    void testPlusInFontNameIsNotDecodedAsSpace() throws Exception {
+        Path cssDir = Files.createTempDirectory("cn1-font-plus");
+        Path outDir = Files.createTempDirectory("cn1-font-plus-out");
+        try {
+            copyFixture(cssDir.resolve("A+B.ttf"));
+            copyFixture(cssDir.resolve("A B.ttf"));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, ("@font-face { font-family: \"Plus\"; src: url(A+B.ttf); }"
+                    + "@font-face { font-family: \"Space\"; src: url(A%20B.ttf); }"
+                    + "Label { font-family: \"Plus\"; font-size: 3mm; }"
+                    + "Title { font-family: \"Space\"; font-size: 4mm; }")
+                    .getBytes(StandardCharsets.UTF_8));
+
+            CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
+            theme.resourceFile = outDir.resolve("theme.res").toFile();
+            theme.res = new com.codename1.ui.util.EditableResourcesForCSS(theme.resourceFile);
+            theme.res.setTheme("Theme", new Hashtable());
+            theme.updateResources();
+        } finally {
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
+    }
+
+    /**
+     * Two families pointing at the SAME file is a legitimate alias, not a
+     * collision -- the deploy copy is idempotent, so nothing is overwritten.
+     * Only genuinely different files sharing a name are an error.
+     */
+    @Test
+    void testTwoFamiliesMayShareOneFontFile() throws Exception {
+        Path cssDir = Files.createTempDirectory("cn1-font-alias");
+        Path outDir = Files.createTempDirectory("cn1-font-alias-out");
+        try {
+            copyFixture(cssDir.resolve("TestFont.ttf"));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, ("@font-face { font-family: \"Body\"; src: url(TestFont.ttf); }"
+                    + "@font-face { font-family: \"Caption\"; src: url(TestFont.ttf); }"
+                    + "Label { font-family: \"Body\"; font-size: 3mm; }"
+                    + "SmallLabel { font-family: \"Caption\"; font-size: 2mm; }")
+                    .getBytes(StandardCharsets.UTF_8));
+
+            CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
+            theme.resourceFile = outDir.resolve("theme.res").toFile();
+            theme.res = new com.codename1.ui.util.EditableResourcesForCSS(theme.resourceFile);
+            theme.res.setTheme("Theme", new Hashtable());
+            theme.updateResources();
+        } finally {
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
+    }
+
+    /**
+     * A remote font is judged by its URL alone, so a bad one is caught without
+     * the compile reaching out to the network.
+     */
+    @Test
+    void testRemoteUnknownExtensionIsRejectedWithoutDownloading() throws Exception {
+        String message = assertCompileFails(
+                "@font-face { font-family: \"TestFont\"; "
+                        + "src: url(https://example.invalid/fonts/TestFont.woff); }"
+                        + "Label { font-family: \"TestFont\"; }",
+                null);
+        assertContains(message, "loads fonts from a file named .ttf or .otf");
+    }
+
+    /** A well-formed sheet must still compile, or the check is worthless. */
+    @Test
+    void testValidTrueTypeFontStillCompiles() throws Exception {
+        Path cssDir = Files.createTempDirectory("cn1-font-ok");
+        Path outDir = Files.createTempDirectory("cn1-font-ok-out");
+        try {
+            copyFixture(cssDir.resolve("TestFont-Regular.ttf"));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, ("@font-face { font-family: \"TestFont\"; src: url(TestFont-Regular.ttf); }"
+                    + "Label { font-family: \"TestFont\"; font-size: 3mm; }")
+                    .getBytes(StandardCharsets.UTF_8));
+
+            CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
+            theme.resourceFile = outDir.resolve("theme.res").toFile();
+            theme.res = new com.codename1.ui.util.EditableResourcesForCSS(theme.resourceFile);
+            theme.res.setTheme("Theme", new Hashtable());
+            theme.updateResources();
+        } finally {
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
+    }
+
+    /**
+     * Writes the sheet into a scratch CSS directory and returns the failure
+     * message. {@code fontFile}, when given, is created so the test proves the
+     * rule was rejected on its name rather than for being absent.
+     */
+    private static String assertCompileFails(String css, String fontFile) throws Exception {
+        Path cssDir = Files.createTempDirectory("cn1-font-invalid");
+        Path outDir = Files.createTempDirectory("cn1-font-invalid-out");
+        try {
+            if (fontFile != null) {
+                copyFixture(cssDir.resolve(fontFile));
+            }
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, css.getBytes(StandardCharsets.UTF_8));
+            return compileExpectingFailure(cssFile, outDir.resolve("theme.res"));
+        } finally {
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
+    }
+
+    /** Compiles the sheet with the fixture written out under {@code fontFile}. */
+    private static void assertCompiles(String css, String fontFile) throws Exception {
+        Path cssDir = Files.createTempDirectory("cn1-font-valid");
+        Path outDir = Files.createTempDirectory("cn1-font-valid-out");
+        try {
+            copyFixture(cssDir.resolve(fontFile));
+            Path cssFile = cssDir.resolve("theme.css");
+            Files.write(cssFile, css.getBytes(StandardCharsets.UTF_8));
+
+            CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
+            theme.resourceFile = outDir.resolve("theme.res").toFile();
+            theme.res = new com.codename1.ui.util.EditableResourcesForCSS(theme.resourceFile);
+            theme.res.setTheme("Theme", new Hashtable());
+            theme.updateResources();
+        } finally {
+            deleteTree(cssDir);
+            deleteTree(outDir);
+        }
+    }
+
+    private static String compileExpectingFailure(Path cssFile, Path resFile) throws Exception {
+        CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
+        theme.resourceFile = resFile.toFile();
+        theme.res = new com.codename1.ui.util.EditableResourcesForCSS(resFile.toFile());
+        theme.res.setTheme("Theme", new Hashtable());
+        try {
+            theme.updateResources();
+        } catch (IllegalArgumentException expected) {
+            return expected.getMessage();
+        }
+        throw new AssertionError("Expected the compile to fail for " + cssFile);
+    }
+
+    private static void copyFixture(Path dest) throws IOException {
+        try (InputStream in = CSSFontFaceValidationTest.class.getResourceAsStream(FIXTURE)) {
+            if (in == null) {
+                throw new AssertionError("Test fixture " + FIXTURE + " was null");
+            }
+            Files.copy(in, dest, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private static void deleteTree(Path path) {
+        File file = path.toFile();
+        File[] children = file.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                deleteTree(child.toPath());
+            }
+        }
+        file.delete();
+    }
+
+    private static void assertContains(String actual, String expected) {
+        if (actual == null || actual.indexOf(expected) < 0) {
+            throw new AssertionError("Expected the error to mention \"" + expected + "\" but it was: " + actual);
+        }
+    }
+}

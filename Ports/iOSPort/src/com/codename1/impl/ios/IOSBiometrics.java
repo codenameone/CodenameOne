@@ -42,16 +42,28 @@ import java.util.Map;
  * <p>The native side dispatches results back via the static
  * {@link #nativeAuthSuccess(int)} / {@link #nativeAuthError(int, int, String)}
  * methods on this class. To stop the ParparVM dead-code eliminator from
- * stripping these (no Java caller exists), the static initializer invokes
- * each with no-op values --- the same idiom used by the original
- * FingerprintScanner cn1lib.</p>
+ * stripping these (no Java caller exists), the static initializer invokes each
+ * once; they return immediately while that is happening.</p>
  */
 public final class IOSBiometrics extends Biometrics {
 
+    /**
+     * True only while the retention calls below are running, so each callback returns
+     * before it touches anything. The same idiom as {@code IOSSurfaceCallbacks}.
+     */
+    private static boolean dceGuard;
+
     static {
         // Prevents the iOS VM optimizer from eliding these callbacks.
+        //
+        // The guard is what makes the calls harmless, and it was missing: they ran
+        // their real bodies during class initialization, before REQUESTS below was
+        // assigned -- static initializers run in textual order -- so take() locked on
+        // a null map and the class failed to initialize.
+        dceGuard = true;
         nativeAuthSuccess(-1);
         nativeAuthError(-1, 0, null);
+        dceGuard = false;
     }
 
     // Map request id -> pending AsyncResource. Static because the native
@@ -123,6 +135,9 @@ public final class IOSBiometrics extends Biometrics {
 
     /** Called from native when the LAContext.evaluatePolicy succeeds. */
     public static void nativeAuthSuccess(final int requestId) {
+        if (dceGuard) {
+            return;
+        }
         final AsyncResource<Boolean> r = take(requestId);
         if (r == null) {
             return;
@@ -139,6 +154,9 @@ public final class IOSBiometrics extends Biometrics {
 
     /** Called from native when evaluatePolicy fails or is cancelled. */
     public static void nativeAuthError(final int requestId, final int errorCode, final String msg) {
+        if (dceGuard) {
+            return;
+        }
         final AsyncResource<Boolean> r = take(requestId);
         if (r == null) {
             return;

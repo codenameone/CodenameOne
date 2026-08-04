@@ -129,7 +129,7 @@ The EDT/UI-thread rule is identical in spirit to Android: never touch a componen
 | `res/values/strings.xml` | `common/src/main/l10n/messages.properties` (and per-locale `messages_de.properties`, etc.) — see `references/build-and-run.md`. |
 | `res/drawable/foo.png` | `common/src/main/resources/foo.png` (flat namespace — `references/java-api-subset.md`). |
 | `res/values/colors.xml` | Theme constants in `theme.css` under `#Constants { ... }`. |
-| `res/font/x.ttf` | `common/src/main/css/fonts/x.ttf`, declared via `@font-face` in `theme.css`. |
+| `res/font/x.ttf` | Anywhere under `common/src/main/css/` (beside `theme.css` or in a subdirectory), declared via `@font-face` in `theme.css`. `.ttf` and `.otf` both work. |
 | `res/raw/seed.json` | `common/src/main/resources/seed.json` — read with `Display.getInstance().getResourceAsStream("/seed.json")`. |
 | `res/layout/*.xml` | No equivalent — build the layout in Java (`Container` + `Layout` + components). |
 

@@ -333,7 +333,9 @@ For the full Lottie feature matrix and troubleshooting, point users to `docs/dev
 
 ### Custom TTF fonts
 
-Drop a `.ttf` (or `.otf`) under `common/src/main/css/fonts/`, then reference its **font name (not file name)** in `font-family`:
+**`.ttf` and `.otf` both work**, upper-case or lower-case — every port loads both formats through its own font API (Core Text, Typeface, DirectWrite, FontConfig, java.awt, FontFace), so there's no need to convert an OpenType font. Web-only formats like `.woff` are not supported and **fail the build**. The compiler also parses each font at build time, so a corrupt file — or one with no PostScript name, which iOS needs to resolve it — fails the build rather than rendering fine in the simulator and falling back to the system font on an iPhone.
+
+Drop the `.ttf` anywhere under `common/src/main/css/` — relative `src:` URLs resolve against the directory holding `theme.css`, so both `url("Inter-Regular.ttf")` beside the CSS and `url("fonts/Inter-Regular.ttf")` in a subdirectory work. It must be somewhere under that directory though: only that directory is copied into the build, so a `../` reference, a missing file, or two rules naming different files that share a file name all fail the build. Then reference its **font name (not file name)** in `font-family`:
 
 ```css
 @font-face {
@@ -349,7 +351,9 @@ Title { font-family: "Inter Bold"; font-size: 4mm; }
 Body  { font-family: "Inter"; font-size: 3mm; }
 ```
 
-Custom TTF/OTF files are **packaged with the app binary** (placed under the build output so the runtime can `Font.createTrueTypeFont(name, file)` them at startup) — they are **not** embedded inside `theme.res`. That means each font you add increases the deployed app size; choose lean subsets where possible.
+A family name containing a space must be quoted everywhere it appears — unquoted, `font-family: Inter Bold` parses as two identifiers and registers under `Inter`, silently colliding with the regular weight. Note also that `font-weight` / `font-style` only select between the built-in `native:` fonts; once `font-family` matches a `@font-face`, they are ignored. That is why each weight needs its own family name. For a whole-theme font swap, set `font-family` on the `Default` selector, then override the UIIDs that need bold or italic.
+
+Bundled font files are **packaged with the app binary** (placed under the build output so the runtime can `Font.createTrueTypeFont(name, file)` them at startup) — they are **not** embedded inside `theme.res`. That means each font you add increases the deployed app size; choose lean subsets where possible.
 
 To load a TTF programmatically:
 
@@ -555,7 +559,9 @@ Painters are for **drawing** (custom backgrounds, decorations), not for animatin
 | `text-align` does nothing | Add the `align` fallback (the initializr appends one automatically for `text-align`). |
 | New CSS only takes effect after restart | The build cache may be stale — `mvn -pl common clean compile`. |
 | 9-piece border looks blurry on iPhone Pro | Expected — 9-piece images are rasterized at the bundled resolution. Use a vector border (`RoundBorder`/`RoundRectBorder`) instead. |
-| Custom TTF doesn't render on device but works in simulator | The `@font-face` `src:` filename and the JS-side `Font.createTrueTypeFont(name, file)` filename must match exactly, and the file must end up packaged with the app. Re-check spelling and confirm the file is under `common/src/main/css/fonts/`. |
+| Custom TTF doesn't render on device but works in simulator | The `@font-face` `src:` filename and the JS-side `Font.createTrueTypeFont(name, file)` filename must match exactly, and the file must end up packaged with the app. Re-check spelling and confirm the file is under `common/src/main/css/` (beside `theme.css` or in a subdirectory of it). |
+| Build fails with "Invalid @font-face rules" | Read the listed reasons — a container the runtime can't load (`.woff`; `.ttf` and `.otf` are both fine), a font outside `common/src/main/css/`, a missing file, a file that isn't a readable font, a font with no PostScript name, or two rules whose files share a name. |
+| Custom font is ignored entirely, no error | The family name has an unquoted space, or `theme.css` isn't at `common/src/main/css/theme.css` — the compiler looks for a `css` directory that is a sibling of a compile source root, and silently does nothing if it isn't there. |
 
 ## Reaching beyond the compiler
 

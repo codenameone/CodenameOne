@@ -207,6 +207,46 @@ public final class NetworkManager {
         return INSTANCE;
     }
 
+    /// Read through [#getNetworkGuard()], which synchronizes on the same monitor the two
+    /// writers below take. Not `volatile`: the core is built for Java 5 semantics and the
+    /// repo's PMD gate forbids the modifier outright, so the lock is what publishes the
+    /// write to the network thread.
+    private static NetworkGuard networkGuard;
+    private static boolean networkGuardSealed;
+
+    /// Installs the app-wide [NetworkGuard].
+    ///
+    /// The first call wins and the slot then seals. A guard can veto requests and enforce
+    /// certificate pins, so allowing it to be replaced at runtime would let any code that runs
+    /// later -- including code an attacker injected -- swap in a permissive one.
+    ///
+    /// @throws IllegalStateException if a guard is already installed
+    public static void setNetworkGuard(NetworkGuard guard) {
+        if (guard == null) {
+            throw new IllegalArgumentException("guard is null");
+        }
+        synchronized (NetworkManager.class) {
+            if (networkGuardSealed) {
+                throw new IllegalStateException("A network guard is already installed");
+            }
+            networkGuard = guard;
+            networkGuardSealed = true;
+        }
+    }
+
+    /// The installed guard, or null when none was installed.
+    public static synchronized NetworkGuard getNetworkGuard() {
+        return networkGuard;
+    }
+
+    /// Test hook: drops the installed guard and unseals the slot.
+    static void resetNetworkGuardForTesting() {
+        synchronized (NetworkManager.class) {
+            networkGuard = null;
+            networkGuardSealed = false;
+        }
+    }
+
     void resetAPN() {
         autoDetected = false;
     }
@@ -1131,6 +1171,16 @@ public final class NetworkManager {
                 }
                 if (requestWasCompleted) {
                     req.complete = true;
+                }
+                NetworkGuard guard = getNetworkGuard();
+                if (guard != null && req.hasGuardResponse()) {
+                    try {
+                        guard.afterResponse(req, req.getResponseCode(), req.getGuardHeaders());
+                    } catch (Throwable t) {
+                        // A guard's bookkeeping must never turn a completed
+                        // request into a failed one.
+                        Log.e(t);
+                    }
                 }
                 // Read once into a local. A listener removed from the EDT --
                 // which is where postResponse() runs, queued while this thread

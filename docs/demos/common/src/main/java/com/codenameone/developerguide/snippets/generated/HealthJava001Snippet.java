@@ -85,10 +85,13 @@ class HealthJava001Snippet {
     void snippet() throws Exception {
         // tag::health-java-001[]
         Health health = Health.getInstance();
-        if (health.getAvailability() != HealthAvailability.AVAILABLE) {
-            // On Android the provider app may be missing or out of date, which
-            // the user can fix; elsewhere this simply means no health support.
+        HealthAvailability availability = health.getAvailability();
+        if (availability == HealthAvailability.PROVIDER_NOT_INSTALLED
+                || availability == HealthAvailability.PROVIDER_UPDATE_REQUIRED) {
             health.openProviderSetup();
+            return;
+        }
+        if (availability == HealthAvailability.NOT_SUPPORTED) {
             return;
         }
         HealthStore store = health.getStore();
