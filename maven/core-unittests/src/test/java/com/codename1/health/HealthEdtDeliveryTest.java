@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -72,14 +73,20 @@ class HealthEdtDeliveryTest extends UITestBase {
      * Runs {@code op} off the EDT and waits for its delivery without blocking
      * the EDT.
      *
-     * <p>Worth spelling out, because the obvious harness fails in a way that
-     * looks like a product bug. These tests run on the EDT; the delivery being
-     * asserted is a {@code callSerially}; so waiting on a latch from the test
-     * thread stops the event loop and the runnable carrying the result can
-     * never run. {@code invokeAndBlock} is the CN1 answer -- it moves the
-     * waiting off the EDT and keeps the loop pumping. My first version of this
-     * file used a plain latch and reported the aggregate path as broken when
-     * it was not.</p>
+     * <p>Worth spelling out, because the harness reads as more than it is.
+     * JUnit runs these on {@code main}, not on the EDT, so
+     * {@code invokeAndBlock} takes its non-EDT branch and simply runs the
+     * operation inline; the real EDT pumps its own loop alongside, which is
+     * what carries the delivery. The call is kept because it states the
+     * precondition the assertion below checks -- the operation starts off the
+     * EDT -- and because it is what a caller would write.</p>
+     *
+     * <p>The consequence is that the EDT is free to deliver the moment a
+     * resource is completed, so every test here has to attach its listener
+     * before that can happen: an already-settled {@code AsyncResource} runs a
+     * late listener inline on the attaching thread, recording "not the EDT"
+     * for a delivery that did happen there. The store tests hold the backend;
+     * the facade test parks the EDT.</p>
      */
     private <T> void assertDeliveredOnEdt(final Landing<T> landing,
             final Runnable op) {
@@ -198,20 +205,6 @@ class HealthEdtDeliveryTest extends UITestBase {
     }
 
     /**
-     * The facade's own actions deliver on the EDT too.
-     *
-     * <p>These were missed when the store's results were moved onto
-     * {@code EdtResult}: {@code openHealthSettings} and
-     * {@code openProviderSetup} settle synchronously before the method
-     * returns, so a callback attached afterwards ran immediately on whatever
-     * thread called -- and a caller doing UI work in it, which is the whole
-     * point of "did the settings screen open?", raced rendering.</p>
-     *
-     * <p>The fallback facade is the one under test here because it is the one
-     * that settles inline; the port facades do the same thing through the
-     * same resource type.</p>
-     */
-    /**
      * Every public health resource is an EDT-delivering one.
      *
      * <p>Written as a source scan rather than as one test per operation
@@ -310,12 +303,41 @@ class HealthEdtDeliveryTest extends UITestBase {
         return "<unknown>";
     }
 
+    /**
+     * The facade's own actions deliver on the EDT too.
+     *
+     * <p>These were missed when the store's results were moved onto
+     * {@code EdtResult}: {@code openHealthSettings} and
+     * {@code openProviderSetup} settle synchronously before the method
+     * returns, so a callback attached afterwards ran immediately on whatever
+     * thread called -- and a caller doing UI work in it, which is the whole
+     * point of "did the settings screen open?", raced rendering.</p>
+     *
+     * <p>The fallback facade is the one under test here because it is the one
+     * that settles inline; the port facades do the same thing through the
+     * same resource type.</p>
+     */
     @Test
     void aFacadeActionDeliversOnTheEdt() {
         final Landing<Boolean> landing = new Landing<Boolean>();
+        final CountDownLatch attached = new CountDownLatch(1);
         assertDeliveredOnEdt(landing, new Runnable() {
             public void run() {
+                // The facade settles before it returns, so unlike the store
+                // tests there is nothing to hold back -- park the EDT instead.
+                // Serial calls run in order, so this blocker is ahead of the
+                // delivery in the queue and the listener wins the attach.
+                CN.callSerially(new Runnable() {
+                    public void run() {
+                        try {
+                            attached.await();
+                        } catch (InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                });
                 Health.getInstance().openHealthSettings().onResult(landing);
+                attached.countDown();
             }
         }, true);
     }
