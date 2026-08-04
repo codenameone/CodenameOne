@@ -150,6 +150,18 @@ class StringFormatConformanceTest {
         assertTrue(total > 900000, "expected the full sweep to run, only " + total + " cases did");
         assertTrue(legacyPercentWidth || skipped == 0,
                 "a modern JDK should not skip any case, skipped " + skipped);
+
+        // Numbers too large for an int are their own class of bug: an invented cap here
+        // once rejected "%1000001d", which the JVM formats quite happily.
+        String[] oversized = {
+            "%2147483648d", "%99999999999d", "%.2147483648f", "%.99999999999f",
+            "%2147483648$d", "%99999999999$d", "%1000001$d"
+        };
+        for (String spec : oversized) {
+            assertEquals(referenceOutcome(spec, Integer.valueOf(1)),
+                    actualOutcome(format, spec, Integer.valueOf(1)),
+                    "oversized numeric field " + spec + " should behave like the JVM");
+        }
         StringBuilder report = new StringBuilder();
         for (Map.Entry<String, String> entry : mismatches.entrySet()) {
             report.append("\n  ").append(entry.getKey()).append("  ").append(entry.getValue());

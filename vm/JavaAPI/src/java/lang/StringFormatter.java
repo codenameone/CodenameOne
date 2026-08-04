@@ -122,6 +122,10 @@ final class StringFormatter {
             }
             if (digitsEnd > pos && digitsEnd < len && format.charAt(digitsEnd) == '$') {
                 argIndex = parseNumber(format, pos, digitsEnd);
+                if (argIndex < 0) {
+                    // Saturated: the index did not fit in an int.
+                    throw new IllegalFormatArgumentIndexException(argIndex);
+                }
                 if (argIndex == 0) {
                     // Argument indexes are 1-based; "%0$s" has no argument to select.
                     throw new IllegalFormatArgumentIndexException(argIndex);
@@ -167,6 +171,9 @@ final class StringFormatter {
             }
             if (pos > widthStart) {
                 width = parseNumber(format, widthStart, pos);
+                if (width < 0) {
+                    throw new IllegalFormatWidthException(width);
+                }
             }
 
             int precision = -1;
@@ -181,6 +188,9 @@ final class StringFormatter {
                     throw new UnknownFormatConversionException(".");
                 }
                 precision = parseNumber(format, precisionStart, pos);
+                if (precision < 0) {
+                    throw new IllegalFormatPrecisionException(precision);
+                }
             }
 
             if (pos >= len) {
@@ -771,15 +781,21 @@ final class StringFormatter {
         return c >= '0' && c <= '9';
     }
 
+    /**
+     * Parses a run of digits the way the JVM does, including its overflow behaviour: a
+     * value too large for an int saturates to {@link Integer#MIN_VALUE}, and the caller
+     * turns that negative result into the exception its field calls for. A large but
+     * representable width is legal -- {@code "%1000001d"} really does produce a million
+     * characters -- so there is deliberately no cap here.
+     */
     private static int parseNumber(String value, int start, int end) {
-        int result = 0;
+        long result = 0;
         for (int i = start; i < end; i++) {
             result = result * 10 + (value.charAt(i) - '0');
-            if (result > 1000000) {
-                // Guard against a width so large it would only be a denial of service.
-                throw new IllegalArgumentException(value.substring(start, end));
+            if (result > Integer.MAX_VALUE) {
+                return Integer.MIN_VALUE;
             }
         }
-        return result;
+        return (int) result;
     }
 }

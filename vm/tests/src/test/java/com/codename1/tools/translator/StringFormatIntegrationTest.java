@@ -194,8 +194,13 @@ class StringFormatIntegrationTest {
     private String runJavaMain(CompilerHelper.CompilerConfig config, Path classesDir, Path javaApiDir)
             throws Exception {
         String javaExe = config.jdkHome.resolve("bin").resolve(CompilerHelper.executableName("java")).toString();
+        // The JVM side formats through its default locale while ParparVM's formatter is
+        // locale independent, so pin the locale rather than inherit whatever the machine
+        // running the build happens to use.
         ProcessBuilder pb = new ProcessBuilder(
                 javaExe,
+                "-Duser.language=en",
+                "-Duser.country=US",
                 "-cp",
                 classesDir + System.getProperty("path.separator") + javaApiDir,
                 "StringFormatApp"
