@@ -138,6 +138,10 @@ public class CodeView extends EditorView {
             clampedEnd = swap;
         }
         if (isProtectedEdit(clampedStart, clampedEnd)) {
+            // Tell the host rather than dropping the edit in silence. A protected region covering
+            // most of the document is indistinguishable from an editor that ignores the keyboard,
+            // so the application needs the chance to explain why nothing happened.
+            host().fireEditorEvent("protectedEdit", String.valueOf(clampedStart));
             return;
         }
         super.replaceRange(clampedStart, clampedEnd, text, record);
