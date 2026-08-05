@@ -354,6 +354,13 @@ jobs:
           export CN1SS_SUITE_LOG="$ART/raw-x64/app-output.log"
           export CN1SS_BINARY_PATH="$ART/raw-x64/benchmark-app.exe"
           if [ "${{ github.event_name }}" != "pull_request" ]; then export CN1SS_SKIP_COMMENT=1; fi
+          # Assertion-only failures count here as they do on every other producer.
+          # A test like CryptoApiTest can fail while the suite still emits its
+          # completion marker and every screenshot matches, and without this the
+          # step exited zero: the workflow stayed green and published a report
+          # containing failed tests. Linux, Android, JavaScript, iOS and Mac all
+          # set this; Windows was the one producer that did not.
+          export CN1SS_FAIL_ON_TEST_PROBLEMS=1
           set +e
           cn1ss_process_and_report \
             "Native Windows port (cross-compiled)" \

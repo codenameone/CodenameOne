@@ -215,11 +215,16 @@ final class DateTimeSupport {
         // from a raw offset plus a fixed one-hour daylight guess, which loses
         // the saving on the desktop ports (Europe/Berlin in June came back as
         // UTC), while TimeZone.getOffset consults the platform's own rules.
-        // The fields below are UTC, which is the reference frame every port's
-        // getOffset native resolves against.
+        // getOffset takes LOCAL STANDARD time fields, which is what its javadoc
+        // says and what every other caller passes. This used to hand it UTC
+        // fields, which happened to work only because the natives read them that
+        // way; now that TimeZone converts properly, an instant has to be turned
+        // into local standard time first -- add the raw offset -- or it would be
+        // shifted by that offset twice.
         long epochMilli = instant.toEpochMilli();
-        long epochDay = floorDiv(epochMilli, MILLIS_PER_DAY);
-        int millisOfDay = (int) floorMod(epochMilli, MILLIS_PER_DAY);
+        long localStandard = epochMilli + tz.getRawOffset();
+        long epochDay = floorDiv(localStandard, MILLIS_PER_DAY);
+        int millisOfDay = (int) floorMod(localStandard, MILLIS_PER_DAY);
         LocalDate utcDate = LocalDate.ofEpochDay(epochDay);
         // Calendar.SUNDAY is 1 and epoch day 0 was a Thursday.
         int dayOfWeek = (int) floorMod(epochDay + 4, 7) + 1;

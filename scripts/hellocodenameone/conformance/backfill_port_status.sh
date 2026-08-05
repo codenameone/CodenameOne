@@ -233,6 +233,16 @@ while IFS= read -r workflow; do
           --port "${found}" --report "${downloaded}" >/dev/null 2>&1 || accept_status=$?
       if [ "${accept_status}" -ne 0 ]; then
         echo "Ignoring the ${found} report from run ${candidate}: $(describe_accept_status "${accept_status}")." >&2
+        if [ "${candidate}" = "${newest_candidate}" ] \
+            && [ "${accept_status}" -eq "${ACCEPT_CONTRACT_DRIFT}" ]; then
+          # The newest run DID report this port; its report is simply built
+          # against another revision of the contract, which is the one case that
+          # is meant to wait quietly for the next run. Without this marker the
+          # omission check below would see no newest-covered file, call the port
+          # omitted and fail the sweep -- turning the documented quiet fallback
+          # into a hard failure every time the merge behind it succeeded.
+          : > "${download_dir}/newest-drift-${found}"
+        fi
         # A malformed report is a producer defect, and falling back to an older
         # run hides it: the fallback is still inside the freshness window, so the
         # closing assertion passes and the sweep goes green while the newest run
@@ -272,7 +282,8 @@ while IFS= read -r workflow; do
   if [ -d "${download_dir}/run-${newest_candidate}" ]; then
     for port in ${owned}; do
       if [ -f "${download_dir}/covered-${port}" ] \
-          && [ ! -f "${download_dir}/newest-covered-${port}" ]; then
+          && [ ! -f "${download_dir}/newest-covered-${port}" ] \
+          && [ ! -f "${download_dir}/newest-drift-${port}" ]; then
         unusable+=("${workflow}: newest run ${newest_candidate} did not report ${port}; an older run supplied it")
       fi
     done
