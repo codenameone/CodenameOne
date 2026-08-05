@@ -23,8 +23,13 @@ import dart.core.DartList;
  * constraint rather than being ignored.</p>
  *
  * <p>Pages are materialized eagerly: page lists are short (the carousel holds
- * six study cards) and every one of them animates against the controller.
- * Momentum comes from CN1's pane; one-page snapping is deferred.</p>
+ * six study cards) and every one of them animates against the controller.</p>
+ *
+ * <p>The element also DRIVES the {@link PageController}: the pane's scroll offset
+ * is published as a fractional page on every scroll event, which is what lets an
+ * {@code AnimatedBuilder(animation: controller)} rebuild as the finger moves.
+ * Momentum comes from CN1's pane; a released drag settles onto a page only when
+ * {@code pageSnapping} is on.</p>
  */
 public class PageViewRenderElement extends ScrollRenderElement {
 
@@ -48,11 +53,132 @@ public class PageViewRenderElement extends ScrollRenderElement {
 
     private double viewportW;
     private double viewportH;
+    private PageController attached;
+    private long reportedPage;
+    private boolean initialScrollApplied;
 
     @Override
     protected void viewport(double width, double height) {
         viewportW = width;
         viewportH = height;
+    }
+
+    // ------------------------------------------------------------------
+    // Controller coupling
+    // ------------------------------------------------------------------
+
+    @Override
+    public void mount(Element parent, int slot) {
+        super.mount(parent, slot);
+        attachController();
+    }
+
+    @Override
+    protected void syncChildren() {
+        super.syncChildren();
+        // the configuration may have swapped the controller out from under us
+        attachController();
+    }
+
+    @Override
+    public void unmount() {
+        if (attached != null) {
+            attached.detach(this);
+            attached = null;
+        }
+        super.unmount();
+    }
+
+    private void attachController() {
+        PageController c = pageView().getController();
+        if (c == attached) {
+            return;
+        }
+        if (attached != null) {
+            attached.detach(this);
+        }
+        attached = c;
+        if (attached != null) {
+            attached.attach(this);
+            // Seed the reported page so settling on the page we STARTED on is not
+            // announced as a change - Flutter fires onPageChanged on transitions,
+            // never for the initial page.
+            reportedPage = attached.initialPage();
+            publishMetrics();
+        }
+    }
+
+    /**
+     * Feeds the controller the pane's geometry and offset. This is what makes
+     * {@code controller.position.haveDimensions} true and {@code controller.page}
+     * fractional, which is the whole basis of the carousel's per-card scaling.
+     */
+    private void publishMetrics() {
+        double extent = pageExtent();
+        if (attached == null || extent <= 0) {
+            // Before the first layout there is no viewport, and publishing zeroes
+            // would claim haveDimensions with a bogus page-0 offset. Flutter's
+            // contract until then is exactly the initial page, which is what an
+            // unattached controller already reports.
+            return;
+        }
+        com.codename1.ui.Container pane = pane();
+        if (!initialScrollApplied) {
+            initialScrollApplied = true;
+            // A PageView opens ON its initialPage; the pane starts at zero, so the
+            // first layout that knows the page extent is where that is realized.
+            if (attached.initialPage() != 0) {
+                scrollToPage(attached.initialPage(), false);
+            }
+        }
+        // Headless there is no pane and therefore no scrolling: the view simply
+        // sits on its initial page.
+        double pixels = pane == null
+                ? attached.initialPage() * extent
+                : (horizontal() ? pane.getScrollX() : pane.getScrollY());
+        double viewportDim = horizontal() ? viewportW : viewportH;
+        attached.applyMetrics(pixels, extent, viewportDim, 0, Math.max(0, maxScroll()));
+        firePageChanged(Math.round(pixels / extent));
+    }
+
+    /** The largest legal scroll offset: the last page's resting position. */
+    private double maxScroll() {
+        return (pageCount() - 1) * pageExtent();
+    }
+
+    private int pageCount() {
+        PageView w = pageView();
+        if (w.isBuilderMode()) {
+            return w.getItemCount() == null ? 0 : (int) w.getItemCount().longValue();
+        }
+        return w.getChildren() == null ? 0 : w.getChildren().size();
+    }
+
+    /** Flutter reports onPageChanged on the SETTLED page, so only on a whole-page change. */
+    private void firePageChanged(long page) {
+        if (page == reportedPage) {
+            return;
+        }
+        reportedPage = page;
+        dart.runtime.Funcs.VoidFunc1<dart.runtime.RefLong> cb = pageView().getOnPageChanged();
+        if (cb != null) {
+            cb.call(new dart.runtime.RefLong(page));
+        }
+    }
+
+    private com.codename1.ui.Container pane() {
+        com.codename1.ui.Component c = component();
+        return c instanceof com.codename1.ui.Container ? (com.codename1.ui.Container) c : null;
+    }
+
+    /** Moves the pane onto {@code page}, animated or immediately. */
+    void scrollToPage(long page, boolean animate) {
+        com.codename1.ui.Container pane = pane();
+        if (!(pane instanceof SnappingPane)) {
+            return;
+        }
+        int target = (int) Math.round(Math.max(0, Math.min(maxScroll(), page * pageExtent())));
+        ((SnappingPane) pane).moveTo(target, animate);
     }
 
     /** The fraction of the viewport one page occupies (Flutter's default is 1). */
@@ -89,12 +215,38 @@ public class PageViewRenderElement extends ScrollRenderElement {
 
         SnappingPane(com.codename1.ui.layouts.Layout layout) {
             super(layout);
+            // CN1 writes the scroll offset directly while a finger drags it, so the
+            // setter is not an observation point - the scroll listener is the only
+            // hook that sees drag, momentum and programmatic scrolling alike.
+            addScrollListener(new com.codename1.ui.events.ScrollListener() {
+                @Override
+                public void scrollChanged(int scrollX, int scrollY, int oldscrollX,
+                                          int oldscrollY) {
+                    publishMetrics();
+                }
+            });
         }
 
         @Override
         public void pointerReleased(int x, int y) {
             super.pointerReleased(x, y);
-            awaitMomentum(Integer.MIN_VALUE);
+            if (pageView().isPageSnapping()) {
+                awaitMomentum(Integer.MIN_VALUE);
+            }
+        }
+
+        /** Programmatic paging from the controller. */
+        void moveTo(int target, boolean animate) {
+            int from = horizontal() ? getScrollX() : getScrollY();
+            if (from == target) {
+                return;
+            }
+            if (!animate) {
+                setScroll(target);
+                return;
+            }
+            settling = true;
+            animateScroll(from, target);
         }
 
         /** Polls until CN1's momentum stops moving the pane, then settles onto a page. */
@@ -165,6 +317,18 @@ public class PageViewRenderElement extends ScrollRenderElement {
             }
             repaint();
         }
+    }
+
+    /**
+     * Publishes metrics once the viewport is known. Layout is the only point at
+     * which a PageView that has never been scrolled can tell its controller the
+     * page geometry, and the carousel's very first frame depends on it.
+     */
+    @Override
+    protected Size performLayout(BoxConstraints constraints) {
+        Size s = super.performLayout(constraints);
+        publishMetrics();
+        return s;
     }
 
     /** One page's extent along the scroll axis, in device pixels. */

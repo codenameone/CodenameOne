@@ -91,6 +91,19 @@ public class PageView extends Widget {
         return itemBuilder;
     }
 
+    /**
+     * Whether a released drag settles on a page. Flutter's default is true, but
+     * it is genuinely opt-out — the gallery's home carousel passes false and
+     * scrolls freely, so snapping it would be a fidelity bug, not a nicety.
+     */
+    public boolean isPageSnapping() {
+        return pageSnapping == null || pageSnapping.booleanValue();
+    }
+
+    public Funcs.VoidFunc1<RefLong> getOnPageChanged() {
+        return onPageChanged;
+    }
+
     public Long getItemCount() {
         return itemCount;
     }
