@@ -1955,7 +1955,7 @@ public abstract class Executor {
         final boolean[] running = new boolean[]{true};
 
         try {
-            new Thread() {
+            Thread reader = new Thread() {
                 public void run() {
                     try {
                         byte[] buffer = new byte[8192];
@@ -1971,7 +1971,8 @@ public abstract class Executor {
                         outputMessage.append("Exception on appending to log: " + ex);
                     }
                 }
-            }.start();
+            };
+            reader.start();
             if (timeout > -1) {
                 new Thread() {
                     public void run() {
@@ -1992,6 +1993,14 @@ public abstract class Executor {
                 }.start();
             }
             int val = p.waitFor();
+            // waitFor returns as soon as the process exits, but the reader thread
+            // may still be draining what is left in the pipe. Callers that inspect
+            // outputMessage after this returns (the translator's out-of-memory
+            // check, for one) would otherwise race the reader and read a partial
+            // tail -- and the tail is exactly where a JVM prints its
+            // OutOfMemoryError. Bounded so a wedged reader cannot hang the build;
+            // the process has already exited, so the stream reaches EOF promptly.
+            reader.join(30000);
             if (destroyed[0]) {
                 log("Process timed out");
                 return 1;

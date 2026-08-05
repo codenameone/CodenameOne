@@ -198,18 +198,134 @@ final class TranslatorHeap {
         return physicalMemoryMB();
     }
 
+    /** Where the cgroup filesystem is mounted on Linux. */
+    private static final String CGROUP_ROOT = "/sys/fs/cgroup";
+
+    /** Lists the cgroup this process belongs to, one hierarchy per line. */
+    private static final String PROC_SELF_CGROUP = "/proc/self/cgroup";
+
+    private static long cgroupLimitMB() {
+        return cgroupLimitMB(new File(CGROUP_ROOT), readFileQuietly(new File(PROC_SELF_CGROUP)));
+    }
+
     /**
      * Reads the memory limit imposed on this process by its cgroup, in MB, or -1
      * when unlimited / unavailable. Handles cgroup v2 ({@code memory.max}, which
      * reads "max" when unlimited) and v1 ({@code memory.limit_in_bytes}, which
      * reports a sentinel near Long.MAX_VALUE when unlimited).
+     *
+     * <p>The limit is NOT necessarily at the mount root. When the process runs in
+     * its own cgroup namespace (the usual container case) the root files are the
+     * container's own limit, but under a systemd unit with {@code MemoryMax=}, or
+     * a container sharing the host cgroup namespace, the root shows the host's
+     * unlimited value and the real limit lives at the path named in
+     * {@code /proc/self/cgroup}. Reading only the root there would fall back to
+     * host RAM and size a heap the container cannot honour -- exactly the kernel
+     * OOM-kill this helper exists to avoid.
+     *
+     * <p>A limit set anywhere on the path applies, so the effective budget is the
+     * smallest limit found from the mount root down to this process's own cgroup.
+     *
+     * @param cgroupRoot      the cgroup filesystem mount point
+     * @param procSelfCgroup  contents of /proc/self/cgroup, or null when absent
+     * @return the limit in MB, or -1 when unlimited or not determinable
      */
-    private static long cgroupLimitMB() {
-        long v2 = readLimitFile(new File("/sys/fs/cgroup/memory.max"));
-        if (v2 > 0) {
-            return v2;
+    static long cgroupLimitMB(File cgroupRoot, String procSelfCgroup) {
+        // v2: one unified hierarchy, listed with an empty controller field.
+        long limit = walkForLimit(cgroupRoot, cgroupPath(procSelfCgroup, ""), "memory.max");
+        // v1: the memory controller is mounted in its own subdirectory.
+        limit = minPositive(limit, walkForLimit(new File(cgroupRoot, "memory"),
+                cgroupPath(procSelfCgroup, "memory"), "memory.limit_in_bytes"));
+        return limit;
+    }
+
+    /**
+     * Smallest limit found walking from a controller root down the given relative
+     * cgroup path. Descending (rather than starting at the leaf and walking up)
+     * means the traversal can never escape the controller root.
+     */
+    private static long walkForLimit(File controllerRoot, String relativePath, String limitFileName) {
+        if (controllerRoot == null || !controllerRoot.isDirectory()) {
+            return -1;
         }
-        return readLimitFile(new File("/sys/fs/cgroup/memory/memory.limit_in_bytes"));
+        long best = readLimitFile(new File(controllerRoot, limitFileName));
+        if (relativePath == null) {
+            return best;
+        }
+        File dir = controllerRoot;
+        for (String segment : relativePath.split("/")) {
+            if (segment.isEmpty()) {
+                continue;
+            }
+            dir = new File(dir, segment);
+            if (!dir.isDirectory()) {
+                break;
+            }
+            best = minPositive(best, readLimitFile(new File(dir, limitFileName)));
+        }
+        return best;
+    }
+
+    /**
+     * This process's cgroup path for a controller, from /proc/self/cgroup lines of
+     * the form {@code hierarchy-ID:controller-list:cgroup-path}.
+     *
+     * @param controller the v1 controller name, or "" for the v2 unified hierarchy
+     *                   (which is the line with an empty controller list)
+     * @return the path, or null when this hierarchy is not listed
+     */
+    static String cgroupPath(String procSelfCgroup, String controller) {
+        if (procSelfCgroup == null) {
+            return null;
+        }
+        for (String line : procSelfCgroup.split("\n")) {
+            String trimmed = line.trim();
+            // The path itself may contain ':', so split on the first two only.
+            int first = trimmed.indexOf(':');
+            if (first < 0) {
+                continue;
+            }
+            int second = trimmed.indexOf(':', first + 1);
+            if (second < 0) {
+                continue;
+            }
+            String controllers = trimmed.substring(first + 1, second);
+            String path = trimmed.substring(second + 1);
+            if (controller.isEmpty()) {
+                if (controllers.isEmpty()) {
+                    return path;
+                }
+            } else {
+                for (String c : controllers.split(",")) {
+                    if (controller.equals(c)) {
+                        return path;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /** The smaller of two limits, ignoring non-positive (absent) ones. */
+    private static long minPositive(long a, long b) {
+        if (a <= 0) {
+            return b;
+        }
+        if (b <= 0) {
+            return a;
+        }
+        return Math.min(a, b);
+    }
+
+    private static String readFileQuietly(File f) {
+        try {
+            if (!f.isFile()) {
+                return null;
+            }
+            return new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private static long readLimitFile(File f) {

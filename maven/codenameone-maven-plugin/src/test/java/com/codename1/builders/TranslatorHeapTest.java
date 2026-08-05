@@ -24,8 +24,13 @@ package com.codename1.builders;
 
 import org.junit.Test;
 
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -136,9 +141,112 @@ public class TranslatorHeapTest {
     }
 
     @Test
-    public void detectsSomeMemoryBudgetOnThisMachine() {
-        // The whole policy degrades to the old constants if this returns -1, so
-        // make sure the detection actually works on a normal build machine.
-        assertTrue(TranslatorHeap.detectBudgetMB() > 0);
+    public void detectsAMemoryBudgetWhereverTheJvmExposesOne() {
+        // The whole policy degrades to the old constants if detection returns -1,
+        // so this guards against that regression going unnoticed. Asserting it
+        // unconditionally would make the test environment-dependent -- detection
+        // legitimately returns -1 on a JVM without the com.sun accessor -- so the
+        // assertion is tied to the exact condition that makes it obligatory.
+        boolean accessorAvailable;
+        try {
+            Class<?> sunOsBean = Class.forName("com.sun.management.OperatingSystemMXBean");
+            accessorAvailable = sunOsBean.isInstance(
+                    java.lang.management.ManagementFactory.getOperatingSystemMXBean());
+        } catch (Throwable ex) {
+            accessorAvailable = false;
+        }
+        if (accessorAvailable) {
+            assertTrue("physical memory is readable on this JVM, so detection must succeed",
+                    TranslatorHeap.detectBudgetMB() > 0);
+        }
+    }
+
+    @Test
+    public void readsTheCgroupLimitFromThisProcessesOwnCgroupNotTheMountRoot() throws Exception {
+        // A systemd unit with MemoryMax=, or a container sharing the host cgroup
+        // namespace: the mount root is unlimited and the real limit sits at the
+        // path named in /proc/self/cgroup. Reading only the root here would fall
+        // back to host RAM and pick a heap the cgroup cannot honour.
+        File root = tempDir();
+        write(new File(root, "memory.max"), "max");
+        File leaf = new File(root, "system.slice/cn1-daemon.service");
+        assertTrue(leaf.mkdirs());
+        write(new File(leaf, "memory.max"), String.valueOf(2048L * 1024 * 1024));
+
+        assertEquals(2048, TranslatorHeap.cgroupLimitMB(root, "0::/system.slice/cn1-daemon.service\n"));
+    }
+
+    @Test
+    public void takesTheTightestLimitOnThePath() throws Exception {
+        // A limit set anywhere on the path applies, so an ancestor's tighter
+        // limit is the one that will actually kill the build.
+        File root = tempDir();
+        write(new File(root, "memory.max"), "max");
+        File mid = new File(root, "system.slice");
+        assertTrue(mid.mkdirs());
+        write(new File(mid, "memory.max"), String.valueOf(1024L * 1024 * 1024));
+        File leaf = new File(mid, "cn1-daemon.service");
+        assertTrue(leaf.mkdirs());
+        write(new File(leaf, "memory.max"), String.valueOf(4096L * 1024 * 1024));
+
+        assertEquals(1024, TranslatorHeap.cgroupLimitMB(root, "0::/system.slice/cn1-daemon.service\n"));
+    }
+
+    @Test
+    public void fallsBackToTheMountRootWhenTheProcessCgroupIsUnknown() throws Exception {
+        // The container-with-its-own-namespace case: the root files ARE the
+        // container's limit and /proc/self/cgroup may be unreadable.
+        File root = tempDir();
+        write(new File(root, "memory.max"), String.valueOf(3072L * 1024 * 1024));
+        assertEquals(3072, TranslatorHeap.cgroupLimitMB(root, null));
+    }
+
+    @Test
+    public void readsACgroupV1Limit() throws Exception {
+        File root = tempDir();
+        File leaf = new File(root, "memory/docker/abc123");
+        assertTrue(leaf.mkdirs());
+        write(new File(leaf, "memory.limit_in_bytes"), String.valueOf(1536L * 1024 * 1024));
+
+        assertEquals(1536, TranslatorHeap.cgroupLimitMB(root,
+                "8:memory:/docker/abc123\n4:cpu,cpuacct:/docker/abc123\n"));
+    }
+
+    @Test
+    public void treatsAnUnlimitedCgroupAsNoLimit() throws Exception {
+        File root = tempDir();
+        write(new File(root, "memory.max"), "max");
+        File v1 = new File(root, "memory");
+        assertTrue(v1.mkdirs());
+        // The v1 "unlimited" sentinel, not a real 8-exabyte budget.
+        write(new File(v1, "memory.limit_in_bytes"), "9223372036854771712");
+
+        assertEquals(-1, TranslatorHeap.cgroupLimitMB(root, "0::/\n"));
+    }
+
+    @Test
+    public void parsesCgroupPathsIncludingOnesContainingColons() {
+        assertEquals("/system.slice/cn1.service",
+                TranslatorHeap.cgroupPath("0::/system.slice/cn1.service\n", ""));
+        assertEquals("/docker/abc",
+                TranslatorHeap.cgroupPath("8:memory:/docker/abc\n", "memory"));
+        // "memory" must not match "memory_hugetlb" or similar in a controller list.
+        assertNull(TranslatorHeap.cgroupPath("8:memoryfoo:/docker/abc\n", "memory"));
+        // systemd scope names legitimately contain ':'.
+        assertEquals("/user.slice/run-r:12.scope",
+                TranslatorHeap.cgroupPath("0::/user.slice/run-r:12.scope\n", ""));
+        assertNull(TranslatorHeap.cgroupPath(null, ""));
+    }
+
+    private static File tempDir() throws Exception {
+        File d = File.createTempFile("cn1-cgroup-test", "");
+        assertTrue(d.delete());
+        assertTrue(d.mkdirs());
+        d.deleteOnExit();
+        return d;
+    }
+
+    private static void write(File f, String contents) throws Exception {
+        Files.write(f.toPath(), contents.getBytes(StandardCharsets.UTF_8));
     }
 }
