@@ -1055,120 +1055,169 @@ JAVA_INT java_lang_Float_floatToIntBits___float_R_int(CODENAME_ONE_THREAD_STATE,
 }
 
 
-JAVA_OBJECT java_lang_Double_toStringImpl___double_boolean_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE d, JAVA_BOOLEAN b) {
-    char s[32];
-    if ( !b ){
-        snprintf(s, 32, "%lf", d);
-    } else {
-        snprintf(s, 32, "%1.20E", d);
-    }
-    
-    // We need to match the format of Java spec.  That includes:
-    // No "+" for positive exponent.
-    // No leading zeroes in positive exponents.
-    // No trailing zeroes in decimal portion.
-    int j=0;
-    // Process only the actual formatted length, not the uninitialized buffer tail
-    // (see the matching note in the Float variant below): walking the garbage past
-    // the snprintf'd string can push `j` past the end of s2[32] and smash the stack.
-    int i = (int) strlen(s);
-    char s2[32];
-    BOOL inside=NO;
-    while (i-->0 && j < 30){
-        if (inside){
-            if (s[i]=='.'){
-                s2[j++]='0';
-            }
-            if (s[i]!='0'){
-                inside=NO;
-                s2[j++]=s[i];
-            }
-
+// java.lang.Double.toString / java.lang.Float.toString must print "the smallest number
+// of digits that uniquely distinguishes the argument value from adjacent values of the
+// same type". The previous implementation instead asked snprintf for a fixed "%f" (six
+// decimals) in the plain range and "%1.20E" (twenty-one significant digits) in the
+// scientific range, so Double.toString(1.0/3.0) came back as "0.333333" instead of
+// "0.3333333333333333", and Double.toString(1e30) came back as
+// "1.00000000000000001988E30" instead of "1.0E30". Both are wrong in every direction
+// that matters: too few digits loses information, too many invent it, and neither round
+// trips. String concatenation of a double went through this, so did String.format.
+//
+// snprintf("%.*e") is correctly rounded, and a rendering that round trips stays round
+// tripping as digits are added, so a binary search over the digit count finds the
+// shortest faithful rendering in a handful of formatting attempts. The search starts at
+// two significand digits because the specification requires at least one digit after the
+// decimal point: Double.toString(Double.MIN_VALUE) is "4.9E-324", not a zero-padded
+// "5.0E-324", even though a single digit round trips.
+static void cn1ShortestDouble(char* buffer, int bufferSize, JAVA_DOUBLE d) {
+    int low = 2;
+    int high = 17;
+    while (low < high) {
+        int mid = (low + high) / 2;
+        snprintf(buffer, bufferSize, "%.*e", mid - 1, d);
+        if (strtod(buffer, NULL) == d) {
+            high = mid;
         } else {
-            if (s[i]=='E'){
-                inside=YES;
-            }
-            if (s[i]=='+'){
-                // If a positive exponent, we don't need leading zeroes in
-                // the exponent
-                while (s2[--j]=='0'){
-
-                }
-                j++;
-                continue;
-            }
-            s2[j++]=s[i];
+            low = mid + 1;
         }
     }
-    i=0;
-    while (j-->0 && i < 31){
-        s[i++]=s2[j];
+    snprintf(buffer, bufferSize, "%.*e", low - 1, d);
+}
+
+static void cn1ShortestFloat(char* buffer, int bufferSize, JAVA_FLOAT f) {
+    int low = 2;
+    int high = 9;
+    while (low < high) {
+        int mid = (low + high) / 2;
+        snprintf(buffer, bufferSize, "%.*e", mid - 1, (double)f);
+        if (strtof(buffer, NULL) == f) {
+            high = mid;
+        } else {
+            low = mid + 1;
+        }
     }
-    s[i]='\0';
-    if (strcmp(s, "NAN") == 0) {
-        s[1] = 'a';
+    snprintf(buffer, bufferSize, "%.*e", low - 1, (double)f);
+}
+
+// Rewrites the "[-]d.dddde[+-]dd" rendering above into the shape java.lang.Double.toString
+// specifies: no '+' and no leading zeros on the exponent, no trailing zeros in the
+// significand, and always at least one digit after the decimal point.
+// Appends one character if there is room for it and for the terminating NUL. Every
+// write in cn1JavaFloatingText goes through here so that boundedness is a property of
+// the helper rather than of reasoning about the largest exponent that can reach it.
+static void cn1AppendChar(char* out, int outSize, int* at, char c) {
+    if (*at < outSize - 1) {
+        out[(*at)++] = c;
     }
-    return newStringFromCString(threadStateData, s);
+}
+
+static void cn1JavaFloatingText(char* out, int outSize, const char* raw, JAVA_BOOLEAN scientific) {
+    const char* p = raw;
+    int at = 0;
+    char digits[32];
+    int digitCount = 0;
+    int exponent = 0;
+    int i;
+    if (outSize < 1) {
+        return;
+    }
+    if (*p == '-') {
+        cn1AppendChar(out, outSize, &at, '-');
+        p++;
+    }
+    while (*p != 0 && *p != 'e' && *p != 'E') {
+        if (*p >= '0' && *p <= '9' && digitCount < (int)sizeof(digits) - 1) {
+            digits[digitCount++] = *p;
+        }
+        p++;
+    }
+    if (*p == 'e' || *p == 'E') {
+        exponent = (int)strtol(p + 1, NULL, 10);
+    }
+    while (digitCount > 1 && digits[digitCount - 1] == '0') {
+        digitCount--;
+    }
+    if (digitCount == 0) {
+        digits[digitCount++] = '0';
+    }
+    if (scientific) {
+        cn1AppendChar(out, outSize, &at, digits[0]);
+        cn1AppendChar(out, outSize, &at, '.');
+        if (digitCount == 1) {
+            cn1AppendChar(out, outSize, &at, '0');
+        } else {
+            for (i = 1; i < digitCount; i++) {
+                cn1AppendChar(out, outSize, &at, digits[i]);
+            }
+        }
+        cn1AppendChar(out, outSize, &at, 'E');
+        snprintf(out + at, outSize - at, "%d", exponent);
+        return;
+    }
+    // Double.toString only takes the plain branch for 1e-3 <= |d| < 1e7, so the exponent
+    // reaching here is small. The native is reachable on its own though, and a large one
+    // would otherwise run past the buffer, so the appends above bound themselves.
+    if (exponent < 0) {
+        cn1AppendChar(out, outSize, &at, '0');
+        cn1AppendChar(out, outSize, &at, '.');
+        for (i = 0; i < -exponent - 1; i++) {
+            cn1AppendChar(out, outSize, &at, '0');
+        }
+        for (i = 0; i < digitCount; i++) {
+            cn1AppendChar(out, outSize, &at, digits[i]);
+        }
+    } else {
+        for (i = 0; i <= exponent; i++) {
+            cn1AppendChar(out, outSize, &at, i < digitCount ? digits[i] : '0');
+        }
+        cn1AppendChar(out, outSize, &at, '.');
+        if (exponent + 1 >= digitCount) {
+            cn1AppendChar(out, outSize, &at, '0');
+        } else {
+            for (i = exponent + 1; i < digitCount; i++) {
+                cn1AppendChar(out, outSize, &at, digits[i]);
+            }
+        }
+    }
+    out[at] = 0;
+}
+
+JAVA_OBJECT java_lang_Double_toStringImpl___double_boolean_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE d, JAVA_BOOLEAN b) {
+    // Double.toString handles these before delegating, but the method is reachable on
+    // its own and the parser below has no meaning for them.
+    if (d != d) {
+        return newStringFromCString(threadStateData, "NaN");
+    }
+    if (d > 1.7976931348623157E308) {
+        return newStringFromCString(threadStateData, "Infinity");
+    }
+    if (d < -1.7976931348623157E308) {
+        return newStringFromCString(threadStateData, "-Infinity");
+    }
+    char raw[48];
+    char out[512];
+    cn1ShortestDouble(raw, (int)sizeof(raw), d);
+    cn1JavaFloatingText(out, (int)sizeof(out), raw, b);
+    return newStringFromCString(threadStateData, out);
 }
 
 JAVA_OBJECT java_lang_Float_toStringImpl___float_boolean_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_FLOAT d, JAVA_BOOLEAN b) {
-    char s[32];
-    if ( !b ){
-        snprintf(s, 32, "%f", d);
-    } else {
-        snprintf(s, 32, "%1.20E", d);
+    if (d != d) {
+        return newStringFromCString(threadStateData, "NaN");
     }
-    // We need to match the format of Java spec.  That includes:
-    // No "+" for positive exponent.
-    // No leading zeroes in positive exponents.
-    // No trailing zeroes in decimal portion.
-    int j=0;
-    // Start the reversal at the actual formatted length, NOT the full 32-byte
-    // buffer: the bytes past the snprintf'd string are uninitialized stack, and
-    // walking them feeds garbage into the loop below -- each iteration can do up to
-    // two `s2[j++]` writes, so a non-'0' tail pushes `j` past the end of s2[32] and
-    // smashes the stack (a top-of-loop `j < 32` guard cannot stop a 2-wide write).
-    // glibc/musl don't zero this region, so on the Linux clean target this
-    // overflowed reliably (formatting a derived font size). Processing only strlen(s)
-    // is both safe and what the algorithm always intended.
-    int i = (int) strlen(s);
-    char s2[32];
-    BOOL inside=NO;
-    while (i-->0 && j < 30){
-        if (inside){
-            if (s[i]=='.'){
-                s2[j++]='0';
-            }
-            if (s[i]!='0'){
-                inside=NO;
-                s2[j++]=s[i];
-            }
-            
-        } else {
-            if (s[i]=='E'){
-                inside=YES;
-            }
-            if (s[i]=='+'){
-                // If a positive exponent, we don't need leading zeroes in
-                // the exponent
-                while (s2[--j]=='0'){
-                    
-                }
-                j++;
-                continue;
-            }
-            s2[j++]=s[i];
-        }
+    if (d > 3.4028234663852886E38f) {
+        return newStringFromCString(threadStateData, "Infinity");
     }
-    i=0;
-    while (j-->0 && i < 31){
-        s[i++]=s2[j];
+    if (d < -3.4028234663852886E38f) {
+        return newStringFromCString(threadStateData, "-Infinity");
     }
-    s[i]='\0';
-    if (strcmp(s, "NAN") == 0) {
-        s[1] = 'a';
-    }
-    return newStringFromCString(threadStateData, s);
+    char raw[48];
+    char out[512];
+    cn1ShortestFloat(raw, (int)sizeof(raw), d);
+    cn1JavaFloatingText(out, (int)sizeof(out), raw, b);
+    return newStringFromCString(threadStateData, out);
 }
 
 
@@ -1332,18 +1381,14 @@ JAVA_DOUBLE java_lang_Math_sin___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA
     return sin(a);
 }
 
+// "a < 0" is false for negative zero, so the old form returned -0.0 where the JDK
+// specifies positive zero. fabs clears the sign bit unconditionally.
 JAVA_DOUBLE java_lang_Math_abs___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a) {
-    if(a < 0) {
-        return a * -1;
-    }
-    return a;
+    return fabs(a);
 }
 
 JAVA_FLOAT java_lang_Math_abs___float_R_float(CODENAME_ONE_THREAD_STATE, JAVA_FLOAT a) {
-    if(a < 0) {
-        return a * -1;
-    }
-    return a;
+    return fabsf(a);
 }
 
 JAVA_INT java_lang_Math_abs___int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT a) {
@@ -3181,63 +3226,3 @@ JAVA_OBJECT java_lang_String_toLowerCase___R_java_lang_String(CODENAME_ONE_THREA
 #endif
 }
 
-JAVA_OBJECT java_lang_String_format___java_lang_String_java_lang_Object_1ARRAY_R_java_lang_String(CODENAME_ONE_THREAD_STATE,  JAVA_OBJECT format, JAVA_OBJECT args) {
-#if defined(__APPLE__) && defined(__OBJC__)
-    enteringNativeAllocations();
-    JAVA_ARRAY argsArray = (JAVA_ARRAY)args;
-    JAVA_ARRAY_OBJECT* objs = (JAVA_ARRAY_OBJECT*)argsArray->data;
-    int len = argsArray->length;
-    NSMutableArray* argsList1 = [NSMutableArray arrayWithCapacity:len];
-    for (int i=0; i<len; i++) {
-        [argsList1 insertObject: toNSString(CN1_THREAD_STATE_PASS_ARG java_lang_String_valueOf___java_lang_Object_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG objs[i])) atIndex:i];
-    }
-    char *argList = (char *)malloc(sizeof(NSString *) * len);
-    [argsList1 getObjects:(id *)argList];
-    NSString* result = [[[NSString alloc] initWithFormat:toNSString(CN1_THREAD_STATE_PASS_ARG format) arguments:argList] autorelease];
-    free(argList);
-    JAVA_OBJECT out = fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString init]);
-    finishedNativeAllocations();
-    return out;
-#else
-    JAVA_OBJECT builder = __NEW_INSTANCE_java_lang_StringBuilder(threadStateData);
-    int formatLength = java_lang_String_length___R_int(threadStateData, format);
-    JAVA_ARRAY argsArray = (JAVA_ARRAY)args;
-    JAVA_ARRAY_OBJECT* values = argsArray == JAVA_NULL ? JAVA_NULL : (JAVA_ARRAY_OBJECT*)argsArray->data;
-    int valuesLength = argsArray == JAVA_NULL ? 0 : argsArray->length;
-    int argIndex = 0;
-
-    for (int i = 0; i < formatLength; i++) {
-        JAVA_CHAR ch = java_lang_String_charAt___int_R_char(threadStateData, format, i);
-        if (ch != '%' || i == formatLength - 1) {
-            java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(threadStateData, builder, ch);
-            continue;
-        }
-
-        JAVA_CHAR token = java_lang_String_charAt___int_R_char(threadStateData, format, i + 1);
-        i++;
-        if (token == '%') {
-            java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(threadStateData, builder, '%');
-            continue;
-        }
-
-        if (argIndex >= valuesLength || values == JAVA_NULL) {
-            java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(threadStateData, builder, '%');
-            java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(threadStateData, builder, token);
-            continue;
-        }
-
-        JAVA_OBJECT value = values[argIndex++];
-        JAVA_OBJECT valueText = java_lang_String_valueOf___java_lang_Object_R_java_lang_String(threadStateData, value);
-        if (token == 'c') {
-            int valueTextLength = java_lang_String_length___R_int(threadStateData, valueText);
-            if (valueTextLength > 0) {
-                JAVA_CHAR out = java_lang_String_charAt___int_R_char(threadStateData, valueText, 0);
-                java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(threadStateData, builder, out);
-            }
-        } else {
-            java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, builder, valueText);
-        }
-    }
-    return java_lang_StringBuilder_toString___R_java_lang_String(threadStateData, builder);
-#endif
-}

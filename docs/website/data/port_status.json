@@ -304,8 +304,8 @@
       "id": "java-standard-apis",
       "category": "Application runtime",
       "name": "Java standard APIs",
-      "description": "Checks streams, strings, time, monotonic time, floating-point conversion, and Java 17 language/runtime support.",
-      "tests": ["FloatingToStringTest", "Java17Tests", "NanoTimeApiTest", "StreamApiTest", "StringApiTest", "TimeApiTest"]
+      "description": "Checks streams, strings, string formatting, time, monotonic time, floating-point conversion, and Java 17 language/runtime support.",
+      "tests": ["FloatingToStringTest", "Java17Tests", "NanoTimeApiTest", "StreamApiTest", "StringApiTest", "StringFormatTest", "TimeApiTest"]
     },
     {
       "id": "threading",
