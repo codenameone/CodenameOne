@@ -1,0 +1,49 @@
+Form {
+    background-color: #ffffff;
+    color: #172033;
+    padding: 3mm;
+}
+
+Title {
+    background-color: #17233b;
+    color: #ffffff;
+    font-family: "native:MainBold";
+    padding: 2mm;
+}
+
+Label, SpanLabel {
+    background-color: transparent;
+    color: #26324a;
+    padding: 2mm;
+}
+
+CheckBox, RadioButton {
+    background-color: transparent;
+    color: #26324a;
+}
+
+Button {
+    background-color: white;
+    color: #2459b8;
+    border: 1px solid #315fce;
+    border-radius: 2mm;
+    padding: 2mm 4mm;
+    margin: 1mm;
+}
+
+@media (prefers-color-scheme: dark) {
+    Form { background-color: black; color: #f5f8ff; }
+    Title { background-color: #071b4d; color: #f5f8ff; }
+    Label, SpanLabel { background-color: transparent; color: #f5f8ff; }
+    CheckBox, RadioButton { background-color: transparent; color: #f5f8ff; }
+    Button { background-color: #163575; color: #f5f8ff; border-color: #5876a9; }
+    TextField { background-color: #0e2a61; color: #f5f8ff; border-color: #5876a9; }
+}
+
+TextField {
+    background-color: #f7f9fc;
+    color: #172033;
+    border: 1px solid #c8d1e2;
+    padding: 2mm;
+    margin: 1mm;
+}

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="Form" layout="TableLayout" tableLayoutRows="2" tableLayoutColumns="3" title="TableLayout — explicit cells" name="TableLayoutForm">
+    <component type="Label" name="nameLabel" text="Name" tableRow="0" tableColumn="0" />
+    <component type="TextField" name="name" text="Ada" tableRow="0" tableColumn="1" tableHorizontalSpan="2" />
+    <component type="Label" name="roleLabel" text="Role" tableRow="1" tableColumn="0" />
+    <component type="Button" name="designer" text="Designer" tableRow="1" tableColumn="1" />
+    <component type="Button" name="developer" text="Developer" tableRow="1" tableColumn="2" />
+</component>

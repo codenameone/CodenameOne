@@ -89,6 +89,10 @@ public class PureEditor {
             view.setEditableState("1".equals(arg));
             return;
         }
+        if ("setCursor".equals(name)) {
+            view.moveCaret(parseInt(arg, 0), false);
+            return;
+        }
         if ("focus".equals(name)) {
             view.requestFocus();
             return;
@@ -106,6 +110,17 @@ public class PureEditor {
             return;
         }
         // remaining rich / code commands are handled by subclasses; ignore here
+    }
+
+    private static int parseInt(String value, int defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException err) {
+            return defaultValue;
+        }
     }
 
     /// Executes a query returning a string result. Unknown queries return an empty string.

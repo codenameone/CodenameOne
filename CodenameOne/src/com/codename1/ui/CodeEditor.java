@@ -219,6 +219,18 @@ public class CodeEditor extends AbstractEditorComponent {
         command("insertText", text);
     }
 
+    /// Protects all text between matching marker lines from editing. This is intended for generated
+    /// source previews that contain explicit user-editable regions. Passing null clears protection.
+    public void setProtectedRegionMarkers(String startMarker, String endMarker) {
+        command("setProtectedMarkers", startMarker == null || endMarker == null
+                ? "" : startMarker + "\n" + endMarker);
+    }
+
+    /// Moves the caret to a character offset, clamped by the editor backend to the document bounds.
+    public void setCursorPosition(int offset) {
+        command("setCursor", String.valueOf(Math.max(0, offset)));
+    }
+
     /// Retrieves the current caret character offset. The callback is invoked on the EDT.
     ///
     /// #### Parameters

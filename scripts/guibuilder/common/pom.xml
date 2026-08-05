@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent><groupId>com.codenameone.guibuilder</groupId><artifactId>cn1-guibuilder</artifactId><version>8.0-SNAPSHOT</version></parent>
+    <artifactId>cn1-guibuilder-common</artifactId>
+    <properties><codename1.platform>common</codename1.platform></properties>
+    <build><plugins>
+        <plugin><groupId>org.codehaus.mojo</groupId><artifactId>properties-maven-plugin</artifactId><version>1.0.0</version><executions><execution><phase>initialize</phase><goals><goal>read-project-properties</goal></goals><configuration><files><file>${basedir}/codenameone_settings.properties</file></files></configuration></execution></executions></plugin>
+        <plugin><groupId>com.codenameone</groupId><artifactId>codenameone-maven-plugin</artifactId><version>${cn1.plugin.version}</version><extensions>true</extensions><executions>
+            <execution><id>cn1-process-classes</id><phase>process-classes</phase><goals><goal>bytecode-compliance</goal><goal>css</goal><goal>process-annotations</goal></goals></execution>
+            <execution><id>attach-test-artifact</id><phase>test</phase><goals><goal>attach-test-artifact</goal></goals></execution>
+        </executions></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><configuration><skipTests>true</skipTests><useModulePath>false</useModulePath></configuration></plugin>
+    </plugins></build>
+    <dependencies>
+        <dependency><groupId>com.codenameone</groupId><artifactId>codenameone-core</artifactId></dependency>
+        <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter-api</artifactId><version>5.10.2</version><scope>test</scope></dependency>
+        <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter-engine</artifactId><version>5.10.2</version><scope>test</scope></dependency>
+    </dependencies>
+</project>
