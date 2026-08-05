@@ -1993,6 +1993,12 @@ public abstract class Executor {
                 }.start();
             }
             int val = p.waitFor();
+            // Stop the timeout watcher FIRST. The process has already exited, so
+            // nothing it could do from here is useful -- and the join below can
+            // hold us here for a while, during which a watcher still counting
+            // would cross the deadline and flag a completed run as timed out.
+            running[0] = false;
+            boolean timedOut = destroyed[0];
             // waitFor returns as soon as the process exits, but the reader thread
             // may still be draining what is left in the pipe. Callers that inspect
             // outputMessage after this returns (the translator's out-of-memory
@@ -2001,11 +2007,10 @@ public abstract class Executor {
             // OutOfMemoryError. Bounded so a wedged reader cannot hang the build;
             // the process has already exited, so the stream reaches EOF promptly.
             reader.join(30000);
-            if (destroyed[0]) {
+            if (timedOut) {
                 log("Process timed out");
                 return 1;
             }
-            running[0] = false;
             log("Process return code is "+val);
             return val;
         } finally {
