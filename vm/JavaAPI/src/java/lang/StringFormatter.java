@@ -244,8 +244,11 @@ final class StringFormatter {
             // becomes the conversion character, which is then rejected as unknown.
         }
 
-        if (pos >= len) {
-            // The shape never completed. The JVM reports the character right after '%'.
+        if (pos >= len || !isConversionChar(format.charAt(pos))) {
+            // The shape never completed: either the specifier ran out, or the character
+            // sitting in the conversion slot is not one a conversion can be spelled with.
+            // "%00." is an unknown conversion, not a duplicate flag, and the character the
+            // JVM reports is the one right after the '%' rather than the offending one.
             throw new UnknownFormatConversionException(String.valueOf(format.charAt(start + 1)));
         }
         char conversion = format.charAt(pos);
@@ -278,6 +281,11 @@ final class StringFormatter {
         spec.lower = spec.upper ? (char) (conversion + ('a' - 'A')) : conversion;
         spec.end = pos;
         return pos;
+    }
+
+    /** The conversion slot only accepts a letter or '%'; anything else is not a specifier. */
+    private static boolean isConversionChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '%';
     }
 
     private static int flagBit(char f) {

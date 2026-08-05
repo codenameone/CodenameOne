@@ -220,6 +220,12 @@ public class StringFormatApp {
         // conversion with no arguments is an unknown conversion, not a missing argument.
         f("bad.unknownConversionNoArgs", "%q");
         f("bad.groupingOnHexNoArgs", "%,x");
+        // The JVM matches the shape of a specifier before judging its parts, and the
+        // conversion slot only accepts a letter or '%'.
+        f("bad.incompleteShape", "%00.");
+        f("bad.incompleteShapeWidth", "%5.2");
+        f("bad.incompleteShapeFlags", "%,,");
+        f("bad.percentIsAConversion", "%00%");
         // Validation order: a character reports an unsupported flag ahead of the missing
         // width, the opposite of every other conversion, and a wrong argument type
         // outranks the deferred sign-flag check on %x and %o.

@@ -302,6 +302,12 @@ public class GenerateStringFormatCases {
         // The conversion is validated before an argument is looked for.
         bad("bad.unknownConversionNoArgs", "%q");
         bad("bad.groupingOnHexNoArgs", "%,x");
+        // The conversion slot only accepts a letter or '%', so these never form a
+        // specifier at all and are unknown conversions rather than flag errors.
+        bad("bad.incompleteShape", "%00.");
+        bad("bad.incompleteShapeWidth", "%5.2");
+        bad("bad.incompleteShapeFlags", "%,,");
+        bad("bad.percentIsAConversion", "%00%");
         // The JVM reports an unsupported flag on a character ahead of the missing width,
         // which is the opposite order from every other conversion.
         bad("bad.charFlagBeforeWidth", "%-0c", Character.valueOf('a'));

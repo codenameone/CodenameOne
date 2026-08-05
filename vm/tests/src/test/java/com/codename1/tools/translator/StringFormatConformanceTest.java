@@ -87,7 +87,15 @@ class StringFormatConformanceTest {
      */
     @Test
     void everySingleSpecifierMatchesTheJdk() throws Exception {
-        Method format = loadFormatter();
+        // The loader has to stay open for the whole sweep, not just long enough to
+        // resolve the method: the relocated exception classes are loaded lazily, the
+        // first time a malformed specifier throws one.
+        try (URLClassLoader loader = compileRelocatedFormatter()) {
+            runSweep(loadFormatMethod(loader));
+        }
+    }
+
+    private void runSweep(Method format) throws Exception {
 
         Object[] arguments = {
             "txt", "", Integer.valueOf(42), Integer.valueOf(-42), Integer.valueOf(0),
@@ -225,13 +233,20 @@ class StringFormatConformanceTest {
         }
     }
 
+    private Method loadFormatMethod(URLClassLoader loader) throws Exception {
+        Class<?> formatter = loader.loadClass("cn1format.StringFormatter");
+        Method format = formatter.getDeclaredMethod("format", String.class, Object[].class);
+        format.setAccessible(true);
+        return format;
+    }
+
     /**
      * Copies java.lang.StringFormatter and the java.util format exceptions it uses into a
-     * neutral package, compiles them, and returns the relocated {@code format} method. The
-     * rewrite is textual and deliberately narrow: only the package and import statements
-     * move, so the logic under test is the shipping source.
+     * neutral package, compiles them, and returns a loader over the result. The rewrite is
+     * textual and deliberately narrow: only the package and import statements move, so the
+     * logic under test is the shipping source.
      */
-    private Method loadFormatter() throws Exception {
+    private URLClassLoader compileRelocatedFormatter() throws Exception {
         Path javaApi = Paths.get("..", "JavaAPI", "src").normalize().toAbsolutePath();
         assertTrue(Files.isDirectory(javaApi), "JavaAPI sources should be at " + javaApi);
 
@@ -264,12 +279,8 @@ class StringFormatConformanceTest {
         assertEquals(0, compiler.run(null, null, System.err, args.toArray(new String[0])),
                 "the relocated formatter should compile");
 
-        URLClassLoader loader = new URLClassLoader(new URL[] { classes.toUri().toURL() },
+        return new URLClassLoader(new URL[] { classes.toUri().toURL() },
                 getClass().getClassLoader());
-        Class<?> formatter = loader.loadClass("cn1format.StringFormatter");
-        Method format = formatter.getDeclaredMethod("format", String.class, Object[].class);
-        format.setAccessible(true);
-        return format;
     }
 
     private String relocate(Path source, Path targetDirectory) throws IOException {

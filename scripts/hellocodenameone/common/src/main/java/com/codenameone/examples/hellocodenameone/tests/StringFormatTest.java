@@ -193,6 +193,10 @@ public class StringFormatTest extends BaseTest {
             checkThrows("bad.unknownConversion", "java.util.UnknownFormatConversionException", () -> String.format("%q", "x"));
             checkThrows("bad.unknownConversionNoArgs", "java.util.UnknownFormatConversionException", () -> String.format("%q"));
             checkThrows("bad.groupingOnHexNoArgs", "java.util.FormatFlagsConversionMismatchException", () -> String.format("%,x"));
+            checkThrows("bad.incompleteShape", "java.util.UnknownFormatConversionException", () -> String.format("%00."));
+            checkThrows("bad.incompleteShapeWidth", "java.util.UnknownFormatConversionException", () -> String.format("%5.2"));
+            checkThrows("bad.incompleteShapeFlags", "java.util.UnknownFormatConversionException", () -> String.format("%,,"));
+            checkThrows("bad.percentIsAConversion", "java.util.DuplicateFormatFlagsException", () -> String.format("%00%"));
             checkThrows("bad.charFlagBeforeWidth", "java.util.FormatFlagsConversionMismatchException", () -> String.format("%-0c", Character.valueOf('a')));
             checkThrows("bad.charAltBeforeWidth", "java.util.FormatFlagsConversionMismatchException", () -> String.format("%-#c", Character.valueOf('a')));
             checkThrows("bad.stringWidthBeforeFlag", "java.util.MissingFormatWidthException", () -> String.format("%-0s", "a"));
