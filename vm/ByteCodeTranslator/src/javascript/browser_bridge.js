@@ -194,15 +194,45 @@
   // registry the stub self-registers into, populated on the main thread by the
   // <script>-loaded stub) and invoke it with the trailing callback, returning a
   // Promise so the worker resumes with the result once callback.complete fires.
+  //
+  // isSupported() is the NativeInterface contract's own "is this available here?"
+  // question, so an unbound interface must make it ANSWER false rather than reject.
+  // The builder generates and registers an <Iface>Impl for EVERY native interface in
+  // the app, so NativeLookup.create() never returns null on this port and isSupported()
+  // is the only signal the developer has; rejecting turned the standard
+  //     create(X.class) != null && x.isSupported()
+  // guard into a thrown RuntimeException for any app that shipped no JS stub for the
+  // interface (issue #5512). Every other method still rejects -- calling an
+  // unimplemented native is a genuine bug and must stay loud.
+  var NI_IS_SUPPORTED = 'isSupported_';
+  var niUnboundWarned = {};
+
+  function niUnsupported(iface, reason) {
+    if (!niUnboundWarned[iface]) {
+      niUnboundWarned[iface] = true;
+      if (global.console && global.console.warn) {
+        global.console.warn('Codename One: native interface ' + iface + ' is not supported in this build ('
+                + reason + '); isSupported() answers false.');
+      }
+    }
+    return Promise.resolve(false);
+  }
+
   function cn1InvokeNativeInterface(iface, method, args) {
     var registry = global.cn1_native_interfaces
             || (global.window && global.window.cn1_native_interfaces);
     var impl = registry ? registry[iface] : null;
     if (!impl) {
+      if (method === NI_IS_SUPPORTED) {
+        return niUnsupported(iface, 'no JS implementation registered');
+      }
       return Promise.reject(new Error('No native interface implementation registered for ' + iface));
     }
     var fn = impl[method];
     if (typeof fn !== 'function') {
+      if (method === NI_IS_SUPPORTED) {
+        return niUnsupported(iface, 'the registered JS implementation defines no isSupported');
+      }
       return Promise.reject(new Error('Native interface ' + iface + ' has no implementation for ' + method));
     }
     var callArgs = [];

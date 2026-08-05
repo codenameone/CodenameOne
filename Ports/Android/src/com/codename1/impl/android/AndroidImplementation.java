@@ -7183,6 +7183,46 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
+    @Override
+    public boolean canGetPublicKeyDigests() {
+        return true;
+    }
+
+    @Override
+    public String[] getSSLCertificatesEx(Object connection, String url) throws IOException {
+        if (connection instanceof HttpsURLConnection) {
+            HttpsURLConnection conn = (HttpsURLConnection) connection;
+            try {
+                conn.connect();
+                java.security.cert.Certificate[] certs = conn.getServerCertificates();
+                java.util.List<String> out = new java.util.ArrayList<String>();
+                for (int i = 0; i < certs.length; i++) {
+                    java.security.cert.Certificate cert = certs[i];
+                    out.add("CHAIN:" + i);
+                    MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+                    sha256.update(cert.getEncoded());
+                    out.add("SHA-256:" + dumpHex(sha256.digest()));
+                    MessageDigest sha1 = MessageDigest.getInstance("SHA1");
+                    sha1.update(cert.getEncoded());
+                    out.add("SHA1:" + dumpHex(sha1.digest()));
+                    // getPublicKey().getEncoded() is already the DER SubjectPublicKeyInfo,
+                    // which is exactly what a public-key pin is computed over.
+                    java.security.PublicKey pk = cert.getPublicKey();
+                    if (pk != null && pk.getEncoded() != null) {
+                        MessageDigest spki = MessageDigest.getInstance("SHA-256");
+                        spki.update(pk.getEncoded());
+                        out.add("SPKI-SHA-256:"
+                                + com.codename1.util.Base64.encodeNoNewline(spki.digest()));
+                    }
+                }
+                return out.toArray(new String[out.size()]);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+        return new String[0];
+    }
+
     /**
      * @inheritDoc
      */
@@ -13617,6 +13657,87 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public boolean isDeviceCompromised() {
         return getCompromiseReasons().length > 0;
+    }
+
+    /**
+     * Base64 SHA-256 digests of the certificates this APK is actually signed with.
+     *
+     * <p>Uses the v2/v3 signing-block API on API 28 and up, which reports the full
+     * signing lineage after a key rotation; below that only the legacy v1 signature
+     * is available. Note that under Play App Signing the digest seen here is
+     * Google's <em>app signing</em> key, not the developer's upload key -- comparing
+     * against the upload key is the classic way to make every production install
+     * report itself as repackaged.</p>
+     */
+    @Override
+    public String[] getAppSignerDigests() {
+        try {
+            Context ctx = getContext();
+            if (ctx == null) {
+                return new String[0];
+            }
+            PackageManager pm = ctx.getPackageManager();
+            String pkg = ctx.getPackageName();
+            Signature[] signatures = null;
+            if (android.os.Build.VERSION.SDK_INT >= 28) {
+                // Reflection because the port compiles against an older android.jar
+                // than the devices it runs on, the same reason the Play Integrity
+                // call in this file is reflective.
+                signatures = signingCertificatesViaReflection(pm, pkg);
+            }
+            if (signatures == null) {
+                PackageInfo info = pm.getPackageInfo(pkg, PackageManager.GET_SIGNATURES);
+                signatures = info.signatures;
+            }
+            if (signatures == null) {
+                return new String[0];
+            }
+            java.util.ArrayList<String> out = new java.util.ArrayList<String>();
+            for (int i = 0; i < signatures.length; i++) {
+                MessageDigest md = MessageDigest.getInstance("SHA-256");
+                md.update(signatures[i].toByteArray());
+                out.add(com.codename1.util.Base64.encodeNoNewline(md.digest()));
+            }
+            return out.toArray(new String[out.size()]);
+        } catch (Throwable t) {
+            // Reporting nothing is better than failing a request over a
+            // package-manager quirk on some OEM build.
+            com.codename1.io.Log.e(t);
+            return new String[0];
+        }
+    }
+
+    /**
+     * PackageManager.GET_SIGNING_CERTIFICATES. Inlined because the port compiles
+     * against an android.jar that predates it.
+     */
+    private static final int FLAG_GET_SIGNING_CERTIFICATES = 0x08000000;
+
+    /**
+     * Reads the v2/v3 signing certificates on API 28+, or null when unavailable so
+     * the caller falls back to the legacy v1 signatures.
+     */
+    private static Signature[] signingCertificatesViaReflection(PackageManager pm, String pkg) {
+        try {
+            PackageInfo info = pm.getPackageInfo(pkg, FLAG_GET_SIGNING_CERTIFICATES);
+            java.lang.reflect.Field signingInfoField =
+                    PackageInfo.class.getField("signingInfo");
+            Object signingInfo = signingInfoField.get(info);
+            if (signingInfo == null) {
+                return null;
+            }
+            Class<?> signingInfoClass = signingInfo.getClass();
+            boolean multipleSigners = ((Boolean) signingInfoClass
+                    .getMethod("hasMultipleSigners").invoke(signingInfo)).booleanValue();
+            // With one signer the history includes the pre-rotation certificates,
+            // which a server comparing against an older build still needs to accept.
+            String method = multipleSigners
+                    ? "getApkContentsSigners"
+                    : "getSigningCertificateHistory";
+            return (Signature[]) signingInfoClass.getMethod(method).invoke(signingInfo);
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     @Override

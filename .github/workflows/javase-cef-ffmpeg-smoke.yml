@@ -70,7 +70,27 @@ jobs:
       - name: Install ffmpeg on Windows
         if: runner.os == 'Windows'
         shell: powershell
-        run: choco install ffmpeg -y
+        run: |
+          # Retried, and then VERIFIED. The community feed answers 504 often enough to
+          # matter, and chocolatey can report success after failing to fetch -- so the
+          # first sign of trouble was the smoke test dying three steps later with
+          # "FileNotFoundError: [WinError 2] The system cannot find the file specified",
+          # which names neither ffmpeg nor the feed. An install step that does not
+          # confirm the tool it installed is how a transient upstream outage becomes an
+          # unreadable failure in somebody else's test.
+          $ok = $false
+          foreach ($delay in 0, 30, 90) {
+            if ($delay -gt 0) {
+              Write-Host "choco install ffmpeg failed; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            choco install ffmpeg -y --no-progress
+            if (Get-Command ffmpeg -ErrorAction SilentlyContinue) { $ok = $true; break }
+          }
+          if (-not $ok) {
+            throw "ffmpeg is not on PATH after installing it. The chocolatey feed is the usual reason -- look for a 504 above."
+          }
+          ffmpeg -version
 
       - name: Run JavaSE CEF/FFmpeg smoke test
         env:

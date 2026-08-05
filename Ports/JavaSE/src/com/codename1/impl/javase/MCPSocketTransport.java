@@ -76,6 +76,31 @@ public final class MCPSocketTransport implements MCPTransport {
 
     @Override
     public void open() throws IOException {
+        // Reopening this instance starts a session; it does not resume a closed one.
+        //
+        // close() set `closed` permanently and nothing cleared it, so a stop()/start() pair
+        // over one transport -- which MCPServer supports, and which is how a caller holding
+        // a single transport restarts -- bound a socket, saw the retained flag below, closed
+        // that socket and threw, stopping the restarted server on its first breath. Cleared
+        // here rather than in close(), because a transport that has been closed and not
+        // reopened must keep refusing reads. Same fix, same reasoning, as
+        // MCPLoopbackSocketTransport.
+        //
+        // Refusing a second open while one is live is part of it: the listening socket is
+        // reachable only through this field, so overwriting it strands a listener that
+        // survives close() and keeps the port bound.
+        synchronized (lock) {
+            if (serverSocket != null) {
+                throw new IOException("This MCP transport is already listening on port "
+                        + port);
+            }
+            closed = false;
+            // A previous session's streams belong to a socket close() already shut. Left
+            // in place, readMessage() would read the old client before accepting the new
+            // one -- it recovers, but only by way of a read failure on a dead socket.
+            reader = null;
+            writer = null;
+        }
         // Bind to the loopback interface only so the MCP control channel is never exposed
         // to the local network. Backlog of one: a single agent attaches at a time, but the
         // listening socket stays bound across client sessions so an agent can disconnect and

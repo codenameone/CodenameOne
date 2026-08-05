@@ -34,6 +34,7 @@ import java.io.PipedOutputStream;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -406,5 +407,71 @@ class MCPLoopbackSocketTransportTest {
         clientWrites.write("{\"id\":42}\n".getBytes("UTF-8"));
         clientWrites.flush();
         assertEquals("{\"id\":42}", transport.readMessage());
+    }
+
+    /**
+     * A connection belongs to the listener that accepted it, not to whichever transport
+     * is open when its callback runs.
+     *
+     * <p>The callback used to resolve the process-wide active transport at execution
+     * time. A transport that accepted a client just before closing therefore handed those
+     * already-accepted streams to whatever opened next -- a client of the stopped
+     * listener taking over the new server's session, which is the one thing the
+     * single-agent rule exists to prevent.</p>
+     */
+    @Test
+    void aConnectionAcceptedByOneTransportIsNotHandedToTheNext() throws Exception {
+        MCPLoopbackSocketTransport accepting = new MCPLoopbackSocketTransport(47811);
+        MCPLoopbackSocketTransport.setActiveForTesting(accepting);
+        // Constructed while `accepting` is the listener, which is when the socket API
+        // creates it: as the connection is accepted.
+        MCPLoopbackSocketTransport.Connection connection =
+                new MCPLoopbackSocketTransport.Connection();
+
+        accepting.close();
+        transport = new MCPLoopbackSocketTransport(47811);
+        MCPLoopbackSocketTransport.setActiveForTesting(transport);
+        // The replacement's own client, already talking.
+        transport.attach(new ByteArrayInputStream("{\"id\":42}\n".getBytes("UTF-8")),
+                new ByteArrayOutputStream());
+
+        final boolean[] orphanClosed = {false};
+        final InputStream orphanIn = new InputStream() {
+            private final byte[] data = "{\"id\":99}\n".getBytes("UTF-8");
+            private int pos;
+
+            @Override
+            public int read() {
+                return pos < data.length ? data[pos++] & 0xff : -1;
+            }
+
+            @Override
+            public void close() {
+                orphanClosed[0] = true;
+            }
+        };
+        // On its own thread with a deadline. The callback deliberately parks for the life
+        // of a session it accepts, so under the old behaviour -- where it adopted whatever
+        // transport was open -- this call never returns. A regression has to fail the test
+        // rather than hang the suite.
+        final MCPLoopbackSocketTransport.Connection handoff = connection;
+        Thread callback = new Thread(new Runnable() {
+            public void run() {
+                handoff.connectionEstablished(orphanIn, new ByteArrayOutputStream());
+            }
+        }, "mcp-orphan-connection");
+        callback.setDaemon(true);
+        callback.start();
+        callback.join(5000L);
+        assertFalse(callback.isAlive(),
+                "a connection whose listener has closed is released, not parked as if it "
+                + "were serving a session");
+
+        assertEquals("{\"id\":42}", transport.readMessage(),
+                "the replacement must still be serving ITS client -- an attach from the "
+                + "previous listener's connection would have dropped it");
+        assertTrue(orphanClosed[0],
+                "and the orphaned connection is closed rather than left half-attached");
+        MCPLoopbackSocketTransport.setActiveForTesting(null);
     }
 }

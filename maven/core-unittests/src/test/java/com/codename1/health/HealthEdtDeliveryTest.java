@@ -34,6 +34,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -72,14 +74,20 @@ class HealthEdtDeliveryTest extends UITestBase {
      * Runs {@code op} off the EDT and waits for its delivery without blocking
      * the EDT.
      *
-     * <p>Worth spelling out, because the obvious harness fails in a way that
-     * looks like a product bug. These tests run on the EDT; the delivery being
-     * asserted is a {@code callSerially}; so waiting on a latch from the test
-     * thread stops the event loop and the runnable carrying the result can
-     * never run. {@code invokeAndBlock} is the CN1 answer -- it moves the
-     * waiting off the EDT and keeps the loop pumping. My first version of this
-     * file used a plain latch and reported the aggregate path as broken when
-     * it was not.</p>
+     * <p>Worth spelling out, because the harness reads as more than it is.
+     * JUnit runs these on {@code main}, not on the EDT, so
+     * {@code invokeAndBlock} takes its non-EDT branch and simply runs the
+     * operation inline; the real EDT pumps its own loop alongside, which is
+     * what carries the delivery. The call is kept because it states the
+     * precondition the assertion below checks -- the operation starts off the
+     * EDT -- and because it is what a caller would write.</p>
+     *
+     * <p>The consequence is that the EDT is free to deliver the moment a
+     * resource is completed, so every test here has to attach its listener
+     * before that can happen: an already-settled {@code AsyncResource} runs a
+     * late listener inline on the attaching thread, recording "not the EDT"
+     * for a delivery that did happen there. The store tests hold the backend;
+     * the facade test parks the EDT.</p>
      */
     private <T> void assertDeliveredOnEdt(final Landing<T> landing,
             final Runnable op) {
@@ -198,20 +206,6 @@ class HealthEdtDeliveryTest extends UITestBase {
     }
 
     /**
-     * The facade's own actions deliver on the EDT too.
-     *
-     * <p>These were missed when the store's results were moved onto
-     * {@code EdtResult}: {@code openHealthSettings} and
-     * {@code openProviderSetup} settle synchronously before the method
-     * returns, so a callback attached afterwards ran immediately on whatever
-     * thread called -- and a caller doing UI work in it, which is the whole
-     * point of "did the settings screen open?", raced rendering.</p>
-     *
-     * <p>The fallback facade is the one under test here because it is the one
-     * that settles inline; the port facades do the same thing through the
-     * same resource type.</p>
-     */
-    /**
      * Every public health resource is an EDT-delivering one.
      *
      * <p>Written as a source scan rather than as one test per operation
@@ -310,53 +304,86 @@ class HealthEdtDeliveryTest extends UITestBase {
         return "<unknown>";
     }
 
+    /**
+     * The facade's own actions deliver on the EDT too.
+     *
+     * <p>These were missed when the store's results were moved onto
+     * {@code EdtResult}: {@code openHealthSettings} and
+     * {@code openProviderSetup} settle synchronously before the method
+     * returns, so a callback attached afterwards ran immediately on whatever
+     * thread called -- and a caller doing UI work in it, which is the whole
+     * point of "did the settings screen open?", raced rendering.</p>
+     *
+     * <p>The fallback facade is the one under test here because it is the one
+     * that settles inline; the port facades do the same thing through the
+     * same resource type.</p>
+     */
     @Test
     void aFacadeActionDeliversOnTheEdt() {
         final Landing<Boolean> landing = new Landing<Boolean>();
+        final CountDownLatch attached = new CountDownLatch(1);
         assertDeliveredOnEdt(landing, new Runnable() {
             public void run() {
-                Health.getInstance().openHealthSettings().onResult(landing);
+                // The facade settles before it returns, so unlike the store
+                // tests there is nothing to hold back -- park the EDT instead.
+                // Serial calls run in order, so this blocker is ahead of the
+                // delivery in the queue and the listener wins the attach.
+                CN.callSerially(new Runnable() {
+                    public void run() {
+                        try {
+                            // Bounded on purpose: a blocker that outlived its
+                            // release would park the EDT for the rest of the
+                            // suite, turning one failure into a hang.
+                            attached.await(10, TimeUnit.SECONDS);
+                        } catch (InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                });
+                try {
+                    Health.getInstance().openHealthSettings()
+                            .onResult(landing);
+                } finally {
+                    // In a finally so a throw above surfaces as itself rather
+                    // than as a suite-wide hang behind a still-parked EDT.
+                    attached.countDown();
+                }
             }
         }, true);
     }
 
-    /**
-     * The same guarantee when the listener attaches AFTER the resource has
-     * settled.
-     *
-     * <p>{@code aFacadeActionDeliversOnTheEdt} above only catches this by
-     * luck. {@code openHealthSettings} completes before it returns, so
-     * off the EDT it schedules delivery and then races the caller's
-     * {@code onResult} across two adjacent statements. Win the race and the
-     * callback is registered before completion and arrives on the EDT; lose it
-     * and {@code AsyncResource.ready} sees a settled resource and runs the
-     * callback inline, on the caller's thread. Intermittent, and it read as a
-     * flaky test rather than the contract breaking.</p>
-     *
-     * <p>This forces the losing side: wait for the resource to settle, THEN
-     * attach. Before the fix this failed every run rather than one in
-     * many.</p>
-     */
+    /// A listener attached AFTER the result settled still arrives on the EDT.
+    ///
+    /// This is the same guarantee as the tests above, at the one moment it used not to
+    /// hold. `AsyncResource.ready` invokes the callback immediately, on the registering
+    /// thread, when the resource is already done -- so EdtResult's contract covered only
+    /// listeners attached before completion. The facade actions complete before
+    /// returning, so a caller cannot attach in time, and which thread the callback ran
+    /// on came down to whether the EDT had drained the hop yet: on the EDT on an idle
+    /// machine, off it on a loaded one. `aFacadeActionDeliversOnTheEdt` therefore passed
+    /// or failed by timing. This one settles the resource and waits for the hop to drain
+    /// before attaching, so the late path is the only one it can take.
     @Test
-    void aLateListenerStillDeliversOnTheEdt() {
+    void aListenerAttachedAfterCompletionStillArrivesOnTheEdt() {
         final Landing<Boolean> landing = new Landing<Boolean>();
         CN.invokeAndBlock(new Runnable() {
             public void run() {
                 assertFalse(CN.isEdt(), "the operation must start off the EDT");
-                AsyncResource<Boolean> r = Health.getInstance().openHealthSettings();
+                AsyncResource<Boolean> settled = Health.getInstance().openHealthSettings();
+                // Wait for the completion hop itself, so the registration below is
+                // unambiguously late rather than merely probably late.
                 long deadline = System.currentTimeMillis() + 10_000L;
-                while (!r.isDone() && System.currentTimeMillis() < deadline) {
+                while (!settled.isDone() && System.currentTimeMillis() < deadline) {
                     try {
                         Thread.sleep(10L);
                     } catch (InterruptedException ex) {
                         return;
                     }
                 }
-                assertTrue(r.isDone(), "the resource must settle before we attach");
-                r.onResult(landing);
+                assertTrue(settled.isDone(), "the fixture needs a settled resource");
+                settled.onResult(landing);
                 deadline = System.currentTimeMillis() + 10_000L;
-                while (!landing.arrived.get()
-                        && System.currentTimeMillis() < deadline) {
+                while (!landing.arrived.get() && System.currentTimeMillis() < deadline) {
                     try {
                         Thread.sleep(10L);
                     } catch (InterruptedException ex) {
@@ -367,7 +394,57 @@ class HealthEdtDeliveryTest extends UITestBase {
         });
         assertTrue(landing.arrived.get(), "the callback must arrive");
         assertTrue(landing.onEdt.get(),
-                "a listener attached after completion must still land on the EDT");
+                "a result must arrive on the EDT even when the listener was attached "
+                + "after it settled");
+    }
+
+    /// And a listener attached after a FAILURE arrives on the EDT too.
+    ///
+    /// `onResult` is `ready` followed by `except`, and only the first was marshalled --
+    /// so this exact sequence, a worker registering on a resource that had already
+    /// failed, ran the error half synchronously on that worker. An app handling a health
+    /// error by showing a dialog or updating a label was then touching the UI off the
+    /// EDT, which is what this class exists to prevent, reached through the other half of
+    /// the same method.
+    @Test
+    void aListenerAttachedAfterAFailureAlsoArrivesOnTheEdt() {
+        final FakeHealthStore store = new FakeHealthStore();
+        store.holdRead = true;
+        final Landing<List<HealthSample>> landing =
+                new Landing<List<HealthSample>>();
+        CN.invokeAndBlock(new Runnable() {
+            public void run() {
+                assertFalse(CN.isEdt(), "the operation must start off the EDT");
+                AsyncResource<List<HealthSample>> failed = store.readSamples(
+                        new SampleQuery()
+                                .addType(HealthDataType.STEPS)
+                                .setTimeRange(HealthTimeRange.between(0L, 1000L)));
+                store.heldRead.error(new IllegalStateException("the backend said no"));
+                long deadline = System.currentTimeMillis() + 10_000L;
+                while (!failed.isDone() && System.currentTimeMillis() < deadline) {
+                    try {
+                        Thread.sleep(10L);
+                    } catch (InterruptedException ex) {
+                        return;
+                    }
+                }
+                assertTrue(failed.isDone(), "the fixture needs a settled failure");
+                failed.onResult(landing);
+                deadline = System.currentTimeMillis() + 10_000L;
+                while (!landing.arrived.get() && System.currentTimeMillis() < deadline) {
+                    try {
+                        Thread.sleep(10L);
+                    } catch (InterruptedException ex) {
+                        return;
+                    }
+                }
+            }
+        });
+        assertTrue(landing.arrived.get(), "the callback must arrive");
+        assertTrue(landing.failed.get(), "and it must be the error half");
+        assertTrue(landing.onEdt.get(),
+                "an error delivered to a late listener is still a callback an app "
+                + "handles by touching the UI, so it belongs on the EDT");
     }
 
     @Test

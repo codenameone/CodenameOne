@@ -237,6 +237,40 @@ public final class WebSocket {
         return this;
     }
 
+    /// Add a header to the opening handshake. Must be called before [connect].
+    /// Passing a null value removes a previously set header. Returns `this` for
+    /// chaining.
+    ///
+    /// Typically used to carry an authorization or attestation token, since a
+    /// WebSocket has no other place to put one.
+    ///
+    /// ```
+    /// WebSocket.build("wss://api.example.com/stream")
+    ///     .header("X-CN1-Attest", token)
+    ///     .connect();
+    /// ```
+    ///
+    /// #### Not supported everywhere
+    ///
+    /// Emitted on Android, desktop, Windows and Linux, which build the opening
+    /// handshake themselves. **Silently dropped on iOS and in the browser**,
+    /// which hand the handshake to a platform WebSocket that exposes no way to
+    /// add headers to it.
+    ///
+    /// Where headers are unavailable, obtain a short-lived ticket over an
+    /// ordinary HTTPS request -- which can be attested and pinned normally --
+    /// and pass it in the URL query instead. That also avoids leaking a
+    /// long-lived credential into a URL.
+    ///
+    /// Headers the handshake sets itself -- `Host`, `Upgrade`, `Connection`,
+    /// `Sec-WebSocket-Key`, `Sec-WebSocket-Version`, `Sec-WebSocket-Protocol`
+    /// -- are reserved and are ignored if passed here. Use [subprotocols] for
+    /// the last of those.
+    public WebSocket header(String name, String value) {
+        impl.setRequestHeader(name, value);
+        return this;
+    }
+
     /// The subprotocol the server selected during the handshake, or null
     /// when none was negotiated. Valid once the [ConnectHandler] has fired.
     public String getSelectedSubprotocol() {

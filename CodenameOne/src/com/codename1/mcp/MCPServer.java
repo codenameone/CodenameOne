@@ -80,6 +80,9 @@ public class MCPServer {
     private String serverVersion = "1.0";
     private boolean screenshotEnabled = true;
     private boolean running;
+    /// Bumped by every start(), so a reader thread can tell its own run from a later one that
+    /// happens to have been handed the same transport instance.
+    private int startGeneration;
     private MCPTransport transport;
     private MCPVerbosity verbosity = MCPVerbosity.OFF;
 
@@ -128,7 +131,7 @@ public class MCPServer {
         this.screenshotEnabled = screenshotEnabled;
     }
 
-    public boolean isRunning() {
+    public synchronized boolean isRunning() {
         return running;
     }
 
@@ -139,10 +142,17 @@ public class MCPServer {
         }
         this.transport = transport;
         running = true;
+        startGeneration++;
+        final int generation = startGeneration;
+        // Captured for the thread rather than read back off the field. A later start()
+        // replaces the field, and a reader thread that followed it would end up serving a
+        // transport the server no longer considers its own -- while the transport it was
+        // actually given was never closed.
+        final MCPTransport mine = transport;
         Thread readerThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                runLoop();
+                runLoop(mine, generation);
             }
         }, "cn1-mcp-server");
         readerThread.start();
@@ -156,27 +166,325 @@ public class MCPServer {
         }
     }
 
-    private void runLoop() {
-        try {
-            transport.open();
-        } catch (IOException ex) {
-            // The transport failed to start listening. Log defensively: the CN1 Log
-            // routes through the platform implementation, which may not be registered
-            // yet when the server is auto-started early in Display.init(), and a raw
-            // NullPointerException here would silently kill the reader thread.
-            try {
-                Log.e(ex);
-            } catch (Throwable logErr) {
-                System.err.println("[cn1.mcp] transport open failed: " + ex);
-            }
+    /// True while `t` is still the transport this server is serving over. False once stop()
+    /// has run, or once a restart handed the server a different transport -- in both cases
+    /// the thread holding `t` owns it alone and has to close it itself.
+    private synchronized boolean isCurrent(MCPTransport t, int generation) {
+        // The generation as well as the identity. A caller that stops and restarts with
+        // the SAME transport instance would otherwise leave the old reader thread looking
+        // current, so it could run on beside the replacement and eventually stop the
+        // server and close the transport underneath it.
+        return running && startGeneration == generation
+                && transport == t; // NOPMD identity is the question, not equality
+    }
+
+    /// Clears the running flag when this thread is still the current run, and answers the
+    /// only other question a thread unwinding from `t` has: does it close `t`?
+    ///
+    /// Both halves have to be decided together under this lock. Deciding "am I current" and
+    /// then closing outside it leaves a window where a `stop()`/`start(sameTransport)` pair
+    /// hands `t` to a fresh generation -- and the old thread, correctly declining to stop
+    /// the *server*, would still close the transport the replacement is now serving over,
+    /// killing a server that had just been restarted.
+    ///
+    /// Three cases, only one of which closes nothing:
+    ///
+    /// - still current: this run is over, so clear `running` and close.
+    /// - superseded, and the replacement holds a different transport: nobody else can close
+    ///   `t`, so this thread must. Leaking it is not benign -- an open transport stays
+    ///   registered process-wide and every later `open()` is refused.
+    /// - superseded, and the replacement holds this same transport: leave it alone. It is
+    ///   the live server's transport now, and the replacement thread will close it.
+    ///
+    /// The close happens here, under the monitor, rather than being reported back to a
+    /// caller that closes afterwards. Deciding and then closing outside the lock leaves
+    /// the very gap this method exists to remove: a reader reaching EOF clears `running`,
+    /// a restart over the same transport lands in the gap, and the close then lands on
+    /// the replacement's transport.
+    private synchronized void releaseAndCloseIfCurrent(MCPTransport t, int generation) {
+        boolean mine;
+        if (startGeneration == generation
+                && transport == t) { // NOPMD identity: is this still our transport?
             running = false;
+            mine = true;
+        } else {
+            mine = transport != t; // NOPMD identity: reused by the replacement, or orphaned?
+        }
+        if (mine) {
+            // Closing under the monitor matches stop(), which is synchronized and closes
+            // the same way. A transport's close() releases a socket; it does not call
+            // back into the server, so there is nothing here to deadlock against.
+            t.close();
+        }
+    }
+
+    /// Unwinds an open this thread performed and must not keep: clears `running` when the
+    /// server is still on this run, and closes `t` either way.
+    ///
+    /// Unconditionally, which is the one thing it does differently from
+    /// `releaseAndCloseIfCurrent`, and the difference is the whole reason it exists. That
+    /// method's same-transport rule -- leave `t` alone, the replacement owns it -- is
+    /// right for a thread unwinding from the read loop, where the replacement has already
+    /// opened the transport and closing it would kill a live server. It is wrong here:
+    /// this runs inside the transport's monitor, so the replacement is still blocked and
+    /// has opened nothing, and the listener registered on `t` is this thread's alone.
+    /// Declining to close it left the replacement's own `open()` refused with "already
+    /// listening" -- and that IOException stopped the server the restart had just brought
+    /// up.
+    ///
+    /// Only ever called while holding `t`'s open lock, which is what makes "the
+    /// replacement cannot have opened yet" true rather than merely likely.
+    private synchronized void discardOwnOpen(MCPTransport t, int generation) {
+        if (startGeneration == generation
+                && transport == t) { // NOPMD identity: is this still our transport?
+            running = false;
+        }
+        t.close();
+    }
+
+    /// Opens `t` for this generation, serialized against any other generation opening the
+    /// same transport. Returns false when this thread is done and must not read.
+    ///
+    /// Serialized per TRANSPORT, and the WHOLE open -- the attempt, its failure path, and
+    /// the teardown of a superseded one -- happens inside. A stop()/start() over the SAME
+    /// transport while the old reader is still parked in open() would otherwise have both
+    /// generations open one instance: the same-transport rule then correctly declines to
+    /// close it on the way out, and the transport is left holding two listeners with one
+    /// handle for them, so the first is leaked and outlives stop().
+    ///
+    /// The teardown has to be in here too, not after. Releasing the lock first let the
+    /// replacement acquire it and call open() while this thread's now-stale listener was
+    /// still registered -- and a transport refuses a second listener, so the replacement
+    /// took an IOException and stopped the server it had just started.
+    ///
+    /// Per transport and not per server, which is what a server-wide lock got wrong: a
+    /// restart over a DIFFERENT transport has nothing to serialize against, and making it
+    /// wait behind a superseded open that may never return deadlocks the restart. Not the
+    /// server monitor either: open() blocks, and holding that across it would make stop()
+    /// wait on what it is stopping.
+    ///
+    /// And deliberately NOT the transport's own monitor, which is what this used to be.
+    /// [MCPTransport] is a public interface: an implementation is entitled to write
+    /// `synchronized void close()`, and with such a transport the two locks were taken in
+    /// opposite orders -- this thread held the transport and waited for the server monitor
+    /// inside `isCurrent`, while `stop()` held the server monitor and waited for the
+    /// transport inside `close()`. Both threads park forever. The same ownership also
+    /// blocked the one call that can end a legitimately blocking `open()`: `close()` could
+    /// not run until `open()` returned, and `open()` was waiting for `close()`. A lock the
+    /// server owns and no transport can name has neither problem, and the ordering below
+    /// has one direction only -- open lock, then server monitor, then whatever the
+    /// transport locks internally.
+    private boolean openSerialized(MCPTransport t, int generation) {
+        Object openLock = acquireOpenLock(t);
+        try {
+            synchronized (openLock) {
+                if (!isCurrent(t, generation)) {
+                    releaseAndCloseIfCurrent(t, generation);
+                    return false;
+                }
+                try {
+                    t.open();
+                } catch (IOException ex) {
+                    // The transport failed to start listening. Log defensively: the CN1
+                    // Log routes through the platform implementation, which may not be
+                    // registered yet when the server is auto-started early in
+                    // Display.init(), and a raw NullPointerException here would silently
+                    // kill the reader thread.
+                    try {
+                        Log.e(ex);
+                    } catch (Throwable logErr) {
+                        System.err.println("[cn1.mcp] transport open failed: " + ex);
+                    }
+                    // A failed open can still have registered something -- the loopback
+                    // transport claims the process-wide slot before it binds -- so this
+                    // unwinds the same way a successful one does.
+                    discardOwnOpen(t, generation);
+                    return false;
+                }
+                if (!isCurrent(t, generation)) {
+                    // Same window, the far side of it: the server moved on while open()
+                    // was in flight. The listener now on `t` is this thread's and has to
+                    // go.
+                    discardOwnOpen(t, generation);
+                    return false;
+                }
+                return true;
+            }
+        } finally {
+            releaseOpenLock(t);
+        }
+    }
+
+    /// The per-transport open locks, and how many threads are currently holding a
+    /// reference to each.
+    ///
+    /// A plain map would grow one entry per transport instance the process ever serves.
+    /// The count is what makes removal safe: dropping an entry while a thread is parked on
+    /// that monitor would let the next generation mint a second lock for the same
+    /// transport, and two generations serializing on different objects are not serialized
+    /// at all.
+    private final List<Object[]> openLocks = new ArrayList<Object[]>();
+
+    /// Transports with a reader still inside their loop, and which generation it belongs
+    /// to.
+    ///
+    /// A restart over the SAME transport instance is the case this exists for. Both
+    /// production transports clear their closed flag in open(), so a reader still parked
+    /// in readMessage() from the previous generation is looking at a live stream again the
+    /// moment the replacement opens -- and it can take a frame the new client sent. The
+    /// frame is then handled by a loop that belongs to a stopped server, or dropped
+    /// entirely; the new session simply never sees it, which reads as a client that hangs.
+    ///
+    /// stop() closes the transport before any of this, so the stale read unwinds
+    /// immediately and the wait below is measured in the time that takes rather than in
+    /// anything the client controls.
+    private final List<Object[]> activeReaders = new ArrayList<Object[]>();
+
+    /// How long a replacement waits for the previous reader of the same transport before
+    /// opening anyway.
+    ///
+    /// Bounded rather than indefinite, and the bound is the whole design. `stop()` closes
+    /// the transport first, so a reader blocked on a real socket unwinds in microseconds
+    /// and this wait is never observed. [MCPTransport] is a public interface, though, and
+    /// an implementation is entitled to a `readMessage()` that parks until something other
+    /// than `close()` releases it -- the loopback test transport is exactly that. Waiting
+    /// forever for such a reader deadlocks the restart against a thread only the caller
+    /// can end, which is worse than the overlap this is guarding against: the loop already
+    /// re-checks `isCurrent` after every read, so a stale reader cannot HANDLE anything,
+    /// and what is left is a frame it might swallow.
+    private static final long READER_HANDOVER_WAIT_MS = 2000L;
+
+    /// Registers this generation as the reader of {@code t}, waiting out any older one.
+    private void awaitSoleReader(MCPTransport t, int generation) {
+        synchronized (activeReaders) {
+            long deadline = System.currentTimeMillis() + READER_HANDOVER_WAIT_MS;
+            for (;;) {
+                Object[] found = null;
+                for (Object[] entry : activeReaders) {
+                    if (entry[0] == t) { // NOPMD identity: one reader per INSTANCE
+                        found = entry;
+                        break;
+                    }
+                }
+                if (found == null) {
+                    activeReaders.add(new Object[] {t, Integer.valueOf(generation)});
+                    return;
+                }
+                if (((Integer) found[1]).intValue() == generation) {
+                    return;
+                }
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0L) {
+                    // The previous reader is not coming back on its own. Taking the
+                    // registration over rather than leaving it to the departed generation
+                    // keeps a third restart waiting for THIS thread, which is the one
+                    // actually on the transport.
+                    found[1] = Integer.valueOf(generation);
+                    return;
+                }
+                try {
+                    activeReaders.wait(remaining);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
+    }
+
+    private void releaseReader(MCPTransport t, int generation) {
+        synchronized (activeReaders) {
+            for (java.util.Iterator<Object[]> it = activeReaders.iterator(); it.hasNext();) {
+                Object[] entry = it.next();
+                if (entry[0] == t // NOPMD identity: one reader per INSTANCE
+                        && ((Integer) entry[1]).intValue() == generation) {
+                    it.remove();
+                    break;
+                }
+            }
+            activeReaders.notifyAll();
+        }
+    }
+
+    private Object acquireOpenLock(MCPTransport t) {
+        synchronized (openLocks) {
+            for (Object[] entry : openLocks) {
+                if (entry[0] == t) { // NOPMD identity: one lock per transport INSTANCE
+                    ((int[]) entry[2])[0]++;
+                    return entry[1];
+                }
+            }
+            Object lock = new Object();
+            openLocks.add(new Object[] {t, lock, new int[] {1}});
+            return lock;
+        }
+    }
+
+    private void releaseOpenLock(MCPTransport t) {
+        synchronized (openLocks) {
+            // Iterator.remove rather than List.remove during a foreach. The foreach
+            // version could not actually throw -- it returned before the iterator was
+            // touched again -- but that made its safety depend on a `return` three lines
+            // away, which is the kind of coupling a later edit breaks without anything
+            // saying so. This shape is safe on its own terms.
+            for (java.util.Iterator<Object[]> it = openLocks.iterator(); it.hasNext();) {
+                Object[] entry = it.next();
+                if (entry[0] == t) { // NOPMD identity: one lock per transport INSTANCE
+                    int[] users = (int[]) entry[2];
+                    users[0]--;
+                    if (users[0] <= 0) {
+                        it.remove();
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    private void runLoop(MCPTransport t, int generation) {
+        // Opening is deferred to this thread, so by the time it happens the server may
+        // already have been stopped or restarted. Either way stop()'s close() ran against a
+        // transport that had not opened yet and therefore released nothing, so opening now
+        // would leave a transport registered with nobody left to close it. That registration
+        // is process-wide: every later open() is refused on the grounds that an agent is
+        // already being served.
+        if (!isCurrent(t, generation)) {
             return;
         }
-        while (running) {
+        // Before opening, not after: a reader from the previous generation of this same
+        // transport instance may still be parked in readMessage(), and open() clears the
+        // flag that would have ended it. Opening first would put two readers on one
+        // stream, and the frame the new client sends can go to the one that no longer
+        // belongs to anybody.
+        awaitSoleReader(t, generation);
+        try {
+            if (!isCurrent(t, generation)) {
+                return;
+            }
+            if (!openSerialized(t, generation)) {
+                return;
+            }
+            readUntilClosed(t, generation);
+        } finally {
+            releaseReader(t, generation);
+        }
+        releaseAndCloseIfCurrent(t, generation);
+    }
+
+    private void readUntilClosed(MCPTransport t, int generation) {
+        while (isCurrent(t, generation)) {
             String line;
             try {
-                line = transport.readMessage();
+                line = t.readMessage();
             } catch (IOException ex) {
+                break;
+            }
+            // Re-checked on the far side of the read as well as the near side. A read
+            // blocks for as long as the client is quiet, which is most of the time, so
+            // "was this server current when the read started" says nothing about whether
+            // it still is when the read returns -- and handling a request for a server
+            // that has been stopped answers on a transport somebody else may now own.
+            if (!isCurrent(t, generation)) {
                 break;
             }
             if (line == null) {
@@ -188,14 +496,12 @@ public class MCPServer {
             String response = handleMessage(line);
             if (response != null) {
                 try {
-                    transport.writeMessage(response);
+                    t.writeMessage(response);
                 } catch (IOException ex) {
                     break;
                 }
             }
         }
-        running = false;
-        transport.close();
     }
 
     /// Handles one inbound JSON-RPC message and returns the response line, or null

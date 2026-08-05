@@ -13,8 +13,16 @@ set -uo pipefail
 # RETRY_ATTEMPTS (default 3) and RETRY_DELAY_SECONDS (default 30) override the
 # bounds; the command is always attempted at least once and the last attempt's
 # exit status is what this script returns.
+#
+# RETRY_ONLY_MATCHING is an extended regex that narrows retrying to failures
+# whose output matches it -- for steps that RUN TESTS, where a blanket retry
+# would quietly convert a flaky test into a pass and hide exactly the kind of
+# race this repo requires to be root-caused. With it set, a failure that does not
+# match is returned on the first attempt, so only the transient-resolution case
+# gets a second chance. Leave it unset for steps that merely download and build.
 attempts="${RETRY_ATTEMPTS:-3}"
 delay="${RETRY_DELAY_SECONDS:-30}"
+only_matching="${RETRY_ONLY_MATCHING:-}"
 
 if [ "$#" -eq 0 ]; then
   echo "retry.sh: no command given" >&2
@@ -35,9 +43,30 @@ esac
 # degenerate ranges, and this loop body must run exactly `attempts` times.
 status=0
 attempt=1
+log=""
+if [ -n "$only_matching" ]; then
+  log="$(mktemp)"
+  trap 'rm -f "$log"' EXIT
+fi
 while [ "$attempt" -le "$attempts" ]; do
-  "$@" && exit 0
-  status=$?
+  if [ -n "$only_matching" ]; then
+    # Streamed as well as captured, so the step's log reads exactly as it would
+    # without the wrapper.
+    "$@" 2>&1 | tee "$log"
+    status=$?
+  else
+    "$@" && exit 0
+    status=$?
+  fi
+  if [ "$status" -eq 0 ]; then
+    exit 0
+  fi
+  if [ -n "$only_matching" ] && ! grep -Eq "$only_matching" "$log"; then
+    echo "retry.sh: attempt ${attempt}/${attempts} failed with status ${status} and the" \
+      "output does not match RETRY_ONLY_MATCHING, so this is a real failure, not a" \
+      "transient one -- not retrying" >&2
+    exit "$status"
+  fi
   if [ "$attempt" -lt "$attempts" ]; then
     echo "retry.sh: attempt ${attempt}/${attempts} failed with status ${status};" \
       "retrying in ${delay}s (possible transient Maven Central 403/429/5xx)" >&2

@@ -166,11 +166,12 @@ int connections = 0;
     SecTrustRef trustRef = [[challenge protectionSpace] serverTrust];
     SecTrustEvaluate(trustRef, NULL);
     NSMutableString* certs = [NSMutableString string];
-    if (insecure) {
-        [[challenge sender] useCredential:[NSURLCredential credentialForTrust:[[challenge protectionSpace] serverTrust]] forAuthenticationChallenge:challenge];
-        return;
-    }
-    //[connection cancel];
+    // The chain is collected and offered to Java even for an insecure request. An
+    // insecure request asks us to accept a certificate the OS would reject -- a
+    // self-signed development server -- and that is a decision about OS trust
+    // evaluation, not a decision to stop looking. Returning here meant a host with
+    // enforced pins accepted any certificate at all as long as the request happened
+    // to be insecure, which is the opposite of what pinning is for.
     
     CFIndex count = SecTrustGetCertificateCount(trustRef);
     for (int i=0; i<count; i++) {
@@ -178,18 +179,44 @@ int connections = 0;
             if (i>0) {
                 [certs appendString:@","];
             }
+            // CHAIN:<n> opens each certificate's group; index 0 is the leaf. The
+            // Java side keeps this and the SPKI entry out of the legacy flat list
+            // so existing checkSSLCertificates overrides see unchanged data.
+            [certs appendFormat:@"CHAIN:%d,", i];
             [certs appendString:@"SHA-256:"];
             [certs appendString:[self getFingerprint256:certRef]];
             [certs appendString:@",SHA1:"];
             [certs appendString:[self getFingerprint:certRef]];
-
+            NSString* spki = [self getPublicKeyDigest:certRef];
+            if (spki != nil) {
+                [certs appendString:@",SPKI-SHA-256:"];
+                [certs appendString:spki];
+            }
         }
+    // Released first, and only under manual retain/release. The delegate is entered once
+    // per challenge and a connection can face several -- a redirect to another host
+    // presents its own chain -- so overwriting the field leaked the previous string. The
+    // rest of this file already keeps its retains behind this guard; an unconditional one
+    // here does not compile under ARC at all.
+#ifdef CN1_USE_ARC
+    sslCertificates = [NSString stringWithString:certs];
+#else
+    [sslCertificates release];
     sslCertificates = [[NSString stringWithString:certs] retain];
-    if (com_codename1_io_NetworkManager_checkCertificatesNativeCallback___int_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG connectionId)) {
-        [challenge.sender performDefaultHandlingForAuthenticationChallenge:challenge];
-    } else {
+#endif
+    if (!com_codename1_io_NetworkManager_checkCertificatesNativeCallback___int_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG connectionId)) {
+        // Java rejected the chain -- a per-request check or a guard pin mismatch.
+        // That veto applies to insecure requests too.
         [challenge.sender cancelAuthenticationChallenge:challenge];
+        return;
     }
+    if (insecure) {
+        // Accepted despite whatever the OS thinks of the chain, which is what the
+        // caller asked for by setting it insecure.
+        [[challenge sender] useCredential:[NSURLCredential credentialForTrust:trustRef] forAuthenticationChallenge:challenge];
+        return;
+    }
+    [challenge.sender performDefaultHandlingForAuthenticationChallenge:challenge];
 }
 
 -(void)setConnectionId:(JAVA_INT)connId {
@@ -197,9 +224,15 @@ int connections = 0;
 }
 
 - (NSString*) getFingerprint: (SecCertificateRef) cert {
-    NSData* certData = (__bridge NSData*) SecCertificateCopyData(cert);
+    // SecCertificateCopyData follows the Copy rule, so the result is owned here.
+    // The bridged cast alone leaked it on every handshake.
+    CFDataRef certData = SecCertificateCopyData(cert);
+    if (certData == NULL) {
+        return @"";
+    }
     unsigned char sha1Bytes[CC_SHA1_DIGEST_LENGTH];
-    CC_SHA1(certData.bytes, (int)certData.length, sha1Bytes);
+    CC_SHA1(CFDataGetBytePtr(certData), (CC_LONG)CFDataGetLength(certData), sha1Bytes);
+    CFRelease(certData);
     NSMutableString *fingerprint = [NSMutableString stringWithCapacity:CC_SHA1_DIGEST_LENGTH * 3];
     for (int i = 0; i < CC_SHA1_DIGEST_LENGTH; ++i) {
         [fingerprint appendFormat:@"%02x ", sha1Bytes[i]];
@@ -207,11 +240,136 @@ int connections = 0;
     return [fingerprint stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
 }
 
-- (NSString*) getFingerprint256: (SecCertificateRef) cert {
-    NSData* keyData = (__bridge NSData*) SecCertificateCopyData(cert);
+/**
+ * Reads one DER TLV at `off`. Returns NO when the buffer is too short or the
+ * length encoding is one we do not handle (indefinite length, or a length that
+ * would not fit). `headerLen` is the tag plus length bytes, `totalLen` covers
+ * the whole TLV.
+ */
+static BOOL cn1ReadDerTlv(const uint8_t* buf, NSUInteger len, NSUInteger off,
+                          uint8_t* tag, NSUInteger* headerLen, NSUInteger* totalLen) {
+    // off is walked forward by the caller, so an off past the end must not be able to
+    // make `off + 2` wrap back into range before the comparison.
+    if (off > len || len - off < 2) {
+        return NO;
+    }
+    *tag = buf[off];
+    NSUInteger n = buf[off + 1];
+    if (n < 0x80) {
+        *headerLen = 2;
+        // n < 0x80 and len - off >= 2, so this cannot overflow; the range check below
+        // is what decides whether the TLV actually fits.
+        *totalLen = 2 + n;
+    } else {
+        NSUInteger countBytes = n & 0x7f;
+        // 0x80 is indefinite length, which DER forbids; more than 4 length bytes
+        // would mean a certificate larger than anything we will ever be handed.
+        if (countBytes == 0 || countBytes > 4 || len - off - 2 < countBytes) {
+            return NO;
+        }
+        NSUInteger contentLen = 0;
+        for (NSUInteger i = 0; i < countBytes; i++) {
+            contentLen = (contentLen << 8) | buf[off + 2 + i];
+        }
+        *headerLen = 2 + countBytes;
+        // Checked against what is actually left rather than by forming the sum first.
+        // A crafted length wraps NSUInteger, `off + *totalLen <= len` then passes, and
+        // the caller hands the wrapped value to CC_SHA256, which reads past the buffer.
+        // The certificate comes off the wire, so it is attacker-shaped by definition.
+        if (contentLen > len - off - *headerLen) {
+            return NO;
+        }
+        *totalLen = *headerLen + contentLen;
+    }
+    // Against what is left, not by forming off + *totalLen. That sum can wrap
+    // NSUInteger for a large off, and a wrapped sum compares small -- so the check
+    // that exists to stop an overread would be the thing that let it through. The
+    // subtraction cannot wrap: off <= len is this function's precondition and is
+    // re-established on the short-form path above.
+    return off <= len && *totalLen <= len - off;
+}
 
+/**
+ * Base64 SHA-256 over the certificate's SubjectPublicKeyInfo, which is what a
+ * public-key pin is computed over.
+ *
+ * Walks the certificate DER rather than going through SecCertificateCopyKey +
+ * SecKeyCopyExternalRepresentation. That pair hands back the *raw* key, so
+ * reconstructing the SPKI means prepending a hand-maintained ASN.1 header chosen
+ * per key type and size -- a table that silently produces wrong digests for any
+ * key type it does not know about. The DER walk is algorithm-agnostic and
+ * matches `openssl x509 -pubkey | openssl pkey -pubin -outform der` exactly.
+ *
+ * Returns nil if the structure is not what we expect, in which case the caller
+ * simply omits the entry and pinning falls back to whole-certificate digests.
+ */
+- (NSString*) getPublicKeyDigest: (SecCertificateRef) cert {
+    // Plain CoreFoundation rather than a toll-free bridge cast: this file builds
+    // both with and without ARC, and the correct bridging annotation differs
+    // between the two. An explicit CFRelease is unambiguous in either mode.
+    CFDataRef certData = SecCertificateCopyData(cert);
+    if (certData == NULL) {
+        return nil;
+    }
+    const uint8_t* buf = CFDataGetBytePtr(certData);
+    NSUInteger len = (NSUInteger) CFDataGetLength(certData);
+    NSString* result = nil;
+    uint8_t tag;
+    NSUInteger headerLen, totalLen;
+    NSUInteger off;
+    int i;
+
+    // Certificate ::= SEQUENCE { tbsCertificate, signatureAlgorithm, signature }
+    if (!cn1ReadDerTlv(buf, len, 0, &tag, &headerLen, &totalLen) || tag != 0x30) {
+        goto cleanup;
+    }
+    off = headerLen;
+
+    // tbsCertificate ::= SEQUENCE { ... }
+    if (!cn1ReadDerTlv(buf, len, off, &tag, &headerLen, &totalLen) || tag != 0x30) {
+        goto cleanup;
+    }
+    off += headerLen;
+
+    // [0] EXPLICIT Version is optional and absent in a v1 certificate.
+    if (!cn1ReadDerTlv(buf, len, off, &tag, &headerLen, &totalLen)) {
+        goto cleanup;
+    }
+    if (tag == 0xA0) {
+        off += totalLen;
+    }
+
+    // Skip serialNumber, signature, issuer, validity, subject. The next element
+    // is subjectPublicKeyInfo.
+    for (i = 0; i < 5; i++) {
+        if (!cn1ReadDerTlv(buf, len, off, &tag, &headerLen, &totalLen)) {
+            goto cleanup;
+        }
+        off += totalLen;
+    }
+
+    if (cn1ReadDerTlv(buf, len, off, &tag, &headerLen, &totalLen) && tag == 0x30) {
+        uint8_t digest[CC_SHA256_DIGEST_LENGTH];
+        CC_SHA256(buf + off, (CC_LONG) totalLen, digest);
+        NSData* digestData = [NSData dataWithBytes:digest length:CC_SHA256_DIGEST_LENGTH];
+        result = [digestData base64EncodedStringWithOptions:0];
+    }
+
+cleanup:
+    CFRelease(certData);
+    return result;
+}
+
+- (NSString*) getFingerprint256: (SecCertificateRef) cert {
+    // Same ownership rule as getFingerprint: this was leaking one certificate's
+    // worth of data per digest, on every connection.
+    CFDataRef keyData = SecCertificateCopyData(cert);
+    if (keyData == NULL) {
+        return @"";
+    }
     uint8_t digest[CC_SHA256_DIGEST_LENGTH]={0};
-    CC_SHA256(keyData.bytes, keyData.length, digest);
+    CC_SHA256(CFDataGetBytePtr(keyData), (CC_LONG)CFDataGetLength(keyData), digest);
+    CFRelease(keyData);
     NSData *out=[NSData dataWithBytes:digest length:CC_SHA256_DIGEST_LENGTH];
     NSString *hash=[out description];
     hash = [hash stringByReplacingOccurrencesOfString:@" " withString:@""];

@@ -133,12 +133,18 @@ def install_runtime():
         "-Plocal-dev-javase",
         "install",
     ]
-    # Maven Central intermittently serves 403/5xx from the runner's CDN edge and
-    # Maven treats those as PERMANENT resolution failures (observed: junit-bom
-    # 403 killed the whole smoke 53s in, before any project code built). Retry
-    # the install a couple of times with a pause -- a genuine build failure
-    # fails identically on every attempt.
-    attempts = 3
+    # Maven Central intermittently serves 403/429/5xx from the runner's CDN edge
+    # and Maven treats those as PERMANENT resolution failures (observed: junit-bom
+    # 403 killed the whole smoke 53s in, before any project code built, and later
+    # a 429 killed it three times in a row while reading the root POM). Retry the
+    # install with a growing pause -- a genuine build failure fails identically on
+    # every attempt.
+    #
+    # The backoff has to grow. A flat 30s wait is inside the window Central is
+    # still rate limiting in, so all three attempts fail for the same reason and
+    # the retry buys nothing; a 429 in particular wants minutes, not seconds.
+    backoffs = [30, 120, 300]
+    attempts = len(backoffs) + 1
     for attempt in range(1, attempts + 1):
         try:
             run(cmd, log_name="build-runtime.log", timeout=1800)
@@ -146,9 +152,11 @@ def install_runtime():
         except RuntimeError:
             if attempt == attempts:
                 raise
+            delay = backoffs[attempt - 1]
             log(f"runtime install failed (attempt {attempt}/{attempts}); "
-                "retrying in 30s in case Maven Central was throwing transient 403/5xx")
-            time.sleep(30)
+                f"retrying in {delay}s in case Maven Central was throwing "
+                "transient 403/429/5xx")
+            time.sleep(delay)
 
 
 def run_smoke_app(video_file: Path, screenshot_path: Path, status_path: Path):
