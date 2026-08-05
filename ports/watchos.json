@@ -1,36 +1,36 @@
 {
-  "commit": "debf39a091d9be0c2bb9905c8f4f32cfebf325ca",
-  "generated_at": "2026-08-05T06:04:32Z",
+  "commit": "09107fff596097faf7f782de6533f712799d7f75",
+  "generated_at": "2026-08-05T13:56:44Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 377108000
+        "duration_ns": 390811000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 154772000
+        "duration_ns": 168522000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 170997000
+        "duration_ns": 193614000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 110011000
+        "duration_ns": 115974000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 454005000
+        "duration_ns": 503357000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 385080000
+        "duration_ns": 395091000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 738781000
+        "duration_ns": 791795000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "watchos",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30975123612",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30989149609",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 168,
+    "pass": 169,
     "skip": 2
   },
   "tests": {
@@ -606,6 +606,10 @@
       "status": "pass"
     },
     "StringApiTest": {
+      "feature": "java-standard-apis",
+      "status": "pass"
+    },
+    "StringFormatTest": {
       "feature": "java-standard-apis",
       "status": "pass"
     },
