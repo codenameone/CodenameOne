@@ -115,6 +115,35 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     
     
     
+    /**
+     * System property that overrides the value passed to Chromium's
+     * {@code --disable-features} switch. When set (even to the empty string) it is
+     * used verbatim; when unset the platform default from {@link #defaultDisableFeatures()}
+     * is applied.
+     */
+    static final String DISABLE_FEATURES_PROPERTY = "cef.disableFeatures";
+
+    /**
+     * Default set of Chromium features to disable via {@code --disable-features}.
+     *
+     * <p>Chromium 135 (CEF 135 / JCEF 135.0.20) ships the Skia "Fontations" Rust font
+     * backend. On recent macOS it panics in its color-table code path
+     * ({@code has_any_color_table} -> {@code crash_in_rust_with_overflow}) while laying
+     * out fonts, killing the simulator JVM with SIGTRAP (exit 133) as soon as a
+     * BrowserComponent paints. Disabling {@code FontationsFontBackend}
+     * (chrome://flags/#enable-fontations-backend) forces Chromium back to the FreeType
+     * backend and avoids the crash. Only the JavaSE simulator's bundled CEF is affected;
+     * the iOS (WKWebView) and Android (system WebView) ports are untouched.</p>
+     *
+     * <p>Gated to macOS so Windows/Linux behavior is unchanged. Passed as a jcef arg
+     * (see {@code CN1JcefRuntime.createBuilder}); Chromium propagates {@code --disable-features}
+     * to the CEF helper subprocesses automatically via its FeatureList mechanism. The
+     * {@code -Dcef.disableFeatures=...} system property overrides this on any platform.</p>
+     */
+    private static String defaultDisableFeatures() {
+        return isMac ? "FontationsFontBackend" : null;
+    }
+
     private static String[] createArgs() {
         List<String> args = new ArrayList<String>();
         if (isMac) {
@@ -122,14 +151,14 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         } else if (isWindows) {
             // no extra stuff here
             //args.add(String.format("--browser-subprocess-path=%s\\jcef_helper.exer", getLibPath()));
-            
+
             args.add("--disable-gpu");
             args.add("--disable-software-rasterizer");
             args.add("--disable-gpu-compositing");
         } else if (isUnix) {
             // no extra stuff here
             //args.add(String.format("--browser-subprocess-path=%s\\jcef_helper.exer", getLibPath()));
-            
+
             args.add("--disable-gpu");
             args.add("--disable-software-rasterizer");
             args.add("--disable-gpu-compositing");
@@ -143,7 +172,14 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         //args.add("--force-device-scale-factor=4");
         args.add("--autoplay-policy=no-user-gesture-required");
         args.add("--enable-usermedia-screen-capturing");
-        //System.out.println("CEF Args: "+args);
+
+        String prop = System.getProperty(DISABLE_FEATURES_PROPERTY);
+        String disableFeatures = prop != null ? prop : defaultDisableFeatures();
+        if (disableFeatures != null && disableFeatures.length() > 0) {
+            args.add("--disable-features=" + disableFeatures);
+        }
+
+        System.out.println("CEF Args: " + args);
         return args.toArray(new String[args.size()]);
     }
     
