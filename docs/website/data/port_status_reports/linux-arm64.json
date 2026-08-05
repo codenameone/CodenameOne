@@ -1,48 +1,48 @@
 {
-  "commit": "587813ab1f221046e99996b2c1d1dfcb58f4ac94",
-  "generated_at": "2026-07-30T19:22:38Z",
+  "commit": "12ecf37a1e695b71794b5243e1525328f7304e51",
+  "generated_at": "2026-08-04T07:46:40Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 170452739
+        "duration_ns": 169171845
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 26587685
+        "duration_ns": 25311725
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 35381384
+        "duration_ns": 35403188
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 62814185
+        "duration_ns": 62833423
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 39201326
+        "duration_ns": 39313867
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 270735594
+        "duration_ns": 270465811
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 4175763773
+        "duration_ns": 3639365036
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 94506846
+        "duration_ns": 93678258
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 132546281
+        "duration_ns": 137501079
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 44943794
+        "duration_ns": 47882264
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,12 +52,12 @@
     "suite_checksum": 0
   },
   "port": "linux-arm64",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30571977091",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30887242018",
   "schema_version": 1,
   "suite_finished": false,
   "summary": {
     "fail": 7,
-    "not-run": 2,
+    "not-run": 3,
     "pass": 161,
     "skip": 0
   },
@@ -130,7 +130,7 @@
     },
     "CalendarApiTest": {
       "feature": "calendar-integration",
-      "status": "pass"
+      "status": "not-run"
     },
     "CallDetectionAPITest": {
       "feature": "device-security-signals",
@@ -333,7 +333,7 @@
     "FileSystemStorageOpenInputStreamMissingTest": {
       "feature": "filesystem-storage",
       "reasons": [
-        "failed: openInputStream returned a stream (com.codename1.impl.linux.LinuxInputStream@FF4236CFD0F0) for a missing path /home/runner/.local/share/codenameone/this-file-must-not-exist-1502-1785438836814.bin instead of throwing. Platform=linux"
+        "failed: openInputStream returned a stream (com.codename1.impl.linux.LinuxInputStream@FF0448FB4EB0) for a missing path /home/runner/.local/share/codenameone/this-file-must-not-exist-1502-1785828925633.bin instead of throwing. Platform=linux"
       ],
       "status": "fail"
     },
@@ -626,6 +626,10 @@
       "status": "pass"
     },
     "StringApiTest": {
+      "feature": "java-standard-apis",
+      "status": "pass"
+    },
+    "StringFormatTest": {
       "feature": "java-standard-apis",
       "status": "pass"
     },

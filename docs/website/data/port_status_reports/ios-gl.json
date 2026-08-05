@@ -1,36 +1,36 @@
 {
-  "commit": "9c7affa41291e328b08a21d823737f581f1b7d3e",
-  "generated_at": "2026-07-30T09:24:29Z",
+  "commit": "12ecf37a1e695b71794b5243e1525328f7304e51",
+  "generated_at": "2026-08-04T10:58:45Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 334687000
+        "duration_ns": 483444000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 21787000
+        "duration_ns": 25544000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 122655000
+        "duration_ns": 149238000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 74123000
+        "duration_ns": 75007000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 322920000
+        "duration_ns": 444808000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 134806000
+        "duration_ns": 191325000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 175512000
+        "duration_ns": 299827000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "ios-gl",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30516173164",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30887242578",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 168,
+    "pass": 169,
     "skip": 2
   },
   "tests": {
@@ -606,6 +606,10 @@
       "status": "pass"
     },
     "StringApiTest": {
+      "feature": "java-standard-apis",
+      "status": "pass"
+    },
+    "StringFormatTest": {
       "feature": "java-standard-apis",
       "status": "pass"
     },

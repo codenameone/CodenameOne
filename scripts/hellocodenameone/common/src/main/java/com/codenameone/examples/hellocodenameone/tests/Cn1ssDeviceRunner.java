@@ -393,6 +393,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new TimeApiTest(),
             new NanoTimeApiTest(),
             new FloatingToStringTest(),
+            new StringFormatTest(),
             new ClipboardRoundTripTest(),
             // External surfaces assertion tests (no screenshots): the serializer wire format
             // round-tripped through JSONParser on the device VM, the timeline-selection helpers

@@ -1077,7 +1077,15 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     // strings.
 
     
-    public native static String format(String format, Object... args);
+    /**
+     * Returns a formatted string using the specified format string and arguments.
+     * Supports the {@code s b h c d o x e f g n %} conversions (and their uppercase
+     * variants) with the {@code - + ' ' 0 , ( #} flags, width, precision, and the
+     * {@code %n$} / {@code %<} argument selectors.
+     */
+    public static String format(String format, Object... args) {
+        return StringFormatter.format(format, args);
+    }
     
     public boolean contains(CharSequence seq) {
         return seq == null ? false : indexOf(seq.toString()) != -1;

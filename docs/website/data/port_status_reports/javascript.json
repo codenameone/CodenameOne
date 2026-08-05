@@ -1,48 +1,48 @@
 {
-  "commit": "587813ab1f221046e99996b2c1d1dfcb58f4ac94",
-  "generated_at": "2026-07-30T19:30:48Z",
+  "commit": "12ecf37a1e695b71794b5243e1525328f7304e51",
+  "generated_at": "2026-08-04T07:46:37Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 1486700000
+        "duration_ns": 936000000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 851400000
+        "duration_ns": 746100000
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 14321000000
+        "duration_ns": 7677700000
       },
       "intArithmetic": {
         "checksum": "1313580095284",
-        "duration_ns": 705300000
+        "duration_ns": 511500000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 3920500000
+        "duration_ns": 2492100000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 586000000
+        "duration_ns": 284400000
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 2741500000
+        "duration_ns": 1673800000
       },
       "quicksort": {
         "checksum": "786886890168670967",
-        "duration_ns": 576800000
+        "duration_ns": 427800000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 1123899999
+        "duration_ns": 754600000
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 1223900000
+        "duration_ns": 699500000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,13 +52,13 @@
     "suite_checksum": 0
   },
   "port": "javascript",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30571977438",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30887242508",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 170,
+    "pass": 171,
     "skip": 0
   },
   "tests": {
@@ -611,6 +611,10 @@
       "status": "pass"
     },
     "StringApiTest": {
+      "feature": "java-standard-apis",
+      "status": "pass"
+    },
+    "StringFormatTest": {
       "feature": "java-standard-apis",
       "status": "pass"
     },

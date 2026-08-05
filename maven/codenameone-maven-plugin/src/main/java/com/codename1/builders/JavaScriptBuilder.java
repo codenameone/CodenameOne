@@ -766,19 +766,8 @@ public class JavaScriptBuilder extends Executor {
         // CN1_TRANSLATOR_OPTS environment variable. The forked JVM does
         // not inherit the Maven process's -D properties, so this is the
         // only way to reach the translator for bisection / tuning.
-        String translatorOpts = System.getenv("CN1_TRANSLATOR_OPTS");
-        boolean heapOverridden = false;
-        java.util.List<String> extraOpts = new java.util.ArrayList<String>();
-        if (translatorOpts != null && !translatorOpts.trim().isEmpty()) {
-            for (String opt : translatorOpts.trim().split("\\s+")) {
-                if (!opt.isEmpty()) {
-                    extraOpts.add(opt);
-                    if (opt.startsWith("-Xmx")) {
-                        heapOverridden = true;
-                    }
-                }
-            }
-        }
+        java.util.List<String> extraOpts = TranslatorHeap.extraJvmOptions();
+        boolean heapOverridden = TranslatorHeap.specifiesHeap(extraOpts);
         // Hand the translator the JavaScript-port webapp (port.js, js/, style.css,
         // ...) so it bundles port.js -- the worker-side native bindings that make
         // Window.current() etc. resolve. Off-repo builds can't find it via the
@@ -797,11 +786,14 @@ public class JavaScriptBuilder extends Executor {
         if (jsPortWebApp != null && jsPortWebApp.isDirectory() && !webAppOverridden) {
             extraOpts.add("-Dcodename1.javascriptport.webapp=" + jsPortWebApp.getAbsolutePath());
         }
-        // Default heap; a -Xmx in CN1_TRANSLATOR_OPTS takes precedence (apps
-        // that disable tree-shaking, e.g. the Playground, emit a much larger
-        // bundle and need a bigger heap to avoid OutOfMemoryError mid-emit).
+        // Heap sized from the machine (see TranslatorHeap); a -Xmx in
+        // CN1_TRANSLATOR_OPTS still takes precedence. The old fixed 512m was
+        // tuned against the sample apps and made a large app fail with
+        // OutOfMemoryError mid-emit unless the developer found and set
+        // CN1_TRANSLATOR_OPTS by hand (issue #5511).
+        int heapMB = TranslatorHeap.maxHeapMB(512);
         if (!heapOverridden) {
-            cmd.add("-Xmx512m");
+            cmd.add("-Xmx" + heapMB + "m");
         }
         cmd.addAll(extraOpts);
         cmd.add("-cp");
@@ -816,7 +808,17 @@ public class JavaScriptBuilder extends Executor {
         cmd.add(version == null ? "1.0" : version);
         cmd.add("ios");
         cmd.add("none");
-        return exec(tmpDir, env, -1, cmd.toArray(new String[0]));
+        int outputMark = message.length();
+        if (exec(tmpDir, env, -1, cmd.toArray(new String[0]))) {
+            return true;
+        }
+        // Name the failure rather than leaving the build to report a bare
+        // "translator failed" -- an out-of-memory death is fixable by the
+        // developer, but only if we say so.
+        if (!heapOverridden && TranslatorHeap.looksOutOfMemory(message.substring(outputMark))) {
+            error(TranslatorHeap.outOfMemoryAdvice(heapMB, true), null);
+        }
+        return false;
     }
 
     private File locateDistDir(File translatorOut, String translatorAppName) {
