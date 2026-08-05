@@ -6,14 +6,14 @@ Form {
 
 Title {
     background-color: #17233b;
-    color:  yellow;
+    color: #ffffff;
     font-family: "native:MainBold";
     padding: 2mm;
 }
 
 Label, SpanLabel {
     background-color: transparent;
-    color: blue;
+    color: #26324a;
     padding: 2mm;
 }
 
