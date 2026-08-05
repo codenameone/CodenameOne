@@ -9,26 +9,37 @@ name: Scaffolding artifact integrity
 # android.onDeviceDebug, ...) were added to the archetype but never to the initializr's
 # common.zip, so they were silently missing from initializr projects.
 #
-# The check only needs python3 + unzip, so it runs fast and is path-gated to the two
+# It also guards the Codename One repository declaration in the three generated root
+# POMs. Dropping it is invisible at generation time -- Maven Central still serves every
+# already-published version -- and only surfaces after the migration cutover, as newly
+# generated projects that cannot see new releases.
+#
+# The check only needs python3 + unzip, so it runs fast and is path-gated to the
 # templates and the test harness itself.
 on:
   pull_request:
     branches: [ master ]
     paths:
       - 'maven/cn1app-archetype/src/main/resources/archetype-resources/common/codenameone_settings.properties'
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/pom.xml'
+      - 'maven/cn1lib-archetype/src/main/resources/archetype-resources/pom.xml'
       - 'scripts/initializr/common/src/main/resources/common.zip'
       - 'maven/integration-tests/scaffolding-settings-parity-test.sh'
       - 'maven/integration-tests/normalize_cn1_settings.py'
       - 'maven/integration-tests/validate_initializr_pom_coordinates.py'
+      - 'maven/integration-tests/validate_generated_repositories.py'
       - '.github/workflows/scaffolding-parity.yml'
   push:
     branches: [ master ]
     paths:
       - 'maven/cn1app-archetype/src/main/resources/archetype-resources/common/codenameone_settings.properties'
+      - 'maven/cn1app-archetype/src/main/resources/archetype-resources/pom.xml'
+      - 'maven/cn1lib-archetype/src/main/resources/archetype-resources/pom.xml'
       - 'scripts/initializr/common/src/main/resources/common.zip'
       - 'maven/integration-tests/scaffolding-settings-parity-test.sh'
       - 'maven/integration-tests/normalize_cn1_settings.py'
       - 'maven/integration-tests/validate_initializr_pom_coordinates.py'
+      - 'maven/integration-tests/validate_generated_repositories.py'
       - '.github/workflows/scaffolding-parity.yml'
 
 concurrency:
@@ -43,5 +54,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Validate Initializr embedded Maven coordinates
         run: python3 maven/integration-tests/validate_initializr_pom_coordinates.py
+      - name: Validate Codename One repository is declared by every scaffold
+        run: python3 maven/integration-tests/validate_generated_repositories.py
       - name: Compare archetype vs initializr codenameone_settings.properties
         run: bash maven/integration-tests/scaffolding-settings-parity-test.sh
