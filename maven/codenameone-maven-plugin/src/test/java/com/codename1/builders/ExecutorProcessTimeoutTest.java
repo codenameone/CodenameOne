@@ -35,6 +35,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * needs the captured output to be complete when exec() returns, which means
  * joining the reader -- and joining the reader must not leave the timeout
  * watcher running past the deadline on a process that already finished.
+ *
+ * <p>The child processes are JVMs running the helpers below rather than shell
+ * commands, so these run on Windows as well as Unix.
  */
 class ExecutorProcessTimeoutTest {
 
@@ -61,6 +64,54 @@ class ExecutorProcessTimeoutTest {
         }
     }
 
+    /** Sleeps, keeping whatever stdout it inherited open for that long. */
+    public static final class Sleeper {
+        public static void main(String[] args) throws Exception {
+            Thread.sleep(Long.parseLong(args[0]));
+        }
+    }
+
+    /**
+     * Starts a {@link Sleeper} that inherits this process's stdout, then exits
+     * immediately. The pipe therefore outlives this process, which is what makes
+     * the reader join in executeProcess actually block.
+     */
+    public static final class ExitsLeavingChildHoldingOutput {
+        public static void main(String[] args) throws Exception {
+            ProcessBuilder pb = javaProcess(Sleeper.class, args[0]);
+            pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+            pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+            pb.start();
+            System.out.println("started");
+            System.out.flush();
+        }
+    }
+
+    /** Prints many lines and then an out-of-memory signature as the very last line. */
+    public static final class PrintsThenFailsWithOom {
+        public static void main(String[] args) {
+            for (int i = 1; i <= 500; i++) {
+                System.out.println("line-" + i);
+            }
+            System.out.println("java.lang.OutOfMemoryError: Java heap space");
+            System.out.flush();
+        }
+    }
+
+    /** A JVM launch of the given helper class, portable across platforms. */
+    private static ProcessBuilder javaProcess(Class<?> main, String... args) {
+        String java = new File(new File(System.getProperty("java.home"), "bin"), "java").getAbsolutePath();
+        java.util.List<String> cmd = new java.util.ArrayList<String>();
+        cmd.add(java);
+        cmd.add("-cp");
+        cmd.add(System.getProperty("java.class.path"));
+        cmd.add(main.getName());
+        for (String a : args) {
+            cmd.add(a);
+        }
+        return new ProcessBuilder(cmd);
+    }
+
     @Test
     void aProcessThatSucceedsIsNotReportedAsTimedOutWhileOutputIsStillDraining() throws Exception {
         // The regression this guards: joining the reader thread after waitFor()
@@ -70,12 +121,10 @@ class ExecutorProcessTimeoutTest {
         // on the iOS and native steps, which are the ones that run with a timeout.
         //
         // Reproducing it needs the join to actually block, which means the pipe
-        // must outlive the process: the shell exits immediately while a
-        // backgrounded grandchild keeps the inherited stdout open. Without the
-        // fix the watcher fires at 1000ms during that wait and exec returns 1.
+        // must outlive the process. Without the fix the watcher fires at 1000ms
+        // during that wait and exec returns 1.
         TestExecutor e = new TestExecutor();
-        ProcessBuilder pb = new ProcessBuilder("/bin/sh", "-c", "sleep 3 & echo started; exit 0");
-        int rc = e.executeProcess(pb, 1000);
+        int rc = e.executeProcess(javaProcess(ExitsLeavingChildHoldingOutput.class, "4000"), 1000);
 
         assertEquals(0, rc, "a command that exited 0 must not be reported as timed out");
     }
@@ -86,30 +135,20 @@ class ExecutorProcessTimeoutTest {
         // exec() returns, and a JVM prints OutOfMemoryError at the very end of
         // the stream -- so a truncated tail is the failure that matters.
         TestExecutor e = new TestExecutor();
-        StringBuilder sb = new StringBuilder();
-        ProcessBuilder pb = new ProcessBuilder("/bin/sh", "-c",
-                "for i in $(seq 1 500); do echo line-$i; done; echo java.lang.OutOfMemoryError: Java heap space");
-        int rc = executeCapturing(e, pb, sb);
+        int mark = e.message.length();
+        int rc = e.executeProcess(javaProcess(PrintsThenFailsWithOom.class), -1);
+        String out = e.message.substring(mark);
 
         assertEquals(0, rc);
-        assertTrue(TranslatorHeap.looksOutOfMemory(sb.toString()),
+        assertTrue(TranslatorHeap.looksOutOfMemory(out),
                 "the tail of the output must be present when exec returns");
-        assertTrue(sb.toString().contains("line-500"), "output must not be truncated");
-    }
-
-    /** executeProcess(pb, timeout) appends into the executor's own message buffer. */
-    private static int executeCapturing(TestExecutor e, ProcessBuilder pb, StringBuilder sink) throws Exception {
-        int mark = e.message.length();
-        int rc = e.executeProcess(pb, -1);
-        sink.append(e.message.substring(mark));
-        return rc;
+        assertTrue(out.contains("line-500"), "output must not be truncated");
     }
 
     @Test
     void aProcessThatOverrunsItsDeadlineIsStillReportedAsTimedOut() throws Exception {
         TestExecutor e = new TestExecutor();
-        ProcessBuilder pb = new ProcessBuilder("/bin/sh", "-c", "sleep 30");
-        int rc = e.executeProcess(pb, 1000);
+        int rc = e.executeProcess(javaProcess(Sleeper.class, "30000"), 1000);
         assertEquals(1, rc, "a genuine timeout must still fail");
     }
 }
