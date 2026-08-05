@@ -2781,6 +2781,24 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// Rejects an initialization vector the mode cannot use. A GCM nonce that
     /// is absent repeats across messages under one key, and a short CBC IV is
     /// read as a whole block by the platform library.
+    /// AAD only binds to the ciphertext under an AEAD mode. CBC and ECB ignore it
+    /// entirely, so passing it here quietly dropped data the caller believed was
+    /// authenticated -- and produced ciphertext the other ports reject, because
+    /// JavaSE and Android route the same call through Cipher.updateAAD, which
+    /// refuses a non-AEAD mode. Refusing it keeps the ports answering alike and
+    /// keeps a caller from believing in a binding that was never made.
+    private static void checkAad(String transformation, byte[] aad) {
+        if (aad == null || aad.length == 0) {
+            return;
+        }
+        String mode = transformation == null ? "" : transformation;
+        if (mode.indexOf("/GCM/") < 0) {
+            throw new RuntimeException(
+                    "Additional authenticated data requires an AEAD mode; " + mode
+                            + " cannot bind it");
+        }
+    }
+
     private static void checkIv(String transformation, byte[] iv) {
         String mode = transformation == null ? "" : transformation;
         if (mode.indexOf("/GCM/") >= 0) {
@@ -2795,6 +2813,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     @Override
     public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
         checkIv(transformation, iv);
+        checkAad(transformation, aad);
         return cryptoResult(LinuxNative.aesCrypt(transformation, true, key, iv, aad, plaintext),
                 "AES encrypt");
     }
@@ -2802,6 +2821,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     @Override
     public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
         checkIv(transformation, iv);
+        checkAad(transformation, aad);
         return cryptoResult(LinuxNative.aesCrypt(transformation, false, key, iv, aad, ciphertext),
                 "AES decrypt");
     }

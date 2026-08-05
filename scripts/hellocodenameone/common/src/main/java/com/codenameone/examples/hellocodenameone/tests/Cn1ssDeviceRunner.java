@@ -775,15 +775,40 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         log("CN1SS:ERR:throwable context=" + context + " message=" + String.valueOf(t.getMessage()));
         String stack = Display.getInstance().getStackTrace(Thread.currentThread(), t);
         if (stack == null) {
-            log("CN1SS:ERR:throwable context=" + context + " stack=null");
-            return;
+            stack = "";
         }
         log("CN1SS:ERR:throwable context=" + context + " stackLength=" + stack.length());
+        if (stack.length() == 0) {
+            // The implementation's own capture comes back empty on some ports --
+            // ParparVM Windows reports stackLength=0 for every throwable -- which
+            // leaves a NullPointerException with no location at all, and CI is the
+            // only place these run. Throwable's own frames are worth asking for
+            // before giving up; on a port that fills them in this is the difference
+            // between naming the line and guessing at it.
+            logThrowableFrames(context, t);
+        }
         for (String line : StringUtil.tokenize(stack, '\n')) {
             if (line.length() > 200) {
                 line = line.substring(0, 200);
             }
             log("CN1SS:ERR:throwable context=" + context + " stack=" + line);
+        }
+    }
+
+    private static void logThrowableFrames(String context, Throwable t) {
+        StackTraceElement[] frames;
+        try {
+            frames = t.getStackTrace();
+        } catch (Throwable unsupported) {
+            log("CN1SS:ERR:throwable context=" + context + " frames=unsupported");
+            return;
+        }
+        if (frames == null || frames.length == 0) {
+            log("CN1SS:ERR:throwable context=" + context + " frames=none");
+            return;
+        }
+        for (int i = 0; i < frames.length && i < 24; i++) {
+            log("CN1SS:ERR:throwable context=" + context + " frame=" + String.valueOf(frames[i]));
         }
     }
 
