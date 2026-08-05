@@ -5,6 +5,7 @@ import com.codename1.guibuilder.model.GuiDocument;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 import com.codename1.ui.Container;
 import com.codename1.ui.Label;
 import com.codename1.ui.FontImage;
@@ -177,8 +178,30 @@ public final class ComponentPreviewFactory {
             }
         }
         if (out.getLayout() instanceof LayeredLayout) GuidedLayoutSupport.apply(element, out);
-        if (out.getComponentCount() == 0) out.add(new Label("Drop components here", "BuilderEmptyHint"));
+        if (out.getComponentCount() == 0) out.add(emptyContainerHint());
         return out;
+    }
+
+    /**
+     * The marker shown for a container with no children.
+     *
+     * <p>Its preferred size is deliberately small and fixed. As an ordinary label it asked for
+     * whatever width its text needed, which is wider than a real empty container would ever be --
+     * enough that emptying one column of a horizontal box pushed the next column past the edge of
+     * the device, so draining a container appeared to delete every component on the form. The hint
+     * exists to mark a drop target, so it must never be the thing that decides a layout.
+     */
+    private static Component emptyContainerHint() {
+        Label hint = new Label("Drop here", "BuilderEmptyHint") {
+            @Override protected Dimension calcPreferredSize() {
+                int width = Display.getInstance().convertToPixels(8);
+                int height = Display.getInstance().convertToPixels(4);
+                return new Dimension(width, height);
+            }
+        };
+        hint.setEndsWith3Points(true);
+        hint.setShowEvenIfBlank(true);
+        return hint;
     }
 
     private static boolean additiveSelection(ActionEvent event) {
