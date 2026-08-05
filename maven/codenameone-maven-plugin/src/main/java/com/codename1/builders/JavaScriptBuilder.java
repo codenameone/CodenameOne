@@ -797,11 +797,14 @@ public class JavaScriptBuilder extends Executor {
         if (jsPortWebApp != null && jsPortWebApp.isDirectory() && !webAppOverridden) {
             extraOpts.add("-Dcodename1.javascriptport.webapp=" + jsPortWebApp.getAbsolutePath());
         }
-        // Default heap; a -Xmx in CN1_TRANSLATOR_OPTS takes precedence (apps
-        // that disable tree-shaking, e.g. the Playground, emit a much larger
-        // bundle and need a bigger heap to avoid OutOfMemoryError mid-emit).
+        // Heap sized from the machine (see TranslatorHeap); a -Xmx in
+        // CN1_TRANSLATOR_OPTS still takes precedence. The old fixed 512m was
+        // tuned against the sample apps and made a large app fail with
+        // OutOfMemoryError mid-emit unless the developer found and set
+        // CN1_TRANSLATOR_OPTS by hand (issue #5511).
+        int heapMB = TranslatorHeap.maxHeapMB(512);
         if (!heapOverridden) {
-            cmd.add("-Xmx512m");
+            cmd.add("-Xmx" + heapMB + "m");
         }
         cmd.addAll(extraOpts);
         cmd.add("-cp");
@@ -816,7 +819,17 @@ public class JavaScriptBuilder extends Executor {
         cmd.add(version == null ? "1.0" : version);
         cmd.add("ios");
         cmd.add("none");
-        return exec(tmpDir, env, -1, cmd.toArray(new String[0]));
+        int outputMark = message.length();
+        if (exec(tmpDir, env, -1, cmd.toArray(new String[0]))) {
+            return true;
+        }
+        // Name the failure rather than leaving the build to report a bare
+        // "translator failed" -- an out-of-memory death is fixable by the
+        // developer, but only if we say so.
+        if (!heapOverridden && TranslatorHeap.looksOutOfMemory(message.substring(outputMark))) {
+            error(TranslatorHeap.outOfMemoryAdvice(heapMB, true), null);
+        }
+        return false;
     }
 
     private File locateDistDir(File translatorOut, String translatorAppName) {
