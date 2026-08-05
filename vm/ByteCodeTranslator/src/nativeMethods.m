@@ -1104,16 +1104,27 @@ static void cn1ShortestFloat(char* buffer, int bufferSize, JAVA_FLOAT f) {
 // Rewrites the "[-]d.dddde[+-]dd" rendering above into the shape java.lang.Double.toString
 // specifies: no '+' and no leading zeros on the exponent, no trailing zeros in the
 // significand, and always at least one digit after the decimal point.
+// Appends one character if there is room for it and for the terminating NUL. Every
+// write in cn1JavaFloatingText goes through here so that boundedness is a property of
+// the helper rather than of reasoning about the largest exponent that can reach it.
+static void cn1AppendChar(char* out, int outSize, int* at, char c) {
+    if (*at < outSize - 1) {
+        out[(*at)++] = c;
+    }
+}
+
 static void cn1JavaFloatingText(char* out, int outSize, const char* raw, JAVA_BOOLEAN scientific) {
     const char* p = raw;
     int at = 0;
-    int limit = outSize - 2;
     char digits[32];
     int digitCount = 0;
     int exponent = 0;
     int i;
+    if (outSize < 1) {
+        return;
+    }
     if (*p == '-') {
-        out[at++] = '-';
+        cn1AppendChar(out, outSize, &at, '-');
         p++;
     }
     while (*p != 0 && *p != 'e' && *p != 'E') {
@@ -1132,41 +1143,41 @@ static void cn1JavaFloatingText(char* out, int outSize, const char* raw, JAVA_BO
         digits[digitCount++] = '0';
     }
     if (scientific) {
-        out[at++] = digits[0];
-        out[at++] = '.';
+        cn1AppendChar(out, outSize, &at, digits[0]);
+        cn1AppendChar(out, outSize, &at, '.');
         if (digitCount == 1) {
-            out[at++] = '0';
+            cn1AppendChar(out, outSize, &at, '0');
         } else {
-            for (i = 1; i < digitCount && at < limit; i++) {
-                out[at++] = digits[i];
+            for (i = 1; i < digitCount; i++) {
+                cn1AppendChar(out, outSize, &at, digits[i]);
             }
         }
-        out[at++] = 'E';
+        cn1AppendChar(out, outSize, &at, 'E');
         snprintf(out + at, outSize - at, "%d", exponent);
         return;
     }
-    // Double.toString only takes the plain branch for 1e-3 <= |d| < 1e7, but the native
-    // is reachable on its own, so every write below is bounded rather than trusting the
-    // exponent to be small.
+    // Double.toString only takes the plain branch for 1e-3 <= |d| < 1e7, so the exponent
+    // reaching here is small. The native is reachable on its own though, and a large one
+    // would otherwise run past the buffer, so the appends above bound themselves.
     if (exponent < 0) {
-        out[at++] = '0';
-        out[at++] = '.';
-        for (i = 0; i < -exponent - 1 && at < limit; i++) {
-            out[at++] = '0';
+        cn1AppendChar(out, outSize, &at, '0');
+        cn1AppendChar(out, outSize, &at, '.');
+        for (i = 0; i < -exponent - 1; i++) {
+            cn1AppendChar(out, outSize, &at, '0');
         }
-        for (i = 0; i < digitCount && at < limit; i++) {
-            out[at++] = digits[i];
+        for (i = 0; i < digitCount; i++) {
+            cn1AppendChar(out, outSize, &at, digits[i]);
         }
     } else {
-        for (i = 0; i <= exponent && at < limit; i++) {
-            out[at++] = i < digitCount ? digits[i] : '0';
+        for (i = 0; i <= exponent; i++) {
+            cn1AppendChar(out, outSize, &at, i < digitCount ? digits[i] : '0');
         }
-        out[at++] = '.';
+        cn1AppendChar(out, outSize, &at, '.');
         if (exponent + 1 >= digitCount) {
-            out[at++] = '0';
+            cn1AppendChar(out, outSize, &at, '0');
         } else {
-            for (i = exponent + 1; i < digitCount && at < limit; i++) {
-                out[at++] = digits[i];
+            for (i = exponent + 1; i < digitCount; i++) {
+                cn1AppendChar(out, outSize, &at, digits[i]);
             }
         }
     }
