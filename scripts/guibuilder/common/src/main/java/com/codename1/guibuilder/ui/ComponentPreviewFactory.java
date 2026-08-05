@@ -159,9 +159,10 @@ public final class ComponentPreviewFactory {
                 if (out.getLayout() instanceof BorderLayout) {
                     out.add(GuiDocument.effectiveBorderConstraint(element, childElement), rendered);
                 } else if (out.getLayout() instanceof TableLayout table) {
-                    int columns = integer(element, "tableLayoutColumns", 2);
-                    int row = integer(childElement, "tableRow", i / Math.max(1, columns));
-                    int column = integer(childElement, "tableColumn", i % Math.max(1, columns));
+                    // GuiDocument owns the cell rule so the preview and the generated source cannot
+                    // disagree about where a component with no explicit cell belongs.
+                    int row = GuiDocument.effectiveTableRow(element, childElement);
+                    int column = GuiDocument.effectiveTableColumn(element, childElement);
                     TableLayout.Constraint constraint = table.createConstraint(row, column)
                             .horizontalSpan(integer(childElement, "tableHorizontalSpan", 1))
                             .verticalSpan(integer(childElement, "tableVerticalSpan", 1));

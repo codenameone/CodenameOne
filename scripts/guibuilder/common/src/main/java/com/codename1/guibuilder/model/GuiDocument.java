@@ -188,9 +188,78 @@ public final class GuiDocument {
         child.setAttribute("name", uniqueName(type));
         if (acceptsChildren(child)) child.setAttribute("layout", "LayeredLayout");
         parent.addChild(child);
+        assignFreeTableCell(parent, child);
         selected = child;
         modified = true;
         return child;
+    }
+
+    /**
+     * Gives a new child of a table an explicit free cell.
+     *
+     * <p>Without this a component added from the palette or the menu carries no cell at all, and
+     * every consumer has to invent one. They did not agree: the preview fell back to sibling order
+     * while the generated source fell back to cell (0, 0), so a table that looked right in the
+     * designer compiled to every component stacked in one corner.
+     */
+    private static void assignFreeTableCell(Element parent, Element child) {
+        if (!"TableLayout".equals(parent.getAttribute("layout"))) return;
+        int columns = tableColumns(parent);
+        Set<String> taken = new LinkedHashSet<>();
+        for (Element sibling : componentsIn(parent)) {
+            if (sibling == child) continue;
+            taken.add(effectiveTableRow(parent, sibling) + ":" + effectiveTableColumn(parent, sibling));
+        }
+        for (int cursor = 0; ; cursor++) {
+            int row = cursor / columns;
+            int column = cursor % columns;
+            if (taken.contains(row + ":" + column)) continue;
+            setNormalizedAttribute(child, "tableRow", String.valueOf(row));
+            setNormalizedAttribute(child, "tableColumn", String.valueOf(column));
+            int declaredRows = parseInt(parent.getAttribute("tableLayoutRows"), 2);
+            if (declaredRows < row + 1) {
+                setNormalizedAttribute(parent, "tableLayoutRows", String.valueOf(row + 1));
+            }
+            return;
+        }
+    }
+
+    /** The declared column count of a table, never below one. */
+    public static int tableColumns(Element parent) {
+        return Math.max(1, parseInt(parent == null ? null : parent.getAttribute("tableLayoutColumns"), 2));
+    }
+
+    /**
+     * The row a table child occupies. Components loaded from a hand written .gui file may carry no
+     * cell; they fall back to sibling order so that the preview, the generated source and the
+     * inspector all place them identically.
+     */
+    public static int effectiveTableRow(Element parent, Element child) {
+        Integer declared = parseIntOrNull(child == null ? null : child.getAttribute("tableRow"));
+        return declared != null ? Math.max(0, declared.intValue())
+                : componentsIn(parent).indexOf(child) / tableColumns(parent);
+    }
+
+    /** The column a table child occupies; see {@link #effectiveTableRow}. */
+    public static int effectiveTableColumn(Element parent, Element child) {
+        Integer declared = parseIntOrNull(child == null ? null : child.getAttribute("tableColumn"));
+        int columns = tableColumns(parent);
+        return declared != null ? Math.max(0, Math.min(columns - 1, declared.intValue()))
+                : componentsIn(parent).indexOf(child) % columns;
+    }
+
+    private static int parseInt(String value, int fallback) {
+        Integer parsed = parseIntOrNull(value);
+        return parsed == null ? fallback : parsed.intValue();
+    }
+
+    private static Integer parseIntOrNull(String value) {
+        if (value == null || value.trim().length() == 0) return null;
+        try {
+            return Integer.valueOf(value.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     public boolean deleteSelected() {
