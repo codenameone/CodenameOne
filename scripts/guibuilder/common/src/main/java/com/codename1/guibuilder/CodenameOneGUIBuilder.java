@@ -2647,6 +2647,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     Container canvasHostForTest() { return canvasHost; }
 
+    CodeEditor activeEditorForTest() { return activeCodeEditor; }
+
     /** Recompiles theme.css from disk and pushes it at the preview, as a live CSS edit does. */
     boolean reloadProjectCssForTest() {
         try {
