@@ -58,6 +58,72 @@ class LiveWorkspaceDragTest {
     }
 
     @Test
+    void drainingAContainerCompletelyKeepsEveryComponent() throws Exception {
+        CodenameOneGUIBuilder builder = workspace();
+        assertNull(onEdt(() -> builder.mcpOpenForm("com.example.NestedLayoutsForm")));
+        flushEdt();
+        List<String> everything = componentNames(builder);
+        assertEquals(11, everything.size(), everything.toString());
+
+        for (String name : new String[]{"nestedA", "nestedB", "nestedC", "nestedD"}) {
+            assertNull(onEdt(() -> builder.mcpDragComponent(name, "nestedAction", "below", null, null)),
+                    "dragging " + name + " reported an error");
+            flushEdt();
+            assertEquals(everything, componentNames(builder),
+                    name + " left the document instead of moving; it is in neither container");
+            assertEquals("rightActions", parentName(builder, name), hierarchy(builder).toString());
+            assertOnePreviewPerComponent(builder, "after moving " + name);
+            assertPreviewsSitInsideTheirModelParent(builder, "after moving " + name);
+            assertEveryComponentIsActuallyVisible(builder, "after moving " + name);
+        }
+        assertEquals(0, childCount(builder, "leftGrid"), hierarchy(builder).toString());
+        assertEquals(6, childCount(builder, "rightActions"), hierarchy(builder).toString());
+    }
+
+    @Test
+    void anEmptiedContainerCanBeFilledAgainByDragging() throws Exception {
+        CodenameOneGUIBuilder builder = workspace();
+        assertNull(onEdt(() -> builder.mcpOpenForm("com.example.NestedLayoutsForm")));
+        flushEdt();
+        List<String> everything = componentNames(builder);
+
+        for (String name : new String[]{"nestedA", "nestedB", "nestedC", "nestedD"}) {
+            assertNull(onEdt(() -> builder.mcpDragComponent(name, "nestedAction", "below", null, null)));
+            flushEdt();
+        }
+        assertEquals(0, childCount(builder, "leftGrid"));
+
+        // An emptied container renders only its "drop components here" hint. Dropping onto that
+        // hint has to resolve to the container, or the components have nowhere to go back to.
+        for (String name : new String[]{"nestedA", "nestedB"}) {
+            assertNull(onEdt(() -> builder.mcpDragComponent(name, "leftGrid", "center", null, null)),
+                    "the emptied container refused " + name);
+            flushEdt();
+            assertEquals(everything, componentNames(builder), name + " was lost on the way back");
+            assertEquals("leftGrid", parentName(builder, name), hierarchy(builder).toString());
+            assertOnePreviewPerComponent(builder, "after returning " + name);
+        }
+    }
+
+    @Test
+    void movingAPopulatedContainerThroughTheCanvasKeepsItsChildren() throws Exception {
+        CodenameOneGUIBuilder builder = workspace();
+        assertNull(onEdt(() -> builder.mcpOpenForm("com.example.NestedLayoutsForm")));
+        flushEdt();
+        List<String> everything = componentNames(builder);
+
+        assertNull(onEdt(() -> builder.mcpDragComponent("leftGrid", "nestedAction", "below", null, null)),
+                "dragging a populated container reported an error");
+        flushEdt();
+
+        assertEquals(everything, componentNames(builder), "moving a container lost part of its subtree");
+        assertEquals("rightActions", parentName(builder, "leftGrid"), hierarchy(builder).toString());
+        assertEquals(4, childCount(builder, "leftGrid"), hierarchy(builder).toString());
+        assertOnePreviewPerComponent(builder, "after moving a populated container");
+        assertPreviewsSitInsideTheirModelParent(builder, "after moving a populated container");
+    }
+
+    @Test
     void undoAfterACrossContainerDragRestoresBothTheModelAndTheCanvas() throws Exception {
         CodenameOneGUIBuilder builder = workspace();
         assertNull(onEdt(() -> builder.mcpOpenForm("com.example.NestedLayoutsForm")));
@@ -193,6 +259,51 @@ class LiveWorkspaceDragTest {
             }
         }
         return null;
+    }
+
+    /**
+     * A component that renders at zero size, or entirely outside the form it belongs to, has
+     * effectively vanished from the designer even though the model still lists it -- which is what
+     * "they are gone from both containers" looks like from the canvas.
+     */
+    private static void assertEveryComponentIsActuallyVisible(CodenameOneGUIBuilder builder, String when) {
+        Container canvas = builder.canvasHostForTest();
+        Component form = findPreview(canvas, builder.documentForTest().root());
+        assertNotNull(form, "the form itself does not render " + when);
+        for (Element element : builder.documentForTest().components()) {
+            if (element == builder.documentForTest().root()) continue;
+            Component preview = findPreview(canvas, element);
+            assertNotNull(preview, name(element) + " has no preview " + when);
+            assertTrue(preview.getWidth() > 0 && preview.getHeight() > 0,
+                    name(element) + " renders at " + preview.getWidth() + "x" + preview.getHeight()
+                            + " " + when + "; it is invisible on the canvas");
+            boolean insideHorizontally = preview.getAbsoluteX() + preview.getWidth() > form.getAbsoluteX()
+                    && preview.getAbsoluteX() < form.getAbsoluteX() + form.getWidth();
+            boolean insideVertically = preview.getAbsoluteY() + preview.getHeight() > form.getAbsoluteY()
+                    && preview.getAbsoluteY() < form.getAbsoluteY() + form.getHeight();
+            assertTrue(insideHorizontally && insideVertically,
+                    name(element) + " renders outside the form " + when + "; component at "
+                            + preview.getAbsoluteX() + "," + preview.getAbsoluteY()
+                            + " " + preview.getWidth() + "x" + preview.getHeight()
+                            + ", form at " + form.getAbsoluteX() + "," + form.getAbsoluteY()
+                            + " " + form.getWidth() + "x" + form.getHeight());
+        }
+    }
+
+    private static List<String> componentNames(CodenameOneGUIBuilder builder) {
+        List<String> names = new ArrayList<>();
+        for (Element element : builder.documentForTest().components()) names.add(name(element));
+        java.util.Collections.sort(names);
+        return names;
+    }
+
+    private static int childCount(CodenameOneGUIBuilder builder, String containerName) {
+        for (Element element : builder.documentForTest().components()) {
+            if (containerName.equals(name(element))) {
+                return com.codename1.guibuilder.model.GuiDocument.componentsIn(element).size();
+            }
+        }
+        return -1;
     }
 
     private static List<String> hierarchy(CodenameOneGUIBuilder builder) {

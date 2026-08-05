@@ -4218,8 +4218,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                         .append(GuiDocument.effectiveBorderConstraint(parent, child).toUpperCase()).append(", ").append(name).append(");\n");
             } else if ("TableLayout".equals(value(parent, "layout", "BoxLayout"))) {
                 out.append(indent).append(parentName).append(".add(((TableLayout) ").append(parentName)
-                        .append(".getLayout()).createConstraint(").append(value(child, "tableRow", "0"))
-                        .append(", ").append(value(child, "tableColumn", "0")).append(")")
+                        .append(".getLayout()).createConstraint(")
+                        .append(GuiDocument.effectiveTableRow(parent, child))
+                        .append(", ").append(GuiDocument.effectiveTableColumn(parent, child)).append(")")
                         .append(".horizontalSpan(").append(value(child, "tableHorizontalSpan", "1")).append(")")
                         .append(".verticalSpan(").append(value(child, "tableVerticalSpan", "1")).append("), ")
                         .append(name).append(");\n");
@@ -4579,34 +4580,36 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             Component targetPreview = componentForElement(canvasHost, target);
             if (targetPreview == null) return "Target " + targetName + " is not visible";
             String where = placement == null || placement.length() == 0 ? "center" : placement;
-            int grabX = source.getWidth() / 2;
-            int grabY = source.getHeight() / 2;
             int gap = standardGap();
-            int desiredX = targetPreview.getAbsoluteX() + Math.max(0, (targetPreview.getWidth() - source.getWidth()) / 2);
-            int desiredY = targetPreview.getAbsoluteY() + Math.max(0, (targetPreview.getHeight() - source.getHeight()) / 2);
-            if ("above".equals(where)) desiredY = targetPreview.getAbsoluteY() - source.getHeight() - gap;
-            else if ("below".equals(where)) desiredY = targetPreview.getAbsoluteY() + targetPreview.getHeight() + gap;
-            else if ("leftOf".equals(where)) desiredX = targetPreview.getAbsoluteX() - source.getWidth() - gap;
-            else if ("rightOf".equals(where)) desiredX = targetPreview.getAbsoluteX() + targetPreview.getWidth() + gap;
+            // Aim the POINTER, not the dragged component's top-left corner. A drop is resolved from
+            // the pointer position, so deriving the release point from the component's own box sent
+            // the pointer outside the target whenever the component was larger than it -- dropping
+            // a full width button "into" a narrow column landed it in the next column instead.
+            int centreX = targetPreview.getAbsoluteX() + targetPreview.getWidth() / 2;
+            int centreY = targetPreview.getAbsoluteY() + targetPreview.getHeight() / 2;
+            releaseX = centreX;
+            releaseY = centreY;
+            if ("above".equals(where)) releaseY = targetPreview.getAbsoluteY() - gap;
+            else if ("below".equals(where)) releaseY = targetPreview.getAbsoluteY() + targetPreview.getHeight() + gap;
+            else if ("leftOf".equals(where)) releaseX = targetPreview.getAbsoluteX() - gap;
+            else if ("rightOf".equals(where)) releaseX = targetPreview.getAbsoluteX() + targetPreview.getWidth() + gap;
             else if ("before".equals(where) || "after".equals(where)) {
+                // Stay inside the target: before/after is an insertion next to it in its own
+                // parent, and dropAfter() decides the side from which half of it the pointer is in.
                 Element parent = document.parentOf(target);
                 boolean horizontal = parent != null && ("X".equals(value(parent, "boxLayoutAxis", "Y"))
                         || "FlowLayout".equals(value(parent, "layout", "BoxLayout"))
                         || "GridLayout".equals(value(parent, "layout", "BoxLayout")));
                 if (horizontal) {
-                    desiredX = "after".equals(where) ? targetPreview.getAbsoluteX() + targetPreview.getWidth() - 1
-                            : targetPreview.getAbsoluteX();
-                    desiredY = targetPreview.getAbsoluteY();
+                    releaseX = "after".equals(where) ? targetPreview.getAbsoluteX() + targetPreview.getWidth() - 1
+                            : targetPreview.getAbsoluteX() + 1;
                 } else {
-                    desiredX = targetPreview.getAbsoluteX();
-                    desiredY = "after".equals(where) ? targetPreview.getAbsoluteY() + targetPreview.getHeight() - 1
-                            : targetPreview.getAbsoluteY();
+                    releaseY = "after".equals(where) ? targetPreview.getAbsoluteY() + targetPreview.getHeight() - 1
+                            : targetPreview.getAbsoluteY() + 1;
                 }
             } else if (!"center".equals(where)) {
                 return "Unknown placement " + where;
             }
-            releaseX = desiredX + grabX;
-            releaseY = desiredY + grabY;
         }
         String before = document.toXml();
         handleDesignerPointerPressed(startX, startY);
