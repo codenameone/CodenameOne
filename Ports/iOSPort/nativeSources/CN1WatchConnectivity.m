@@ -49,19 +49,91 @@ static NSString *const kStampPrefix = @"s.";
 static NSString *const kTombPrefix = @"t.";
 
 /// A monotonic publication stamp. Wall-clock millis order correctly against the peer's stamps (both
-/// devices are time-synced far more tightly than a context replication takes), and the counter
-/// breaks ties between two publishes inside the same millisecond on this device.
-static int64_t cn1WearableNextSequence(void) {
-    static int64_t last = 0;
+/// devices are time-synced far more tightly than a context replication takes), the counter breaks
+/// ties between two publishes inside the same millisecond on this device, and -- because wall time
+/// alone is not enough when the peer runs ahead or this clock is corrected backwards -- it is also
+/// raised past every stamp the peer has shown us.
+///
+/// Where that floor is kept so it survives a relaunch. Without persistence the counter restarts at
+/// wall time on every launch and a peer that ran ahead wins all over again.
+static NSString *const kCn1WearableClockKey = @"cn1.wearable.clock";
+
+static NSLock *cn1WearableClockLock(void) {
     static dispatch_once_t once;
     static NSLock *lock = nil;
     dispatch_once(&once, ^{
         lock = [[NSLock alloc] init];
     });
+    return lock;
+}
+
+/// The high-water mark: wall time, our own prior writes, AND every stamp a peer has shown us.
+static int64_t cn1WearableClockFloor(void) {
+    static dispatch_once_t once;
+    static int64_t restored = 0;
+    dispatch_once(&once, ^{
+        restored = (int64_t) [[NSUserDefaults standardUserDefaults] doubleForKey:kCn1WearableClockKey];
+    });
+    return restored;
+}
+
+static int64_t cn1WearableLast = 0;
+
+/// Raises the clock past a stamp we have just seen from the peer.
+///
+/// Without this the counter only ever observed local time and local writes, so a peer publishing
+/// while its clock ran ahead -- or this device's clock being corrected backwards -- left every
+/// subsequent local putData/removeData carrying a LOWER stamp than the peer's existing entry. The
+/// peer's older value then keeps winning, and getData() keeps returning it, until wall time
+/// catches up. This is the same Lamport rule the Android side applies in sequenceOf().
+static void cn1WearableObserveSequence(int64_t seen) {
+    if (seen <= 0) {
+        return;
+    }
+    NSLock *lock = cn1WearableClockLock();
+    [lock lock];
+    int64_t floorValue = cn1WearableClockFloor();
+    if (seen > cn1WearableLast) {
+        cn1WearableLast = seen;
+    }
+    if (seen > floorValue) {
+        // Persist so the floor outlives this process; a relaunch that forgot it would hand the
+        // peer the advantage back.
+        [[NSUserDefaults standardUserDefaults] setDouble:(double) seen forKey:kCn1WearableClockKey];
+    }
+    [lock unlock];
+}
+
+/// Serializes the whole applicationContext read-modify-write.
+///
+/// WCSession has no merge: updateApplicationContext REPLACES the dictionary. putData and removeData
+/// therefore copy it, change one path, and write the whole thing back, and two of those running
+/// concurrently both copy the SAME starting dictionary -- the second write then discards the first
+/// caller's path entirely. Nothing about it is atomic, and the loss is silent: the publish
+/// "succeeds" and the value simply is not there.
+///
+/// Both methods take this lock across copy, mutate AND update, because holding it for only part of
+/// the cycle leaves exactly the same window.
+static NSLock *cn1WearableContextLock(void) {
+    static dispatch_once_t once;
+    static NSLock *lock = nil;
+    dispatch_once(&once, ^{
+        lock = [[NSLock alloc] init];
+    });
+    return lock;
+}
+
+static int64_t cn1WearableNextSequence(void) {
+    NSLock *lock = cn1WearableClockLock();
     [lock lock];
     int64_t now = (int64_t) ([[NSDate date] timeIntervalSince1970] * 1000.0);
-    last = now > last ? now : last + 1;
-    int64_t result = last;
+    int64_t floorValue = cn1WearableClockFloor();
+    if (floorValue > cn1WearableLast) {
+        cn1WearableLast = floorValue;
+    }
+    cn1WearableLast = now > cn1WearableLast ? now : cn1WearableLast + 1;
+    int64_t result = cn1WearableLast;
+    [[NSUserDefaults standardUserDefaults] setDouble:(double) result forKey:kCn1WearableClockKey];
     [lock unlock];
     return result;
 }
@@ -103,9 +175,15 @@ static CN1WearableEntry cn1WearableEntryFor(NSDictionary *ctx, NSString *path) {
         e.data = value;
         e.known = YES;
         e.stamp = [stamp isKindOfClass:[NSNumber class]] ? [stamp longLongValue] : 0;
+        // Every stamp we read raises our clock, wherever it came from. Done here rather than in the
+        // receive callback because this is the ONE place entries are parsed -- getData, dataPaths
+        // and didReceiveApplicationContext all funnel through it, so no read path can forget to.
+        // Reading our own entry is a no-op: it can never exceed our own counter.
+        cn1WearableObserveSequence(e.stamp);
     }
     if ([tomb isKindOfClass:[NSNumber class]]) {
         int64_t t = [tomb longLongValue];
+        cn1WearableObserveSequence(t);
         // A removal published after the value wins over it -- that is the whole point of keeping the
         // tombstone rather than deleting the entry outright.
         if (!e.known || t > e.stamp) {
@@ -118,8 +196,17 @@ static CN1WearableEntry cn1WearableEntryFor(NSDictionary *ctx, NSString *path) {
     return e;
 }
 
-/// Which side's knowledge of a path is authoritative. Ours wins ties, which only happens when both
-/// sides predate stamping or published inside the same millisecond.
+/// Which side's knowledge of a path is authoritative.
+///
+/// Ties are broken by ROLE, not by ownership. "Ours wins" is the one answer that cannot work here:
+/// both devices run this same function, so on an equal stamp each would keep its own value, each
+/// would suppress the other's callback, and the pair would sit permanently disagreeing about the
+/// path with no event left to resolve it. Equal stamps are not exotic either -- two sides
+/// publishing inside the same millisecond, or entries that predate stamping, both land here.
+///
+/// The phone wins. The rule is arbitrary but it is *stable and shared*: each side knows which half
+/// it is at compile time, so both compute the same winner without exchanging anything. That is the
+/// same property the Android side gets from comparing node ids in outranks().
 static BOOL cn1WearableLocalWins(CN1WearableEntry mine, CN1WearableEntry theirs) {
     if (!theirs.known) {
         return YES;
@@ -127,7 +214,14 @@ static BOOL cn1WearableLocalWins(CN1WearableEntry mine, CN1WearableEntry theirs)
     if (!mine.known) {
         return NO;
     }
-    return mine.stamp >= theirs.stamp;
+    if (mine.stamp != theirs.stamp) {
+        return mine.stamp > theirs.stamp;
+    }
+#if TARGET_OS_WATCH
+    return NO;
+#else
+    return YES;
+#endif
 }
 
 /// How long a tombstone is kept before it is dropped, and the ceiling on how many are kept at all.
@@ -385,6 +479,8 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     if (s == nil || path == nil) {
         return;
     }
+    NSLock *ctxLock = cn1WearableContextLock();
+    [ctxLock lock];
     NSMutableDictionary *ctx = [[s applicationContext] mutableCopy];
     if (ctx == nil) {
         ctx = [[NSMutableDictionary alloc] init];
@@ -424,6 +520,8 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     if (s == nil || path == nil) {
         return;
     }
+    NSLock *ctxLock = cn1WearableContextLock();
+    [ctxLock lock];
     NSMutableDictionary *ctx = [[s applicationContext] mutableCopy];
     if (ctx == nil) {
         ctx = [[NSMutableDictionary alloc] init];
@@ -437,6 +535,7 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     cn1WearablePruneTombstones(ctx, [s receivedApplicationContext]);
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
+    [ctxLock unlock];
     [ctx release];
 }
 
