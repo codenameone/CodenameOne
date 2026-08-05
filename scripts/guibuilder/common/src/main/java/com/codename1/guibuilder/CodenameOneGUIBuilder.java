@@ -3978,11 +3978,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // Most of a companion file is generated and therefore protected. Refusing those edits
             // without a word is indistinguishable from an editor that ignores the keyboard, which
             // is exactly how it was read, so say what happened and where typing does work.
-            editor.addProtectedEditListener(e -> {
-                setStatus("That block is generated from the design and cannot be typed into"
-                        + " - edit between the USER CODE markers");
-                editor.setCursorPosition(editableOffset);
-            });
+            // Report the refusal and nothing else. Moving the caret into the user region looked
+            // helpful and was awful: the rejected keystroke was already gone, so typing "PINK" in a
+            // generated block dropped the P, jumped the caret to the user region and typed "INK"
+            // there. A refused edit must leave the caret exactly where the user put it.
+            editor.addProtectedEditListener(e -> setStatus(
+                    "That block is generated from the design and cannot be edited"
+                            + " - type between the USER CODE markers"));
             Component stage = canvasHost.getComponentCount() == 0 ? new Label() : canvasHost.getComponentAt(0);
             Container editorPane = editorPane(handler == null ? "Companion Java source • edit inside USER CODE markers" : "Handler: " + handler, editor,
                     () -> editor.getText(value -> saveSourceAndModel(sourcePath, value)), this::refreshEditor);
