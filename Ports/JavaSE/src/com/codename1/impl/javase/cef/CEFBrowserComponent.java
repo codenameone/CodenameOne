@@ -25,6 +25,7 @@ package com.codename1.impl.javase.cef;
 import com.codename1.impl.javase.IBrowserComponent;
 import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.impl.javase.JavaSEPort.Peer;
+import com.codename1.io.Log;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
@@ -117,9 +118,10 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     
     /**
      * System property that overrides the value passed to Chromium's
-     * {@code --disable-features} switch. When set (even to the empty string) it is
-     * used verbatim; when unset the platform default from {@link #defaultDisableFeatures()}
-     * is applied.
+     * {@code --disable-features} switch. When set to a non-empty value, that value is
+     * used verbatim; setting it to the empty string clears the default so no
+     * {@code --disable-features} switch is passed. When the property is unset the
+     * platform default from {@link #defaultDisableFeatures()} is applied.
      */
     static final String DISABLE_FEATURES_PROPERTY = "cef.disableFeatures";
 
@@ -179,7 +181,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
             args.add("--disable-features=" + disableFeatures);
         }
 
-        System.out.println("CEF Args: " + args);
+        Log.p("CEF Args: " + args, Log.DEBUG);
         return args.toArray(new String[args.size()]);
     }
     
