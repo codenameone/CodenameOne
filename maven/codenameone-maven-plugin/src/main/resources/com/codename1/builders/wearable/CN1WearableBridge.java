@@ -1723,11 +1723,23 @@ public class CN1WearableBridge implements WearableBridge {
             return;
         }
         synchronized (pendingWinnerPaths) {
-            if (!pendingWinnerPaths.add(path)) {
+            boolean fresh = pendingWinnerPaths.add(path);
+            // Upgrade to deletion state even when a resolution is already pending, and do it
+            // BEFORE the early return. Coalescing on the path alone loses the reason: a first-sight
+            // change can schedule a non-deletion resolution, a deletion for the same path can
+            // arrive before that timer runs, and the flag would be dropped -- so an empty result
+            // would be read as "nothing to announce" while the deletion was the LAST event the
+            // Data Layer will send, leaving the listener holding a value that no longer exists.
+            //
+            // Only ever set, never cleared: once a deletion is folded into a pending resolution,
+            // a later non-deletion caller must not downgrade it back.
+            if (afterDeletion) {
+                deletionPaths.add(path);
+            }
+            if (!fresh) {
                 return;
             }
         }
-        pendingDeletions(path, afterDeletion);
         scheduleWinnerResolution(context, path, 1);
     }
 
@@ -1787,15 +1799,6 @@ public class CN1WearableBridge implements WearableBridge {
      * resolution that owns it.
      */
     private static final java.util.Set<String> deletionPaths = new java.util.HashSet<String>();
-
-    private static void pendingDeletions(String path, boolean afterDeletion) {
-        if (!afterDeletion) {
-            return;
-        }
-        synchronized (pendingWinnerPaths) {
-            deletionPaths.add(path);
-        }
-    }
 
     private static boolean wasAfterDeletion(String path) {
         synchronized (pendingWinnerPaths) {
