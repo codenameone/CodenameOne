@@ -27,6 +27,8 @@ import java.lang.management.ManagementFactory;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Picks the maximum heap for a forked ByteCodeTranslator JVM.
@@ -126,6 +128,49 @@ final class TranslatorHeap {
     static String maxHeapArg(int floorMB) {
         return "-Xmx" + maxHeapMB(floorMB) + "m";
     }
+
+    /**
+     * Extra JVM options for a forked translator, from {@code CN1_TRANSLATOR_OPTS}.
+     *
+     * <p>A forked JVM inherits none of this process's {@code -D} properties, so
+     * this variable is the only way to reach the translator with a diagnostic
+     * flag, a kill switch, or an explicit heap. Every builder that forks the
+     * translator must read it, or the escape hatch works on some targets and
+     * silently does nothing on others.
+     *
+     * @return the whitespace-separated tokens, never null
+     */
+    static List<String> extraJvmOptions() {
+        List<String> out = new ArrayList<String>();
+        String raw = System.getenv(OPTS_ENV);
+        if (raw != null && raw.trim().length() > 0) {
+            for (String opt : raw.trim().split("\\s+")) {
+                if (opt.length() > 0) {
+                    out.add(opt);
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Whether the caller-supplied options already set a maximum heap, in which
+     * case the auto-sized value must not be added on top of it.
+     */
+    static boolean specifiesHeap(List<String> options) {
+        if (options == null) {
+            return false;
+        }
+        for (String opt : options) {
+            if (opt.startsWith("-Xmx")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Raw JVM options passed through to the forked translator. */
+    static final String OPTS_ENV = "CN1_TRANSLATOR_OPTS";
 
     /**
      * Whether a failed translator run failed for lack of memory.

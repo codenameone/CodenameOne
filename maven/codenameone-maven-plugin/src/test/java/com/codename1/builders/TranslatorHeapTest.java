@@ -238,6 +238,21 @@ public class TranslatorHeapTest {
         assertNull(TranslatorHeap.cgroupPath(null, ""));
     }
 
+    @Test
+    public void detectsAnExplicitHeapAmongTheExtraOptions() {
+        // Every builder that forks the translator uses this to decide whether to
+        // add the auto-sized heap on top of the caller's options. Getting it wrong
+        // means either two -Xmx flags or an ignored override.
+        assertTrue(TranslatorHeap.specifiesHeap(java.util.Arrays.asList("-Xmx6g")));
+        assertTrue(TranslatorHeap.specifiesHeap(
+                java.util.Arrays.asList("-Dparparvm.js.rta.off", "-Xmx6g")));
+        assertFalse(TranslatorHeap.specifiesHeap(java.util.Arrays.asList("-Dparparvm.js.rta.off")));
+        assertFalse(TranslatorHeap.specifiesHeap(java.util.Collections.<String>emptyList()));
+        assertFalse(TranslatorHeap.specifiesHeap(null));
+        // -Xms is not a maximum and must not suppress the auto-sized ceiling.
+        assertFalse(TranslatorHeap.specifiesHeap(java.util.Arrays.asList("-Xms512m")));
+    }
+
     private static File tempDir() throws Exception {
         File d = File.createTempFile("cn1-cgroup-test", "");
         assertTrue(d.delete());

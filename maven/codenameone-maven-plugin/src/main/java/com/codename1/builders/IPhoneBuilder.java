@@ -3508,18 +3508,9 @@ public class IPhoneBuilder extends Executor {
                 // -Xmx) from the CN1_TRANSLATOR_OPTS environment variable. The
                 // forked JVM does not inherit the Maven process's -D properties,
                 // so this is the only way to reach the translator for tuning.
-                String translatorOpts = System.getenv("CN1_TRANSLATOR_OPTS");
-                boolean heapOverridden = false;
-                if (translatorOpts != null && !translatorOpts.trim().isEmpty()) {
-                    for (String opt : translatorOpts.trim().split("\\s+")) {
-                        if (!opt.isEmpty()) {
-                            parparCmd.add(opt);
-                            if (opt.startsWith("-Xmx")) {
-                                heapOverridden = true;
-                            }
-                        }
-                    }
-                }
+                java.util.List<String> translatorOpts = TranslatorHeap.extraJvmOptions();
+                parparCmd.addAll(translatorOpts);
+                boolean heapOverridden = TranslatorHeap.specifiesHeap(translatorOpts);
                 // Heap sized from the machine (see TranslatorHeap), floored at the
                 // 1024m the cloud builder has always used; a -Xmx in
                 // CN1_TRANSLATOR_OPTS still takes precedence. The dead-code cull

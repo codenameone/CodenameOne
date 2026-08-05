@@ -766,19 +766,8 @@ public class JavaScriptBuilder extends Executor {
         // CN1_TRANSLATOR_OPTS environment variable. The forked JVM does
         // not inherit the Maven process's -D properties, so this is the
         // only way to reach the translator for bisection / tuning.
-        String translatorOpts = System.getenv("CN1_TRANSLATOR_OPTS");
-        boolean heapOverridden = false;
-        java.util.List<String> extraOpts = new java.util.ArrayList<String>();
-        if (translatorOpts != null && !translatorOpts.trim().isEmpty()) {
-            for (String opt : translatorOpts.trim().split("\\s+")) {
-                if (!opt.isEmpty()) {
-                    extraOpts.add(opt);
-                    if (opt.startsWith("-Xmx")) {
-                        heapOverridden = true;
-                    }
-                }
-            }
-        }
+        java.util.List<String> extraOpts = TranslatorHeap.extraJvmOptions();
+        boolean heapOverridden = TranslatorHeap.specifiesHeap(extraOpts);
         // Hand the translator the JavaScript-port webapp (port.js, js/, style.css,
         // ...) so it bundles port.js -- the worker-side native bindings that make
         // Window.current() etc. resolve. Off-repo builds can't find it via the
