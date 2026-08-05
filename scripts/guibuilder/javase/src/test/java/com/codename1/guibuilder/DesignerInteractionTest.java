@@ -1111,6 +1111,218 @@ class DesignerInteractionTest {
     }
 
     @Test
+    void aTableDropLandsInTheCellUnderThePointerAndLeavesEveryOtherCellAlone() throws Exception {
+        GuiDocument document = document("<component type=\"Form\" layout=\"TableLayout\" tableLayoutRows=\"2\" tableLayoutColumns=\"2\">"
+                + "<component type=\"Button\" name=\"a\" text=\"A\" tableRow=\"0\" tableColumn=\"0\"/>"
+                + "<component type=\"Button\" name=\"b\" text=\"B\" tableRow=\"0\" tableColumn=\"1\"/>"
+                + "<component type=\"Button\" name=\"c\" text=\"C\" tableRow=\"1\" tableColumn=\"0\"/></component>");
+        Element a = document.components().get(1);
+        Element b = document.components().get(2);
+        Element c = document.components().get(3);
+        CodenameOneGUIBuilder builder = builder(document);
+        Container canvas = canvasFor(document, builder, 400, 400);
+
+        // Drop c into the empty cell (row 1, column 1): the lower right quadrant.
+        Component source = componentForElement(canvas, c);
+        CodenameOneGUIBuilder.DropPlan plan = builder.planDrop(c, document.root(), source, 300, 300);
+        assertNotNull(plan);
+        assertTrue(builder.applyDropPlan(c, plan, 300, 300));
+
+        assertEquals("1", c.getAttribute("tableRow"), document.toXml());
+        assertEquals("1", c.getAttribute("tableColumn"), document.toXml());
+        assertEquals("0:0", a.getAttribute("tableRow") + ":" + a.getAttribute("tableColumn"),
+                "a was not dragged, so its cell must not move: " + document.toXml());
+        assertEquals("0:1", b.getAttribute("tableRow") + ":" + b.getAttribute("tableColumn"),
+                "b was not dragged, so its cell must not move: " + document.toXml());
+    }
+
+    @Test
+    void aTableDropNeverStacksTwoComponentsInOneCell() throws Exception {
+        GuiDocument document = document("<component type=\"Form\" layout=\"TableLayout\" tableLayoutRows=\"2\" tableLayoutColumns=\"2\">"
+                + "<component type=\"Button\" name=\"a\" text=\"A\" tableRow=\"0\" tableColumn=\"0\"/>"
+                + "<component type=\"Button\" name=\"b\" text=\"B\" tableRow=\"0\" tableColumn=\"1\"/>"
+                + "<component type=\"Button\" name=\"c\" text=\"C\" tableRow=\"1\" tableColumn=\"0\"/>"
+                + "<component type=\"Button\" name=\"d\" text=\"D\" tableRow=\"1\" tableColumn=\"1\"/></component>");
+        Element a = document.components().get(1);
+        Element d = document.components().get(4);
+        CodenameOneGUIBuilder builder = builder(document);
+        Container canvas = canvasFor(document, builder, 400, 400);
+
+        // Drop d onto a's occupied cell: the two must swap, not overlap.
+        Component source = componentForElement(canvas, d);
+        CodenameOneGUIBuilder.DropPlan plan = builder.planDrop(d, document.root(), source, 100, 100);
+        assertNotNull(plan);
+        assertTrue(builder.applyDropPlan(d, plan, 100, 100));
+
+        assertEquals("0:0", d.getAttribute("tableRow") + ":" + d.getAttribute("tableColumn"), document.toXml());
+        assertEquals("1:1", a.getAttribute("tableRow") + ":" + a.getAttribute("tableColumn"),
+                "the displaced component must take the vacated cell: " + document.toXml());
+        assertEquals(4, distinctTableCells(document).size(), document.toXml());
+    }
+
+    @Test
+    void aComponentDraggedBetweenTwoNestedContainersReparentsAndRenders() throws Exception {
+        GuiDocument document = nestedColumnsDocument();
+        Element leftGrid = document.components().get(2);
+        Element rightActions = document.components().get(7);
+        Element nestedA = document.components().get(3);
+        Element nestedAction = document.components().get(9);
+        CodenameOneGUIBuilder builder = builder(document);
+        Container canvas = canvasFor(document, builder, 700, 500);
+
+        Component target = componentForElement(canvas, nestedAction);
+        assertNotNull(target, "the demo must render the right hand column");
+        Component source = componentForElement(canvas, nestedA);
+        int x = target.getAbsoluteX() + target.getWidth() / 2;
+        int y = target.getAbsoluteY() + target.getHeight() - 2;
+
+        CodenameOneGUIBuilder.DropPlan plan = builder.planDrop(nestedA, builder.elementAt(canvas, x, y), source, x, y);
+        assertNotNull(plan, "hovering the far column must produce a drop plan");
+        assertSame(rightActions, plan.parent, "the drop must target the hovered container, not the drag source's");
+        assertTrue(builder.applyDropPlan(nestedA, plan, x, y), document.toXml());
+
+        assertSame(rightActions, document.parentOf(nestedA), document.toXml());
+        assertEquals(3, document.componentsIn(leftGrid).size(),
+                "the source container must actually give the child up: " + document.toXml());
+        Container reRendered = canvasFor(document, builder, 700, 500);
+        Component moved = componentForElement(reRendered, nestedA);
+        assertNotNull(moved, "the moved component must still render: " + document.toXml());
+        assertTrue(moved.getWidth() > 0 && moved.getHeight() > 0,
+                "the moved component must not collapse to zero size: " + document.toXml());
+        Component column = componentForElement(reRendered, rightActions);
+        assertTrue(moved.getAbsoluteX() >= column.getAbsoluteX()
+                        && moved.getAbsoluteX() < column.getAbsoluteX() + column.getWidth(),
+                "the moved component must render inside its new parent");
+    }
+
+    @Test
+    void aNestedContainerCanBeDraggedWholeWithoutLosingItsChildren() throws Exception {
+        GuiDocument document = nestedColumnsDocument();
+        Element contentColumns = document.components().get(1);
+        Element leftGrid = document.components().get(2);
+        Element rightActions = document.components().get(7);
+        CodenameOneGUIBuilder builder = builder(document);
+        Container canvas = canvasFor(document, builder, 700, 500);
+
+        Component source = componentForElement(canvas, leftGrid);
+        Component target = componentForElement(canvas, rightActions);
+        int x = target.getAbsoluteX() + target.getWidth() - 2;
+        int y = target.getAbsoluteY() + target.getHeight() / 2;
+        CodenameOneGUIBuilder.DropPlan plan = builder.planDrop(leftGrid, rightActions, source, x, y);
+        assertNotNull(plan);
+        assertTrue(builder.applyDropPlan(leftGrid, plan, x, y), document.toXml());
+
+        assertEquals(4, document.componentsIn(leftGrid).size(),
+                "moving a container must carry its whole subtree: " + document.toXml());
+        assertNotSame(contentColumns, document.parentOf(leftGrid));
+        Container reRendered = canvasFor(document, builder, 700, 500);
+        for (Element child : document.componentsIn(leftGrid)) {
+            Component preview = componentForElement(reRendered, child);
+            assertNotNull(preview, child.getAttribute("name") + " vanished: " + document.toXml());
+        }
+    }
+
+    @Test
+    void undoAfterAReparentingDragRestoresTheExactTreeAndOrder() throws Exception {
+        GuiDocument document = nestedColumnsDocument();
+        String before = document.toXml();
+        Element leftGrid = document.components().get(2);
+        Element rightActions = document.components().get(7);
+        Element nestedA = document.components().get(3);
+        CodenameOneGUIBuilder builder = builder(document);
+        canvasFor(document, builder, 700, 500);
+
+        assertTrue(builder.applyDropPlan(nestedA,
+                sequentialPlan(document, rightActions, rightActions, "BoxLayout", true), 0, 0));
+        assertSame(rightActions, document.parentOf(nestedA));
+        assertTrue(document.undo());
+
+        assertEquals(before, document.toXml(), "undo must restore the document byte for byte");
+        List<Element> grid = GuiDocument.componentsIn(findByName(document, "leftGrid"));
+        assertEquals(List.of("nestedA", "nestedB", "nestedC", "nestedD"), namesOf(grid),
+                "undo must restore sibling order, not just membership");
+    }
+
+    @Test
+    void repeatedEditAndUndoCyclesNeverDriftTheDocument() throws Exception {
+        GuiDocument document = nestedColumnsDocument();
+        String before = document.toXml();
+        CodenameOneGUIBuilder builder = builder(document);
+        for (int i = 0; i < 4; i++) {
+            canvasFor(document, builder, 700, 500);
+            Element rightActions = findByName(document, "rightActions");
+            Element nestedA = findByName(document, "nestedA");
+            assertTrue(builder.applyDropPlan(nestedA,
+                    sequentialPlan(document, rightActions, rightActions, "BoxLayout", true), 0, 0),
+                    "cycle " + i + " could not move the component");
+            assertTrue(document.undo(), "cycle " + i + " could not undo");
+            assertEquals(before, document.toXml(), "the document drifted on cycle " + i);
+        }
+    }
+
+    private static Element findByName(GuiDocument document, String name) {
+        for (Element element : document.components()) {
+            if (name.equals(element.getAttribute("name"))) return element;
+        }
+        return null;
+    }
+
+    private static List<String> namesOf(List<Element> elements) {
+        List<String> names = new java.util.ArrayList<>();
+        for (Element element : elements) names.add(element.getAttribute("name"));
+        return names;
+    }
+
+    private static String value(Element element, String attribute, String fallback) {
+        String raw = element == null ? null : element.getAttribute(attribute);
+        return raw == null ? fallback : raw;
+    }
+
+    /**
+     * Indented exactly like the .gui files the editor loads from disk. The indentation is not
+     * cosmetic: XMLParser turns it into whitespace text nodes, so a document read from a project
+     * has interleaved non-component children that a document built from one long line does not.
+     */
+    private static GuiDocument nestedColumnsDocument() {
+        return document("<component type=\"Form\" layout=\"BorderLayout\" title=\"Nested hierarchy\" name=\"NestedLayoutsForm\">\n"
+                + "    <component type=\"Container\" name=\"contentColumns\" layout=\"BoxLayout\" boxLayoutAxis=\"X\" layoutConstraint=\"Center\">\n"
+                + "        <component type=\"Container\" name=\"leftGrid\" layout=\"GridLayout\" gridLayoutRows=\"2\" gridLayoutColumns=\"2\">\n"
+                + "            <component type=\"Button\" name=\"nestedA\" text=\"A\" />\n"
+                + "            <component type=\"Button\" name=\"nestedB\" text=\"B\" />\n"
+                + "            <component type=\"Button\" name=\"nestedC\" text=\"C\" />\n"
+                + "            <component type=\"Button\" name=\"nestedD\" text=\"D\" />\n"
+                + "        </component>\n"
+                + "        <component type=\"Container\" name=\"rightActions\" layout=\"BoxLayout\" boxLayoutAxis=\"Y\">\n"
+                + "            <component type=\"Label\" name=\"nestedDescription\" text=\"Drag components between both nested containers.\" />\n"
+                + "            <component type=\"Button\" name=\"nestedAction\" text=\"Action\" />\n"
+                + "        </component>\n"
+                + "    </component>\n"
+                + "</component>");
+    }
+
+    private static java.util.Set<String> distinctTableCells(GuiDocument document) {
+        java.util.Set<String> cells = new java.util.HashSet<>();
+        for (int i = 1; i < document.components().size(); i++) {
+            Element child = document.components().get(i);
+            cells.add(child.getAttribute("tableRow") + ":" + child.getAttribute("tableColumn"));
+        }
+        return cells;
+    }
+
+    private static Container canvasFor(GuiDocument document, CodenameOneGUIBuilder builder, int width, int height)
+            throws Exception {
+        Container preview = (Container) render(document, width, height);
+        Container canvas = new Container(new LayeredLayout());
+        canvas.setWidth(width);
+        canvas.setHeight(height);
+        canvas.add(preview);
+        canvas.layoutContainer();
+        layoutNested(canvas);
+        set(builder, "canvasHost", canvas);
+        return canvas;
+    }
+
+    @Test
     void nestedGridPlacementMovesOnlyTheSelectedBranch() throws Exception {
         GuiDocument document = document("<component type=\"Form\" layout=\"BoxLayout\"><component type=\"Container\" name=\"grid\" layout=\"GridLayout\" gridLayoutRows=\"1\" gridLayoutColumns=\"2\">"
                 + "<component type=\"Label\" name=\"inside\"/></component><component type=\"Button\" name=\"outside\"/></component>");

@@ -1360,7 +1360,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         boxDropParent = parent;
         boxDropIndex = Math.max(0, Math.min(index, parent.getComponentCount()));
         parent.addComponent(boxDropIndex, spacer);
-        parent.animateLayout(90);
+        // revalidate, never animateLayout: a layout animation captures the preview tree and
+        // re-applies that captured state when it finishes. The drop commits and rebuilds the
+        // canvas well inside the animation's window, so the animation then restored the
+        // pre-drop preview over the new one -- the model moved, the canvas did not, and the
+        // spacer stayed behind. Nested containers made it worse because each level animated.
+        parent.revalidate();
     }
 
     private void clearBoxDropSpacer() {
@@ -1442,7 +1447,29 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private final class FlowPlacementAdapter extends BoxPlacementAdapter { }
     private final class GridPlacementAdapter extends BoxPlacementAdapter { }
-    private final class TablePlacementAdapter extends BoxPlacementAdapter { }
+
+    /**
+     * A table drop is a placement into one addressed cell, not an insertion into a sequence. It
+     * therefore behaves like BorderLayout rather than BoxLayout: the pointer picks the cell, and a
+     * cell that is already taken swaps rather than pushing everything along.
+     */
+    private final class TablePlacementAdapter implements PlacementAdapter {
+        public void plan(DropPlan plan, Element dragged, Element target, Component source, int x, int y) {
+            Component parentPreview = componentForElement(canvasHost, plan.parent);
+            plan.tableCell = tableCellAt(plan.parent, parentPreview, x, y);
+            plan.occupied = childAtTableCell(plan.parent, plan.tableCell[0], plan.tableCell[1], dragged);
+            String cell = "row " + plan.tableCell[0] + ", column " + plan.tableCell[1];
+            if (plan.occupied == null) {
+                plan.message = "Place in " + cell;
+            } else if (dragged == null) {
+                plan.valid = false;
+                plan.message = cell + " is occupied by "
+                        + value(plan.occupied, "name", value(plan.occupied, "type", "component"));
+            } else {
+                plan.message = "Swap with " + value(plan.occupied, "name", "component") + " in " + cell;
+            }
+        }
+    }
 
     private String borderRegionAt(Element parent, Element dragged, Component parentPreview,
             Component source, int x, int y) {
@@ -1601,6 +1628,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private boolean applyDropPlanImpl(Element dragged, DropPlan plan, int x, int y) {
         Element oldParent = document.parentOf(dragged);
+        if ("TableLayout".equals(plan.layout) && plan.tableCell != null) {
+            return applyTableDrop(dragged, plan, oldParent);
+        }
         int oldIndex = document.componentIndex(oldParent, dragged);
         String oldLayout = oldParent == null ? "" : value(oldParent, "layout", "BoxLayout");
         String oldLayeredInsets = dragged.getAttribute("layeredInsets");
@@ -1680,6 +1710,58 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             document.setAttribute("layeredInsets", null);
         }
         return true;
+    }
+
+    /**
+     * Commits a table drop as an explicit cell assignment. Only the dragged component and, when the
+     * aimed cell was taken, its previous occupant change cells; every other child keeps the cell it
+     * had. XML order is left alone as well, because in a table it carries no layout meaning and
+     * reordering it would churn the generated source for no visible reason.
+     */
+    private boolean applyTableDrop(Element dragged, DropPlan plan, Element oldParent) {
+        int row = plan.tableCell[0];
+        int column = plan.tableCell[1];
+        Integer vacatedRow = parseInteger(dragged.getAttribute("tableRow"));
+        Integer vacatedColumn = parseInteger(dragged.getAttribute("tableColumn"));
+        if (oldParent != plan.parent) {
+            document.select(dragged);
+            if (!document.moveSelectedToParent(plan.parent, componentChildren(plan.parent).size())) return false;
+        }
+        if (plan.occupied != null) {
+            document.select(plan.occupied);
+            boolean canSwap = oldParent == plan.parent && vacatedRow != null && vacatedColumn != null;
+            int[] destination = canSwap ? new int[]{vacatedRow.intValue(), vacatedColumn.intValue()}
+                    : firstFreeTableCell(plan.parent, dragged, plan.occupied);
+            document.setAttribute("tableRow", String.valueOf(destination[0]));
+            document.setAttribute("tableColumn", String.valueOf(destination[1]));
+        }
+        document.select(dragged);
+        document.setAttribute("layoutConstraint", null);
+        document.setAttribute("layeredInsets", null);
+        document.setAttribute("tableRow", String.valueOf(row));
+        document.setAttribute("tableColumn", String.valueOf(column));
+        normalizeTableCells(plan.parent);
+        document.select(dragged);
+        return true;
+    }
+
+    /** The first cell in row-major order that no sibling claims, growing past the last row if needed. */
+    private int[] firstFreeTableCell(Element parent, Element... ignored) {
+        int columns = Math.max(1, integer(value(parent, "tableLayoutColumns", "2"), 2));
+        Set<String> taken = new LinkedHashSet<>();
+        for (Element child : componentChildren(parent)) {
+            boolean skip = false;
+            for (Element candidate : ignored) skip = skip || child == candidate;
+            if (skip) continue;
+            Integer row = parseInteger(child.getAttribute("tableRow"));
+            Integer column = parseInteger(child.getAttribute("tableColumn"));
+            if (row != null && column != null) taken.add(row + ":" + column);
+        }
+        for (int cursor = 0; ; cursor++) {
+            int row = cursor / columns;
+            int column = cursor % columns;
+            if (!taken.contains(row + ":" + column)) return new int[]{row, column};
+        }
     }
 
     private void persistGuidedConstraints(GuiDocument targetDocument, Element element, DropPlan plan, Container parent,
@@ -2276,19 +2358,79 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private int standardGap() { return Math.max(6, Display.getInstance().convertToPixels(1)); }
 
+    /**
+     * Gives every child of a table a cell, without ever moving a child that already has one.
+     *
+     * <p>Reassigning cells from sibling order is what an implicit, code-first TableLayout does, and
+     * it is wrong for a designer: dropping one component then renumbers every other cell, so the
+     * whole table jumps to a layout nobody asked for. Cells are the user's placement decision, so
+     * only components that have no cell yet, or whose cell collides with an earlier sibling, are
+     * assigned one, and they take the first free cell in row-major order.
+     */
     private void normalizeTableCells(Element parent) {
         int columns = Math.max(1, integer(value(parent, "tableLayoutColumns", "2"), 2));
         List<Element> children = componentChildren(parent);
-        int requiredRows = Math.max(1, (children.size() + columns - 1) / columns);
+        Set<String> taken = new LinkedHashSet<>();
+        List<Element> unplaced = new ArrayList<>();
+        for (Element child : children) {
+            Integer row = parseInteger(child.getAttribute("tableRow"));
+            Integer column = parseInteger(child.getAttribute("tableColumn"));
+            if (row == null || column == null || row.intValue() < 0 || column.intValue() < 0
+                    || column.intValue() >= columns || !taken.add(row + ":" + column)) {
+                unplaced.add(child);
+            }
+        }
+        int cursor = 0;
+        for (Element child : unplaced) {
+            while (taken.contains((cursor / columns) + ":" + (cursor % columns))) cursor++;
+            taken.add((cursor / columns) + ":" + (cursor % columns));
+            document.select(child);
+            document.setAttribute("tableRow", String.valueOf(cursor / columns));
+            document.setAttribute("tableColumn", String.valueOf(cursor % columns));
+        }
+        growTableToFit(parent, taken);
+    }
+
+    /** Widens the declared row count so no assigned cell falls outside the table and disappears. */
+    private void growTableToFit(Element parent, Set<String> occupiedCells) {
+        int requiredRows = 1;
+        for (String cell : occupiedCells) {
+            Integer row = parseInteger(cell.substring(0, cell.indexOf(':')));
+            if (row != null) requiredRows = Math.max(requiredRows, row.intValue() + 1);
+        }
         if (integer(value(parent, "tableLayoutRows", "2"), 2) < requiredRows) {
             document.select(parent);
             document.setAttribute("tableLayoutRows", String.valueOf(requiredRows));
         }
-        for (int i = 0; i < children.size(); i++) {
-            document.select(children.get(i));
-            document.setAttribute("tableRow", String.valueOf(i / columns));
-            document.setAttribute("tableColumn", String.valueOf(i % columns));
+    }
+
+    /** The child occupying {@code row}/{@code column}, or null. */
+    private Element childAtTableCell(Element parent, int row, int column, Element ignored) {
+        for (Element child : componentChildren(parent)) {
+            if (child == ignored) continue;
+            Integer childRow = parseInteger(child.getAttribute("tableRow"));
+            Integer childColumn = parseInteger(child.getAttribute("tableColumn"));
+            if (childRow != null && childColumn != null
+                    && childRow.intValue() == row && childColumn.intValue() == column) return child;
         }
+        return null;
+    }
+
+    /**
+     * The cell under the pointer, derived from the parent preview's own geometry rather than from
+     * sibling order, so a drop lands where it was aimed.
+     */
+    int[] tableCellAt(Element parent, Component parentPreview, int x, int y) {
+        int columns = Math.max(1, integer(value(parent, "tableLayoutColumns", "2"), 2));
+        int rows = Math.max(1, integer(value(parent, "tableLayoutRows", "2"), 2));
+        if (parentPreview == null || parentPreview.getWidth() < 1 || parentPreview.getHeight() < 1) {
+            return new int[]{0, 0};
+        }
+        int width = Math.max(1, contentWidth(parentPreview));
+        int height = Math.max(1, contentHeight(parentPreview));
+        int column = ((x - contentX(parentPreview)) * columns) / width;
+        int row = ((y - contentY(parentPreview)) * rows) / height;
+        return new int[]{Math.max(0, Math.min(rows - 1, row)), Math.max(0, Math.min(columns - 1, column))};
     }
 
     private List<Element> componentChildren(Element parent) {
@@ -2318,6 +2460,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String snapDescription;
         SnapResult horizontalSnap;
         SnapResult verticalSnap;
+        /** {row, column} for a TableLayout drop; null for every other layout. */
+        int[] tableCell;
     }
 
     static final class GuidedSimulation {
@@ -2497,6 +2641,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return document != null && document.containsElement(element);
     }
 
+    List<Element> selectedElementsSnapshot() {
+        return new ArrayList<>(selectedElements);
+    }
+
+    Container canvasHostForTest() { return canvasHost; }
+
+    GuiDocument documentForTest() { return document; }
+
     private void cancelDesignerDrag() {
         designerDraggedElement = null;
         designerDragDocument = null;
@@ -2535,12 +2687,39 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             selectedElements.clear();
             return;
         }
+        rebindSelectionToDocument();
         selectedElements.removeIf(element -> !document.containsElement(element));
         Element primary = document.selected();
         if (selectedElements.isEmpty() && primary != null && primary != document.root()) selectedElements.add(primary);
         if (!selectedElements.isEmpty() && !selectedElements.contains(primary)) {
             document.select(selectedElements.iterator().next());
         }
+    }
+
+    /**
+     * Re-resolves the selection against the live tree by component name.
+     *
+     * <p>Undo and redo restore by reparsing, so every Element identity changes even though the
+     * form is unchanged. Everything the editor holds -- the multi-selection here, and the drag
+     * state cleared alongside it -- then refers to a tree the document has thrown away. Dropping
+     * those entries would silently deselect after every undo; names are unique in a document, so
+     * they survive the reparse and are the right key to re-resolve against.
+     */
+    private void rebindSelectionToDocument() {
+        if (selectedElements.isEmpty()) return;
+        List<Element> rebound = new ArrayList<>();
+        for (Element element : selectedElements) {
+            if (document.containsElement(element)) {
+                rebound.add(element);
+                continue;
+            }
+            String name = element.getAttribute("name");
+            Element live = name == null ? null : findElementNamed(document, name);
+            if (live != null) rebound.add(live);
+        }
+        if (rebound.equals(new ArrayList<>(selectedElements))) return;
+        selectedElements.clear();
+        selectedElements.addAll(rebound);
     }
 
     private void selectElement(Element element, boolean additive, String source) {
@@ -3010,9 +3189,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         boolean moved = false;
         document.beginTransaction();
         try {
+            // In a table the neighbour must be identified before the move, because "the component
+            // one step earlier" is the one whose cell the user wants; afterwards it is the
+            // selection itself that sits at that index.
+            Element neighbour = parent != null && "TableLayout".equals(value(parent, "layout", "BoxLayout"))
+                    ? siblingBy(parent, selected, delta) : null;
             if (!document.moveSelectedBy(delta)) return false;
             moved = true;
             if (parent != null && "TableLayout".equals(value(parent, "layout", "BoxLayout"))) {
+                // Swap the two cells rather than renumbering the table from sibling order: the
+                // user asked these two components to trade places, not the rest to shuffle.
+                if (neighbour != null) swapTableCells(selected, neighbour);
                 normalizeTableCells(parent);
                 document.select(selected);
             }
@@ -3020,6 +3207,23 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             document.endTransaction();
         }
         return moved;
+    }
+
+    private Element siblingBy(Element parent, Element element, int delta) {
+        List<Element> children = componentChildren(parent);
+        int index = children.indexOf(element) + delta;
+        return index < 0 || index >= children.size() ? null : children.get(index);
+    }
+
+    private void swapTableCells(Element first, Element second) {
+        String firstRow = first.getAttribute("tableRow");
+        String firstColumn = first.getAttribute("tableColumn");
+        document.select(first);
+        document.setAttribute("tableRow", second.getAttribute("tableRow"));
+        document.setAttribute("tableColumn", second.getAttribute("tableColumn"));
+        document.select(second);
+        document.setAttribute("tableRow", firstRow);
+        document.setAttribute("tableColumn", firstColumn);
     }
 
     private void applyLayeredAction(String action) {
