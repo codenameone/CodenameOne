@@ -1503,14 +1503,14 @@
     },
     "compact-strings-parparvm": {
       "hashnode": {
-        "url": "https://hashnode.com/draft/6a721af9dd3e6285f360a9b7",
-        "published": false,
+        "url": "https://debugagent.com/compact-strings-cut-character-storage-in-half",
+        "published": true,
         "draft_url": "https://hashnode.com/draft/6a721af9dd3e6285f360a9b7",
         "cover_set": true,
         "subheading_set": true,
-        "tags_set": false,
-        "canonical_set": false,
-        "syndicated_at": "2026-08-04T17:03:22+00:00"
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-05T02:41:11+00:00"
       }
     }
   }
