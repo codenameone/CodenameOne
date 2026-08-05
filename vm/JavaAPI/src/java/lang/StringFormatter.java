@@ -91,11 +91,41 @@ final class StringFormatter {
         private int point;
     }
 
+    /** One parsed format specifier, reused across both passes to avoid per-specifier garbage. */
+    private static final class Spec {
+        private int start;
+        private int end;
+        private int argIndex;
+        private boolean previous;
+        private int flags;
+        private int width;
+        private int precision;
+        private char conversion;
+        private char lower;
+        private boolean upper;
+    }
+
     static String format(String format, Object[] args) {
         if (format == null) {
             throw new NullPointerException();
         }
         int len = format.length();
+        Spec spec = new Spec();
+
+        // The JVM parses and validates the whole format string before it formats any of
+        // it, so a broken specifier late in the string outranks a missing argument early
+        // in it: String.format("%s %q") reports the unknown conversion, not the missing
+        // argument. Validate everything up front rather than as we emit.
+        int scan = 0;
+        while (scan < len) {
+            if (format.charAt(scan) != '%') {
+                scan++;
+                continue;
+            }
+            scan = parseSpec(format, scan, spec);
+            validateSpec(spec);
+        }
+
         StringBuilder out = new StringBuilder(len + 16);
         int pos = 0;
         int nextArg = 0;
@@ -107,167 +137,219 @@ final class StringFormatter {
                 pos++;
                 continue;
             }
-            int specStart = pos;
-            pos++;
-            if (pos >= len) {
-                throw new UnknownFormatConversionException("%");
-            }
+            pos = parseSpec(format, pos, spec);
 
-            // An explicit argument index is a run of digits terminated by '$'. If the '$'
-            // is not there the same digits are a width, so rewind.
-            int argIndex = -1;
-            int digitsEnd = pos;
-            while (digitsEnd < len && isDigit(format.charAt(digitsEnd))) {
-                digitsEnd++;
+            if (spec.conversion == '%') {
+                out.append(pad("%", spec.width, spec.flags));
+                continue;
             }
-            if (digitsEnd > pos && digitsEnd < len && format.charAt(digitsEnd) == '$') {
-                argIndex = parseNumber(format, pos, digitsEnd);
-                if (argIndex < 0) {
-                    // Saturated: the index did not fit in an int.
-                    throw new IllegalFormatArgumentIndexException(argIndex);
-                }
-                if (argIndex == 0) {
-                    // Argument indexes are 1-based; "%0$s" has no argument to select.
-                    throw new IllegalFormatArgumentIndexException(argIndex);
-                }
-                pos = digitsEnd + 1;
-            }
-
-            int flags = 0;
-            while (pos < len) {
-                char f = format.charAt(pos);
-                int flag;
-                if (f == '-') {
-                    flag = FLAG_MINUS;
-                } else if (f == '+') {
-                    flag = FLAG_PLUS;
-                } else if (f == ' ') {
-                    flag = FLAG_SPACE;
-                } else if (f == '0') {
-                    flag = FLAG_ZERO;
-                } else if (f == ',') {
-                    flag = FLAG_COMMA;
-                } else if (f == '(') {
-                    flag = FLAG_PAREN;
-                } else if (f == '#') {
-                    flag = FLAG_HASH;
-                } else if (f == '<') {
-                    flag = FLAG_PREVIOUS;
-                } else {
-                    break;
-                }
-                if ((flags & flag) != 0) {
-                    throw new DuplicateFormatFlagsException(String.valueOf(f));
-                }
-                flags |= flag;
-                pos++;
-            }
-            boolean previous = (flags & FLAG_PREVIOUS) != 0;
-
-            int width = -1;
-            int widthStart = pos;
-            while (pos < len && isDigit(format.charAt(pos))) {
-                pos++;
-            }
-            if (pos > widthStart) {
-                width = parseNumber(format, widthStart, pos);
-                if (width < 0) {
-                    throw new IllegalFormatWidthException(width);
-                }
-            }
-
-            int precision = -1;
-            if (pos < len && format.charAt(pos) == '.') {
-                pos++;
-                int precisionStart = pos;
-                while (pos < len && isDigit(format.charAt(pos))) {
-                    pos++;
-                }
-                if (pos == precisionStart) {
-                    // "%.s" is malformed; the JVM reports the '.' as the conversion.
-                    throw new UnknownFormatConversionException(".");
-                }
-                precision = parseNumber(format, precisionStart, pos);
-                if (precision < 0) {
-                    throw new IllegalFormatPrecisionException(precision);
-                }
-            }
-
-            if (pos >= len) {
-                throw new UnknownFormatConversionException(format.substring(specStart + 1));
-            }
-            char conversion = format.charAt(pos);
-            pos++;
-
-            if (conversion == '%' || conversion == 'n') {
-                checkTextFlags(conversion, flags, width, precision);
-                out.append(conversion == '%' ? pad("%", width, flags) : "\n");
+            if (spec.conversion == 'n') {
+                out.append('\n');
                 continue;
             }
 
             // format(fmt, (Object[]) null) is not an empty argument list: the JVM skips
             // the bounds checks and hands every specifier a null. "%<" is the exception
             // -- it reuses the previous argument, so there must have been one either way.
-            // The JVM validates the specifier before it looks for an argument: "%q" with
-            // no arguments is an unknown conversion, not a missing argument.
-            boolean upper = conversion >= 'A' && conversion <= 'Z';
-            char lower = validateSpecifier(conversion, upper, flags, width, precision);
-
             Object arg;
-            if (previous) {
+            if (spec.previous) {
                 if (lastArg < 0 || (args != null && lastArg >= args.length)) {
-                    throw new MissingFormatArgumentException(format.substring(specStart, pos));
+                    throw new MissingFormatArgumentException(format.substring(spec.start, spec.end));
                 }
                 arg = args == null ? null : args[lastArg];
-            } else if (argIndex > 0) {
-                if (args != null && argIndex > args.length) {
-                    throw new MissingFormatArgumentException(format.substring(specStart, pos));
+            } else if (spec.argIndex > 0) {
+                if (args != null && spec.argIndex > args.length) {
+                    throw new MissingFormatArgumentException(format.substring(spec.start, spec.end));
                 }
-                lastArg = argIndex - 1;
+                lastArg = spec.argIndex - 1;
                 arg = args == null ? null : args[lastArg];
             } else {
                 if (args != null && nextArg >= args.length) {
-                    throw new MissingFormatArgumentException(format.substring(specStart, pos));
+                    throw new MissingFormatArgumentException(format.substring(spec.start, spec.end));
                 }
                 lastArg = nextArg;
                 arg = args == null ? null : args[nextArg];
                 nextArg++;
             }
-            out.append(convert(conversion, lower, upper, arg, flags, width, precision));
+            out.append(convert(spec, arg));
         }
         return out.toString();
     }
 
     /**
-     * Everything the JVM rejects before it selects an argument. Returns the lowercase
-     * conversion so the caller does not recompute it.
+     * Parses the specifier beginning at {@code start} into {@code spec} and returns the
+     * index just past it. Grammar errors are raised here, so they surface during the
+     * validation pass the way the JVM raises them while parsing.
      */
-    private static char validateSpecifier(char conversion, boolean upper, int flags,
-                                          int width, int precision) {
-        if (upper && "SBHCXEG".indexOf(conversion) < 0) {
-            // 'D' and 'O' have no uppercase form in java.util.Formatter.
-            throw new UnknownFormatConversionException(String.valueOf(conversion));
+    private static int parseSpec(String format, int start, Spec spec) {
+        int len = format.length();
+        int pos = start + 1;
+        spec.start = start;
+        if (pos >= len) {
+            throw new UnknownFormatConversionException("%");
         }
-        char lower = upper ? (char) (conversion + ('a' - 'A')) : conversion;
-        if ("sbhcdoxefg".indexOf(lower) < 0) {
-            // %a (hexadecimal float) and %t (date and time) land here: unimplemented
-            // rather than silently wrong. See the class javadoc.
-            throw new UnknownFormatConversionException(String.valueOf(conversion));
+
+        // Walk the whole specifier before judging any of it. The JVM matches the shape
+        // first, so "%,," is an unknown conversion rather than a duplicate flag: there is
+        // no conversion character for those flags to belong to.
+        int argIndex = -1;
+        int digitsEnd = pos;
+        while (digitsEnd < len && isDigit(format.charAt(digitsEnd))) {
+            digitsEnd++;
         }
-        checkFlags(conversion, lower, flags, width, precision);
-        return lower;
+        boolean hasIndex = digitsEnd > pos && digitsEnd < len && format.charAt(digitsEnd) == '$';
+        if (hasIndex) {
+            argIndex = parseNumber(format, pos, digitsEnd);
+            pos = digitsEnd + 1;
+        }
+
+        int flags = 0;
+        char duplicateFlag = 0;
+        while (pos < len) {
+            int flag = flagBit(format.charAt(pos));
+            if (flag == 0) {
+                break;
+            }
+            if ((flags & flag) != 0 && duplicateFlag == 0) {
+                duplicateFlag = format.charAt(pos);
+            }
+            flags |= flag;
+            pos++;
+        }
+
+        int width = -1;
+        int widthStart = pos;
+        while (pos < len && isDigit(format.charAt(pos))) {
+            pos++;
+        }
+        boolean hasWidth = pos > widthStart;
+        if (hasWidth) {
+            width = parseNumber(format, widthStart, pos);
+        }
+
+        int precision = -1;
+        boolean hasPrecision = false;
+        if (pos < len && format.charAt(pos) == '.') {
+            int precisionStart = pos + 1;
+            int scan = precisionStart;
+            while (scan < len && isDigit(format.charAt(scan))) {
+                scan++;
+            }
+            if (scan > precisionStart) {
+                hasPrecision = true;
+                precision = parseNumber(format, precisionStart, scan);
+                pos = scan;
+            }
+            // A '.' with no digits is not a precision at all; it falls through and
+            // becomes the conversion character, which is then rejected as unknown.
+        }
+
+        if (pos >= len) {
+            // The shape never completed. The JVM reports the character right after '%'.
+            throw new UnknownFormatConversionException(String.valueOf(format.charAt(start + 1)));
+        }
+        char conversion = format.charAt(pos);
+        pos++;
+
+        // Now judge the parts, in the order the JVM judges them.
+        if (hasIndex && argIndex <= 0) {
+            // Either saturated past int range, or zero: indexes are 1-based.
+            throw new IllegalFormatArgumentIndexException(argIndex);
+        }
+        if (duplicateFlag != 0) {
+            throw new DuplicateFormatFlagsException(String.valueOf(duplicateFlag));
+        }
+        if (hasWidth && width < 0) {
+            throw new IllegalFormatWidthException(width);
+        }
+        if (hasPrecision && precision < 0) {
+            throw new IllegalFormatPrecisionException(precision);
+        }
+
+        spec.argIndex = hasIndex ? argIndex : -1;
+        spec.flags = flags;
+        spec.previous = (flags & FLAG_PREVIOUS) != 0;
+        spec.width = hasWidth ? width : -1;
+        spec.precision = hasPrecision ? precision : -1;
+        spec.conversion = conversion;
+        spec.upper = conversion >= 'A' && conversion <= 'Z';
+        // The JVM lowercases a known conversion and carries the case as a flag, so the
+        // conversion it reports in an exception is the lowercase one.
+        spec.lower = spec.upper ? (char) (conversion + ('a' - 'A')) : conversion;
+        spec.end = pos;
+        return pos;
     }
 
-    private static String convert(char conversion, char lower, boolean upper, Object arg,
-                                  int flags, int width, int precision) {
-        switch (lower) {
-            case 's':
+    private static int flagBit(char f) {
+        if (f == '-') {
+            return FLAG_MINUS;
+        }
+        if (f == '+') {
+            return FLAG_PLUS;
+        }
+        if (f == ' ') {
+            return FLAG_SPACE;
+        }
+        if (f == '0') {
+            return FLAG_ZERO;
+        }
+        if (f == ',') {
+            return FLAG_COMMA;
+        }
+        if (f == '(') {
+            return FLAG_PAREN;
+        }
+        if (f == '#') {
+            return FLAG_HASH;
+        }
+        if (f == '<') {
+            return FLAG_PREVIOUS;
+        }
+        return 0;
+    }
+
+    /** Everything the JVM rejects before it selects any argument. */
+    private static void validateSpec(Spec spec) {
+        if (spec.conversion == '%' || spec.conversion == 'n') {
+            checkTextFlags(spec.conversion, spec.flags, spec.width, spec.precision);
+            return;
+        }
+        if (spec.upper && "SBHCXEG".indexOf(spec.conversion) < 0) {
+            // 'D' and 'O' have no uppercase form; an unknown conversion keeps its case.
+            throw new UnknownFormatConversionException(String.valueOf(spec.conversion));
+        }
+        if ("sbhcdoxefg".indexOf(spec.lower) < 0) {
+            // %a (hexadecimal float) and %t (date and time) land here: unimplemented
+            // rather than silently wrong. See the class javadoc.
+            throw new UnknownFormatConversionException(String.valueOf(spec.conversion));
+        }
+        checkFlags(spec);
+    }
+
+    private static String convert(Spec spec, Object arg) {
+        char conversion = spec.lower;
+        boolean upper = spec.upper;
+        int flags = spec.flags;
+        int width = spec.width;
+        int precision = spec.precision;
+        switch (conversion) {
+            case 's': {
                 // '#' on a string is a print-time check on the JVM, so a missing argument
                 // outranks it while a null argument does not.
                 if ((flags & FLAG_HASH) != 0) {
                     throw new FormatFlagsConversionMismatchException("#", conversion);
                 }
-                return text(arg == null ? "null" : arg.toString(), upper, flags, width, precision);
+                String value = arg == null ? "null" : arg.toString();
+                if (value == null) {
+                    // toString() may legally return null. An unadorned %s appends it and
+                    // so renders "null"; with a width, precision or case conversion the
+                    // JVM dereferences it and fails, which is what the paths below do.
+                    if (width < 0 && precision < 0 && !upper) {
+                        return "null";
+                    }
+                }
+                return text(value, upper, flags, width, precision);
+            }
             case 'b': {
                 String value;
                 if (arg == null) {
@@ -303,11 +385,11 @@ final class StringFormatter {
                 return decimal(arg, conversion, upper, flags, width, precision);
             case 'o':
             case 'x':
-                return radix(arg, conversion, lower == 'o' ? 3 : 4, upper, flags, width, precision);
+                return radix(arg, conversion, conversion == 'o' ? 3 : 4, upper, flags, width, precision);
             case 'e':
             case 'f':
             case 'g':
-                return floatingPoint(arg, conversion, lower, upper, flags, width, precision);
+                return floatingPoint(arg, conversion, conversion, upper, flags, width, precision);
             default:
                 throw new UnknownFormatConversionException(String.valueOf(conversion));
         }
@@ -342,14 +424,19 @@ final class StringFormatter {
      * Rejects the flag combinations that {@code java.util.Formatter} rejects, so that a
      * bogus format string fails the same way here as it does on the JVM.
      */
-    private static void checkFlags(char conversion, char lower, int flags, int width, int precision) {
+    private static void checkFlags(Spec spec) {
+        char conversion = spec.lower;
+        char lower = spec.lower;
+        int flags = spec.flags;
+        int width = spec.width;
+        int precision = spec.precision;
         if (lower == 's' || lower == 'b' || lower == 'h') {
             // '#' on a boolean or hash code is reported ahead of the width check; on a
             // string it is deferred to print time (see convert).
             if ((flags & FLAG_HASH) != 0 && lower != 's') {
                 throw new FormatFlagsConversionMismatchException("#", conversion);
             }
-            failMissingWidth(conversion, flags, width, FLAG_MINUS);
+            failMissingWidth(spec, FLAG_MINUS);
             failMismatch(conversion, flags,
                     FLAG_PLUS | FLAG_SPACE | FLAG_ZERO | FLAG_COMMA | FLAG_PAREN);
             return;
@@ -363,11 +450,11 @@ final class StringFormatter {
             // missing width, even though '-' has no width to justify against.
             failMismatch(conversion, flags,
                     FLAG_PLUS | FLAG_SPACE | FLAG_ZERO | FLAG_COMMA | FLAG_PAREN | FLAG_HASH);
-            failMissingWidth(conversion, flags, width, FLAG_MINUS);
+            failMissingWidth(spec, FLAG_MINUS);
             return;
         }
         // Numeric conversions: zero padding is meaningful, so it needs a width too.
-        failMissingWidth(conversion, flags, width, FLAG_MINUS | FLAG_ZERO);
+        failMissingWidth(spec, FLAG_MINUS | FLAG_ZERO);
         if ((flags & FLAG_PLUS) != 0 && (flags & FLAG_SPACE) != 0) {
             throw new IllegalFormatFlagsException(flagString(flags));
         }
@@ -386,9 +473,15 @@ final class StringFormatter {
         }
     }
 
-    private static void failMissingWidth(char conversion, int flags, int width, int needsWidth) {
-        if (width < 0 && (flags & needsWidth) != 0) {
-            throw new MissingFormatWidthException("%" + flagString(flags) + conversion);
+    /**
+     * The specifier the JVM reports here is rebuilt rather than quoted from the source,
+     * and it puts the flags ahead of the argument index: "%1$-s" is reported as "%-1$s".
+     */
+    private static void failMissingWidth(Spec spec, int needsWidth) {
+        if (spec.width < 0 && (spec.flags & needsWidth) != 0) {
+            String index = spec.argIndex > 0 ? spec.argIndex + "$" : "";
+            throw new MissingFormatWidthException(
+                    "%" + flagString(spec.flags) + index + spec.conversion);
         }
     }
 
