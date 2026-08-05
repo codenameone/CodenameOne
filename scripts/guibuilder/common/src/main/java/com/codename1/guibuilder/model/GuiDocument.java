@@ -1,0 +1,636 @@
+package com.codename1.guibuilder.model;
+
+import com.codename1.util.regex.StringReader;
+import com.codename1.xml.Element;
+import com.codename1.xml.XMLParser;
+import com.codename1.xml.XMLWriter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+public final class GuiDocument {
+    /** Single-name Guided Layout relationships. Mirrors the attributes GuidedLayoutSupport reads. */
+    private static final String[] REFERENCE_NAME_ATTRIBUTES = {
+            "guidedMatchWidth", "guidedMatchHeight", "guidedReferenceTarget"};
+    private static final String SIZE_MATCH = "match";
+    private static final String SIZE_PREFERRED = "preferred";
+
+    private final String path;
+    private Element root;
+    private Element selected;
+    private boolean modified;
+    private final List<State> undo = new ArrayList<>();
+    private final List<State> redo = new ArrayList<>();
+    private int transactionDepth;
+    private State transactionStart;
+
+    private GuiDocument(String path, Element root) {
+        this.path = path;
+        this.root = root;
+        this.selected = root;
+    }
+
+    public static GuiDocument parse(String path, String xml) {
+        Element root = new XMLParser().parse(new StringReader(xml));
+        if (root == null || !"component".equals(root.getTagName())) {
+            throw new IllegalArgumentException("GUI file does not contain a component root");
+        }
+        return new GuiDocument(path, root);
+    }
+
+    public String path() { return path; }
+    public Element root() { return root; }
+    public Element selected() { return selected; }
+    public boolean isModified() { return modified; }
+    public void markSaved() { modified = false; }
+
+    public void select(Element element) {
+        if (element != null && containsElement(element)) selected = element;
+    }
+
+    /** Identity-based ownership check. Elements parsed for another form must never be accepted. */
+    public boolean containsElement(Element element) {
+        return element != null && containsIdentity(root, element);
+    }
+
+    public String attribute(String name, String fallback) {
+        String value = selected.getAttribute(name);
+        return value == null ? fallback : value;
+    }
+
+    public void setAttribute(String name, String value) {
+        beforeMutation();
+        setNormalizedAttribute(selected, name, value);
+        modified = true;
+    }
+
+    public String effectiveUiid(Element element) {
+        String explicit = element == null ? null : element.getAttribute("uiid");
+        if (explicit != null && explicit.length() > 0) return explicit;
+        String type = element == null ? null : element.getAttribute("type");
+        return type == null || type.length() == 0 ? "Component" : type;
+    }
+
+    public Element parentOf(Element element) {
+        return element == root ? null : findParent(root, element);
+    }
+
+    public String parentLayout(Element element) {
+        Element parent = parentOf(element);
+        if (parent == null) return "";
+        String layout = parent.getAttribute("layout");
+        return layout == null || layout.length() == 0 ? "BoxLayout" : layout;
+    }
+
+    /** Returns a valid, deterministic constraint even for malformed legacy BorderLayouts. */
+    public static String effectiveBorderConstraint(Element parent, Element child) {
+        if (parent == null || child == null) return "Center";
+        List<String> used = new ArrayList<>();
+        for (int i = 0; i < parent.getNumChildren(); i++) {
+            Object value = parent.getChildAt(i);
+            if (!(value instanceof Element candidate) || !"component".equals(candidate.getTagName())) continue;
+            String constraint = normalizeBorderConstraint(candidate.getAttribute("layoutConstraint"));
+            if (constraint == null || used.contains(constraint)) constraint = firstFreeBorderConstraint(used);
+            if (candidate == child) return constraint;
+            used.add(constraint);
+        }
+        return "Center";
+    }
+
+    public static Element childAtBorderConstraint(Element parent, String constraint, Element excluding) {
+        String wanted = normalizeBorderConstraint(constraint);
+        if (parent == null || wanted == null) return null;
+        for (int i = 0; i < parent.getNumChildren(); i++) {
+            Object value = parent.getChildAt(i);
+            if (value instanceof Element child && "component".equals(child.getTagName()) && child != excluding
+                    && wanted.equals(effectiveBorderConstraint(parent, child))) return child;
+        }
+        return null;
+    }
+
+    public static String normalizeBorderConstraint(String constraint) {
+        if (constraint == null) return null;
+        if ("north".equalsIgnoreCase(constraint)) return "North";
+        if ("south".equalsIgnoreCase(constraint)) return "South";
+        if ("east".equalsIgnoreCase(constraint)) return "East";
+        if ("west".equalsIgnoreCase(constraint)) return "West";
+        if ("center".equalsIgnoreCase(constraint)) return "Center";
+        return null;
+    }
+
+    private static String firstFreeBorderConstraint(List<String> used) {
+        String[] order = {"Center", "North", "South", "West", "East"};
+        for (String candidate : order) if (!used.contains(candidate)) return candidate;
+        return "Center";
+    }
+
+    public boolean moveSelectedBy(int delta) {
+        if (selected == root || delta == 0) return false;
+        Element parent = findParent(root, selected);
+        if (parent == null) return false;
+        int index = childIndex(parent, selected);
+        int target = index + delta;
+        if (index < 0 || target < 0 || target >= parent.getNumChildren()) return false;
+        beforeMutation();
+        parent.removeChildAt(index);
+        parent.insertChildAt(selected, target);
+        modified = true;
+        return true;
+    }
+
+    public List<Element> commands() {
+        List<Element> result = new ArrayList<>();
+        for (int i = 0; i < root.getNumChildren(); i++) {
+            Object child = root.getChildAt(i);
+            if (child instanceof Element e && "command".equals(e.getTagName())) result.add(e);
+        }
+        return result;
+    }
+
+    public Element addCommand() {
+        beforeMutation();
+        Element command = new Element("command");
+        command.setAttribute("name", "Command " + (commands().size() + 1));
+        command.setAttribute("placement", "right");
+        command.setAttribute("actionEvent", "onCommand" + (commands().size() + 1));
+        root.addChild(command);
+        modified = true;
+        return command;
+    }
+
+    public boolean removeCommand(Element command) {
+        if (command == null || !"command".equals(command.getTagName())) return false;
+        int index = childIndex(root, command);
+        if (index < 0) return false;
+        beforeMutation();
+        root.removeChildAt(index);
+        modified = true;
+        return true;
+    }
+
+    public void setCommandAttribute(Element command, String name, String value) {
+        if (command == null || !"command".equals(command.getTagName())) return;
+        beforeMutation();
+        setNormalizedAttribute(command, name, value);
+        modified = true;
+    }
+
+    public Element addComponent(String type) {
+        beforeMutation();
+        Element parent = selected;
+        if (!acceptsChildren(parent)) parent = findParent(root, selected);
+        if (parent == null) parent = root;
+        Element child = new Element("component");
+        child.setAttribute("type", type);
+        child.setAttribute("name", uniqueName(type));
+        if (acceptsChildren(child)) child.setAttribute("layout", "LayeredLayout");
+        parent.addChild(child);
+        selected = child;
+        modified = true;
+        return child;
+    }
+
+    public boolean deleteSelected() {
+        if (selected == root) return false;
+        Element parent = findParent(root, selected);
+        if (parent == null) return false;
+        int index = childIndex(parent, selected);
+        if (index < 0) return false;
+        Element removed = selected;
+        beginTransaction();
+        try {
+            parent.removeChildAt(index);
+            selected = parent;
+            // Guided Layout relationships are stored by name. Leaving a reference to a deleted
+            // component behind makes its dependents jump to an inset measured from nothing.
+            clearReferencesTo(root, namesIn(removed, new LinkedHashSet<String>()));
+            modified = true;
+        } finally {
+            endTransaction();
+        }
+        return true;
+    }
+
+    /**
+     * Renames the selected component, guaranteeing a unique name and repointing every Guided
+     * Layout relationship that referenced the old name, as one undo step. Returns the name that
+     * was actually applied, which differs from the request when the request was already taken.
+     */
+    public String renameSelected(String requestedName) {
+        Element target = selected;
+        if (target == null || !"component".equals(target.getTagName())) return null;
+        String previous = target.getAttribute("name");
+        String requested = requestedName == null ? "" : requestedName.trim();
+        if (requested.length() == 0 || requested.equals(previous)) return previous;
+        Set<Element> exclude = new LinkedHashSet<>();
+        exclude.add(target);
+        String unique = availableName(requested, exclude, null);
+        beginTransaction();
+        try {
+            setNormalizedAttribute(target, "name", unique);
+            if (previous != null && previous.length() > 0) {
+                Map<String, String> renames = new LinkedHashMap<>();
+                renames.put(previous, unique);
+                remapReferences(root, renames);
+            }
+            modified = true;
+        } finally {
+            endTransaction();
+        }
+        return unique;
+    }
+
+    public String copySelectedXml() {
+        return new XMLWriter(true).toXML(selected);
+    }
+
+    public Element pasteXml(String xml) {
+        if (xml == null || xml.length() == 0) return null;
+        Element pasted = new XMLParser().parse(new StringReader(xml));
+        if (pasted == null || !"component".equals(pasted.getTagName())) return null;
+        beginTransaction();
+        try {
+            if (pasted.getParent() != null) removeChild(pasted.getParent(), pasted);
+            Element parent = acceptsChildren(selected) ? selected : findParent(root, selected);
+            if (parent == null) parent = root;
+            uniquifyPastedNames(pasted);
+            parent.addChild(pasted);
+            selected = pasted;
+            modified = true;
+        } finally {
+            endTransaction();
+        }
+        return pasted;
+    }
+
+    /**
+     * A pasted subtree keeps its internal relationships but must not collide with names that are
+     * already used: every component in it is renamed where necessary and the references inside the
+     * subtree follow. Names outside the subtree keep pointing at the original components.
+     */
+    private void uniquifyPastedNames(Element pasted) {
+        List<Element> elements = new ArrayList<>();
+        collect(pasted, elements);
+        Set<Element> exclude = new LinkedHashSet<>(elements);
+        Set<String> assigned = new LinkedHashSet<>();
+        Map<String, String> renames = new LinkedHashMap<>();
+        for (Element element : elements) {
+            String current = element.getAttribute("name");
+            String type = element.getAttribute("type");
+            String base = current == null || current.length() == 0
+                    ? lowerFirst(type == null || type.length() == 0 ? "component" : type) : current;
+            String unique = availableName(base, exclude, assigned);
+            assigned.add(unique);
+            if (unique.equals(current)) continue;
+            setNormalizedAttribute(element, "name", unique);
+            if (current != null && current.length() > 0) renames.put(current, unique);
+        }
+        if (!renames.isEmpty()) remapReferences(pasted, renames);
+    }
+
+    /** Returns `requested` when it is free, otherwise the same base with the lowest free suffix. */
+    private String availableName(String requested, Set<Element> exclude, Set<String> reserved) {
+        if (isNameAvailable(requested, exclude, reserved)) return requested;
+        String base = requested;
+        while (base.length() > 1 && base.charAt(base.length() - 1) >= '0'
+                && base.charAt(base.length() - 1) <= '9') {
+            base = base.substring(0, base.length() - 1);
+        }
+        for (int index = 1; index < 10000; index++) {
+            String candidate = base + index;
+            if (isNameAvailable(candidate, exclude, reserved)) return candidate;
+        }
+        return requested;
+    }
+
+    private boolean isNameAvailable(String name, Set<Element> exclude, Set<String> reserved) {
+        if (reserved != null && reserved.contains(name)) return false;
+        return !containsName(root, name, exclude);
+    }
+
+    private static void remapReferences(Element element, Map<String, String> renames) {
+        String[] references = splitReferences(element);
+        if (references != null) {
+            boolean changed = false;
+            for (int i = 0; i < references.length; i++) {
+                String replacement = renames.get(references[i].trim());
+                if (replacement == null) continue;
+                references[i] = replacement;
+                changed = true;
+            }
+            if (changed) setNormalizedAttribute(element, "guidedReferences", joinReferences(references));
+        }
+        for (String attribute : REFERENCE_NAME_ATTRIBUTES) {
+            String value = element.getAttribute(attribute);
+            String replacement = value == null ? null : renames.get(value.trim());
+            if (replacement != null) setNormalizedAttribute(element, attribute, replacement);
+        }
+        for (int i = 0; i < element.getNumChildren(); i++) {
+            Object child = element.getChildAt(i);
+            if (child instanceof Element childElement) remapReferences(childElement, renames);
+        }
+    }
+
+    private static void clearReferencesTo(Element element, Set<String> removedNames) {
+        String[] references = splitReferences(element);
+        if (references != null) {
+            boolean changed = false;
+            for (int i = 0; i < references.length; i++) {
+                if (!removedNames.contains(references[i].trim())) continue;
+                references[i] = "-";
+                changed = true;
+            }
+            if (changed) setNormalizedAttribute(element, "guidedReferences", joinReferences(references));
+        }
+        clearMatchReference(element, "guidedMatchWidth", "guidedHorizontalSize", removedNames);
+        clearMatchReference(element, "guidedMatchHeight", "guidedVerticalSize", removedNames);
+        String target = element.getAttribute("guidedReferenceTarget");
+        if (target != null && removedNames.contains(target.trim())) {
+            setNormalizedAttribute(element, "guidedReferenceTarget", null);
+        }
+        for (int i = 0; i < element.getNumChildren(); i++) {
+            Object child = element.getChildAt(i);
+            if (child instanceof Element childElement) clearReferencesTo(childElement, removedNames);
+        }
+    }
+
+    /** A match policy whose target is gone falls back to the component's own preferred size. */
+    private static void clearMatchReference(Element element, String matchAttribute,
+            String policyAttribute, Set<String> removedNames) {
+        String value = element.getAttribute(matchAttribute);
+        if (value == null || !removedNames.contains(value.trim())) return;
+        setNormalizedAttribute(element, matchAttribute, null);
+        if (SIZE_MATCH.equals(element.getAttribute(policyAttribute))) {
+            setNormalizedAttribute(element, policyAttribute, SIZE_PREFERRED);
+        }
+    }
+
+    private static String[] splitReferences(Element element) {
+        String raw = element.getAttribute("guidedReferences");
+        return raw == null || raw.length() == 0 ? null : raw.split("\\|", -1);
+    }
+
+    private static String joinReferences(String[] references) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < references.length; i++) {
+            if (i > 0) out.append('|');
+            out.append(references[i] == null || references[i].trim().length() == 0
+                    ? "-" : references[i].trim());
+        }
+        return out.toString();
+    }
+
+    private static Set<String> namesIn(Element element, Set<String> out) {
+        String name = element.getAttribute("name");
+        if (name != null && name.length() > 0) out.add(name);
+        for (int i = 0; i < element.getNumChildren(); i++) {
+            Object child = element.getChildAt(i);
+            if (child instanceof Element childElement && "component".equals(childElement.getTagName())) {
+                namesIn(childElement, out);
+            }
+        }
+        return out;
+    }
+
+    public boolean moveSelectedTo(Element target) {
+        return moveSelectedTo(target, false);
+    }
+
+    public boolean moveSelectedTo(Element target, boolean afterTarget) {
+        if (selected == root || target == null || target == selected) return false;
+        Element oldParent = findParent(root, selected);
+        Element targetParent = findParent(root, target);
+        if (oldParent == null) return false;
+        Element destination = acceptsChildren(target) ? target : targetParent;
+        if (destination == null || isDescendant(selected, destination)) return false;
+        beforeMutation();
+        int targetIndex = destination.getNumChildren();
+        if (destination == targetParent) {
+            for (int i = 0; i < destination.getNumChildren(); i++) {
+                if (destination.getChildAt(i) == target) {
+                    targetIndex = i + (afterTarget ? 1 : 0);
+                    break;
+                }
+            }
+        }
+        int oldIndex = destination == oldParent ? childIndex(oldParent, selected) : -1;
+        removeChild(oldParent, selected);
+        if (oldIndex >= 0 && oldIndex < targetIndex) targetIndex--;
+        if (destination == oldParent && targetIndex > destination.getNumChildren()) targetIndex = destination.getNumChildren();
+        destination.insertChildAt(selected, targetIndex);
+        modified = true;
+        return true;
+    }
+
+    public int componentIndex(Element parent, Element child) {
+        if (parent == null || child == null) return -1;
+        int componentIndex = 0;
+        for (int i = 0; i < parent.getNumChildren(); i++) {
+            Object value = parent.getChildAt(i);
+            if (!(value instanceof Element element) || !"component".equals(element.getTagName())) continue;
+            if (element == child) return componentIndex;
+            componentIndex++;
+        }
+        return -1;
+    }
+
+    public boolean moveSelectedToParent(Element destination, int componentIndex) {
+        if (selected == root || destination == null || !acceptsChildren(destination)
+                || selected == destination || isDescendant(selected, destination)) return false;
+        Element oldParent = findParent(root, selected);
+        if (oldParent == null) return false;
+        beforeMutation();
+        removeChild(oldParent, selected);
+        int xmlIndex = destination.getNumChildren();
+        int seen = 0;
+        for (int i = 0; i < destination.getNumChildren(); i++) {
+            Object child = destination.getChildAt(i);
+            if (child instanceof Element element && "component".equals(element.getTagName())) {
+                if (seen >= componentIndex) { xmlIndex = i; break; }
+                seen++;
+            }
+        }
+        destination.insertChildAt(selected, Math.max(0, Math.min(xmlIndex, destination.getNumChildren())));
+        modified = true;
+        return true;
+    }
+
+    public List<Element> components() {
+        List<Element> result = new ArrayList<>();
+        collect(root, result);
+        return result;
+    }
+
+    public String toXml() {
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n" + new XMLWriter(true).toXML(root);
+    }
+
+    public boolean canUndo() { return !undo.isEmpty(); }
+    public boolean canRedo() { return !redo.isEmpty(); }
+
+    public void beginTransaction() {
+        if (transactionDepth++ == 0) transactionStart = capture();
+    }
+
+    public void endTransaction() {
+        if (transactionDepth == 0) return;
+        if (--transactionDepth == 0) {
+            if (transactionStart != null && !transactionStart.xml.equals(xmlOnly())) {
+                undo.add(transactionStart);
+                redo.clear();
+            }
+            transactionStart = null;
+        }
+    }
+
+    public boolean undo() {
+        if (!canUndo()) return false;
+        redo.add(capture());
+        restore(undo.remove(undo.size() - 1));
+        return true;
+    }
+
+    public boolean redo() {
+        if (!canRedo()) return false;
+        undo.add(capture());
+        restore(redo.remove(redo.size() - 1));
+        return true;
+    }
+
+    public static boolean acceptsChildren(Element element) {
+        String type = element == null ? null : element.getAttribute("type");
+        return "Form".equals(type) || "Container".equals(type) || "Dialog".equals(type)
+                || "Tabs".equals(type) || "Accordion".equals(type);
+    }
+
+    private String uniqueName(String type) {
+        int index = 1;
+        while (containsName(root, lowerFirst(type) + index, null)) index++;
+        return lowerFirst(type) + index;
+    }
+
+    private static String lowerFirst(String value) {
+        return value.substring(0, 1).toLowerCase() + value.substring(1);
+    }
+
+    private static boolean containsName(Element element, String name, Set<Element> exclude) {
+        if ((exclude == null || !exclude.contains(element)) && name.equals(element.getAttribute("name"))) {
+            return true;
+        }
+        for (int i = 0; i < element.getNumChildren(); i++) {
+            Object child = element.getChildAt(i);
+            if (child instanceof Element e && containsName(e, name, exclude)) return true;
+        }
+        return false;
+    }
+
+    private static Element findParent(Element parent, Element target) {
+        for (int i = 0; i < parent.getNumChildren(); i++) {
+            Object child = parent.getChildAt(i);
+            if (child == target) return parent;
+            if (child instanceof Element e) {
+                Element found = findParent(e, target);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private static void removeChild(Element parent, Element child) {
+        for (int i = 0; i < parent.getNumChildren(); i++) {
+            if (parent.getChildAt(i) == child) {
+                parent.removeChildAt(i);
+                return;
+            }
+        }
+    }
+
+    private static int childIndex(Element parent, Element child) {
+        for (int i = 0; i < parent.getNumChildren(); i++) {
+            if (parent.getChildAt(i) == child) return i;
+        }
+        return -1;
+    }
+
+    private static boolean isDescendant(Element ancestor, Element candidate) {
+        if (ancestor == candidate) return true;
+        for (int i = 0; i < ancestor.getNumChildren(); i++) {
+            Object child = ancestor.getChildAt(i);
+            if (child instanceof Element e && isDescendant(e, candidate)) return true;
+        }
+        return false;
+    }
+
+    private static boolean containsIdentity(Element parent, Element target) {
+        if (parent == target) return true;
+        for (int i = 0; i < parent.getNumChildren(); i++) {
+            Object child = parent.getChildAt(i);
+            if (child instanceof Element element && containsIdentity(element, target)) return true;
+        }
+        return false;
+    }
+
+    private static void collect(Element element, List<Element> result) {
+        result.add(element);
+        for (int i = 0; i < element.getNumChildren(); i++) {
+            Object child = element.getChildAt(i);
+            if (child instanceof Element e && "component".equals(e.getTagName())) collect(e, result);
+        }
+    }
+
+    /** XMLParser stores case-insensitive attribute keys in lowercase. Always mutate that canonical
+     * key and remove a possible camel-case duplicate created by older GUI Builder versions. */
+    private static void setNormalizedAttribute(Element element, String name, String value) {
+        String canonical = name.toLowerCase();
+        element.removeAttribute(canonical);
+        if (!canonical.equals(name)) element.removeAttribute(name);
+        if (value != null && value.trim().length() > 0) element.setAttribute(canonical, value.trim());
+    }
+
+    private void beforeMutation() {
+        if (transactionDepth > 0) return;
+        undo.add(capture());
+        redo.clear();
+    }
+
+    private State capture() {
+        return new State(xmlOnly(), selected == null ? null : selected.getAttribute("name"), modified);
+    }
+
+    private String xmlOnly() {
+        return new XMLWriter(true).toXML(root);
+    }
+
+    private void restore(State state) {
+        root = new XMLParser().parse(new StringReader(state.xml));
+        selected = state.selectedName == null ? root : findByName(root, state.selectedName);
+        if (selected == null) selected = root;
+        modified = state.modified;
+    }
+
+    private static Element findByName(Element element, String name) {
+        if (name.equals(element.getAttribute("name"))) return element;
+        for (int i = 0; i < element.getNumChildren(); i++) {
+            Object child = element.getChildAt(i);
+            if (child instanceof Element) {
+                Element found = findByName((Element) child, name);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private static final class State {
+        final String xml;
+        final String selectedName;
+        final boolean modified;
+        State(String xml, String selectedName, boolean modified) {
+            this.xml = xml;
+            this.selectedName = selectedName;
+            this.modified = modified;
+        }
+    }
+}

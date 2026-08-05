@@ -45,6 +45,8 @@ public class CodeView extends EditorView {
     private ThemePalette palette = ThemePalette.LIGHT;
     private boolean showLineNumbers = true;
     private int tabSize = 4;
+    private String protectedStartMarker;
+    private String protectedEndMarker;
 
     private int[] endStates;
     private int validUpTo;
@@ -112,6 +114,57 @@ public class CodeView extends EditorView {
     public void setDiagnostics(List<CodeDiagnostic> diagnostics) {
         this.diagnostics = diagnostics;
         repaint();
+    }
+
+    /// Protects every range delimited by matching marker strings from user edits. Passing null or an
+    /// empty marker clears the protection. Whole-document replacement remains available so generated
+    /// source can still be refreshed by the host.
+    public void setProtectedRegionMarkers(String startMarker, String endMarker) {
+        protectedStartMarker = emptyToNull(startMarker);
+        protectedEndMarker = emptyToNull(endMarker);
+    }
+
+    private static String emptyToNull(String value) {
+        return value == null || value.length() == 0 ? null : value;
+    }
+
+    @Override
+    protected void replaceRange(int start, int end, String text, boolean record) {
+        int clampedStart = getDocument().clamp(start);
+        int clampedEnd = getDocument().clamp(end);
+        if (clampedStart > clampedEnd) {
+            int swap = clampedStart;
+            clampedStart = clampedEnd;
+            clampedEnd = swap;
+        }
+        if (isProtectedEdit(clampedStart, clampedEnd)) {
+            return;
+        }
+        super.replaceRange(clampedStart, clampedEnd, text, record);
+    }
+
+    private boolean isProtectedEdit(int start, int end) {
+        if (protectedStartMarker == null || protectedEndMarker == null) {
+            return false;
+        }
+        String source = getDocument().getText();
+        int searchFrom = 0;
+        while (searchFrom < source.length()) {
+            int protectedStart = source.indexOf(protectedStartMarker, searchFrom);
+            if (protectedStart < 0) {
+                return false;
+            }
+            int endMarker = source.indexOf(protectedEndMarker,
+                    protectedStart + protectedStartMarker.length());
+            int protectedEnd = endMarker < 0
+                    ? source.length() : endMarker + protectedEndMarker.length();
+            if ((start == end && start >= protectedStart && start <= protectedEnd)
+                    || (start < protectedEnd && end > protectedStart)) {
+                return true;
+            }
+            searchFrom = protectedEnd;
+        }
+        return false;
     }
 
     /// Enables or disables the completion popup.

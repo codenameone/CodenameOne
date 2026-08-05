@@ -283,6 +283,29 @@ class LayeredLayoutTest extends UITestBase {
     }
 
     @FormTest
+    void baselineReferenceUsesActualComponentBaselinesWithDifferentMarginsAndPadding() {
+        LayeredLayout layout = new LayeredLayout();
+        Container container = new Container(layout);
+        container.setSize(new Dimension(500, 240));
+        Label label = new Label("Baseline label");
+        Button button = new Button("Baseline button");
+        label.getAllStyles().setPadding(4, 6, 3, 3);
+        label.getAllStyles().setMargin(0, 0, 0, 0);
+        button.getAllStyles().setPadding(12, 10, 8, 8);
+        button.getAllStyles().setMargin(10, 5, 4, 4);
+        container.add(label).add(button);
+        layout.setInsets(label, "30px auto auto 20px");
+        layout.setInsets(button, "baseline auto auto 180px");
+        layout.setReferenceComponentTop(button, label, 0);
+
+        container.layoutContainer();
+
+        assertEquals(label.getY() + label.getBaseline(label.getWidth(), label.getHeight()),
+                button.getY() + button.getBaseline(button.getWidth(), button.getHeight()),
+                "baseline unit must align the actual rendered text, including themed margins and padding");
+    }
+
+    @FormTest
     void testLayeredLayoutWithVariedSizes() {
         LayeredLayout layout = new LayeredLayout();
         Container container = new Container(layout);
