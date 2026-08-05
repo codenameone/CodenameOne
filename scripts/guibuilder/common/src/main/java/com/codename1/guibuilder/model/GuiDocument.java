@@ -464,8 +464,19 @@ public final class GuiDocument {
         return result;
     }
 
+    /** The direct component children of {@code parent}, in document order, skipping non-component tags. */
+    public static List<Element> componentsIn(Element parent) {
+        List<Element> result = new ArrayList<>();
+        if (parent == null) return result;
+        for (int i = 0; i < parent.getNumChildren(); i++) {
+            Object child = parent.getChildAt(i);
+            if (child instanceof Element element && "component".equals(element.getTagName())) result.add(element);
+        }
+        return result;
+    }
+
     public String toXml() {
-        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n" + new XMLWriter(true).toXML(root);
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n" + xmlOnly();
     }
 
     public boolean canUndo() { return !undo.isEmpty(); }
@@ -600,8 +611,80 @@ public final class GuiDocument {
         return new State(xmlOnly(), selected == null ? null : selected.getAttribute("name"), modified);
     }
 
+    /**
+     * Serializes the tree with attributes in a stable order.
+     *
+     * <p>Element stores attributes in a Hashtable, so XMLWriter emits them in whatever order that
+     * table happens to iterate. Two trees describing the same form then produce different text,
+     * which made undo comparison unreliable -- an edit-then-undo round trip reported a change that
+     * had not happened -- and made every save churn unrelated lines in the .gui file. Ordering is
+     * type, name, layout, then the rest alphabetically: the identifying attributes first, so the
+     * files stay readable.
+     */
     private String xmlOnly() {
-        return new XMLWriter(true).toXML(root);
+        StringBuilder out = new StringBuilder();
+        writeElement(root, 0, out);
+        return out.toString();
+    }
+
+    private static final String[] LEADING_ATTRIBUTES = {"type", "name", "layout"};
+
+    private static void writeElement(Element element, int depth, StringBuilder out) {
+        // String.repeat is outside the Codename One runtime API the compliance check enforces.
+        StringBuilder indentBuilder = new StringBuilder();
+        for (int i = 0; i < depth; i++) indentBuilder.append('\t');
+        String indent = indentBuilder.toString();
+        out.append(indent).append('<').append(element.getTagName());
+        for (String key : orderedAttributeNames(element)) {
+            out.append(' ').append(key).append("=\"").append(escape(element.getAttribute(key))).append('"');
+        }
+        // Every tag, not just components: a form also carries <command> children for its toolbar,
+        // and dropping them here would delete the toolbar on the next save.
+        List<Element> children = new ArrayList<>();
+        for (int i = 0; i < element.getNumChildren(); i++) {
+            Object child = element.getChildAt(i);
+            if (child instanceof Element e && e.getTagName() != null) children.add(e);
+        }
+        if (children.isEmpty()) {
+            out.append(" />\n");
+            return;
+        }
+        out.append(">\n");
+        for (Element child : children) writeElement(child, depth + 1, out);
+        out.append(indent).append("</").append(element.getTagName()).append(">\n");
+    }
+
+    private static List<String> orderedAttributeNames(Element element) {
+        java.util.Hashtable attributes = element.getAttributes();
+        List<String> rest = new ArrayList<>();
+        if (attributes != null) {
+            for (java.util.Enumeration keys = attributes.keys(); keys.hasMoreElements();) {
+                rest.add(String.valueOf(keys.nextElement()));
+            }
+        }
+        java.util.Collections.sort(rest);
+        List<String> ordered = new ArrayList<>();
+        for (String leading : LEADING_ATTRIBUTES) {
+            if (rest.remove(leading)) ordered.add(leading);
+        }
+        ordered.addAll(rest);
+        return ordered;
+    }
+
+    private static String escape(String value) {
+        if (value == null) return "";
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '&' -> out.append("&amp;");
+                case '<' -> out.append("&lt;");
+                case '>' -> out.append("&gt;");
+                case '"' -> out.append("&quot;");
+                default -> out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     private void restore(State state) {
