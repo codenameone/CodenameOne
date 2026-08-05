@@ -127,6 +127,54 @@ class AdapterError(RuntimeError):
     """Raised when an adapter cannot complete its flow."""
 
 
+def _retryable_failed_draft(state: State, slug: str, platform: str) -> bool:
+    """Return True only for an explicitly recorded unpublished draft.
+
+    Older versions recorded a Hashnode draft URL as if it completed the
+    platform.  An explicit ``--post-slug`` recovery may retry that draft, but
+    normal rotation keeps its existing cadence and does not unexpectedly dump
+    every historical draft in one run.
+    """
+    post = state.raw.get("posts", {}).get(slug, {})
+    if not isinstance(post, dict):
+        return False
+    entry = post.get(platform, {})
+    return bool(
+        isinstance(entry, dict)
+        and entry.get("published") is False
+        and entry.get("draft_url")
+    )
+
+
+def _completed_hashnode_result(
+    *,
+    published_url: str | None,
+    draft_url: str,
+    cover_set: bool,
+    subheading_set: bool,
+    tags_set: bool,
+    canonical_set: bool,
+) -> dict[str, Any]:
+    """Build persisted Hashnode state only after a public publish succeeds."""
+    if published_url is None or re.search(
+        r"^https?://(?:www\.)?hashnode\.com/(?:draft|edit)/", published_url
+    ):
+        raise AdapterError(
+            "Hashnode retained the article as an unpublished draft; "
+            f"retry required: {draft_url}"
+        )
+    return {
+        "url": published_url,
+        "published": True,
+        "draft_url": draft_url,
+        "cover_set": cover_set,
+        "subheading_set": subheading_set,
+        "tags_set": tags_set,
+        "canonical_set": canonical_set,
+        "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+    }
+
+
 def _find_first(page, selectors: list[str], *, timeout: int = 15000):
     """Try each selector in turn; return the first that becomes visible.
 
@@ -593,6 +641,9 @@ class HashnodeAdapter:
     # the dashboard is the only entry point that creates a fresh draft
     # bound to the user's primary publication.
     DASHBOARD_URL = "https://hashnode.com/"
+    PUBLICATION_URL = os.environ.get(
+        "HASHNODE_PUBLICATION_URL", "https://debugagent.com"
+    ).rstrip("/")
 
     TITLE_SELECTOR = "textarea[placeholder='Article Title...']"
     BODY_SELECTOR = "div[contenteditable='true']"
@@ -606,15 +657,20 @@ class HashnodeAdapter:
     COVER_UPLOAD_IMAGE_BUTTON_SELECTOR = "button:has-text('Upload Image')"
     SUBHEADING_BUTTON_SELECTOR = "button:has(span:text-is('Subheading'))"
     SUBHEADING_TEXTAREA_SELECTOR = "textarea[placeholder='Add a subheading']"
-    DISCOVERY_TAB_SELECTOR = "button[role='tab']:has-text('Discovery')"
-    TAGS_INPUT_SELECTOR = "input#editor-tags"
-    CANONICAL_TOGGLE_SELECTOR = "label:has-text('Add a canonical URL')"
-    CANONICAL_INPUT_SELECTOR = "input[placeholder='https://example.com/original-article']"
+    DIALOG_SELECTOR = "[role='dialog'][data-state='open']"
+    DISCOVERY_TAB_SELECTOR = f"{DIALOG_SELECTOR} button[role='tab']:has-text('Discovery')"
+    TAGS_INPUT_SELECTOR = f"{DIALOG_SELECTOR} input#editor-tags"
+    CANONICAL_TOGGLE_SELECTOR = f"{DIALOG_SELECTOR} button#republish-canonical"
+    CANONICAL_INPUT_SELECTOR = (
+        f"{DIALOG_SELECTOR} input[placeholder='https://example.com/original-article']"
+    )
     CLOSE_DIALOG_SELECTOR = "button:has-text('Close')"
     # The in-dialog Publish button (distinct from the top-bar Publish
     # which just opens the dialog) lives inside the open Radix dialog
     # alongside "Submit for Review" and "Close".
-    DIALOG_PUBLISH_SELECTOR = "[role='dialog'][data-state='open'] button:text-is('Publish')"
+    DIALOG_PUBLISH_SELECTOR = (
+        f"{DIALOG_SELECTOR} [data-slot='sheet-footer'] button:text-is('Publish')"
+    )
 
     # The five tags every Codename One syndicated post carries on
     # Hashnode. All five exist as canonical Hashnode tags so a
@@ -737,9 +793,21 @@ class HashnodeAdapter:
         published_url: str | None = None
         try:
             self._open_publish_dialog_discovery(page)
+            expected_public_url = self._public_url_from_discovery(page)
             tags_set = self._set_tags(page, mod)
             canonical_set = self._set_canonical_url(page, ctx.post.canonical_url, mod)
-            published_url = self._publish_from_dialog(page, draft_url)
+            if tags_set and canonical_set:
+                published_url = self._publish_from_dialog(
+                    page,
+                    draft_url,
+                    expected_public_url,
+                    ctx.post.canonical_url,
+                )
+            else:
+                print(
+                    "  [hashnode] refusing to publish until tags and canonical URL are verified",
+                    file=sys.stderr,
+                )
         except Exception as err:  # noqa: BLE001 — surface as non-fatal
             print(f"  [hashnode] publish-dialog flow failed (non-fatal): {err}",
                   file=sys.stderr)
@@ -752,16 +820,14 @@ class HashnodeAdapter:
             except Exception:  # noqa: BLE001
                 pass
 
-        return {
-            "url": published_url or draft_url,
-            "published": published_url is not None,
-            "draft_url": draft_url,
-            "cover_set": cover_set,
-            "subheading_set": subheading_set,
-            "tags_set": tags_set,
-            "canonical_set": canonical_set,
-            "syndicated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-        }
+        return _completed_hashnode_result(
+            published_url=published_url,
+            draft_url=draft_url,
+            cover_set=cover_set,
+            subheading_set=subheading_set,
+            tags_set=tags_set,
+            canonical_set=canonical_set,
+        )
 
     # ------------------------------------------------------------------ #
     # Step helpers — each returns True on success and False on a
@@ -848,6 +914,18 @@ class HashnodeAdapter:
         page.locator(self.DISCOVERY_TAB_SELECTOR).first.click(timeout=15000)
         page.wait_for_timeout(2000)
 
+    def _public_url_from_discovery(self, page) -> str:
+        """Read Hashnode's saved article slug before publishing."""
+        slug_section = page.locator(
+            f"{self.DIALOG_SELECTOR} label[for='editor-slug']"
+        ).first.locator("xpath=../..").inner_text()
+        match = re.search(r"(?:^|\s)/([a-z0-9][a-z0-9-]*)(?:\s|$)", slug_section)
+        if not match:
+            raise AdapterError(
+                f"Could not read Hashnode article slug from {slug_section!r}"
+            )
+        return f"{self.PUBLICATION_URL}/{match.group(1)}"
+
     def _set_tags(self, page, mod: str) -> bool:
         try:
             tags_input = page.locator(self.TAGS_INPUT_SELECTOR).first
@@ -857,13 +935,15 @@ class HashnodeAdapter:
             # JS is ignored — Hashnode listens for native pointer
             # events — so we use Playwright's real click and loop on
             # the live count.
-            pill_row = tags_input.locator("xpath=ancestor::div[contains(@class,'space-y-3')][1]")
+            dialog = page.locator(self.DIALOG_SELECTOR).first
+            selected_pills = dialog.locator("button").filter(
+                has_text=re.compile(r"^#[a-z0-9][a-z0-9-]*$")
+            )
             for _ in range(20):  # hard cap so we never loop forever
-                pills = pill_row.locator("button:has-text('#')")
-                count = pills.count()
+                count = selected_pills.count()
                 if count == 0:
                     break
-                pills.first.click()
+                selected_pills.first.click()
                 page.wait_for_timeout(400)
             # Add the canonical tag set. Typing alone + Enter triggers
             # Hashnode's autocomplete and frequently commits a
@@ -874,49 +954,34 @@ class HashnodeAdapter:
             #   2. Click the exact-match dropdown suggestion if one is
             #      present (its first line is "#<tag>" followed by a
             #      post-count line).
-            #   3. If no exact-match suggestion is available, press
-            #      Escape to dismiss the autocomplete dropdown, then
-            #      Enter to commit the literal typed value. Escape
-            #      before Enter prevents Enter from picking the
-            #      currently-highlighted fuzzy suggestion.
+            #   3. If no exact-match suggestion is available, press Enter
+            #      without pressing Escape. Hashnode's 2026-08 editor puts
+            #      these fields inside a Radix side sheet where Escape closes
+            #      the entire publish dialog.
             #
             # After each iteration verify the target pill landed; if
             # not, retry once more.
             for tag in self.TAGS:
-                pills_before = self._pill_count(pill_row)
+                if self._tag_is_selected(dialog, tag):
+                    continue
                 for attempt in range(2):
-                    tags_input.click()
-                    page.keyboard.press(f"{mod}+A")
-                    page.keyboard.press("Delete")
-                    page.keyboard.type(tag, delay=15)
+                    # Re-query and fill on every attempt. Selecting a tag
+                    # re-renders the tags control and detaches the old input.
+                    tags_input = page.locator(self.TAGS_INPUT_SELECTOR).first
+                    tags_input.fill(tag, timeout=10000)
                     page.wait_for_timeout(1200)
                     if not self._click_exact_tag_suggestion(page, tag):
-                        page.keyboard.press("Escape")
-                        page.wait_for_timeout(200)
-                        # Escape moves focus off the input on some
-                        # builds; re-focus, restore the typed value,
-                        # and commit with Enter so Hashnode treats
-                        # this as a "create new tag" rather than
-                        # selecting an autocomplete option.
-                        tags_input.click()
-                        if tags_input.input_value() != tag:
-                            page.keyboard.press(f"{mod}+A")
-                            page.keyboard.press("Delete")
-                            page.keyboard.type(tag, delay=15)
-                            page.wait_for_timeout(300)
-                        page.keyboard.press("Escape")
-                        page.wait_for_timeout(200)
-                        tags_input.click()
-                        page.keyboard.press("Enter")
+                        page.locator(self.TAGS_INPUT_SELECTOR).first.press("Enter")
                     page.wait_for_timeout(1200)
-                    if self._pill_count(pill_row) > pills_before:
+                    if self._tag_is_selected(dialog, tag):
                         break
                     print(f"  [hashnode] tag '{tag}' did not land (attempt {attempt + 1}); retrying",
                           file=sys.stderr)
                 else:
-                    print(f"  [hashnode] tag '{tag}' could not be added after retry; skipping",
+                    print(f"  [hashnode] tag '{tag}' could not be added after retry",
                           file=sys.stderr)
-            return True
+                    return False
+            return all(self._tag_is_selected(dialog, tag) for tag in self.TAGS)
         except Exception as err:  # noqa: BLE001
             print(f"  [hashnode] tag set failed (non-fatal): {err}",
                   file=sys.stderr)
@@ -925,6 +990,14 @@ class HashnodeAdapter:
     @staticmethod
     def _pill_count(pill_row) -> int:
         return pill_row.locator("button:has-text('#')").count()
+
+    @staticmethod
+    def _tag_is_selected(dialog, tag: str) -> bool:
+        return bool(dialog.locator("button").evaluate_all(
+            "(buttons, wanted) => buttons.some(button => "
+            "(button.innerText || '').trim() === wanted)",
+            f"#{tag}",
+        ))
 
     @staticmethod
     def _click_exact_tag_suggestion(page, tag: str) -> bool:
@@ -960,7 +1033,13 @@ class HashnodeAdapter:
         page.mouse.click(clicked["x"], clicked["y"])
         return True
 
-    def _publish_from_dialog(self, page, draft_url: str) -> str | None:
+    def _publish_from_dialog(
+        self,
+        page,
+        draft_url: str,
+        expected_public_url: str,
+        canonical_url: str,
+    ) -> str | None:
         """Click the in-dialog Publish button and wait for the redirect
         to the live article URL. Returns the published URL on success
         or None on failure (the caller falls back to a Close-as-draft
@@ -996,16 +1075,44 @@ class HashnodeAdapter:
         published_url = page.url
         if "/draft/" in published_url or published_url == draft_url:
             return None
+        # Hashnode's 2026-08 editor redirects successful publishes to an
+        # authenticated /edit/<post-id> route instead of the public article.
+        # Verify the expected publication-domain URL before recording it.
+        if re.search(
+            r"^https?://(?:www\.)?hashnode\.com/edit/", published_url
+        ):
+            return (
+                expected_public_url
+                if self._wait_for_public_article(expected_public_url, canonical_url)
+                else None
+            )
         return published_url
+
+    @staticmethod
+    def _wait_for_public_article(public_url: str, canonical_url: str) -> bool:
+        deadline = time.time() + 45
+        request = urllib.request.Request(public_url, headers={"User-Agent": _UA_STR})
+        while time.time() < deadline:
+            try:
+                with urllib.request.urlopen(request, timeout=15) as response:
+                    body = response.read().decode("utf-8", errors="replace")
+                if response.status == 200 and canonical_url in body:
+                    return True
+            except Exception:  # noqa: BLE001 -- public propagation is retried
+                pass
+            time.sleep(3)
+        return False
 
     def _set_canonical_url(self, page, canonical_url: str, mod: str) -> bool:
         try:
-            # "Add a canonical URL" is a Radix switch label that
-            # reveals the input below it. Only click if the input is
-            # not already visible (clicking a second time would toggle
-            # it back off).
+            # "Add a canonical URL" is now a Radix checkbox button inside
+            # the Discovery sheet. Only click when unchecked; clicking a
+            # second time would toggle canonical attribution back off.
             if page.locator(self.CANONICAL_INPUT_SELECTOR).count() == 0:
-                page.locator(self.CANONICAL_TOGGLE_SELECTOR).first.click(timeout=8000)
+                toggle = page.locator(self.CANONICAL_TOGGLE_SELECTOR).first
+                toggle.wait_for(state="visible", timeout=8000)
+                if toggle.get_attribute("aria-checked") != "true":
+                    toggle.click()
                 page.wait_for_timeout(1500)
             canonical_input = page.locator(self.CANONICAL_INPUT_SELECTOR).first
             # Locator.fill() programmatically replaces the value, but
@@ -1014,14 +1121,10 @@ class HashnodeAdapter:
             # earlier syndication) is already in the field. Select-all
             # + type generates real key events so React picks up the
             # change.
-            canonical_input.click()
-            page.keyboard.press(f"{mod}+A")
-            page.keyboard.press("Delete")
-            page.wait_for_timeout(300)
-            page.keyboard.type(canonical_url, delay=5)
+            canonical_input.fill(canonical_url)
             canonical_input.press("Tab")  # blur to flush onBlur handlers
             page.wait_for_timeout(2000)
-            return True
+            return canonical_input.input_value() == canonical_url
         except Exception as err:  # noqa: BLE001
             print(f"  [hashnode] canonical URL set failed (non-fatal): {err}",
                   file=sys.stderr)
@@ -1128,6 +1231,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help=f"Minimum post age in days (default: {MIN_AGE_DAYS}).")
     parser.add_argument("--blog-dir", default=str(BLOG_DIR))
     parser.add_argument("--state-file", default=str(STATE_FILE))
+    parser.add_argument(
+        "--post-slug",
+        help=(
+            "Process one exact eligible post. This may retry an explicitly "
+            "recorded unpublished draft without changing normal rotation."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -1181,8 +1291,30 @@ def main(argv: list[str]) -> int:
     state = State.load(state_file)
     platform_names = [a.name for a in adapters]
     platform_filters = {a.name: a.accepts for a in adapters if hasattr(a, "accepts")}
-    candidate = select_candidate(posts, state, platform_names, today, floor, args.min_age_days,
-                                 platform_filters=platform_filters)
+    candidate = None
+    if args.post_slug:
+        candidate = next((post for post in posts if post.slug == args.post_slug), None)
+        if candidate is None:
+            print(f"Unknown post slug: {args.post_slug}", file=sys.stderr)
+            return 1
+        cutoff = today - dt.timedelta(days=args.min_age_days)
+        if candidate.date <= floor or candidate.date > cutoff:
+            print(
+                f"Post {candidate.slug} is not eligible on {today.isoformat()} "
+                f"with a {args.min_age_days}-day delay.",
+                file=sys.stderr,
+            )
+            return 1
+    else:
+        candidate = select_candidate(
+            posts,
+            state,
+            platform_names,
+            today,
+            floor,
+            args.min_age_days,
+            platform_filters=platform_filters,
+        )
     if candidate is None and not args.validate_only:
         print("No syndication candidate found today.")
         return 0
@@ -1205,8 +1337,14 @@ def main(argv: list[str]) -> int:
                   f"(published {candidate.date.strftime('%A')}); skipping.")
             continue
         if state.is_syndicated(candidate.slug, adapter.name) and not args.validate_only:
-            print(f"  [{adapter.name}] already syndicated; skipping.")
-            continue
+            retry_failed_draft = bool(
+                args.post_slug
+                and _retryable_failed_draft(state, candidate.slug, adapter.name)
+            )
+            if not retry_failed_draft:
+                print(f"  [{adapter.name}] already syndicated; skipping.")
+                continue
+            print(f"  [{adapter.name}] retrying explicitly recorded unpublished draft.")
         if args.dry_run:
             print(f"  [{adapter.name}] dry run — would publish {len(body_markdown)} chars, "
                   f"canonical {candidate.canonical_url}")
@@ -1229,7 +1367,7 @@ def main(argv: list[str]) -> int:
 
         state.record(candidate.slug, adapter.name, result)
         any_change = True
-        print(f"  [{adapter.name}] published draft: {result['url']}")
+        print(f"  [{adapter.name}] published: {result['url']}")
 
     if any_change:
         state.save(state_file)

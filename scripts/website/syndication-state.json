@@ -1426,6 +1426,10 @@
         "id": 4293450,
         "url": "https://dev.to/codenameone/bluetooth-support-across-every-codename-one-target-4om5",
         "syndicated_at": "2026-08-02T14:25:15+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/c55af10bfadd/edit",
+        "syndicated_at": "2026-08-04T22:34:44+00:00"
       }
     },
     "2026-08-02-1200-shai-on-device-ai-mcp-loopback": {
@@ -1452,6 +1456,10 @@
         "id": 4304034,
         "url": "https://dev.to/codenameone/pure-codename-one-text-editing-without-native-overlays-2i9l",
         "syndicated_at": "2026-08-03T15:39:51+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/5982d0a906fb/edit",
+        "syndicated_at": "2026-08-04T22:37:50+00:00"
       }
     },
     "2026-08-03-1200-codenameone-road-following-map-routing": {
@@ -1473,6 +1481,15 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-08-03T17:02:29+00:00"
+      },
+      "devto": {
+        "id": 4314093,
+        "url": "https://dev.to/codenameone/a-lightweight-rich-text-component-without-a-web-view-3ch0",
+        "syndicated_at": "2026-08-04T15:30:13+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/a-lightweight-rich-text-component-without-a-web-view-58fd7a813d83?postPublishedType=initial",
+        "syndicated_at": "2026-08-04T22:42:09+00:00"
       }
     },
     "2026-08-04-1200-shai-maven-central-cloudflare-r2": {
@@ -1482,6 +1499,18 @@
         "account": "shai",
         "source_slug": "maven-central-cloudflare-r2",
         "scheduled_at": "2026-08-04T09:00:00+00:00"
+      }
+    },
+    "compact-strings-parparvm": {
+      "hashnode": {
+        "url": "https://debugagent.com/compact-strings-cut-character-storage-in-half",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a721af9dd3e6285f360a9b7",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-05T02:41:11+00:00"
       }
     }
   }
