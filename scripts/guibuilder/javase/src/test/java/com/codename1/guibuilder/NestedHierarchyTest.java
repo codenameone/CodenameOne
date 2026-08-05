@@ -280,6 +280,42 @@ class NestedHierarchyTest {
         }
     }
 
+    @Test
+    void emptyingAColumnDoesNotPushTheOtherColumnOffTheDevice() {
+        // Exactly the shape of NestedLayoutsForm once its grid column has been drained.
+        GuiDocument document = document("<component type=\"Form\" layout=\"BorderLayout\" name=\"Form\">\n"
+                + "    <component type=\"Label\" name=\"header\" text=\"Header\" layoutConstraint=\"North\" />\n"
+                + "    <component type=\"Container\" name=\"columns\" layout=\"BoxLayout\" boxLayoutAxis=\"X\" layoutConstraint=\"Center\">\n"
+                + "        <component type=\"Container\" name=\"emptied\" layout=\"GridLayout\" gridLayoutRows=\"2\" gridLayoutColumns=\"2\" />\n"
+                + "        <component type=\"Container\" name=\"filled\" layout=\"BoxLayout\" boxLayoutAxis=\"Y\">\n"
+                + "            <component type=\"Label\" name=\"description\" text=\"Drag components between both nested containers.\" />\n"
+                + "            <component type=\"Button\" name=\"action\" text=\"Action\" />\n"
+                + "            <component type=\"Button\" name=\"movedA\" text=\"A\" />\n"
+                + "            <component type=\"Button\" name=\"movedB\" text=\"B\" />\n"
+                + "            <component type=\"Button\" name=\"movedC\" text=\"C\" />\n"
+                + "            <component type=\"Button\" name=\"movedD\" text=\"D\" />\n"
+                + "        </component>\n"
+                + "    </component>\n"
+                + "</component>");
+
+        // Phone portrait is the narrowest canvas mode the editor offers, and the one the empty
+        // container hint used to overflow: it asked for its full text width, which left no room
+        // for the neighbouring column and pushed every component past the right edge.
+        Container rendered = (Container) render(document, 720, 1200);
+        Component form = findPreview(rendered, document.root());
+        int rightEdge = (form == null ? rendered : form).getAbsoluteX()
+                + (form == null ? rendered : form).getWidth();
+        for (Element element : document.components()) {
+            if (element == document.root()) continue;
+            Component preview = findPreview(rendered, element);
+            assertNotNull(preview, element.getAttribute("name") + " does not render");
+            assertTrue(preview.getAbsoluteX() < rightEdge,
+                    element.getAttribute("name") + " starts at x=" + preview.getAbsoluteX()
+                            + ", past the device's right edge at " + rightEdge
+                            + "; emptying a column must not push its neighbour off the canvas");
+        }
+    }
+
     // ---- undo across nesting ------------------------------------------------------------------
 
     @Test
