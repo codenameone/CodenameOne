@@ -69,31 +69,43 @@ class KotlinUiTest : BaseTest() {
         kotlinForm.addAll(label, button, switchRow, textField, slider)
         step("added")
 
+        step("accordion-ctor")
         val accordion = Accordion()
-        accordion.addContent("Details", BoxLayout.encloseY(
-                MultiButton("MultiButton Line 1").apply {
-                    setTextLine2("Additional detail line")
-                },
-                MultiButton("MultiButton Line 2").apply {
-                    setTextLine2("More detail for Kotlin UI")
-                }
-        ))
+        step("multibutton-1")
+        val mb1 = MultiButton("MultiButton Line 1")
+        mb1.setTextLine2("Additional detail line")
+        step("multibutton-2")
+        val mb2 = MultiButton("MultiButton Line 2")
+        mb2.setTextLine2("More detail for Kotlin UI")
+        step("accordion-details")
+        accordion.addContent("Details", BoxLayout.encloseY(mb1, mb2))
 
+        step("checkbox")
+        val check = CheckBox("Enable notifications")
+        step("prefs-switch")
+        val prefSwitch = Switch()
+        prefSwitch.setOn()
+        step("textarea")
+        val note = TextArea(3, 20)
+        step("textarea-hint")
+        note.hint = "Add a short note"
+        step("prefs-container")
         val preferences = Container(BoxLayout.y())
-        preferences.addAll(
-                CheckBox("Enable notifications"),
-                Switch().apply { setOn() },
-                TextArea(3, 20).apply { hint = "Add a short note" }
-        )
+        preferences.addAll(check, prefSwitch, note)
+        step("accordion-prefs")
         accordion.addContent("Preferences", preferences)
 
+        step("accordion-summary")
         accordion.addContent("Summary", BoxLayout.encloseY(
                 Label("Accordion showcases grouped UI"),
                 Button("Confirm Settings")
         ))
 
+        step("form-add")
         kotlinForm.add(accordion)
+        step("form-show")
         kotlinForm.show()
+        step("shown")
         return true
     }
 }

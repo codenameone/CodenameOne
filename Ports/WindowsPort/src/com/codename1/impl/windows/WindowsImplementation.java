@@ -2813,7 +2813,16 @@ public class WindowsImplementation extends CodenameOneImplementation {
             if (iv == null || iv.length == 0) {
                 throw new RuntimeException("AES-GCM requires a nonce");
             }
-        } else if (mode.indexOf("/ECB/") < 0 && (iv == null || iv.length != 16)) {
+        } else if (mode.indexOf("/ECB/") >= 0) {
+            // ECB has no IV. The native ignores one, so passing it produced
+            // ciphertext while quietly discarding a parameter the caller thought
+            // mattered -- and JavaSE and Android reject the same call, because
+            // they hand a non-null iv to JCE as an IvParameterSpec and ECB
+            // refuses it. Refusing here keeps the ports answering alike.
+            if (iv != null && iv.length > 0) {
+                throw new RuntimeException("AES-ECB cannot use an initialization vector");
+            }
+        } else if (iv == null || iv.length != 16) {
             throw new RuntimeException("AES-CBC requires a 16 byte initialization vector");
         }
     }

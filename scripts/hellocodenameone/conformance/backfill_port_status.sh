@@ -127,6 +127,15 @@ while IFS= read -r workflow; do
   # normalized report, and a report that records real failures is the result
   # the table is supposed to show.
   #
+  # Every terminal conclusion except cancelled/skipped counts, not just success
+  # and failure. GitHub reports timed_out and startup_failure separately, and a
+  # producer that times out before normalization uploads no report at all --
+  # exactly the case the "newest run uploaded no port-status artifact" check
+  # exists to catch. Filtering those runs out here meant they never reached it,
+  # so an older still-fresh report covered the port and the sweep stayed green
+  # over a producer that emitted nothing. Cancelled stays excluded: that is
+  # someone superseding a run, not the producer failing.
+  #
   # workflow_dispatch counts too. The producers declare dispatch and schedule
   # rather than push, so a maintainer rerunning one on master to repair a port
   # the scheduled run missed is exactly the recovery this sweep exists to pick
@@ -145,7 +154,7 @@ while IFS= read -r workflow; do
   candidates="$(gh run list --workflow "${workflow}" --branch master --limit 100 \
     --json databaseId,event,conclusion,updatedAt \
     | jq -r --arg horizon "${horizon}" '[.[] | select((.event == "push" or .event == "schedule" or .event == "workflow_dispatch") and
-          (.conclusion == "success" or .conclusion == "failure") and
+          (.conclusion != null and .conclusion != "cancelled" and .conclusion != "skipped") and
           (.updatedAt >= $horizon))]
           | sort_by(.updatedAt) | reverse | .[].databaseId')"
   if [ -z "${candidates}" ]; then
