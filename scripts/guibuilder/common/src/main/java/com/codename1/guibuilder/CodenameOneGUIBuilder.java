@@ -2647,6 +2647,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     Container canvasHostForTest() { return canvasHost; }
 
+    /** Recompiles theme.css from disk and pushes it at the preview, as a live CSS edit does. */
+    boolean reloadProjectCssForTest() {
+        try {
+            return applyProjectCss(ProjectIO.read(binding.cssFile()), new CodeEditor("css", ""));
+        } catch (IOException ex) {
+            return false;
+        }
+    }
+
     GuiDocument documentForTest() { return document; }
 
     private void cancelDesignerDrag() {
@@ -3866,7 +3875,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             editor.setShowLineNumbers(true);
             editor.onReady(editor::focusEditor);
             Component stage = canvasHost.getComponentAt(0);
-            Container editorPane = editorPane("theme.css", editor,
+            // Name the file being edited. "theme.css" alone left it ambiguous which stylesheet the
+            // canvas was actually showing when the two did not appear to agree.
+            Container editorPane = editorPane(binding.cssFile(), editor,
                     () -> editor.getText(value -> saveCss(value, editor)), this::refreshEditor);
             editor.addChangeListener(event -> scheduleLiveCss(editor));
             if (cssLiveTimer != null) cssLiveTimer.cancel();
@@ -3964,9 +3975,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             int userMarker = source.indexOf("// <gui-builder-user-code>");
             final int editableOffset = userMarker < 0 ? 0
                     : userMarker + "// <gui-builder-user-code>".length() + 1;
-            editor.onReady(() -> {
+            // Most of a companion file is generated and therefore protected. Refusing those edits
+            // without a word is indistinguishable from an editor that ignores the keyboard, which
+            // is exactly how it was read, so say what happened and where typing does work.
+            editor.addProtectedEditListener(e -> {
+                setStatus("That block is generated from the design and cannot be typed into"
+                        + " - edit between the USER CODE markers");
                 editor.setCursorPosition(editableOffset);
-                editor.focusEditor();
             });
             Component stage = canvasHost.getComponentCount() == 0 ? new Label() : canvasHost.getComponentAt(0);
             Container editorPane = editorPane(handler == null ? "Companion Java source • edit inside USER CODE markers" : "Handler: " + handler, editor,
@@ -3976,7 +3991,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             canvasHost.removeAll();
             canvasHost.add(BorderLayout.CENTER, split);
             canvasHost.revalidate();
-            setStatus("Editing " + relativeFormName(document.path()) + " Java behavior");
+            // Only now: requestFocus does nothing for a component that is not yet in the form, and
+            // a caret left at offset zero sits inside the first generated block.
+            editor.onReady(() -> {
+                editor.setCursorPosition(editableOffset);
+                editor.focusEditor();
+            });
+            setStatus("Editing " + relativeFormName(document.path()) + " Java behavior"
+                    + " - type between the USER CODE markers");
         } catch (IOException ex) {
             ToastBar.showErrorMessage("Unable to open source: " + ex.getMessage());
         }
@@ -4031,6 +4053,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     private void refreshProjectThemeOnPreview() {
+        if (projectTheme == null) {
+            // Falling back to the builder's own theme silently is what makes the canvas look like
+            // it is showing a stylesheet other than the one open in the editor. It is.
+            setStatus("Project CSS is not loaded - the canvas is showing the builder's theme");
+        }
         try {
             if (projectTheme != null) {
                 UIManager.getInstance().setThemeProps(projectTheme);
