@@ -13,18 +13,39 @@ import com.codename1.ui.TextField
 import com.codename1.ui.layouts.BoxLayout
 
 class KotlinUiTest : BaseTest() {
+    // Breadcrumbs because the Windows port reports NullPointerException with no
+    // stack at all -- Display.getStackTrace and Throwable.getStackTrace both come
+    // back empty there, so CI gives a bare exception and no location. Cheap on
+    // every other port, and the difference between naming the failing
+    // construction and guessing at it. Remove once the Windows failure is fixed.
+    private fun step(name: String) {
+        System.out.println("CN1SS:INFO:kotlin-step=" + name)
+    }
+
     override fun runTest(): Boolean {
+        step("form")
         val kotlinForm = createForm("Kotlin", BoxLayout.y(), "kotlin")
-        kotlinForm.addAll(
-                Label("Kotlin UI Test Components"),
-                Button("Kotlin Button"),
-                BoxLayout.encloseX(Switch(), Switch().apply { setOn() }),
-                TextField("", "Enter name"),
-                Slider().apply {
-                    isEditable = true
-                    progress = 50
-                }
-        )
+        step("label")
+        val label = Label("Kotlin UI Test Components")
+        step("button")
+        val button = Button("Kotlin Button")
+        step("switch-off")
+        val switchOff = Switch()
+        step("switch-on-ctor")
+        val switchOn = Switch()
+        step("switch-on-seton")
+        switchOn.setOn()
+        step("switch-row")
+        val switchRow = BoxLayout.encloseX(switchOff, switchOn)
+        step("textfield")
+        val textField = TextField("", "Enter name")
+        step("slider")
+        val slider = Slider()
+        slider.isEditable = true
+        slider.progress = 50
+        step("addAll")
+        kotlinForm.addAll(label, button, switchRow, textField, slider)
+        step("added")
 
         val accordion = Accordion()
         accordion.addContent("Details", BoxLayout.encloseY(
