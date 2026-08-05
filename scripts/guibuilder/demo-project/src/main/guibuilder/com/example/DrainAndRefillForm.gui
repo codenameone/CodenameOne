@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="Form" layout="BorderLayout" title="Drain a container, then refill it" name="DrainAndRefillForm">
+    <component type="Label" name="drainHeader" text="Empty the left column completely, then drag components back into it" layoutConstraint="North" />
+    <component type="Container" name="drainColumns" layout="BoxLayout" boxLayoutAxis="X" layoutConstraint="Center">
+        <component type="Container" name="fullColumn" layout="BoxLayout" boxLayoutAxis="Y">
+            <component type="Button" name="itemOne" text="One" />
+            <component type="Button" name="itemTwo" text="Two" />
+            <component type="Button" name="itemThree" text="Three" />
+            <component type="Button" name="itemFour" text="Four" />
+        </component>
+        <component type="Container" name="alreadyEmpty" layout="BoxLayout" boxLayoutAxis="Y" />
+        <component type="Container" name="singleChild" layout="GridLayout" gridLayoutRows="2" gridLayoutColumns="2">
+            <component type="Button" name="lonely" text="Only child" />
+        </component>
+    </component>
+</component>
