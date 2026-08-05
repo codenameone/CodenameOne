@@ -162,7 +162,37 @@ public abstract class RenderElement extends Element {
         }
         dirty = true;
         performRebuild();
-        markNeedsLayout();
+        if (updateAffectsLayout()) {
+            markNeedsLayout();
+        } else {
+            markNeedsPaint();
+        }
+    }
+
+    /**
+     * Whether a new configuration for THIS element can change geometry.
+     *
+     * <p>Flutter draws a hard line between {@code markNeedsPaint} and
+     * {@code markNeedsLayout}, and it is not an optimization detail — marking
+     * layout walks to the root, so a purely visual change to one widget would
+     * otherwise relayout the entire screen on every frame it animates.</p>
+     *
+     * <p>Returning false is only safe when this element's size cannot depend on
+     * its own configuration. It says nothing about the CHILDREN: if a rebuild
+     * replaces a child, that child's own update marks layout and the walk passes
+     * through here as usual.</p>
+     */
+    protected boolean updateAffectsLayout() {
+        return true;
+    }
+
+    /**
+     * The subtree must repaint, but every measurement stays valid.
+     */
+    public void markNeedsPaint() {
+        if (component != null) {
+            component.repaint();
+        }
     }
 
     @Override

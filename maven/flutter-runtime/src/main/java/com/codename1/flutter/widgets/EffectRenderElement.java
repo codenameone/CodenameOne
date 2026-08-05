@@ -99,6 +99,21 @@ public abstract class EffectRenderElement extends RenderElement {
         return constraints.constrain(cs);
     }
 
+    /**
+     * An effect is a PAINT wrapper: {@link #performLayout} takes its size straight
+     * from the child, so no configuration of the effect itself - a Transform's
+     * scale, a Material's colour or elevation - can move anything.
+     *
+     * <p>This matters most where it is animated. The gallery's carousel rebuilds a
+     * Transform per card per scroll frame; treating that as a layout change marked
+     * every ancestor up to the Scaffold dirty and relayed out the whole page on
+     * each frame, which is what made dragging the carousel stutter.</p>
+     */
+    @Override
+    protected boolean updateAffectsLayout() {
+        return false;
+    }
+
     @Override
     protected void positionChildren(int x, int y) {
         // The pane's own layout places the subtree in pane coordinates; nothing to do
