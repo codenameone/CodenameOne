@@ -16726,6 +16726,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                         "The supplied key does not decrypt this database", ex);
             }
             throw new IOException(ex.getMessage(), ex);
+        } catch (IOException ex) {
+            // probeKey turns a rejected key into a DatabaseEncryptionException, which is an
+            // IOException and so slipped past the SQLException handler above with the connection
+            // still open. Repeated passphrase attempts then piled up live handles and kept the
+            // file locked.
+            closeQuietly(conn);
+            throw ex;
         }
     }
 

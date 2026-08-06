@@ -77,7 +77,19 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
      * belongs to the connection and is already gone.
      */
     void invalidate() {
+        if (closed) {
+            return;
+        }
         closed = true;
+        // Close the native cursor as well, not just this wrapper. It holds the SQLiteQuery that
+        // keeps a reference to the database, so leaving it open stops the database close from
+        // releasing everything - and marking the wrapper closed first means a later close() from
+        // the application is a no-op, so nothing else would ever release it.
+        try {
+            c.close();
+        } catch (RuntimeException ignored) {
+            // The database is going away regardless.
+        }
     }
 
     @Override
@@ -240,6 +252,9 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
 
     @Override
     public boolean wasNull() throws IOException {
+        // Checked first: without it a Row retained past the close of its cursor reached straight
+        // into an already-closed native cursor below.
+        checkOpen();
         if (last_read_column_index < 0) {
             // Before anything has been read there is no "last value", so this used to answer
             // true, which says the value you have not read is null. False is the answer JDBC

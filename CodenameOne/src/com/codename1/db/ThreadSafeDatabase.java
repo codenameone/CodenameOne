@@ -180,6 +180,26 @@ public class ThreadSafeDatabase extends Database {
     }
 
     @Override
+    public boolean isInTransaction() {
+        // beginTransaction() runs against the underlying database, so it moves that object's
+        // flag, not this wrapper's. Without delegating, the wrapper always reported false --
+        // including immediately after a successful begin -- and a caller trusting it would skip
+        // the commit or rollback it still owed.
+        synchronized (dispatchLock) {
+            if (closed) {
+                return false;
+            }
+            Boolean state = (Boolean) et.run(new RunnableWithResultSync<Boolean>() {
+                @Override
+                public Boolean run() {
+                    return Boolean.valueOf(underlying.isInTransaction());
+                }
+            });
+            return state != null && state.booleanValue();
+        }
+    }
+
+    @Override
     public void changeKey(final DatabaseConfig config) throws IOException {
         // Without this the wrapper inherits the base implementation, which always reports
         // NOT_SUPPORTED, so a wrapped database could never be re-keyed however capable the
@@ -389,7 +409,12 @@ public class ThreadSafeDatabase extends Database {
         }
     }
 
-    private class CursorWrapper implements Cursor {
+    /// Implements `CursorExt` as well as `Cursor`, because every cursor a Codename One port
+    /// returns implements it and the wrapper is documented as transparent. Without it a wrapped
+    /// cursor silently lost the capability: `Database#count(Cursor)` answered -1 even on Android,
+    /// where the exact count is already known, and the extension calls bypassed the worker
+    /// thread this class exists to funnel everything through.
+    private class CursorWrapper implements CursorExt {
         private final Cursor underlyingCursor;
 
         public CursorWrapper(Cursor underlyingCursor) {
@@ -484,6 +509,26 @@ public class ThreadSafeDatabase extends Database {
                     return underlyingCursor.position(row);
                 }
             });
+        }
+
+        @Override
+        public void beforeFirst() throws IOException {
+            invokeWithException(new RunnableWithIOException() {
+                @Override
+                public void run() throws IOException {
+                    Database.beforeFirst(underlyingCursor);
+                }
+            });
+        }
+
+        @Override
+        public int getCount() throws IOException {
+            return ((Integer) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
+                public Object run() throws IOException {
+                    return Integer.valueOf(Database.count(underlyingCursor));
+                }
+            })).intValue();
         }
 
         @Override

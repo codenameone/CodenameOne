@@ -6531,13 +6531,37 @@ function cn1SqliteApplyKey(db, key) {
 }
 
 /** Opens a database by name, through the pool when one is available. */
+/**
+ * Applies the key and proves it works, tagging a failure as a key failure.
+ *
+ * Only this step can fail because of the key. Opening the file, the pool and the VFS can all fail
+ * for reasons no key would fix -- storage full, a corrupt file, OPFS unavailable -- and reporting
+ * those as WRONG_KEY would have an application prompting for a passphrase that cannot help, even
+ * when it never supplied one.
+ */
+function cn1SqliteApplyKeyAndProbe(db, key) {
+  try {
+    cn1SqliteApplyKey(db, key);
+    // Read the schema either way. Key validation is lazy, so an unkeyed open of an encrypted file
+    // also succeeds: without this, opening one without a key would look like proof it is plaintext.
+    db.exec("SELECT count(*) FROM sqlite_master");
+  } catch (err) {
+    if (err && typeof err === "object") {
+      err.cn1WrongKey = true;
+    }
+    throw err;
+  }
+}
+
 function cn1SqliteOpen(name, key) {
   if (cn1SqlitePool) {
     const pooled = new cn1SqlitePool.OpfsSAHPoolDb(cn1SqliteDbPath(name));
-    cn1SqliteApplyKey(pooled, key);
-    // Read the schema either way. Key validation is lazy, so an unkeyed open of an encrypted file
-    // also succeeds: without this, opening one without a key would look like proof it is plaintext.
-    pooled.exec("SELECT count(*) FROM sqlite_master");
+    try {
+      cn1SqliteApplyKeyAndProbe(pooled, key);
+    } catch (err) {
+      pooled.close();
+      throw err;
+    }
     return pooled;
   }
   // filename: gives the connection a name inside the VFS, so reopening finds it again.
@@ -6545,8 +6569,7 @@ function cn1SqliteOpen(name, key) {
   const anchored = cn1SqliteMemoryAnchors.has(name);
   const db = new cn1Sqlite.oo1.DB({ filename: uri, flags: "c" });
   try {
-    cn1SqliteApplyKey(db, key);
-    db.exec("SELECT count(*) FROM sqlite_master");
+    cn1SqliteApplyKeyAndProbe(db, key);
   } catch (err) {
     // Closing releases the store if this connection was the one that created it, so a rejected
     // key leaves nothing behind.
@@ -6640,8 +6663,13 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_open_java_lang_S
     try {
       return cn1SqliteRegister(cn1SqliteOpen(jvm.toNativeString(name), key === null ? null : jvm.toNativeString(key)));
     } catch (err) {
-      // 0 means "the key did not work"; the Java side turns that into WRONG_KEY.
-      return 0;
+      if (err && err.cn1WrongKey) {
+        // 0 means "the key did not work"; the Java side turns that into WRONG_KEY.
+        return 0;
+      }
+      // Anything else is a storage or corruption failure, which no key can resolve. Let it
+      // propagate so the caller sees what actually went wrong rather than a bogus key error.
+      throw err;
     }
   });
 

@@ -193,7 +193,11 @@ public class DatabaseImpl extends Database {
     public Cursor executeQuery(String sql) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
-        return register(new CursorImpl(SQLiteNative.prepare(peer, sql)));
+        long stmt = SQLiteNative.prepare(peer, sql);
+        // A statement with placeholders and no arguments would otherwise run with every slot
+        // left as NULL rather than reporting the missing parameters.
+        checkParameterCount(stmt, 0);
+        return register(new CursorImpl(stmt));
     }
 
     @Override

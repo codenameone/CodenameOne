@@ -326,6 +326,10 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
 
     @Override
     public boolean wasNull() throws IOException {
+        // The only shared cursor operation that used to skip this, so a Row retained past the
+        // close of its cursor or its database kept answering from a stale latch instead of
+        // reporting that it is gone.
+        checkOpen();
         return lastReadWasNull;
     }
 

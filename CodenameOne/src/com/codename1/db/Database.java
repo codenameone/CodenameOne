@@ -386,6 +386,7 @@ public abstract class Database {
         // Not openOrCreate: on Android the system SQLite has no cipher, so a database opened
         // through it could never be re-keyed. The platform decides which engine can do this.
         validateDatabaseNameArgument(databaseName);
+        requireExistingDatabase(databaseName, "encrypt");
         Database db = Display.getInstance().openOrCreateForRekey(databaseName);
         try {
             db.changeKey(config);
@@ -409,11 +410,36 @@ public abstract class Database {
         if (config == null || !config.isEncrypted()) {
             throw new IllegalArgumentException("decrypt() requires the config that currently opens the database");
         }
+        validateDatabaseNameArgument(databaseName);
+        requireExistingDatabase(databaseName, "decrypt");
         Database db = openOrCreate(databaseName, config);
         try {
             db.changeKey(DatabaseConfig.plain());
         } finally {
             db.close();
+        }
+    }
+
+    /// Refuses to migrate a database that is not there.
+    ///
+    /// Both migrations open their source through an open-or-create hook, so a missing or mistyped
+    /// name used to create an empty database, convert that, and report success -- leaving the
+    /// database the caller meant untouched while telling them it had been converted. Both
+    /// document an existing database as their input, so the absence is an error.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name to check
+    /// - `operation`: the calling method, for the message
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if no such database exists
+    private static void requireExistingDatabase(String databaseName, String operation)
+            throws IOException {
+        if (!exists(databaseName)) {
+            throw new IOException(operation + "() works on an existing database, and there is no "
+                    + "database named " + databaseName);
         }
     }
 

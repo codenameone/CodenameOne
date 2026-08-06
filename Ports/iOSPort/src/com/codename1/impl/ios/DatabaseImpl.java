@@ -249,8 +249,16 @@ class DatabaseImpl extends Database {
     public Cursor executeQuery(String sql) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
-        return register(new CursorImpl(
-                IOSImplementation.nativeInstance.sqlDbExecQuery(peer, sql, null)));
+        if (isLegacyBehavior()) {
+            return register(new CursorImpl(
+                    IOSImplementation.nativeInstance.sqlDbExecQuery(peer, sql, null)));
+        }
+        // Prepared rather than handed to sqlDbExecQuery, which binds nothing when given a null
+        // argument array: a statement with placeholders would run with every slot left as NULL
+        // instead of reporting the parameters the caller did not supply.
+        long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+        checkParameterCount(stmt, 0);
+        return register(new CursorImpl(stmt));
     }
 
     private Cursor register(CursorImpl cursor) {

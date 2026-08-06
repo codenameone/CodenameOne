@@ -10989,7 +10989,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // ARCore-backed AR implementation uses.
         try {
             Class c = Class.forName("com.codename1.impl.android.cipher.AndroidCipherFactory");
-            java.lang.reflect.Method open = c.getMethod("open", String.class, String.class);
+            java.lang.reflect.Method open = c.getMethod("open", String.class, String.class,
+                    String.class);
             return (Database) open.invoke(null,
                     resolveNativeDatabasePath(databaseName), databaseName,
                     config.resolveKeyMaterial(databaseName));
@@ -11001,6 +11002,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             throw new IOException(cause == null ? err.toString() : cause.getMessage(), cause);
         } catch (IOException err) {
             throw err;
+        } catch (ClassNotFoundException notBundled) {
+            // The only benign reason to land here: the build pruned the package because the
+            // application never referenced DatabaseConfig.
+            throw new com.codename1.db.DatabaseEncryptionException(
+                    com.codename1.db.DatabaseEncryptionException.NOT_SUPPORTED,
+                    "This build does not include encrypted database support", notBundled);
+        } catch (NoSuchMethodException broken) {
+            // The package is present but does not expose the entry point this reaches through.
+            // That is a broken build, not an unsupported platform, and reporting it as
+            // NOT_SUPPORTED would hide it: every caller would be told encryption is unavailable
+            // on a device that ships the engine. This is the failure mode a compiler would have
+            // caught if the seam were not reflective, so it has to be loud.
+            throw new IOException("The encrypted database implementation is present but does not "
+                    + "expose the expected entry point. This build is inconsistent: "
+                    + broken.getMessage(), broken);
         } catch (Throwable err) {
             throw new com.codename1.db.DatabaseEncryptionException(
                     com.codename1.db.DatabaseEncryptionException.NOT_SUPPORTED,
@@ -11059,6 +11075,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 throw (IOException) cause;
             }
             throw new IOException(cause == null ? err.toString() : cause.getMessage(), cause);
+        } catch (NoSuchMethodException broken) {
+            // Same reasoning as openOrCreateDB: falling back to the plaintext engine here would
+            // silently turn a re-key into a no-op on a build that does ship the cipher.
+            throw new IOException("The encrypted database implementation is present but does not "
+                    + "expose the expected entry point. This build is inconsistent: "
+                    + broken.getMessage(), broken);
         } catch (Throwable err) {
             return openOrCreateDB(databaseName);
         }

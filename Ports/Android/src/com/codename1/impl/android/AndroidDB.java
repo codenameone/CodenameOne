@@ -277,12 +277,16 @@ public class AndroidDB extends Database {
         checkOpen();
         requireSingleStatement(sql);
         checkParameterCount(sql, params.length);
-        if (!hasBlob(params)) {
+        if (isLegacyBehavior()) {
+            // rawQuery can only carry text, which is what this port used to do to every query
+            // argument whatever its type.
             return executeQuery(sql, coerceToText(params, "executeQuery"));
         }
         try {
-            // rawQuery can only carry text arguments. Binding through a cursor factory is the
-            // supported way to get a blob into a query, and is what androidx.sqlite does.
+            // Bind through a cursor factory rather than stringifying: the contract is that a
+            // parameter binds by its runtime type, so a Long has to reach SQLite as INTEGER or
+            // "SELECT ? = 42" and typeof(?) both answer wrongly. This is the route
+            // androidx.sqlite uses, and it is the only one that carries a blob as well.
             android.database.Cursor c = db.rawQueryWithFactory(
                     new BlobBindingCursorFactory(params), sql, null, null);
             return wrap(c);
@@ -311,15 +315,6 @@ public class AndroidDB extends Database {
         });
         openCursors.add(cursor);
         return cursor;
-    }
-
-    private static boolean hasBlob(Object[] params) {
-        for (int iter = 0; iter < params.length; iter++) {
-            if (params[iter] instanceof byte[]) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /** Binds by runtime type onto any SQLiteProgram, which covers both statements and queries. */

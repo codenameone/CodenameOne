@@ -86,17 +86,24 @@ public class AndroidCipherFactory {
         SQLiteDatabase db = null;
         try {
             db = SQLiteDatabase.openOrCreateDatabase(file, key, null, null);
+        } catch (RuntimeException err) {
+            // An unwritable directory, a full disk or any other filesystem failure lands here,
+            // and no key can solve it. Reporting WRONG_KEY would send an application that follows
+            // the error codes into prompting for a different passphrase forever.
+            throw new IOException("The database " + path + " could not be opened: "
+                    + err.getMessage(), err);
+        }
+        try {
             // SQLCipher applies the key lazily, so without reading something now a wrong key
-            // would not surface until some later and apparently unrelated query.
+            // would not surface until some later and apparently unrelated query. This read is the
+            // only failure here that actually means the key is wrong.
             db.rawQuery("SELECT count(*) FROM sqlite_master", null).close();
             return new AndroidCipherDB(db, databaseName);
         } catch (RuntimeException err) {
-            if (db != null) {
-                try {
-                    db.close();
-                } catch (RuntimeException ignored) {
-                    // The original failure is the one worth reporting.
-                }
+            try {
+                db.close();
+            } catch (RuntimeException ignored) {
+                // The original failure is the one worth reporting.
             }
             throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
                     "The supplied key does not decrypt this database", err);

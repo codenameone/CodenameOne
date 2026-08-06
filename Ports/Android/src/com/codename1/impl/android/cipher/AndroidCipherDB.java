@@ -304,10 +304,15 @@ class AndroidCipherDB extends Database {
         checkOpen();
         requireSingleStatement(sql);
         checkParameterCount(sql, params.length);
-        if (!hasBlob(params)) {
+        if (isLegacyBehavior()) {
+            // rawQuery can only carry text, which is what this port used to do to every query
+            // argument whatever its type.
             return executeQuery(sql, coerceToText(params, "executeQuery"));
         }
         try {
+            // Bind through a cursor factory rather than stringifying: the contract is that a
+            // parameter binds by its runtime type, so a Long has to reach SQLite as INTEGER or
+            // "SELECT ? = 42" and typeof(?) both answer wrongly.
             return wrap(db.rawQueryWithFactory(new BlobBindingCursorFactory(params), sql, null, null));
         } catch (Exception e) {
             throw new IOException(e.getMessage(), e);
@@ -332,15 +337,6 @@ class AndroidCipherDB extends Database {
         });
         openCursors.add(cursor);
         return cursor;
-    }
-
-    private static boolean hasBlob(Object[] params) {
-        for (int iter = 0; iter < params.length; iter++) {
-            if (params[iter] instanceof byte[]) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static void bind(SQLiteProgram s, Object[] params) {

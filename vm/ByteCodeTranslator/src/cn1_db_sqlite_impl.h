@@ -62,6 +62,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <errno.h>
 
 extern JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim);
 
@@ -142,7 +143,16 @@ JAVA_BOOLEAN PREFIX##_sqlDbExists___java_lang_String_R_boolean(CODENAME_ONE_THRE
 }                                                                                                   \
                                                                                                    \
 JAVA_VOID PREFIX##_sqlDbDelete___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {    \
-    remove(stringToUTF8(threadStateData, path));                                                    \
+    const char* target = stringToUTF8(threadStateData, path);                                       \
+    /* Deleting what is not there is the documented no-op. Any other failure -- a read-only file, \
+     * or a Windows handle still open on it -- has to be reported, or delete() returns and the    \
+     * database is still sitting there. */                                                         \
+    if (remove(target) != 0 && errno != ENOENT) {                                                   \
+        char cn1DbDeleteMessage[512];                                                               \
+        snprintf(cn1DbDeleteMessage, sizeof(cn1DbDeleteMessage),                                    \
+                "The database %s could not be deleted: %s", target, strerror(errno));               \
+        cn1DbThrow(threadStateData, cn1DbDeleteMessage);                                            \
+    }                                                                                               \
 }                                                                                                   \
                                                                                                    \
 JAVA_LONG PREFIX##_sqlDbOpen___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {      \
