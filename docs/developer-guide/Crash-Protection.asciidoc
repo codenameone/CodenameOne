@@ -1,3 +1,4 @@
+[[crash-protection]]
 == Crash Protection
 
 Crash Protection is an opt-in service that captures uncaught exceptions in your shipping app and files them as deduplicated issues on your GitHub repository. Symbolicated stack traces, scrubbed messages, and a per-bug counter are all recorded server-side; you triage from GitHub Issues like any other bug.
@@ -85,12 +86,12 @@ The Codename One crash-protection client runs incoming messages through a scrubb
 - `rawStack` -- the pre-rendered Java stack (via `printStackTrace`, including the cause chain). On the ParparVM ports this is the readable Java trace, since `getStackTrace()` there yields a formatted string rather than structured frames
 - `traceFormat` -- how the server should read `rawStack`: `structured`, `parparvm-text`, `js-error`, or `none`. Derived, never guessed
 - `mappingId` -- the id of the obfuscation mapping a hardened build shipped with, so a report ties to the exact mapping even if a rebuild reused the build key; empty for unhardened builds
-- `hardenLevel` -- the hardening level of the build, so the server can explain an unretraceable report honestly
+- `hardenLevel` -- the hardening level of the build, so the server can give an honest reason for an unretraceable report
 - `clientTs`
 
 === Crash reports from a hardened build
 
-When a build is hardened (see <<app-hardening>>), the build server retains the cross-platform obfuscation mapping and symbolicates incoming reports against it, so a hardened build's crashes still land as readable, correctly-lined issues. Two things follow from how the mapping is retained: a report whose mapping has aged out of retention can no longer be retraced, and a locally hardened build -- whose mapping never reached the server -- can't be symbolicated at all. On the ParparVM ports (iOS, tvOS, watchOS, mac-native, Windows, Linux) the Java trace arrives as `rawStack` in the `parparvm-text` format and is parsed server-side; on the JavaScript port it arrives as a JavaScript engine stack (`js-error`) and is symbolicated best-effort through the source map.
+When a build is hardened (see <<app-hardening>>), the build server retains the cross-platform obfuscation mapping and symbolicates incoming reports against it, so a hardened build's crashes still land as readable, correctly lined issues. Two things follow from how the mapping is retained: a report whose mapping has aged out of retention can no longer be retraced, and a locally hardened build -- whose mapping never reached the server -- can't be symbolicated at all. On the ParparVM ports (iOS, tvOS, watchOS, mac-native, Windows, Linux) the Java trace arrives as `rawStack` in the `parparvm-text` format and is parsed server-side; on the JavaScript port it arrives as a JavaScript engine stack (`js-error`) and is symbolicated best-effort through the source map.
 
 ==== Default scrubber rules
 

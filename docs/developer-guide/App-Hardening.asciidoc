@@ -3,15 +3,15 @@
 
 Every shipped app is a program someone else can read. The class and method names survive into the binary, the string constants sit in plain sight, and the control flow is exactly what you wrote. On Android a release build is run through R8, which renames the Java names -- but on the other ports even that much isn't true: the iOS and native builds translate your code to C through ParparVM and the class names, method names and every string literal end up in the binary as readable text.
 
-App Hardening closes that gap across *all* the ports from one place. It renames classes, methods and fields; encrypts string constants so they are not present as plaintext in the binary; and obfuscates control flow -- and it does this to the merged application before each platform build, so Android, iOS, JavaScript and the native desktop targets are all covered by one transform and one mapping.
+App Hardening closes that gap across *all* the ports from one place. It renames classes, methods and fields; encrypts string constants so they're not present as plaintext in the binary; and obfuscates control flow -- and it does this to the merged application before each platform build, so Android, iOS, JavaScript and the native desktop targets are all covered by one transform and one mapping.
 
-WARNING: App Hardening doesn't make an app impossible to reverse engineer, and no product does. What it changes is the cost: turning a class named `LoginController` with a string `"invalid password"` into a class named `zqab` with an encrypted constant moves the first afternoon of a reverse-engineering effort from "read it" to "reconstruct it." Be careful not to promise more than that, internally or in marketing. It is one layer; pair it with <<app-shield>> so the statement your backend trusts is made by hardware the attacker doesn't control.
+WARNING: App Hardening doesn't make an app impossible to reverse engineer, and no product does. What it changes is the cost: turning a class named `LoginController` with a string `"invalid password"` into a class named `zqab` with an encrypted constant moves the first afternoon of a reverse-engineering effort from "read it" to "reconstruct it." Be careful not to promise more than that, internally or in marketing. It's one layer; pair it with <<app-shield>> so the statement your backend trusts is made by hardware the attacker doesn't control.
 
-This is an *Enterprise* feature. A build that asks for it without an Enterprise subscription *fails with an explanation* rather than quietly producing an unhardened binary -- a binary that looks protected but isn't is worse than one that never claimed to be.
+This is an *Enterprise* feature. A build that asks for it without an Enterprise subscription *fails with an explanation* rather than producing an unhardened binary -- a binary that looks protected but isn't is worse than one that never claimed to be.
 
 === What it changes, per port
 
-The transform runs on the merged application jar, at the bytecode level, before any platform-specific build step. That is why one implementation reaches every port: iOS/ParparVM translates the already-hardened bytecode to C (so the C constant pool never sees the plaintext), R8 consumes already-hardened classes on Android, and the JavaScript backend minifies already-hardened classes.
+The transform runs on the merged application jar, at the bytecode level, before any platform-specific build step. That's why one implementation reaches every port: iOS/ParparVM translates the already-hardened bytecode to C (so the C constant pool never sees the plaintext), R8 consumes already-hardened classes on Android, and the JavaScript backend minifies already-hardened classes.
 
 [cols="2,1,4"]
 |===
@@ -103,23 +103,23 @@ Renaming is safe for code the compiler and runtime resolve by symbol, and unsafe
 
 Two categories deserve special attention:
 
-* *Name-bound persistence.* A `PropertyBusinessObject`'s property names *are* the JSON keys and the database column names. Renaming them would silently change the on-disk schema and the wire format, which corrupts data on the next app upgrade rather than throwing. The engine keeps these member names automatically.
+* *Name-bound persistence.* A `PropertyBusinessObject`'s property names *are* the JSON keys and the database column names. Renaming them would change the on-disk schema and the wire format, which corrupts data on the next app upgrade rather than throwing. The engine keeps these member names automatically.
 * *Runtime reflection you construct dynamically.* If you build a class name at runtime from pieces the analysis can't follow, add a `harden.keep` rule for it.
 
 When you enable a hardening level, review your app for these name-bound patterns before the first hardened cloud build: reflective `Class.forName` targets built from dynamic strings, GUI-builder resources that reference components by class name, and any framework registration that resolves an implementation by name. The automatic keep analysis catches the common cases; a `harden.keep` rule covers anything it can't see.
 
 === Crash reports from a hardened build
 
-Hardening and Crash Protection are designed together. The build server retains the obfuscation mapping and symbolicates incoming reports against it, so a crash from a hardened build still lands as a readable, correctly-lined GitHub issue -- see <<crash-protection>>. Two consequences follow: a report whose mapping has aged out of retention can no longer be retraced, and a locally hardened build (whose mapping never reached the server) can't be symbolicated at all, which is why the pre-flight refuses to harden a local target by default.
+Hardening and Crash Protection are designed together. The build server retains the obfuscation mapping and symbolicates incoming reports against it, so a crash from a hardened build still lands as a readable, correctly lined GitHub issue -- see <<crash-protection>>. Two consequences follow: a report whose mapping has aged out of retention can no longer be retraced, and a locally hardened build (whose mapping never reached the server) can't be symbolicated at all, which is why the pre-flight refuses to harden a local target by default.
 
-=== Local and source builds are not hardened
+=== Local and source builds aren't hardened
 
-Hardening runs on the Codename One build server. A local or source-project target (`*-source`, `local-*`) never reaches the server, so its output is not hardened; the build fails the pre-flight rather than mislead you, unless you set `harden.allowUnhardenedLocalBuild=true`. The simulator is never obfuscated either -- it runs your `target/classes` directly. App code can read `com.codename1.security.hardening.Hardening.isHardened()` to tell an honestly-hardened build from one of these.
+Hardening runs on the Codename One build server. A local or source-project target (`*-source`, `local-*`) never reaches the server, so its output isn't hardened; the build fails the pre-flight rather than mislead you, unless you set `harden.allowUnhardenedLocalBuild=true`. The simulator is never obfuscated either -- it runs your `target/classes` directly. App code can read `com.codename1.security.hardening.Hardening.isHardened()` to tell a hardened build apart from one of these.
 
 === Hardening and App Shield
 
 These are two different Enterprise features and you can use either or both. App Hardening protects the *binary* -- it raises the cost of reading and modifying the app on the device. App Shield protects the *app-to-server relationship* -- it gives your backend a cryptographically verifiable statement that a request came from a genuine, unmodified app on an uncompromised device. Hardening makes an attacker work harder to patch out App Shield's checks; App Shield makes patching them out insufficient, because the statement your backend trusts is made by a party the attacker doesn't control.
 
-=== What this does not protect against
+=== What this doesn't protect against
 
-Hardening raises the cost of static analysis and casual tampering. It does not stop a determined attacker with time, it does not protect a secret you embed in the client (put it on your server -- see the security chapter), and it is not a substitute for server-side authorization. Treat it as one layer of defense in depth, not a guarantee.
+Hardening raises the cost of static analysis and casual tampering. It doesn't stop a determined attacker with time, it doesn't protect a secret you embed in the client (put it on your server -- see the security chapter), and it's not a substitute for server-side authorization. Treat it as one layer of defense in depth, not a guarantee.

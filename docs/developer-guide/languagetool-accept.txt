@@ -634,3 +634,12 @@ BlueZ
 # App Shield chapter (App-Shield.asciidoc). "quickstart" is the product's own
 # name for the backend integration snippets the build console renders.
 [Qq]uickstarts?
+
+# -----------------------------------------------------------------------------
+# App Hardening (Enterprise) terminology.
+# -----------------------------------------------------------------------------
+unhardened
+unretraceable
+[Dd]eobfuscation
+[Mm]inif(y|ies|ied|ier|ication)
+[Rr]etrace(d|s|able)?
