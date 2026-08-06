@@ -289,6 +289,32 @@ class WatchNativeBuilderTest {
                 "CFBundleVersion must not follow the injected marketing version: " + plist);
     }
 
+    /// A standalone bundle has to declare itself watch-only; omitting the companion key is not the
+    /// same statement, and the difference shows up at install and App Store validation.
+    @Test
+    void standaloneWatchAppIsMarkedWatchOnly(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("watchStandalone", "true");
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("<key>WKWatchOnly</key>"),
+                "a standalone watch app must declare WKWatchOnly: " + plist);
+        assertFalse(plist.contains("WKCompanionAppBundleIdentifier"),
+                "a standalone watch app must not name a companion: " + plist);
+    }
+
+    /// And the companion build must NOT claim to be watch-only.
+    @Test
+    void companionWatchAppIsNotWatchOnly(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        String plist = writeInfoPlist(req, tmp);
+        assertFalse(plist.contains("<key>WKWatchOnly</key>"),
+                "a companion watch app must not declare WKWatchOnly: " + plist);
+        assertTrue(plist.contains("WKCompanionAppBundleIdentifier"),
+                "a companion watch app must name its container: " + plist);
+    }
+
     private static WatchNativeBuilder parse(BuildRequest req) {
         WatchNativeBuilder b = new WatchNativeBuilder(new IPhoneBuilder());
         b.parseHints(req);

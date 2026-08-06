@@ -492,7 +492,12 @@ class WatchNativeBuilder {
                 : request.getArg("ios.bundleVersion", shortVersion(request)));
         // Modern single-target watch app marker.
         sb.append("    <key>WKApplication</key>\n    <true/>\n");
-        if (!isStandalone()) {
+        if (isStandalone()) {
+            // A standalone bundle must SAY it is watch-only, not merely omit the companion key.
+            // Without WKWatchOnly the bundle is neither tied to a containing iOS app nor declared
+            // independent, which installs unpredictably and can fail App Store validation.
+            sb.append("    <key>WKWatchOnly</key>\n    <true/>\n");
+        } else {
             plistString(sb, "WKCompanionAppBundleIdentifier", request.getPackageName());
         }
         // HealthKit privacy strings. The watch slice has its own Info.plist and
