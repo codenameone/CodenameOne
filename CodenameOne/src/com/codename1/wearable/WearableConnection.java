@@ -48,9 +48,12 @@ import java.util.Map;
 /// registered -- including the one that made the platform launch your app -- is queued and replayed,
 /// but only to a listener that exists by the time the EDT gets to it.
 ///
-/// When there is nothing on the other end, [#isSupported()] returns false and every call here is an
-/// inert no-op, so this API needs no platform conditionals around it. See the package documentation
-/// for how to choose between a message, replicated data and a file transfer.
+/// Where the platform provides no wearable link at all, [#isSupported()] returns false and every
+/// call here is an inert no-op, so this API needs no platform conditionals around it. Note what
+/// that method does NOT tell you: an iPhone with no watch paired to it still reports true, because
+/// the question is whether the API exists. Gate wearable UI on [#isPaired()] or [#isReachable()].
+/// See the package documentation for how to choose between a message, replicated data and a file
+/// transfer.
 public final class WearableConnection {
     private static final List<WearableMessageListener> messageListeners =
             new ArrayList<WearableMessageListener>();

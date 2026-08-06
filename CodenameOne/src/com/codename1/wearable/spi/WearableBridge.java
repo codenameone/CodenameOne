@@ -40,13 +40,20 @@ package com.codename1.wearable.spi;
 /// `notifyStateChanged`), which take care of EDT dispatch and of queueing across a cold start.
 public interface WearableBridge {
 
-    /// Returns true when this device can talk to a counterpart at all -- the transport exists and
-    /// the app is allowed to use it. False on a platform with no wearable link, which makes the
-    /// whole public API inert.
+    /// Returns true when the PLATFORM provides the transport and this app may use it -- not whether
+    /// a counterpart device exists.
+    ///
+    /// An implementation should answer for the API, not for the pairing: Apple's bridge reports
+    /// `WCSession` availability whether or not a watch is paired, and an implementation that folded
+    /// pairing into this answer would make the whole public API inert on a phone whose watch merely
+    /// happens to be unpaired right now. Pairing is [#isPaired()]'s question and reachability is
+    /// [#isReachable()]'s.
+    ///
+    /// False makes the whole public API inert, so return false only when there is no transport.
     ///
     /// #### Returns
     ///
-    /// true if the wearable transport is available
+    /// true if the platform's wearable transport is available to this app
     boolean isSupported();
 
     /// Returns true when a counterpart device is paired with this one, whether or not it is
