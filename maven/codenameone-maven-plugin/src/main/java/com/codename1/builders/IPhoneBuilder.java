@@ -135,14 +135,37 @@ public class IPhoneBuilder extends Executor {
     /// them the generated factory can actually construct.
     private final HealthListenerScan healthScan = new HealthListenerScan();
 
-    /// Whether the scan found real health data access on the phone.
+    /// Whether this project uses HealthKit -- scanner-detected calls, or a capability the project
+    /// asked for explicitly.
     ///
-    /// The watch builder asks, because the phone's privacy strings are not evidence of use: a
-    /// project can retain an `ios.NSHealth*UsageDescription` hint long after the code that needed
-    /// it is gone, and entitling the watch on that basis fails codesigning against an App ID with
-    /// no HealthKit capability.
-    boolean phoneUsesHealthData() {
-        return usesHealthRead || usesHealthWrite || usesHealthWorkout;
+    /// The privacy strings are deliberately NOT evidence: a project can retain an
+    /// `ios.NSHealth*UsageDescription` hint long after the code that needed it is gone, and
+    /// entitling on that basis fails codesigning against an App ID with no HealthKit capability.
+    /// The capability hints ARE evidence, because asking for background delivery or recalibrated
+    /// estimates is asking for HealthKit -- and they are how a project whose health access lives in
+    /// native code declares it at all, where the bytecode scan sees nothing.
+    ///
+    /// This is what both the phone entitlement decision and the watch target's
+    /// CODE_SIGN_ENTITLEMENTS read, so the two slices of one app cannot disagree about whether the
+    /// app uses HealthKit.
+    boolean phoneUsesHealthData(BuildRequest request) {
+        return usesHealthRead || usesHealthWrite || usesHealthWorkout
+                || healthCapabilityRequested(request, "ios.health.backgroundDelivery",
+                        "background-delivery")
+                || healthCapabilityRequested(request, "ios.health.recalibrateEstimates",
+                        "recalibrate-estimates");
+    }
+
+    /// A HealthKit sub-capability requested under either spelling: the short alias, or the
+    /// canonical entitlement key written out in full. The generic renderer emits whatever is in the
+    /// `ios.entitlements.*` namespace, so a project that used the long spelling got its
+    /// sub-capability emitted while a gate reading only the aliases left the parent entitlement
+    /// off -- the unsignable set the aliases exist to avoid, reached by the other spelling.
+    private static boolean healthCapabilityRequested(BuildRequest request, String alias,
+            String suffix) {
+        return "true".equalsIgnoreCase(request.getArg(alias, "false"))
+                || "true".equalsIgnoreCase(request.getArg(
+                        "ios.entitlements.com.apple.developer.healthkit." + suffix, "false"));
     }
 
     private boolean usesHealthRead;
@@ -3000,20 +3023,11 @@ public class IPhoneBuilder extends Executor {
                 // com.apple.developer.healthkit off. That is the same
                 // unsignable entitlement set the aliases were fixed to
                 // avoid, reachable by the other spelling.
-                boolean entitleHealthKit = usesHealthRead || usesHealthWrite
-                        || usesHealthWorkout
-                        || "true".equalsIgnoreCase(request.getArg(
-                                "ios.health.backgroundDelivery", "false"))
-                        || "true".equalsIgnoreCase(request.getArg(
-                                "ios.health.recalibrateEstimates", "false"))
-                        || "true".equalsIgnoreCase(request.getArg(
-                                "ios.entitlements.com.apple.developer"
-                                        + ".healthkit.background-delivery",
-                                "false"))
-                        || "true".equalsIgnoreCase(request.getArg(
-                                "ios.entitlements.com.apple.developer"
-                                        + ".healthkit.recalibrate-estimates",
-                                "false"));
+                // The one expression, shared with the watch builder. Two copies of it came apart
+                // once already: the watch read the scanner flags alone, so a project whose health
+                // access is in native code -- declared only through the capability hints -- got an
+                // entitled phone and an unentitled watch.
+                boolean entitleHealthKit = phoneUsesHealthData(request);
                 String healthKitEntitlement = request.getArg(
                         "ios.entitlements.com.apple.developer.healthkit",
                         null);

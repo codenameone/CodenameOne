@@ -644,7 +644,8 @@ class WatchNativeBuilder {
         for (String injectedKey : injectedPlistKeys(request)) {
             if (injectedKey.startsWith("NS") && injectedKey.endsWith("UsageDescription")) {
                 String description = injectedPlistString(request, injectedKey);
-                if (description != null && description.length() > 0) {
+                if (description != null && description.length() > 0
+                        && !isPurposeStringOptOut(description)) {
                     purposeStrings.put(injectedKey, description);
                 }
             }
@@ -652,7 +653,7 @@ class WatchNativeBuilder {
         for (String arg : request.getArgs()) {
             if (arg.startsWith("ios.NS") && arg.endsWith("UsageDescription")) {
                 String description = trimToNull(request.getArg(arg, null));
-                if (description != null) {
+                if (description != null && !isPurposeStringOptOut(description)) {
                     purposeStrings.put(arg.substring(arg.lastIndexOf('.') + 1), description);
                 }
             }
@@ -707,7 +708,7 @@ class WatchNativeBuilder {
         // touches HealthKit -- which then failed codesigning against an App ID without the
         // capability, with nothing in the output to say why. Same rule, same accessor, as the
         // BuildDaemon mirror: a cloud build and a local build must reach the same verdict.
-        boolean watchHealth = watchUsesHealth(owner.phoneUsesHealthData());
+        boolean watchHealth = watchUsesHealth(owner.phoneUsesHealthData(request));
         boolean workoutProcessing =
                 "true".equalsIgnoreCase(workoutProcessingHint);
         if (needsPurposeString(watchHealth, healthShare, healthUpdate,
@@ -896,13 +897,23 @@ class WatchNativeBuilder {
         // ios.NSHealth* here while the plist pass read the merged purpose strings meant a
         // description supplied through ios.plistInject produced a bundle that declared HealthKit
         // and was signed without the entitlement, so authorization failed on device.
-        boolean phoneUsesHealth = owner.phoneUsesHealthData();
+        boolean phoneUsesHealth = owner.phoneUsesHealthData(request);
         if (!watchUsesHealth(phoneUsesHealth)) {
             return "";
         }
         return "  bs['CODE_SIGN_ENTITLEMENTS'] = '"
                 + IPhoneBuilder.escapeRubyStr(mainClass + "-src/" + mainClass
                         + "-Watch.entitlements") + "'\n";
+    }
+
+    /// The established opt-out for a privacy hint: the phone's generic injector skips a usage
+    /// description whose value is exactly {@code false}, so a project suppresses a key the builder
+    /// would otherwise supply by setting it to that. Carried over verbatim, because the watch
+    /// treating it as an ordinary description put the literal word "false" in front of the user in
+    /// a watchOS permission prompt -- and in the HealthKit case that string is also what the
+    /// entitlement validation reads.
+    private static boolean isPurposeStringOptOut(String description) {
+        return "false".equals(description);
     }
 
     private static void plistString(StringBuilder sb, String key, String value) {

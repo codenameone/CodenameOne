@@ -504,6 +504,62 @@ class WatchNativeBuilderTest {
                 "declared health usage must sign the watch target with the entitlements file");
     }
 
+    /// A project whose health access lives in native code declares it through the capability
+    /// hints, not through anything the bytecode scan can see. The phone builder has always treated
+    /// those hints as HealthKit use; when the watch read the scanner flags alone the same app --
+    /// running the SAME lifecycle class on both slices -- got an entitled phone and an unentitled
+    /// watch, and only the watch failed authorization.
+    @Test
+    void explicitHealthCapabilitiesEntitleTheSharedLifecycleWatchToo() {
+        for (String hint : new String[] {
+                "ios.health.backgroundDelivery",
+                "ios.health.recalibrateEstimates",
+                "ios.entitlements.com.apple.developer.healthkit.background-delivery",
+                "ios.entitlements.com.apple.developer.healthkit.recalibrate-estimates"}) {
+            BuildRequest req = request();
+            req.putArgument("watchMain", "com.mycompany.myapp.MyApp");
+            req.putArgument(hint, "true");
+            assertTrue(parse(req).watchEntitlementsSetting(req, req.getMainClass())
+                            .contains("CODE_SIGN_ENTITLEMENTS"),
+                    hint + " must entitle the watch target as it does the phone");
+
+            // A watch with its OWN root shakes from that root, so the phone's usage says nothing
+            // about it -- entitling it anyway fails codesigning for an ordinary watch app whose
+            // App ID has no HealthKit capability. Unchanged by this fix, and worth pinning next
+            // to it so the two rules are not confused for each other.
+            BuildRequest distinct = request();
+            distinct.putArgument("watchMain", WATCH_MAIN);
+            distinct.putArgument(hint, "true");
+            assertEquals("",
+                    parse(distinct).watchEntitlementsSetting(distinct, distinct.getMainClass()),
+                    hint + " must not entitle a watch app with its own lifecycle class");
+        }
+        BuildRequest none = request();
+        none.putArgument("watchMain", "com.mycompany.myapp.MyApp");
+        assertEquals("", parse(none).watchEntitlementsSetting(none, none.getMainClass()),
+                "a project that asks for nothing is still not entitled");
+    }
+
+    /// "false" is the established opt-out for a privacy hint -- the phone's generic injector skips
+    /// a usage description with exactly that value. The watch treated it as an ordinary string and
+    /// would have shown the literal word in a watchOS permission prompt.
+    @Test
+    void falseSuppressesAPurposeStringAsItDoesOnThePhone(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.NSMicrophoneUsageDescription", "false");
+        req.putArgument("ios.plistInject", "<key>NSCameraUsageDescription</key><string>false</string>"
+                + "<key>NSMotionUsageDescription</key><string>Counts your steps</string>");
+        String plist = writeInfoPlist(req, tmp);
+        assertFalse(plist.contains("NSMicrophoneUsageDescription"),
+                "an opted-out argument must not reach the watch plist: " + plist);
+        assertFalse(plist.contains("NSCameraUsageDescription"),
+                "an opted-out injected key must not reach the watch plist: " + plist);
+        assertFalse(plist.contains("<string>false</string>"), plist);
+        assertTrue(plist.contains("Counts your steps"),
+                "an ordinary description is unaffected: " + plist);
+    }
+
     private static int countOccurrences(String haystack, String needle) {
         int n = 0;
         for (int i = haystack.indexOf(needle); i >= 0; i = haystack.indexOf(needle, i + 1)) {
