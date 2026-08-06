@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.ios;
 
+import com.codename1.wearable.WearableConnection;
 import com.codename1.wearable.spi.WearableBridge;
 
 /// Apple `WearableBridge`, backing `com.codename1.wearable` with `WCSession`.
@@ -43,8 +44,19 @@ import com.codename1.wearable.spi.WearableBridge;
 final class IOSWearableBridge implements WearableBridge {
     private final IOSNative nativeInstance;
 
-    IOSWearableBridge(IOSNative nativeInstance) {
+    IOSWearableBridge(final IOSNative nativeInstance) {
         this.nativeInstance = nativeInstance;
+        // What to do when the pending-delivery cap discards one of our callbacks: forget that the
+        // path's value was received. WatchConnectivity replaces the whole context on every publish,
+        // so the entry is otherwise treated as unchanged forever and the app never sees it -- there
+        // is no per-path redelivery to fall back on. Forgetting makes the next context update look
+        // new. Runs after the drain, so the re-offer meets a listener.
+        WearableConnection.setDroppedDeliveryHandler(
+                new WearableConnection.DroppedDeliveryHandler() {
+                    public void deliveryDropped(String path) {
+                        nativeInstance.wearableForgetReceived(path);
+                    }
+                });
     }
 
     public boolean isSupported() {

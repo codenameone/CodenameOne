@@ -1204,6 +1204,10 @@ public final class IOSNative {
     /// Re-offers everything still parked in the durable inbox. Called once a data listener exists.
     native void wearableReplayInbox();
 
+    /// Forgets that a path's value was received, so the next context update delivers it again.
+    /// Used to recover a delivery the pending-delivery cap discarded.
+    native void wearableForgetReceived(String path);
+
     // --- Secure storage (Security.framework keychain) -----------------------
 
     /** Sets the kSecAttrAccessGroup applied to subsequent keychain operations. {@code null} clears. */

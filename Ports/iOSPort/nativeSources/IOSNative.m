@@ -15190,6 +15190,15 @@ void com_codename1_impl_ios_IOSNative_wearableReplayInbox__(CN1_THREAD_STATE_MUL
     POOL_END();
 }
 
+void com_codename1_impl_ios_IOSNative_wearableForgetReceived___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
+    if (path == JAVA_NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    cn1_wearable_forgetReceived([toNSString(CN1_THREAD_GET_STATE_PASS_ARG path) UTF8String]);
+    POOL_END();
+}
+
 void cn1_wearable_deliverDataRemoved(const char *path) {
     JAVA_OBJECT jPath = path == NULL ? JAVA_NULL : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [NSString stringWithUTF8String:path]);
     com_codename1_impl_ios_IOSWearableCallbacks_nativeDataRemoved___java_lang_String(
@@ -15355,6 +15364,8 @@ void cn1_wearable_releaseInbox(const char *inboxToken) {
 }
 void cn1_wearable_replayInbox(void) {
 }
+void cn1_wearable_forgetReceived(const char *path) {
+}
 void cn1_wearable_deliverDataRemoved(const char *path) {
 }
 void cn1_wearable_notifyStateChanged(void) {
@@ -15399,6 +15410,8 @@ void com_codename1_impl_ios_IOSNative_wearableConfirmInbox___java_lang_String(CN
 void com_codename1_impl_ios_IOSNative_wearableReleaseInbox___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT token) {
 }
 void com_codename1_impl_ios_IOSNative_wearableReplayInbox__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+void com_codename1_impl_ios_IOSNative_wearableForgetReceived___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
 }
 
 #endif // CN1_USE_WATCHCONNECTIVITY

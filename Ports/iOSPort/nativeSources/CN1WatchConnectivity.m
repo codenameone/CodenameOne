@@ -303,6 +303,26 @@ void cn1_wearable_replayInbox(void) {
     cn1WearableDrainInbox();
 }
 
+/// Forgets that a path's current value was received, so the next whole-context update delivers it
+/// again.
+///
+/// For a delivery the pending-delivery cap had to discard: the entry is already recorded in
+/// _lastReceived, so every later context replace treats it as unchanged and the app never sees it.
+/// Dropping the record makes the very next update look new.
+void cn1_wearable_forgetReceived(const char *path) {
+    if (path == NULL) {
+        return;
+    }
+    NSString *p = [NSString stringWithUTF8String:path];
+    CN1WatchConnectivity *shared = [CN1WatchConnectivity shared];
+    if (shared == nil || p.length == 0) {
+        return;
+    }
+    @synchronized (shared) {
+        [shared forgetReceivedPath:p];
+    }
+}
+
 /// Retires a delivered inbox entry.
 ///
 /// Invoked from Java on the EDT after the payload has been handed to the application, which is the
@@ -884,6 +904,11 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     [ctx release];
 }
 
+/// Drops a path's received marker; see cn1_wearable_forgetReceived.
+- (void)forgetReceivedPath:(NSString *)path {
+    [_lastReceived removeObjectForKey:path];
+}
+
 /// Prunes without publishing anything else, for the scheduled sweep, on activation, and whenever
 /// the peer's context arrives.
 ///
@@ -1206,6 +1231,17 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
             if (acknowledged) {
                 NSError *ackErr = nil;
                 [session updateApplicationContext:mineCtx error:&ackErr];
+                if (ackErr != nil) {
+                    // The acknowledgement did NOT go out, so our stale value is still in the
+                    // context and the peer must keep its tombstone. Recording the tombstone as
+                    // announced anyway would send every later context update down the
+                    // unchanged-sentinel branch, so this path would never be acknowledged again and
+                    // the peer would hold that tombstone for good. Forget the marks instead: the
+                    // next context update re-runs the acknowledgement.
+                    for (NSString *path in acknowledge) {
+                        [seen removeObjectForKey:path];
+                    }
+                }
             }
             [mineCtx release];
         }

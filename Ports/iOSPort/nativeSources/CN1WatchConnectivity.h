@@ -88,6 +88,9 @@
 /// Queues a file transfer to the peer.
 - (void)transferFile:(NSString *)path name:(NSString *)name contents:(NSData *)contents;
 
+/// Drops a path's received marker so the next whole-context update delivers it again.
+- (void)forgetReceivedPath:(NSString *)path;
+
 @end
 
 #endif // CN1_USE_WATCHCONNECTIVITY
@@ -109,6 +112,8 @@ void cn1_wearable_confirmInbox(const char *inboxToken);
 void cn1_wearable_releaseInbox(const char *inboxToken);
 /// Re-offers everything still parked in the inbox. Called once a listener exists.
 void cn1_wearable_replayInbox(void);
+/// Forgets that a path's value was received, so the next context update delivers it again.
+void cn1_wearable_forgetReceived(const char *path);
 void cn1_wearable_deliverDataRemoved(const char *path);
 void cn1_wearable_notifyStateChanged(void);
 

@@ -826,7 +826,18 @@ public final class WearableConnection {
     }
 
     /// Paths whose parked delivery was discarded and not superseded, awaiting the drain.
-    private static final List<String> droppedPaths = new ArrayList<String>();
+    ///
+    /// A SET, and bounded like every other cache here. Recovery is per path, so a path repeated
+    /// adds nothing, and an app that never registers a listener while the peer churns through
+    /// paths would otherwise grow this list without limit -- defeating the cap it exists to serve.
+    /// Past the bound the oldest entry goes: the port's own startup replay remains the backstop for
+    /// anything that falls off, which is the same guarantee as before this list existed.
+    private static final java.util.Set<String> droppedPaths =
+            java.util.Collections.newSetFromMap(new java.util.LinkedHashMap<String, Boolean>() {
+                protected boolean removeEldestEntry(java.util.Map.Entry<String, Boolean> eldest) {
+                    return size() > MAX_PENDING;
+                }
+            });
 
     /// Actions a port asked to run once deliveries can actually reach a listener, keyed so repeated
     /// requests for the same operation collapse into one.
@@ -870,7 +881,10 @@ public final class WearableConnection {
         List<Runnable> replays = null;
         List<String> dropped = null;
         synchronized (queue) {
-            if (queue == pendingData && !droppedPaths.isEmpty()) {
+            // Only taken when a port can actually act on them. Clearing the set with no handler
+            // registered would discard the one record that a path needs re-offering -- and iOS,
+            // which registers late in its bridge's construction, would lose whatever arrived first.
+            if (queue == pendingData && droppedDeliveries != null && !droppedPaths.isEmpty()) {
                 dropped = new ArrayList<String>(droppedPaths);
                 droppedPaths.clear();
             }

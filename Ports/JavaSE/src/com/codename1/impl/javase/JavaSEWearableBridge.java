@@ -226,7 +226,17 @@ class JavaSEWearableBridge implements WearableBridge {
         // first leaves only a window in which neither exists, and the next scan finds the value:
         // every observable ordering converges on the replacement.
         File tomb = new File(dataDir, encodePath(path) + TOMB_SUFFIX);
-        boolean hadTombstone = tomb.delete();
+        boolean hadTombstone = tomb.isFile();
+        if (hadTombstone && !tomb.delete()) {
+            // A delete that FAILED is not the same as a tombstone that was not there, and the
+            // previous boolean could not tell them apart. Publishing anyway would leave both
+            // records durable, and a peer scanning them in the order listFiles() happens to give
+            // could deliver the tombstone last and settle in the removed state while getData
+            // returns live data -- permanently, since neither record changes again.
+            com.codename1.io.Log.p("Wearable simulator: could not clear the tombstone for " + path
+                    + "; not publishing over it");
+            return;
+        }
         if (hadTombstone) {
             synchronized (seenData) {
                 seenData.remove(tomb.getName());
