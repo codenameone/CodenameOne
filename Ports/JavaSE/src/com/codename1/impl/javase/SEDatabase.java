@@ -369,6 +369,10 @@ public class SEDatabase extends Database {
         PreparedStatement s = null;
         try {
             s = conn.prepareStatement(sql);
+            // The driver would report unbound parameters itself, but with its own wording. Going
+            // through the same check keeps the message identical to the other overloads and to
+            // the other ports.
+            checkParameterCount(s, 0);
             ResultSet resultSet = s.executeQuery();
             SECursor cursor = new SECursor(this, s, resultSet);
             registerCursor(cursor);
