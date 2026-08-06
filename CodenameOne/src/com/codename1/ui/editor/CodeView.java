@@ -137,14 +137,28 @@ public class CodeView extends EditorView {
             clampedStart = clampedEnd;
             clampedEnd = swap;
         }
-        if (isProtectedEdit(clampedStart, clampedEnd)) {
-            // Tell the host rather than dropping the edit in silence. A protected region covering
-            // most of the document is indistinguishable from an editor that ignores the keyboard,
-            // so the application needs the chance to explain why nothing happened.
-            host().fireEditorEvent("protectedEdit", String.valueOf(clampedStart));
+        if (!isEditAllowed(clampedStart, clampedEnd)) {
             return;
         }
         super.replaceRange(clampedStart, clampedEnd, text, record);
+    }
+
+    /// Refuses edits that fall inside a protected region, whichever path they arrive through.
+    /// Input method composition writes to the document directly rather than through
+    /// `#replaceRange(int, int, String, boolean)`, so checking only there let a composing keyboard
+    /// insert provisional text into generated source that is meant to be read only.
+    @Override
+    protected boolean isEditAllowed(int start, int end) {
+        int from = Math.min(start, end);
+        int to = Math.max(start, end);
+        if (!isProtectedEdit(from, to)) {
+            return true;
+        }
+        // Tell the host rather than dropping the edit in silence. A protected region covering
+        // most of the document is indistinguishable from an editor that ignores the keyboard,
+        // so the application needs the chance to explain why nothing happened.
+        host().fireEditorEvent("protectedEdit", String.valueOf(from));
+        return false;
     }
 
     private boolean isProtectedEdit(int start, int end) {
@@ -162,7 +176,10 @@ public class CodeView extends EditorView {
                     protectedStart + protectedStartMarker.length());
             int protectedEnd = endMarker < 0
                     ? source.length() : endMarker + protectedEndMarker.length();
-            if ((start == end && start >= protectedStart && start <= protectedEnd)
+            // protectedEnd is the offset just past the end marker, so a caret sitting exactly there
+            // is already outside the block. Treating it as protected made the first character after
+            // a generated region impossible to type.
+            if ((start == end && start >= protectedStart && start < protectedEnd)
                     || (start < protectedEnd && end > protectedStart)) {
                 return true;
             }

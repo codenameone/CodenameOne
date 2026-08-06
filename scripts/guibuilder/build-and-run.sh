@@ -47,8 +47,11 @@ cd "$REPO_ROOT/maven"
 # stale ones, which is how fixes kept reaching the tests but not the running editor. Remove the
 # output directory outright.
 rm -rf core/target factory/target css-compiler/target
+# Offline: an online build resolves codenameone-core / codenameone-javase from the remote snapshot
+# repository and installs it over the jar just built here, which is how the editor kept running
+# without changes that had demonstrably compiled.
 JAVA_HOME="$JDK8" PATH="$JDK8/bin:$PATH" \
-  mvn -q -Dmaven.repo.local="$LOCAL_REPO" -pl factory,core,css-compiler \
+  mvn -q -o -Dmaven.repo.local="$LOCAL_REPO" -pl factory,core,css-compiler \
     -DskipTests -Dmaven.javadoc.skip=true clean install
 # mvn install has repeatedly reported success while leaving the previous jar in place, so the
 # freshly built artifacts are copied over it explicitly. Trusting install is what made fixes compile
@@ -71,19 +74,34 @@ JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/editor/EditorView.class" "
 
 echo "==> javase port (JDK 8)"
 JAVA_HOME="$JDK8" PATH="$JDK8/bin:$PATH" \
-  mvn -q -Dcn1.binaries="$REPO_ROOT/maven/target/cn1-binaries" -Dmaven.repo.local="$LOCAL_REPO" \
+  mvn -q -o -Dcn1.binaries="$REPO_ROOT/maven/target/cn1-binaries" -Dmaven.repo.local="$LOCAL_REPO" \
     -pl javase -DskipTests -Dmaven.javadoc.skip=true clean install
+# The port is copied over the installed artifact for the same reason core is, with one addition:
+# an unrelated build in this repository has resolved codenameone-javase from a remote snapshot and
+# installed it over the local one, after which Display.init returns a null implementation and every
+# test in the suite fails at once. Run other Maven commands against this repository offline (-o).
+for jar in "$REPO_ROOT/maven/javase/target/"*.jar; do
+  [ -e "$jar" ] || continue
+  case "$jar" in *-sources.jar|*-javadoc.jar|*jar-with-dependencies.jar) continue;; esac
+  dest="$LOCAL_REPO/com/codenameone/codenameone-javase/8.0-SNAPSHOT/$(basename "$jar")"
+  [ -e "$dest" ] && cp -f "$jar" "$dest"
+done
+
+# Checked again after the port build: that build resolves core as a dependency and has replaced the
+# installed jar with a remote snapshot, undoing everything verified above.
+JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/CodeEditor.class" "setCursorPosition"
+JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/Form.class" "focusedHandlesInput"
 
 cd "$REPO_ROOT/scripts/guibuilder"
 if [ "$run_tests" = "1" ]; then
   echo "==> tests (JDK 21)"
   JAVA_HOME="$JDK21" PATH="$JDK21/bin:$PATH" \
-    mvn -nsu -Dmaven.repo.local="$LOCAL_REPO" -pl javase -am test -Dcodename1.platform=javase
+    mvn -nsu -o -Dmaven.repo.local="$LOCAL_REPO" -pl javase -am test -Dcodename1.platform=javase
 fi
 
 echo "==> package (JDK 21)"
 JAVA_HOME="$JDK21" PATH="$JDK21/bin:$PATH" \
-  mvn -nsu -q -Dmaven.repo.local="$LOCAL_REPO" -pl javase -am -Pexecutable-jar package \
+  mvn -nsu -o -q -Dmaven.repo.local="$LOCAL_REPO" -pl javase -am -Pexecutable-jar package \
     -Dcodename1.platform=javase -Dmaven.test.skip=true
 
 if [ "$launch" = "0" ]; then

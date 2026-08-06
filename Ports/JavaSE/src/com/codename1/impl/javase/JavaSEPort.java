@@ -3506,6 +3506,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 ignorePressedKeys.add(e.getKeyCode());
                 return;
             }
+            // This press was not blocked, so any record left over from an earlier blocked press of
+            // the same key is stale: the platform swallowed that release (a system shortcut such as
+            // Cmd+P on macOS does exactly that) and the record would otherwise eat this key's
+            // release forever, which looks like one letter of the alphabet no longer existing.
+            ignorePressedKeys.remove(e.getKeyCode());
             if (editorFocused && !editorHandlesKey(e)) {
                 return;
             }
@@ -3526,15 +3531,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void keyReleased(KeyEvent e) {
+            // A blocked press records its key so the matching release is dropped too. The record is
+            // honoured whatever modifiers this release reports: releasing Ctrl before P leaves a
+            // bare P release, and Codename One enters characters on release, so trusting the
+            // modifiers here typed the shortcut's letter into the focused field. Stale records are
+            // cleared by the next unblocked press of the same key instead.
             boolean ignore = ignorePressedKeys.remove(e.getKeyCode());
-            // A blocked press records its key so the matching release is dropped too. When the
-            // platform never delivers that release -- a system shortcut such as Cmd+P on macOS
-            // consumes it -- the entry goes stale and silently eats that key from then on, which
-            // looks like one letter of the alphabet no longer existing. Honour the record only
-            // while this release still carries the modifiers that caused the press to be blocked.
-            if (ignore && !(e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown())) {
-                ignore = false;
-            }
             if (!isEnabled()) {
                 return;
             }

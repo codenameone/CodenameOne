@@ -301,9 +301,10 @@ public final class ComponentPreviewFactory {
         return natural;
     }
 
+    /** See CodenameOneGUIBuilder#value: an emptied attribute is a value, not a missing one. */
     private static String value(Element element, String name, String fallback) {
         String value = element.getAttribute(name);
-        return value == null || value.length() == 0 ? fallback : value;
+        return value == null ? fallback : value;
     }
 
     private static boolean supportsInlineContent(String type) {
@@ -318,11 +319,22 @@ public final class ComponentPreviewFactory {
         component.setRTL("true".equals(value(element, "rtl", "false")));
         if (component instanceof Label label) {
             label.setGap(integer(element, "gap", label.getGap()));
-            label.setAlignment(alignment(value(element, "alignment", "left")));
             label.setTickerEnabled("true".equals(value(element, "tickerEnabled", "false")));
+        } else if (component instanceof SpanLabel span) {
+            // SpanLabel is a Container rather than a Label, so the inspector's gap silently did
+            // nothing here while the generated source was free to set it.
+            span.setGap(integer(element, "gap", span.getGap()));
+        }
+        // Applied only when the document carries it: the generated source emits nothing for an
+        // absent attribute, and forcing LEFT here would make the preview disagree with a themed
+        // alignment. Labels and text inputs are the components that own the setter.
+        if (element.getAttribute("alignment") != null) {
+            if (component instanceof Label label) label.setAlignment(alignment(element.getAttribute("alignment")));
+            else if (component instanceof TextArea area) area.setAlignment(alignment(element.getAttribute("alignment")));
         }
         if (component instanceof Button button) button.setToggle("true".equals(value(element, "toggle", "false")));
         if (component instanceof CheckBox check) check.setSelected("true".equals(value(element, "selected", "false")));
+        else if (component instanceof RadioButton radio) radio.setSelected("true".equals(value(element, "selected", "false")));
         if (component instanceof TextArea area) {
             area.setColumns(integer(element, "columns", area.getColumns()));
             area.setRows(integer(element, "rows", area.getRows()));

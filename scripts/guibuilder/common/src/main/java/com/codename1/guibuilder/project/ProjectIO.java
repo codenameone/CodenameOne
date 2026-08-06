@@ -82,16 +82,47 @@ public final class ProjectIO {
         return path != null && FileSystemStorage.getInstance().exists(fsUrl(path));
     }
 
+    /**
+     * Writes through a sibling temporary file so a failed write cannot destroy the previous
+     * content. Opening the target directly truncates it before the first byte arrives, which turns
+     * a full disk or a killed process into an empty form, stylesheet or source file.
+     */
     public static void write(String path, String content) throws IOException {
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        String url = fsUrl(path);
+        ensureParent(url);
+        String temporary = url + ".cn1tmp";
         OutputStream out = null;
         try {
-            String url = fsUrl(path);
-            ensureParent(url);
-            out = FileSystemStorage.getInstance().openOutputStream(url);
+            out = fs.openOutputStream(temporary);
             out.write(content.getBytes("UTF-8"));
+            out.close();
+            out = null;
+        } catch (IOException ex) {
+            Util.cleanup(out);
+            fs.delete(temporary);
+            throw ex;
         } finally {
             Util.cleanup(out);
         }
+        if (!fs.exists(temporary)) {
+            throw new IOException("Failed to write " + path);
+        }
+        // rename() cannot replace an existing file on every platform, so the target is removed
+        // first. The window this opens is one rename wide and only after the new content is
+        // safely on disk, where the truncating write left it open for the whole serialization.
+        if (fs.exists(url)) {
+            fs.delete(url);
+        }
+        fs.rename(temporary, fileName(url));
+        if (!fs.exists(url)) {
+            throw new IOException("Failed to replace " + path + " with the file just written");
+        }
+    }
+
+    private static String fileName(String url) {
+        int slash = url.lastIndexOf('/');
+        return slash < 0 ? url : url.substring(slash + 1);
     }
 
     private static void ensureParent(String path) {
@@ -104,8 +135,17 @@ public final class ProjectIO {
         fs.mkdir(parent);
     }
 
+    /**
+     * Normalizes to forward slashes before building the URL. The Maven plugin hands this editor
+     * native paths, so on Windows every path arrives with backslashes; leaving them in place makes
+     * the separator arithmetic in {@code ensureParent} and {@code fileName} silently find nothing.
+     * A drive-lettered path becomes {@code file://C:/...}, which the JavaSE port maps back to
+     * {@code C:\...}.
+     */
     public static String fsUrl(String path) {
-        if (path == null || path.startsWith("file://") || path.indexOf("://") > 0) return path;
-        return "file://" + path;
+        if (path == null) return null;
+        String normalized = path.replace('\\', '/');
+        if (normalized.startsWith("file://") || normalized.indexOf("://") > 0) return normalized;
+        return "file://" + normalized;
     }
 }

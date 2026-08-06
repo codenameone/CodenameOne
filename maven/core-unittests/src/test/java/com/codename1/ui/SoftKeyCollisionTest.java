@@ -41,10 +41,18 @@ class SoftKeyCollisionTest extends UITestBase {
     private static final class RecordingInput extends Component {
         final StringBuilder typed = new StringBuilder();
 
+        boolean editsText = true;
+
         RecordingInput() {
             setFocusable(true);
-            // Declares that this component owns the keyboard, exactly as the text editors do.
+            // Lists and editable sliders set this too, which is why it alone must not divert soft keys.
             setHandlesInput(true);
+        }
+
+        /** Declares that key codes reaching this component are text, exactly as the editors do. */
+        @Override
+        protected boolean consumesRawTextInput() {
+            return editsText;
         }
 
         @Override
@@ -92,11 +100,35 @@ class SoftKeyCollisionTest extends UITestBase {
             RecordingInput input = showFocusedInput();
             // Hand the keyboard back: the component no longer claims raw input.
             input.setHandlesInput(false);
+            input.editsText = false;
 
             input.getComponentForm().keyReleased(LOWERCASE_P);
 
             assertEquals("", input.typed.toString(),
                     "soft key handling must still take precedence for components that do not edit text");
+        } finally {
+            MenuBar.leftSK = previous;
+        }
+    }
+
+    /**
+     * A list in single focus mode, an editable slider and a map all set handlesInput so the focus
+     * manager leaves their arrow keys alone. None of them turn key codes into characters, so a soft
+     * key must still reach the menu bar and fire its command while one of them holds the focus.
+     */
+    @Test
+    void aComponentThatMerelyHandlesInputDoesNotSwallowSoftKeys() {
+        int previous = MenuBar.leftSK;
+        MenuBar.leftSK = LOWERCASE_P;
+        try {
+            RecordingInput input = showFocusedInput();
+            input.editsText = false;
+            assertTrue(input.handlesInput(), "this is the case being guarded against");
+
+            input.getComponentForm().keyReleased(LOWERCASE_P);
+
+            assertEquals("", input.typed.toString(),
+                    "handlesInput alone must not divert a soft key away from the menu bar");
         } finally {
             MenuBar.leftSK = previous;
         }

@@ -2472,7 +2472,9 @@ public class Tabs extends Container {
                                 // A tab can be removed in response to the same pointer gesture
                                 // (e.g. an inspector rebuild).  Its global swipe listener may still
                                 // receive the queued drag after deinitialization.
-                                if (parent != null) parent.clearComponentsAwaitingRelease();
+                                if (parent != null) {
+                                    parent.clearComponentsAwaitingRelease();
+                                }
                             }
                         }
                     }
