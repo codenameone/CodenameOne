@@ -404,6 +404,7 @@ public class JavaScriptBuilder extends Executor {
         PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(f), StandardCharsets.UTF_8));
         try {
             pw.println("import com.codename1.impl.html5.ParparVMBootstrap;");
+            pw.println("import com.codename1.ui.Display;");
             pw.println("import " + packageName + "." + mainClass + ";");
             pw.println();
             pw.println("public final class " + launcherName + " {");
