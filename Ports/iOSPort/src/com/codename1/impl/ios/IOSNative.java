@@ -1192,6 +1192,11 @@ public final class IOSNative {
     /** Queues a background file transfer to the peer. */
     native void wearableTransferFile(String path, String name, byte[] contents);
 
+    /// Retires a durable inbox entry once the payload has reached the application. Delivery of an
+    /// incoming file parks a copy on disk first, and only this call -- made from the EDT after the
+    /// listener has run -- is allowed to discard it.
+    native void wearableConfirmInbox(String token);
+
     // --- Secure storage (Security.framework keychain) -----------------------
 
     /** Sets the kSecAttrAccessGroup applied to subsequent keychain operations. {@code null} clears. */

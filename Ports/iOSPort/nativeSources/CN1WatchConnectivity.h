@@ -97,6 +97,13 @@
 void cn1_wearable_deliverMessage(const char *path, const void *payload, int payloadLength, int replyToken);
 void cn1_wearable_deliverReply(int replyToken, const void *payload, int payloadLength, const char *error);
 void cn1_wearable_deliverDataChanged(const char *path, const void *payload, int payloadLength);
+/// Same delivery, but the inbox entry named by inboxToken is retired only once the EDT has actually
+/// consumed the payload. Renaming at queue time marked a transfer delivered that a process death
+/// could still lose, and the ".done" sweep would then drop it without ever replaying it.
+void cn1_wearable_deliverDataChangedTracked(const char *path, const void *payload, int payloadLength,
+                                            const char *inboxToken);
+/// Retires an inbox entry. Called from Java once the delivery has run on the EDT.
+void cn1_wearable_confirmInbox(const char *inboxToken);
 void cn1_wearable_deliverDataRemoved(const char *path);
 void cn1_wearable_notifyStateChanged(void);
 

@@ -1319,7 +1319,11 @@ public class CN1WearableBridge implements WearableBridge {
                 items.release();
             }
         } catch (Throwable unavailable) {
-            return new String[0];
+            // A transport failure is not an authoritative "no paths". Returning an empty array let
+            // a caller clear valid replicated state on a timeout, the same conflation getData had.
+            // The last successful enumeration is the honest answer.
+            String[] known = pathsCache;
+            return known == null ? new String[0] : known.clone();
         }
     }
 
@@ -1379,6 +1383,16 @@ public class CN1WearableBridge implements WearableBridge {
             lastSweepAt = now;
         }
         final long cutoff = System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;
+        // Also scheduled for when THIS item expires. The immediate sweep cannot include the
+        // transfer just published -- its cutoff predates it -- so an app that sends a final
+        // transfer and then simply keeps running left it published forever, since nothing else
+        // would ever run the sweep. The retention window is a promise about the item, not about
+        // how often the app happens to transfer.
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                expireOwnTransfers();
+            }
+        }, TRANSFER_RETENTION_MILLIS + 1000L);
         transferTimer.schedule(new java.util.TimerTask() {
             public void run() {
                 try {
@@ -2161,7 +2175,12 @@ public class CN1WearableBridge implements WearableBridge {
 
     private static void scheduleWinnerResolution(final Context context, final String path,
             final int attempt) {
-        transferTimer.schedule(new java.util.TimerTask() {
+        // Its OWN timer, not the transfer timer. Deletion chains now run until they resolve, and
+        // each attempt can block for the full Tasks.await timeout -- so a batch of deletions during
+        // an outage would hold the shared timer thread for seconds per round and stall the file
+        // transfer retries that share it. Two independent failure domains should not queue behind
+        // each other.
+        winnerTimer.schedule(new java.util.TimerTask() {
             public void run() {
                 try {
                     // Snapshot BEFORE the query. resolveValue() blocks, and an ordinary callback can
@@ -2239,8 +2258,27 @@ public class CN1WearableBridge implements WearableBridge {
                     scheduleWinnerResolution(context, path, attempt + 1);
                 }
             }
-        }, WINNER_RETRY_MILLIS * attempt);
+        }, winnerDelay(attempt));
     }
+
+    /// One daemon timer for deferred winner resolution, separate from the transfer retries.
+    private static final java.util.Timer winnerTimer =
+            new java.util.Timer("cn1-wearable-resolve", true);
+
+    /**
+     * Backoff for a deferred resolution, capped.
+     *
+     * <p>Capped because a deletion chain has no attempt limit any more: multiplying an unbounded
+     * counter gave an unbounded delay, so after a long outage the next query would be an hour or
+     * more away and restored connectivity would NOT clear the stale deletion promptly -- which is
+     * the whole point of keeping the chain alive.</p>
+     */
+    private static long winnerDelay(int attempt) {
+        long linear = WINNER_RETRY_MILLIS * (long) attempt;
+        return linear > WINNER_RETRY_CAP_MILLIS ? WINNER_RETRY_CAP_MILLIS : linear;
+    }
+
+    private static final long WINNER_RETRY_CAP_MILLIS = 60 * 1000L;
 
     private static void forgetPendingWinner(String path) {
         synchronized (pendingWinnerPaths) {

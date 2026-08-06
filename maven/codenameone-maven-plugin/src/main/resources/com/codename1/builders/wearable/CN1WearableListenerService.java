@@ -95,7 +95,17 @@ public class CN1WearableListenerService extends WearableListenerService {
     }
 
     @Override
-    public void onMessageReceived(MessageEvent event) {
+    public void onMessageReceived(final MessageEvent event) {
+        // Same reasoning as onDataChanged: isFromAKnownNode can block on a cold start.
+        final MessageEvent frozen = event.freeze();
+        WORKER.execute(new Runnable() {
+            public void run() {
+                handleMessageReceived(frozen);
+            }
+        });
+    }
+
+    private void handleMessageReceived(MessageEvent event) {
         String path = event.getPath();
         if (path == null || !isFromAKnownNode(event.getSourceNodeId())) {
             return;
@@ -147,8 +157,37 @@ public class CN1WearableListenerService extends WearableListenerService {
         }
     }
 
+    /**
+     * Where the Data Layer callbacks do their work.
+     *
+     * <p>Provenance checking blocks: on a cold start it runs {@code Tasks.await} for the local node,
+     * the connected nodes and the capability set. Play services REFUSES a main-thread await, so if
+     * these callbacks arrive on the main thread every one of those throws, each failure becomes an
+     * empty snapshot, and the first legitimate event of a cold start is discarded as unverified --
+     * while the retry loop sleeps the main thread on the way.
+     *
+     * <p>The documentation is not unambiguous about which thread {@code WearableListenerService}
+     * uses, so this does not rely on the answer: the work is moved to a background thread either
+     * way, which is correct under both readings and removes the ANR risk outright. Events are
+     * frozen first because the buffer is recycled as soon as the callback returns.</p>
+     */
+    private static final java.util.concurrent.ExecutorService WORKER =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+
     @Override
     public void onDataChanged(DataEventBuffer events) {
+        final java.util.List<DataEvent> frozen = new java.util.ArrayList<DataEvent>();
+        for (DataEvent e : events) {
+            frozen.add(e.freeze());
+        }
+        WORKER.execute(new Runnable() {
+            public void run() {
+                handleDataChanged(frozen);
+            }
+        });
+    }
+
+    private void handleDataChanged(java.lang.Iterable<DataEvent> events) {
         // NOT before the loop. This service is exported and there is no binding permission that
         // would narrow it to Play services, so starting the app first let an untrusted caller bring
         // the UI forward with an empty or forged callback -- the provenance check below stops the

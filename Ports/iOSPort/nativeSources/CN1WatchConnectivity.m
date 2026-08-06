@@ -175,8 +175,9 @@ static void cn1WearableDrainInbox(void) {
     for (NSString *name in names) {
         NSString *full = [dir stringByAppendingPathComponent:name];
         if ([name hasSuffix:@".done"]) {
-            // Delivered by an earlier run and kept only until we got here. Reaching activation
-            // proves that run stayed alive past the delivery, so it can go now.
+            // Legacy marker: entries are now retired by cn1_wearable_confirmInbox once the EDT has
+            // consumed them, so nothing writes these any more. An app updated across that change
+            // can still find one parked here, and it was already delivered.
             [[NSFileManager defaultManager] removeItemAtPath:full error:NULL];
             continue;
         }
@@ -190,17 +191,34 @@ static void cn1WearableDrainInbox(void) {
             NSString *path = entry[@"p"];
             NSData *body = entry[@"b"];
             if ([path isKindOfClass:[NSString class]] && [body isKindOfClass:[NSData class]]) {
-                cn1_wearable_deliverDataChanged(path.UTF8String, body.bytes, (int) body.length);
+                // Tracked: the entry is retired from the EDT, after the app has the payload.
+                // Marking it here instead would retire it the moment the replay was QUEUED, and a
+                // process death before the EDT ran it would lose the file for good -- the exact
+                // failure this inbox exists to prevent.
+                cn1_wearable_deliverDataChangedTracked(path.UTF8String, body.bytes,
+                                                       (int) body.length, name.UTF8String);
+                continue;
             }
         }
-        // Marked, not deleted. Deleting here would drop the payload the moment the replay was
-        // QUEUED, so a process death before the EDT ran it would lose the file for good -- the
-        // exact failure this inbox exists to prevent. The marker is cleared on the next activation,
-        // which this run has to survive to reach.
-        [[NSFileManager defaultManager] moveItemAtPath:full
-                                                toPath:[full stringByAppendingString:@".done"]
-                                                 error:NULL];
+        // Unreadable or malformed: nothing to deliver and replaying it forever helps nobody.
+        [[NSFileManager defaultManager] removeItemAtPath:full error:NULL];
     }
+}
+
+/// Retires a delivered inbox entry.
+///
+/// Invoked from Java on the EDT after the payload has been handed to the application, which is the
+/// only moment at which losing the durable copy is safe.
+void cn1_wearable_confirmInbox(const char *inboxToken) {
+    if (inboxToken == NULL) {
+        return;
+    }
+    NSString *name = [NSString stringWithUTF8String:inboxToken];
+    if (name.length == 0) {
+        return;
+    }
+    NSString *full = [cn1WearableInboxDir() stringByAppendingPathComponent:name];
+    [[NSFileManager defaultManager] removeItemAtPath:full error:NULL];
 }
 
 /// Serializes the whole applicationContext read-modify-write.
@@ -932,17 +950,11 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // and nothing redelivers it -- the sender's copy is gone too.
     NSData *wrapped = cn1WearableWrapFile(file.fileURL.lastPathComponent, body);
     NSString *stashed = cn1WearableStashInbox(path, wrapped);
-    cn1_wearable_deliverDataChanged(path.UTF8String, wrapped.bytes, (int) wrapped.length);
-    // Marked delivered rather than deleted or left alone. Leaving it meant every activation
-    // replayed a transfer the app already had; deleting it here would discard the payload while the
-    // delivery was still only queued. The ".done" marker records "this run got as far as
-    // delivering", and the next activation -- which the run must survive to reach -- clears it.
-    if (stashed != nil) {
-        NSString *full = [cn1WearableInboxDir() stringByAppendingPathComponent:stashed];
-        [[NSFileManager defaultManager] moveItemAtPath:full
-                                                toPath:[full stringByAppendingString:@".done"]
-                                                 error:NULL];
-    }
+    // Retired from the EDT once the app actually has the payload, not here. Deleting or marking at
+    // this point discards the only durable copy while the delivery is still merely queued, and a
+    // process death in that window loses a one-shot transfer the sender was already told arrived.
+    cn1_wearable_deliverDataChangedTracked(path.UTF8String, wrapped.bytes, (int) wrapped.length,
+                                           stashed == nil ? NULL : stashed.UTF8String);
 }
 
 @end

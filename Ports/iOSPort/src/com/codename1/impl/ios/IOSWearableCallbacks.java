@@ -40,6 +40,7 @@ final class IOSWearableCallbacks {
         nativeMessageReceived(null, null, 0);
         nativeReplyReceived(0, null, null);
         nativeDataChanged(null, null);
+        nativeDataChangedTracked(null, null, null);
         nativeDataRemoved(null);
         nativeStateChanged();
         dceGuard = false;
@@ -80,6 +81,28 @@ final class IOSWearableCallbacks {
             return;
         }
         WearableConnection.deliverDataChanged(path, payload);
+    }
+
+    /// Called from native for a delivery whose durable copy must survive until the app has it.
+    ///
+    /// An incoming file transfer is stashed on disk before it is handed over, because
+    /// WatchConnectivity deletes its own temporary the moment the delegate returns. Confirming from
+    /// inside the delivery -- rather than when it was merely queued -- is what makes the stash
+    /// worth having: a process death before the EDT runs now replays on the next activation
+    /// instead of losing a one-shot transfer the sender already considers delivered.
+    static void nativeDataChangedTracked(final String path, byte[] payload, final String token) {
+        if (dceGuard) {
+            return;
+        }
+        if (token == null) {
+            WearableConnection.deliverDataChanged(path, payload);
+            return;
+        }
+        WearableConnection.deliverDataChangedTracked(path, payload, new Runnable() {
+            public void run() {
+                IOSImplementation.nativeInstance.wearableConfirmInbox(token);
+            }
+        });
     }
 
     /// Called from native when the peer removes a replicated value.
