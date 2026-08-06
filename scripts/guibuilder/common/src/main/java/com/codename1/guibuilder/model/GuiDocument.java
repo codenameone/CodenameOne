@@ -231,7 +231,7 @@ public final class GuiDocument {
         Set<String> taken = new LinkedHashSet<>();
         for (Element sibling : componentsIn(parent)) {
             if (sibling == child) continue;
-            taken.add(effectiveTableRow(parent, sibling) + ":" + effectiveTableColumn(parent, sibling));
+            markOccupied(taken, parent, sibling);
         }
         for (int cursor = 0; ; cursor++) {
             int row = cursor / columns;
@@ -244,6 +244,23 @@ public final class GuiDocument {
                 setNormalizedAttribute(parent, "tableLayoutRows", String.valueOf(row + 1));
             }
             return;
+        }
+    }
+
+    /**
+     * Marks every cell a sibling covers, not just the one it starts in. A component with a span
+     * greater than one occupies a rectangle; treating it as a single cell handed the next component
+     * a slot underneath it, and TableLayout then placed two children in the same space.
+     */
+    private static void markOccupied(Set<String> taken, Element parent, Element sibling) {
+        int row = effectiveTableRow(parent, sibling);
+        int column = effectiveTableColumn(parent, sibling);
+        int rowSpan = Math.max(1, parseInt(sibling.getAttribute("tableVerticalSpan"), 1));
+        int columnSpan = Math.max(1, parseInt(sibling.getAttribute("tableHorizontalSpan"), 1));
+        for (int r = row; r < row + rowSpan; r++) {
+            for (int c = column; c < column + columnSpan; c++) {
+                taken.add(r + ":" + c);
+            }
         }
     }
 
@@ -684,13 +701,25 @@ public final class GuiDocument {
         }
     }
 
+    /** Attributes whose value is the user's own text. Trimming these, or dropping them when they
+     * are set to the empty string, changes what the form says: the leading spaces in a label
+     * disappear, and clearing a text field brings the sample placeholder back instead of leaving it
+     * empty. Structural attributes stay normalized because a stray space in a cell index or a
+     * layout name is never intentional. */
+    private static final String TEXTUAL_ATTRIBUTES = "|text|hint|title|";
+
     /** XMLParser stores case-insensitive attribute keys in lowercase. Always mutate that canonical
      * key and remove a possible camel-case duplicate created by older GUI Builder versions. */
     private static void setNormalizedAttribute(Element element, String name, String value) {
         String canonical = name.toLowerCase();
         element.removeAttribute(canonical);
         if (!canonical.equals(name)) element.removeAttribute(name);
-        if (value != null && value.trim().length() > 0) element.setAttribute(canonical, value.trim());
+        if (value == null) return;
+        if (TEXTUAL_ATTRIBUTES.indexOf("|" + canonical + "|") >= 0) {
+            element.setAttribute(canonical, value);
+            return;
+        }
+        if (value.trim().length() > 0) element.setAttribute(canonical, value.trim());
     }
 
     private void beforeMutation() {
@@ -773,6 +802,12 @@ public final class GuiDocument {
                 case '<' -> out.append("&lt;");
                 case '>' -> out.append("&gt;");
                 case '"' -> out.append("&quot;");
+                // XML attribute normalization turns a literal newline, carriage return or tab into
+                // a space when the file is read back, so a multi line TextArea value quietly
+                // collapsed onto one line the first time the form was saved and reopened.
+                case '\n' -> out.append("&#10;");
+                case '\r' -> out.append("&#13;");
+                case '\t' -> out.append("&#9;");
                 default -> out.append(c);
             }
         }

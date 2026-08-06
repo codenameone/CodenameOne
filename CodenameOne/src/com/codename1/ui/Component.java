@@ -4263,6 +4263,22 @@ public class Component implements Animation, StyleListener, Editable {
         this.handlesInput = handlesInput;
     }
 
+    /// Whether this component turns key codes into printable characters, as a text editor does.
+    ///
+    /// Key codes and character codes share one value space, so a port is free to map a soft key
+    /// onto a value that is also a printable character: the desktop port maps the left soft key to
+    /// `VK_F1`, which is 112, the code of a lowercase `p`. A form serves a component that answers
+    /// true here before the menu bar, or that character could never be typed into it. This is
+    /// deliberately narrower than `#handlesInput()`, which components such as lists and editable
+    /// sliders also set for focus traversal while still expecting their soft keys to work.
+    ///
+    /// #### Returns
+    ///
+    /// true if key codes reaching this component are text rather than commands
+    protected boolean consumesRawTextInput() {
+        return false;
+    }
+
     /// Returns true if the component has focus
     ///
     /// #### Returns

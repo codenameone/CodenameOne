@@ -3224,17 +3224,21 @@ public class Form extends Container {
         menuBar.setMinimizeOnBack(minimizeOnBack);
     }
 
-    /// True when the focused component has claimed raw keyboard input via
-    /// `Component#setHandlesInput(boolean)`, so soft key mapping must not intercept keys ahead of it.
+    /// True when the focused component turns key codes into text, so soft key mapping must not
+    /// intercept keys ahead of it.
     ///
     /// A port is free to map a soft key onto any key code, and the desktop port uses the function
     /// keys: `VK_F1` is 112, which is also the character code of a lowercase `p`. Key codes and
     /// character codes share one value space here, so a text component would silently never receive
-    /// that character -- one letter of the alphabet simply stopped working. A component editing text
-    /// has already declared that it owns the keyboard, so it is served first.
+    /// that character -- one letter of the alphabet simply stopped working.
+    ///
+    /// `Component#handlesInput()` is too broad a test for this: lists, editable sliders and map
+    /// components set it for focus traversal while still expecting the back and menu commands to
+    /// reach the menu bar, so only components that declare themselves raw text editors take
+    /// priority here.
     private boolean focusedHandlesInput() {
-        return focused != null && focused.handlesInput() && focused.isEnabled()
-                && focused.getComponentForm() == this;
+        return focused != null && focused.consumesRawTextInput() && focused.isEnabled()
+                && focused.getComponentForm() == this; //NOPMD CompareObjectsWithEquals
     }
 
     /// {@inheritDoc}

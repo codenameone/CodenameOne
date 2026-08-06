@@ -1096,7 +1096,9 @@ public class SplitPane extends Container {
         protected void initComponent() {
             super.initComponent();
             Form form = getComponentForm();
-            if (form != null) form.setEnableCursors(true);
+            if (form != null) {
+                form.setEnableCursors(true);
+            }
         }
 
 

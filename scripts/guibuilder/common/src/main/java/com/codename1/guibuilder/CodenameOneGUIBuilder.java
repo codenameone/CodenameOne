@@ -94,6 +94,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private Container inspectorHost;
     private Label status;
     private String paletteFilter = "";
+    private Map<Element, String> javaNames = new LinkedHashMap<>();
     private String clipboardXml;
     private boolean darkMode;
     private String canvasMode = "phonePortrait";
@@ -530,15 +531,25 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void switchForm(String path) {
         cancelDesignerDrag();
-        if (document != null && document.isModified() && !com.codename1.ui.Dialog.show("Unsaved changes", "Save changes before switching forms?", "Save", "Discard")) {
-            openForm(path);
-            return;
+        if (document != null && document.isModified()) {
+            if (com.codename1.ui.Dialog.show("Unsaved changes", "Save changes before switching forms?", "Save", "Discard")) {
+                // Staying on a form whose save failed is the only way to keep the work: opening the
+                // next form replaces the document and the edits are gone.
+                if (!save()) {
+                    setStatus("Still editing " + relativeFormName(document.path()) + "; the save failed");
+                    return;
+                }
+            }
         }
-        if (document != null && document.isModified()) save();
         openForm(path);
     }
 
-    private void openForm(String path) {
+    /**
+     * @return true when the form was parsed and is now the document being edited. Callers that
+     *     report success to a client have to know: a malformed file left the previous form on
+     *     screen while the caller announced the new one.
+     */
+    private boolean openForm(String path) {
         try {
             cancelDesignerDrag();
             document = GuiDocument.parse(path, ProjectIO.read(path));
@@ -549,8 +560,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             refreshForms();
             refreshEditor();
             setStatus("Editing " + relativeFormName(path));
+            return true;
         } catch (Exception ex) {
             ToastBar.showErrorMessage("Unable to open GUI file: " + ex.getMessage());
+            return false;
         }
     }
 
@@ -3889,23 +3902,40 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         refreshEditor();
     }
 
-    private void save() {
-        if (document == null) return;
+    /**
+     * @return true when the form reached disk. Callers that are about to replace the in-memory
+     *     document have to know: a read only file or a full disk otherwise discarded the edits the
+     *     user had just asked to keep.
+     */
+    private boolean save() {
+        if (document == null) return true;
         try {
             ProjectIO.write(document.path(), document.toXml());
             document.markSaved();
             recordAction("saved", "form", relativeFormName(document.path()));
             setStatus("Saved " + relativeFormName(document.path()));
             ToastBar.showMessage("GUI form saved", FontImage.MATERIAL_CHECK);
+            return true;
         } catch (IOException ex) {
             ToastBar.showErrorMessage("Save failed: " + ex.getMessage());
+            return false;
         }
     }
 
     private void refreshProject() {
         guiFiles = ProjectIO.findGuiFiles(binding.guiDir());
         refreshForms();
-        if (document != null) openForm(document.path());
+        if (document == null) return;
+        // Re-reading the form from disk throws away everything edited since the last save. Refresh
+        // is about picking up files added outside the editor, so it must not cost the user work.
+        if (document.isModified()
+                && !com.codename1.ui.Dialog.show("Unsaved changes",
+                        "Reloading " + relativeFormName(document.path())
+                        + " from disk discards the changes you have not saved.", "Reload", "Keep editing")) {
+            setStatus("Project refreshed; kept your unsaved changes");
+            return;
+        }
+        openForm(document.path());
     }
 
     private void showEmptyProject() {
@@ -4236,6 +4266,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     private String defaultCompanionSource() {
+        assignJavaNames();
         String form = relativeFormName(document.path());
         int dot = form.lastIndexOf('.');
         String packageName = dot < 0 ? "" : form.substring(0, dot);
@@ -4247,7 +4278,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         StringBuilder out = new StringBuilder();
         out.append("// <gui-builder-generated>\n");
         if (packageName.length() > 0) out.append("package ").append(packageName).append(";\n\n");
-        out.append("import com.codename1.components.SpanLabel;\n")
+        out.append("import com.codename1.components.Accordion;\n")
+                .append("import com.codename1.components.SpanLabel;\n")
                 .append("import com.codename1.ui.*;\n")
                 .append("import com.codename1.ui.events.ActionEvent;\n")
                 .append("import com.codename1.ui.geom.Dimension;\n")
@@ -4256,8 +4288,19 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (bindingEnabled) out.append(annotationBinding
                 ? "import com.codename1.binding.Binding;\nimport com.codename1.binding.Binders;\n"
                 : "import com.codename1.properties.UiBinding;\n");
+        // A .gui whose root is a Container is a reusable piece of UI, not a screen, and a Dialog is
+        // neither. Generating "extends Form" for all three produced a class the project could not
+        // use as the type it was designed as. Dialog takes the same (title, layout) constructor Form
+        // does; Container takes the layout alone.
+        String rootType = value(document.root(), "type", "Form");
+        boolean containerRoot = "Container".equals(rootType);
+        String superClass = containerRoot ? "Container" : "Dialog".equals(rootType) ? "Dialog" : "Form";
+        String superCall = containerRoot
+                ? "super(" + layoutSource(document.root()) + ");\n"
+                : "super(\"" + javaEscape(value(document.root(), "title", className)) + "\", "
+                        + layoutSource(document.root()) + ");\n";
         out.append("\n// Generated live from ").append(relativeFormName(document.path())).append(".gui.\n")
-                .append("public class ").append(className).append(" extends Form {\n");
+                .append("public class ").append(className).append(" extends ").append(superClass).append(" {\n");
         if (bindingEnabled) {
             out.append("    private final ").append(modelName).append(" model;\n")
                     .append(annotationBinding ? "    private Binding binding;\n" : "    private UiBinding.Binding binding;\n");
@@ -4269,15 +4312,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (bindingEnabled) {
             out.append("\n    public ").append(className).append("() { this(new ").append(modelName).append("()); }\n\n")
                     .append("    public ").append(className).append("(").append(modelName).append(" model) {\n")
-                    .append("        super(\"").append(javaEscape(value(document.root(), "title", className))).append("\", ")
-                    .append(layoutSource(document.root())).append(");\n")
+                    .append("        ").append(superCall)
                     .append("        this.model = model;\n        buildUI();\n")
                     .append(annotationBinding ? "        binding = Binders.bind(model, this);\n    }\n\n"
                             : "        binding = new UiBinding().bind(model, this);\n    }\n\n");
         } else {
             out.append("\n    public ").append(className).append("() {\n")
-                    .append("        super(\"").append(javaEscape(value(document.root(), "title", className))).append("\", ")
-                    .append(layoutSource(document.root())).append(");\n        buildUI();\n    }\n\n");
+                    .append("        ").append(superCall).append("        buildUI();\n    }\n\n");
         }
         out.append("    private void buildUI() {\n");
         appendGeneratedChildren(out, document.root(), "this", "        ");
@@ -4294,8 +4335,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         out.append("// </gui-builder-generated>\n")
                 .append("// <gui-builder-user-code>\n");
         for (String handler : generatedHandlers()) {
-            out.append("    protected void ").append(handler).append("(ActionEvent event) {\n")
-                    .append("        // Add behavior here.\n    }\n\n");
+            out.append(handlerStub(handler));
         }
         return out.append("// </gui-builder-user-code>\n")
                 .append("// <gui-builder-generated>\n}\n// </gui-builder-generated>\n").toString();
@@ -4311,6 +4351,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                     .append(indent).append(name).append(".setName(\"").append(javaEscape(value(child, "name", name))).append("\");\n");
             if (child.getAttribute("uiid") != null) out.append(indent).append(name).append(".setUIID(\"")
                     .append(javaEscape(child.getAttribute("uiid"))).append("\");\n");
+            appendGeneratedProperties(out, child, name, type, indent);
             String handler = child.getAttribute("actionEvent");
             if (handler != null && handler.length() > 0 && ("Button".equals(type) || "CheckBox".equals(type) || "RadioButton".equals(type))) {
                 out.append(indent).append(name).append(".addActionListener(this::").append(javaIdentifier(handler)).append(");\n");
@@ -4318,6 +4359,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if ("Tabs".equals(value(parent, "type", ""))) {
                 out.append(indent).append(parentName).append(".addTab(\"").append(javaEscape(value(child, "name", "Tab")))
                         .append("\", ").append(name).append(");\n");
+            } else if ("Accordion".equals(value(parent, "type", ""))) {
+                out.append(indent).append(parentName).append(".addContent(\"")
+                        .append(javaEscape(value(child, "name", "Section"))).append("\", ").append(name).append(");\n");
             } else if ("BorderLayout".equals(value(parent, "layout", "BoxLayout"))) {
                 out.append(indent).append(parentName).append(".add(BorderLayout.")
                         .append(GuiDocument.effectiveBorderConstraint(parent, child).toUpperCase()).append(", ").append(name).append(");\n");
@@ -4327,10 +4371,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                         .append(GuiDocument.effectiveTableRow(parent, child))
                         .append(", ").append(GuiDocument.effectiveTableColumn(parent, child)).append(")")
                         .append(".horizontalSpan(").append(value(child, "tableHorizontalSpan", "1")).append(")")
-                        .append(".verticalSpan(").append(value(child, "tableVerticalSpan", "1")).append("), ")
-                        .append(name).append(");\n");
+                        .append(".verticalSpan(").append(value(child, "tableVerticalSpan", "1")).append(")")
+                        // The preview honours these percentages, so a form designed against them
+                        // collapses to preferred-size columns at runtime when they are dropped here.
+                        .append(percentageConstraint(child, "tableWidth", "widthPercentage"))
+                        .append(percentageConstraint(child, "tableHeight", "heightPercentage"))
+                        .append(", ").append(name).append(");\n");
             } else out.append(indent).append(parentName).append(".add(").append(name).append(");\n");
             if (GuiDocument.acceptsChildren(child)) appendGeneratedChildren(out, child, name, indent);
+            appendGeneratedTabState(out, child, name, type, indent);
         }
         if ("LayeredLayout".equals(value(parent, "layout", "BoxLayout"))) {
             for (Element child : componentChildren(parent)) {
@@ -4355,7 +4404,126 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
     }
 
+    /**
+     * Emits the inspector properties that the preview applies through
+     * {@code ComponentPreviewFactory.applyAttributes}. Without these the designer showed a component
+     * as configured while the generated form fell back to every default, so the running app did not
+     * match the design. Only attributes the document actually carries are emitted, and only for the
+     * types that really own the setter, so the generated source stays readable and always compiles.
+     */
+    private void appendGeneratedProperties(StringBuilder out, Element element, String name, String type,
+            String indent) {
+        appendBooleanSetter(out, element, name, indent, "enabled", "setEnabled");
+        appendBooleanSetter(out, element, name, indent, "visible", "setVisible");
+        appendBooleanSetter(out, element, name, indent, "rtl", "setRTL");
+        if (isLabelType(type) || "SpanLabel".equals(type)) {
+            appendIntSetter(out, element, name, indent, "gap", "setGap");
+        }
+        if (isLabelType(type) || "TextArea".equals(type) || "TextField".equals(type)) {
+            String alignment = element.getAttribute("alignment");
+            if (alignment != null) out.append(indent).append(name).append(".setAlignment(Component.")
+                    .append(alignmentConstant(alignment)).append(");\n");
+        }
+        if (isLabelType(type)) {
+            appendBooleanSetter(out, element, name, indent, "tickerEnabled", "setTickerEnabled");
+        }
+        if ("Button".equals(type)) appendBooleanSetter(out, element, name, indent, "toggle", "setToggle");
+        if ("CheckBox".equals(type) || "RadioButton".equals(type)) {
+            appendBooleanSetter(out, element, name, indent, "selected", "setSelected");
+        }
+        if ("TextField".equals(type) || "TextArea".equals(type)) {
+            appendIntSetter(out, element, name, indent, "columns", "setColumns");
+            appendIntSetter(out, element, name, indent, "maxSize", "setMaxSize");
+            appendBooleanSetter(out, element, name, indent, "editable", "setEditable");
+            appendBooleanSetter(out, element, name, indent, "growByContent", "setGrowByContent");
+            String constraint = element.getAttribute("constraint");
+            if (constraint != null) out.append(indent).append(name).append(".setConstraint(TextArea.")
+                    .append(constraintConstant(constraint)).append(");\n");
+        }
+        if ("TextArea".equals(type)) appendIntSetter(out, element, name, indent, "rows", "setRows");
+        if ("Slider".equals(type)) {
+            appendIntSetter(out, element, name, indent, "minValue", "setMinValue");
+            appendIntSetter(out, element, name, indent, "maxValue", "setMaxValue");
+            appendIntSetter(out, element, name, indent, "progress", "setProgress");
+            appendBooleanSetter(out, element, name, indent, "editable", "setEditable");
+            appendBooleanSetter(out, element, name, indent, "infinite", "setInfinite");
+        }
+        if (GuiDocument.acceptsChildren(element)) {
+            appendBooleanSetter(out, element, name, indent, "scrollableX", "setScrollableX");
+            appendBooleanSetter(out, element, name, indent, "scrollableY", "setScrollableY");
+        }
+    }
+
+    /**
+     * Tab placement and selection are emitted after the tabs themselves, because selecting an index
+     * on an empty Tabs throws.
+     */
+    private void appendGeneratedTabState(StringBuilder out, Element element, String name, String type,
+            String indent) {
+        if (!"Tabs".equals(type)) return;
+        String placement = element.getAttribute("tabPlacement");
+        if (placement != null) out.append(indent).append(name).append(".setTabPlacement(Component.")
+                .append(tabPlacementConstant(placement)).append(");\n");
+        Integer selected = parseInteger(element.getAttribute("selectedIndex"));
+        int tabs = componentChildren(element).size();
+        if (selected != null && selected.intValue() >= 0 && selected.intValue() < tabs) {
+            out.append(indent).append(name).append(".setSelectedIndex(").append(selected.intValue()).append(", false);\n");
+        }
+    }
+
+    private void appendBooleanSetter(StringBuilder out, Element element, String name, String indent,
+            String attribute, String setter) {
+        String raw = element.getAttribute(attribute);
+        if (raw == null) return;
+        out.append(indent).append(name).append('.').append(setter).append('(')
+                .append("true".equals(raw) ? "true" : "false").append(");\n");
+    }
+
+    private void appendIntSetter(StringBuilder out, Element element, String name, String indent,
+            String attribute, String setter) {
+        Integer parsed = parseInteger(element.getAttribute(attribute));
+        if (parsed == null) return;
+        out.append(indent).append(name).append('.').append(setter).append('(').append(parsed.intValue()).append(");\n");
+    }
+
+    private String percentageConstraint(Element element, String attribute, String method) {
+        Integer parsed = parseInteger(element.getAttribute(attribute));
+        return parsed == null || parsed.intValue() < 0 ? "" : "." + method + "(" + parsed.intValue() + ")";
+    }
+
+    private boolean isLabelType(String type) {
+        return "Label".equals(type) || "Button".equals(type) || "CheckBox".equals(type)
+                || "RadioButton".equals(type);
+    }
+
+    private static String alignmentConstant(String value) {
+        if ("center".equalsIgnoreCase(value)) return "CENTER";
+        if ("right".equalsIgnoreCase(value)) return "RIGHT";
+        return "LEFT";
+    }
+
+    private static String tabPlacementConstant(String value) {
+        if ("bottom".equalsIgnoreCase(value)) return "BOTTOM";
+        if ("left".equalsIgnoreCase(value)) return "LEFT";
+        if ("right".equalsIgnoreCase(value)) return "RIGHT";
+        return "TOP";
+    }
+
+    private static String constraintConstant(String value) {
+        if ("EMAILADDR".equals(value) || "PASSWORD".equals(value) || "NUMERIC".equals(value)
+                || "URL".equals(value)) {
+            return value;
+        }
+        return "ANY";
+    }
+
+    private String handlerStub(String handler) {
+        return "    protected void " + handler + "(ActionEvent event) {\n"
+                + "        // Add behavior here.\n    }\n\n";
+    }
+
     private String generatedModelSource() {
+        assignJavaNames();
         String form = relativeFormName(document.path());
         int dot = form.lastIndexOf('.');
         String packageName = dot < 0 ? "" : form.substring(0, dot);
@@ -4420,6 +4588,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String source;
         if ("Container".equals(type)) source = "new Container(" + layoutSource(element) + ")";
         else if ("Tabs".equals(type)) source = "new Tabs()";
+        // Accordion is a child-accepting type the document model already supports, and it lives in
+        // com.codename1.components with no String constructor, so the generic "new Type(text)"
+        // fallback produced source that does not compile.
+        else if ("Accordion".equals(type)) source = "new Accordion()";
         else if ("Slider".equals(type)) source = "new Slider()";
         else if ("TextField".equals(type)) source = "new TextField(" + text + ", \"" + javaEscape(value(element, "hint", "")) + "\")";
         else if ("TextArea".equals(type)) source = "new TextArea(" + text + ")";
@@ -4457,13 +4629,57 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return handlers;
     }
 
-    private String javaName(Element element) { return javaIdentifier(value(element, "name", value(element, "type", "component"))); }
+    /**
+     * The Java name of a component, unique across the document. A .gui may legitimately name two
+     * components "foo-bar" and "foo_bar", or name one "class"; both produce companion source that
+     * does not compile unless the names are disambiguated here.
+     */
+    private String javaName(Element element) {
+        String assigned = javaNames.get(element);
+        return assigned != null ? assigned : javaIdentifier(value(element, "name", value(element, "type", "component")));
+    }
+
+    /** Recomputed for every generation because a rename changes every name after it. */
+    private void assignJavaNames() {
+        javaNames = new LinkedHashMap<>();
+        Set<String> used = new LinkedHashSet<>();
+        // the names the generated class itself declares
+        used.add("model");
+        used.add("binding");
+        used.add("buildUI");
+        for (Element element : document.components()) {
+            if (element == document.root()) continue;
+            String base = javaIdentifier(value(element, "name", value(element, "type", "component")));
+            String candidate = base;
+            int suffix = 2;
+            while (!used.add(candidate)) {
+                candidate = base + suffix;
+                suffix++;
+            }
+            javaNames.put(element, candidate);
+        }
+    }
+
     private String javaIdentifier(String value) {
         String cleaned = value == null ? "component" : value.replaceAll("[^A-Za-z0-9_$]", "_");
         if (cleaned.length() == 0) return "component";
         char first = cleaned.charAt(0);
         boolean validStart = first == '_' || first == '$' || first >= 'A' && first <= 'Z' || first >= 'a' && first <= 'z';
-        return validStart ? cleaned : "_" + cleaned;
+        String identifier = validStart ? cleaned : "_" + cleaned;
+        // A component may legitimately be called "class" or "new"; the field or method generated
+        // from it may not.
+        return isJavaReserved(identifier) ? identifier + "_" : identifier;
+    }
+
+    private static final String JAVA_RESERVED = "|abstract|assert|boolean|break|byte|case|catch|"
+            + "char|class|const|continue|default|do|double|else|enum|extends|false|final|finally|"
+            + "float|for|goto|if|implements|import|instanceof|int|interface|long|native|new|null|"
+            + "package|private|protected|public|return|short|static|strictfp|super|switch|"
+            + "synchronized|this|throw|throws|transient|true|try|void|volatile|while|_|var|record|"
+            + "sealed|permits|yield|";
+
+    private static boolean isJavaReserved(String identifier) {
+        return JAVA_RESERVED.indexOf("|" + identifier + "|") >= 0;
     }
     private String javaEscape(String value) {
         return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
@@ -4485,13 +4701,143 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         int oldStart = existing.indexOf(startMarker);
         int oldEnd = existing.indexOf(endMarker);
         if (oldStart < 0 || oldEnd < oldStart) {
-            return existing.indexOf("// Generated live from ") >= 0 ? generated : existing;
+            if (existing.indexOf("// Generated live from ") >= 0) return generated;
+            String migrated = migrateLegacySource(existing, generated);
+            return migrated != null ? migrated : existing;
         }
         int newStart = generated.indexOf(startMarker);
         int newEnd = generated.indexOf(endMarker);
         if (newStart < 0 || newEnd < newStart) return generated;
         String userCode = existing.substring(oldStart + startMarker.length(), oldEnd);
         return generated.substring(0, newStart + startMarker.length()) + userCode + generated.substring(newEnd);
+    }
+
+    static final String LEGACY_GENERATED_START = "//-- DON'T EDIT BELOW THIS LINE!!!";
+    static final String LEGACY_GENERATED_END = "//-- DON'T EDIT ABOVE THIS LINE!!!";
+
+    /**
+     * Rewrites a companion source scaffolded by an older {@code cn1:create-gui-form} into this
+     * editor's format. Those files carry {@code //-- DON'T EDIT} markers and an empty
+     * {@code initGuiBuilderComponents}, which this editor does not write to, so without this a form
+     * designed in a project created by the old scaffolder saved its .gui and produced an empty
+     * screen at runtime. Anything the developer added to the class is carried into the user-code
+     * region; the old constructors and the old generated block are dropped because the new
+     * generated region replaces both.
+     *
+     * @return the migrated source, or null when this is not a legacy scaffolded file
+     */
+    String migrateLegacySource(String existing, String generated) {
+        int legacyStart = existing.indexOf(LEGACY_GENERATED_START);
+        int legacyEnd = existing.indexOf(LEGACY_GENERATED_END);
+        if (legacyStart < 0 || legacyEnd < legacyStart) return null;
+        String carried = legacyUserMembers(existing, legacyStart, legacyEnd);
+        String marker = "// <gui-builder-user-code>";
+        if (carried.length() == 0) return generated;
+        String merged = dropStubsAlreadyWritten(generated, carried);
+        int insert = merged.indexOf(marker);
+        if (insert < 0) return merged;
+        insert += marker.length();
+        return merged.substring(0, insert) + "\n" + carried + "\n" + merged.substring(insert);
+    }
+
+    /**
+     * Removes the empty handler stubs for events the migrated code already implements. The old
+     * scaffold kept the developer's handlers outside its generated block, so carrying them over
+     * without this produced a class declaring the same method twice.
+     */
+    private String dropStubsAlreadyWritten(String generated, String carried) {
+        String out = generated;
+        for (String handler : generatedHandlers()) {
+            if (carried.indexOf(handler + "(") < 0) continue;
+            out = out.replace(handlerStub(handler), "");
+        }
+        return out;
+    }
+
+    private String legacyUserMembers(String existing, int legacyStart, int legacyEnd) {
+        int bodyStart = existing.indexOf('{', classDeclaration(existing));
+        int bodyEnd = existing.lastIndexOf('}');
+        if (bodyStart < 0 || bodyEnd <= bodyStart) return "";
+        String body = existing.substring(bodyStart + 1, bodyEnd);
+        int offset = bodyStart + 1;
+        if (legacyStart > offset && legacyEnd > legacyStart) {
+            int endOfLine = existing.indexOf('\n', legacyEnd);
+            int cut = (endOfLine < 0 ? existing.length() : endOfLine + 1) - offset;
+            body = body.substring(0, legacyStart - offset) + body.substring(Math.min(cut, body.length()));
+        }
+        return removeConstructors(body, className(existing)).trim();
+    }
+
+    private int classDeclaration(String source) {
+        int index = source.indexOf("class ");
+        return index < 0 ? 0 : index;
+    }
+
+    private String className(String source) {
+        int index = classDeclaration(source);
+        if (index == 0 && !source.startsWith("class ")) return "";
+        int start = index + "class ".length();
+        int end = start;
+        while (end < source.length() && isIdentifierChar(source.charAt(end))) end++;
+        return source.substring(start, end);
+    }
+
+    private static boolean isIdentifierChar(char c) {
+        return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '$';
+    }
+
+    /**
+     * Drops every constructor of the scaffolded class. The generated region declares its own, and
+     * the scaffolded ones call an {@code initGuiBuilderComponents} that no longer exists.
+     */
+    private String removeConstructors(String body, String className) {
+        if (className.length() == 0) return body;
+        String out = body;
+        int from = 0;
+        while (true) {
+            int index = out.indexOf(className + "(", from);
+            if (index < 0) return out;
+            char before = index == 0 ? ' ' : out.charAt(index - 1);
+            int close = matchingBrace(out, out.indexOf(")", index));
+            boolean instantiation = index >= 4 && "new ".equals(out.substring(index - 4, index));
+            if (isIdentifierChar(before) || before == '.' || instantiation || close < 0) {
+                from = index + className.length();
+                continue;
+            }
+            int lineStart = out.lastIndexOf("\n", index);
+            int cut = lineStart < 0 ? 0 : lineStart;
+            out = out.substring(0, cut) + out.substring(close + 1);
+            from = cut;
+        }
+    }
+
+    /**
+     * Finds the closing brace of the block that starts after {@code afterIndex}, ignoring braces
+     * inside string and character literals so a constructor that builds text is not truncated.
+     */
+    private int matchingBrace(String source, int afterIndex) {
+        if (afterIndex < 0) return -1;
+        int depth = 0;
+        boolean started = false;
+        char quote = 0;
+        for (int i = afterIndex; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (quote != 0) {
+                if (c == '\\') i++;
+                else if (c == quote) quote = 0;
+                continue;
+            }
+            if (c == '"' || c == '\'') { quote = c; continue; }
+            if (c == '{') { depth++; started = true; }
+            else if (c == '}') {
+                depth--;
+                if (started && depth == 0) return i;
+                if (depth < 0) return -1;
+            } else if (c == ';' && !started) {
+                return -1;
+            }
+        }
+        return -1;
     }
 
     private String resolveInitialForm() {
@@ -4530,9 +4876,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 || "CheckBox".equals(type) || "RadioButton".equals(type)
                 || "TextField".equals(type) || "TextArea".equals(type);
     }
+    /**
+     * The fallback applies to an attribute that is absent, not to one the user deliberately
+     * emptied: clearing a label's text must leave it empty rather than bringing the sample text
+     * back. Structural attributes are removed rather than blanked, so they are unaffected.
+     */
     private static String value(Element element, String attribute, String fallback) {
         String result = element == null ? null : element.getAttribute(attribute);
-        return result == null || result.length() == 0 ? fallback : result;
+        return result == null ? fallback : result;
     }
     private FontImage material(char icon, String uiid) { return FontImage.createMaterial(icon, UIManager.getInstance().getComponentStyle(uiid)); }
     private void setStatus(String message) {
@@ -4680,7 +5031,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             String relative = relativeFormName(path);
             String simple = relative.substring(relative.lastIndexOf('.') + 1);
             if (formName.equals(relative) || formName.equals(simple) || formName.equals(path)) {
-                openForm(path);
+                if (!openForm(path)) return "Could not open " + relative;
                 recordAction("form_opened", "form", relative, "source", "mcp");
                 return null;
             }
@@ -4754,7 +5105,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     String mcpCommand(String command) {
         if (command == null) return "command is required";
-        if ("save".equals(command)) save();
+        // A client that is told the save succeeded will happily go on to close the editor.
+        if ("save".equals(command)) {
+            if (!save()) return "Save failed; the form is still only in the editor";
+        }
         else if ("undo".equals(command)) undo();
         else if ("redo".equals(command)) redo();
         else if ("refresh".equals(command)) refreshProject();

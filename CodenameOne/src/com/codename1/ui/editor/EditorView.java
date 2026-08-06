@@ -54,6 +54,7 @@ public class EditorView extends Component implements TextInputClient {
     private int caret;
     private int anchor = -1;
     private boolean multiKeyModeRestore;
+    private boolean multiKeyModeChanged;
     private int composingStart = -1;
     private int composingEnd = -1;
     // pre-composition snapshot so the finalized composition forms a single undo unit
@@ -815,6 +816,27 @@ public class EditorView extends Component implements TextInputClient {
 
     // ---- editing primitives ----
 
+    /// This view edits text, so key codes reaching it are characters rather than commands.
+    @Override
+    protected boolean consumesRawTextInput() {
+        return true;
+    }
+
+    /// Whether the given range may be modified. Subclasses that make part of the document read only
+    /// override this so every mutation path is covered, including input method composition, which
+    /// writes to the document without going through `#replaceRange(int, int, String, boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: inclusive start offset of the edit
+    ///
+    /// - `end`: exclusive end offset of the edit
+    ///
+    /// **Returns:** true when the edit may proceed
+    protected boolean isEditAllowed(int start, int end) {
+        return true;
+    }
+
     /// Replaces the range `[start, end)` with `text`, updating the caret, history and platform input
     /// state.
     ///
@@ -1358,7 +1380,12 @@ public class EditorView extends Component implements TextInputClient {
         // last one, so releases were being discarded and characters silently vanished -- always
         // the same ones, because it depends on which pairs overlap. Multi key mode delivers every
         // release. It is restored on focus loss so the rest of the application is unaffected.
-        multiKeyModeRestore = Display.getInstance().isMultiKeyMode();
+        // Captured once: gaining focus twice without an intervening restore would otherwise
+        // record the mode this editor itself installed.
+        if (!multiKeyModeChanged) {
+            multiKeyModeRestore = Display.getInstance().isMultiKeyMode();
+            multiKeyModeChanged = true;
+        }
         Display.getInstance().setMultiKeyMode(true);
         startInput();
         if (!animRegistered && getComponentForm() != null) {
@@ -1369,10 +1396,22 @@ public class EditorView extends Component implements TextInputClient {
         repaint();
     }
 
+    /// Puts multi key mode back the way this editor found it, and only if this editor is the one
+    /// that changed it. An editor that was initialized but never focused must not restore anything:
+    /// removing it would otherwise switch the mode off underneath the editor currently being typed
+    /// in, bringing back the dropped keystrokes this exists to prevent.
+    private void restoreMultiKeyMode() {
+        if (!multiKeyModeChanged) {
+            return;
+        }
+        multiKeyModeChanged = false;
+        Display.getInstance().setMultiKeyMode(multiKeyModeRestore);
+    }
+
     @Override
     protected void focusLost() {
         super.focusLost();
-        Display.getInstance().setMultiKeyMode(multiKeyModeRestore);
+        restoreMultiKeyMode();
         stopInput();
         if (animRegistered && getComponentForm() != null) {
             getComponentForm().deregisterAnimated(this);
@@ -1391,7 +1430,7 @@ public class EditorView extends Component implements TextInputClient {
         // drops animation registrations on deinit, so reset the flag to re-register the
         // caret blink when focus returns. Multi key mode is restored here for the same reason:
         // focusLost never runs on this path and the setting is global.
-        Display.getInstance().setMultiKeyMode(multiKeyModeRestore);
+        restoreMultiKeyMode();
         stopInput();
         animRegistered = false;
     }
@@ -1816,6 +1855,9 @@ public class EditorView extends Component implements TextInputClient {
         }
         start = doc.clamp(start);
         end = doc.clamp(end);
+        if (!isEditAllowed(start, end)) {
+            return;
+        }
         if (composingStart < 0) {
             // snapshot the pre-composition document so the whole composition (including the
             // selection this first compose replaces) finalizes as a single undo unit in

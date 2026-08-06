@@ -362,7 +362,15 @@ class DesignerInteractionTest {
         plan.snapX = 150;
         plan.snapY = 150;
         assertTrue(builder.applyDropPlan(card, plan, plan.snapX, plan.snapY));
-        assertEquals("78px 298px 238px 98px", card.getAttribute("layeredInsets"), document.toXml());
+        // The exact numbers include the component's own margins, which the theme states in
+        // millimetres and therefore differ with the display density. What has to hold everywhere is
+        // that the drop was recorded as a fixed rectangle; where that rectangle lands is asserted
+        // below, on the rendered result.
+        String insets = card.getAttribute("layeredInsets");
+        assertNotNull(insets, document.toXml());
+        for (String side : insets.split(" ")) {
+            assertTrue(side.endsWith("px"), "a dropped rectangle must be pinned in pixels, was " + insets);
+        }
 
         Component rendered = ComponentPreviewFactory.create(document.root(), card, handler());
         rendered.setWidth(500);
@@ -439,8 +447,13 @@ class DesignerInteractionTest {
         assertEquals(narrowCard.getWidth(), wideCard.getWidth());
         assertEquals(300, wideCard.getX() - narrowCard.getX(), 1,
                 "right docking must reflow by the surface width delta, not preserve an absolute x");
-        assertEquals(600, narrowCard.getX() + narrowCard.getWidth(), 4);
-        assertEquals(900, wideCard.getX() + wideCard.getWidth(), 4);
+        // The distance kept from the docked edge comes from the display density, so it is compared
+        // between the two surfaces rather than against a pixel count measured on one machine.
+        int narrowMargin = 600 - (narrowCard.getX() + narrowCard.getWidth());
+        int wideMargin = 900 - (wideCard.getX() + wideCard.getWidth());
+        assertEquals(narrowMargin, wideMargin, "docking must keep the same distance from either edge");
+        assertTrue(narrowMargin >= 0 && narrowMargin <= 12,
+                "a component docked right must sit at the edge, but it was " + narrowMargin + "px away");
     }
 
     @Test

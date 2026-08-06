@@ -18,7 +18,15 @@ socket.on("data", chunk => {
     const line = buffer.slice(0, index);
     buffer = buffer.slice(index + 1);
     if (!line.trim()) continue;
-    const message = JSON.parse(line);
+    // A malformed or truncated line used to throw out of the data handler and kill the client,
+    // taking every pending request with it. Report it and keep reading the stream.
+    let message;
+    try {
+      message = JSON.parse(line);
+    } catch (error) {
+      process.stderr.write(`MCP_BAD_LINE ${error.message}: ${line}\n`);
+      continue;
+    }
     const handler = pending.get(message.id);
     if (handler) {
       pending.delete(message.id);
