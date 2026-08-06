@@ -65,21 +65,48 @@ public final class StringEncryptTransform {
     private final boolean encryptAllStrings;
     private final int seed;
     private final ClassLoader hierarchy;
+    private final java.util.Set<String> constantValues;
     private int encryptedCount;
 
     public StringEncryptTransform(boolean encryptAllStrings, int seed) {
-        this(encryptAllStrings, seed, null);
+        this(encryptAllStrings, seed, null, null);
+    }
+
+    public StringEncryptTransform(boolean encryptAllStrings, int seed, ClassLoader hierarchy) {
+        this(encryptAllStrings, seed, hierarchy, null);
     }
 
     /**
-     * @param hierarchy a classloader over the (renamed) input classes plus the library jars, used
-     *                  for stack-map frame computation so it never loads types through the engine's
-     *                  own classloader; may be {@code null} in tests with no app-type merges
+     * @param hierarchy      a classloader over the (renamed) input classes plus the library jars,
+     *                       used for stack-map frame computation so it never loads types through the
+     *                       engine's own classloader; may be {@code null} in tests
+     * @param constantValues in "constants" mode ({@code encryptAllStrings == false}), the set of
+     *                       string values that were declared as {@code static final String}
+     *                       constants across the jar; only those literals (including javac's inlined
+     *                       copies at every read site) are encrypted. Ignored in "all" mode. May be
+     *                       {@code null}, in which case constants mode encrypts nothing extra.
      */
-    public StringEncryptTransform(boolean encryptAllStrings, int seed, ClassLoader hierarchy) {
+    public StringEncryptTransform(boolean encryptAllStrings, int seed, ClassLoader hierarchy,
+                                  java.util.Set<String> constantValues) {
         this.encryptAllStrings = encryptAllStrings;
         this.seed = seed;
         this.hierarchy = hierarchy;
+        this.constantValues = constantValues;
+    }
+
+    /** Collects the values of {@code static final String} fields in {@code classBytes} into {@code out}. */
+    public static void collectConstantValues(byte[] classBytes, final java.util.Set<String> out) {
+        new ClassReader(classBytes).accept(new org.objectweb.asm.ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public org.objectweb.asm.FieldVisitor visitField(int access, String name, String desc,
+                                                             String sig, Object value) {
+                if ((access & Opcodes.ACC_STATIC) != 0 && (access & Opcodes.ACC_FINAL) != 0
+                        && value instanceof String) {
+                    out.add((String) value);
+                }
+                return null;
+            }
+        }, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
     }
 
     public int getEncryptedCount() {
@@ -105,7 +132,10 @@ public final class StringEncryptTransform {
         int base = keyBase(cn.name);
         boolean changed = false;
 
-        // Channel 1: LDC string literals in method bodies.
+        // Channel 1: LDC string literals in method bodies. In "all" mode every literal is
+        // encrypted; in "constants" mode only literals whose value was declared as a
+        // static-final String constant somewhere in the jar -- which is exactly the set javac
+        // inlined at these read sites -- so ordinary incidental literals are left alone.
         if (cn.methods != null) {
             for (MethodNode mn : cn.methods) {
                 if (mn.instructions == null) {
@@ -118,7 +148,7 @@ public final class StringEncryptTransform {
             }
         }
 
-        // Channel 2: static final String ConstantValue attributes.
+        // Channel 2: static final String ConstantValue attributes (both modes).
         changed |= encryptStaticFinalStrings(cn, base);
 
         if (!changed) {
@@ -139,7 +169,7 @@ public final class StringEncryptTransform {
             AbstractInsnNode next = insn.getNext();
             if (insn instanceof LdcInsnNode) {
                 LdcInsnNode ldc = (LdcInsnNode) insn;
-                if (ldc.cst instanceof String && shouldEncrypt((String) ldc.cst)) {
+                if (ldc.cst instanceof String && shouldEncryptLiteral((String) ldc.cst)) {
                     String plain = (String) ldc.cst;
                     ldc.cst = encode(plain, base);
                     mn.instructions.insert(ldc, new MethodInsnNode(
@@ -271,6 +301,20 @@ public final class StringEncryptTransform {
             return false;
         }
         return true;
+    }
+
+    /**
+     * A method-body literal is encrypted in "all" mode, or in "constants" mode only when its value
+     * was declared as a static-final String constant somewhere in the jar (javac inlined those here).
+     */
+    private boolean shouldEncryptLiteral(String s) {
+        if (!shouldEncrypt(s)) {
+            return false;
+        }
+        if (encryptAllStrings) {
+            return true;
+        }
+        return constantValues != null && constantValues.contains(s);
     }
 
     /** Encodes a string by XORing each char with a position-dependent key derived from {@code base}. */

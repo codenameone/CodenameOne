@@ -106,7 +106,9 @@ public final class HardeningConfig {
         List<String> keep = new ArrayList<String>();
         String keepRaw = get(hints, "harden.keep", null);
         if (keepRaw != null) {
-            for (String rule : keepRaw.split("[\\n;]")) {
+            // Split only on newlines: a semicolon is legal ProGuard syntax inside a rule body
+            // (e.g. "-keep class com.example.Foo { *; }"), so splitting on ';' would shred rules.
+            for (String rule : keepRaw.split("\\r?\\n")) {
                 String t = rule.trim();
                 if (!t.isEmpty()) {
                     keep.add(t);

@@ -378,6 +378,39 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <!-- Embed the forked app-hardening engine as a classpath resource
+                         (/cn1-hardening.jar), run as a separate process by Executor. Resolved from
+                         the reactor/local repo (the runtime dependency above forces cn1-hardening
+                         to build first), which works for full and partial/plugin-only builds alike,
+                         unlike copying from a sibling target/ directory. -->
+                    <execution>
+                        <id>embed-hardening-engine</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.codenameone</groupId>
+                                    <artifactId>cn1-hardening</artifactId>
+                                    <version>${project.version}</version>
+                                    <classifier>standalone</classifier>
+                                    <type>jar</type>
+                                    <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+                                    <destFileName>cn1-hardening.jar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                            <overWriteReleases>true</overWriteReleases>
+                            <overWriteSnapshots>true</overWriteSnapshots>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <executions>
                     <execution>
@@ -393,11 +426,6 @@
                                 <copy file="${cn1.binaries}/Stubber.jar" todir="${project.build.outputDirectory}"/>
                                 <copy file="${maven.multiModuleProjectDirectory}/UpdateCodenameOne.jar"
                                       todir="${project.build.outputDirectory}/com/codename1/maven"/>
-                                <!-- Embed the forked app-hardening engine as a classpath resource
-                                     (/cn1-hardening.jar), the same mechanism the parparvm compiler
-                                     uses. Extracted and run as a separate process by Executor. -->
-                                <copy file="${maven.multiModuleProjectDirectory}/cn1-hardening/target/cn1-hardening-${project.version}-standalone.jar"
-                                      tofile="${project.build.outputDirectory}/cn1-hardening.jar"/>
                             </target>
                         </configuration>
 

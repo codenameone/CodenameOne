@@ -161,8 +161,19 @@ public final class HardeningEngine {
         int encryptedStrings = 0;
         boolean stringsApplied = cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform());
         if (stringsApplied) {
+            // In "constants" mode, first collect the values declared as static-final String
+            // constants across the whole jar, so we encrypt exactly those (and javac's inlined
+            // copies) and nothing incidental.
+            java.util.Set<String> constantValues = null;
+            if (!cfg.isEncryptAllStrings()) {
+                constantValues = new java.util.HashSet<String>();
+                for (byte[] cls : renamed.values()) {
+                    StringEncryptTransform.collectConstantValues(cls, constantValues);
+                }
+            }
             for (Map.Entry<String, byte[]> e : renamed.entrySet()) {
-                StringEncryptTransform t = new StringEncryptTransform(cfg.isEncryptAllStrings(), seed, hierarchy);
+                StringEncryptTransform t = new StringEncryptTransform(
+                        cfg.isEncryptAllStrings(), seed, hierarchy, constantValues);
                 byte[] out = t.transform(e.getValue());
                 if (out != e.getValue()) {
                     e.setValue(out);

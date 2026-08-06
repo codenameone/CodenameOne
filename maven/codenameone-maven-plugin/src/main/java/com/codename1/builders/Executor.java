@@ -2356,9 +2356,31 @@ public abstract class Executor {
         return true;
     }
 
-    /** Extra library jars the hardening engine should see so it does not misrename overrides. */
+    /**
+     * Library jars the hardening engine passes to ProGuard so it can see inherited framework APIs
+     * and not rename an application method that overrides a framework method (which would break
+     * dispatch at runtime). The caller supplies the compile/platform classpath in the
+     * {@code cn1.hardening.libraryJars} request argument (path-separated); subclasses may add more.
+     */
     protected java.util.List<File> hardeningLibraryJars(BuildRequest request) {
-        return new java.util.ArrayList<File>();
+        java.util.List<File> jars = new java.util.ArrayList<File>();
+        String raw = request.getArg("cn1.hardening.libraryJars", "");
+        if (raw == null || raw.length() == 0) {
+            // Fallback: the maven plugin publishes the compile classpath here (a single injection
+            // point rather than threading it through every local-build request).
+            raw = System.getProperty("cn1.hardening.libraryJars", "");
+        }
+        if (raw != null && raw.length() > 0) {
+            for (String p : raw.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+                if (p != null && p.trim().length() > 0) {
+                    File f = new File(p.trim());
+                    if (f.exists()) {
+                        jars.add(f);
+                    }
+                }
+            }
+        }
+        return jars;
     }
 
     private File lastHardeningMapping;
@@ -2436,6 +2458,12 @@ public abstract class Executor {
             if (exit == 0) {
                 lastHardeningMapping = mapping.isFile() ? mapping : null;
                 lastHardeningMappingId = readMappingId(mapping);
+                // Propagate the mapping id / hardened flag / level into the request BEFORE the
+                // builder generates its stubs, so the stubs stamp them as runtime properties
+                // (Hardening.isHardened(), the crash report's mappingId/hardenLevel).
+                request.putArgument("cn1.mappingId", lastHardeningMappingId);
+                request.putArgument("cn1.hardened", "true");
+                request.putArgument("cn1.hardenLevel", level.trim().toLowerCase());
                 log("cn1-hardening: applied, mappingId=" + lastHardeningMappingId);
                 return hardened;
             }

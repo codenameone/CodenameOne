@@ -94,7 +94,12 @@ public final class BuiltinKeepRules {
         r.add("-dontusemixedcaseclassnames");
         r.add("-dontnote");
         r.add("-dontwarn");
-        r.add("-keepattributes Exceptions,InnerClasses,Signature,EnclosingMethod,*Annotation*");
+        // Keep SourceFile + LineNumberTable: ParparVM translates the line table into its
+        // on-device debug-line info, and the crash retrace passes device line numbers through
+        // rather than reconstructing them, so stripping the tables would make every hardened
+        // trace report unknown/-1 lines. The renamed names still hide the code; line tables don't.
+        r.add("-keepattributes Exceptions,InnerClasses,Signature,EnclosingMethod,*Annotation*,"
+                + "SourceFile,LineNumberTable");
         return r;
     }
 

@@ -209,6 +209,29 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         } else {
             System.clearProperty("cn1.harden.forceOff");
         }
+        // Publish the compile classpath so the hardening engine can hand it to ProGuard as library
+        // jars (so an application method that overrides a framework method is not renamed apart from
+        // its superclass). Only needed when hardening will actually run.
+        if (!"off".equalsIgnoreCase(level.trim()) && !r.isForceOff()) {
+            try {
+                List<String> cp = project.getCompileClasspathElements();
+                StringBuilder sb = new StringBuilder();
+                for (String element : cp) {
+                    File f = new File(element);
+                    if (f.isFile() && element.endsWith(".jar")) {
+                        if (sb.length() > 0) {
+                            sb.append(File.pathSeparator);
+                        }
+                        sb.append(f.getAbsolutePath());
+                    }
+                }
+                System.setProperty("cn1.hardening.libraryJars", sb.toString());
+            } catch (org.apache.maven.artifact.DependencyResolutionRequiredException ex) {
+                getLog().debug("Could not resolve compile classpath for hardening library jars", ex);
+            }
+        } else {
+            System.clearProperty("cn1.hardening.libraryJars");
+        }
     }
 
     /**

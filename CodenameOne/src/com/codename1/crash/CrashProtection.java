@@ -254,11 +254,32 @@ public final class CrashProtection {
     /// Swallows any failure: capturing a crash report must never itself crash.
     private static String safeRawStack(Throwable t) {
         try {
-            java.io.StringWriter sw = new java.io.StringWriter();
-            java.io.PrintWriter pw = new java.io.PrintWriter(sw);
-            t.printStackTrace(pw);
-            pw.flush();
-            String s = sw.toString();
+            // Built by hand rather than via printStackTrace(PrintWriter): the core is compiled
+            // against a restricted (CLDC-like) API that has no java.io.PrintWriter. The frame
+            // lines use the "    at <cls>.<method>:<line>" shape -- the same the ParparVM native
+            // trace uses -- so the trace-format sniffer classifies it correctly when structured
+            // frames are unavailable. getStackTrace() now returns frames on every port.
+            StringBuilder sb = new StringBuilder();
+            Throwable cur = t;
+            int depth = 0;
+            while (cur != null && depth < 8) {
+                if (depth > 0) {
+                    sb.append("Caused by: ");
+                }
+                sb.append(cur.toString()).append('\n');
+                StackTraceElement[] els = cur.getStackTrace();
+                int limit = els.length < CrashReportPayload.MAX_FRAMES
+                        ? els.length : CrashReportPayload.MAX_FRAMES;
+                for (int i = 0; i < limit; i++) {
+                    StackTraceElement e = els[i];
+                    sb.append("    at ").append(e.getClassName()).append('.')
+                            .append(e.getMethodName()).append(':').append(e.getLineNumber())
+                            .append('\n');
+                }
+                cur = cur.getCause();
+                depth++;
+            }
+            String s = sb.toString();
             return s.length() == 0 ? null : s;
         } catch (Throwable ignored) {
             return null;

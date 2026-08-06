@@ -758,6 +758,32 @@ public class AndroidGradleBuilder extends Executor {
         return "and";
     }
 
+    /**
+     * R8 keep rules contributed by app hardening, appended to the generated {@code proguard.cfg}.
+     * On Android the engine does not rename, so the user's {@code harden.keep} rules and the
+     * name-bound property-object rule (renaming a {@code PropertyBusinessObject}'s members silently
+     * changes JSON/DB schema) must be handed to R8 here. Empty when hardening is off.
+     */
+    private String hardeningR8Keep(BuildRequest request) {
+        String level = request.getArg("harden.level", "off");
+        if (level == null || level.trim().length() == 0 || "off".equalsIgnoreCase(level.trim())) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("-keepclassmembernames class * implements "
+                + "com.codename1.properties.PropertyBusinessObject { *; }\n");
+        String keep = request.getArg("harden.keep", "");
+        if (keep != null && keep.trim().length() > 0) {
+            // Newlines only: a ';' is legal inside a ProGuard rule body.
+            for (String rule : keep.split("\\r?\\n")) {
+                if (rule.trim().length() > 0) {
+                    sb.append(rule.trim()).append('\n');
+                }
+            }
+        }
+        return sb.toString();
+    }
+
     @Override
     protected boolean hardeningRenameSupported() {
         // R8 remains the sole renamer on Android; the engine only encrypts strings here and
@@ -4744,6 +4770,8 @@ public class AndroidGradleBuilder extends Executor {
             stubSourceCode += decodeFunction();
             stubSourceCode += "    public static final String BUILD_KEY = \"" + buildKeyEncoded(request) + "\";\n"
                     + "    public static final String CN1_MAPPING_ID = \"" + resolveMappingId(request) + "\";\n"
+                    + "    public static final String CN1_HARDENED = \"" + request.getArg("cn1.hardened", "false") + "\";\n"
+                    + "    public static final String CN1_HARDEN_LEVEL = \"" + request.getArg("cn1.hardenLevel", "off") + "\";\n"
                     + "    public static final String PACKAGE_NAME = \"" + request.getPackageName() + "\";\n"
                     + "    public static final String BUILT_BY_USER = \"" + xorEncode(request.getUserName()) + "\";\n"
                     + "    public static final String LICENSE_KEY = \"" + xorEncode(licenseKey) + "\";\n"
@@ -4805,6 +4833,8 @@ public class AndroidGradleBuilder extends Executor {
                     + nativeThemeStubProps
                     + "        Display.getInstance().setProperty(\"build_key\", d(BUILD_KEY));\n"
                     + "        Display.getInstance().setProperty(\"cn1.mappingId\", CN1_MAPPING_ID);\n"
+                    + "        Display.getInstance().setProperty(\"cn1.hardened\", CN1_HARDENED);\n"
+                    + "        Display.getInstance().setProperty(\"cn1.hardenLevel\", CN1_HARDEN_LEVEL);\n"
                     + "        Display.getInstance().setProperty(\"package_name\", PACKAGE_NAME);\n"
                     + "        Display.getInstance().setProperty(\"built_by_user\", d(BUILT_BY_USER));\n"
                     + useBackgroundPermissionSnippet
@@ -5521,6 +5551,11 @@ public class AndroidGradleBuilder extends Executor {
                         : "")
                 + facebookProguard
                 + " " + request.getArg("android.proguardKeep", "") + "\n"
+                // App-hardening keep rules for R8. On Android the engine does not rename (R8 is the
+                // sole renamer), so the user's harden.keep and the name-bound property-object rule
+                // must reach R8 here or a dynamically-resolved class can still be renamed and fail
+                // only in the hardened release.
+                + hardeningR8Keep(request)
                 + (usesHealthStore
                         ? HealthManifestFragments.proguardKeepRules(
                                 new java.util.ArrayList<String>(
