@@ -650,6 +650,8 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     NSMutableDictionary<NSNumber *, NSNumber *> *_pendingReplyAt;
     /// Guards the recurring tombstone sweep to a single pending chain; see pruneTombstonesNow.
     BOOL _tombstoneSweepScheduled;
+    /// Guards the post-removal deadline sweep to one block, however many paths are removed.
+    BOOL _tombstoneDeadlineScheduled;
     int _nextInboundToken;
     /// Keys the peer's last context carried, so a key that vanishes is reported as a removal.
     /// What the peer's context last said for each path: the authoritative stamp we delivered, or
@@ -853,13 +855,22 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // an app whose last act is a removal kept that final batch in its persisted context for good --
     // the tombstone is necessarily younger than its TTL at the moment it is written, and nothing
     // else would ever look again.
-    CN1WatchConnectivity *keepAlive = [self retain];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
-                                 (int64_t) (kCN1TombstoneTTLMillis + 1000) * NSEC_PER_MSEC),
-                   dispatch_get_main_queue(), ^{
-        [keepAlive pruneTombstonesNow];
-        [keepAlive release];
-    });
+    // ONE deadline block, however many paths are removed. Every removeData used to queue its own
+    // 24-hour block, each retaining the delegate, so churn through many paths accumulated
+    // thousands of them and as many redundant whole-context passes. The first tombstone's deadline
+    // is the earliest one that can matter; the sweep it triggers re-arms itself hourly while
+    // anything is still held, which covers every tombstone raised after it.
+    if (!_tombstoneDeadlineScheduled) {
+        _tombstoneDeadlineScheduled = YES;
+        CN1WatchConnectivity *keepAlive = [self retain];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                     (int64_t) (kCN1TombstoneTTLMillis + 1000) * NSEC_PER_MSEC),
+                       dispatch_get_main_queue(), ^{
+            keepAlive->_tombstoneDeadlineScheduled = NO;
+            [keepAlive pruneTombstonesNow];
+            [keepAlive release];
+        });
+    }
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
     [ctxLock unlock];
@@ -1133,6 +1144,18 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         NSNumber *previous = _lastReceived[path];
         if (previous != nil && previous.longLongValue == theirs.stamp) {
             // Same entry we already delivered, re-sent as part of the whole-context replace.
+            continue;
+        }
+        // A tombstone we have ALREADY announced is also unchanged, and it does not compare equal:
+        // what was recorded for it is the sentinel, not the peer's stamp. Without this, every
+        // unrelated publication by the peer re-delivered dataRemoved for that path -- once per
+        // whole-context update until the tombstone was finally pruned -- and an app that treats a
+        // removal as an event acted on it each time.
+        //
+        // Only while it is STILL a tombstone: a republish under the same path arrives with
+        // theirs.removed false and falls through to be delivered normally.
+        if (previous != nil && previous.longLongValue == kCN1RemovalAnnounced && theirs.removed) {
+            seen[path] = @(kCN1RemovalAnnounced);
             continue;
         }
         if (theirs.removed) {
