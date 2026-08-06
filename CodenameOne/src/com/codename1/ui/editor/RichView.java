@@ -220,7 +220,7 @@ public class RichView extends EditorView {
     }
 
     @Override
-    protected void copySelection() {
+    public void copySelection() {
         if (!hasSelection()) {
             return;
         }

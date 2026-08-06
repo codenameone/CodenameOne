@@ -1032,20 +1032,25 @@ public class EditorView extends Component implements TextInputClient {
 
     // ---- clipboard ----
 
-    protected void copySelection() {
+    /// Copies the selection to the clipboard. Public so a host that owns the platform menu bar can
+    /// route its Copy item here: a menu accelerator consumes the keystroke before the editor sees
+    /// it, so the host has to perform the operation on the editor's behalf.
+    public void copySelection() {
         if (hasSelection()) {
             Display.getInstance().copyToClipboard(doc.substring(getSelectionStart(), getSelectionEnd()));
         }
     }
 
-    private void cutSelection() {
+    /// Cuts the selection to the clipboard. See `#copySelection()` for why this is public.
+    public void cutSelection() {
         if (hasSelection() && editable) {
             copySelection();
             replaceRange(getSelectionStart(), getSelectionEnd(), "", true);
         }
     }
 
-    private void pasteClipboard() {
+    /// Inserts the clipboard contents at the caret. See `#copySelection()` for why this is public.
+    public void pasteClipboard() {
         if (!editable) {
             return;
         }

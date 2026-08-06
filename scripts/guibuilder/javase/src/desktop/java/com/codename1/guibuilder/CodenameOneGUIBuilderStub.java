@@ -474,7 +474,10 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
         edit.add(item("Copy", KeyEvent.VK_C, true, () -> editFocusedTextOrForm("copy")));
         edit.add(item("Paste", KeyEvent.VK_V, true, () -> editFocusedTextOrForm("paste")));
         edit.addSeparator();
-        edit.add(item("Delete Component", KeyEvent.VK_BACK_SPACE, false, CodenameOneGUIBuilder::deleteActiveSelection));
+        // Bare Backspace, so it competes with typing: guard it, or deleting a character in the code
+        // editor deletes the selected component from the design instead.
+        edit.add(item("Delete Component", KeyEvent.VK_BACK_SPACE, false,
+                () -> { if (!isCodeEditorFocused()) CodenameOneGUIBuilder.deleteActiveSelection(); }));
 
         JMenu view = new JMenu("View");
         JCheckBoxMenuItem dark = new JCheckBoxMenuItem("Dark Mode", CodenameOneGUIBuilder.isActiveDarkMode());
@@ -537,6 +540,11 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
     }
 
     private static void editFocusedTextOrForm(String operation) {
+        // A menu accelerator consumes the keystroke before Codename One ever sees it, and the AWT
+        // focus owner is always the canvas rather than a Swing text component, so without this the
+        // Edit menu treated Cmd+V inside the code editor as "paste a component into the design".
+        // That rebuilt the canvas and tore down the split pane the editor was living in.
+        if (editFocusedCodeEditor(operation)) return;
         java.awt.Component focus = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
         if (focus instanceof JTextComponent) {
             JTextComponent text = (JTextComponent) focus;
@@ -548,6 +556,29 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
         if ("cut".equals(operation)) CodenameOneGUIBuilder.cutActiveSelection();
         else if ("copy".equals(operation)) CodenameOneGUIBuilder.copyActiveSelection();
         else CodenameOneGUIBuilder.pasteActiveSelection();
+    }
+
+    /** True while a Codename One code editor holds the focus and should own the keyboard. */
+    private static boolean isCodeEditorFocused() {
+        com.codename1.ui.Form form = com.codename1.ui.CN.getCurrentForm();
+        return form != null && form.getFocused() instanceof com.codename1.ui.editor.EditorView;
+    }
+
+    /** Routes a clipboard operation to the Codename One code editor when it holds the focus. */
+    private static boolean editFocusedCodeEditor(String operation) {
+        com.codename1.ui.Form form = com.codename1.ui.CN.getCurrentForm();
+        com.codename1.ui.Component focused = form == null ? null : form.getFocused();
+        if (!(focused instanceof com.codename1.ui.editor.EditorView)) return false;
+        final com.codename1.ui.editor.EditorView view = (com.codename1.ui.editor.EditorView) focused;
+        if (view.getComponentForm() == null) return false;
+        com.codename1.ui.CN.callSerially(new Runnable() {
+            @Override public void run() {
+                if ("cut".equals(operation)) view.cutSelection();
+                else if ("copy".equals(operation)) view.copySelection();
+                else view.pasteClipboard();
+            }
+        });
+        return true;
     }
 
     private static JMenuItem item(String label, int key, boolean menuShortcut, Runnable action) {
