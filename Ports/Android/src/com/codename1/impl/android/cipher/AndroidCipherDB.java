@@ -294,6 +294,15 @@ class AndroidCipherDB extends Database {
         }
         SQLiteDatabase closing = db;
         db = null;
+        // Invalidate the cursors before letting go of the connection. Each holds a SQLiteQuery
+        // that keeps the old connection alive, and its wrapper still reports itself open, so
+        // after the swap it would either read the file that is about to be replaced or fail with
+        // an unchecked error from a closed pool. close() does this; this path bypassed it.
+        AndroidCursor[] migrating = openCursors.toArray(new AndroidCursor[openCursors.size()]);
+        openCursors.clear();
+        for (int iter = 0; iter < migrating.length; iter++) {
+            migrating[iter].invalidate();
+        }
         closing.close();
         File original = new File(path);
         File backup = new File(path + BACKUP_SUFFIX);

@@ -11066,14 +11066,34 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// and install the converted file in its place, so a process death in that gap leaves a
     /// complete database under the backup name and nothing under the live one. Putting it back
     /// first is what makes the window recoverable rather than a silent empty database.
-    static void recoverInterruptedDatabaseMigration(String path) {
+    static void recoverInterruptedDatabaseMigration(String path) throws IOException {
         if (path == null) {
             return;
         }
         File live = new File(path);
         File backup = new File(path + DATABASE_BACKUP_SUFFIX);
-        if (backup.isFile() && !live.exists()) {
-            backup.renameTo(live);
+        if (!backup.isFile()) {
+            return;
+        }
+        if (!live.exists()) {
+            // Died between the two renames: the backup is the only copy. Put it back, and refuse
+            // to continue if that fails - opening would create an empty database over the top and
+            // the next conversion would remove the backup as stale, losing the data for good.
+            if (!backup.renameTo(live)) {
+                throw new IOException("The database " + path + " is mid-conversion and the copy "
+                        + "holding its contents, at " + backup + ", could not be moved back. The "
+                        + "data is intact in that file; the database was not opened rather than "
+                        + "replacing it with an empty one.");
+            }
+            return;
+        }
+        // Both exist, so the swap completed and only the cleanup was lost. The backup is the
+        // database in its previous form, which after an encrypt is a plaintext copy sitting at a
+        // predictable name, so leaving it is the encryption-at-rest hole in slow motion.
+        if (!backup.delete() && backup.exists()) {
+            throw new IOException("The database " + path + " was converted, but the copy of its "
+                    + "previous form at " + backup + " could not be removed. Delete it before "
+                    + "relying on this database being encrypted.");
         }
     }
 

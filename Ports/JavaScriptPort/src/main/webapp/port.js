@@ -6484,6 +6484,26 @@ function cn1SqliteLookup(id) {
   return obj;
 }
 
+/**
+ * Distinguishes a browser that cannot do synchronous OPFS from one that merely would not.
+ *
+ * The first is permanent and memory is the best available answer. The second - another tab
+ * holding the handles, a quota, a timeout - is transient, and quietly substituting an empty
+ * in-memory database for a persistent one that exists is data loss, not degradation.
+ */
+function cn1SqliteOpfsIsUnsupported(err) {
+  if (typeof FileSystemFileHandle === "undefined"
+      || typeof FileSystemFileHandle.prototype === "undefined"
+      || typeof FileSystemFileHandle.prototype.createSyncAccessHandle !== "function") {
+    return true;
+  }
+  const message = String((err && err.message) || err || "").toLowerCase();
+  return message.indexOf("not supported") >= 0
+      || message.indexOf("unsupported") >= 0
+      || message.indexOf("is not a function") >= 0
+      || message.indexOf("undefined") >= 0;
+}
+
 /** How long either half of the engine bring-up may take before it is treated as unavailable. */
 const CN1_SQLITE_INIT_TIMEOUT_MS = 15000;
 
@@ -6561,9 +6581,22 @@ function cn1SqliteStartInit() {
         CN1_SQLITE_INIT_TIMEOUT_MS,
         "opening the OPFS storage pool");
     } catch (err) {
-      // Firefox before 111 and Safari before 15.2 have no createSyncAccessHandle.
-      // Degrade to memory, but say so: silently losing every write on reload is
-      // exactly the kind of failure that should not be discovered in production.
+      if (!cn1SqliteOpfsIsUnsupported(err)) {
+        // Contention with another tab, a timeout, a quota or any other transient storage failure.
+        // Falling back here would open a fresh in-memory database, so an existing persistent one
+        // would look empty and everything written this session would vanish at page close -
+        // silent data loss dressed up as a working database. Reporting the database as
+        // unavailable is the only answer that does not lie.
+        console.warn("Codename One: the OPFS storage pool could not be opened, so databases are "
+          + "unavailable in this session. This is usually another tab holding the same storage. "
+          + "Reported cause: " + err);
+        cn1Sqlite = null;
+        cn1SqlitePool = null;
+        return false;
+      }
+      // Firefox before 111 and Safari before 15.2 have no createSyncAccessHandle at all. There is
+      // no persistent storage to lose on those, so memory is a genuine improvement over nothing -
+      // but say so, because losing every write on reload should not be discovered in production.
       console.warn("Codename One: this browser has no synchronous OPFS access, so databases are "
         + "kept in memory for the lifetime of this page and are lost when it closes. Reported "
         + "cause: " + err);
