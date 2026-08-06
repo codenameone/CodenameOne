@@ -4106,6 +4106,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             canvasHost.revalidate();
             canvasHost.repaint();
         }
+        // Repaint the form as well. A component only repaints itself when it is already painting
+        // its own region, and the canvas sits inside a split pane whose parent decides the frame,
+        // so restyling without asking the form for a new frame left the old pixels on screen.
+        Form current = Display.getInstance().getCurrent();
+        if (current != null) current.repaint();
     }
 
     private void loadProjectTheme() {
