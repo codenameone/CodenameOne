@@ -1136,7 +1136,13 @@ public class CN1WearableBridge implements WearableBridge {
             rememberValueIfStampUnchanged(path, before, out);
             return out;
         } catch (java.io.IOException unavailable) {
-            return null;
+            // A failed query is NOT an empty path, and the two must not collapse into the same
+            // answer: the public getter documents null as "no value here", so returning it after a
+            // timeout invites a caller to clear state for a path that is still published.
+            // resolveValue throws precisely to keep them apart. The last known snapshot is the
+            // honest answer -- it is what this device last saw -- and null only when there is not
+            // even that.
+            return cachedValue(path);
         }
     }
 
@@ -1485,10 +1491,24 @@ public class CN1WearableBridge implements WearableBridge {
                             if (t.payload != null && !isLocallyAuthored(context, uri.getHost())) {
                                 long tseq = sequenceOf(valueOrTransferMap(item));
                                 if (claimTransfer(uri, tseq)) {
-                                    confirmTransferDelivered(uri, tseq,
-                                            WearableConnection.deliverDataChangedTracked(
-                                                    t.logicalPath, t.payload));
+                                    // Confirmed from INSIDE the delivery, not from its dispatch.
+                                    // deliverDataChangedTracked returning true only means the
+                                    // runnable reached the EDT; a process death before it ran would
+                                    // persist a claim for a file the app never saw and suppress the
+                                    // redelivery that would have replaced it.
+                                    final Uri claimed = uri;
+                                    final long claimedSeq = tseq;
+                                    WearableConnection.deliverDataChangedTracked(
+                                            t.logicalPath, t.payload, new Runnable() {
+                                                public void run() {
+                                                    confirmTransferDelivered(claimed, claimedSeq, true);
+                                                }
+                                            });
                                 }
+                                // Released on SUCCESS as well as on give-up. Every transfer has a
+                                // sequence-suffixed URI, so a receiver that handles many slow
+                                // transfers would otherwise keep one entry per transfer forever.
+                                forgetRetryStart(uri);
                                 return;
                             }
                         }
@@ -1880,6 +1900,18 @@ public class CN1WearableBridge implements WearableBridge {
      * <p>Access-ordered with an eviction cap: the only cost of evicting a transfer claim is that a
      * re-synced copy of a very old transfer could be delivered twice, and the sender's own sweep
      * removes those items long before that many newer ones accumulate.
+     */
+    /**
+     * Delivery stamps per path. A plain HashMap, deliberately SEPARATE from {@link #transferClaims}
+     * and deliberately NOT size-capped.
+     *
+     * <p>Recorded because it has been read the other way: transfer claims live in their own bounded
+     * LRU, so a burst of file transfers cannot evict a replicated path's ordering stamp. They are
+     * different lifetimes -- a claim is one-shot and expendable once the sender's retention window
+     * passes, an ordering stamp must outlive anything that could arrive for that path -- which is
+     * exactly why they are not one map. Evicting a stamp would let a stale item pass the ordering
+     * test, so this one grows with the number of distinct paths an app uses, which is bounded by
+     * the app rather than by traffic.</p>
      */
     private static final Map<String, String> deliveredSequences = new HashMap<String, String>();
 

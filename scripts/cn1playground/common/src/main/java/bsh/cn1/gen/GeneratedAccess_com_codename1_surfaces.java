@@ -2615,6 +2615,10 @@ public final class GeneratedAccess_com_codename1_surfaces {
         if ("LOCKSCREEN".equals(name)) return com.codename1.surfaces.WidgetSize.LOCKSCREEN;
         if ("MEDIUM".equals(name)) return com.codename1.surfaces.WidgetSize.MEDIUM;
         if ("SMALL".equals(name)) return com.codename1.surfaces.WidgetSize.SMALL;
+        if ("WATCH_CIRCULAR".equals(name)) return com.codename1.surfaces.WidgetSize.WATCH_CIRCULAR;
+        if ("WATCH_CORNER".equals(name)) return com.codename1.surfaces.WidgetSize.WATCH_CORNER;
+        if ("WATCH_INLINE".equals(name)) return com.codename1.surfaces.WidgetSize.WATCH_INLINE;
+        if ("WATCH_RECTANGULAR".equals(name)) return com.codename1.surfaces.WidgetSize.WATCH_RECTANGULAR;
         throw unsupportedStaticField(com.codename1.surfaces.WidgetSize.class, name);
     }
 

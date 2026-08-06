@@ -109,6 +109,10 @@ static void cn1WearableObserveSequence(int64_t seen) {
 /// discarded, never usefully invoked.
 static const NSTimeInterval kCN1ReplyExpirySeconds = 120.0;
 
+/// Stand-in stamp meaning "this path's removal has already been announced". A real stamp is a
+/// wall-clock millisecond value, so a negative sentinel cannot collide with one.
+static const int64_t kCN1RemovalAnnounced = -1;
+
 /// Drops reply blocks the app never answered. Caller holds the _pendingReplies monitor.
 static void cn1WearableExpireReplies(NSMutableDictionary *replies, NSMutableDictionary *arrivedAt) {
     if (replies.count == 0) {
@@ -774,6 +778,7 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
             continue;
         }
         if (theirs.removed) {
+            seen[path] = @(kCN1RemovalAnnounced);
             if (mine.known && !mine.removed) {
                 // Acknowledge it by dropping OUR live value for the path. The remover keeps a
                 // tombstone until the value it removed is gone from our context, so without this
@@ -806,8 +811,16 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         if (seen[gone] == nil) {
             // Dropped out of the peer's context without a tombstone -- an older peer build, or a
             // context rebuilt from scratch. Treat it as the removal it is.
+            //
+            // Except when we already announced that removal. A tombstone the peer PRUNED after its
+            // 24-hour TTL also disappears from the context, and the listener was told about it when
+            // the tombstone first arrived; re-announcing on the next routine context update turns
+            // ordinary housekeeping into a duplicate dataRemoved. _lastReceived remembers the
+            // tombstone's stamp, and a negative marker records that its removal has been reported.
             CN1WearableEntry mine = cn1WearableEntryFor(localCtx, gone);
-            if (!mine.known || mine.removed) {
+            NSNumber *previous = _lastReceived[gone];
+            BOOL alreadyAnnounced = previous != nil && previous.longLongValue == kCN1RemovalAnnounced;
+            if ((!mine.known || mine.removed) && !alreadyAnnounced) {
                 cn1_wearable_deliverDataRemoved(gone.UTF8String);
             }
         }

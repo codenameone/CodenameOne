@@ -149,7 +149,13 @@ public class CN1WearableListenerService extends WearableListenerService {
 
     @Override
     public void onDataChanged(DataEventBuffer events) {
-        ensureAppRunning();
+        // NOT before the loop. This service is exported and there is no binding permission that
+        // would narrow it to Play services, so starting the app first let an untrusted caller bring
+        // the UI forward with an empty or forged callback -- the provenance check below stops the
+        // payload but cannot undo a launch that already happened. The app is started on the first
+        // event that proves it came from a known node, which is also the first event that could
+        // give the app anything to do.
+        boolean started = false;
         for (DataEvent event : events) {
             android.net.Uri uri = event.getDataItem().getUri();
             String path = uri.getPath();
@@ -164,6 +170,10 @@ public class CN1WearableListenerService extends WearableListenerService {
             if (path == null || !isFromAKnownHost(uri)
                     || (!transferItem && !path.startsWith(CN1WearableBridge.pathPrefix()))) {
                 continue;
+            }
+            if (!started) {
+                ensureAppRunning();
+                started = true;
             }
             if (transferItem) {
                 // A file transfer arrives as a DataMap carrying an Asset rather than an inline
@@ -193,9 +203,18 @@ public class CN1WearableListenerService extends WearableListenerService {
                     // The claim is made DURABLE only if this reached a live listener. Parked in the
                     // cold-start queue it is not safe yet: a process death would lose the payload
                     // while a persisted claim suppressed the redelivery that would replace it.
-                    CN1WearableBridge.confirmTransferDelivered(uri, transferSeq,
-                            WearableConnection.deliverDataChangedTracked(
-                                    transfer.logicalPath, transfer.payload));
+                    // Confirmed from inside the delivery: dispatched is not delivered, and a
+                    // claim persisted for a file the app never received suppresses the redelivery
+                    // that would have replaced it.
+                    final android.net.Uri claimed = uri;
+                    final long claimedSeq = transferSeq;
+                    WearableConnection.deliverDataChangedTracked(
+                            transfer.logicalPath, transfer.payload, new Runnable() {
+                                public void run() {
+                                    CN1WearableBridge.confirmTransferDelivered(
+                                            claimed, claimedSeq, true);
+                                }
+                            });
                 }
                 // An unreadable asset delivers nothing now; decodeTransfer has scheduled a re-read,
                 // which beats handing the listener DataMap bytes dressed up as a payload.

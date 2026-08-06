@@ -258,6 +258,8 @@ class JavaSEWearableBridge implements WearableBridge {
             if (recorded <= 0) {
                 recorded = stamp;
             }
+            // Alongside the stamp, so a filesystem that rounds mtimes cannot erase who wrote this.
+            recordAuthor(f);
             // Our own write must not come back to us as a peer change.
             synchronized (seenData) {
                 seenData.put(f.getName(), Long.valueOf(recorded));
@@ -438,11 +440,17 @@ class JavaSEWearableBridge implements WearableBridge {
         s.setTcpNoDelay(true);
         peer = s;
         peerOut = new DataOutputStream(s.getOutputStream());
-        writeFrame(peerOut, FRAME_HELLO, "", new byte[0], 0);
+        // The hello carries the project identity. The port is derived from a hash of the shared
+        // directory truncated to 10,000 values, so two unrelated projects whose paths collide -- or
+        // any other local service already sitting on that port -- would otherwise connect, both
+        // report reachable, and exchange live messages and replies between unrelated apps. A
+        // successful connection to a small shared port range proves nothing about who is on it.
+        writeFrame(peerOut, FRAME_HELLO, projectIdentity(), new byte[0], 0);
         WearableConnection.notifyStateChanged();
     }
 
     private void readLoop(Socket s) {
+        boolean helloVerified = false;
         try {
             DataInputStream in = new DataInputStream(s.getInputStream());
             while (!closed) {
@@ -459,10 +467,27 @@ class JavaSEWearableBridge implements WearableBridge {
                 byte[] payload = new byte[length];
                 in.readFully(payload);
                 switch (kind) {
+                    case FRAME_HELLO:
+                        // Validate the identity before anything else is honoured. A peer on a
+                        // colliding port -- another project, or an unrelated local service that
+                        // happens to speak enough of this to get here -- is dropped rather than
+                        // treated as the pair.
+                        if (!projectIdentity().equals(path)) {
+                            throw new IOException("Wearable simulator: refusing a peer from a "
+                                    + "different project (" + path + ")");
+                        }
+                        helloVerified = true;
+                        break;
                     case FRAME_MESSAGE:
+                        if (!helloVerified) {
+                            throw new IOException("Wearable simulator: traffic before a verified hello");
+                        }
                         WearableConnection.deliverMessage(path, payload, token);
                         break;
                     case FRAME_REPLY:
+                        if (!helloVerified) {
+                            throw new IOException("Wearable simulator: traffic before a verified hello");
+                        }
                         cancelReplyTimeout(token);
                         WearableConnection.deliverReply(token, payload, null);
                         break;
@@ -501,6 +526,14 @@ class JavaSEWearableBridge implements WearableBridge {
             out.write(body);
             out.flush();
         }
+    }
+
+    /// Identifies the project on the wire, so a port collision cannot be mistaken for a peer.
+    ///
+    /// The absolute shared directory is the identity: it is what "the same project" means here, and
+    /// it is exactly what the port hash throws away.
+    private String projectIdentity() {
+        return dataDir.getAbsolutePath();
     }
 
     /// Derives a stable loopback port from the shared directory, so two JVMs of the same project
@@ -571,7 +604,7 @@ class JavaSEWearableBridge implements WearableBridge {
                     // hand the sender its own file through its own data listener.
                     continue;
                 }
-                if (!isTransfer(f.getName()) && authoredLocally(stamp)) {
+                if (!isTransfer(f.getName()) && authoredLocallyFor(f, stamp)) {
                     // Our own VALUE, for the same reason. primeSeenData() records nothing so that a
                     // value published while this side was down still replays on startup -- but that
                     // also replayed values THIS side published before it restarted, reporting them
@@ -679,6 +712,65 @@ class JavaSEWearableBridge implements WearableBridge {
     private boolean authoredLocally(long stamp) {
         return (stamp & 1L) == (watchSide ? 1L : 0L);
     }
+
+    /**
+     * Author identity that does not depend on the filesystem preserving a single bit.
+     *
+     * <p>The side bit rides in the stamp's low bit, and a filesystem that rounds modification times
+     * -- FAT to two seconds, some network mounts coarser -- erases it. The phone then reads every
+     * watch publication as locally authored and suppresses its callback, which is the pairing
+     * silently not working rather than failing.
+     *
+     * <p>So the author is also recorded next to the file, in a sidecar the filesystem cannot round.
+     * The stamp stays authoritative when the sidecar is missing (an older file, or a write that
+     * failed), because a wrong-but-present answer is worse than the previous behaviour only if it
+     * disagrees, and the sidecar is written under the same lock as the publication.</p>
+     */
+    private boolean authoredLocallyFor(File f, long stamp) {
+        Boolean recorded = recordedAuthor(f);
+        if (recorded != null) {
+            return recorded.booleanValue() == watchSide;
+        }
+        return authoredLocally(stamp);
+    }
+
+    /** The ".author" sidecar for a published value: "watch" or "phone", or null when absent. */
+    private Boolean recordedAuthor(File f) {
+        File side = new File(f.getParentFile(), f.getName() + AUTHOR_SUFFIX);
+        try {
+            if (!side.isFile()) {
+                return null;
+            }
+            byte[] b = readFully(side);
+            String v = new String(b, "UTF-8").trim();
+            if ("watch".equals(v)) {
+                return Boolean.TRUE;
+            }
+            if ("phone".equals(v)) {
+                return Boolean.FALSE;
+            }
+            return null;
+        } catch (IOException unreadable) {
+            return null;
+        }
+    }
+
+    private void recordAuthor(File f) {
+        File side = new File(f.getParentFile(), f.getName() + AUTHOR_SUFFIX);
+        try {
+            FileOutputStream out = new FileOutputStream(side);
+            try {
+                out.write((watchSide ? "watch" : "phone").getBytes("UTF-8"));
+            } finally {
+                out.close();
+            }
+        } catch (IOException err) {
+            // The stamp's side bit remains the fallback.
+        }
+    }
+
+    /** Suffix of the author sidecar. Ends in a dot-suffix so the watcher skips it like a staging file. */
+    private static final String AUTHOR_SUFFIX = ".author.tmp";
 
     private static long lastStamp;
 

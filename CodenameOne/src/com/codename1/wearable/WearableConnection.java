@@ -65,6 +65,17 @@ public final class WearableConnection {
     /// Queued separately per listener type: an app that registers its data listener first would
     /// otherwise drain a queued *message* while messageListeners was still empty, losing it for
     /// good.
+    /**
+     * Deliveries parked until a listener exists.
+     *
+     * <p>Bounded. A peer that keeps sending to an app version which never registers the matching
+     * listener -- a retired message path, a build that dropped the feature -- would otherwise grow
+     * these without limit, and each queued runnable captures its whole payload, so the cost is the
+     * traffic rather than the count. When the cap is reached the OLDEST delivery is dropped: for a
+     * replicated value the newest is the one that matters, and for a message a listener that has
+     * never appeared was never going to read the old ones either.</p>
+     */
+    private static final int MAX_PENDING = 256;
     private static final List<Runnable> pendingMessages = new ArrayList<Runnable>();
     private static final List<Runnable> pendingData = new ArrayList<Runnable>();
 
@@ -537,6 +548,9 @@ public final class WearableConnection {
         // delivery can never be parked after the drain that would have replayed it.
         synchronized (queue) {
             if (listeners.isEmpty()) {
+                while (queue.size() >= MAX_PENDING) {
+                    queue.remove(0);
+                }
                 queue.add(delivery);
                 return false;
             }
@@ -563,6 +577,28 @@ public final class WearableConnection {
     /// `true` when a listener was registered and the delivery was dispatched; `false` when it was
     /// queued for a listener that does not exist yet.
     public static boolean deliverDataChangedTracked(final String path, final byte[] payload) {
+        return deliverDataChangedTracked(path, payload, null);
+    }
+
+    /// As above, invoking `onDelivered` once application listeners have actually RUN.
+    ///
+    /// The distinction matters for anything that records a delivery durably. `deliver` returning
+    /// true means the runnable was handed to the EDT, not that it executed -- a process death in
+    /// between loses the payload while the record says it arrived. A one-shot file transfer
+    /// suppresses its own redelivery on the strength of that record, so the difference between
+    /// "dispatched" and "delivered" is the difference between a duplicate and a permanent loss.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path whose value changed
+    /// - `payload`: the encoded new value
+    /// - `onDelivered`: run on the EDT after the listeners, or null
+    ///
+    /// #### Returns
+    ///
+    /// `true` when a listener was registered and the delivery was dispatched.
+    public static boolean deliverDataChangedTracked(final String path, final byte[] payload,
+            final Runnable onDelivered) {
         return deliver(new Runnable() {
             @Override
             public void run() {
@@ -571,6 +607,9 @@ public final class WearableConnection {
                         dataListeners.toArray(new WearableDataListener[dataListeners.size()]);
                 for (WearableDataListener l : copy) {
                     l.dataChanged(m);
+                }
+                if (onDelivered != null) {
+                    onDelivered.run();
                 }
             }
         }, dataListeners, pendingData);
