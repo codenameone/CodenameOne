@@ -331,7 +331,14 @@ public class AndroidGradleBuilder extends Executor {
         return request.getArg("watchMain", "").trim();
     }
 
-    private static String appLifecycleClass(BuildRequest request) {
+    private String appLifecycleClass(BuildRequest request) {
+        // Unit-test mode wins. generateUnitTestFiles has already replaced the main class with
+        // CodenameOneUnitTestExecutor, and rooting the APK at the watch lifecycle instead started
+        // the watch application rather than DeviceRunner -- so the tests never ran and the build
+        // reported no results rather than failing, which is the worse of the two.
+        if (isUnitTestMode()) {
+            return request.getMainClass();
+        }
         String watchMain = request.getArg("watchMain", "").trim();
         boolean standalone = "true".equals(request.getArg("watchStandalone", "false"));
         if (watchMain.length() > 0 && standalone) {
