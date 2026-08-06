@@ -50,10 +50,24 @@ rm -rf core/target factory/target css-compiler/target
 JAVA_HOME="$JDK8" PATH="$JDK8/bin:$PATH" \
   mvn -q -Dmaven.repo.local="$LOCAL_REPO" -pl factory,core,css-compiler \
     -DskipTests -Dmaven.javadoc.skip=true clean install
+# mvn install has repeatedly reported success while leaving the previous jar in place, so the
+# freshly built artifacts are copied over it explicitly. Trusting install is what made fixes compile
+# and pass tests without ever reaching the running editor.
+for module in core factory css-compiler; do
+  for jar in "$REPO_ROOT/maven/$module/target/"*.jar; do
+    [ -e "$jar" ] || continue
+    case "$jar" in *-sources.jar|*-javadoc.jar) continue;; esac
+    artifact="$(basename "$jar" | sed 's/-8\.0-SNAPSHOT\.jar$//')"
+    dest="$LOCAL_REPO/com/codenameone/$artifact/8.0-SNAPSHOT/$(basename "$jar")"
+    [ -e "$dest" ] && cp -f "$jar" "$dest"
+  done
+done
+
 JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/editor/CodeView.class" "protectedStartMarker"
 JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/editor/EditorView.class" "multiKeyModeRestore"
 JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/CodeEditor.class" "setCursorPosition"
 JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/Form.class" "focusedHandlesInput"
+JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/editor/EditorView.class" "copySelection"
 
 echo "==> javase port (JDK 8)"
 JAVA_HOME="$JDK8" PATH="$JDK8/bin:$PATH" \
