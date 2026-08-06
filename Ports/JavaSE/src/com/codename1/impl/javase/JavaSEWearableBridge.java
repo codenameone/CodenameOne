@@ -706,10 +706,21 @@ class JavaSEWearableBridge implements WearableBridge {
                 }
                 if (f.lastModified() != stamp) {
                     // Replaced while we were reading it, so this snapshot belongs to neither the
-                    // file we classified nor the one now on disk. Forget it and let the next scan
-                    // see the winner whole.
+                    // file we classified nor the one now on disk. Forget the marker and let the
+                    // next scan see the winner whole.
+                    //
+                    // Unless the file is GONE. This scan has already taken the name off `gone`, so
+                    // dropping the marker too would leave the next scan with nothing to notice the
+                    // disappearance by -- a peer that republished and then removed a path would
+                    // never produce dataRemoved, and the listener would hold the old value for
+                    // good. Restoring the previous marker puts the name back in the next scan's
+                    // `gone` list, which is what reports the removal.
                     synchronized (seenData) {
-                        seenData.remove(f.getName());
+                        if (!f.exists() && previous != null) {
+                            seenData.put(f.getName(), previous);
+                        } else {
+                            seenData.remove(f.getName());
+                        }
                     }
                     continue;
                 }
@@ -846,7 +857,8 @@ class JavaSEWearableBridge implements WearableBridge {
      */
     /// The writer's own stamp out of the frame, or Long.MIN_VALUE when the bytes carry none.
     private static long framedStamp(byte[] all) {
-        if (!framed(all)) {
+        // Only the current framing carries one; a v1 file falls back to mtime folded with author.
+        if (headerLength(all) != VALUE_HEADER_LENGTH) {
             return Long.MIN_VALUE;
         }
         long v = 0;
@@ -905,8 +917,15 @@ class JavaSEWearableBridge implements WearableBridge {
                 }
                 off += r;
             }
-            if (off < head.length) {
+            if (off < VALUE_HEADER_V1_LENGTH) {
                 return null;
+            }
+            if (off < head.length) {
+                // A v1 file, or a v2 file truncated: hand back exactly what was read so
+                // headerLength can judge it rather than guessing from a padded buffer.
+                byte[] shorter = new byte[off];
+                System.arraycopy(head, 0, shorter, 0, off);
+                return shorter;
             }
         } catch (IOException unreadable) {
             return null;
@@ -941,9 +960,10 @@ class JavaSEWearableBridge implements WearableBridge {
     /// The author recorded in the value's own header: TRUE for the watch, FALSE for the phone,
     /// null when the file predates the header or is too short to carry one.
     private static Boolean authorOf(byte[] snapshot) {
-        if (!framed(snapshot)) {
+        if (headerLength(snapshot) == 0) {
             return null;
         }
+        // Same offset in both framings.
         byte who = snapshot[VALUE_MAGIC.length];
         if (who == 'w') {
             return Boolean.TRUE;
@@ -956,11 +976,27 @@ class JavaSEWearableBridge implements WearableBridge {
 
     /// True when these bytes carry the author frame.
     private static boolean framed(byte[] all) {
-        if (all == null || all.length < VALUE_HEADER_LENGTH) {
+        return headerLength(all) > 0;
+    }
+
+    /// The frame length these bytes carry: 0 when unframed, {@link #VALUE_HEADER_V1_LENGTH} for the
+    /// first framing, {@link #VALUE_HEADER_LENGTH} for the current one.
+    private static int headerLength(byte[] all) {
+        if (matches(all, VALUE_MAGIC) && all.length >= VALUE_HEADER_LENGTH) {
+            return VALUE_HEADER_LENGTH;
+        }
+        if (matches(all, VALUE_MAGIC_V1) && all.length >= VALUE_HEADER_V1_LENGTH) {
+            return VALUE_HEADER_V1_LENGTH;
+        }
+        return 0;
+    }
+
+    private static boolean matches(byte[] all, byte[] magic) {
+        if (all == null || all.length < magic.length) {
             return false;
         }
-        for (int i = 0; i < VALUE_MAGIC.length; i++) {
-            if (all[i] != VALUE_MAGIC[i]) {
+        for (int i = 0; i < magic.length; i++) {
+            if (all[i] != magic[i]) {
                 return false;
             }
         }
@@ -969,10 +1005,10 @@ class JavaSEWearableBridge implements WearableBridge {
 
     /// The value's bytes with the author frame removed, from an in-memory snapshot.
     private static byte[] payloadOf(byte[] all) {
-        if (!framed(all)) {
+        int skip = headerLength(all);
+        if (skip == 0) {
             return all;
         }
-        int skip = VALUE_HEADER_LENGTH;
         byte[] body = new byte[all.length - skip];
         System.arraycopy(all, skip, body, 0, body.length);
         return body;
@@ -981,6 +1017,13 @@ class JavaSEWearableBridge implements WearableBridge {
     /// Marks a framed value file. Chosen so a stale sandbox written before the header existed still
     /// reads correctly: no magic simply means "fall back to the stamp's side bit".
     private static final byte[] VALUE_MAGIC = {'C', 'N', '1', 'W', 'A', '2'};
+
+    /// The first framing, still read. It carries the author but no stamp, so a sandbox written by
+    /// the immediately preceding build keeps working: rejecting it outright would hand the app its
+    /// own six magic bytes as payload, and WearableMessage would read the 'C' as a wire version and
+    /// decode an empty value.
+    private static final byte[] VALUE_MAGIC_V1 = {'C', 'N', '1', 'W', 'A', '1'};
+    private static final int VALUE_HEADER_V1_LENGTH = VALUE_MAGIC_V1.length + 1;
 
     /// magic + author + the writer's own 8-byte stamp.
     ///
