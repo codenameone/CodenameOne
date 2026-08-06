@@ -185,6 +185,25 @@ public class HardeningEngineTest {
     }
 
     @Test
+    public void platformOptOutIsSkippedNotHardened() throws Exception {
+        File in = buildInputJar();
+        File out = tmp.newFile("optout-hardened.jar");
+        Map<String, String> hints = new HashMap<String, String>();
+        hints.put("harden.level", "standard");
+        hints.put("harden.ios.enabled", "false");
+        HardeningRequest req = new HardeningRequest()
+                .inputJar(in).outputJar(out).mappingFile(tmp.newFile("optout-map.txt"))
+                .workDir(tmp.newFolder("optout-work"))
+                .config(HardeningConfig.from(hints, "ios", true))
+                .mainClass("com.codename1.hardening.fixture.Secrets");
+        HardeningResult r = HardeningEngine.harden(req);
+        assertFalse(r.isHardened());
+        assertEquals(HardeningResult.Outcome.SKIPPED_PLATFORM_DISABLED, r.getOutcome());
+        assertFalse("an opted-out platform must not count as an applied transform",
+                HardeningEngine.willApplyAnyTransform(HardeningConfig.from(hints, "ios", true)));
+    }
+
+    @Test
     public void androidRenameOnlyIsHardenedViaR8() throws Exception {
         // Android (renameSupported=false), standard with strings off: the engine renames nothing,
         // but R8 will, so the build must be marked hardened rather than skipped.

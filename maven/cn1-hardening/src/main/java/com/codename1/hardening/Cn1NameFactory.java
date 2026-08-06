@@ -84,15 +84,20 @@ public final class Cn1NameFactory {
     /**
      * Writes a dictionary of {@code count} distinct names to {@code out}. A build feeds the same
      * file as the class, member and package obfuscation dictionary; sizing it above the number of
-     * names any one scope needs guarantees ProGuard never falls back to short names.
+     * names any one scope needs guarantees ProGuard never falls back to short names. The
+     * {@code seed} shifts the starting word so that different seeds (or build keys) yield different
+     * name assignments -- hence different mappings -- while the same seed reproduces them exactly.
      */
-    public static void writeDictionary(File out, int count) throws IOException {
+    public static void writeDictionary(File out, int count, int seed) throws IOException {
         int safeCount = Math.max(count, 1);
+        // A stable, non-negative offset from the seed; the word() indexing stays injective, so the
+        // offset never introduces collisions.
+        int offset = (seed & 0x7fffffff) % 1000000;
         FileOutputStream fo = new FileOutputStream(out);
         try {
             Writer w = new BufferedWriter(new OutputStreamWriter(fo, Charset.forName("UTF-8")));
             for (int i = 0; i < safeCount; i++) {
-                w.write(word(i));
+                w.write(word(offset + i));
                 w.write('\n');
             }
             w.flush();

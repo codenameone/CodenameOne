@@ -146,7 +146,9 @@ public final class HardeningEngine {
                         + "JDK 17; for a local hardened build, run it on JDK 8-" + PROGUARD_MAX_JDK + ".");
             }
             File dict = new File(workDir, "cn1-dict.txt");
-            Cn1NameFactory.writeDictionary(dict, Cn1NameFactory.dictionarySizeFor(classesIn));
+            // Seed the dictionary so harden.seed / the build key actually changes the mapping.
+            Cn1NameFactory.writeDictionary(dict, Cn1NameFactory.dictionarySizeFor(classesIn),
+                    deriveSeed(cfg, req.getBuildKey()));
             File renamedJar = new File(workDir, "renamed.jar");
             ProGuardRunner.rename(classesJar, renamedJar, mappingFile,
                     req.getLibraryJars(), keepRules, dict, workDir);
@@ -266,6 +268,11 @@ public final class HardeningEngine {
      */
     /** True when at least one transform will actually run for this config and platform. */
     static boolean willApplyAnyTransform(HardeningConfig cfg) {
+        // A per-platform opt-out means nothing runs for this target -- so a non-entitled build with
+        // harden.<platform>.enabled=false is skipped, not rejected as not-entitled.
+        if (!cfg.isPlatformEnabled()) {
+            return false;
+        }
         // renameRequested (not renameEnabled): on Android the engine does not rename, but R8 does,
         // so a rename-only Android build is still a hardened build and must not be skipped.
         if (cfg.isRenameRequested()) {
