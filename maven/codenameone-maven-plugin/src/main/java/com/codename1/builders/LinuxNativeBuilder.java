@@ -182,7 +182,7 @@ public class LinuxNativeBuilder extends Executor {
     }
 
     @Override
-    protected String hardeningPlatform() {
+    protected String hardeningPlatform(BuildRequest request) {
         return "linux";
     }
 

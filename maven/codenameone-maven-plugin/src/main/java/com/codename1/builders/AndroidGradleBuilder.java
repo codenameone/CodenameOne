@@ -754,7 +754,7 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     @Override
-    protected String hardeningPlatform() {
+    protected String hardeningPlatform(BuildRequest request) {
         return "and";
     }
 
@@ -824,6 +824,18 @@ public class AndroidGradleBuilder extends Executor {
             request.putArgument("android.enableProguard", "false");
             request.putArgument("android.release", "false");
             request.putArgument("android.debug", "true");
+        }
+        // On Android renaming is delivered by R8 (the engine does not rename here), so a hardening
+        // level that promises renaming cannot be honored with R8 turned off. Fail rather than ship a
+        // build stamped "hardened" that was never renamed. (harden.rename=false opts out explicitly.)
+        String hardenLevel = request.getArg("harden.level", "off");
+        boolean hardenRenames = hardenLevel != null && !"off".equalsIgnoreCase(hardenLevel.trim())
+                && hardenLevel.trim().length() > 0
+                && !"false".equalsIgnoreCase(request.getArg("harden.rename", "true"));
+        if (hardenRenames && request.getArg("android.enableProguard", "true").equals("false")) {
+            throw new BuildException("harden.level=" + hardenLevel + " requires Android's R8/ProGuard "
+                    + "renaming, but android.enableProguard=false disables it. Enable R8, set "
+                    + "harden.rename=false, or set harden.level=off.");
         }
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set

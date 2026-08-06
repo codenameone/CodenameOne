@@ -162,10 +162,13 @@ public final class ControlFlowTransform {
 
     private void initGuardField(ClassNode cn) {
         InsnList init = new InsnList();
-        // zq$cf = System.getProperty("java.home").length();  -- always >= 1, never foldable.
+        // zq$cf = System.getProperty("java.home", "cn1").length();  -- always >= 1, never foldable.
+        // The two-arg overload guarantees a non-null result (java.home can be absent on Android),
+        // so the guard can never NPE in <clinit>.
         init.add(new LdcInsnNode("java.home"));
+        init.add(new LdcInsnNode("cn1"));
         init.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/System", "getProperty",
-                "(Ljava/lang/String;)Ljava/lang/String;", false));
+                "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", false));
         init.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/String", "length", "()I", false));
         init.add(new FieldInsnNode(Opcodes.PUTSTATIC, cn.name, GUARD_FIELD, GUARD_DESC));
 

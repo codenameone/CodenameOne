@@ -164,7 +164,7 @@ public class WindowsNativeBuilder extends Executor {
     }
 
     @Override
-    protected String hardeningPlatform() {
+    protected String hardeningPlatform(BuildRequest request) {
         return "win";
     }
 

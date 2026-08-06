@@ -478,7 +478,14 @@ public class IPhoneBuilder extends Executor {
 
 
     @Override
-    protected String hardeningPlatform() {
+    protected String hardeningPlatform(BuildRequest request) {
+        // A native-Mac build reports "mac" so harden.mac.enabled / harden.ios.enabled apply to the
+        // right output. (A combined iOS build that also emits a Mac slice hardens the shared jar
+        // once, under "ios".)
+        if ("true".equals(request.getArg("macNative.enabled", "false"))
+                && !"true".equals(request.getArg("ios.enabled", "true"))) {
+            return "mac";
+        }
         return "ios";
     }
 
@@ -2030,6 +2037,7 @@ public class IPhoneBuilder extends Executor {
                     + delayPushCompletion
                     + "        Display.getInstance().setProperty(\"AppVersion\", APPLICATION_VERSION);\n"
                     + "        Display.getInstance().setProperty(\"AppName\", APPLICATION_NAME);\n"
+                    + hardeningRuntimeProperties(request)
                     + newStorage
                     + disableScreenshots
                     + adPadding

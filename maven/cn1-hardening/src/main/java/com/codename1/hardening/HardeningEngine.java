@@ -208,8 +208,11 @@ public final class HardeningEngine {
 
         JarDemuxer.rebuild(req.getOutputJar(), renamed, nonClass);
 
+        // Only the engine's own rename produces a mapping worth an id. On Android the engine does
+        // not rename (R8 is the sole renamer and produces the real per-build mapping later), so the
+        // engine mapping is empty -- hashing it would stamp a meaningless constant id. Leave it empty.
         String mappingId = "";
-        if (mappingFile != null) {
+        if (mappingFile != null && cfg.isRenameEnabled()) {
             mappingId = MappingWriter.finalizeMapping(mappingFile, ENGINE_VERSION, PROGUARD_VERSION,
                     cfg.getPlatform(), req.getBuildKey());
         }

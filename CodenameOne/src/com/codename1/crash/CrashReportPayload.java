@@ -45,10 +45,12 @@ final class CrashReportPayload {
     /// signal handlers are usually compact (~64 frames * ~120 chars),
     /// but a corrupt stack can produce arbitrarily long output.
     static final int MAX_NATIVE_STACK_LEN = 16 * 1024;
-    /// Hard cap on the raw (pre-rendered) Java stack string. On the
-    /// ParparVM ports the trace arrives as a formatted string rather
-    /// than structured frames; on the JS port it is a JavaScript
-    /// engine stack. Mirrors {@link #MAX_NATIVE_STACK_LEN}.
+    /// Hard cap on the raw (pre-rendered) Java stack string captured via
+    /// `printStackTrace` -- the verbatim platform rendering plus the cause
+    /// chain. It complements the structured {@link #frames} (populated on
+    /// every port), and on the JS port, where there are no structured
+    /// frames, it carries the JavaScript engine stack. Mirrors
+    /// {@link #MAX_NATIVE_STACK_LEN}.
     static final int MAX_RAW_STACK_LEN = 16 * 1024;
 
     /// Trace-format discriminator values. Tells the server how to parse

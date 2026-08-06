@@ -2344,8 +2344,21 @@ public abstract class Executor {
      * The platform id this builder targets, for the hardening engine ({@code ios}, {@code and},
      * {@code javascript}, {@code win}, {@code linux}, {@code mac}, ...). Subclasses override.
      */
-    protected String hardeningPlatform() {
+    protected String hardeningPlatform(BuildRequest request) {
         return "unknown";
+    }
+
+    /**
+     * Java source that stamps the hardening runtime properties ({@code cn1.mappingId},
+     * {@code cn1.hardened}, {@code cn1.hardenLevel}) into {@code Display}, so every port's stub can
+     * emit them the same way. These back {@code Hardening.isHardened()} and the crash report's
+     * mapping id / level. The values are controlled build outputs (a hex id and a fixed level),
+     * so string concatenation into the stub is safe.
+     */
+    protected String hardeningRuntimeProperties(BuildRequest request) {
+        return "        Display.getInstance().setProperty(\"cn1.mappingId\", \"" + resolveMappingId(request) + "\");\n"
+                + "        Display.getInstance().setProperty(\"cn1.hardened\", \"" + request.getArg("cn1.hardened", "false") + "\");\n"
+                + "        Display.getInstance().setProperty(\"cn1.hardenLevel\", \"" + request.getArg("cn1.hardenLevel", "off") + "\");\n";
     }
 
     /**
@@ -2492,7 +2505,7 @@ public abstract class Executor {
                 p.setProperty(key, request.getArg(key, ""));
             }
         }
-        p.setProperty("cn1.platform", hardeningPlatform());
+        p.setProperty("cn1.platform", hardeningPlatform(request));
         // The keep rule must name the FULLY QUALIFIED main class: getMainClass() is the simple name
         // (the stubs combine it with getPackageName()), so passing it bare would keep a default-package
         // class and let ProGuard rename the real application class out from under the generated stub.

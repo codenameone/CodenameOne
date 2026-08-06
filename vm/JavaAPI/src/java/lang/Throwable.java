@@ -106,6 +106,14 @@ public class Throwable{
         }
     }
     
+    public void printStackTrace(java.io.PrintStream s) {
+        s.println(stack);
+        if (cause != null) {
+            s.println("Caused by ");
+            cause.printStackTrace(s);
+        }
+    }
+
     public void printStackTrace(PrintWriter s) {
         s.println(stack);
         if (cause != null) {

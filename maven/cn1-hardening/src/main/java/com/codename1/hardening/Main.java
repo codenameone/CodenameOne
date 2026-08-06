@@ -93,9 +93,23 @@ public final class Main {
                 }
             }
 
+            // An unrecognized harden.level must fail loudly rather than be treated as off (which
+            // would ship an unhardened binary the developer believes is hardened).
+            String rawLevel = hints.get("harden.level");
+            if (rawLevel != null && rawLevel.trim().length() > 0
+                    && !"off".equalsIgnoreCase(rawLevel.trim())
+                    && HardeningProfile.parse(rawLevel) == null) {
+                System.err.println("Invalid harden.level '" + rawLevel + "'. Valid values are: "
+                        + "off, standard, aggressive, paranoid.");
+                return EXIT_FAILED;
+            }
+
             HardeningConfig cfg = HardeningConfig.from(hints, platform, renameSupported);
 
-            if (cfg.getProfile() != HardeningProfile.OFF && !entitled) {
+            // Gate entitlement only when hardening will actually run: a per-platform opt-out
+            // (harden.<platform>.enabled=false) must be able to produce an unhardened build even
+            // on a non-entitled account, rather than failing here.
+            if (cfg.isActive() && !entitled) {
                 System.err.println("App hardening is an Enterprise feature and this build is not "
                         + "entitled. Refusing to produce a half-hardened binary.");
                 return EXIT_NOT_ENTITLED;

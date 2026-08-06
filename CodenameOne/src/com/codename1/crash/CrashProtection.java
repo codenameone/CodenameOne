@@ -254,32 +254,16 @@ public final class CrashProtection {
     /// Swallows any failure: capturing a crash report must never itself crash.
     private static String safeRawStack(Throwable t) {
         try {
-            // Built by hand rather than via printStackTrace(PrintWriter): the core is compiled
-            // against a restricted (CLDC-like) API that has no java.io.PrintWriter. The frame
-            // lines use the "    at <cls>.<method>:<line>" shape -- the same the ParparVM native
-            // trace uses -- so the trace-format sniffer classifies it correctly when structured
-            // frames are unavailable. getStackTrace() now returns frames on every port.
-            StringBuilder sb = new StringBuilder();
-            Throwable cur = t;
-            int depth = 0;
-            while (cur != null && depth < 8) {
-                if (depth > 0) {
-                    sb.append("Caused by: ");
-                }
-                sb.append(cur.toString()).append('\n');
-                StackTraceElement[] els = cur.getStackTrace();
-                int limit = els.length < CrashReportPayload.MAX_FRAMES
-                        ? els.length : CrashReportPayload.MAX_FRAMES;
-                for (int i = 0; i < limit; i++) {
-                    StackTraceElement e = els[i];
-                    sb.append("    at ").append(e.getClassName()).append('.')
-                            .append(e.getMethodName()).append(':').append(e.getLineNumber())
-                            .append('\n');
-                }
-                cur = cur.getCause();
-                depth++;
-            }
-            String s = sb.toString();
+            // Capture the platform's own rendering via printStackTrace(PrintStream) -- PrintStream
+            // (unlike PrintWriter) is in the restricted CLDC core API. This is what preserves the
+            // real trace on the ParparVM ports: the pre-rendered C shadow-call-stack text, or the
+            // JavaScript engine's Error().stack on the JS port (where getStackTrace() has no
+            // structured frames to offer). On the JVM ports it is the standard full trace.
+            java.io.ByteArrayOutputStream bout = new java.io.ByteArrayOutputStream();
+            java.io.PrintStream ps = new java.io.PrintStream(bout);
+            t.printStackTrace(ps);
+            ps.flush();
+            String s = bout.toString();
             return s.length() == 0 ? null : s;
         } catch (Throwable ignored) {
             return null;
