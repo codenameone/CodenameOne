@@ -104,6 +104,30 @@ static void cn1WearableObserveSequence(int64_t seen) {
     [lock unlock];
 }
 
+/// How long an unanswered inbound reply block is kept. Comfortably past the sender's own reply
+/// deadline: by the time this fires the peer has already given up, so the block can only be
+/// discarded, never usefully invoked.
+static const NSTimeInterval kCN1ReplyExpirySeconds = 120.0;
+
+/// Drops reply blocks the app never answered. Caller holds the _pendingReplies monitor.
+static void cn1WearableExpireReplies(NSMutableDictionary *replies, NSMutableDictionary *arrivedAt) {
+    if (replies.count == 0) {
+        return;
+    }
+    NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+    NSMutableArray *stale = [NSMutableArray array];
+    for (NSNumber *key in arrivedAt.allKeys) {
+        NSNumber *at = arrivedAt[key];
+        if (at == nil || now - at.doubleValue > kCN1ReplyExpirySeconds) {
+            [stale addObject:key];
+        }
+    }
+    for (NSNumber *key in stale) {
+        [replies removeObjectForKey:key];
+        [arrivedAt removeObjectForKey:key];
+    }
+}
+
 /// Serializes the whole applicationContext read-modify-write.
 ///
 /// WCSession has no merge: updateApplicationContext REPLACES the dictionary. putData and removeData
@@ -285,7 +309,14 @@ static void cn1WearablePruneTombstones(NSMutableDictionary *ctx, NSDictionary *p
         int64_t sb = [ctx[b] isKindOfClass:[NSNumber class]] ? [ctx[b] longLongValue] : 0;
         return sa < sb ? NSOrderedAscending : (sa > sb ? NSOrderedDescending : NSOrderedSame);
     }];
-    for (NSUInteger i = 0; i + kCN1MaxTombstones < remaining.count; i++) {
+    // Walk the WHOLE list oldest-first and stop once the count is under the cap, rather than
+    // examining only the oldest (count - cap) entries. With the old bound, a protected entry among
+    // those oldest ones consumed one of the slots examined and nothing took its place: 300
+    // tombstones whose oldest 44 were still protecting peer values meant every pass skipped and all
+    // 300 stayed, forever, even though 256 newer ones could safely have been kept. The choice was
+    // deterministic, so repeating the prune changed nothing.
+    NSUInteger keep = remaining.count;
+    for (NSUInteger i = 0; i < remaining.count && keep > kCN1MaxTombstones; i++) {
         NSString *key = remaining[i];
         NSString *path = [key substringFromIndex:kTombPrefix.length];
         CN1WearableEntry theirs = cn1WearableEntryFor(peerCtx, path);
@@ -296,6 +327,7 @@ static void cn1WearablePruneTombstones(NSMutableDictionary *ctx, NSDictionary *p
             continue;
         }
         [ctx removeObjectForKey:key];
+        keep--;
     }
 }
 
@@ -355,9 +387,16 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // Reply blocks for messages the peer sent us that expect an answer. The Java side answers
     // asynchronously on the EDT, so the block has to outlive the delegate callback.
     NSMutableDictionary<NSNumber *, void (^)(NSDictionary<NSString *, id> *)> *_pendingReplies;
+    /// When each pending reply arrived, so one that is never answered can be retired. Parallel to
+    /// _pendingReplies and guarded by the same monitor.
+    NSMutableDictionary<NSNumber *, NSNumber *> *_pendingReplyAt;
     int _nextInboundToken;
     /// Keys the peer's last context carried, so a key that vanishes is reported as a removal.
-    NSSet<NSString *> *_lastReceivedKeys;
+    /// What the peer's context last said for each path: the authoritative stamp we delivered, or
+    /// the tombstone stamp for a removal. Stamps rather than bare keys, because WCSession hands
+    /// over the WHOLE context on any change -- a set of keys cannot tell an unchanged entry from a
+    /// re-sent one.
+    NSMutableDictionary<NSString *, NSNumber *> *_lastReceived;
 }
 
 + (CN1WatchConnectivity *)shared {
@@ -374,8 +413,9 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     self = [super init];
     if (self != nil) {
         _pendingReplies = [[NSMutableDictionary alloc] init];
+        _pendingReplyAt = [[NSMutableDictionary alloc] init];
         _nextInboundToken = 1;
-        _lastReceivedKeys = [[NSSet alloc] init];
+        _lastReceived = [[NSMutableDictionary alloc] init];
     }
     return self;
 }
@@ -461,6 +501,7 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         // alive: retain before removing, or the block is deallocated before it is called.
         handler = [_pendingReplies[key] retain];
         [_pendingReplies removeObjectForKey:key];
+        [_pendingReplyAt removeObjectForKey:key];
     }
     if (handler != nil) {
         handler(@{kReplyKey: (payload == nil ? [NSData data] : payload)});
@@ -682,11 +723,18 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     if (replyHandler != nil) {
         // Park the block so the Java side can answer after it has hopped to the EDT.
         @synchronized (_pendingReplies) {
+            // Retire anything the app never answered. sendReply is the only other way out of this
+            // dictionary, so a build that registers no message listener -- WearableConnection parks
+            // those deliveries indefinitely -- never removes a single entry, and every reply-bearing
+            // message the peer sends leaks a copied block. The senders have long since timed out by
+            // then, so answering late is pointless; the entry just has to go.
+            cn1WearableExpireReplies(_pendingReplies, _pendingReplyAt);
             token = _nextInboundToken++;
             // -copy returns +1 under manual reference counting and the dictionary retains it too,
             // so hand off the copy's ownership rather than leaking it.
             void (^stored)(NSDictionary<NSString *, id> *) = [replyHandler copy];
             _pendingReplies[@(token)] = stored;
+            _pendingReplyAt[@(token)] = @([[NSDate date] timeIntervalSince1970]);
             [stored release];
         }
     }
@@ -706,24 +754,56 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // UI back to stale state while an immediate getData() still returned the newer local value -- the
     // listener and the getter disagreeing about the same path. So every path is compared against the
     // local entry first, and only a peer entry that actually wins is delivered.
+    // Third: WCSession hands over the peer's ENTIRE context whenever any part of it changes, so
+    // every unchanged peer path arrives again on every publish. Announcing them all meant
+    // publishing /b produced a dataChanged for /a as well, and every past removal was re-announced
+    // indefinitely. Only an entry whose authoritative stamp actually moved is delivered.
     NSDictionary *localCtx = [session applicationContext];
-    NSMutableSet *seen = [NSMutableSet set];
+    NSMutableDictionary *seen = [NSMutableDictionary dictionary];
+    NSMutableArray *acknowledge = [NSMutableArray array];
     for (NSString *path in cn1WearableAllPaths(nil, applicationContext)) {
-        [seen addObject:path];
         CN1WearableEntry theirs = cn1WearableEntryFor(applicationContext, path);
         CN1WearableEntry mine = cn1WearableEntryFor(localCtx, path);
+        seen[path] = @(theirs.stamp);
         if (cn1WearableLocalWins(mine, theirs)) {
             continue;
         }
+        NSNumber *previous = _lastReceived[path];
+        if (previous != nil && previous.longLongValue == theirs.stamp) {
+            // Same entry we already delivered, re-sent as part of the whole-context replace.
+            continue;
+        }
         if (theirs.removed) {
+            if (mine.known && !mine.removed) {
+                // Acknowledge it by dropping OUR live value for the path. The remover keeps a
+                // tombstone until the value it removed is gone from our context, so without this
+                // its tombstones accumulate past the cap and eventually the context can no longer
+                // be published at all. Clearing the value is the acknowledgement.
+                [acknowledge addObject:path];
+            }
             cn1_wearable_deliverDataRemoved(path.UTF8String);
         } else if (theirs.data != nil) {
             cn1_wearable_deliverDataChanged(path.UTF8String, theirs.data.bytes,
                                             (int) theirs.data.length);
         }
     }
-    for (NSString *gone in _lastReceivedKeys) {
-        if (![seen containsObject:gone]) {
+    if (acknowledge.count > 0) {
+        NSLock *ctxLock = cn1WearableContextLock();
+        [ctxLock lock];
+        NSMutableDictionary *mineCtx = [[session applicationContext] mutableCopy];
+        if (mineCtx != nil) {
+            for (NSString *path in acknowledge) {
+                [mineCtx removeObjectForKey:cn1WearableValueKey(path)];
+                [mineCtx removeObjectForKey:cn1WearableStampKey(path)];
+            }
+            NSError *ackErr = nil;
+            [session updateApplicationContext:mineCtx error:&ackErr];
+            [mineCtx release];
+        }
+        [ctxLock unlock];
+    }
+    for (NSString *gone in _lastReceived.allKeys) {
+        if (seen[gone] == nil) {
             // Dropped out of the peer's context without a tombstone -- an older peer build, or a
             // context rebuilt from scratch. Treat it as the removal it is.
             CN1WearableEntry mine = cn1WearableEntryFor(localCtx, gone);
@@ -732,8 +812,8 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
             }
         }
     }
-    [_lastReceivedKeys release];
-    _lastReceivedKeys = [seen retain];
+    [_lastReceived release];
+    _lastReceived = [seen mutableCopy];
 }
 
 - (void)session:(WCSession *)session didReceiveFile:(WCSessionFile *)file {
