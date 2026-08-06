@@ -118,13 +118,20 @@ public final class WearableConnection {
 
     // --- state --------------------------------------------------------------
 
-    /// Returns true when this device can talk to a counterpart app at all. False on a desktop build,
-    /// on a phone whose platform has no wearable link, and in the simulator with no watch window
-    /// open. When this is false every other call here does nothing.
+    /// Returns true when this PLATFORM provides a wearable link, not when a counterpart exists.
+    ///
+    /// False on a desktop build and on any platform with no wearable API at all, and when false
+    /// every other call here does nothing. But an iPhone with no watch paired to it still reports
+    /// true: the question this answers is whether the API is present, and Apple's is. The same
+    /// holds on Android whenever the app was built with the wearable glue.
+    ///
+    /// Ask [#isPaired()] whether a counterpart device is actually paired, and [#isReachable()]
+    /// whether its app can receive something right now. Treating this method as either of those
+    /// will offer wearable features on a phone that has no watch.
     ///
     /// #### Returns
     ///
-    /// true if the wearable link is available
+    /// true if the platform provides the wearable link
     public static boolean isSupported() {
         WearableBridge b = bridge();
         return b != null && b.isSupported();

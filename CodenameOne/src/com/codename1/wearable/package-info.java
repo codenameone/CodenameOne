@@ -54,9 +54,16 @@
 ///
 /// #### Degrades instead of failing
 ///
-/// On a device with no counterpart -- a phone with no paired watch, a desktop build, the
-/// simulator with no watch window open -- there is no bridge, [WearableConnection#isSupported()]
-/// returns false and every call is an inert no-op. Application code needs no platform conditionals.
+/// Where the platform has no wearable link at all -- a desktop build, or any platform without the
+/// API -- there is no bridge, [WearableConnection#isSupported()] returns false and every call is an
+/// inert no-op. Application code needs no platform conditionals.
+///
+/// `isSupported()` answers a narrower question than it may appear to: whether the PLATFORM provides
+/// the link, not whether a counterpart is there. An iPhone with no watch paired to it still reports
+/// true. Use [WearableConnection#isPaired()] to ask whether a counterpart device exists and
+/// [WearableConnection#isReachable()] to ask whether its app can receive something now -- offering
+/// a wearable feature on the strength of `isSupported()` alone will show it on a phone with no
+/// watch.
 ///
 /// Merely referencing this package makes the build wire the native plumbing (`WatchConnectivity` on
 /// Apple, the `play-services-wearable` dependency and a `WearableListenerService` on Android); apps

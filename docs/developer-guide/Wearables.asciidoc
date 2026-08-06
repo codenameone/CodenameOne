@@ -204,12 +204,18 @@ case, not the exceptional one.
 
 ==== Knowing What's There
 
-`isSupported()` is false where there is nothing to talk to at all, and every call
-is then a harmless no-op, so this API needs no platform conditionals around it.
-`isPaired()`, `isCompanionAppInstalled()` and `isReachable()` distinguish the
-cases worth telling a user about: no watch, a watch without your watch app
-installed, and a sleeping watch. Add a `WearableStateListener`
-rather than polling.
+`isSupported()` asks whether the platform provides the link, not whether a watch
+is there. It's false on a desktop build and on any platform with no wearable
+API, and every call is then a harmless no-op, so this API needs no platform
+conditionals around it -- but an iPhone with no paired watch still answers true,
+because Apple's API is present either way.
+
+Ask the other three about the counterpart. `isPaired()`,
+`isCompanionAppInstalled()` and `isReachable()` distinguish the cases worth
+telling a user about: no watch, a watch without your watch app installed, and a
+sleeping watch. Gate a wearable feature on those rather than on `isSupported()`,
+or you will offer it to someone holding a phone and nothing else. Add a
+`WearableStateListener` rather than polling.
 
 === Complications and Tiles
 [[watch-complications]]
