@@ -657,12 +657,14 @@ public abstract class Executor {
 
     /// The same decision, for a stub that runs before `Display` exists.
     ///
-    /// Reflective rather than a direct call. The JavaScript staging directory holds the
-    /// framework's own classes alongside the application's, so a scan of it cannot tell whether
-    /// the application uses the database -- it always appears to. And an Ant project may be
-    /// pinned to a core that predates `setLegacyBehavior`, where a direct call would not compile.
-    /// Going through reflection makes both harmless: the call pins no class for the optimizer and
-    /// degrades to a no-op on a core without the method.
+    /// A **direct** call, not reflection: ParparVM's dead-code elimination does not keep a member
+    /// reached only reflectively, so a reflective form would be culled and the lookup would fail
+    /// at runtime, silently leaving the application on the new behaviour. The launcher calls
+    /// `SVGRegistry.installGlobal` and `NativeLookup.register` directly for the same reason.
+    ///
+    /// It compiles everywhere because it is emitted only when the staged core actually has the
+    /// switch. A core that predates it has none to set, and its behaviour is already the old
+    /// behaviour, so emitting nothing there reaches the same result.
     ///
     /// #### Parameters
     ///
@@ -672,17 +674,29 @@ public abstract class Executor {
     /// #### Returns
     ///
     /// the source line to insert, or an empty string
-    protected String databaseLegacyStubCall(BuildRequest request, boolean usesDatabase) {
-        if (!isDatabaseLegacyMode(request, usesDatabase)) {
+    protected String databaseLegacyStubCall(BuildRequest request, boolean usesDatabase,
+            boolean coreHasLegacySwitch) {
+        if (!coreHasLegacySwitch || !isDatabaseLegacyMode(request, usesDatabase)) {
             return "";
         }
-        return "        try {\n"
-             + "            Class.forName(\"com.codename1.db.Database\")\n"
-             + "                .getMethod(\"setLegacyBehavior\", boolean.class)\n"
-             + "                .invoke(null, Boolean.TRUE);\n"
-             + "        } catch (Throwable __dbLegacyUnavailable) {\n"
-             + "            // A core without the compatibility switch has nothing to restore.\n"
-             + "        }\n";
+        return "        com.codename1.db.Database.setLegacyBehavior(true);\n";
+    }
+
+    /// Whether the staged framework carries the database compatibility switch.
+    ///
+    /// `DatabaseConfig` arrived with the portable database contract, so its presence is what
+    /// distinguishes a core that has `setLegacyBehavior` from one that predates the feature.
+    ///
+    /// #### Parameters
+    ///
+    /// - `stageClasses`: the staged class tree, or null
+    ///
+    /// #### Returns
+    ///
+    /// true if the switch is available to call directly
+    protected boolean coreHasLegacySwitch(File stageClasses) {
+        return stageClasses != null
+                && new File(stageClasses, "com/codename1/db/DatabaseConfig.class").exists();
     }
 
     protected void scanClassesForPermissions(File directory, final ClassScanner scanner) throws IOException {

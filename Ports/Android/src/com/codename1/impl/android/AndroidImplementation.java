@@ -10970,6 +10970,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException {
+        // Before anything opens: a plaintext open of a database mid-conversion would create an
+        // empty one over the top of the real data, which nothing afterwards could undo.
+        recoverInterruptedDatabaseMigration(resolveNativeDatabasePath(databaseName));
         SQLiteDatabase db;
         if (databaseName.startsWith("file://")) {
             db = SQLiteDatabase.openOrCreateDatabase(FileSystemStorage.getInstance().toNativePath(databaseName), null);
@@ -11049,6 +11052,31 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * callers that hand it to FileSystemStorage but wrong for anything constructing a java.io.File
      * from it.
      */
+    /// Suffix used by the encrypted-database migration for the copy it moves aside.
+    ///
+    /// Declared here rather than only in the cipher package because that package is deleted from
+    /// builds that never encrypt, while recovery has to happen on every open: the migration
+    /// leaves the live name missing for an instant, and a plaintext open in that window would
+    /// create an empty database on top of the real one.
+    static final String DATABASE_BACKUP_SUFFIX = ".cn1backup";
+
+    /// Restores a database whose conversion was interrupted between the two renames.
+    ///
+    /// Called before every open, encrypted or not. Encrypt and decrypt move the original aside
+    /// and install the converted file in its place, so a process death in that gap leaves a
+    /// complete database under the backup name and nothing under the live one. Putting it back
+    /// first is what makes the window recoverable rather than a silent empty database.
+    static void recoverInterruptedDatabaseMigration(String path) {
+        if (path == null) {
+            return;
+        }
+        File live = new File(path);
+        File backup = new File(path + DATABASE_BACKUP_SUFFIX);
+        if (backup.isFile() && !live.exists()) {
+            backup.renameTo(live);
+        }
+    }
+
     private String resolveNativeDatabasePath(String databaseName) {
         if (databaseName.startsWith("file://")) {
             return FileSystemStorage.getInstance().toNativePath(databaseName);

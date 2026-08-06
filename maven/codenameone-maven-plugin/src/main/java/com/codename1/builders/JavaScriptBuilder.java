@@ -466,7 +466,8 @@ public class JavaScriptBuilder extends Executor {
             }
             // Before the bootstrap, so the switch is in force by the time anything opens a
             // database. Display does not exist yet here, hence the static call.
-            pw.print(databaseLegacyStubCall(request, usesDatabase));
+            pw.print(databaseLegacyStubCall(request, usesDatabase,
+                    coreHasLegacySwitch(stageClasses)));
             pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "());");
             pw.println("    }");
             pw.println("}");

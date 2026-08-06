@@ -68,21 +68,6 @@ public class AndroidCipherFactory {
     }
 
     /**
-     * Restores a database whose conversion was interrupted between the two renames.
-     *
-     * AndroidCipherDB moves the original aside before installing the converted file, so if the
-     * process dies in that gap the live name is missing while a complete database sits under the
-     * backup name. Opening then would create an empty database and the real data would be
-     * removed by the next conversion. Putting it back first makes that window recoverable.
-     */
-    private static void recoverInterruptedMigration(File file) {
-        File backup = new File(file.getPath() + AndroidCipherDB.BACKUP_SUFFIX);
-        if (backup.isFile() && !file.exists()) {
-            backup.renameTo(file);
-        }
-    }
-
-    /**
      * Recognises the engine's "this is not a SQLite database" report.
      *
      * That is what a SQLCipher database decrypted with the wrong key looks like: the plaintext it
@@ -119,7 +104,10 @@ public class AndroidCipherFactory {
         if (parent != null && !parent.exists()) {
             parent.mkdirs();
         }
-        recoverInterruptedMigration(file);
+        // Shared with the plaintext open path, which needs it just as much: the migration
+        // leaves the live name missing for an instant either way.
+        com.codename1.impl.android.AndroidImplementation.recoverInterruptedDatabaseMigration(
+                file.getPath());
         SQLiteDatabase db = null;
         try {
             db = SQLiteDatabase.openOrCreateDatabase(file, key, null, null);

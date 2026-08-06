@@ -254,7 +254,8 @@ class AndroidCipherDB extends Database {
      * the two names at every instant; AndroidCipherFactory recovers from the backup if the
      * process dies in the gap.
      */
-    static final String BACKUP_SUFFIX = ".cn1backup";
+    static final String BACKUP_SUFFIX =
+            com.codename1.impl.android.AndroidImplementation.DATABASE_BACKUP_SUFFIX;
 
     /** Reads one integer header pragma, which sqlcipher_export does not carry across. */
     private int readHeaderPragma(String pragma) {
@@ -316,9 +317,16 @@ class AndroidCipherDB extends Database {
             throw new IOException("The converted database could not replace " + path
                     + ", so the original was restored and nothing was converted");
         }
-        backup.delete();
         currentKey = targetKey;
         db = openAt(path, targetKey);
+        // The backup is the database in its previous form. After an encrypt that means a
+        // plaintext copy of what is now an encrypted database, sitting at a predictable name --
+        // which defeats the encryption entirely, so its removal is checked rather than assumed.
+        if (!backup.delete() && backup.exists()) {
+            throw new IOException("The database was converted, but the copy of its previous form "
+                    + "at " + backup + " could not be removed. Delete it before relying on this "
+                    + "database being encrypted.");
+        }
     }
 
     private SQLiteDatabase openAt(String path, String key) throws IOException {

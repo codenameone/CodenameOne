@@ -116,25 +116,50 @@ public class ThreadSafeDatabase extends Database {
     }
 
     private void invokeWithException(final RunnableWithIOException r) throws IOException {
-        IOException err;
+        Object err;
         synchronized (dispatchLock) {
             checkOpen();
-            err = et.run(new RunnableWithResultSync<IOException>() {
+            err = et.run(new RunnableWithResultSync<Object>() {
                 @Override
                 @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
-                public IOException run() {
+                public Object run() {
                     try {
                         r.run();
                         return null;
-                    } catch (IOException err) {
+                    } catch (Throwable err) {
+                        // Throwable, not IOException. Anything escaping this callback is caught by
+                        // the worker's own loop, which never delivers a result, so the caller waits
+                        // forever holding dispatchLock and every later call queues behind it. An
+                        // unchecked exception from the engine -- Android raises
+                        // CursorIndexOutOfBoundsException for a bad column, for one -- is enough to
+                        // wedge the whole wrapper. Carrying it back keeps that a thrown error.
                         return err;
                     }
                 }
             });
         }
-        if (err != null) {
-            throw err;
+        rethrow(err);
+    }
+
+    /// Re-raises whatever the worker carried back, preserving its kind.
+    ///
+    /// An unchecked exception is rethrown as itself so callers see the same failure they would
+    /// from an unwrapped database; anything else that is not an IOException is wrapped, because
+    /// this API promises IOException.
+    private static void rethrow(Object err) throws IOException {
+        if (err == null) {
+            return;
         }
+        if (err instanceof IOException) {
+            throw (IOException) err;
+        }
+        if (err instanceof RuntimeException) {
+            throw (RuntimeException) err;
+        }
+        if (err instanceof Error) {
+            throw (Error) err;
+        }
+        throw new IOException(((Throwable) err).getMessage(), (Throwable) err);
     }
 
     private Object invokeWithException(final RunnableWithResponseOrIOException r) throws IOException {
@@ -147,16 +172,27 @@ public class ThreadSafeDatabase extends Database {
                 public Object run() {
                     try {
                         return r.run();
-                    } catch (IOException err) {
-                        return err;
+                    } catch (Throwable err) {
+                        // See invokeWithException above: an escape here wedges the wrapper.
+                        return new Failure(err);
                     }
                 }
             });
         }
-        if (ret instanceof IOException) {
-            throw (IOException) ret;
+        if (ret instanceof Failure) {
+            rethrow(((Failure) ret).cause);
         }
         return ret;
+    }
+
+    /// Distinguishes a failure carried back from the worker from a result that happens to be a
+    /// Throwable, which a query returning one as a value could otherwise be mistaken for.
+    private static final class Failure {
+        private final Throwable cause;
+
+        Failure(Throwable cause) {
+            this.cause = cause;
+        }
     }
 
     @Override

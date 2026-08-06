@@ -121,17 +121,20 @@ class DatabaseLegacyDefaultTest {
     @Test
     void emitsStubSourceOnlyWhenTheSwitchIsOn() {
         assertEquals("", executor.databaseLegacyStubProperty(mavenRequest(), true));
-        assertEquals("", executor.databaseLegacyStubCall(mavenRequest(), true));
+        assertEquals("", executor.databaseLegacyStubCall(mavenRequest(), true, true));
 
         String property = executor.databaseLegacyStubProperty(antRequest(), true);
         assertTrue(property.contains("setProperty(\"db.legacy\", \"true\")"), property);
 
-        // The launcher variant runs before Display exists, so it must not go through it, and it
-        // reaches the switch reflectively so it still compiles against a core that predates it.
-        String call = executor.databaseLegacyStubCall(antRequest(), true);
-        assertTrue(call.contains("setLegacyBehavior"), call);
-        assertTrue(call.contains("Class.forName"), call);
-        assertTrue(call.contains("catch (Throwable"), call);
+        // The launcher variant runs before Display exists, so it must not go through it, and the
+        // call is direct because ParparVM does not retain a member reached only reflectively.
+        String call = executor.databaseLegacyStubCall(antRequest(), true, true);
+        assertTrue(call.contains("Database.setLegacyBehavior(true)"), call);
+        assertFalse(call.contains("Class.forName"), call);
         assertFalse(call.contains("Display"), call);
+
+        // Nothing is emitted against a core that predates the switch: it would not compile, and
+        // that core's behaviour is already the behaviour compatibility mode restores.
+        assertEquals("", executor.databaseLegacyStubCall(antRequest(), true, false));
     }
 }
