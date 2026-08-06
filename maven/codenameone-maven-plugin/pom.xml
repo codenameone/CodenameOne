@@ -257,6 +257,19 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- App-hardening engine 'standalone' (shaded ProGuard + ASM). Declared at runtime
+             scope purely to force the reactor to build cn1-hardening before this module, so
+             the generate-resources step can embed its jar as /cn1-hardening.jar. It is never
+             on the compile classpath and is run as a forked process, like the parparvm bundle
+             above; the engine carries its own ProGuard/ASM. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-hardening</artifactId>
+            <version>${project.version}</version>
+            <classifier>standalone</classifier>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- WindowsPort 'bundle' (WindowsPort.jar + nativewindows.jar) supplies the
              native Windows platform classes and C/C++ sources to WindowsNativeBuilder
              as classpath resources, the same way the parparvm bundle does. -->

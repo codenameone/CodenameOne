@@ -21,14 +21,12 @@
  * need additional information or have any questions.
  */
 
-/**
- * Read-only reporting of Codename One App Hardening status for the current build.
- *
- * <p>App Hardening is an Enterprise, build-server transform that renames classes,
- * encrypts strings and obfuscates control flow in the shipped binary across every
- * port, integrated with Crash Protection so obfuscated stack traces are still
- * symbolicated. The engine runs on the build server; this package only lets app
- * code observe whether the current build was hardened. See the App Hardening
- * chapter of the developer guide.
- */
+/// Read-only reporting of Codename One App Hardening status for the current build.
+///
+/// App Hardening is an Enterprise, build-server transform that renames classes,
+/// encrypts strings and obfuscates control flow in the shipped binary across every
+/// port, integrated with Crash Protection so obfuscated stack traces are still
+/// symbolicated. The engine runs on the build server; this package only lets app
+/// code observe whether the current build was hardened. See the App Hardening
+/// chapter of the developer guide.
 package com.codename1.security.hardening;

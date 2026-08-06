@@ -24,52 +24,44 @@ package com.codename1.security.hardening;
 
 import com.codename1.ui.Display;
 
-/**
- * Read-only reporting of whether this build was hardened, and with what.
- *
- * <p>App Hardening is an Enterprise, build-server transform: it renames classes,
- * encrypts strings and obfuscates control flow in the shipped binary across every
- * port. This class does not perform any of that -- it only reports what the build
- * server stamped into the app, so app code (and the crash reporter) can tell an
- * honestly-hardened build apart from an unhardened one such as a local or
- * simulator build.
- *
- * <p>The values are stamped as display properties by the build; in the simulator
- * and in local builds they report {@code false} / {@code "off"}, because those are
- * never obfuscated.
- *
- * @author Shai Almog
- */
+/// Read-only reporting of whether this build was hardened, and with what.
+///
+/// App Hardening is an Enterprise, build-server transform: it renames classes,
+/// encrypts strings and obfuscates control flow in the shipped binary across every
+/// port. This class does not perform any of that -- it only reports what the build
+/// server stamped into the app, so app code (and the crash reporter) can tell an
+/// honestly-hardened build apart from an unhardened one such as a local or
+/// simulator build.
+///
+/// The values are stamped as display properties by the build; in the simulator
+/// and in local builds they report `false` / `"off"`, because those are never
+/// obfuscated.
+///
+/// @author Shai Almog
 public final class Hardening {
 
     private Hardening() {
     }
 
-    /**
-     * Whether the shipped binary was hardened. Always {@code false} in the simulator and in
-     * local or source-project builds, which are never obfuscated.
-     *
-     * @return true if the build server applied hardening to this build
-     */
+    /// Whether the shipped binary was hardened. Always `false` in the simulator and in
+    /// local or source-project builds, which are never obfuscated.
+    ///
+    /// @return true if the build server applied hardening to this build
     public static boolean isHardened() {
         return "true".equals(Display.getInstance().getProperty("cn1.hardened", "false"));
     }
 
-    /**
-     * The hardening level the build shipped with.
-     *
-     * @return one of {@code "off"}, {@code "standard"}, {@code "aggressive"}, {@code "paranoid"}
-     */
+    /// The hardening level the build shipped with.
+    ///
+    /// @return one of `"off"`, `"standard"`, `"aggressive"`, `"paranoid"`
     public static String getLevel() {
         return Display.getInstance().getProperty("cn1.hardenLevel", "off");
     }
 
-    /**
-     * The id of the obfuscation mapping this build was hardened with, matching the mapping the
-     * build server retained for crash symbolication. Empty when the build was not hardened.
-     *
-     * @return the mapping id, or an empty string
-     */
+    /// The id of the obfuscation mapping this build was hardened with, matching the mapping the
+    /// build server retained for crash symbolication. Empty when the build was not hardened.
+    ///
+    /// @return the mapping id, or an empty string
     public static String getMappingId() {
         return Display.getInstance().getProperty("cn1.mappingId", "");
     }
