@@ -205,17 +205,21 @@ class JavaSEWearableBridge implements WearableBridge {
     // --- replicated data ----------------------------------------------------
 
     public void putData(String path, byte[] payload) {
-        writeValue(dataFile(path), payload, path);
-        // The tombstone goes with it. Left behind, a peer scanning afterwards processes both
-        // records, and listFiles() promises no order -- so it can deliver the removal AFTER the new
-        // value and leave the listener showing a path as deleted while getData returns it. The
-        // other order is no better: a spurious removal for a path that is currently live.
+        // The tombstone goes FIRST, before the value it is being replaced by.
+        //
+        // Removing it afterwards leaves an interval in which both records exist, and the peer scans
+        // every 500ms with no ordering guarantee from listFiles() -- so it could deliver the
+        // removal after the new value and leave the listener showing a path as deleted while
+        // getData returns the replacement. A failed delete would make that permanent. Removing it
+        // first leaves only a window in which neither exists, and the next scan finds the value:
+        // every observable ordering converges on the replacement.
         File tomb = new File(dataDir, encodePath(path) + TOMB_SUFFIX);
         if (tomb.delete()) {
             synchronized (seenData) {
                 seenData.remove(tomb.getName());
             }
         }
+        writeValue(dataFile(path), payload, path);
     }
 
     private void writeValue(File f, byte[] payload, String path) {
