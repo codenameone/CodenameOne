@@ -143,13 +143,17 @@
                 </exclusion>
             </exclusions>
         </dependency>
-        <!-- commons-compress 1.27.1, used by JCEF Maven to extract native
-             bundles, requires BoundedInputStream.builder() from Commons IO
-             2.16.1. The reactor otherwise manages Commons IO at 2.14.0. -->
+        <!-- commons-compress 1.28.0, which JCEF Maven 146 uses to extract the
+             native bundles, calls AbstractStreamBuilder.getInputStream() and
+             requires Commons IO 2.20.0 (its own declared dependency). An older
+             Commons IO on the classpath throws IllegalAccessError from
+             GzipCompressorInputStream during native extraction. The reactor
+             otherwise manages Commons IO at 2.14.0, so pin it here. Keep this in
+             sync with commons-compress when bumping jcefmaven.version. -->
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
-            <version>2.16.1</version>
+            <version>2.20.0</version>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
