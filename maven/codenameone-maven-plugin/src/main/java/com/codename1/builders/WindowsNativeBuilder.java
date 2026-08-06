@@ -164,6 +164,11 @@ public class WindowsNativeBuilder extends Executor {
     }
 
     @Override
+    protected String hardeningPlatform() {
+        return "win";
+    }
+
+    @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         String arch = normalizeArch(request.getArg("windows.arch", ARCH_X64));
         log("Building native Windows app for arch=" + arch + " (triple " + targetTriple(arch) + ")");

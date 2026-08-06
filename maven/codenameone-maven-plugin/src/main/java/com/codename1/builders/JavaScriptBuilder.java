@@ -90,6 +90,11 @@ public class JavaScriptBuilder extends Executor {
     }
 
     @Override
+    protected String hardeningPlatform() {
+        return "javascript";
+    }
+
+    @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         debug("Request Args: ");
         debug("-----------------");

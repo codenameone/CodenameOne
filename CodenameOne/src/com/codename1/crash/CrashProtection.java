@@ -149,7 +149,8 @@ public final class CrashProtection {
                     "Process terminated by native fault",
                     new ArrayList<Frame>(0),
                     null,
-                    pendingNative);
+                    pendingNative,
+                    null);
             persistJson(synthetic.toJson());
         }
         installed = true;
@@ -240,8 +241,28 @@ public final class CrashProtection {
         String message = scrubber.scrubMessage(t.getMessage());
         List<Frame> frames = extractFrames(t);
         String nativeLog = safeNativeLog();
+        String rawStack = scrubber.scrubRawStack(safeRawStack(t));
         return new CrashReportPayload(newEventId(), exClass, message,
-                frames, nativeLog, null);
+                frames, nativeLog, null, rawStack);
+    }
+
+    /// Renders the throwable (and its cause chain) as a pre-rendered stack
+    /// string via `printStackTrace`. This is the one trace API that behaves
+    /// identically on every port, and on the ParparVM C targets -- where
+    /// `getStackTrace()` may return the trace only as a formatted string --
+    /// it is what keeps a Java crash readable, especially once obfuscated.
+    /// Swallows any failure: capturing a crash report must never itself crash.
+    private static String safeRawStack(Throwable t) {
+        try {
+            java.io.StringWriter sw = new java.io.StringWriter();
+            java.io.PrintWriter pw = new java.io.PrintWriter(sw);
+            t.printStackTrace(pw);
+            pw.flush();
+            String s = sw.toString();
+            return s.length() == 0 ? null : s;
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     /// Pulls the platform log snapshot, swallowing any exception the

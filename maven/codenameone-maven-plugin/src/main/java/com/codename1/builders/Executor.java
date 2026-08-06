@@ -1218,7 +1218,7 @@ public abstract class Executor {
             Thread t = new Thread() {
                 public void run() {
                     try {
-                        File s = sourceZip;
+                        File s = hardenSourceJar(sourceZip, request);
                         result[0] = build(s, request);
 
                     } catch (Throwable err) {
@@ -2338,6 +2338,252 @@ public abstract class Executor {
             dat[iter] = (byte)(dat[iter] ^ (iter % 254 + 1));
         }
         return Base64.encodeNoNewline(dat);
+    }
+
+    /**
+     * The platform id this builder targets, for the hardening engine ({@code ios}, {@code and},
+     * {@code javascript}, {@code win}, {@code linux}, {@code mac}, ...). Subclasses override.
+     */
+    protected String hardeningPlatform() {
+        return "unknown";
+    }
+
+    /**
+     * Whether the hardening engine should rename for this platform. Android returns false: R8
+     * remains the sole renamer there, and the engine only encrypts strings and exports keep rules.
+     */
+    protected boolean hardeningRenameSupported() {
+        return true;
+    }
+
+    /** Extra library jars the hardening engine should see so it does not misrename overrides. */
+    protected java.util.List<File> hardeningLibraryJars(BuildRequest request) {
+        return new java.util.ArrayList<File>();
+    }
+
+    private File lastHardeningMapping;
+    private String lastHardeningMappingId = "";
+
+    /** The cross-platform obfuscation mapping produced by the last {@link #hardenSourceJar} call, or null. */
+    public File getLastHardeningMapping() {
+        return lastHardeningMapping;
+    }
+
+    /** The mapping id produced by the last {@link #hardenSourceJar} call, or empty. */
+    public String getLastHardeningMappingId() {
+        return lastHardeningMappingId;
+    }
+
+    /**
+     * Runs the build with hardening applied first: {@code build(hardenSourceJar(sourceZip, request),
+     * request)}. Callers that bypass {@link #buildNoException} (the local build paths in the maven
+     * plugin) invoke this instead of {@code build} directly, so hardening reaches every path.
+     */
+    public boolean runBuild(File sourceZip, BuildRequest request) throws BuildException {
+        return build(hardenSourceJar(sourceZip, request), request);
+    }
+
+    /**
+     * Applies the app-hardening transform to the merged application jar and returns the jar the
+     * build should proceed with. When hardening is not requested (or already applied, or declined
+     * by the engine) the input jar is returned unchanged; when the engine reports the build is not
+     * entitled, the build fails. The engine runs as a forked process so it is single-sourced across
+     * the plugin and the cloud daemon and never shares a classloader with the caller.
+     */
+    public File hardenSourceJar(File sourceZip, BuildRequest request) throws BuildException {
+        String level = request.getArg("harden.level", "off");
+        if (level == null || level.trim().length() == 0 || "off".equalsIgnoreCase(level.trim())) {
+            return sourceZip;
+        }
+        // The client-side pre-flight (Check 1) sets this when a local/source target opted into
+        // an unhardened build via harden.allowUnhardenedLocalBuild; honor it as a single point.
+        if ("true".equals(System.getProperty("cn1.harden.forceOff"))) {
+            log("cn1-hardening: forced off for this local build; building unhardened");
+            return sourceZip;
+        }
+        if (isAlreadyHardened(sourceZip)) {
+            log("cn1-hardening: input already hardened; skipping");
+            return sourceZip;
+        }
+        try {
+            File engine = getResourceAsFile("/cn1-hardening.jar", ".jar");
+            File workDir = new File(sourceZip.getParentFile(), "cn1-harden-work");
+            workDir.mkdirs();
+            File hardened = new File(workDir, "hardened.jar");
+            File mapping = new File(workDir, "cn1-mapping.txt");
+            File report = new File(workDir, "cn1-harden-report.json");
+            File config = new File(workDir, "config.properties");
+            writeHardeningConfig(config, request);
+
+            String javaBin = new File(System.getProperty("java.home"), "bin/java").getAbsolutePath();
+            java.util.List<String> cmd = new java.util.ArrayList<String>();
+            cmd.add(javaBin);
+            cmd.add("-jar");
+            cmd.add(engine.getAbsolutePath());
+            cmd.add("harden");
+            cmd.add("--in");
+            cmd.add(sourceZip.getAbsolutePath());
+            cmd.add("--out");
+            cmd.add(hardened.getAbsolutePath());
+            cmd.add("--mapping");
+            cmd.add(mapping.getAbsolutePath());
+            cmd.add("--report");
+            cmd.add(report.getAbsolutePath());
+            cmd.add("--config");
+            cmd.add(config.getAbsolutePath());
+
+            int exit = runForked(cmd, workDir);
+            if (exit == 0) {
+                lastHardeningMapping = mapping.isFile() ? mapping : null;
+                lastHardeningMappingId = readMappingId(mapping);
+                log("cn1-hardening: applied, mappingId=" + lastHardeningMappingId);
+                return hardened;
+            }
+            if (exit == 4) {
+                throw new BuildException("App hardening is an Enterprise feature and this build "
+                        + "is not entitled. Upgrade at https://www.codenameone.com/pricing.html "
+                        + "or set codename1.arg.harden.level=off.");
+            }
+            if (exit == 3) {
+                log("cn1-hardening: declined by engine; building unhardened");
+                return sourceZip;
+            }
+            throw new BuildException("App hardening failed (engine exit code " + exit
+                    + "). This build has been stopped rather than shipping a partially hardened binary.");
+        } catch (BuildException be) {
+            throw be;
+        } catch (Exception e) {
+            throw new BuildException("App hardening failed: " + e.getMessage());
+        }
+    }
+
+    private void writeHardeningConfig(File config, BuildRequest request) throws IOException {
+        java.util.Properties p = new java.util.Properties();
+        for (String key : request.getArgs()) {
+            if (key.startsWith("harden.")) {
+                p.setProperty(key, request.getArg(key, ""));
+            }
+        }
+        p.setProperty("cn1.platform", hardeningPlatform());
+        p.setProperty("cn1.mainClass", request.getMainClass() == null ? "" : request.getMainClass());
+        p.setProperty("cn1.renameSupported", Boolean.toString(hardeningRenameSupported()));
+        // Local plugin builds are ungated: the engine is open source and a developer must be able
+        // to reproduce a cloud failure locally. The cloud daemon sets this from the account tier.
+        p.setProperty("cn1.entitled", request.getArg("cn1.entitled", "true"));
+        p.setProperty("cn1.buildKey", resolveBuildKey(request));
+        StringBuilder libs = new StringBuilder();
+        for (File lib : hardeningLibraryJars(request)) {
+            if (lib != null && lib.exists()) {
+                if (libs.length() > 0) {
+                    libs.append(File.pathSeparator);
+                }
+                libs.append(lib.getAbsolutePath());
+            }
+        }
+        p.setProperty("cn1.libraryJars", libs.toString());
+        FileOutputStream fo = new FileOutputStream(config);
+        try {
+            p.store(fo, "Codename One hardening configuration");
+        } finally {
+            fo.close();
+        }
+    }
+
+    private int runForked(java.util.List<String> cmd, File workDir) throws IOException, InterruptedException {
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.directory(workDir);
+        pb.redirectErrorStream(true);
+        Process proc = pb.start();
+        java.io.BufferedReader r = new java.io.BufferedReader(
+                new java.io.InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8));
+        String line;
+        while ((line = r.readLine()) != null) {
+            log(line);
+        }
+        return proc.waitFor();
+    }
+
+    private boolean isAlreadyHardened(File jar) {
+        if (jar == null || !jar.isFile()) {
+            return false;
+        }
+        java.util.zip.ZipFile zf = null;
+        try {
+            zf = new java.util.zip.ZipFile(jar);
+            return zf.getEntry("META-INF/CN1-HARDENED") != null;
+        } catch (IOException e) {
+            return false;
+        } finally {
+            if (zf != null) {
+                try {
+                    zf.close();
+                } catch (IOException ignore) {
+                    // best effort
+                }
+            }
+        }
+    }
+
+    private String readMappingId(File mapping) {
+        if (mapping == null || !mapping.isFile()) {
+            return "";
+        }
+        java.io.BufferedReader r = null;
+        try {
+            r = new java.io.BufferedReader(new java.io.InputStreamReader(
+                    new FileInputStream(mapping), StandardCharsets.UTF_8));
+            String line;
+            while ((line = r.readLine()) != null) {
+                if (line.startsWith("# mappingId:")) {
+                    return line.substring("# mappingId:".length()).trim();
+                }
+            }
+        } catch (IOException e) {
+            return "";
+        } finally {
+            if (r != null) {
+                try {
+                    r.close();
+                } catch (IOException ignore) {
+                    // best effort
+                }
+            }
+        }
+        return "";
+    }
+
+    /**
+     * The per-build key the cloud stamps into the app and that crash reports echo back so the
+     * server can match a report to its uploaded symbol bundle. The cloud passes it in the
+     * {@code cn1.buildKey} argument; when it is absent (local builds) we fall back to the
+     * literal {@code LOCAL_BUILD}. Historically Android hard-coded {@code "LOCAL_BUILD"} as the
+     * <em>encoded</em> constant and then ran it through {@code d()} / {@code Util.xorDecode},
+     * which is not valid Base64 and decoded to junk -- always encode through this pair.
+     */
+    public String resolveBuildKey(BuildRequest request) {
+        String bk = request.getArg("cn1.buildKey", null);
+        if(bk == null || bk.length() == 0) {
+            bk = "LOCAL_BUILD";
+        }
+        return bk;
+    }
+
+    /**
+     * The {@link #resolveBuildKey(BuildRequest) build key} in the {@code d()}-decodable encoded
+     * form the generated stubs embed, i.e. what a stub assigns to its {@code BUILD_KEY} constant
+     * before stamping {@code Display.setProperty("build_key", d(BUILD_KEY))} at runtime.
+     */
+    public String buildKeyEncoded(BuildRequest request) {
+        return xorEncode(resolveBuildKey(request));
+    }
+
+    /**
+     * Identifier of the obfuscation mapping this build was hardened with, stamped alongside the
+     * build key so a crash report can be tied to the exact mapping even if a rebuilt app reused
+     * the build key. Empty for unhardened builds. Passed by the cloud in {@code cn1.mappingId}.
+     */
+    public String resolveMappingId(BuildRequest request) {
+        return request.getArg("cn1.mappingId", "");
     }
 
     /**

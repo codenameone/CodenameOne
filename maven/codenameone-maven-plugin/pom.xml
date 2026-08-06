@@ -380,6 +380,11 @@
                                 <copy file="${cn1.binaries}/Stubber.jar" todir="${project.build.outputDirectory}"/>
                                 <copy file="${maven.multiModuleProjectDirectory}/UpdateCodenameOne.jar"
                                       todir="${project.build.outputDirectory}/com/codename1/maven"/>
+                                <!-- Embed the forked app-hardening engine as a classpath resource
+                                     (/cn1-hardening.jar), the same mechanism the parparvm compiler
+                                     uses. Extracted and run as a separate process by Executor. -->
+                                <copy file="${maven.multiModuleProjectDirectory}/cn1-hardening/target/cn1-hardening-${project.version}-standalone.jar"
+                                      tofile="${project.build.outputDirectory}/cn1-hardening.jar"/>
                             </target>
                         </configuration>
 

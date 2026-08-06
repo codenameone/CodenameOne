@@ -38,6 +38,8 @@ public class Throwable{
     private Throwable cause;
     private String stack;
     private java.util.List<Throwable> suppressed;
+    private StackTraceElement[] parsedStack;
+    private boolean stackParsed;
     
     
     /**
@@ -114,11 +116,132 @@ public class Throwable{
     
     
     public StackTraceElement[] getStackTrace() {
-        return new StackTraceElement[0];
+        if(!stackParsed) {
+            parsedStack = parseStackString(stack);
+            stackParsed = true;
+        }
+        if(parsedStack == null || parsedStack.length == 0) {
+            return new StackTraceElement[0];
+        }
+        StackTraceElement[] copy = new StackTraceElement[parsedStack.length];
+        System.arraycopy(parsedStack, 0, copy, 0, parsedStack.length);
+        return copy;
     }
-    
+
     public void setStackTrace(StackTraceElement[] el) {
-        
+        if(el == null) {
+            throw new NullPointerException();
+        }
+        StackTraceElement[] copy = new StackTraceElement[el.length];
+        for(int i = 0 ; i < el.length ; i++) {
+            if(el[i] == null) {
+                throw new NullPointerException();
+            }
+            copy[i] = el[i];
+        }
+        parsedStack = copy;
+        stackParsed = true;
+    }
+
+    /**
+     * Parses the pre-rendered stack string produced by the native getStack() into
+     * structured frames. The format emitted on the C targets (see
+     * nativeMethods.m java_lang_Throwable_getStack) is a class-name header line
+     * followed by one "    at &lt;fqcn&gt;.&lt;method&gt;:&lt;line&gt;" line per frame.
+     *
+     * On the ParparVM JavaScript port the same field instead holds a JavaScript
+     * engine's Error().stack, whose frames carry '(', '/' or '@' -- characters a
+     * Java class or method name never contains. We reject the whole parse in that
+     * case (returning no frames, the historical behaviour) rather than fabricate
+     * bogus frames from a foreign format. Parsing is indexOf-based on purpose: it
+     * runs while another failure is being reported, so it avoids regex and never
+     * throws.
+     */
+    private static StackTraceElement[] parseStackString(String s) {
+        if(s == null || s.length() == 0) {
+            return new StackTraceElement[0];
+        }
+        java.util.ArrayList<StackTraceElement> frames = new java.util.ArrayList<StackTraceElement>();
+        int pos = 0;
+        int len = s.length();
+        while(pos < len) {
+            String line;
+            int nl = s.indexOf('\n', pos);
+            if(nl < 0) {
+                line = s.substring(pos);
+                pos = len;
+            } else {
+                line = s.substring(pos, nl);
+                pos = nl + 1;
+            }
+            // Only "    at ..." lines are frames; the class-name header and any
+            // blank line are skipped.
+            if(line.indexOf("    at ") != 0) {
+                continue;
+            }
+            String body = line.substring(7);
+            // Any of these characters means this is not the ParparVM text format
+            // (it is a JavaScript Error().stack, whose frames use URLs, parens or
+            // '@'). Bail on the whole trace rather than emit a made-up frame.
+            if(body.indexOf('(') >= 0 || body.indexOf('/') >= 0
+                    || body.indexOf('@') >= 0 || body.indexOf(' ') >= 0) {
+                return new StackTraceElement[0];
+            }
+            int colon = body.lastIndexOf(':');
+            if(colon < 0) {
+                continue;
+            }
+            int dot = body.lastIndexOf('.', colon - 1);
+            if(dot < 0) {
+                continue;
+            }
+            String cls = body.substring(0, dot);
+            String method = body.substring(dot + 1, colon);
+            if(cls.length() == 0 || method.length() == 0) {
+                continue;
+            }
+            int lineNumber = parseLineNumber(body, colon + 1);
+            // Synthesize a source file name from the simple class name so
+            // isNativeMethod() (fileName == null) stays false -- ParparVM does not
+            // carry the original source file, so this is best-effort, not authoritative.
+            String fileName = simpleClassName(cls) + ".java";
+            frames.add(new StackTraceElement(cls, method, fileName, lineNumber));
+        }
+        return frames.toArray(new StackTraceElement[frames.size()]);
+    }
+
+    private static int parseLineNumber(String s, int from) {
+        int len = s.length();
+        int i = from;
+        boolean negative = false;
+        if(i < len && s.charAt(i) == '-') {
+            negative = true;
+            i++;
+        }
+        int value = 0;
+        boolean any = false;
+        for(; i < len ; i++) {
+            char c = s.charAt(i);
+            if(c < '0' || c > '9') {
+                break;
+            }
+            value = value * 10 + (c - '0');
+            any = true;
+        }
+        if(!any) {
+            return -1;
+        }
+        return negative ? -value : value;
+    }
+
+    private static String simpleClassName(String fqcn) {
+        int d = fqcn.lastIndexOf('.');
+        String simple = d < 0 ? fqcn : fqcn.substring(d + 1);
+        int dollar = simple.indexOf('$');
+        if(dollar > 0) {
+            simple = simple.substring(0, dollar);
+        }
+        return simple;
     }
 
     /**

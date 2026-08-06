@@ -78,6 +78,23 @@ public class PiiScrubber {
         return methodName;
     }
 
+    /// Scrubs a pre-rendered stack string. On the ParparVM ports the whole
+    /// Java trace arrives as one string rather than structured frames, so a
+    /// stricter application can override this to redact aggressively. The
+    /// default applies the same message scrubbing (emails, long digit runs),
+    /// which is harmless on class/method/line text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rawStack`: the pre-rendered stack string; may be `null`.
+    ///
+    /// #### Returns
+    ///
+    /// the scrubbed stack string, or `null` if `rawStack` is `null`.
+    public String scrubRawStack(String rawStack) {
+        return scrubMessage(rawStack);
+    }
+
     /// Replaces all occurrences of an email-like substring with the form
     /// `<first-three>***@<domain>`. Local parts shorter than three
     /// characters are not padded; the original prefix is preserved and

@@ -164,7 +164,19 @@ public class BuildHintEditor {
                         model.type = BuildHintValueType.Checkbox;
                     } else if ("select".equalsIgnoreCase(propertyValue)) {
                         model.type = BuildHintValueType.Select;
-                        String valuesString = System.getProperty("codename1.arg.{{ "+model.name+" }}.values");
+                        // Resolve the sibling ".values" property using the *exact* brace content of
+                        // the ".type" property we're processing. model.name has already been stripped
+                        // of its group prefix (a grouped hint registered as {{#group#name}} leaves
+                        // model.name == "name"), and the registration side uses no spaces inside the
+                        // braces, so the old "{{ "+model.name+" }}" lookup missed every grouped Select
+                        // and every space-sensitive key. Deriving the key from propName keeps the two
+                        // in lockstep regardless of grouping or spacing. Fall back to the historical
+                        // spaced form for any cn1lib that registered its values key that way.
+                        String valuesKey = propName.substring(0, propName.indexOf("}}.")+3) + "values";
+                        String valuesString = System.getProperty(valuesKey);
+                        if (valuesString == null) {
+                            valuesString = System.getProperty("codename1.arg.{{ "+model.name+" }}.values");
+                        }
                         if (valuesString != null) {
                             String separator = ""+valuesString.charAt(valuesString.length()-1);
                             ArrayList<String> values = new ArrayList<String>();

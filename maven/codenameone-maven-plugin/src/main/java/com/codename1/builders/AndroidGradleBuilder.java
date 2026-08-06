@@ -754,6 +754,18 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     @Override
+    protected String hardeningPlatform() {
+        return "and";
+    }
+
+    @Override
+    protected boolean hardeningRenameSupported() {
+        // R8 remains the sole renamer on Android; the engine only encrypts strings here and
+        // exports its keep rules to the generated proguard.cfg.
+        return false;
+    }
+
+    @Override
     public boolean build(File sourceZip, final BuildRequest request) throws BuildException {
         boolean facebookSupported = request.getArg("facebook.appId", null) != null;
         newFirebaseMessaging = request.getArg("android.newFirebaseMessaging", "true").equals("true");
@@ -4730,7 +4742,8 @@ public class AndroidGradleBuilder extends Executor {
                     + "\n\n"
                     + "public class " + request.getMainClass() + "Stub extends " + request.getArg("android.customActivity", "CodenameOneActivity") + "{\n";
             stubSourceCode += decodeFunction();
-            stubSourceCode += "    public static final String BUILD_KEY = \"LOCAL_BUILD\";\n"
+            stubSourceCode += "    public static final String BUILD_KEY = \"" + buildKeyEncoded(request) + "\";\n"
+                    + "    public static final String CN1_MAPPING_ID = \"" + resolveMappingId(request) + "\";\n"
                     + "    public static final String PACKAGE_NAME = \"" + request.getPackageName() + "\";\n"
                     + "    public static final String BUILT_BY_USER = \"" + xorEncode(request.getUserName()) + "\";\n"
                     + "    public static final String LICENSE_KEY = \"" + xorEncode(licenseKey) + "\";\n"
@@ -4791,6 +4804,7 @@ public class AndroidGradleBuilder extends Executor {
                     + gcmSenderId
                     + nativeThemeStubProps
                     + "        Display.getInstance().setProperty(\"build_key\", d(BUILD_KEY));\n"
+                    + "        Display.getInstance().setProperty(\"cn1.mappingId\", CN1_MAPPING_ID);\n"
                     + "        Display.getInstance().setProperty(\"package_name\", PACKAGE_NAME);\n"
                     + "        Display.getInstance().setProperty(\"built_by_user\", d(BUILT_BY_USER));\n"
                     + useBackgroundPermissionSnippet
@@ -5106,7 +5120,7 @@ public class AndroidGradleBuilder extends Executor {
                     + "     public static final String C2DM_MESSAGE_EXTRA = \"message\";\n"
                     + "     public static final String C2DM_MESSAGE_IMAGE = \"image\";\n"
                     + "     public static final String C2DM_MESSAGE_CATEGORY = \"category\";\n"
-                    + "     public static final String BUILD_KEY = \"LOCAL_BUILD\"\n;"
+                    + "     public static final String BUILD_KEY = \"" + buildKeyEncoded(request) + "\"\n;"
                     + "     public static final String PACKAGE_NAME = \"" + request.getPackageName() + "\"\n;"
                     + "     public static final String BUILT_BY_USER = \"" + xorEncode(request.getUserName()) + "\"\n;"
                     + "	private static String KEY = \"c2dmPref\";\n"

@@ -478,6 +478,11 @@ public class IPhoneBuilder extends Executor {
 
 
     @Override
+    protected String hardeningPlatform() {
+        return "ios";
+    }
+
+    @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         // Builder instances are normally single-use, but keep scan-derived
         // native feature state deterministic if an instance is reused.

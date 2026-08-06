@@ -54,7 +54,59 @@ final class BuildHintSchemaDefaults {
     private BuildHintSchemaDefaults() {
     }
 
+    /**
+     * App Hardening (Enterprise). Grouped Select hints; note these rely on the grouped-Select
+     * value lookup in BuildHintEditor being keyed by the exact brace content (see the fix there).
+     */
+    private static void registerHardening() {
+        set("{{@hardening}}.label", "App Hardening (Enterprise)");
+        set("{{@hardening}}.description",
+                "Build-server transforms that make the shipped binary harder to reverse "
+                + "engineer -- class/method/field renaming, string encryption and control-flow "
+                + "obfuscation -- applied across every port, integrated with Crash Protection so "
+                + "obfuscated stack traces are still symbolicated. Runs on the Codename One build "
+                + "server only: the simulator is never obfuscated and a local or source-project "
+                + "build is not hardened. Requires an Enterprise subscription; a build that asks "
+                + "for it without one fails rather than shipping an unhardened binary.");
+
+        set("{{#hardening#harden.level}}.label", "Hardening level");
+        set("{{#hardening#harden.level}}.type", "Select");
+        set("{{#hardening#harden.level}}.values", "off,standard,aggressive,paranoid");
+        set("{{#hardening#harden.level}}.description",
+                "off = no hardening. standard = renaming + constant-string encryption. "
+                + "aggressive = + all-string encryption + control flow. paranoid = + opaque "
+                + "predicates + reflective-name hiding. Higher levels cost build time, size and "
+                + "startup; measure before choosing paranoid.");
+
+        set("{{#hardening#harden.strings}}.label", "String encryption");
+        set("{{#hardening#harden.strings}}.type", "Select");
+        set("{{#hardening#harden.strings}}.values", "off,constants,all");
+        set("{{#hardening#harden.strings}}.description",
+                "Override string encryption independently of the level.");
+
+        set("{{#hardening#harden.controlFlow}}.label", "Control-flow obfuscation");
+        set("{{#hardening#harden.controlFlow}}.type", "Select");
+        set("{{#hardening#harden.controlFlow}}.values", "off,on");
+        set("{{#hardening#harden.controlFlow}}.description",
+                "Override control-flow obfuscation. Applied on Android and desktop only; left off "
+                + "the ParparVM native ports where it fights the translator's optimizer.");
+
+        set("{{#hardening#harden.keep}}.label", "Keep rules");
+        set("{{#hardening#harden.keep}}.type", "TextArea");
+        set("{{#hardening#harden.keep}}.description",
+                "ProGuard-syntax keep rules for classes resolved by name at runtime that the "
+                + "automatic analysis can't see. Same syntax as android.proguardKeep.");
+
+        set("{{#hardening#harden.allowUnhardenedLocalBuild}}.label", "Allow unhardened local build");
+        set("{{#hardening#harden.allowUnhardenedLocalBuild}}.type", "Select");
+        set("{{#hardening#harden.allowUnhardenedLocalBuild}}.values", "false,true");
+        set("{{#hardening#harden.allowUnhardenedLocalBuild}}.description",
+                "Let a local or source-project target build unhardened instead of failing the "
+                + "pre-flight. The output is NOT hardened.");
+    }
+
     static void register() {
+        registerHardening();
         // Group.
         set("{{@nativeTheme}}.label", "Native Theme");
         set("{{@nativeTheme}}.description",

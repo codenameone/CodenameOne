@@ -101,11 +101,17 @@
         <module>windows</module>
         <module>linux</module>
         <module>parparvm</module>
+        <!-- The hardening engine builds before the plugin so the plugin's
+             generate-resources step can embed its shaded standalone jar as a
+             classpath resource. The engine is invoked as a forked process, never
+             on the plugin's classpath (it carries its own ProGuard/ASM). -->
+        <module>cn1-hardening</module>
         <module>designer</module>
         <module>codenameone-maven-plugin</module>
         <module>cn1app-archetype</module>
         <module>cn1lib-archetype</module>
         <module>cn1-debug-proxy</module>
+        <module>cn1-retrace</module>
         <module>cn1-ai-whisper</module>
         <module>cn1-ai-stablediffusion</module>
         <module>cn1-admob</module>
@@ -371,7 +377,10 @@
             <dependency>
                 <groupId>com.guardsquare</groupId>
                 <artifactId>proguard-base</artifactId>
-                <version>7.2.0-beta2</version>
+                <!-- 7.3.2 is the last ProGuard line that still runs on Java 8 (proguard-core
+                     9.0.8, class files at major 52); 7.4+ raised the floor to JDK 11. The
+                     app-hardening engine pins this again in maven/cn1-hardening/pom.xml. -->
+                <version>7.3.2</version>
             </dependency>
             <dependency>
                 <groupId>javax.xml.bind</groupId>

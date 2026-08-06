@@ -182,6 +182,11 @@ public class LinuxNativeBuilder extends Executor {
     }
 
     @Override
+    protected String hardeningPlatform() {
+        return "linux";
+    }
+
+    @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         String arch = normalizeArch(request.getArg("linux.arch", ARCH_X64));
         log("Building native Linux app for arch=" + arch + " (triple " + targetTriple(arch, isMuslRequested(request)) + ")");

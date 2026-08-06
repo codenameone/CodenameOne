@@ -162,6 +162,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
         }
 
+        applyHardeningPreflight();
+
         try {
             createAntProject();
         } catch (IOException ex) {
@@ -170,6 +172,42 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         } catch (LibraryPropertiesException ex) {
             getLog().error("Failed to merge properties from library "+ex.libName+".  " + ex.getMessage());
             throw new MojoExecutionException("Failed to merge properties from library "+ex.libName+".  " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * App-hardening pre-flight (Check 1). Validates {@code harden.level} and refuses targets that
+     * cannot be hardened before a build is spent. Runs for every target: for cloud targets it fails
+     * fast client-side before submission; for local/source targets it stops (or, with the escape
+     * hatch, forces hardening off) because a locally built binary never reaches the server and its
+     * mapping would be orphaned from the crash-symbolication service.
+     */
+    private void applyHardeningPreflight() throws MojoFailureException {
+        Properties settings = new Properties();
+        File settingsFile = new File(getCN1ProjectDir(), "codenameone_settings.properties");
+        if (settingsFile.isFile()) {
+            try (FileInputStream fis = new FileInputStream(settingsFile)) {
+                settings.load(fis);
+            } catch (IOException ex) {
+                getLog().debug("Could not read codenameone_settings.properties for hardening pre-flight", ex);
+            }
+        }
+        String level = settings.getProperty("codename1.arg.harden.level", "off");
+        boolean allowLocal = "true".equalsIgnoreCase(
+                settings.getProperty("codename1.arg.harden.allowUnhardenedLocalBuild", "false").trim());
+        boolean onDeviceDebug = "true".equalsIgnoreCase(
+                settings.getProperty("codename1.arg.android.onDeviceDebug", "false").trim())
+                || (buildTarget != null && buildTarget.contains("on-device-debug"));
+
+        HardeningPreflight.Result r = HardeningPreflight.check(level, buildTarget, allowLocal, onDeviceDebug);
+        if (r.isFailed()) {
+            throw new MojoFailureException(r.getMessage());
+        }
+        if (r.isForceOff()) {
+            getLog().warn(r.getMessage());
+            System.setProperty("cn1.harden.forceOff", "true");
+        } else {
+            System.clearProperty("cn1.harden.forceOff");
         }
     }
 
@@ -1318,7 +1356,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         try {
             getLog().info("Starting android project builder...");
-            boolean result = e.build(distJar, request);
+            boolean result = e.runBuild(distJar, request);
             getLog().info("Android project builder completed with result "+result);
             if (!result) {
                 getLog().error("Received false return value from build()");
@@ -1522,7 +1560,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
 
         try {
-            boolean result = e.build(distJar, request);
+            boolean result = e.runBuild(distJar, request);
             if (!result) {
                 String builderLog = e.getErrorMessage();
                 if (builderLog != null && builderLog.trim().length() > 0) {
@@ -1653,7 +1691,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setIncludeSource(true);
 
         try {
-            boolean result = e.build(distJar, r);
+            boolean result = e.runBuild(distJar, r);
             if (!result) {
                 String builderLog = e.getErrorMessage();
                 if (builderLog != null && builderLog.trim().length() > 0) {
@@ -1664,6 +1702,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if (e.getWindowsExecutable() != null) {
                 getLog().info("Built native Windows executable: " + e.getWindowsExecutable().getAbsolutePath());
             }
+        } catch (com.codename1.builders.BuildException hardeningEx) {
+            throw new MojoExecutionException(hardeningEx.getMessage(), hardeningEx);
         } catch (org.apache.tools.ant.BuildException ex) {
             String builderLog = e.getErrorMessage();
             if (builderLog != null && builderLog.trim().length() > 0) {
@@ -1734,7 +1774,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setIncludeSource(true);
 
         try {
-            boolean result = e.build(distJar, r);
+            boolean result = e.runBuild(distJar, r);
             if (!result) {
                 String builderLog = e.getErrorMessage();
                 if (builderLog != null && builderLog.trim().length() > 0) {
@@ -1745,6 +1785,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if (e.getLinuxExecutable() != null) {
                 getLog().info("Built native Linux executable: " + e.getLinuxExecutable().getAbsolutePath());
             }
+        } catch (com.codename1.builders.BuildException hardeningEx) {
+            throw new MojoExecutionException(hardeningEx.getMessage(), hardeningEx);
         } catch (org.apache.tools.ant.BuildException ex) {
             String builderLog = e.getErrorMessage();
             if (builderLog != null && builderLog.trim().length() > 0) {
@@ -1827,7 +1869,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setIncludeSource(true);
 
         try {
-            boolean result = e.build(distJar, r);
+            boolean result = e.runBuild(distJar, r);
             if (!result) {
                 String builderLog = e.getErrorMessage();
                 if (builderLog != null && builderLog.trim().length() > 0) {
