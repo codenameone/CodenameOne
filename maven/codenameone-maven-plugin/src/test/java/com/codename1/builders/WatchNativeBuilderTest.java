@@ -363,6 +363,32 @@ class WatchNativeBuilderTest {
                 "a whitespace-only description is absent, not blank: " + plist);
     }
 
+    /// ios.locationUsageDescription is a supported hint the phone translates into an NS key later,
+    /// after this plist is written -- so the watch has to translate it itself or ship without one.
+    @Test
+    void watchPlistTranslatesTheLocationFallback(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.locationUsageDescription", "Finds nearby stops");
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("<key>NSLocationWhenInUseUsageDescription</key>"),
+                "the location fallback must become an NS key in the watch plist: " + plist);
+        assertTrue(plist.contains("Finds nearby stops"), plist);
+    }
+
+    /// And an explicit NS key wins, rather than being emitted twice.
+    @Test
+    void explicitLocationKeyIsNotDuplicatedByTheFallback(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.locationUsageDescription", "fallback text");
+        req.putArgument("ios.NSLocationWhenInUseUsageDescription", "explicit text");
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("explicit text"), plist);
+        assertFalse(plist.contains("fallback text"),
+                "the explicit key wins and the fallback is not also emitted: " + plist);
+    }
+
     private static WatchNativeBuilder parse(BuildRequest req) {
         WatchNativeBuilder b = new WatchNativeBuilder(new IPhoneBuilder());
         b.parseHints(req);

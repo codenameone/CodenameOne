@@ -547,7 +547,7 @@ public final class WearableConnection {
                     l.dataRemoved(path);
                 }
             }
-        });
+        }, true);
     }
 
     /// Framework/port entry point: reports that reachability, pairing or peer-app installation
@@ -569,7 +569,11 @@ public final class WearableConnection {
     /// Parks a replicated delivery TAGGED with its path, so the cap can prefer an entry the
     /// incoming one actually supersedes.
     private static void deliverTagged(String path, Runnable delivery) {
-        deliver(delivery, dataListeners, pendingData, null, false, path);
+        deliverTagged(path, delivery, false);
+    }
+
+    private static void deliverTagged(String path, Runnable delivery, boolean removal) {
+        deliver(delivery, dataListeners, pendingData, null, false, path, removal);
     }
 
     /// Runs a delivery on the EDT, or parks it until a listener exists.
@@ -592,6 +596,11 @@ public final class WearableConnection {
 
     private static boolean deliver(Runnable delivery, List<?> listeners, List<Runnable> queue,
             Runnable onDropped, boolean oneShot, String path) {
+        return deliver(delivery, listeners, queue, onDropped, oneShot, path, false);
+    }
+
+    private static boolean deliver(Runnable delivery, List<?> listeners, List<Runnable> queue,
+            Runnable onDropped, boolean oneShot, String path, boolean removal) {
         List<Runnable> release = null;
         boolean parked;
         // The listener check and the enqueue share the queue's monitor with drainPending, so a
@@ -609,7 +618,7 @@ public final class WearableConnection {
                     }
                 }
                 queue.add(oneShot ? new OneShot(delivery, onDropped)
-                        : (path != null ? new Replicated(delivery, path) : delivery));
+                        : (path != null ? new Replicated(delivery, path, removal) : delivery));
             }
         }
         // Run outside the monitor: this calls back into the port, and holding the queue's lock
@@ -665,7 +674,10 @@ public final class WearableConnection {
             if (!(parked instanceof OneShot)) {
                 queue.remove(i);
                 if (parked instanceof Replicated) {
-                    droppedPaths.add(((Replicated) parked).path);
+                    Replicated r = (Replicated) parked;
+                    // Prefixed so the kind survives with the path: a removal recovered as an
+                    // ordinary change resolves to "nothing there" and announces nothing.
+                    droppedPaths.add((r.removal ? "-" : "+") + r.path);
                 }
                 return null;
             }
@@ -679,10 +691,13 @@ public final class WearableConnection {
     private static final class Replicated implements Runnable {
         private final Runnable delivery;
         final String path;
+        /// Whether this parked delivery was a removal rather than a value change.
+        final boolean removal;
 
-        Replicated(Runnable delivery, String path) {
+        Replicated(Runnable delivery, String path, boolean removal) {
             this.delivery = delivery;
             this.path = path;
+            this.removal = removal;
         }
 
         @Override
@@ -816,7 +831,11 @@ public final class WearableConnection {
         ///
         /// A null path means the record itself overflowed and more was discarded than can be
         /// named: re-offer everything available rather than one path.
-        void deliveryDropped(String path);
+        ///
+        /// `wasRemoval` distinguishes the two kinds, because recovering them differs: re-resolving
+        /// a path that is now empty is "nothing to announce" under the ordinary rule, which is
+        /// exactly the wrong answer for a removal.
+        void deliveryDropped(String path, boolean wasRemoval);
     }
 
     /// Framework/port entry point: registers what to do about a discarded delivery.
@@ -929,7 +948,12 @@ public final class WearableConnection {
             DroppedDeliveryHandler handler = droppedDeliveries;
             if (handler != null) {
                 for (int i = 0; i < dropped.size(); i++) {
-                    handler.deliveryDropped(dropped.get(i));
+                    String tagged = dropped.get(i);
+                    if (tagged == null) {
+                        handler.deliveryDropped(null, false);
+                    } else {
+                        handler.deliveryDropped(tagged.substring(1), tagged.charAt(0) == '-');
+                    }
                 }
             }
         }

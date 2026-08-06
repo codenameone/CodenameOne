@@ -532,6 +532,17 @@ class WatchNativeBuilder {
                 }
             }
         }
+        // The location FALLBACK too. ios.locationUsageDescription is a supported hint -- the phone
+        // builder even supplies one itself when it detects location use -- and the phone plist
+        // turns it into NSLocationWhenInUseUsageDescription later. The watch plist is written
+        // before that translation happens, so a loop over ios.NS* alone leaves the watch bundle
+        // with no purpose string while the project is configured correctly.
+        String locationFallback = trimToNull(request.getArg("ios.locationUsageDescription", null));
+        if (locationFallback != null
+                && trimToNull(request.getArg("ios.NSLocationWhenInUseUsageDescription", null))
+                        == null) {
+            plistString(sb, "NSLocationWhenInUseUsageDescription", locationFallback);
+        }
         // Read again, not re-emitted: the HealthKit pair is already in the plist from the loop
         // above, but the entitlement checks below need to know whether they were declared.
         String healthShare = trimToNull(request.getArg(
