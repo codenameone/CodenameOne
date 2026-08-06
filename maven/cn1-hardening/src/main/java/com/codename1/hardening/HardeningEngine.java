@@ -189,7 +189,7 @@ public final class HardeningEngine {
         boolean controlFlowApplied = cfg.isControlFlow() && controlFlowSafeFor(cfg.getPlatform());
         if (controlFlowApplied) {
             for (Map.Entry<String, byte[]> e : renamed.entrySet()) {
-                ControlFlowTransform t = new ControlFlowTransform(hierarchy);
+                ControlFlowTransform t = new ControlFlowTransform(hierarchy, cfg.getControlFlowIntensity());
                 byte[] out = t.transform(e.getValue());
                 if (out != e.getValue()) {
                     e.setValue(out);
@@ -232,7 +232,8 @@ public final class HardeningEngine {
             result.getTransformsApplied().add(cfg.isEncryptAllStrings() ? "strings:all" : "strings:constants");
         }
         if (controlFlowApplied && guardedMethods > 0) {
-            result.getTransformsApplied().add("controlFlow");
+            result.getTransformsApplied().add(cfg.getControlFlowIntensity() >= 2
+                    ? "controlFlow:intense" : "controlFlow");
         }
         if (cfg.isControlFlow() && !controlFlowApplied) {
             result.getWarnings().add("control-flow obfuscation is not applied on platform '"

@@ -60,6 +60,17 @@ public class MappingFileTest {
     }
 
     @Test
+    public void mapsDistinctOriginalLineRange() throws Exception {
+        // R8 / optimized ProGuard: obfuscated lines 1:2 map to original lines 40:41.
+        MappingFile mf = MappingFile.parse(
+                "com.example.MyForm -> zqaaaa:\n"
+                + "    1:2:void f():40:41 -> a\n");
+        Frame out = mf.retrace(new Frame("zqaaaa", "a", "zqaaaa.java", 2));
+        assertEquals("f", out.getMethodName());
+        assertEquals(41, out.getLineNumber());
+    }
+
+    @Test
     public void unknownClassPassesThroughUnchanged() throws Exception {
         MappingFile mf = MappingFile.parse(MAPPING);
         Frame in = new Frame("some.Other", "x", "Other.java", 9);

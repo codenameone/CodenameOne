@@ -92,6 +92,12 @@ public final class JarDemuxer {
                         zos.putNextEntry(out);
                         zos.write(data);
                         zos.closeEntry();
+                    } else if (isJarSignature(name)) {
+                        // Renaming/transforming classes invalidates any bundled jar signature, so
+                        // carrying the .SF/.RSA/.DSA/.EC blocks across would make a verifying JarFile
+                        // throw SecurityException: Invalid signature file digest. Drop them; without
+                        // the .SF the JVM no longer verifies, which is correct for a rewritten jar.
+                        continue;
                     } else {
                         nonClass.put(name, data);
                     }
@@ -154,6 +160,20 @@ public final class JarDemuxer {
             fi.close();
         }
         return classes;
+    }
+
+    /** True for a jar signature block under META-INF that a class rewrite invalidates. */
+    static boolean isJarSignature(String name) {
+        String upper = name.toUpperCase();
+        if (!upper.startsWith("META-INF/")) {
+            return false;
+        }
+        // Only the signature blocks in META-INF's top level, not nested paths.
+        if (upper.indexOf('/', "META-INF/".length()) >= 0) {
+            return false;
+        }
+        return upper.endsWith(".SF") || upper.endsWith(".RSA") || upper.endsWith(".DSA")
+                || upper.endsWith(".EC");
     }
 
     private static byte[] readAll(InputStream in) throws IOException {

@@ -173,6 +173,18 @@ public final class HardeningConfig {
         return controlFlow;
     }
 
+    /**
+     * How many opaque-predicate guards control-flow obfuscation inserts per method: {@code paranoid}
+     * inserts two (nested) where {@code aggressive} inserts one, which is what makes {@code paranoid}
+     * a genuinely stronger tier rather than an alias.
+     */
+    public int getControlFlowIntensity() {
+        if (!controlFlow) {
+            return 0;
+        }
+        return profile == HardeningProfile.PARANOID ? 2 : 1;
+    }
+
     public boolean isPlatformEnabled() {
         return platformEnabled;
     }

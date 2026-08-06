@@ -193,6 +193,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
         }
         String level = settings.getProperty("codename1.arg.harden.level", "off");
+        // A per-platform opt-out (harden.<platform>.enabled=false) means hardening won't run for
+        // this target, so the pre-flight must not reject it -- treat the level as off.
+        String hardenPlatform = normalizeHardenPlatform(platform);
+        if (hardenPlatform != null && "false".equalsIgnoreCase(
+                settings.getProperty("codename1.arg.harden." + hardenPlatform + ".enabled", "true").trim())) {
+            level = "off";
+        }
         boolean allowLocal = "true".equalsIgnoreCase(
                 settings.getProperty("codename1.arg.harden.allowUnhardenedLocalBuild", "false").trim());
         boolean onDeviceDebug = "true".equalsIgnoreCase(
@@ -232,6 +239,36 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         } else {
             System.clearProperty("cn1.hardening.libraryJars");
         }
+    }
+
+    /** Maps {@code codename1.platform} to the {@code harden.<platform>.enabled} opt-out key. */
+    private static String normalizeHardenPlatform(String platform) {
+        if (platform == null) {
+            return null;
+        }
+        String p = platform.trim().toLowerCase();
+        if (p.startsWith("android")) {
+            return "and";
+        }
+        if (p.startsWith("ios")) {
+            return "ios";
+        }
+        if (p.contains("javascript")) {
+            return "javascript";
+        }
+        if (p.contains("win")) {
+            return "win";
+        }
+        if (p.contains("mac")) {
+            return "mac";
+        }
+        if (p.contains("linux")) {
+            return "linux";
+        }
+        if (p.contains("javase") || p.contains("desktop")) {
+            return "javase";
+        }
+        return null;
     }
 
     /**

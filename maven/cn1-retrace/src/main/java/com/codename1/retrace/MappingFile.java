@@ -43,13 +43,23 @@ public final class MappingFile {
 
     private static final class MethodMapping {
         final String originalName;
-        final int startLine;
-        final int endLine;
+        final int startLine;         // obfuscated range start (0 if none)
+        final int endLine;           // obfuscated range end
+        final int originalStartLine; // original range start (0 if none / same)
 
-        MethodMapping(String originalName, int startLine, int endLine) {
+        MethodMapping(String originalName, int startLine, int endLine, int originalStartLine) {
             this.originalName = originalName;
             this.startLine = startLine;
             this.endLine = endLine;
+            this.originalStartLine = originalStartLine;
+        }
+
+        /** Maps an observed obfuscated line into the original source line, when both ranges are known. */
+        int mapLine(int observed) {
+            if (startLine != 0 && originalStartLine != 0 && observed >= startLine && observed <= endLine) {
+                return originalStartLine + (observed - startLine);
+            }
+            return observed;
         }
     }
 
@@ -124,7 +134,21 @@ public final class MappingFile {
                 left = left.substring(secondColon + 1);
             }
         }
-        // left is now "returnType methodName(args)"; extract the method name.
+        // left is now "returnType methodName(args)" optionally followed by ":origStart[:origEnd]"
+        // (R8 / optimized ProGuard maps the obfuscated range to a distinct original range).
+        int originalStartLine = 0;
+        int closeParen = left.indexOf(')');
+        if (closeParen >= 0) {
+            String afterParen = left.substring(closeParen + 1);
+            if (afterParen.startsWith(":")) {
+                String[] parts = afterParen.substring(1).split(":");
+                if (parts.length >= 1) {
+                    originalStartLine = parseIntSafe(parts[0]);
+                }
+            }
+            left = left.substring(0, closeParen + 1);
+        }
+        // Extract the method name from "returnType methodName(args)".
         int paren = left.indexOf('(');
         String beforeParen = left.substring(0, paren).trim();
         int sp = beforeParen.lastIndexOf(' ');
@@ -134,7 +158,7 @@ public final class MappingFile {
             list = new ArrayList<MethodMapping>();
             cm.methods.put(obfName, list);
         }
-        list.add(new MethodMapping(originalMethod, startLine, endLine));
+        list.add(new MethodMapping(originalMethod, startLine, endLine, originalStartLine));
     }
 
     /**
@@ -147,24 +171,30 @@ public final class MappingFile {
         if (cm == null) {
             return obfuscated;
         }
+        int observed = obfuscated.getLineNumber();
         String originalMethod = obfuscated.getMethodName();
+        int mappedLine = observed;
         List<MethodMapping> candidates = cm.methods.get(obfuscated.getMethodName());
         if (candidates != null && !candidates.isEmpty()) {
-            originalMethod = pickByLine(candidates, obfuscated.getLineNumber());
+            MethodMapping m = pickByLine(candidates, observed);
+            originalMethod = m.originalName;
+            // Translate the observed obfuscated line back to the original source line when the
+            // mapping carries a distinct original range (R8 / optimized ProGuard).
+            mappedLine = m.mapLine(observed);
         }
         String originalClass = cm.originalName;
         String file = simpleSourceFile(originalClass);
-        return new Frame(originalClass, originalMethod, file, obfuscated.getLineNumber());
+        return new Frame(originalClass, originalMethod, file, mappedLine);
     }
 
-    private String pickByLine(List<MethodMapping> candidates, int line) {
+    private MethodMapping pickByLine(List<MethodMapping> candidates, int line) {
         // Prefer a candidate whose obfuscated line range contains the frame's line.
         for (MethodMapping m : candidates) {
             if (m.startLine != 0 && line >= m.startLine && line <= m.endLine) {
-                return m.originalName;
+                return m;
             }
         }
-        return candidates.get(0).originalName;
+        return candidates.get(0);
     }
 
     private static String simpleSourceFile(String fqcn) {

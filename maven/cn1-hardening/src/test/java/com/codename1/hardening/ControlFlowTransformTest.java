@@ -65,6 +65,28 @@ public class ControlFlowTransformTest {
                 c.getMethod("concat", String.class).invoke(null, "Bo"));
     }
 
+    @Test
+    public void intenseGuardsVerifyAndPreserveBehaviour() throws Exception {
+        // Paranoid intensity: two nested guards per method. Must still verify and be a no-op.
+        byte[] out = new ControlFlowTransform(null, 2).transform(original());
+        CheckClassAdapter.verify(new ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        Class<?> c = new ByteLoader().define(CLASS + "$P", rename(out, CLASS, CLASS + "$P"));
+        // A distinct class name via a fresh loader; behaviour must be unchanged.
+        assertEquals("hello secret world", c.getMethod("greet").invoke(null));
+        assertEquals(5, c.getMethod("compute", int.class, int.class).invoke(null, 2, 3));
+    }
+
+    // Renames the class internal name so the intense variant can load beside the plain one.
+    private static byte[] rename(byte[] bytes, String from, String to) {
+        org.objectweb.asm.ClassReader cr = new org.objectweb.asm.ClassReader(bytes);
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
+        cr.accept(new org.objectweb.asm.commons.ClassRemapper(cw,
+                new org.objectweb.asm.commons.SimpleRemapper(from.replace('.', '/'),
+                        to.replace('.', '/'))), 0);
+        return cw.toByteArray();
+    }
+
     private static final class ByteLoader extends ClassLoader {
         Class<?> define(String name, byte[] b) {
             return defineClass(name, b, 0, b.length);

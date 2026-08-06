@@ -58,18 +58,25 @@ public final class ControlFlowTransform {
     static final String GUARD_DESC = "I";
 
     private final ClassLoader hierarchy;
+    private final int intensity;
     private int guardedMethods;
 
     public ControlFlowTransform() {
-        this(null);
+        this(null, 1);
+    }
+
+    public ControlFlowTransform(ClassLoader hierarchy) {
+        this(hierarchy, 1);
     }
 
     /**
      * @param hierarchy a classloader over the (renamed) input classes plus the library jars, used
      *                  for stack-map frame computation; may be {@code null} in tests
+     * @param intensity how many opaque-predicate guards to insert per method (paranoid uses 2)
      */
-    public ControlFlowTransform(ClassLoader hierarchy) {
+    public ControlFlowTransform(ClassLoader hierarchy, int intensity) {
         this.hierarchy = hierarchy;
+        this.intensity = Math.max(1, intensity);
     }
 
     public int getGuardedMethods() {
@@ -93,7 +100,9 @@ public final class ControlFlowTransform {
                 if (!isGuardable(mn)) {
                     continue;
                 }
-                prependGuard(cn, mn);
+                for (int i = 0; i < intensity; i++) {
+                    prependGuard(cn, mn);
+                }
                 guardedMethods++;
                 changed = true;
             }
