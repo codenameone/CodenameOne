@@ -36,6 +36,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -854,8 +855,99 @@ class JavaSEWearableBridge implements WearableBridge {
         // live rather than being an absence.
     }
 
+    /// Retires this side's own tombstones: the acknowledged ones past their window, and the
+    /// oldest ones once the directory cap is exceeded.
+    ///
+    /// A pass of its own, over every tombstone, rather than a branch inside the delivery loop. That
+    /// loop only reaches a file whose recorded stamp has changed, and a tombstone never changes
+    /// after it is written -- {@link #writeValue} records the stamp as it creates the file, and an
+    /// acknowledgement lands as a separate file that leaves the tombstone's marker alone. So the
+    /// housekeeping ran exactly once, at creation, when nothing was yet eligible: no tombstone
+    /// written during a run was ever retired and the cap did nothing until a restart.
+    ///
+    /// Throttled, because it reads each tombstone to find its birth stamp and the scan it hangs off
+    /// runs twice a second. Retirement is not latency-sensitive; being a few seconds late costs
+    /// nothing.
+    private void pruneOwnTombstones(File[] files) {
+        if (files == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastTombPrune < TOMB_PRUNE_INTERVAL_MILLIS) {
+            return;
+        }
+        lastTombPrune = now;
+        // Birth stamp alongside the file, because BOTH decisions here are about age and neither
+        // can be answered from the name. Decoded from the frame: the stamp encodes
+        // wallMillis * 2 + sideBit, and comparing it undecoded reads as about minus fifty-seven
+        // years, which is why this cleanup once never fired at all. A file with no frame falls
+        // back to its mtime -- setLastModified can be refused outright, so this is a guess, but it
+        // is the only one available for a file this build did not write.
+        List<File> own = new ArrayList<File>();
+        final Map<String, Long> bornAt = new HashMap<String, Long>();
+        for (File f : files) {
+            if (!f.isFile() || !isTombstone(f.getName())) {
+                continue;
+            }
+            byte[] snapshot;
+            try {
+                snapshot = readFully(f);
+            } catch (IOException vanished) {
+                continue;
+            }
+            if (!authoredLocallyFor(snapshot, f.lastModified())) {
+                continue;
+            }
+            long born = framedStamp(snapshot);
+            own.add(f);
+            bornAt.put(f.getName(), Long.valueOf(born == Long.MIN_VALUE
+                    ? f.lastModified() : born / 2));
+            // Acknowledged AND past its window: the peer has seen this removal, so keeping the
+            // record no longer protects anyone.
+            if (acknowledges(new File(dataDir, f.getName() + ACK_SUFFIX), born)
+                    && now - bornAt.get(f.getName()).longValue() > TOMB_TTL_MILLIS) {
+                retireTombstone(f);
+                own.remove(own.size() - 1);
+            }
+        }
+        if (own.size() <= MAX_TOMBS) {
+            return;
+        }
+        // Past the cap the OLDEST go, by birth stamp. listFiles() has no ordering guarantee, so
+        // deleting whichever came back first discarded a removal made seconds ago while removals
+        // from hours earlier stayed -- and it is the recent one an offline peer most needs.
+        Collections.sort(own, new java.util.Comparator<File>() {
+            public int compare(File a, File b) {
+                long x = bornAt.get(a.getName()).longValue();
+                long y = bornAt.get(b.getName()).longValue();
+                return x < y ? -1 : (x > y ? 1 : a.getName().compareTo(b.getName()));
+            }
+        });
+        for (int i = 0; i < own.size() - MAX_TOMBS; i++) {
+            retireTombstone(own.get(i));
+        }
+    }
+
+    /// Deletes a tombstone and its acknowledgement, and forgets both markers.
+    private void retireTombstone(File tomb) {
+        File ack = new File(dataDir, tomb.getName() + ACK_SUFFIX);
+        tomb.delete();
+        ack.delete();
+        synchronized (seenData) {
+            seenData.remove(tomb.getName());
+            seenData.remove(ack.getName());
+        }
+    }
+
+    /// When the tombstone pass last ran. It reads every tombstone, and the scan it hangs off runs
+    /// twice a second.
+    private long lastTombPrune;
+
+    private static final long TOMB_PRUNE_INTERVAL_MILLIS = 5000L;
+
     private void scanData() {
         File[] files = dataDir.listFiles();
+        pruneOwnTombstones(files);
         List<String> gone;
         synchronized (seenData) {
             gone = new ArrayList<String>(seenData.keySet());
@@ -946,35 +1038,14 @@ class JavaSEWearableBridge implements WearableBridge {
                     if (authoredLocallyFor(snapshot, stamp)) {
                         // Ours. Keep it for the peer to find, and drop it once it is old enough
                         // that any peer which was going to see it has had every chance.
-                        // Aged from the stamp INSIDE the file, not from its mtime. The mtime is
-                        // normally the encoded stamp, but setLastModified can be refused outright
-                        // -- writeValue says so -- and then the mtime is an ordinary wall-clock
-                        // value whose half looks decades old, so the author would delete its own
-                        // tombstone on the very next scan and an offline peer would never see the
-                        // removal. Decoded, because the stamp encodes wallMillis * 2 + sideBit;
-                        // comparing it undecoded reads as about minus fifty-seven years, which is
-                        // why this cleanup never fired at all before.
-                        long born = framedStamp(snapshot);
-                        long age = born == Long.MIN_VALUE
-                                ? System.currentTimeMillis() - stamp
-                                : System.currentTimeMillis() - (born / 2);
-                        // Age alone is NOT permission to forget. A peer that stayed closed longer
-                        // than the window would come back to neither a value nor a tombstone and
-                        // never learn of the removal -- which is the failure the tombstone exists
-                        // to prevent, reintroduced by its own expiry. The device ports keep theirs
-                        // until the peer acknowledges; so does this one now.
-                        File ack = new File(dataDir, f.getName() + ACK_SUFFIX);
-                        boolean acknowledged = acknowledges(ack, born);
-                        // The cap is the backstop, so an app whose peer never runs cannot fill the
-                        // directory: past it the oldest go, acknowledged or not.
-                        if ((acknowledged && age > TOMB_TTL_MILLIS) || ownTombstones() > MAX_TOMBS) {
-                            f.delete();
-                            ack.delete();
-                            synchronized (seenData) {
-                                seenData.remove(f.getName());
-                                seenData.remove(ack.getName());
-                            }
-                        }
+                        // Kept for the peer to find. Retiring it is housekeeping and does NOT
+                        // belong here: this loop only reaches a file whose stamp changed, and a
+                        // tombstone never changes after it is written -- writeValue records its
+                        // stamp as it creates it, so the very next scan skips it as already seen.
+                        // An acknowledgement arrives as a SEPARATE file and does not disturb the
+                        // tombstone's marker, so nothing here would ever run again. See
+                        // pruneOwnTombstones, which runs over all of them regardless of what the
+                        // delivery loop has seen.
                         continue;
                     }
                     WearableConnection.deliverDataRemoved(tombstonePath(f.getName()));
