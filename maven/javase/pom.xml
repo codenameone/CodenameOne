@@ -147,9 +147,11 @@
              native bundles, calls AbstractStreamBuilder.getInputStream() and
              requires Commons IO 2.20.0 (its own declared dependency). An older
              Commons IO on the classpath throws IllegalAccessError from
-             GzipCompressorInputStream during native extraction. The reactor
-             otherwise manages Commons IO at 2.14.0, so pin it here. Keep this in
-             sync with commons-compress when bumping jcefmaven.version. -->
+             GzipCompressorInputStream during native extraction. The root
+             reactor's dependencyManagement pins commons-io to this same version;
+             this direct pin keeps standalone consumers of codenameone-javase (who
+             don't inherit the reactor's dependencyManagement) on 2.20.0 too. Keep
+             both in sync with commons-compress when bumping jcefmaven.version. -->
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
