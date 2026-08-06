@@ -72,9 +72,10 @@ public final class WearableConnection {
     /// otherwise grow these without limit, and each queued runnable captures its whole payload, so
     /// the cost tracks traffic rather than count.
     ///
-    /// At the cap the OLDEST delivery is dropped: for a replicated value the newest is the one that
-    /// matters, and for a live message a listener that has never appeared was not going to read the
-    /// old ones either.
+    /// At the cap the oldest REPLACEABLE delivery is dropped: for a replicated value the newest is
+    /// the one that matters, and for a live message a listener that has never appeared was not
+    /// going to read the old ones either. A one-shot file transfer is not replaceable and is
+    /// evicted only when nothing else is parked -- see [#evictOne].
     private static final int MAX_PENDING = 256;
     private static final List<Runnable> pendingMessages = new ArrayList<Runnable>();
     private static final List<Runnable> pendingData = new ArrayList<Runnable>();
@@ -544,19 +545,64 @@ public final class WearableConnection {
     /// app has finished wiring itself up. Parking rather than dropping is what makes it safe to
     /// register listeners in `init()`.
     private static boolean deliver(Runnable delivery, List<?> listeners, List<Runnable> queue) {
+        return deliver(delivery, listeners, queue, false);
+    }
+
+    /// Runs a delivery on the EDT, or parks it until a listener exists.
+    ///
+    /// `oneShot` marks a delivery whose payload has no other copy in this process -- a file
+    /// transfer. It changes only what the cap evicts.
+    private static boolean deliver(Runnable delivery, List<?> listeners, List<Runnable> queue,
+            boolean oneShot) {
         // The listener check and the enqueue share the queue's monitor with drainPending, so a
         // delivery can never be parked after the drain that would have replayed it.
         synchronized (queue) {
             if (listeners.isEmpty()) {
                 while (queue.size() >= MAX_PENDING) {
-                    queue.remove(0);
+                    evictOne(queue);
                 }
-                queue.add(delivery);
+                queue.add(oneShot ? new OneShot(delivery) : delivery);
                 return false;
             }
         }
         Display.getInstance().callSerially(delivery);
         return true;
+    }
+
+    /// Makes room for one delivery, taking a replaceable one first.
+    ///
+    /// The cap used to take the oldest entry outright, and replicated updates share this queue with
+    /// file transfers. A replicated update is safely replaceable -- a later publication of the same
+    /// path supersedes it, and the value is still readable with `getData`. A transfer is not: it is
+    /// one-shot, the payload exists nowhere else in this process, and dropping it is the whole
+    /// delivery.
+    ///
+    /// So transfers are evicted only when every parked delivery is one, and even then the eviction
+    /// merely drops the runnable: the confirmation callback is NOT invoked, so the port's durable
+    /// copy -- the iOS inbox entry, the JavaSE file, the Android transfer claim -- is left
+    /// unretired and the payload is redelivered on the next activation instead of being lost.
+    private static void evictOne(List<Runnable> queue) {
+        for (int i = 0; i < queue.size(); i++) {
+            if (!(queue.get(i) instanceof OneShot)) {
+                queue.remove(i);
+                return;
+            }
+        }
+        queue.remove(0);
+    }
+
+    /// Marks a parked delivery as the only copy of its payload. See [#evictOne].
+    private static final class OneShot implements Runnable {
+        private final Runnable delivery;
+
+        OneShot(Runnable delivery) {
+            this.delivery = delivery;
+        }
+
+        @Override
+        public void run() {
+            delivery.run();
+        }
     }
 
     /// Framework/port entry point: as [#deliverDataChanged], reporting whether the delivery reached
@@ -612,7 +658,7 @@ public final class WearableConnection {
                     onDelivered.run();
                 }
             }
-        }, dataListeners, pendingData);
+        }, dataListeners, pendingData, onDelivered != null);
     }
 
     /// Replays what was queued for one listener type, once a listener of that type exists.

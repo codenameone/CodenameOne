@@ -4938,6 +4938,27 @@ public class IPhoneBuilder extends Executor {
         for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
             widgetBuilder.addKind(kind);
         }
+        // Named out loud, every time, whether or not the extension is generated. A watch-only kind
+        // is silently dropped from the iOS bundle and NOTHING else emits it -- there is no watchOS
+        // widget extension target and no Wear complication data source yet -- so a developer who
+        // declares one and says nothing about it gets no surface on any platform and no clue why.
+        // The limitation is documented in the Wearables guide; this is the build-time half of it.
+        StringBuilder watchOnly = new StringBuilder();
+        for (IOSWidgetExtensionBuilder.Kind watchKind : surfacesKinds) {
+            if (IOSWidgetExtensionBuilder.isWatchOnly(watchKind)) {
+                if (watchOnly.length() > 0) {
+                    watchOnly.append(", ");
+                }
+                watchOnly.append(watchKind.getId());
+            }
+        }
+        if (watchOnly.length() > 0) {
+            log("[surfaces] NOTE: these kinds declare only watch complication families and will "
+                    + "NOT appear on any device in this build: " + watchOnly + ". The watchOS "
+                    + "widget extension target and the Wear OS complication data source are not "
+                    + "generated yet. Declare a phone family alongside them if you need a surface "
+                    + "today.");
+        }
         if (!widgetBuilder.hasIosSurface()) {
             // Every declared kind is a watch complication and there is no live activity, so the iOS
             // extension would host nothing -- and a WidgetBundle with an empty body does not compile.

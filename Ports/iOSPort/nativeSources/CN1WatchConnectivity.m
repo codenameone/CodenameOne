@@ -925,7 +925,21 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
             // and reporting that back would fire dataRemoved on the device that asked for it, which
             // WearableDataListener promises never to do. Only a path we never had, or never removed
             // ourselves, is a peer-originated disappearance.
-            if (!mine.known && !alreadyAnnounced) {
+            if (mine.known && !mine.removed) {
+                // A LIVE local value survived the peer's disappearance. Both devices had published
+                // this path, the peer's newer value was the one delivered, and now the peer's entry
+                // is gone without a tombstone -- so the winner is our own value again. Saying
+                // nothing left the listener on the vanished peer value while getData() already
+                // returned the local one, and nothing later would reconcile them.
+                //
+                // Announced only once per disappearance: _lastReceived is rewritten from `seen`
+                // below, so `gone` drops out of it and this branch cannot re-fire on the next
+                // context update.
+                if (mine.data != nil && !alreadyAnnounced) {
+                    cn1_wearable_deliverDataChanged(gone.UTF8String, mine.data.bytes,
+                                                    (int) mine.data.length);
+                }
+            } else if (!mine.known && !alreadyAnnounced) {
                 cn1_wearable_deliverDataRemoved(gone.UTF8String);
             }
         }
