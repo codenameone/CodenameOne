@@ -606,6 +606,13 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     ctx[cn1WearableValueKey(path)] = (payload == nil ? [NSData data] : payload);
     ctx[cn1WearableStampKey(path)] = @(cn1WearableNextSequence());
     [ctx removeObjectForKey:cn1WearableTombKey(path)];
+    // Pruned here as well, not only in removeData. Tombstones raised while the peer was offline
+    // become prunable the moment it reconnects and acknowledges them -- but an app that then only
+    // ever calls putData() never reached the sweep, because removeData() held its only call site.
+    // The context kept growing until a perfectly ordinary value publication was rejected for size,
+    // with every tombstone in it eligible for removal. Publishing is exactly when that matters,
+    // since publishing is what the oversized context breaks.
+    cn1WearablePruneTombstones(ctx, [s receivedApplicationContext]);
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
     // Released before the error branch below, not after it: an early return there would leave the
@@ -895,7 +902,12 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
             CN1WearableEntry mine = cn1WearableEntryFor(localCtx, gone);
             NSNumber *previous = _lastReceived[gone];
             BOOL alreadyAnnounced = previous != nil && previous.longLongValue == kCN1RemovalAnnounced;
-            if ((!mine.known || mine.removed) && !alreadyAnnounced) {
+            // mine.removed means WE hold the tombstone -- this device called removeData. The peer's
+            // value then disappears from its context precisely because it acknowledged our removal,
+            // and reporting that back would fire dataRemoved on the device that asked for it, which
+            // WearableDataListener promises never to do. Only a path we never had, or never removed
+            // ourselves, is a peer-originated disappearance.
+            if (!mine.known && !alreadyAnnounced) {
                 cn1_wearable_deliverDataRemoved(gone.UTF8String);
             }
         }
