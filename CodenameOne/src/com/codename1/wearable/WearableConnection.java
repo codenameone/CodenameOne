@@ -524,16 +524,48 @@ public final class WearableConnection {
     /// The platform starts an app to hand it a payload, so the payload routinely arrives before the
     /// app has finished wiring itself up. Parking rather than dropping is what makes it safe to
     /// register listeners in `init()`.
-    private static void deliver(Runnable delivery, List<?> listeners, List<Runnable> queue) {
+    private static boolean deliver(Runnable delivery, List<?> listeners, List<Runnable> queue) {
         // The listener check and the enqueue share the queue's monitor with drainPending, so a
         // delivery can never be parked after the drain that would have replayed it.
         synchronized (queue) {
             if (listeners.isEmpty()) {
                 queue.add(delivery);
-                return;
+                return false;
             }
         }
         Display.getInstance().callSerially(delivery);
+        return true;
+    }
+
+    /// Framework/port entry point: as [#deliverDataChanged], reporting whether the delivery reached
+    /// a registered listener rather than being parked for a cold start.
+    ///
+    /// Ports use this where the answer changes what they record. A file transfer is the case: its
+    /// one-shot claim must not be made durable while the payload exists only in this process's
+    /// pending queue, because a process death then loses the payload AND suppresses the redelivery
+    /// that would have replaced it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path whose value changed
+    /// - `payload`: the encoded new value
+    ///
+    /// #### Returns
+    ///
+    /// `true` when a listener was registered and the delivery was dispatched; `false` when it was
+    /// queued for a listener that does not exist yet.
+    public static boolean deliverDataChangedTracked(final String path, final byte[] payload) {
+        return deliver(new Runnable() {
+            @Override
+            public void run() {
+                WearableMessage m = WearableMessage.fromByteArray(path, payload);
+                WearableDataListener[] copy =
+                        dataListeners.toArray(new WearableDataListener[dataListeners.size()]);
+                for (WearableDataListener l : copy) {
+                    l.dataChanged(m);
+                }
+            }
+        }, dataListeners, pendingData);
     }
 
     /// Replays what was queued for one listener type, once a listener of that type exists.

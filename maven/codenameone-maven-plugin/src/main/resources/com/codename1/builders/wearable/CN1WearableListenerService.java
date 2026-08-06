@@ -169,9 +169,10 @@ public class CN1WearableListenerService extends WearableListenerService {
                 }
                 CN1WearableBridge.Transfer transfer =
                         CN1WearableBridge.decodeTransfer(this, event.getDataItem());
+                long transferSeq = CN1WearableBridge.sequenceOf(
+                        CN1WearableBridge.valueOrTransferMap(event.getDataItem()));
                 if (transfer.payload != null
-                        && CN1WearableBridge.claimTransfer(uri, CN1WearableBridge.sequenceOf(
-                                CN1WearableBridge.valueOrTransferMap(event.getDataItem())))) {
+                        && CN1WearableBridge.claimTransfer(uri, transferSeq)) {
                     // On the path the sender passed to transferFile, not the filename-suffixed
                     // storage path this item happens to live at: a listener routes on what it asked
                     // for. The decoded payload carries the same path internally.
@@ -181,7 +182,13 @@ public class CN1WearableListenerService extends WearableListenerService {
                     // item belongs to the sender, and deleting it here would propagate: with two
                     // watches paired to one phone, the first to connect would consume the file and
                     // the second would get the tombstone.
-                    WearableConnection.deliverDataChanged(transfer.logicalPath, transfer.payload);
+                    //
+                    // The claim is made DURABLE only if this reached a live listener. Parked in the
+                    // cold-start queue it is not safe yet: a process death would lose the payload
+                    // while a persisted claim suppressed the redelivery that would replace it.
+                    CN1WearableBridge.confirmTransferDelivered(uri, transferSeq,
+                            WearableConnection.deliverDataChangedTracked(
+                                    transfer.logicalPath, transfer.payload));
                 }
                 // An unreadable asset delivers nothing now; decodeTransfer has scheduled a re-read,
                 // which beats handing the listener DataMap bytes dressed up as a payload.

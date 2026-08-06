@@ -1294,8 +1294,11 @@ public class CN1WearableBridge implements WearableBridge {
                         for (DataItem item : items) {
                             Transfer t = decodeTransferOnce(context, item);
                             if (t.payload != null) {
-                                if (claimTransfer(uri, sequenceOf(valueOrTransferMap(item)))) {
-                                    WearableConnection.deliverDataChanged(t.logicalPath, t.payload);
+                                long tseq = sequenceOf(valueOrTransferMap(item));
+                                if (claimTransfer(uri, tseq)) {
+                                    confirmTransferDelivered(uri, tseq,
+                                            WearableConnection.deliverDataChangedTracked(
+                                                    t.logicalPath, t.payload));
                                 }
                                 return;
                             }
@@ -2003,10 +2006,36 @@ public class CN1WearableBridge implements WearableBridge {
                     return false;
                 }
             }
-            String stamp = sequence + "|" + (uri.getHost() == null ? "" : uri.getHost());
-            transferClaims.put(key, stamp);
-            persistClaim(key, stamp);
+            transferClaims.put(key, sequence + "|" + (uri.getHost() == null ? "" : uri.getHost()));
+            // Claimed in memory only. The DURABLE claim waits until the payload has actually
+            // reached a listener -- see confirmTransferDelivered.
             return true;
+        }
+    }
+
+    /**
+     * Makes a transfer's claim durable, once the payload is no longer only in this process.
+     *
+     * <p>Persisting at claim time was wrong in the one direction that cannot be recovered from. A
+     * transfer can wake this service in a cold process, and if Android refuses the background
+     * activity launch the payload sits in WearableConnection's in-memory pending queue. Kill the
+     * process before the user opens the app and the payload is gone -- while the persisted claim
+     * suppresses the Data Layer redelivery that would have replaced it, losing a transfer that the
+     * durable-item design exists to guarantee.
+     *
+     * <p>So the claim is only written once delivery reached a registered listener. If it was
+     * parked, the in-memory claim still prevents a duplicate within this process, and a redelivery
+     * after a restart is allowed through. That can hand the app a file twice if it did drain the
+     * queue before dying -- deliberately the direction to err in, because a duplicate is something
+     * an app can recognise and a lost one-shot file is not.</p>
+     */
+    static void confirmTransferDelivered(Uri uri, long sequence, boolean reachedListener) {
+        if (uri == null || !reachedListener) {
+            return;
+        }
+        String key = uri.getHost() + ":" + uri.getPath();
+        synchronized (transferClaims) {
+            persistClaim(key, sequence + "|" + (uri.getHost() == null ? "" : uri.getHost()));
         }
     }
 

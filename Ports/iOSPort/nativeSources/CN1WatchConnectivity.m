@@ -492,6 +492,9 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     [ctx removeObjectForKey:cn1WearableTombKey(path)];
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
+    // Released before the error branch below, not after it: an early return there would leave the
+    // lock held for the life of the process and every later putData/removeData would block on it.
+    [ctxLock unlock];
     if (err != nil) {
         NSLog(@"[cn1.wearable] failed to publish %@: %@", path, err.localizedDescription);
     }
