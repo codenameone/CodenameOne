@@ -580,6 +580,11 @@ static void cn1WearablePruneTombstones(NSMutableDictionary *ctx, NSDictionary *p
             continue;
         }
         [ctx removeObjectForKey:key];
+        // The birth record goes with it. Pruning finds those records only through tombstones still
+        // in the context, so an entry dropped here becomes unreachable -- churn through unique
+        // paths would grow the defaults dictionary without bound. Same reason as the TTL and
+        // republish paths.
+        cn1WearableForgetTombstoneBirth([key substringFromIndex:kTombPrefix.length]);
         keep--;
     }
 }
@@ -643,6 +648,8 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     /// When each pending reply arrived, so one that is never answered can be retired. Parallel to
     /// _pendingReplies and guarded by the same monitor.
     NSMutableDictionary<NSNumber *, NSNumber *> *_pendingReplyAt;
+    /// Guards the recurring tombstone sweep to a single pending chain; see pruneTombstonesNow.
+    BOOL _tombstoneSweepScheduled;
     int _nextInboundToken;
     /// Keys the peer's last context carried, so a key that vanishes is reported as a removal.
     /// What the peer's context last said for each path: the authoritative stamp we delivered, or
@@ -886,11 +893,17 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
             break;
         }
     }
-    if (stillHeld) {
+    if (stillHeld && !_tombstoneSweepScheduled) {
+        // ONE chain, ever. This runs on activation and on every received application context, and
+        // each call used to start its own recurring hourly sweep -- a peer syncing frequently would
+        // accumulate thousands of delayed blocks, each retaining the delegate and rescheduling
+        // itself. The flag is cleared when the sweep fires, so exactly one is ever pending.
+        _tombstoneSweepScheduled = YES;
         CN1WatchConnectivity *again = [self retain];
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                                      (int64_t) kCN1TombstonePruneRetryMillis * NSEC_PER_MSEC),
                        dispatch_get_main_queue(), ^{
+            again->_tombstoneSweepScheduled = NO;
             [again pruneTombstonesNow];
             [again release];
         });

@@ -526,9 +526,9 @@ class JavaSEWearableBridge implements WearableBridge {
                         // colliding port -- another project, or an unrelated local service that
                         // happens to speak enough of this to get here -- is dropped rather than
                         // treated as the pair.
-                        if (!projectIdentity().equals(path)) {
-                            throw new IOException("Wearable simulator: refusing a peer from a "
-                                    + "different project (" + path + ")");
+                        if (!expectedPeerIdentity().equals(path)) {
+                            throw new IOException("Wearable simulator: refusing a peer that is not "
+                                    + "this project's counterpart (" + path + ")");
                         }
                         helloVerified = true;
                         // Only now is this a peer. Reachability, the writable stream and the state
@@ -601,7 +601,17 @@ class JavaSEWearableBridge implements WearableBridge {
     /// The absolute shared directory is the identity: it is what "the same project" means here, and
     /// it is exactly what the port hash throws away.
     private String projectIdentity() {
-        return dataDir.getAbsolutePath();
+        // The ROLE travels with the identity. The project alone does not identify a counterpart:
+        // two phone simulators, or an orphaned watch process beside a freshly launched one, both
+        // pass a project-only check -- and then each reports the link reachable and exchanges live
+        // traffic with something that is not its pair. A NUL separates the two because a path
+        // cannot contain one.
+        return dataDir.getAbsolutePath() + "\u0000" + (watchSide ? "watch" : "phone");
+    }
+
+    /// The identity this side requires of its peer: the same project, the OTHER role.
+    private String expectedPeerIdentity() {
+        return dataDir.getAbsolutePath() + "\u0000" + (watchSide ? "phone" : "watch");
     }
 
     /// Derives a stable loopback port from the shared directory, so two JVMs of the same project
