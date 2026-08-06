@@ -76,6 +76,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private String canvasMode = "phonePortrait";
     private Element dropGuideTarget;
     private Hashtable projectTheme;
+    /// The look and feel of the design canvas. The preview hierarchy owns it so the project theme
+    /// and the builder's own chrome can coexist; they cannot share the global UIManager.
+    private final UIManager previewUIManager = UIManager.createInstance();
     private Hashtable builderTheme;
     private Component previewRoot;
     private Component formToolbarPreview;
@@ -579,6 +582,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             }
         });
         previewRoot = preview;
+        // The whole device surface resolves its look and feel from the canvas UIManager, so the
+        // project CSS styles the preview and the builder's own theme never leaks into it.
+        device.setUIManager(previewUIManager);
+        if (preview instanceof Container previewContainer) previewContainer.setUIManager(previewUIManager);
         refreshProjectThemeOnPreview();
         device.add(BorderLayout.CENTER, preview);
         if (desktop) stage.add(BorderLayout.CENTER, device); else stage.add(device);
@@ -4078,28 +4085,27 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void refreshProjectThemeOnPreview() {
         if (projectTheme == null) {
-            // Falling back to the builder's own theme silently is what makes the canvas look like
-            // it is showing a stylesheet other than the one open in the editor. It is.
             setStatus("Project CSS is not loaded - the canvas is showing the builder's theme");
+            return;
         }
-        try {
-            if (projectTheme != null) {
-                UIManager.getInstance().setThemeProps(projectTheme);
-                if (previewRoot != null) previewRoot.refreshTheme();
-                if (formToolbarPreview != null) formToolbarPreview.refreshTheme();
-            }
-        } finally {
-            if (builderTheme != null) UIManager.getInstance().setThemeProps(builderTheme);
+        // Install the project theme into the canvas's own UIManager and leave the global one alone.
+        // Swapping the global theme, refreshing, then swapping the builder's theme back meant the
+        // preview only held the project styling for the instant of that call: every later
+        // re-resolution -- a repaint, a revalidate, any refreshTheme cascade -- resolved against
+        // the builder chrome again, so CSS edits appeared to do nothing.
+        previewUIManager.setThemeProps(projectTheme);
+        if (previewRoot != null) {
+            previewRoot.refreshTheme(false);
+            ComponentPreviewFactory.stabilizeDesignStyles(previewRoot);
         }
-        if (previewRoot != null) ComponentPreviewFactory.stabilizeDesignStyles(previewRoot);
-        if (formToolbarPreview != null) ComponentPreviewFactory.stabilizeDesignStyles(formToolbarPreview);
-        // refreshTheme swaps the style objects but nothing asks for a new frame, so the canvas kept
-        // painting the styling it was already showing and CSS edits looked like they did nothing.
+        if (formToolbarPreview != null) {
+            formToolbarPreview.refreshTheme(false);
+            ComponentPreviewFactory.stabilizeDesignStyles(formToolbarPreview);
+        }
         if (canvasHost != null) {
             canvasHost.revalidate();
             canvasHost.repaint();
         }
-        if (workspace != null) workspace.repaint();
     }
 
     private void loadProjectTheme() {

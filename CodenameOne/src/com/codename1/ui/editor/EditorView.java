@@ -53,6 +53,7 @@ public class EditorView extends Component implements TextInputClient {
 
     private int caret;
     private int anchor = -1;
+    private boolean multiKeyModeRestore;
     private int composingStart = -1;
     private int composingEnd = -1;
     // pre-composition snapshot so the finalized composition forms a single undo unit
@@ -1356,6 +1357,13 @@ public class EditorView extends Component implements TextInputClient {
     @Override
     protected void focusGained() {
         super.focusGained();
+        // Typing happens on key release, and Display drops any release whose code does not match
+        // the most recent press. Anyone typing at speed presses the next key before releasing the
+        // last one, so releases were being discarded and characters silently vanished -- always
+        // the same ones, because it depends on which pairs overlap. Multi key mode delivers every
+        // release. It is restored on focus loss so the rest of the application is unaffected.
+        multiKeyModeRestore = Display.getInstance().isMultiKeyMode();
+        Display.getInstance().setMultiKeyMode(true);
         startInput();
         if (!animRegistered && getComponentForm() != null) {
             getComponentForm().registerAnimated(this);
@@ -1368,6 +1376,7 @@ public class EditorView extends Component implements TextInputClient {
     @Override
     protected void focusLost() {
         super.focusLost();
+        Display.getInstance().setMultiKeyMode(multiKeyModeRestore);
         stopInput();
         if (animRegistered && getComponentForm() != null) {
             getComponentForm().deregisterAnimated(this);
@@ -1384,7 +1393,9 @@ public class EditorView extends Component implements TextInputClient {
         // input session here or the stale handle would block startInput on the next focus
         // gain, leaving the editor deaf until an explicit focus round-trip. The form also
         // drops animation registrations on deinit, so reset the flag to re-register the
-        // caret blink when focus returns.
+        // caret blink when focus returns. Multi key mode is restored here for the same reason:
+        // focusLost never runs on this path and the setting is global.
+        Display.getInstance().setMultiKeyMode(multiKeyModeRestore);
         stopInput();
         animRegistered = false;
     }
