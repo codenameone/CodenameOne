@@ -424,9 +424,13 @@ public class CN1WearableBridge implements WearableBridge {
             return;
         }
         synchronized (valueCache) {
+            // Any authoritative answer supersedes a remembered absence, in both directions: a
+            // publication makes the path exist, and a removal is itself the absence.
             if (payload == null) {
+                knownAbsent.add(path);
                 valueCache.remove(path);
             } else {
+                knownAbsent.remove(path);
                 // A copy, because the same array is handed to the application. A listener that
                 // mutates the payload it receives -- decrypting or unpacking in place, say -- would
                 // otherwise rewrite the bridge's own snapshot, and getData() would answer with
@@ -1249,7 +1253,11 @@ public class CN1WearableBridge implements WearableBridge {
         // afford five seconds either way.
         if (isCallerLatencySensitive()) {
             byte[] cached = cachedValue(path);
-            if (cached == null) {
+            boolean absent;
+            synchronized (valueCache) {
+                absent = knownAbsent.contains(path);
+            }
+            if (cached == null && !absent) {
                 // An empty cache is not an authoritative absence. After a process restart the Data
                 // Layer has no reason to re-announce an item it already delivered, so nothing
                 // refills the cache on its own and the getter would report "nothing published" for
@@ -1300,6 +1308,16 @@ public class CN1WearableBridge implements WearableBridge {
                     ResolvedValue v = resolveValue(context, path);
                     if (v != null) {
                         rememberValueIfStampUnchanged(path, before, v.payload);
+                    } else {
+                        // An AUTHORITATIVE absence -- the query answered, and the path is empty.
+                        // Recording it stops a polling UI re-asking forever: without this, every
+                        // repaint that reads a path which genuinely does not exist scheduled
+                        // another blocking query on the timer that transfer replay, retries and
+                        // cleanup all share. resolveValue THROWS when it cannot ask, so a failure
+                        // never reaches this branch and never masquerades as an absence.
+                        synchronized (valueCache) {
+                            knownAbsent.add(path);
+                        }
                     }
                 } catch (Throwable unavailable) {
                     // Nothing to record; the marker is released below either way.
@@ -1399,6 +1417,10 @@ public class CN1WearableBridge implements WearableBridge {
      * per replica, so the entry has to outlive all of them, while a peer's genuine removal of the
      * same path later must still reach the app.</p>
      */
+    /// Paths a completed query reported as empty. Guarded by {@link #valueCache}, and cleared for a
+    /// path the moment anything authoritative says it exists again.
+    private static final java.util.Set<String> knownAbsent = new java.util.HashSet<String>();
+
     private static final Map<String, Removal> localRemovals = new HashMap<String, Removal>();
     private static final long LOCAL_REMOVAL_WINDOW_MILLIS = 30 * 1000L;
 
