@@ -97,12 +97,19 @@ class KotlinUiTest : BaseTest() {
         // print), so the failure is in what addContent does to one of them --
         // setHidden(true), which caches margins and forces a zero preferred size.
         // One probe section per child says which.
+        // Probed on a throwaway Accordion that is never added to the form. The
+        // first version of this put the probes into the real one, which changed
+        // the rendered "kotlin" screenshot and failed the golden comparison on
+        // every other port -- a diagnostic is not worth breaking six jobs for.
+        // addContent does its work in the AccordionContent constructor, so an
+        // unparented Accordion exercises exactly the same path and renders nothing.
+        val probe = Accordion()
         step("probe-checkbox")
-        accordion.addContent("ProbeCheck", Container(BoxLayout.y()).apply { add(CheckBox("probe")) })
+        probe.addContent("ProbeCheck", Container(BoxLayout.y()).apply { add(CheckBox("probe")) })
         step("probe-switch")
-        accordion.addContent("ProbeSwitch", Container(BoxLayout.y()).apply { add(Switch()) })
+        probe.addContent("ProbeSwitch", Container(BoxLayout.y()).apply { add(Switch()) })
         step("probe-textarea")
-        accordion.addContent("ProbeText", Container(BoxLayout.y()).apply { add(TextArea(3, 20)) })
+        probe.addContent("ProbeText", Container(BoxLayout.y()).apply { add(TextArea(3, 20)) })
         step("accordion-prefs")
         accordion.addContent("Preferences", preferences)
 
