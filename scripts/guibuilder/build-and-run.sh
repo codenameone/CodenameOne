@@ -43,11 +43,17 @@ verify_core_class() {
 
 echo "==> core (JDK 8)"
 cd "$REPO_ROOT/maven"
+# mvn clean is not enough: the core module has produced a jar mixing freshly compiled classes with
+# stale ones, which is how fixes kept reaching the tests but not the running editor. Remove the
+# output directory outright.
+rm -rf core/target factory/target css-compiler/target
 JAVA_HOME="$JDK8" PATH="$JDK8/bin:$PATH" \
   mvn -q -Dmaven.repo.local="$LOCAL_REPO" -pl factory,core,css-compiler \
     -DskipTests -Dmaven.javadoc.skip=true clean install
 JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/editor/CodeView.class" "protectedStartMarker"
 JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/editor/EditorView.class" "multiKeyModeRestore"
+JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/CodeEditor.class" "setCursorPosition"
+JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/Form.class" "focusedHandlesInput"
 
 echo "==> javase port (JDK 8)"
 JAVA_HOME="$JDK8" PATH="$JDK8/bin:$PATH" \
