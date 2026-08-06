@@ -763,7 +763,16 @@ public class CodenameOneView {
                     return false;
                 }
                 int scrollY = Math.round(-rotary * rotaryScrollFactor(step));
-                this.implementation.pointerWheelMoved(x, y, 0, scrollY, true, motionModifierMask(event));
+                // NOT event.getX()/getY(). A rotary event is not a pointer event: it carries no
+                // meaningful position and in practice reports (0,0), so feeding those coordinates
+                // to pointerWheelMoved synthesized a drag over whatever occupies the top-left --
+                // usually the title bar -- and the crown scrolled nothing on most screens.
+                //
+                // The crown scrolls what has focus, so aim at the focused component's scrollable
+                // ancestor instead, falling back to the content pane when nothing is focused.
+                int[] target = rotaryTarget();
+                this.implementation.pointerWheelMoved(target[0], target[1], 0, scrollY, true,
+                        motionModifierMask(event));
                 return true;
             }
 
@@ -780,6 +789,35 @@ public class CodenameOneView {
             return true;
         }
         return false;
+    }
+
+    /**
+     * A point inside whatever the crown should scroll.
+     *
+     * <p>Walks up from the focused component to the nearest vertically scrollable ancestor and
+     * returns its centre; without a focus, the content pane's centre. Any point inside the right
+     * container will do -- the wheel path only uses it to decide which component receives the
+     * scroll -- so the centre is chosen because it cannot land on a border or a child that happens
+     * to sit at the container's origin.</p>
+     */
+    private int[] rotaryTarget() {
+        com.codename1.ui.Form f = this.implementation.getCurrentForm();
+        com.codename1.ui.Component anchor = null;
+        if (f != null) {
+            com.codename1.ui.Component focused = f.getFocused();
+            com.codename1.ui.Container c = focused == null ? null : focused.getParent();
+            while (c != null && !c.isScrollableY()) {
+                c = c.getParent();
+            }
+            anchor = c != null ? (com.codename1.ui.Component) c : f.getContentPane();
+        }
+        if (anchor == null) {
+            return new int[] {0, 0};
+        }
+        return new int[] {
+            anchor.getAbsoluteX() + anchor.getWidth() / 2,
+            anchor.getAbsoluteY() + anchor.getHeight() / 2
+        };
     }
 
     /**

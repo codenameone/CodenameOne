@@ -525,6 +525,12 @@ public class CodenameOneSettings extends Lifecycle {
         // build hints. Both take a fully-qualified class name, unlike the phone
         // main class which is a simple name resolved against the package.
         grid.add(textFieldGroup("Watch Main Class", "codename1.watchMain", false));
+        // The one thing about the watch build that cannot be derived from the project, so it needs
+        // a control. Without it this page could only ever produce the companion configuration --
+        // and since this change also retired the old wearable distribution/standalone hints, the
+        // standalone Wear product and standalone Apple distribution were unreachable from the UI
+        // and had to be set by hand in the properties file.
+        grid.add(switchGroup("Standalone Watch App", "codename1.watchStandalone"));
         grid.add(textFieldGroup("TV Main Class", "codename1.tvMain", false));
         page.add(grid);
         page.add(iconDrop());
@@ -1756,6 +1762,23 @@ public class CodenameOneSettings extends Lifecycle {
 
     private void textRow(Container parent, String label, String key, boolean secret) {
         parent.add(textFieldGroup(label, key, secret));
+    }
+
+    /**
+     * A boolean setting, stored as the string {@code "true"}/{@code "false"} the build hints use.
+     *
+     * <p>Shaped like {@link #textFieldGroup} so it sits in the same grid: label above, control
+     * below. Anything other than {@code "true"} reads as off, which matches how the builders parse
+     * these -- they compare against {@code "true"} rather than parsing a boolean.</p>
+     */
+    private Component switchGroup(String label, String key) {
+        Container fieldGroup = new Container(BoxLayout.y());
+        fieldGroup.setUIID(uiid("SettingsFieldGroup"));
+        Switch sw = new Switch(uiid("SettingsSwitch"));
+        sw.setValue("true".equals(settings.get(key)));
+        sw.addActionListener(e -> settings.set(key, sw.isValue() ? "true" : "false"));
+        fieldGroup.add(new Label(label, uiid("SettingsFieldLabel"))).add(sw);
+        return fieldGroup;
     }
 
     private Component textFieldGroup(String label, String key, boolean secret) {

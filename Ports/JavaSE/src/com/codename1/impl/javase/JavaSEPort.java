@@ -734,7 +734,21 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// watch gets its own storage sandbox, but the two still have to meet somewhere to exchange data.
     private static String sharedHomeDir = ".cn1";
 
+    /// The companion watch process, so "Launch Watch App" runs one rather than one per click.
+    private static Process watchProcess;
+    private static final Object WATCH_PROCESS_LOCK = new Object();
+
     static {
+        // A launched watch inherits the phone's shared home through this property. Without it the
+        // child falls back to ".cn1" while a phone started from a generated desktop stub uses
+        // ".<mainName>", and the pair rendezvous in two different directories -- paired-looking,
+        // never reachable. Applied before watchSandbox so the watch still gets its own storage
+        // sandbox off the shared root.
+        String inherited = System.getProperty("cn1.app.home");
+        if (inherited != null && inherited.length() > 0) {
+            sharedHomeDir = inherited;
+            appHomeDir = inherited;
+        }
         appHomeDir = watchSandbox(appHomeDir);
     }
 
@@ -5727,6 +5741,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             // The watch half needs to know which side it is, which class to start, and to come up on
             // a watch skin so CN.isWatch() is true and the "watch" override layer applies.
             cmd.add("-Dcn1.wearable.side=watch");
+            // The child must inherit THIS process's shared home. A generated desktop stub calls
+            // setAppHomeDir(".<mainName>"), and without passing it on the watch would fall back to
+            // the default ".cn1" -- so the phone bridge rendezvous under <mainName>/wearable while
+            // the watch waits under .cn1/wearable. Both windows then show a paired project that
+            // never becomes reachable and never exchanges anything, with nothing to indicate why.
+            cmd.add("-Dcn1.app.home=" + getSharedHomeDir());
             cmd.add("-Dcodename1.watchMain=" + watchMain);
             cmd.add("-Dskin=" + WATCH_COMPANION_SKIN);
             cmd.add("-Ddskin=" + WATCH_COMPANION_SKIN);
@@ -5739,7 +5759,21 @@ public class JavaSEPort extends CodenameOneImplementation {
             // package name, and starts codename1.packageName + codename1.mainName instead -- which
             // would put the phone lifecycle on a watch skin and look like the watch app.
             cmd.add("-force");
-            new ProcessBuilder(cmd).inheritIO().start();
+            synchronized (WATCH_PROCESS_LOCK) {
+                if (watchProcess != null && watchProcess.isAlive()) {
+                    // One companion, not one per click. The rendezvous server services a single
+                    // accepted socket synchronously, so a second watch connects into the backlog,
+                    // reports itself reachable and is then never read until the first exits -- and
+                    // depending on startup order two watches can even pair with each other before
+                    // the phone. Re-selecting the action is a request for the watch, not for
+                    // another watch.
+                    javax.swing.JOptionPane.showMessageDialog(window,
+                            "The watch app is already running.",
+                            "Watch App", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                    return;
+                }
+                watchProcess = new ProcessBuilder(cmd).inheritIO().start();
+            }
         } catch (Exception err) {
             javax.swing.JOptionPane.showMessageDialog(window,
                     "Could not launch the watch app:\n" + err,
