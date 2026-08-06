@@ -241,6 +241,38 @@ class WatchNativeBuilderTest {
         return req;
     }
 
+    /// An embedded watch app whose versions differ from its container is rejected by App Store
+    /// validation, and ios.plistInject REPLACES the phone's default version injection rather than
+    /// adding to it -- so a project that sets the version there must not leave the watch behind.
+    @Test
+    void watchVersionsFollowPlistInject(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.plistInject",
+                "<key>CFBundleShortVersionString</key><string>9.9.9</string>"
+                        + "<key>CFBundleVersion</key><string>4242</string>");
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("<string>9.9.9</string>"),
+                "watch CFBundleShortVersionString must follow the injected phone value: " + plist);
+        assertTrue(plist.contains("<string>4242</string>"),
+                "watch CFBundleVersion must follow the injected phone value: " + plist);
+    }
+
+    /// ios.bundleVersion still applies when the injection does not name CFBundleVersion.
+    @Test
+    void watchVersionsFallBackWhenNotInjected(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.plistInject",
+                "<key>CFBundleShortVersionString</key><string>7.7.7</string>");
+        req.putArgument("ios.bundleVersion", "31");
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("<string>7.7.7</string>"),
+                "injected short version must reach the watch plist: " + plist);
+        assertTrue(plist.contains("<string>31</string>"),
+                "ios.bundleVersion must still win for CFBundleVersion: " + plist);
+    }
+
     private static WatchNativeBuilder parse(BuildRequest req) {
         WatchNativeBuilder b = new WatchNativeBuilder(new IPhoneBuilder());
         b.parseHints(req);

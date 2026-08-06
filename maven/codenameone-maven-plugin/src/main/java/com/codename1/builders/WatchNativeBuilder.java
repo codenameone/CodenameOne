@@ -408,6 +408,34 @@ class WatchNativeBuilder {
      * @param request the build request
      * @return the version string, never null
      */
+
+    /**
+     * The value {@code ios.plistInject} gives a key, or null when it does not set one.
+     *
+     * <p>Deliberately literal: the hint is a raw plist fragment, so this looks for
+     * {@code <key>NAME</key>} and takes the next {@code <string>} that follows it. Anything more
+     * clever would be pretending to parse a document that is only ever a fragment.</p>
+     */
+    static String injectedPlistString(BuildRequest request, String key) {
+        String inject = request.getArg("ios.plistInject", null);
+        if (inject == null) {
+            return null;
+        }
+        int at = inject.indexOf("<key>" + key + "</key>");
+        if (at < 0) {
+            return null;
+        }
+        int open = inject.indexOf("<string>", at);
+        if (open < 0) {
+            return null;
+        }
+        int close = inject.indexOf("</string>", open);
+        if (close < 0) {
+            return null;
+        }
+        return inject.substring(open + "<string>".length(), close).trim();
+    }
+
     static String shortVersion(BuildRequest request) {
         String version = request.getVersion();
         if (version == null || version.length() == 0) {
@@ -446,9 +474,17 @@ class WatchNativeBuilder {
         // and rejects the archive when they differ, so both keys are derived exactly the way the
         // phone derives them -- including the ios.twoDigitVersion reformatting and the
         // ios.bundleVersion override -- rather than being pinned to a constant.
-        plistString(sb, "CFBundleShortVersionString", shortVersion(request));
-        plistString(sb, "CFBundleVersion",
-                request.getArg("ios.bundleVersion", shortVersion(request)));
+        // ios.plistInject wins where it sets either key. It REPLACES the phone's default version
+        // injection rather than adding to it, so a project that overrides the version there ships a
+        // phone app whose version is not shortVersion(request) at all -- and an embedded watch app
+        // whose versions differ from its container is rejected by App Store validation, which is
+        // the one failure that only shows up at submission.
+        String injectedShort = injectedPlistString(request, "CFBundleShortVersionString");
+        String watchShort = injectedShort != null ? injectedShort : shortVersion(request);
+        String injectedBundle = injectedPlistString(request, "CFBundleVersion");
+        plistString(sb, "CFBundleShortVersionString", watchShort);
+        plistString(sb, "CFBundleVersion", injectedBundle != null ? injectedBundle
+                : request.getArg("ios.bundleVersion", watchShort));
         // Modern single-target watch app marker.
         sb.append("    <key>WKApplication</key>\n    <true/>\n");
         if (!isStandalone()) {
