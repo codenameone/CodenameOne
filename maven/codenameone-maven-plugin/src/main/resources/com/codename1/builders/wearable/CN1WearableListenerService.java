@@ -294,15 +294,23 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // correct it). What matters is what this device ASKED to remove, which is what the
                 // removal markers record -- read at arrival, not at handler time.
                 //
-                // The recorded stamp is deliberately left as it is. It means "the newest thing this
-                // process delivered", and clearing it would reset the baseline to empty, so an older
-                // replica from another authority arriving next would pass the ordering test as
-                // though it were new. Leaving it costs nothing: a local republish always draws a
-                // higher sequence from the monotonic clock.
-                //
-                // The cached value does go, or a latency-sensitive getData() would keep answering
-                // with a value this device has just deleted.
+                // The cached value goes, or a latency-sensitive getData() would keep answering with
+                // a value this device has just deleted.
                 CN1WearableBridge.rememberValue(appPath, null);
+                // And so does the ordering baseline. Keeping it was wrong for a peer whose logical
+                // clock never caught up with ours: an offline peer republishing the path draws a
+                // sequence LOWER than the winner we removed, deliverIfOutranks rejects it against a
+                // stamp describing an item that no longer exists anywhere, and both the listener
+                // and getData() stay empty with no later event to correct them. After a successful
+                // removal the path holds nothing, so anything that arrives next is by definition
+                // the new winner.
+                //
+                // Dropped only while the stamp is still the one just observed, so a delivery that
+                // raced in behind this tombstone keeps its baseline.
+                String stamp = CN1WearableBridge.deliveredStamp(appPath);
+                if (stamp != null) {
+                    CN1WearableBridge.forgetDeliveredSequenceIfUnchanged(appPath, stamp);
+                }
                 continue;
             }
             if (event.getType() == DataEvent.TYPE_DELETED) {

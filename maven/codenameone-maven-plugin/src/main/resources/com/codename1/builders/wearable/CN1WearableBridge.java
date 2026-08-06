@@ -1536,6 +1536,7 @@ public class CN1WearableBridge implements WearableBridge {
         final long cutoff = System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;
         transferTimer.schedule(new java.util.TimerTask() {
             public void run() {
+                boolean failed = false;
                 try {
                     DataItemBuffer items = Tasks.await(dataClient.getDataItems(),
                             TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -1567,10 +1568,22 @@ public class CN1WearableBridge implements WearableBridge {
                         items.release();
                     }
                 } catch (Throwable unavailable) {
-                    // Best effort: the next transfer sweeps again.
+                    failed = true;
                 } finally {
                     synchronized (sweepLock) {
                         sweepScheduled = false;
+                        if (failed) {
+                            // Retried, not abandoned. "The next transfer sweeps again" assumes
+                            // there IS a next transfer: an app that sends its last file and then
+                            // hits a transient getDataItems() failure at that item's deadline left
+                            // it published for good, and once the receiver's claim is pruned at 24
+                            // hours a reconnect can redeliver a one-shot file. Retrying costs one
+                            // task on a timer that is otherwise idle.
+                            //
+                            // lastSweepAt was set when this attempt started, so the deferred sweep
+                            // is not suppressed by its own coalescing window.
+                            scheduleDeferredSweep(SWEEP_MIN_INTERVAL_MILLIS);
+                        }
                     }
                 }
             }
