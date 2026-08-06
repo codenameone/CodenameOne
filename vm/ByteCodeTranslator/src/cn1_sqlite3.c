@@ -84,23 +84,28 @@
 #define SQLITE_ENABLE_JSON1 1
 
 /*
- * Hardware AES on 64-bit ARM, only where the toolchain has actually enabled the instructions.
+ * Hardware-accelerated ciphers, only where the toolchain has actually enabled the instructions.
  *
- * The engine has two ways in. Where the compiler defines __ARM_FEATURE_CRYPTO the intrinsics are
- * available everywhere and it just uses them; that is what Apple's toolchain does, so iOS keeps
- * hardware AES. Otherwise it falls back to tagging individual functions with
- * __attribute__((target(...))), and on the clang used for the Linux and Windows arm64
- * cross-builds that attribute does not enable the feature for the intrinsics, so the build fails
- * with "always_inline function 'vaeseq_u8' requires target feature 'aes'".
+ * The engine has two ways of reaching them. Where the compiler advertises the feature globally --
+ * __ARM_FEATURE_CRYPTO on Apple's arm64, __AES__ on an x86 build with AES-NI turned on -- the
+ * intrinsics are simply available and it uses them. Otherwise it tags individual functions with
+ * __attribute__((target(...))), and neither the clang used for the Linux and Windows arm64
+ * cross-builds nor clang-cl honours that for these intrinsics: the arm64 build fails on
+ * "always_inline function 'vaeseq_u8' requires target feature 'aes'", and the x86 one on an
+ * unknown __m256i.
  *
- * Rather than force the whole binary to require ARM crypto extensions, which not every ARMv8 part
- * has, fall back to the software implementation on exactly that path. It is slower, and it is
- * correct on every chip.
+ * Forcing the whole binary to require crypto extensions or AVX2 would exclude real hardware, so
+ * that path uses the software implementation instead. It is slower, and it runs everywhere.
  */
-#if defined(__aarch64__) && !defined(__ARM_FEATURE_CRYPTO)
+#if !defined(__ARM_FEATURE_CRYPTO) && !defined(__AES__)
 #define SQLITE3MC_OMIT_AES_HARDWARE_SUPPORT 1
-#define AEGIS_OMIT_AES_HARDWARE_SUPPORT 1
 #endif
+
+/*
+ * AEGIS is not a cipher Codename One selects -- the on-disk format is SQLCipher's AES-256-CBC --
+ * so its VAES/AVX2 acceleration is all liability and no benefit here. Off unconditionally.
+ */
+#define AEGIS_OMIT_AES_HARDWARE_SUPPORT 1
 
 #include "cn1_sqlite3_amalgamation.h"
 

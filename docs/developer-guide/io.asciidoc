@@ -222,7 +222,7 @@ Pass a `DatabaseConfig` to encrypt a database at rest. Check that the platform c
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/IoSnippets.java[tag=io-java-001,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava090Snippet.java[tag=io-java-090,indent=0]
 ----
 
 There are three ways to key a database.
@@ -264,7 +264,7 @@ An application that already ships a plaintext database can convert it in place:
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/IoSnippets.java[tag=io-java-002,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava091Snippet.java[tag=io-java-091,indent=0]
 ----
 
 `Database.decrypt` is the reverse, and `Database.changeKey` re-keys a database that is already open.
@@ -286,7 +286,7 @@ wrap one in `ThreadSafeDatabase`, which routes every call through a single worke
 
 [source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/IoSnippets.java[tag=io-java-003,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava092Snippet.java[tag=io-java-092,indent=0]
 ----
 
 The wrapper costs a thread handoff per call, so a connection per thread is faster when the threads
