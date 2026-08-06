@@ -273,6 +273,22 @@ class WatchNativeBuilderTest {
                 "ios.bundleVersion must still win for CFBundleVersion: " + plist);
     }
 
+    /// The two version keys are independent. An injected marketing version must NOT become the
+    /// watch's CFBundleVersion, because the phone's still comes from the build version -- deriving
+    /// it from the injected string reintroduces the mismatch as phone 1.0 against watch 9.9.
+    @Test
+    void injectedShortVersionDoesNotBecomeTheBundleVersion(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.plistInject",
+                "<key>CFBundleShortVersionString</key><string>9.9</string>");
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("<key>CFBundleShortVersionString</key>\n    <string>9.9</string>"),
+                "injected short version must reach the watch plist: " + plist);
+        assertFalse(plist.contains("<key>CFBundleVersion</key>\n    <string>9.9</string>"),
+                "CFBundleVersion must not follow the injected marketing version: " + plist);
+    }
+
     private static WatchNativeBuilder parse(BuildRequest req) {
         WatchNativeBuilder b = new WatchNativeBuilder(new IPhoneBuilder());
         b.parseHints(req);

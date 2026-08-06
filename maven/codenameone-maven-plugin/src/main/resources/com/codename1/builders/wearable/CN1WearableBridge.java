@@ -158,6 +158,7 @@ public class CN1WearableBridge implements WearableBridge {
         // prune timer is process-local while the claims are not, so a process that exits before it
         // fires leaves them for the next cold start to clear.
         pruneClaims(this.context);
+        replayOutstandingTransfers();
     }
 
     // --- state --------------------------------------------------------------
@@ -1615,6 +1616,68 @@ public class CN1WearableBridge implements WearableBridge {
                 sweepOwnTransfers();
             }
         }, delay < 0 ? 0 : delay + 1000L);
+    }
+
+    /**
+     * Offers, once per app start, any inbound transfer still published and never claimed.
+     *
+     * <p>Nothing else covers this. A transfer can wake the listener service in a cold process, and
+     * if Android refuses the background activity launch the payload exists only in
+     * WearableConnection's in-memory queue -- so killing that process before the user opens the app
+     * loses it. The DataItem itself is untouched, but it is also UNCHANGED, and an unchanged item
+     * raises no callback for a process that starts later, so the app would never see it and the
+     * sender would eventually sweep the only durable copy.
+     *
+     * <p>The claim is what makes this safe to run unconditionally: an item already handed over has
+     * a durable claim, so {@code claimTransfer} refuses it here and nothing is delivered twice.</p>
+     */
+    private void replayOutstandingTransfers() {
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                try {
+                    DataItemBuffer items = Tasks.await(dataClient.getDataItems(),
+                            TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    try {
+                        String localNode = localNodeId(context);
+                        for (DataItem item : items) {
+                            final Uri uri = item.getUri();
+                            String p = uri == null ? null : uri.getPath();
+                            if (p == null || !isTransferPath(p)) {
+                                continue;
+                            }
+                            // Our own outbound transfer: handing it back would deliver the sender
+                            // its own file.
+                            if (localNode != null && localNode.equals(uri.getHost())) {
+                                continue;
+                            }
+                            Transfer t = decodeTransfer(context, item);
+                            if (t == null || t.payload == null) {
+                                continue;
+                            }
+                            final long seq = sequenceOf(valueOrTransferMap(item));
+                            if (!claimTransfer(context, uri, seq)) {
+                                // Already delivered, in this process or a previous one.
+                                continue;
+                            }
+                            WearableConnection.deliverDataChangedTracked(
+                                    t.logicalPath, t.payload, new Runnable() {
+                                        public void run() {
+                                            confirmTransferDelivered(context, uri, seq, true);
+                                        }
+                                    }, new Runnable() {
+                                        public void run() {
+                                            relinquishTransfer(context, uri);
+                                        }
+                                    });
+                        }
+                    } finally {
+                        items.release();
+                    }
+                } catch (Throwable unavailable) {
+                    // Best effort at startup; a reachable Data Layer also delivers changes normally.
+                }
+            }
+        }, 0);
     }
 
     /// The sweep itself, coalesced. Schedules no follow-up beyond a deferred retry when coalescing

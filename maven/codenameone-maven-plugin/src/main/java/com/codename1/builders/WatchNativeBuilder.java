@@ -483,8 +483,13 @@ class WatchNativeBuilder {
         String watchShort = injectedShort != null ? injectedShort : shortVersion(request);
         String injectedBundle = injectedPlistString(request, "CFBundleVersion");
         plistString(sb, "CFBundleShortVersionString", watchShort);
+        // The fallback stays shortVersion(request), NOT watchShort. The two keys are independent:
+        // the phone's CFBundleVersion is ios.bundleVersion defaulting to the build version, and it
+        // does not follow an injected marketing version -- so deriving the watch's from the
+        // injected short string produced the very mismatch this code exists to prevent (project
+        // 1.0 with an injected 9.9 gave phone 1.0 against watch 9.9).
         plistString(sb, "CFBundleVersion", injectedBundle != null ? injectedBundle
-                : request.getArg("ios.bundleVersion", watchShort));
+                : request.getArg("ios.bundleVersion", shortVersion(request)));
         // Modern single-target watch app marker.
         sb.append("    <key>WKApplication</key>\n    <true/>\n");
         if (!isStandalone()) {
