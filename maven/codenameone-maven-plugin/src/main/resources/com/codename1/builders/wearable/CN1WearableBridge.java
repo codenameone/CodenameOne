@@ -396,7 +396,11 @@ public class CN1WearableBridge implements WearableBridge {
             if (payload == null) {
                 valueCache.remove(path);
             } else {
-                valueCache.put(path, payload);
+                // A copy, because the same array is handed to the application. A listener that
+                // mutates the payload it receives -- decrypting or unpacking in place, say -- would
+                // otherwise rewrite the bridge's own snapshot, and getData() would answer with
+                // bytes nobody ever published until the next event refreshed the path.
+                valueCache.put(path, payload.clone());
             }
             String[] known = pathsCache;
             if (known == null) {
@@ -432,7 +436,10 @@ public class CN1WearableBridge implements WearableBridge {
 
     private static byte[] cachedValue(String path) {
         synchronized (valueCache) {
-            return valueCache.get(path);
+            byte[] cached = valueCache.get(path);
+            // Also a copy on the way out: the caller owns what getData() returns and may do as it
+            // likes with it, which must not reach back into the snapshot.
+            return cached == null ? null : cached.clone();
         }
     }
 
