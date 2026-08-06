@@ -688,6 +688,15 @@ class JavaSEWearableBridge implements WearableBridge {
                     }
                     continue;
                 }
+                // The DELIVERED snapshot decides what was seen, not the earlier peek. A peer can
+                // replace the file between the two with one carrying the same coarse timestamp, so
+                // the peek's classification could be recorded while the peer's bytes were handed
+                // over -- and the next scan, computing the key from that same peer file, would see
+                // a different key and deliver it a second time.
+                synchronized (seenData) {
+                    seenData.put(f.getName(),
+                            Long.valueOf(seenKey(stamp, authoredLocallyFor(snapshot, stamp))));
+                }
                 if (f.lastModified() != stamp) {
                     // Replaced while we were reading it, so this snapshot belongs to neither the
                     // file we classified nor the one now on disk. Forget it and let the next scan

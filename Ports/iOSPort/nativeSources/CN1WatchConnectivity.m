@@ -448,14 +448,22 @@ static const NSUInteger kCN1MaxTombstones = 256;
 /// peer parses, so the age lives here instead, in this device's own defaults.
 static NSString *const kCN1TombBirthKey = @"cn1.wearable.tombstoneBirth";
 
+/// How long to wait before looking at a retained tombstone again. Hourly: the thing being waited
+/// for is a peer coming back, which is not a fast event, and each pass is a dictionary walk.
+static const int64_t kCN1TombstonePruneRetryMillis = 60 * 60 * 1000;
+
 static int64_t cn1WearableNowMillis(void) {
     return (int64_t) ([[NSDate date] timeIntervalSince1970] * 1000.0);
 }
 
 static void cn1WearableNoteTombstoneBirth(NSString *path) {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
-    NSMutableDictionary *births =
-            [[d dictionaryForKey:kCN1TombBirthKey] mutableCopy] ?: [NSMutableDictionary dictionary];
+    // Both branches must be OWNED: ARC is off here, and releasing an autoreleased fallback below
+    // would over-release it and crash when the pool drains.
+    NSMutableDictionary *births = [[d dictionaryForKey:kCN1TombBirthKey] mutableCopy];
+    if (births == nil) {
+        births = [[NSMutableDictionary alloc] init];
+    }
     births[path] = @(cn1WearableNowMillis());
     [d setObject:births forKey:kCN1TombBirthKey];
     [births release];
@@ -830,7 +838,12 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     [ctx release];
 }
 
-/// Prunes without publishing anything else, for the scheduled sweep and on activation.
+/// Prunes without publishing anything else, for the scheduled sweep, on activation, and whenever
+/// the peer's context arrives.
+///
+/// Re-arms itself while anything is still held back: a tombstone past its TTL is kept until the
+/// peer acknowledges the removal, and a peer that is offline at the deadline acknowledges later --
+/// with no sweep left to notice, a quiet app kept that tombstone for good.
 - (void)pruneTombstonesNow {
     WCSession *s = [self session];
     if (s == nil) {
@@ -845,6 +858,22 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     }
     NSUInteger before = ctx.count;
     cn1WearablePruneTombstones(ctx, [s receivedApplicationContext]);
+    BOOL stillHeld = NO;
+    for (NSString *key in ctx.allKeys) {
+        if ([key isKindOfClass:[NSString class]] && [key hasPrefix:kTombPrefix]) {
+            stillHeld = YES;
+            break;
+        }
+    }
+    if (stillHeld) {
+        CN1WatchConnectivity *again = [self retain];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                     (int64_t) kCN1TombstonePruneRetryMillis * NSEC_PER_MSEC),
+                       dispatch_get_main_queue(), ^{
+            [again pruneTombstonesNow];
+            [again release];
+        });
+    }
     if (ctx.count != before) {
         // Only when something actually went: updateApplicationContext with an unchanged dictionary
         // is a wasted transfer, and on the peer it looks like a fresh context to re-examine.
@@ -1053,6 +1082,10 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // every unchanged peer path arrives again on every publish. Announcing them all meant
     // publishing /b produced a dataChanged for /a as well, and every past removal was re-announced
     // indefinitely. Only an entry whose authoritative stamp actually moved is delivered.
+    // The peer's context is exactly the evidence a retained tombstone was waiting for, so look at
+    // them again now. Without this, a tombstone kept past its TTL because the peer was offline had
+    // only the periodic retry to release it.
+    [self pruneTombstonesNow];
     NSDictionary *localCtx = [session applicationContext];
     NSMutableDictionary *seen = [NSMutableDictionary dictionary];
     NSMutableArray *acknowledge = [NSMutableArray array];

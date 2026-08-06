@@ -1656,13 +1656,26 @@ public class CN1WearableBridge implements WearableBridge {
      * a durable claim, so {@code claimTransfer} refuses it here and nothing is delivered twice.</p>
      */
     private void replayOutstandingTransfers() {
-        replayOutstandingTransfers(1);
+        replayOutstandingTransfers(1, System.currentTimeMillis());
     }
 
-    private static final int REPLAY_RETRIES = 5;
-    private static final long REPLAY_RETRY_MILLIS = 5000;
+    /// Linear backoff, capped, so a long outage is cheap but a short one recovers quickly.
+    private static long replayDelay(int attempt) {
+        long linear = REPLAY_RETRY_MILLIS * (long) attempt;
+        return linear > REPLAY_RETRY_CAP_MILLIS ? REPLAY_RETRY_CAP_MILLIS : linear;
+    }
 
-    private void replayOutstandingTransfers(final int attempt) {
+    /// Replay retries are bounded by the sender's RETENTION WINDOW, not by an attempt count.
+    ///
+    /// Five tries spanned about twenty seconds, and an outage longer than that ended the only
+    /// recovery this transfer has -- the item stays published for a day, raises no callback because
+    /// it never changes, and is then swept. So the chain runs until an enumeration actually
+    /// succeeds or the window has passed, backing off to a minute so a long outage costs one
+    /// failing query an hour rather than a busy loop.
+    private static final long REPLAY_RETRY_MILLIS = 5000;
+    private static final long REPLAY_RETRY_CAP_MILLIS = 60 * 1000L;
+
+    private void replayOutstandingTransfers(final int attempt, final long startedAt) {
         transferTimer.schedule(new java.util.TimerTask() {
             public void run() {
                 boolean replayFailed = false;
@@ -1717,16 +1730,17 @@ public class CN1WearableBridge implements WearableBridge {
                 } catch (Throwable unavailable) {
                     replayFailed = true;
                 }
-                if (replayFailed && attempt < REPLAY_RETRIES) {
-                    // Retried, because this pass is the ONLY cover for a transfer whose cold-start
-                    // delivery died with the service process: the DataItem is unchanged, so no
-                    // normal callback is guaranteed, and an app that stays open until the sender's
-                    // retention sweep loses the file outright. Bounded, because a Data Layer that
-                    // is still unreachable after this many tries is not a transient failure.
-                    replayOutstandingTransfers(attempt + 1);
+                if (replayFailed
+                        && System.currentTimeMillis() - startedAt < TRANSFER_RETENTION_MILLIS) {
+                    // Retried for as long as the sender may still be holding the item. This pass is
+                    // the ONLY cover for a transfer whose cold-start delivery died with the service
+                    // process: the DataItem is unchanged, so no normal callback is guaranteed, and
+                    // an app that stays open through an outage would otherwise lose the file when
+                    // the sender eventually sweeps it.
+                    replayOutstandingTransfers(attempt + 1, startedAt);
                 }
             }
-        }, attempt == 1 ? 0 : REPLAY_RETRY_MILLIS);
+        }, attempt == 1 ? 0 : replayDelay(attempt));
     }
 
     /// The sweep itself, coalesced. Schedules no follow-up beyond a deferred retry when coalescing
