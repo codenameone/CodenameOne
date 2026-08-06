@@ -890,6 +890,10 @@ public class EditorView extends Component implements TextInputClient {
 
     /// Inserts text at the caret, replacing any active selection.
     public void insertText(String text) {
+        if (System.getProperty("cn1.key.trace") != null) {
+            System.out.println("EDITOR-TRACE insertText \"" + text + "\" caret=" + getCaretOffset()
+                    + " sel=" + getSelectionStart() + "-" + getSelectionEnd());
+        }
         if (!editable || text == null || text.length() == 0) {
             return;
         }
@@ -1734,6 +1738,11 @@ public class EditorView extends Component implements TextInputClient {
 
     @Override
     public void keyReleased(int keyCode) {
+        if (System.getProperty("cn1.key.trace") != null) {
+            System.out.println("EDITOR-TRACE keyReleased code=" + keyCode + " focused=" + hasFocus()
+                    + " editable=" + editable + " inputActive=" + inputActive
+                    + " gameAction=" + Display.getInstance().getGameAction(keyCode));
+        }
         if (!inputActive && editable) {
             if (isPrimaryModifierDown() || Display.getInstance().isAltKeyDown()) {
                 // modifier combos are handled in keyPressed; never type the raw character

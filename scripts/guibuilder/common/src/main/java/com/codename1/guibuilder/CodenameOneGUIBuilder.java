@@ -97,6 +97,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private boolean finishingInlineEditor;
     private DropPlan activeDropPlan;
     private CodeEditor activeCodeEditor;
+    /** Reopens whichever editor was on screen after the canvas is rebuilt; null when none is. */
+    private Runnable activeEditorReopen;
+    private boolean reopeningEditor;
     private String lastObservedCss;
     private com.codename1.ui.util.UITimer cssLiveTimer;
     private int cssEditRevision;
@@ -510,6 +513,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         try {
             cancelDesignerDrag();
             document = GuiDocument.parse(path, ProjectIO.read(path));
+            activeEditorReopen = null;
             selectedElements.clear();
             recordAction("form_opened", "form", relativeFormName(path));
             loadProjectTheme();
@@ -583,6 +587,24 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         refreshHierarchy();
         canvasHost.revalidate();
         Display.getInstance().callSerially(this::refreshGuidedSelectionOverlay);
+        // Rebuilding the canvas replaces everything inside it, including the split pane an open
+        // editor lives in -- so any drop, delete or undo silently closed the editor mid-edit.
+        // Put it back. The guard stops the reopen from recursing through this method.
+        Runnable reopen = activeEditorReopen;
+        if (reopen != null && !reopeningEditor) {
+            reopeningEditor = true;
+            try {
+                reopen.run();
+            } finally {
+                reopeningEditor = false;
+            }
+        }
+    }
+
+    /** Closes an open editor pane for good, rather than letting the next refresh restore it. */
+    private void closeEditorPane() {
+        activeEditorReopen = null;
+        refreshEditor();
     }
 
     private Component buildFormToolbarPreview() {
@@ -3879,7 +3901,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // Name the file being edited. "theme.css" alone left it ambiguous which stylesheet the
             // canvas was actually showing when the two did not appear to agree.
             Container editorPane = editorPane(binding.cssFile(), editor,
-                    () -> editor.getText(value -> saveCss(value, editor)), this::refreshEditor);
+                    () -> editor.getText(value -> saveCss(value, editor)), this::closeEditorPane);
+            activeEditorReopen = this::openCss;
             editor.addChangeListener(event -> scheduleLiveCss(editor));
             if (cssLiveTimer != null) cssLiveTimer.cancel();
             cssLiveTimer = com.codename1.ui.util.UITimer.timer(250, true, workspace, () -> {
@@ -3938,7 +3961,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             editor.onReady(editor::focusEditor);
             Component stage = canvasHost.getComponentCount() == 0 ? new Label() : canvasHost.getComponentAt(0);
             Container editorPane = editorPane("Binding model: " + relativeFormName(document.path()) + "Model",
-                    editor, () -> editor.getText(value -> saveSource(modelPath, value)), this::refreshEditor);
+                    editor, () -> editor.getText(value -> saveSource(modelPath, value)), this::closeEditorPane);
+            activeEditorReopen = this::openBindingModel;
             canvasHost.removeComponent(stage);
             canvasHost.removeAll();
             canvasHost.add(BorderLayout.CENTER,
@@ -3983,8 +4007,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             final int editableOffset = userMarker < 0 ? 0
                     : userMarker + "// <gui-builder-user-code>".length() + 1;
             Component stage = canvasHost.getComponentCount() == 0 ? new Label() : canvasHost.getComponentAt(0);
+            final String reopenHandler = handler;
             Container editorPane = editorPane(handler == null ? "Companion Java source • edit inside USER CODE markers" : "Handler: " + handler, editor,
-                    () -> editor.getText(value -> saveSourceAndModel(sourcePath, value)), this::refreshEditor);
+                    () -> editor.getText(value -> saveSourceAndModel(sourcePath, value)), this::closeEditorPane);
+            activeEditorReopen = () -> openSourceEditor(reopenHandler);
             canvasHost.removeComponent(stage);
             SplitPane split = new SplitPane(SplitPane.HORIZONTAL_SPLIT, editorPane, stage, "20%", "58%", "85%");
             canvasHost.removeAll();
