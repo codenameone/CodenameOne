@@ -3875,7 +3875,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             editor.setTheme(darkMode ? "dark" : "light");
             editor.setEditable(true);
             editor.setShowLineNumbers(true);
-            editor.onReady(editor::focusEditor);
             Component stage = canvasHost.getComponentAt(0);
             // Name the file being edited. "theme.css" alone left it ambiguous which stylesheet the
             // canvas was actually showing when the two did not appear to agree.
@@ -3899,6 +3898,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             canvasHost.removeAll();
             canvasHost.add(BorderLayout.CENTER, split);
             canvasHost.revalidate();
+            // Focus only once the editor is in the form: requestFocus does nothing before that.
+            editor.onReady(editor::focusEditor);
             setStatus("Editing CSS • changes compile into the live preview");
         } catch (IOException ex) {
             ToastBar.showErrorMessage("Unable to read theme.css: " + ex.getMessage());
@@ -4066,6 +4067,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
         if (previewRoot != null) ComponentPreviewFactory.stabilizeDesignStyles(previewRoot);
         if (formToolbarPreview != null) ComponentPreviewFactory.stabilizeDesignStyles(formToolbarPreview);
+        // refreshTheme swaps the style objects but nothing asks for a new frame, so the canvas kept
+        // painting the styling it was already showing and CSS edits looked like they did nothing.
+        if (canvasHost != null) {
+            canvasHost.revalidate();
+            canvasHost.repaint();
+        }
+        if (workspace != null) workspace.repaint();
     }
 
     private void loadProjectTheme() {
