@@ -1482,6 +1482,62 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
+    /**
+     * Commits an ordering decision AND the delivery it authorises as one step.
+     *
+     * <p>Doing the compare-and-replace atomically is not enough on its own: between committing the
+     * stamp and calling deliverDataChanged, an ordinary callback for a NEWER publication can run,
+     * advance the stamp and emit its payload -- and then this caller emits its older payload after
+     * it. The cache is left holding the newer stamp, so the newer value is rejected if it is ever
+     * seen again, and nothing is left to correct the listener. Ordering the stamps without ordering
+     * the deliveries just moves the race one line down.</p>
+     *
+     * <p>Safe to hold the monitor across the dispatch because
+     * {@link WearableConnection#deliverDataChanged} does not run listener code on this thread -- it
+     * either parks the delivery on the pending queue or hands it to the EDT. No application code
+     * runs under this lock.</p>
+     */
+    static boolean deliverIfOutranks(String path, long sequence, String node, byte[] payload) {
+        synchronized (deliveredSequences) {
+            if (!setDeliveredSequenceIfOutranks(path, sequence, node)) {
+                return false;
+            }
+            WearableConnection.deliverDataChanged(path, payload);
+            return true;
+        }
+    }
+
+    /** As {@link #deliverIfOutranks}, for the deletion paths that anchor on a pre-query stamp. */
+    static boolean deliverIfStampUnchanged(String path, String expected, long sequence, String node,
+            byte[] payload) {
+        synchronized (deliveredSequences) {
+            if (!setDeliveredSequenceIfStampUnchanged(path, expected, sequence, node)) {
+                return false;
+            }
+            WearableConnection.deliverDataChanged(path, payload);
+            return true;
+        }
+    }
+
+    /**
+     * Drops the stamp and announces the removal as one step, and only while the stamp is still the
+     * one read before the query.
+     *
+     * <p>{@code expected == null} returns false rather than removing: it means either that the app
+     * was never told this path had a value (so a removal would be an event that never happened) or
+     * that another deletion event in the same buffer already announced it -- which is what keeps
+     * one logical removal from being reported once per replica.</p>
+     */
+    static boolean deliverRemovalIfStampUnchanged(String path, String expected) {
+        synchronized (deliveredSequences) {
+            if (expected == null || !forgetDeliveredSequenceIfUnchanged(path, expected)) {
+                return false;
+            }
+            WearableConnection.deliverDataRemoved(path);
+            return true;
+        }
+    }
+
     /** The recorded stamp for a path, or null -- an opaque snapshot for {@link #forgetDeliveredSequenceIfUnchanged}. */
     static String deliveredStamp(String path) {
         synchronized (deliveredSequences) {
@@ -1794,24 +1850,20 @@ public class CN1WearableBridge implements WearableBridge {
                         //
                         // Otherwise the stamp describes a live value, and the ordinary monotonic
                         // rule is right.
-                        boolean delivered = wasAfterDeletion(path)
-                                ? setDeliveredSequenceIfStampUnchanged(
-                                        path, before, winner.sequence, winner.node)
-                                : setDeliveredSequenceIfOutranks(path, winner.sequence, winner.node);
-                        if (delivered) {
-                            WearableConnection.deliverDataChanged(path, winner.payload);
+                        if (wasAfterDeletion(path)) {
+                            deliverIfStampUnchanged(path, before, winner.sequence, winner.node,
+                                    winner.payload);
+                        } else {
+                            deliverIfOutranks(path, winner.sequence, winner.node, winner.payload);
                         }
-                    } else if (wasAfterDeletion(path) && before != null
-                            && forgetDeliveredSequenceIfUnchanged(path, before)) {
-                        // before != null for the same reason the inline path checks the drop took
-                        // something: with no recorded stamp the app was never told this path had a
-                        // value, so a removal would be an event that never happened.
+                    } else if (wasAfterDeletion(path)
+                            && deliverRemovalIfStampUnchanged(path, before)) {
                         // Empty AND nothing landed while we were asking. Announcing a removal for a
                         // path a concurrent publication has since refilled is the one error the app
-                        // cannot recover from, so it is conditional on the stamp being untouched.
-                        // Dropping the stamp stays coupled to the removal: a value republished later
-                        // with a lower sequence must not then be filtered as older.
-                        WearableConnection.deliverDataRemoved(path);
+                        // cannot recover from, so the drop, the check and the announcement are one
+                        // atomic step -- and dropping the stamp stays coupled to the removal, since
+                        // a value republished later with a lower sequence must not be filtered as
+                        // older.
                     }
                     forgetPendingWinner(path);
                 } catch (Throwable stillUnavailable) {
@@ -1934,6 +1986,14 @@ public class CN1WearableBridge implements WearableBridge {
         String key = uri.getHost() + ":" + uri.getPath();
         synchronized (transferClaims) {
             String previous = transferClaims.get(key);
+            if (previous == null) {
+                // Not in memory does not mean not delivered. A transfer stays published as a
+                // durable DataItem for the sender's whole retention window, and the Data Layer
+                // re-delivers it on the next connection -- so a receiver that restarted in between
+                // would hand the app the same one-shot file again and repeat whatever the app does
+                // with it. The claim has to outlive the process for the contract to mean anything.
+                previous = persistedClaim(key);
+            }
             if (previous != null) {
                 int split = previous.indexOf('|');
                 long prevSeq = Long.parseLong(previous.substring(0, split));
@@ -1943,9 +2003,74 @@ public class CN1WearableBridge implements WearableBridge {
                     return false;
                 }
             }
-            transferClaims.put(key,
-                    sequence + "|" + (uri.getHost() == null ? "" : uri.getHost()));
+            String stamp = sequence + "|" + (uri.getHost() == null ? "" : uri.getHost());
+            transferClaims.put(key, stamp);
+            persistClaim(key, stamp);
             return true;
+        }
+    }
+
+    /** Preference store for durable transfer claims; see {@link #claimTransfer}. */
+    private static final String CLAIM_PREFS = "cn1.wearable.claims";
+
+    /**
+     * The claim recorded for a transfer key in a previous process, or null.
+     *
+     * <p>Read only on an in-memory miss, so the common path stays a map lookup and the disk read
+     * happens once per key per process.</p>
+     */
+    private static String persistedClaim(String key) {
+        CN1WearableBridge b = current;
+        if (b == null) {
+            return null;
+        }
+        try {
+            return b.context.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE)
+                    .getString(key, null);
+        } catch (Throwable unavailable) {
+            return null;
+        }
+    }
+
+    /**
+     * Records a claim durably, and prunes claims older than the sender's retention window.
+     *
+     * <p>Bounded by the same window the sender sweeps its transfers on: once the item itself is
+     * gone there is nothing left to re-deliver, so the claim has no one to stop and keeping it
+     * would grow this store without limit.</p>
+     */
+    private static void persistClaim(String key, String stamp) {
+        CN1WearableBridge b = current;
+        if (b == null) {
+            return;
+        }
+        try {
+            android.content.SharedPreferences prefs =
+                    b.context.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE);
+            android.content.SharedPreferences.Editor edit = prefs.edit();
+            edit.putString(key, stamp);
+            long cutoff = System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;
+            for (Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
+                Object v = e.getValue();
+                if (!(v instanceof String)) {
+                    continue;
+                }
+                String recorded = (String) v;
+                int split = recorded.indexOf('|');
+                if (split <= 0) {
+                    continue;
+                }
+                try {
+                    if (Long.parseLong(recorded.substring(0, split)) < cutoff) {
+                        edit.remove(e.getKey());
+                    }
+                } catch (NumberFormatException unparsable) {
+                    edit.remove(e.getKey());
+                }
+            }
+            edit.apply();
+        } catch (Throwable unavailable) {
+            // Best effort: the in-memory claim still holds for this process.
         }
     }
 

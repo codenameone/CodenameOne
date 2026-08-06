@@ -228,11 +228,10 @@ public class CN1WearableListenerService extends WearableListenerService {
                         // replica leaves the same item winning, and re-announcing a value the app
                         // already holds is a spurious change -- listeners re-render, and anything
                         // that treats a change as an event would act on it twice.
-                        if (CN1WearableBridge.setDeliveredSequenceIfStampUnchanged(
-                                appPath, beforeQuery, remaining.sequence, remaining.node)) {
-                            WearableConnection.deliverDataChanged(appPath, remaining.payload);
-                        }
-                    } else if (CN1WearableBridge.forgetDeliveredSequenceIfPresent(appPath)) {
+                        CN1WearableBridge.deliverIfStampUnchanged(appPath, beforeQuery,
+                                remaining.sequence, remaining.node, remaining.payload);
+                    } else if (CN1WearableBridge.deliverRemovalIfStampUnchanged(
+                            appPath, beforeQuery)) {
                         // Genuinely empty, so the stamp can go: a value republished here later with
                         // a lower stamp than the removed one carried must not be filtered as older.
                         //
@@ -242,7 +241,11 @@ public class CN1WearableListenerService extends WearableListenerService {
                         // announce the same logical removal again, so a listener that treats
                         // removal as an event would act on it once per replica. The first event
                         // takes the stamp and reports; the rest find nothing and stay quiet.
-                        WearableConnection.deliverDataRemoved(appPath);
+                        //
+                        // Anchored on beforeQuery, not merely "was something there": the query above
+                        // blocks, so a newer publication delivered while it ran would otherwise have
+                        // its stamp removed and a removal announced for a path that has already been
+                        // refilled -- the newer callback has already fired and may not repeat.
                     }
                 } catch (java.io.IOException couldNotResolve) {
                     // The follow-up query failed rather than answering "nothing here". Still do not
