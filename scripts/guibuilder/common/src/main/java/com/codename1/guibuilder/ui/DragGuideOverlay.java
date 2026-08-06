@@ -7,8 +7,25 @@ import com.codename1.ui.layouts.BorderLayout;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Paints insertion and constraint geometry above the visual designer while dragging. */
+/**
+ * Paints insertion and constraint geometry above the visual designer while dragging.
+ *
+ * <p>This is a glass pane: it draws over the whole canvas area and must never be hit by a pointer.
+ * It is layered at inset zero on top of the canvas host, so ordinary hit testing picked it for
+ * every press in that area -- including presses on the code editor, which lives inside the canvas
+ * host once a source or CSS editor is open. The editor therefore never took focus and appeared to
+ * ignore the keyboard entirely.
+ */
 public final class DragGuideOverlay extends Component {
+    /**
+     * Never claims a pointer position. Hit testing walks children by containment, so returning
+     * false here keeps the overlay purely decorative and lets presses reach whatever it covers.
+     */
+    @Override
+    public boolean contains(int x, int y) {
+        return false;
+    }
+
     private String layout = "BoxLayout";
     private String axis = "Y";
     private String constraint;
@@ -82,6 +99,9 @@ public final class DragGuideOverlay extends Component {
     }
 
     public DragGuideOverlay() {
+        // setIgnorePointerEvents governs event delivery, not hit testing: the overlay was still
+        // the component found at a pointer position, which is what decides focus. contains() above
+        // is what actually keeps it out of the way.
         setIgnorePointerEvents(true);
         setVisible(false);
     }

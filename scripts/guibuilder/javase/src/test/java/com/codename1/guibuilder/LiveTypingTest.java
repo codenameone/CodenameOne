@@ -41,6 +41,7 @@ class LiveTypingTest {
         String before = textOf(editor);
         assertTrue(before.contains("// <gui-builder-user-code>"), "the companion source lost its markers");
 
+        assertNothingCoversTheEditor(view);
         click(view);
         assertSame(view, view.getComponentForm().getFocused(),
                 "clicking the editor did not focus it, so no keystroke can ever reach it");
@@ -62,6 +63,7 @@ class LiveTypingTest {
         CodeEditor editor = builder.activeEditorForTest();
         assertNotNull(editor, "the CSS editor was never created");
         EditorView view = viewOf(editor);
+        assertNothingCoversTheEditor(view);
         click(view);
         assertSame(view, view.getComponentForm().getFocused(),
                 "clicking the CSS editor did not focus it");
@@ -87,6 +89,32 @@ class LiveTypingTest {
             });
         }
         settle();
+    }
+
+    /**
+     * The designer layers a drag guide over the whole canvas area, and the editor sits inside that
+     * area. If anything covering the editor claims the pointer, every click lands on the cover and
+     * the editor can never be focused or typed into -- with no visible sign of why.
+     */
+    private static void assertNothingCoversTheEditor(EditorView view) {
+        int x = view.getAbsoluteX() + view.getWidth() / 2;
+        int y = view.getAbsoluteY() + Math.min(view.getHeight() - 2, 20);
+        Form form = view.getComponentForm();
+        final Component[] hit = new Component[1];
+        Display.getInstance().callSeriallyAndWait(() -> hit[0] = form.getComponentAt(x, y));
+        assertNotNull(hit[0], "nothing at all is hit testable where the editor is drawn");
+        assertFalse(hit[0] instanceof com.codename1.guibuilder.ui.DragGuideOverlay,
+                "the drag guide overlay claims the pointer over the editor, so clicks never reach it");
+        assertTrue(hit[0] == view || isDescendantOf(hit[0], view) || isDescendantOf(view, hit[0]),
+                "a pointer over the editor is claimed by " + hit[0].getClass().getName()
+                        + " instead of the editing surface");
+    }
+
+    private static boolean isDescendantOf(Component candidate, Component ancestor) {
+        for (Container parent = candidate.getParent(); parent != null; parent = parent.getParent()) {
+            if (parent == ancestor) return true;
+        }
+        return false;
     }
 
     /**
