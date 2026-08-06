@@ -389,6 +389,23 @@ class WatchNativeBuilderTest {
                 "the explicit key wins and the fallback is not also emitted: " + plist);
     }
 
+    /// ios.plistInject is a supported way to set a purpose string, and it is a raw fragment rather
+    /// than an argument -- so a loop over ios.NS* never sees it and the watch ships without one.
+    @Test
+    void watchPlistCarriesInjectedPrivacyStrings(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.plistInject",
+                "<key>NSMicrophoneUsageDescription</key><string>Records a note</string>"
+                        + "<key>UIRequiresFullScreen</key><true/>");
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("<key>NSMicrophoneUsageDescription</key>"),
+                "an injected purpose string must reach the watch plist: " + plist);
+        assertTrue(plist.contains("Records a note"), plist);
+        assertFalse(plist.contains("UIRequiresFullScreen"),
+                "only privacy keys are mirrored, not the whole fragment: " + plist);
+    }
+
     private static WatchNativeBuilder parse(BuildRequest req) {
         WatchNativeBuilder b = new WatchNativeBuilder(new IPhoneBuilder());
         b.parseHints(req);

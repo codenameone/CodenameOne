@@ -427,6 +427,34 @@ class WatchNativeBuilder {
      * {@code <key>NAME</key>} and takes the next {@code <string>} that follows it. Anything more
      * clever would be pretending to parse a document that is only ever a fragment.</p>
      */
+    /// Every {@code <key>} the {@code ios.plistInject} fragment sets.
+    ///
+    /// Deliberately literal, like {@link #injectedPlistString}: the hint is a fragment, not a
+    /// document, so this scans for the tags rather than pretending to parse XML.
+    static java.util.List<String> injectedPlistKeys(BuildRequest request) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        String inject = request.getArg("ios.plistInject", null);
+        if (inject == null) {
+            return out;
+        }
+        int at = 0;
+        while (true) {
+            int open = inject.indexOf("<key>", at);
+            if (open < 0) {
+                return out;
+            }
+            int close = inject.indexOf("</key>", open);
+            if (close < 0) {
+                return out;
+            }
+            String key = inject.substring(open + "<key>".length(), close).trim();
+            if (key.length() > 0 && !out.contains(key)) {
+                out.add(key);
+            }
+            at = close + "</key>".length();
+        }
+    }
+
     static String injectedPlistString(BuildRequest request, String key) {
         String inject = request.getArg("ios.plistInject", null);
         if (inject == null) {
@@ -529,6 +557,19 @@ class WatchNativeBuilder {
                 String description = trimToNull(request.getArg(arg, null));
                 if (description != null) {
                     plistString(sb, arg.substring(arg.lastIndexOf('.') + 1), description);
+                }
+            }
+        }
+        // Purpose strings supplied through ios.plistInject as well. That fragment is a supported
+        // way to set plist keys and the phone honours it, but it is a raw blob rather than
+        // arguments, so a loop over ios.NS* alone never sees them -- and the watch bundle is
+        // terminated when its lifecycle exercises the API the project did declare.
+        for (String injectedKey : injectedPlistKeys(request)) {
+            if (injectedKey.startsWith("NS") && injectedKey.endsWith("UsageDescription")
+                    && trimToNull(request.getArg("ios." + injectedKey, null)) == null) {
+                String description = injectedPlistString(request, injectedKey);
+                if (description != null && description.length() > 0) {
+                    plistString(sb, injectedKey, description);
                 }
             }
         }

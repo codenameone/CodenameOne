@@ -341,11 +341,23 @@ public class WearableMessage {
     /// #### Returns
     ///
     /// the encoded payload, never null
+    /// The most entries the wire format can carry, set by its 16-bit count field.
+    static final int MAX_WIRE_ENTRIES = 65535;
+
     public byte[] toByteArray() {
         ByteArrayOutputStream bo = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bo);
         try {
             out.writeByte(FORMAT_VERSION);
+            if (values.size() > MAX_WIRE_ENTRIES) {
+                // Refused, not truncated and not silently mangled. The count is a 16-bit field, so
+                // 32768 entries wrote a NEGATIVE short, the reader looped zero times, and the peer
+                // accepted a message with every value gone -- no error anywhere, on either side.
+                // A payload this size is already past what either transport will carry, so failing
+                // here costs nothing that would otherwise have worked.
+                throw new IllegalStateException("A WearableMessage carries at most "
+                        + MAX_WIRE_ENTRIES + " entries; this one has " + values.size());
+            }
             out.writeShort(values.size());
             for (Map.Entry<String, Object> e : values.entrySet()) {
                 writeLongUTF(out, e.getKey());
@@ -418,7 +430,10 @@ public class WearableMessage {
                         + FORMAT_VERSION);
                 return m;
             }
-            int count = in.readShort();
+            // UNSIGNED: the writer's short is a count, never negative, and reading it signed
+            // halved the range for no reason -- and turned an over-large one into zero rather than
+            // into an error.
+            int count = in.readUnsignedShort();
             for (int i = 0; i < count; i++) {
                 String key = readLongUTF(in);
                 int type = in.readByte();
