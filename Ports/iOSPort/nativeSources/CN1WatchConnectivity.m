@@ -897,8 +897,15 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // publisher would resurrect data instead of clearing it.
     [ctx removeObjectForKey:cn1WearableValueKey(path)];
     [ctx removeObjectForKey:cn1WearableStampKey(path)];
+    // A tombstone may ALREADY exist for this path -- removeData called twice. Its birth record is
+    // then the one that matters, and overwriting it would restart a retention window that has been
+    // running; the failure branch below would go further and delete it, leaving the still-published
+    // original to be read as newly born on the next pass.
+    BOOL freshTombstone = ctx[cn1WearableTombKey(path)] == nil;
     ctx[cn1WearableTombKey(path)] = @(cn1WearableNextSequence());
-    cn1WearableNoteTombstoneBirth(path);
+    if (freshTombstone) {
+        cn1WearableNoteTombstoneBirth(path);
+    }
     NSMutableArray *retiredBirths = [NSMutableArray array];
     cn1WearablePruneTombstones(ctx, [s receivedApplicationContext], retiredBirths);
     // Also swept when THIS tombstone comes of age. Pruning ran only from putData and removeData, so
@@ -924,14 +931,21 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
     if (err != nil) {
-        // The tombstone never entered the session context, so its birth record has nothing to be
-        // discovered through: pruning walks tombstones in the context, and one with no tombstone is
-        // unreachable for good. Repeated failed removals of unique paths would grow the defaults
-        // dictionary without bound.
+        // Only a record this call CREATED. A tombstone that was already published keeps its own
+        // birth: it is still out there, and deleting its record would have the next pass treat it
+        // as newly born and grant it another full window -- the very thing this branch exists to
+        // avoid in the other direction.
         //
-        // The records the prune retired are deliberately KEPT: their tombstones are still in the
-        // published context, and forgetting them would hand each one a fresh retention window.
-        cn1WearableForgetTombstoneBirth(path);
+        // For a fresh one the reasoning is the opposite: it never entered the session context, so
+        // pruning -- which walks tombstones in the context -- can never reach its record again, and
+        // repeated failed removals of unique paths would grow the defaults dictionary without
+        // bound.
+        //
+        // The records the prune retired are deliberately KEPT either way: their tombstones are
+        // still in the published context.
+        if (freshTombstone) {
+            cn1WearableForgetTombstoneBirth(path);
+        }
     } else {
         for (NSString *retiredPath in retiredBirths) {
             cn1WearableForgetTombstoneBirth(retiredPath);

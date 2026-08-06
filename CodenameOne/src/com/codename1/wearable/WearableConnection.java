@@ -883,9 +883,27 @@ public final class WearableConnection {
     private static final java.util.Set<String> droppedRemovals =
             java.util.Collections.newSetFromMap(new java.util.LinkedHashMap<String, Boolean>() {
                 protected boolean removeEldestEntry(java.util.Map.Entry<String, Boolean> eldest) {
-                    return size() > MAX_PENDING;
+                    if (size() <= MAX_REMEMBERED_REMOVALS) {
+                        return false;
+                    }
+                    // The one loss in this class that nothing downstream can repair. A discarded
+                    // CHANGE can be re-offered by the port, and overflowing that record asks for a
+                    // rescan; a removal has no such fallback, because the item is gone and there is
+                    // nothing anywhere to rediscover. So this is said out loud rather than dropped
+                    // quietly -- an app whose listener arrives after this many distinct removals
+                    // has one it will never hear about, and the log is the only evidence.
+                    com.codename1.io.Log.p("com.codename1.wearable: no listener has registered and "
+                            + MAX_REMEMBERED_REMOVALS + " removals are already waiting; the "
+                            + "removal of " + eldest.getKey() + " can no longer be delivered. "
+                            + "Register a WearableDataListener from init().");
+                    return true;
                 }
             });
+
+    /// How many discarded removals are remembered. Larger than the delivery cap on purpose: a
+    /// removal is a path and nothing else, so remembering one is cheap, and it is the only kind
+    /// whose loss cannot be repaired by re-offering something that still exists.
+    private static final int MAX_REMEMBERED_REMOVALS = 4096;
 
     /// Set when the dropped-path set overflowed, so the port is asked for a full rescan instead of
     /// a list of paths it can no longer be given. Read and cleared with [#droppedPaths]'s monitor.
