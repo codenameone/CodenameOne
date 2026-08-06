@@ -305,13 +305,15 @@ public class CN1WearableListenerService extends WearableListenerService {
                 try {
                     CN1WearableBridge.ResolvedValue winner =
                             CN1WearableBridge.resolveValueWithRetry(this, appPath);
-                    // Compare-and-replace, not a plain replace: resolveValueWithRetry blocks (and
-                    // retries), so another callback can stamp this path with a NEWER publication
-                    // while it runs. Overwriting that would deliver the older payload and leave the
-                    // older stamp recorded, hiding the newer value behind it.
-                    if (winner != null && CN1WearableBridge.setDeliveredSequenceIfOutranks(
-                            appPath, winner.sequence, winner.node)) {
-                        WearableConnection.deliverDataChanged(appPath, winner.payload);
+                    // Compare-and-replace AND dispatch as one step. resolveValueWithRetry blocks
+                    // (and retries), so another callback can stamp this path with a newer
+                    // publication while it runs -- and committing the stamp separately from the
+                    // delivery leaves the same race one line further down: the newer payload goes
+                    // out first, this older one after it, and the cache keeps the newer stamp so
+                    // nothing is left that can correct the listener.
+                    if (winner != null) {
+                        CN1WearableBridge.deliverIfOutranks(appPath, winner.sequence, winner.node,
+                                winner.payload);
                     }
                     continue;
                 } catch (java.io.IOException couldNotResolve) {
@@ -336,8 +338,11 @@ public class CN1WearableListenerService extends WearableListenerService {
             // An older item arriving after a newer one is ordinary, not exotic: a reconnect does it
             // whenever both nodes publish the same path. deliverIfOutranks declines those silently.
             if (ownEcho) {
-                // Bookkeeping only: the stamp still has to move so a later peer item is judged
-                // against what this device actually published, but no listener is told.
+                // The ONE deliberate use of the raw setter. Bookkeeping only: the stamp still has
+                // to move so a later peer item is judged against what this device actually
+                // published, but no listener is told, so there is no dispatch to order it with.
+                // Every other stamp mutation goes through the deliver* helpers, which commit the
+                // stamp and the delivery together.
                 CN1WearableBridge.setDeliveredSequenceIfOutranks(
                         appPath, CN1WearableBridge.sequenceOf(value), uri.getHost());
             } else {
