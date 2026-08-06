@@ -1470,7 +1470,19 @@ public class CN1WearableBridge implements WearableBridge {
      */
     /// Paths a completed query reported as empty. Guarded by {@link #valueCache}, and cleared for a
     /// path the moment anything authoritative says it exists again.
-    private static final java.util.Set<String> knownAbsent = new java.util.HashSet<String>();
+    private static final java.util.Set<String> knownAbsent =
+            java.util.Collections.newSetFromMap(new java.util.LinkedHashMap<String, Boolean>() {
+                protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
+                    // Bounded like valueCache, and for the same reason. Only a later publication of
+                    // the SAME path clears an entry, so an app using record-specific paths would
+                    // otherwise retain every deleted path string for the life of the process. An
+                    // evicted entry costs one extra background query the next time that path is
+                    // read, which is exactly the state before this cache existed.
+                    return size() > MAX_KNOWN_ABSENT;
+                }
+            });
+
+    private static final int MAX_KNOWN_ABSENT = 256;
 
     private static final Map<String, Removal> localRemovals = new HashMap<String, Removal>();
     private static final long LOCAL_REMOVAL_WINDOW_MILLIS = 30 * 1000L;
@@ -1728,7 +1740,8 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     /**
-     * Offers, once per app start, any inbound transfer still published and never claimed.
+     * Offers, once per app start, anything still published that this process has not delivered:
+     * inbound transfers that were never claimed, and replicated values with no delivery stamp.
      *
      * <p>Nothing else covers this. A transfer can wake the listener service in a cold process, and
      * if Android refuses the background activity launch the payload exists only in
@@ -1781,7 +1794,28 @@ public class CN1WearableBridge implements WearableBridge {
                         for (DataItem item : items) {
                             final Uri uri = item.getUri();
                             String p = uri == null ? null : uri.getPath();
-                            if (p == null || !isTransferPath(p)) {
+                            if (p == null) {
+                                continue;
+                            }
+                            if (!isTransferPath(p)) {
+                                // An ordinary replicated VALUE. The same loss applies to it: the
+                                // event that woke the service can die with that process when
+                                // Android refuses the activity launch, and the DataItem is then
+                                // unchanged, so nothing re-announces it and a listener registered
+                                // from init() stays stale until the peer publishes again -- which
+                                // contradicts the cold-start replay this API promises.
+                                //
+                                // Routed through the ordinary winner resolution rather than
+                                // delivered from here: that is the code that decides between two
+                                // publishers and records the delivery stamp, and a path this
+                                // process HAS already delivered has a stamp, so nothing is
+                                // delivered twice.
+                                if (p.startsWith(PATH_PREFIX) && valueMap(item) != null) {
+                                    String appPath = decode(p.substring(PATH_PREFIX.length()));
+                                    if (!hasDeliveredStamp(appPath)) {
+                                        scheduleWinnerResolution(context, appPath);
+                                    }
+                                }
                                 continue;
                             }
                             // Our own outbound transfer: handing it back would deliver the sender
