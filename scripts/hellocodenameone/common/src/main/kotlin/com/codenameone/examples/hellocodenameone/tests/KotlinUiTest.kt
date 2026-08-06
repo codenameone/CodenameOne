@@ -92,6 +92,17 @@ class KotlinUiTest : BaseTest() {
         step("prefs-container")
         val preferences = Container(BoxLayout.y())
         preferences.addAll(check, prefSwitch, note)
+        // Bisect: addContent("Preferences", ...) is where the Windows port throws.
+        // The container and all three children construct fine (the steps above all
+        // print), so the failure is in what addContent does to one of them --
+        // setHidden(true), which caches margins and forces a zero preferred size.
+        // One probe section per child says which.
+        step("probe-checkbox")
+        accordion.addContent("ProbeCheck", Container(BoxLayout.y()).apply { add(CheckBox("probe")) })
+        step("probe-switch")
+        accordion.addContent("ProbeSwitch", Container(BoxLayout.y()).apply { add(Switch()) })
+        step("probe-textarea")
+        accordion.addContent("ProbeText", Container(BoxLayout.y()).apply { add(TextArea(3, 20)) })
         step("accordion-prefs")
         accordion.addContent("Preferences", preferences)
 
