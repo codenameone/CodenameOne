@@ -427,9 +427,12 @@ public class CN1WearableListenerService extends WearableListenerService {
                                 CN1WearableBridge.rememberValue(appPath, null);
                                 WearableConnection.deliverDataRemoved(appPath);
                             }
-                        } else {
+                        } else if (!CN1WearableBridge.isRemovalAnnounced(beforeQuery)) {
                             CN1WearableBridge.deliverRemovalIfStampUnchanged(appPath, beforeQuery);
                         }
+                        // A sentinel means this logical removal has already been reported, by an
+                        // earlier tombstone of the same wildcard delete. Passing it to the ordinary
+                        // path would consume it and announce again, once per replica.
                     }
                 } catch (java.io.IOException couldNotResolve) {
                     // The follow-up query failed rather than answering "nothing here". Still do not

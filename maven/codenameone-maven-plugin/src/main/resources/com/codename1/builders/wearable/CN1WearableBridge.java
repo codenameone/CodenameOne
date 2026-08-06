@@ -2514,6 +2514,16 @@ public class CN1WearableBridge implements WearableBridge {
     /// stamp is "sequence|node", so a value with neither cannot collide with one.
     private static final String REMOVAL_ANNOUNCED = "removed";
 
+    /// Whether a stamp is the removal sentinel rather than a real delivery.
+    ///
+    /// The remaining tombstones of one wildcard delete must not be passed to the ordinary removal
+    /// path: that path CONSUMES the stamp it finds and announces, so it would report the same
+    /// logical removal again -- and re-announce once per replica, alternating between recreating
+    /// and consuming the sentinel.
+    static boolean isRemovalAnnounced(String stamp) {
+        return REMOVAL_ANNOUNCED.equals(stamp);
+    }
+
     /** The recorded stamp for a path, or null -- an opaque snapshot for {@link #forgetDeliveredSequenceIfUnchanged}. */
     static String deliveredStamp(String path) {
         synchronized (deliveredSequences) {

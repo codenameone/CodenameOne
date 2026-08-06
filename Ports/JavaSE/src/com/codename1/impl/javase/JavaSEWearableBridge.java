@@ -206,6 +206,16 @@ class JavaSEWearableBridge implements WearableBridge {
 
     public void putData(String path, byte[] payload) {
         writeValue(dataFile(path), payload, path);
+        // The tombstone goes with it. Left behind, a peer scanning afterwards processes both
+        // records, and listFiles() promises no order -- so it can deliver the removal AFTER the new
+        // value and leave the listener showing a path as deleted while getData returns it. The
+        // other order is no better: a spurious removal for a path that is currently live.
+        File tomb = new File(dataDir, encodePath(path) + TOMB_SUFFIX);
+        if (tomb.delete()) {
+            synchronized (seenData) {
+                seenData.remove(tomb.getName());
+            }
+        }
     }
 
     private void writeValue(File f, byte[] payload, String path) {
@@ -344,7 +354,8 @@ class JavaSEWearableBridge implements WearableBridge {
         for (File f : files) {
             // A transfer is not a readable replicated path -- getData() on its storage name is not
             // part of the API -- so it is left out, matching the device ports.
-            if (f.isFile() && !f.getName().endsWith(".tmp") && !isTransfer(f.getName())) {
+            if (f.isFile() && !f.getName().endsWith(".tmp") && !isTransfer(f.getName())
+                    && !isTombstone(f.getName())) {
                 out.add(decodePath(f.getName()));
             }
         }
@@ -762,7 +773,10 @@ class JavaSEWearableBridge implements WearableBridge {
                     if (authoredLocallyFor(snapshot, stamp)) {
                         // Ours. Keep it for the peer to find, and drop it once it is old enough
                         // that any peer which was going to see it has had every chance.
-                        if (System.currentTimeMillis() - stamp > TOMB_TTL_MILLIS) {
+                        // DECODED first. nextStamp encodes wallMillis * 2 + sideBit, so comparing
+                        // the raw value against currentTimeMillis stays negative for decades and
+                        // the cleanup would never have run -- tombstones would simply accumulate.
+                        if (System.currentTimeMillis() - (stamp / 2) > TOMB_TTL_MILLIS) {
                             f.delete();
                             synchronized (seenData) {
                                 seenData.remove(f.getName());
