@@ -344,8 +344,8 @@ public final class DatabaseConfig {
     static String toKeyLiteral(byte[] key) {
         StringBuilder b = new StringBuilder(68);
         b.append("x'");
-        for (int iter = 0; iter < key.length; iter++) {
-            int v = key[iter] & 0xff;
+        for (byte raw : key) {
+            int v = raw & 0xff;
             b.append(HEX[v >>> 4]);
             b.append(HEX[v & 0x0f]);
         }

@@ -28,7 +28,6 @@ import com.codename1.db.DatabaseConfig;
 import com.codename1.db.DatabaseEncryptionException;
 import com.codename1.db.Row;
 import com.codename1.io.FileSystemStorage;
-import com.codename1.io.Util;
 import com.codename1.ui.Display;
 
 import java.io.IOException;
@@ -56,7 +55,7 @@ import java.io.InputStream;
 /// asserts that `Database#setLegacyBehavior(boolean)` really does restore what each platform used
 /// to do, which is what makes the compatibility promise testable rather than aspirational. Run the
 /// legacy mode only with the flag actually set.
-public class DatabaseConformanceSuite {
+public final class DatabaseConformanceSuite {
 
     /// Assert the portable contract.
     public static final int MODE_STRICT = 0;
@@ -513,9 +512,11 @@ public class DatabaseConformanceSuite {
         // ---- stepping past the end repeatedly must not move the row count
         cur = db.executeQuery("SELECT id FROM conf_cur ORDER BY id");
         try {
+            int walked = 0;
             while (cur.next()) {
-                // walk to the end
+                walked++;
             }
+            r.check(walked == 5, "walking the whole result set sees every row, saw " + walked);
             int countAfterFirstExhaustion = Database.count(cur);
             cur.next();
             cur.next();
@@ -957,31 +958,33 @@ public class DatabaseConformanceSuite {
         if (path == null) {
             return false;
         }
-        InputStream in = null;
         try {
-            in = FileSystemStorage.getInstance().openInputStream(path);
-            byte[] header = new byte[15];
-            int offset = 0;
-            while (offset < header.length) {
-                int read = in.read(header, offset, header.length - offset);
-                if (read < 0) {
-                    return false;
+            InputStream in = FileSystemStorage.getInstance().openInputStream(path);
+            try {
+                byte[] header = new byte[15];
+                int offset = 0;
+                while (offset < header.length) {
+                    int read = in.read(header, offset, header.length - offset);
+                    if (read < 0) {
+                        return false;
+                    }
+                    offset += read;
                 }
-                offset += read;
-            }
-            // Compare bytes rather than decoding: the header is fixed ASCII, and decoding it
-            // would depend on the platform default charset.
-            byte[] expected = {'S', 'Q', 'L', 'i', 't', 'e', ' ', 'f', 'o', 'r', 'm', 'a', 't', ' ', '3'};
-            for (int iter = 0; iter < expected.length; iter++) {
-                if (header[iter] != expected[iter]) {
-                    return false;
+                // Compare bytes rather than decoding: the header is fixed ASCII, and decoding it
+                // would depend on the platform default charset.
+                byte[] expected = {'S', 'Q', 'L', 'i', 't', 'e', ' ', 'f', 'o', 'r', 'm',
+                    'a', 't', ' ', '3'};
+                for (int iter = 0; iter < expected.length; iter++) {
+                    if (header[iter] != expected[iter]) {
+                        return false;
+                    }
                 }
+                return true;
+            } finally {
+                in.close();
             }
-            return true;
         } catch (IOException err) {
             return false;
-        } finally {
-            Util.cleanup(in);
         }
     }
 

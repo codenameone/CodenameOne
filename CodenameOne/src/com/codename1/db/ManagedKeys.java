@@ -33,7 +33,7 @@ import java.io.IOException;
 /// derive byte-identical key material from the same alias, or a database written on
 /// one device could not be opened on another. The only per-platform part is where
 /// `com.codename1.security.SecureStorage` physically puts the bytes.
-class ManagedKeys {
+final class ManagedKeys {
 
     /// Prefix applied to every alias so database keys cannot collide with whatever
     /// else the application stores through `SecureStorage`.
@@ -134,8 +134,8 @@ class ManagedKeys {
 
     private static String toHex(byte[] data) {
         StringBuilder b = new StringBuilder(data.length * 2);
-        for (int iter = 0; iter < data.length; iter++) {
-            int v = data[iter] & 0xff;
+        for (byte raw : data) {
+            int v = raw & 0xff;
             b.append("0123456789abcdef".charAt(v >>> 4));
             b.append("0123456789abcdef".charAt(v & 0x0f));
         }

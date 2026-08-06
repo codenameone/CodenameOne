@@ -42,7 +42,7 @@ import java.util.List;
 /// also counts the `END` that closes a `CASE` expression. A trigger body whose `BEGIN`/`END`
 /// structure is unbalanced by construction cannot be split correctly -- but such a script would not
 /// parse in SQLite either.
-public class SQLStatementSplitter {
+public final class SQLStatementSplitter {
 
     private SQLStatementSplitter() {
     }

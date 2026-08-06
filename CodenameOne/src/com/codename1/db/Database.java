@@ -24,7 +24,6 @@ package com.codename1.db;
 
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.FileSystemStorage;
-import com.codename1.io.Util;
 import com.codename1.ui.Display;
 
 import java.io.IOException;
@@ -333,28 +332,31 @@ public abstract class Database {
         if (path == null) {
             return false;
         }
-        InputStream in = null;
         try {
-            in = FileSystemStorage.getInstance().openInputStream(path);
-            byte[] header = new byte[PLAINTEXT_HEADER.length];
-            int offset = 0;
-            while (offset < header.length) {
-                int read = in.read(header, offset, header.length - offset);
-                if (read < 0) {
-                    return true;
+            InputStream in = FileSystemStorage.getInstance().openInputStream(path);
+            try {
+                byte[] header = new byte[PLAINTEXT_HEADER.length];
+                int offset = 0;
+                while (offset < header.length) {
+                    int read = in.read(header, offset, header.length - offset);
+                    if (read < 0) {
+                        return true;
+                    }
+                    offset += read;
                 }
-                offset += read;
-            }
-            for (int iter = 0; iter < header.length; iter++) {
-                if (header[iter] != PLAINTEXT_HEADER[iter]) {
-                    return true;
+                for (int iter = 0; iter < PLAINTEXT_HEADER.length; iter++) {
+                    if (header[iter] != PLAINTEXT_HEADER[iter]) {
+                        return true;
+                    }
                 }
+                return false;
+            } finally {
+                in.close();
             }
-            return false;
         } catch (IOException err) {
+            // Unreadable or truncated. Reporting "encrypted" is the conservative answer, since the
+            // one thing we can say is that it is not a readable plaintext SQLite file.
             return true;
-        } finally {
-            Util.cleanup(in);
         }
     }
 
