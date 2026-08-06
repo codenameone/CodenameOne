@@ -66,6 +66,19 @@ public class SQLiteNative {
      */
     public static native long open(String name, String key) throws IOException;
 
+    /**
+     * Whether the last failed {@link #open(String, String)} failed because of the key.
+     *
+     * The bridge reports an open failure as a zero peer rather than by raising: an exception
+     * thrown inside a native binding does not arrive in the translated code as a Java throwable,
+     * it unwinds the worker and hangs every thread waiting on the call. So the classification is
+     * fetched separately.
+     */
+    public static native boolean lastOpenWasWrongKey();
+
+    /** The message from the last failed {@link #open(String, String)}. */
+    public static native String lastOpenError();
+
     public static native void close(long dbPeer);
 
     public static native void rekey(long dbPeer, String key) throws IOException;

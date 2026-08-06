@@ -57,8 +57,15 @@ public class DatabaseImpl extends Database {
         this.databaseName = name;
         peer = SQLiteNative.open(name, key);
         if (peer == 0) {
-            throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
-                    "The supplied key does not decrypt this database");
+            if (SQLiteNative.lastOpenWasWrongKey()) {
+                throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
+                        "The supplied key does not decrypt this database");
+            }
+            // Storage or corruption, which no key can resolve. Reporting it as a key failure
+            // would have an application prompting for a passphrase that cannot help, and for an
+            // open with no key at all the diagnosis is impossible on its face.
+            throw new IOException("The database " + name + " could not be opened: "
+                    + SQLiteNative.lastOpenError());
         }
     }
 

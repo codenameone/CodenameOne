@@ -6484,16 +6484,71 @@ function cn1SqliteLookup(id) {
   return obj;
 }
 
+/** How long either half of the engine bring-up may take before it is treated as unavailable. */
+const CN1_SQLITE_INIT_TIMEOUT_MS = 15000;
+
+/**
+ * Rejects if the given promise has not settled in time.
+ *
+ * Neither step of the bring-up is guaranteed to settle at all. Acquiring a synchronous OPFS
+ * access handle blocks while another context holds the same file, and a browser that never
+ * releases it leaves the promise pending forever rather than rejecting. The translated code is
+ * waiting on this through the yield-on-promise bridge, which resumes only when the promise
+ * settles, so "pending forever" parks the event thread and every thread behind it -- a hang with
+ * nothing logged anywhere. A rejection, by contrast, is something the caller can report.
+ */
+function cn1SqliteWithin(promise, millis, what) {
+  return new Promise(function(resolve, reject) {
+    let settled = false;
+    const timer = setTimeout(function() {
+      if (!settled) {
+        settled = true;
+        reject(new Error(what + " did not complete within " + millis + "ms"));
+      }
+    }, millis);
+    Promise.resolve(promise).then(function(value) {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+      }
+    }, function(err) {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
+  });
+}
+
 function cn1SqliteStartInit() {
   if (cn1SqliteInitPromise) {
     return cn1SqliteInitPromise;
   }
   cn1SqliteInitPromise = (async function() {
-    // Classic worker, so importScripts is the load mechanism and is synchronous.
-    importScripts("js/sqlite3mc.js");
-    cn1Sqlite = await sqlite3InitModule();
+    // This promise must never reject. The translated code awaits it through the runtime's
+    // yield-on-promise bridge, which resumes the calling thread only on resolution -- a rejection
+    // leaves the event thread parked on an await that never returns, and every other thread then
+    // blocks behind it. That is a hang with no error anywhere, not a failed database call. So
+    // every failure here resolves to false instead, and the caller reports the engine as
+    // unavailable in the ordinary way.
     try {
-      cn1SqlitePool = await cn1Sqlite.installOpfsSAHPoolVfs({ name: "cn1-db" });
+      // Classic worker, so importScripts is the load mechanism and is synchronous.
+      importScripts("js/sqlite3mc.js");
+      cn1Sqlite = await cn1SqliteWithin(sqlite3InitModule(), CN1_SQLITE_INIT_TIMEOUT_MS,
+        "loading the SQLite WebAssembly module");
+    } catch (err) {
+      console.warn("Codename One: the SQLite engine could not be loaded, so databases are "
+        + "unavailable in this build. Reported cause: " + err);
+      cn1Sqlite = null;
+      cn1SqlitePool = null;
+      return false;
+    }
+    try {
+      cn1SqlitePool = await cn1SqliteWithin(
+        cn1Sqlite.installOpfsSAHPoolVfs({ name: "cn1-db" }), CN1_SQLITE_INIT_TIMEOUT_MS,
+        "opening the OPFS storage pool");
     } catch (err) {
       // Firefox before 111 and Safari before 15.2 have no createSyncAccessHandle.
       // Degrade to memory, but say so: silently losing every write on reload is
@@ -6518,6 +6573,12 @@ function cn1SqliteStartInit() {
  * as plaintext.
  */
 const cn1SqliteMemoryAnchors = new Map();
+
+/** Whether the last failed open failed because of the key, rather than storage or corruption. */
+let cn1SqliteLastOpenWrongKey = false;
+
+/** The message from the last failed open, for the exception the Java side raises. */
+let cn1SqliteLastOpenError = "";
 
 /** Applies the key, if there is one, selecting the portable cipher scheme first. */
 function cn1SqliteApplyKey(db, key) {
@@ -6669,18 +6730,26 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_open_java_lang_String_java_lang_String_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_open___java_lang_String_java_lang_String_R_long"],
   function(name, key) {
+    cn1SqliteLastOpenWrongKey = false;
+    cn1SqliteLastOpenError = "";
     try {
       return cn1SqliteRegister(cn1SqliteOpen(jvm.toNativeString(name), key === null ? null : jvm.toNativeString(key)));
     } catch (err) {
-      if (err && err.cn1WrongKey) {
-        // 0 means "the key did not work"; the Java side turns that into WRONG_KEY.
-        return 0;
-      }
-      // Anything else is a storage or corruption failure, which no key can resolve. Let it
-      // propagate so the caller sees what actually went wrong rather than a bogus key error.
-      throw err;
+      // Report through a sentinel and two accessors rather than by throwing. An exception raised
+      // inside a native binding does not cross back into the translated code as a Java throwable:
+      // it unwinds the worker and leaves every thread waiting on a call that never returns, which
+      // is a hang rather than an error.
+      cn1SqliteLastOpenWrongKey = !!(err && err.cn1WrongKey);
+      cn1SqliteLastOpenError = err && err.message ? String(err.message) : String(err);
+      return 0;
     }
   });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenWasWrongKey_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenWasWrongKey___R_boolean"],
+  function() { return cn1SqliteLastOpenWrongKey; });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenError_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenError___R_java_lang_String"],
+  function() { return jvm.createStringLiteral(String(cn1SqliteLastOpenError)); });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_close_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_close___long", "cn1_com_codename1_impl_html5_database_SQLiteNative_close_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_close___long_R_void"],
   function(dbId) {
