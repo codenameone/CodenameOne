@@ -69,8 +69,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
         <java-tests.version>11</java-tests.version>
-        <jcefmaven.version>135.0.20</jcefmaven.version>
-        <jcef.version>jcef-ca49ada+cef-135.0.20+ge7de5c3+chromium-135.0.7049.85</jcef.version>
+        <jcefmaven.version>146.0.10</jcefmaven.version>
+        <jcef.version>jcef-d3de827+cef-146.0.10+g8219561+chromium-146.0.7680.179</jcef.version>
         <ffmpeg.version>7.1-1.5.11</ffmpeg.version>
         <rhino.version>1.7.11</rhino.version>
         <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>

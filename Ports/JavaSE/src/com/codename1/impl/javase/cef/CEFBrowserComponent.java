@@ -128,19 +128,23 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     /**
      * Default set of Chromium features to disable via {@code --disable-features}.
      *
-     * <p>Chromium 135 (CEF 135 / JCEF 135.0.20) ships the Skia "Fontations" Rust font
-     * backend. On recent macOS it panics in its color-table code path
+     * <p>Chromium 135 (CEF 135 / JCEF 135.0.20) shipped the Skia "Fontations" Rust font
+     * backend, which panicked in its color-table code path
      * ({@code has_any_color_table} -> {@code crash_in_rust_with_overflow}) while laying
-     * out fonts, killing the simulator JVM with SIGTRAP (exit 133) as soon as a
-     * BrowserComponent paints. Disabling {@code FontationsFontBackend}
-     * (chrome://flags/#enable-fontations-backend) forces Chromium back to the FreeType
-     * backend and avoids the crash. Only the JavaSE simulator's bundled CEF is affected;
-     * the iOS (WKWebView) and Android (system WebView) ports are untouched.</p>
+     * out fonts on recent macOS, killing the simulator JVM with SIGTRAP (exit 133) as
+     * soon as a BrowserComponent painted. The underlying crash is fixed upstream in the
+     * newer Chromium bundled by CEF/JCEF (see {@code jcefmaven.version} in maven/pom.xml,
+     * now CEF 146 / Chromium 146), so this switch is no longer required. It is retained
+     * only as a low-risk safety net for the bundled font stack; disabling
+     * {@code FontationsFontBackend} (chrome://flags/#enable-fontations-backend) forces
+     * Chromium back to the FreeType backend. Only the JavaSE simulator's bundled CEF is
+     * affected; the iOS (WKWebView) and Android (system WebView) ports are untouched.</p>
      *
      * <p>Gated to macOS so Windows/Linux behavior is unchanged. Passed as a jcef arg
      * (see {@code CN1JcefRuntime.createBuilder}); Chromium propagates {@code --disable-features}
      * to the CEF helper subprocesses automatically via its FeatureList mechanism. The
-     * {@code -Dcef.disableFeatures=...} system property overrides this on any platform.</p>
+     * {@code -Dcef.disableFeatures=...} system property overrides this on any platform
+     * (an empty value disables it entirely).</p>
      */
     private static String defaultDisableFeatures() {
         return isMac ? "FontationsFontBackend" : null;
