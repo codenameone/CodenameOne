@@ -20,35 +20,41 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.android;
+package com.codename1.impl.android.cipher;
 
-import android.database.sqlite.SQLiteCursor;
-import android.database.sqlite.SQLiteCursorDriver;
-import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteProgram;
-import android.database.sqlite.SQLiteQuery;
-import android.database.sqlite.SQLiteStatement;
+import android.database.sqlite.SQLiteException;
 
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
+import com.codename1.db.DatabaseConfig;
+import com.codename1.impl.android.AndroidCursor;
 import com.codename1.impl.SQLStatementSplitter;
+
+import net.zetetic.database.sqlcipher.SQLiteCursor;
+import net.zetetic.database.sqlcipher.SQLiteCursorDriver;
+import net.zetetic.database.sqlcipher.SQLiteDatabase;
+import net.zetetic.database.sqlcipher.SQLiteProgram;
+import net.zetetic.database.sqlcipher.SQLiteQuery;
+import net.zetetic.database.sqlcipher.SQLiteStatement;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * The SQLCipher-backed database.
  *
- * @author Chen
+ * Structurally this mirrors AndroidDB, because SQLCipher deliberately mirrors
+ * android.database.sqlite. The two cannot share code: the types are source compatible but not
+ * assignment compatible, and any shared supertype referencing net.zetetic would have to live in
+ * the always-present part of the port, which is exactly what has to stay deletable.
  */
-public class AndroidDB extends Database {
+class AndroidCipherDB extends Database {
 
     private SQLiteDatabase db;
-
-    /** Cursors created from this database, invalidated when it closes. */
     private final List<AndroidCursor> openCursors = new ArrayList<AndroidCursor>();
 
-    public AndroidDB(SQLiteDatabase db) {
+    AndroidCipherDB(SQLiteDatabase db) {
         this.db = db;
     }
 
@@ -88,7 +94,6 @@ public class AndroidDB extends Database {
     public void rollbackTransaction() throws IOException {
         checkOpen();
         checkEndTransaction();
-        // Ending without setTransactionSuccessful is what rolls back.
         db.endTransaction();
     }
 
@@ -103,7 +108,7 @@ public class AndroidDB extends Database {
             inTransaction = false;
             try {
                 closing.endTransaction();
-            } catch (Exception ignored) {
+            } catch (RuntimeException ignored) {
                 // Best effort; the close below is what matters.
             }
         }
@@ -116,6 +121,20 @@ public class AndroidDB extends Database {
     }
 
     @Override
+    public void changeKey(DatabaseConfig config) throws IOException {
+        checkOpen();
+        try {
+            if (config == null || !config.isEncrypted()) {
+                db.execSQL("PRAGMA rekey = ''");
+            } else {
+                db.execSQL("PRAGMA rekey = \"" + config.resolveKeyMaterial(null) + "\"");
+            }
+        } catch (SQLiteException err) {
+            throw new IOException(err.getMessage(), err);
+        }
+    }
+
+    @Override
     public void execute(String sql) throws IOException {
         checkOpen();
         try {
@@ -123,8 +142,6 @@ public class AndroidDB extends Database {
                 db.execSQL(sql);
                 return;
             }
-            // execSQL rejects anything after the first statement, so split and run each: the
-            // portable contract is that execute(String) runs a whole script.
             String[] statements = SQLStatementSplitter.split(sql);
             for (int iter = 0; iter < statements.length; iter++) {
                 db.execSQL(statements[iter]);
@@ -144,8 +161,6 @@ public class AndroidDB extends Database {
             if (params != null) {
                 for (int i = 0; i < params.length; i++) {
                     if (params[i] == null) {
-                        // bindString rejects null, so this used to fail outright rather than
-                        // storing SQL NULL.
                         s.bindNull(i + 1);
                     } else {
                         s.bindString(i + 1, params[i]);
@@ -189,8 +204,7 @@ public class AndroidDB extends Database {
         checkOpen();
         requireSingleStatement(sql);
         try {
-            android.database.Cursor c = db.rawQuery(sql, params);
-            return wrap(c);
+            return wrap(db.rawQuery(sql, params));
         } catch (Exception e) {
             throw new IOException(e.getMessage(), e);
         }
@@ -207,11 +221,7 @@ public class AndroidDB extends Database {
             return executeQuery(sql, coerceToText(params, "executeQuery"));
         }
         try {
-            // rawQuery can only carry text arguments. Binding through a cursor factory is the
-            // supported way to get a blob into a query, and is what androidx.sqlite does.
-            android.database.Cursor c = db.rawQueryWithFactory(
-                    new BlobBindingCursorFactory(params), sql, null, null);
-            return wrap(c);
+            return wrap(db.rawQueryWithFactory(new BlobBindingCursorFactory(params), sql, null, null));
         } catch (Exception e) {
             throw new IOException(e.getMessage(), e);
         }
@@ -224,8 +234,6 @@ public class AndroidDB extends Database {
 
     private Cursor wrap(android.database.Cursor c) throws IOException {
         if (!isLegacyBehavior()) {
-            // rawQuery is lazy: without forcing the window fill here, malformed SQL surfaces from
-            // the first next() instead of from executeQuery.
             c.getCount();
         }
         AndroidCursor cursor = new AndroidCursor(c);
@@ -242,7 +250,6 @@ public class AndroidDB extends Database {
         return false;
     }
 
-    /** Binds by runtime type onto any SQLiteProgram, which covers both statements and queries. */
     private static void bind(SQLiteProgram s, Object[] params) {
         for (int i = 0; i < params.length; i++) {
             Object p = params[i];

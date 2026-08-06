@@ -10980,11 +10980,61 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public Database openOrCreateDB(String databaseName, com.codename1.db.DatabaseConfig config) throws IOException {
+        if (config == null || !config.isEncrypted()) {
+            return openOrCreateDB(databaseName);
+        }
+        // The SQLCipher-backed package is deleted at build time for apps that never touch
+        // DatabaseConfig, so it has to be reached reflectively - the same arrangement the
+        // ARCore-backed AR implementation uses.
+        try {
+            Class c = Class.forName("com.codename1.impl.android.cipher.AndroidCipherFactory");
+            java.lang.reflect.Method open = c.getMethod("open", String.class, String.class);
+            return (Database) open.invoke(null,
+                    getDatabasePath(databaseName), config.resolveKeyMaterial(databaseName));
+        } catch (java.lang.reflect.InvocationTargetException err) {
+            Throwable cause = err.getCause();
+            if (cause instanceof IOException) {
+                throw (IOException) cause;
+            }
+            throw new IOException(cause == null ? err.toString() : cause.getMessage(), cause);
+        } catch (IOException err) {
+            throw err;
+        } catch (Throwable err) {
+            throw new com.codename1.db.DatabaseEncryptionException(
+                    com.codename1.db.DatabaseEncryptionException.NOT_SUPPORTED,
+                    "This build does not include encrypted database support", err);
+        }
+    }
+
+    @Override
+    public boolean isDatabaseEncryptionSupported() {
+        try {
+            Class c = Class.forName("com.codename1.impl.android.cipher.AndroidCipherFactory");
+            return ((Boolean) c.getMethod("isAvailable").invoke(null)).booleanValue();
+        } catch (Throwable notPresent) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean isDatabaseManagedKeyHardwareBacked() {
+        // SecureStorage wraps the key with an AndroidKeyStore key, which is non-exportable and
+        // hardware backed on devices with a TEE or StrongBox.
+        return android.os.Build.VERSION.SDK_INT >= 23;
+    }
+
+    @Override
+    public boolean isBlobQueryParameterSupported() {
+        return true;
+    }
+
+    @Override
     public boolean isDatabaseCustomPathSupported() {
         return true;
     }
-    
-    
+
+
 
     @Override
     public void deleteDB(String databaseName) throws IOException {
