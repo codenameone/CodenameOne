@@ -37,6 +37,7 @@ import net.zetetic.database.sqlcipher.SQLiteProgram;
 import net.zetetic.database.sqlcipher.SQLiteQuery;
 import net.zetetic.database.sqlcipher.SQLiteStatement;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,9 +61,20 @@ class AndroidCipherDB extends Database {
      */
     private final String databaseName;
 
-    AndroidCipherDB(SQLiteDatabase db, String databaseName) {
+    /**
+     * The key this database is currently open under, empty for a plaintext file.
+     *
+     * Retained because changeKey has to know which of two very different migrations it is
+     * performing, and because the export route below has to reopen the database afterwards.
+     * SQLCipher already holds the key for the lifetime of the connection, so this adds no
+     * exposure beyond what having the database open already implies.
+     */
+    private String currentKey;
+
+    AndroidCipherDB(SQLiteDatabase db, String databaseName, String key) {
         this.db = db;
         this.databaseName = databaseName;
+        this.currentKey = key == null ? "" : key;
     }
 
     private void checkOpen() throws IOException {
@@ -195,17 +207,100 @@ class AndroidCipherDB extends Database {
     @Override
     public void changeKey(DatabaseConfig config) throws IOException {
         checkOpen();
+        String targetKey = config == null || !config.isEncrypted()
+                ? "" : config.resolveKeyMaterial(databaseName);
+        if (currentKey.length() == 0 || targetKey.length() == 0) {
+            // One side is plaintext, which rekey refuses outright.
+            migrateThroughExport(targetKey);
+            return;
+        }
+        // Quote through the shared helper: a passphrase may contain quotes, and interpolating it
+        // directly would let one change the statement.
+        String statement = "PRAGMA rekey = " + toPragmaLiteral(targetKey);
+        // rawQuery, not execSQL. This PRAGMA answers with a row, and execSQL rejects anything
+        // that returns one outright -- "Queries can be performed using SQLiteDatabase query or
+        // rawQuery methods only" -- so every re-key failed before it began. The row itself is of
+        // no interest; the cursor has to be stepped for the statement to run at all.
+        android.database.Cursor c = null;
         try {
-            if (config == null || !config.isEncrypted()) {
-                db.execSQL("PRAGMA rekey = ''");
-            } else {
-                // Quote through the shared helper: a passphrase may contain quotes, and
-                // interpolating it directly would let one change the statement.
-                db.execSQL("PRAGMA rekey = "
-                        + toPragmaLiteral(config.resolveKeyMaterial(databaseName)));
-            }
+            c = db.rawQuery(statement, null);
+            c.moveToFirst();
+            currentKey = targetKey;
         } catch (SQLiteException err) {
             throw new IOException(err.getMessage(), err);
+        } finally {
+            if (c != null) {
+                c.close();
+            }
+        }
+    }
+
+    /**
+     * Converts between plaintext and encrypted, which PRAGMA rekey cannot do.
+     *
+     * SQLCipher accepts rekey only between two encrypted states: on a plaintext database, and on
+     * a rekey to the empty key, it refuses with "PRAGMA rekey can only be run on an existing
+     * encrypted database. Use sqlcipher_export() and ATTACH to convert encrypted/plaintext
+     * databases." Both of those are exactly Database.encrypt and Database.decrypt, so this is
+     * the route both take here. The engines differ on this: the SQLite3MC build the other ports
+     * carry does rekey all three directions in place, which is why only Android needs it.
+     *
+     * sqlcipher_export copies schema and rows but not the header pragmas, so user_version is
+     * carried across explicitly; an application using it for schema versioning would otherwise
+     * silently come back as version zero.
+     *
+     * The new database is built beside the old one and swapped in only once it is complete, so a
+     * failure part way leaves the original untouched.
+     */
+    private void migrateThroughExport(String targetKey) throws IOException {
+        String path = db.getPath();
+        File target = new File(path + ".cn1migrate");
+        if (target.exists() && !target.delete()) {
+            throw new IOException("A previous migration left " + target + " behind and it could "
+                    + "not be removed");
+        }
+        int userVersion = 0;
+        try {
+            android.database.Cursor uv = db.rawQuery("PRAGMA user_version", null);
+            try {
+                if (uv.moveToFirst()) {
+                    userVersion = uv.getInt(0);
+                }
+            } finally {
+                uv.close();
+            }
+            db.execSQL("ATTACH DATABASE " + toPragmaLiteral(target.getPath())
+                    + " AS cn1migrate KEY " + toPragmaLiteral(targetKey));
+            android.database.Cursor exported = db.rawQuery("SELECT sqlcipher_export('cn1migrate')",
+                    null);
+            exported.moveToFirst();
+            exported.close();
+            db.execSQL("PRAGMA cn1migrate.user_version = " + userVersion);
+            db.execSQL("DETACH DATABASE cn1migrate");
+        } catch (RuntimeException err) {
+            target.delete();
+            throw new IOException("The database could not be converted: " + err.getMessage(), err);
+        }
+        SQLiteDatabase closing = db;
+        db = null;
+        closing.close();
+        File original = new File(path);
+        if (!original.delete() || !target.renameTo(original)) {
+            // The converted copy is intact, so say where it is rather than discarding it.
+            db = openAt(path, currentKey);
+            throw new IOException("The converted database could not replace " + path
+                    + ". The conversion itself succeeded and is at " + target);
+        }
+        currentKey = targetKey;
+        db = openAt(path, targetKey);
+    }
+
+    private SQLiteDatabase openAt(String path, String key) throws IOException {
+        try {
+            return SQLiteDatabase.openOrCreateDatabase(new File(path), key, null, null);
+        } catch (RuntimeException err) {
+            throw new IOException("The converted database could not be reopened: "
+                    + err.getMessage(), err);
         }
     }
 

@@ -269,8 +269,15 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 `Database.decrypt` is the reverse, and `Database.changeKey` re-keys a database that's already open.
-The engine performs each conversion in a single transaction, so an interruption leaves the original
-file intact, and schema metadata such as `PRAGMA user_version` survives.
+An interruption leaves the original file intact, and schema metadata such as `PRAGMA user_version`
+survives.
+
+How that's achieved differs by platform, which matters only if you're watching the filesystem. Most
+platforms re-key the file in place. Android can't: its SQLCipher engine re-keys only between two
+encrypted states and refuses to convert to or from plaintext, so the port writes the converted
+database alongside the original and swaps it in once it's complete. A `.cn1migrate` file next to
+your database means a conversion was interrupted partway; the original is still the live one, and
+the leftover is cleaned up on the next attempt.
 
 ===== The on-disk format
 

@@ -126,7 +126,7 @@ public class AndroidCipherFactory {
             // would not surface until some later and apparently unrelated query. This read is the
             // only failure here that actually means the key is wrong.
             db.rawQuery("SELECT count(*) FROM sqlite_master", null).close();
-            return new AndroidCipherDB(db, databaseName);
+            return new AndroidCipherDB(db, databaseName, key);
         } catch (RuntimeException err) {
             try {
                 db.close();
