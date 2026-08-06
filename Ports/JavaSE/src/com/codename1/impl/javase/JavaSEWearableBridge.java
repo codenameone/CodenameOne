@@ -224,6 +224,14 @@ class JavaSEWearableBridge implements WearableBridge {
     // --- replicated data ----------------------------------------------------
 
     public void putData(String path, byte[] payload) {
+        // Under writeLock, so the tombstone housekeeping cannot delete a record this call is in
+        // the middle of replacing. See pruneOwnTombstones.
+        synchronized (writeLock) {
+            putDataLocked(path, payload);
+        }
+    }
+
+    private void putDataLocked(String path, byte[] payload) {
         // The tombstone goes FIRST, before the value it is being replaced by.
         //
         // Removing it afterwards leaves an interval in which both records exist, and the peer scans
@@ -366,6 +374,14 @@ class JavaSEWearableBridge implements WearableBridge {
     }
 
     public void removeData(String path) {
+        // Under writeLock, so the tombstone housekeeping cannot delete a record this call is in
+        // the middle of replacing. See pruneOwnTombstones.
+        synchronized (writeLock) {
+            removeDataLocked(path);
+        }
+    }
+
+    private void removeDataLocked(String path) {
         File f = dataFile(path);
         if (f.isFile() && !f.delete()) {
             // The value is still there. Publishing the tombstone anyway would leave BOTH durable,
@@ -877,6 +893,13 @@ class JavaSEWearableBridge implements WearableBridge {
             return;
         }
         lastTombPrune = now;
+        synchronized (writeLock) {
+            pruneOwnTombstones(files, now);
+        }
+    }
+
+    /// Caller holds {@link #writeLock}, so this side cannot publish or remove underneath the pass.
+    private void pruneOwnTombstones(File[] files, long now) {
         // Birth stamp alongside the file, because BOTH decisions here are about age and neither
         // can be answered from the name. Decoded from the frame: the stamp encodes
         // wallMillis * 2 + sideBit, and comparing it undecoded reads as about minus fifty-seven
@@ -900,13 +923,12 @@ class JavaSEWearableBridge implements WearableBridge {
             }
             long born = framedStamp(snapshot);
             own.add(f);
-            bornAt.put(f.getName(), Long.valueOf(born == Long.MIN_VALUE
-                    ? f.lastModified() : born / 2));
+            bornAt.put(f.getName(), Long.valueOf(tombstoneVersion(snapshot, f)));
             // Acknowledged AND past its window: the peer has seen this removal, so keeping the
             // record no longer protects anyone.
             if (acknowledges(new File(dataDir, f.getName() + ACK_SUFFIX), born)
                     && now - bornAt.get(f.getName()).longValue() > TOMB_TTL_MILLIS) {
-                retireTombstone(f);
+                retireTombstone(f, bornAt.get(f.getName()).longValue());
                 own.remove(own.size() - 1);
             }
         }
@@ -924,12 +946,33 @@ class JavaSEWearableBridge implements WearableBridge {
             }
         });
         for (int i = 0; i < own.size() - MAX_TOMBS; i++) {
-            retireTombstone(own.get(i));
+            retireTombstone(own.get(i), bornAt.get(own.get(i).getName()).longValue());
         }
     }
 
-    /// Deletes a tombstone and its acknowledgement, and forgets both markers.
-    private void retireTombstone(File tomb) {
+    /// Deletes a tombstone and its acknowledgement, and forgets both markers -- but only while the
+    /// file is still the VERSION this pass examined.
+    ///
+    /// A tombstone is identified by its path, so a path removed, republished and removed again
+    /// reuses the same file name. Between reading a tombstone here and deleting it, those two calls
+    /// can replace it, and an unguarded delete then destroyed a removal made moments ago while
+    /// vouching for the one it had actually inspected. The offline peer the tombstone exists for
+    /// would have missed that second removal entirely.
+    ///
+    /// {@link #writeLock} serialises this against this JVM's own putData and removeData. The peer
+    /// is a different process and no lock reaches it, which is why the version is re-read here as
+    /// well: it cannot make the delete atomic, but it closes the window to the interval between
+    /// this check and the delete itself, rather than the whole pass.
+    private void retireTombstone(File tomb, long expected) {
+        byte[] current;
+        try {
+            current = readFully(tomb);
+        } catch (IOException alreadyGone) {
+            return;
+        }
+        if (tombstoneVersion(current, tomb) != expected) {
+            return;
+        }
         File ack = new File(dataDir, tomb.getName() + ACK_SUFFIX);
         tomb.delete();
         ack.delete();
@@ -938,6 +981,24 @@ class JavaSEWearableBridge implements WearableBridge {
             seenData.remove(ack.getName());
         }
     }
+
+    /// A tombstone's birth time in wall-clock millis, from the stamp inside it.
+    ///
+    /// Falls back to the mtime for a file with no frame -- setLastModified can be refused outright,
+    /// so that is a guess, but it is the only answer available for a file this build did not write.
+    private static long tombstoneVersion(byte[] snapshot, File f) {
+        long born = framedStamp(snapshot);
+        return born == Long.MIN_VALUE ? f.lastModified() : born / 2;
+    }
+
+    /// Serialises this side's tombstone housekeeping against its own publications and removals.
+    ///
+    /// The pass reads a tombstone, decides it is retirable and then deletes it, and putData /
+    /// removeData run on application threads with no relation to the scanner. Without this a
+    /// republish-and-remove landing in that gap had its FRESH tombstone deleted on the strength of
+    /// the old one's acknowledgement. It does not reach the peer JVM -- see retireTombstone, which
+    /// re-reads the version for that.
+    private final Object writeLock = new Object();
 
     /// When the tombstone pass last ran. It reads every tombstone, and the scan it hangs off runs
     /// twice a second.
