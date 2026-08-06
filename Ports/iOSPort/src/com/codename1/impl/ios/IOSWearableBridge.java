@@ -51,14 +51,27 @@ final class IOSWearableBridge implements WearableBridge {
         // so the entry is otherwise treated as unchanged forever and the app never sees it -- there
         // is no per-path redelivery to fall back on. Forgetting makes the next context update look
         // new. Runs after the drain, so the re-offer meets a listener.
-        WearableConnection.setDroppedDeliveryHandler(
-                new WearableConnection.DroppedDeliveryHandler() {
-                    public void deliveryDropped(String path) {
-                        // A null path is the rescan request; the native side reads it as "forget
-                        // every received marker" and re-runs the delivery over the held context.
-                        nativeInstance.wearableForgetReceived(path);
-                    }
-                });
+        WearableConnection.setDroppedDeliveryHandler(new DroppedDelivery(nativeInstance));
+    }
+
+    /// Named and STATIC, not an anonymous inner class.
+    ///
+    /// It needs the natives and nothing else, but an anonymous class declared in the constructor
+    /// also captures the enclosing bridge -- and this one is handed straight to a static registry,
+    /// so it published `this` before the constructor had finished and then pinned the bridge for
+    /// the life of the process. Naming it costs six lines and removes both.
+    private static final class DroppedDelivery implements WearableConnection.DroppedDeliveryHandler {
+        private final IOSNative nativeInstance;
+
+        DroppedDelivery(IOSNative nativeInstance) {
+            this.nativeInstance = nativeInstance;
+        }
+
+        public void deliveryDropped(String path) {
+            // A null path is the rescan request; the native side reads it as "forget every
+            // received marker" and re-runs the delivery over the held context.
+            nativeInstance.wearableForgetReceived(path);
+        }
     }
 
     public boolean isSupported() {

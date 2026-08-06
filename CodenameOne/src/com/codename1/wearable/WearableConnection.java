@@ -912,6 +912,21 @@ public final class WearableConnection {
 
     /// Set when the dropped-path set overflowed, so the port is asked for a full rescan instead of
     /// a list of paths it can no longer be given. Read and cleared with [#droppedPaths]'s monitor.
+    /// Takes the overflow flag and clears it.
+    ///
+    /// Synchronized on {@link #pendingData} by NAME even though the caller already holds that
+    /// monitor -- this runs only while draining pendingData itself, so the acquisition is reentrant
+    /// and nothing changes at runtime. The caller locks a queue it received as a parameter, which
+    /// merely happens to alias the static field, and a guard that depends on an alias is one a
+    /// reader cannot check and a static analyzer must assume is broken.
+    private static boolean takeRescanRequest() {
+        synchronized (pendingData) {
+            boolean requested = rescanRequested;
+            rescanRequested = false;
+            return requested;
+        }
+    }
+
     private static boolean rescanRequested;
 
     /// Actions a port asked to run once deliveries can actually reach a listener, keyed so repeated
@@ -968,8 +983,7 @@ public final class WearableConnection {
             if (queue == pendingData && droppedDeliveries != null && !droppedPaths.isEmpty()) {
                 dropped = new ArrayList<String>(droppedPaths);
                 droppedPaths.clear();
-                if (rescanRequested) {
-                    rescanRequested = false;
+                if (takeRescanRequest()) {
                     // A null path is the rescan request: more was lost than can be named.
                     dropped.add(null);
                 }
