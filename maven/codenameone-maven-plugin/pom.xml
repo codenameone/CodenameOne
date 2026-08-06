@@ -272,7 +272,7 @@
                  'standalone' classifier is not attached until cn1-hardening's package/shade. The
                  shaded jar itself is pulled by maven-dependency-plugin at prepare-package (below).
                  provided + optional + a wildcard exclusion keep cn1-hardening's classes and its
-                 ProGuard/ASM off this plugin's classpath -- the engine is only ever forked. -->
+                 ProGuard/ASM off this plugin's classpath (the engine is only ever forked). -->
             <scope>provided</scope>
             <optional>true</optional>
             <exclusions>
