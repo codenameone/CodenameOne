@@ -176,12 +176,11 @@ class LinuxDatabase extends Database {
 
     @Override
     public void execute(String sql, Object... params) throws IOException {
-        if (params == null || params.length == 0) {
-            // An explicitly empty array is still a parameterized call, so it is held to the
-            // single-statement rule; only a null array means "no parameters at all".
-            if (params != null) {
-                requireSingleStatement(sql);
-            }
+        if (params == null) {
+            // Only a null array means "no parameters at all". An explicitly empty one is still a
+            // parameterized call, so it goes down the path below and is held to both the
+            // single-statement rule and the parameter count -- otherwise
+            // execute("INSERT ... VALUES (?)", new Object[0]) would run with the slot unbound.
             execute(sql);
             return;
         }

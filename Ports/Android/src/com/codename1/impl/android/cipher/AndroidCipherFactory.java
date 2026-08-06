@@ -68,6 +68,21 @@ public class AndroidCipherFactory {
     }
 
     /**
+     * Restores a database whose conversion was interrupted between the two renames.
+     *
+     * AndroidCipherDB moves the original aside before installing the converted file, so if the
+     * process dies in that gap the live name is missing while a complete database sits under the
+     * backup name. Opening then would create an empty database and the real data would be
+     * removed by the next conversion. Putting it back first makes that window recoverable.
+     */
+    private static void recoverInterruptedMigration(File file) {
+        File backup = new File(file.getPath() + AndroidCipherDB.BACKUP_SUFFIX);
+        if (backup.isFile() && !file.exists()) {
+            backup.renameTo(file);
+        }
+    }
+
+    /**
      * Recognises the engine's "this is not a SQLite database" report.
      *
      * That is what a SQLCipher database decrypted with the wrong key looks like: the plaintext it
@@ -104,6 +119,7 @@ public class AndroidCipherFactory {
         if (parent != null && !parent.exists()) {
             parent.mkdirs();
         }
+        recoverInterruptedMigration(file);
         SQLiteDatabase db = null;
         try {
             db = SQLiteDatabase.openOrCreateDatabase(file, key, null, null);
@@ -133,8 +149,13 @@ public class AndroidCipherFactory {
             } catch (RuntimeException ignored) {
                 // The original failure is the one worth reporting.
             }
-            throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
-                    "The supplied key does not decrypt this database", err);
+            if (isNotADatabase(err)) {
+                throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
+                        "The supplied key does not decrypt this database", err);
+            }
+            // A malformed image or a read error reaches here too, and no key repairs either.
+            throw new IOException("The database " + path + " could not be read: "
+                    + err.getMessage(), err);
         }
     }
 }

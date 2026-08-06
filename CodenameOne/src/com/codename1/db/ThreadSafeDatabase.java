@@ -186,14 +186,19 @@ public class ThreadSafeDatabase extends Database {
         // including immediately after a successful begin -- and a caller trusting it would skip
         // the commit or rollback it still owed.
         //
-        // Read directly rather than through the worker. This is the one method on Database with
-        // no IOException, so it reads as a cheap accessor and callers poll it from the event
-        // thread; routing it through the dispatch would block that thread behind whatever
-        // statement is currently running, which on Android is an ANR. The value is a single
-        // boolean written by the same worker that runs every transaction call, so the worst a
-        // racing read sees is the state from immediately before or after a transition -- which
-        // is all a caller on another thread could ever know anyway.
-        return underlying.isInTransaction();
+        // Read under the dispatch lock, but without handing work to the worker. The lock is what
+        // publishes the write: every transaction call runs inside it, so acquiring it here gives
+        // the happens-before that a plain read of another thread's field does not, and without it
+        // a polling thread could keep seeing stale state indefinitely.
+        //
+        // Deliberately not a dispatch. This is the one method on Database with no IOException, so
+        // it reads as a cheap accessor and callers poll it from the event thread; queueing work
+        // would park that thread behind whatever statement is running, which on Android is an
+        // ANR. Taking the lock can still wait for an in-flight call, but only for as long as that
+        // call holds it, and the answer is then current rather than stale.
+        synchronized (dispatchLock) {
+            return underlying.isInTransaction();
+        }
     }
 
     @Override

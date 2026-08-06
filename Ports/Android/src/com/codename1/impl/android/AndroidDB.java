@@ -227,12 +227,11 @@ public class AndroidDB extends Database {
 
     @Override
     public void execute(String sql, Object... params) throws IOException {
-        if (params == null || params.length == 0) {
-            // An explicitly empty array is still a parameterized call, so it is held to the
-            // single-statement rule; only a null array means "no parameters at all".
-            if (params != null) {
-                requireSingleStatement(sql);
-            }
+        if (params == null) {
+            // Only a null array means "no parameters at all". An explicitly empty one is still a
+            // parameterized call, so it goes down the path below and is held to both the
+            // single-statement rule and the parameter count -- otherwise
+            // execute("INSERT ... VALUES (?)", new Object[0]) would run with the slot unbound.
             execute(sql);
             return;
         }
@@ -314,7 +313,19 @@ public class AndroidDB extends Database {
         if (!isLegacyBehavior()) {
             // rawQuery is lazy: without forcing the window fill here, malformed SQL surfaces from
             // the first next() instead of from executeQuery.
-            c.getCount();
+            try {
+                c.getCount();
+            } catch (RuntimeException err) {
+                // Compiling or filling failed, so this cursor is never handed out and never
+                // registered - closing it here is the only chance to release the query and the
+                // database reference it holds.
+                try {
+                    c.close();
+                } catch (RuntimeException ignored) {
+                    // The compile failure is the one worth reporting.
+                }
+                throw err;
+            }
         }
         final AndroidCursor cursor = new AndroidCursor(c);
         cursor.setCloseListener(new AndroidCursor.CloseListener() {

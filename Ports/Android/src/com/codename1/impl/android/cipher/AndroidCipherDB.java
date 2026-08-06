@@ -249,9 +249,13 @@ class AndroidCipherDB extends Database {
      * carried across explicitly; an application using it for schema versioning would otherwise
      * silently come back as version zero.
      *
-     * The new database is built beside the old one and swapped in only once it is complete, so a
-     * failure part way leaves the original untouched.
+     * The new database is built beside the old one and swapped in only once it is complete. The
+     * original is renamed aside rather than deleted, so a complete database exists under one of
+     * the two names at every instant; AndroidCipherFactory recovers from the backup if the
+     * process dies in the gap.
      */
+    static final String BACKUP_SUFFIX = ".cn1backup";
+
     private void migrateThroughExport(String targetKey) throws IOException {
         String path = db.getPath();
         File target = new File(path + ".cn1migrate");
@@ -285,12 +289,28 @@ class AndroidCipherDB extends Database {
         db = null;
         closing.close();
         File original = new File(path);
-        if (!original.delete() || !target.renameTo(original)) {
-            // The converted copy is intact, so say where it is rather than discarding it.
+        File backup = new File(path + BACKUP_SUFFIX);
+        backup.delete();
+        // Move the original aside rather than deleting it. Deleting first leaves a window where
+        // the only copy of the data is the converted file under a name nothing looks for: a
+        // process kill there strands it, the next open creates an empty database in its place,
+        // and the migration after that removes the stranded copy as stale leftovers. Renaming
+        // means there is a complete database under one of the two names at every instant.
+        if (!original.renameTo(backup)) {
+            target.delete();
+            db = openAt(path, currentKey);
+            throw new IOException("The database " + path + " could not be moved aside, so it was "
+                    + "left as it was and not converted");
+        }
+        if (!target.renameTo(original)) {
+            // Put it back exactly as it was.
+            backup.renameTo(original);
+            target.delete();
             db = openAt(path, currentKey);
             throw new IOException("The converted database could not replace " + path
-                    + ". The conversion itself succeeded and is at " + target);
+                    + ", so the original was restored and nothing was converted");
         }
+        backup.delete();
         currentKey = targetKey;
         db = openAt(path, targetKey);
     }
@@ -350,12 +370,11 @@ class AndroidCipherDB extends Database {
 
     @Override
     public void execute(String sql, Object... params) throws IOException {
-        if (params == null || params.length == 0) {
-            // An explicitly empty array is still a parameterized call, so it is held to the
-            // single-statement rule; only a null array means "no parameters at all".
-            if (params != null) {
-                requireSingleStatement(sql);
-            }
+        if (params == null) {
+            // Only a null array means "no parameters at all". An explicitly empty one is still a
+            // parameterized call, so it goes down the path below and is held to both the
+            // single-statement rule and the parameter count -- otherwise
+            // execute("INSERT ... VALUES (?)", new Object[0]) would run with the slot unbound.
             execute(sql);
             return;
         }
@@ -429,7 +448,18 @@ class AndroidCipherDB extends Database {
 
     private Cursor wrap(android.database.Cursor c) throws IOException {
         if (!isLegacyBehavior()) {
-            c.getCount();
+            // Eager, so malformed SQL is reported from executeQuery rather than from next().
+            try {
+                c.getCount();
+            } catch (RuntimeException err) {
+                // Never handed out and never registered, so this is the only chance to release it.
+                try {
+                    c.close();
+                } catch (RuntimeException ignored) {
+                    // The compile failure is the one worth reporting.
+                }
+                throw err;
+            }
         }
         final AndroidCursor cursor = new AndroidCursor(c);
         cursor.setCloseListener(new AndroidCursor.CloseListener() {

@@ -6488,6 +6488,16 @@ function cn1SqliteLookup(id) {
 const CN1_SQLITE_INIT_TIMEOUT_MS = 15000;
 
 /**
+ * Slots in the OPFS access-handle pool.
+ *
+ * The pool preallocates a fixed number of file handles and throws "SAH pool is full" once they
+ * are taken, so the default of six is a hard ceiling on databases -- and journal files take slots
+ * of their own, so the real ceiling is lower than it looks. Slots are cheap, an empty one is an
+ * unused zero length file, so this is set well above what an application is likely to need.
+ */
+const CN1_SQLITE_POOL_CAPACITY = 64;
+
+/**
  * Rejects if the given promise has not settled in time.
  *
  * Neither step of the bring-up is guaranteed to settle at all. Acquiring a synchronous OPFS
@@ -6547,7 +6557,8 @@ function cn1SqliteStartInit() {
     }
     try {
       cn1SqlitePool = await cn1SqliteWithin(
-        cn1Sqlite.installOpfsSAHPoolVfs({ name: "cn1-db" }), CN1_SQLITE_INIT_TIMEOUT_MS,
+        cn1Sqlite.installOpfsSAHPoolVfs({ name: "cn1-db", initialCapacity: CN1_SQLITE_POOL_CAPACITY }),
+        CN1_SQLITE_INIT_TIMEOUT_MS,
         "opening the OPFS storage pool");
     } catch (err) {
       // Firefox before 111 and Safari before 15.2 have no createSyncAccessHandle.
@@ -6592,6 +6603,19 @@ function cn1SqliteApplyKey(db, key) {
 }
 
 /**
+ * Recognises the engine's report for a file whose header did not decrypt.
+ *
+ * SQLite answers SQLITE_NOTADB for a wrong key, because the bytes it produces are not a database
+ * header. A corrupt image reports SQLITE_CORRUPT instead, which no key can fix.
+ */
+function cn1SqliteLooksLikeAKeyFailure(err) {
+  const message = String((err && err.message) || err || "").toLowerCase();
+  return message.indexOf("not a database") >= 0
+      || message.indexOf("notadb") >= 0
+      || message.indexOf("file is encrypted") >= 0;
+}
+
+/**
  * Applies the key and proves it works, tagging a failure as a key failure.
  *
  * Only this step can fail because of the key. Opening the file, the pool and the VFS can all fail
@@ -6607,10 +6631,11 @@ function cn1SqliteApplyKeyAndProbe(db, key) {
     // also succeeds: without this, opening one without a key would look like proof it is plaintext.
     db.exec("SELECT count(*) FROM sqlite_master");
   } catch (err) {
-    // Only tag when a key was actually supplied. The probe also fails on a corrupt or truncated
-    // plaintext file, and reporting that as a wrong key to a caller who supplied none is a
-    // diagnosis that is impossible on its face.
-    if (keyed && err && typeof err === "object") {
+    // A wrong key looks like a file that is not a database, because the plaintext it produces has
+    // no valid header. A malformed image or a read error is a different thing entirely and no key
+    // repairs it, so only the first is tagged - and only when a key was actually supplied, since
+    // reporting a key problem to a caller who supplied none is a diagnosis impossible on its face.
+    if (keyed && cn1SqliteLooksLikeAKeyFailure(err) && err && typeof err === "object") {
       err.cn1WrongKey = true;
     }
     throw err;

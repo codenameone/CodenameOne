@@ -126,9 +126,12 @@ class DatabaseLegacyDefaultTest {
         String property = executor.databaseLegacyStubProperty(antRequest(), true);
         assertTrue(property.contains("setProperty(\"db.legacy\", \"true\")"), property);
 
-        // The launcher variant runs before Display exists, so it must not go through it.
+        // The launcher variant runs before Display exists, so it must not go through it, and it
+        // reaches the switch reflectively so it still compiles against a core that predates it.
         String call = executor.databaseLegacyStubCall(antRequest(), true);
-        assertTrue(call.contains("Database.setLegacyBehavior(true)"), call);
+        assertTrue(call.contains("setLegacyBehavior"), call);
+        assertTrue(call.contains("Class.forName"), call);
+        assertTrue(call.contains("catch (Throwable"), call);
         assertFalse(call.contains("Display"), call);
     }
 }

@@ -657,9 +657,12 @@ public abstract class Executor {
 
     /// The same decision, for a stub that runs before `Display` exists.
     ///
-    /// `Database.setLegacyBehavior` is a plain static and needs no display, so a launcher that
-    /// only hands control to the bootstrap can still apply the switch. Referencing `Database`
-    /// pins the class, which is why this is emitted only for an application that already uses it.
+    /// Reflective rather than a direct call. The JavaScript staging directory holds the
+    /// framework's own classes alongside the application's, so a scan of it cannot tell whether
+    /// the application uses the database -- it always appears to. And an Ant project may be
+    /// pinned to a core that predates `setLegacyBehavior`, where a direct call would not compile.
+    /// Going through reflection makes both harmless: the call pins no class for the optimizer and
+    /// degrades to a no-op on a core without the method.
     ///
     /// #### Parameters
     ///
@@ -673,7 +676,13 @@ public abstract class Executor {
         if (!isDatabaseLegacyMode(request, usesDatabase)) {
             return "";
         }
-        return "        com.codename1.db.Database.setLegacyBehavior(true);\n";
+        return "        try {\n"
+             + "            Class.forName(\"com.codename1.db.Database\")\n"
+             + "                .getMethod(\"setLegacyBehavior\", boolean.class)\n"
+             + "                .invoke(null, Boolean.TRUE);\n"
+             + "        } catch (Throwable __dbLegacyUnavailable) {\n"
+             + "            // A core without the compatibility switch has nothing to restore.\n"
+             + "        }\n";
     }
 
     protected void scanClassesForPermissions(File directory, final ClassScanner scanner) throws IOException {
