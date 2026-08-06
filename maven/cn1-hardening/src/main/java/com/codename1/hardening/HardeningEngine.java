@@ -48,8 +48,36 @@ public final class HardeningEngine {
 
     public static final String ENGINE_VERSION = "1.0.0";
     public static final String PROGUARD_VERSION = "7.3.2";
+    /** Highest Java feature version whose class files ProGuard 7.3.2 can read. */
+    public static final int PROGUARD_MAX_JDK = 20;
 
     private HardeningEngine() {
+    }
+
+    /**
+     * Whether ProGuard can run on the current JVM. 7.3.2 cannot read class files newer than
+     * JDK 20 (it fails on the JDK's own module classes), so renaming must run on JDK 8-20 --
+     * the cloud daemon forks the engine on JDK 17. String encryption and control flow have no
+     * such limit.
+     */
+    public static boolean proguardCanRunHere() {
+        return currentJdkFeature() <= PROGUARD_MAX_JDK;
+    }
+
+    static int currentJdkFeature() {
+        String v = System.getProperty("java.specification.version", "1.8");
+        if (v.startsWith("1.")) {
+            v = v.substring(2);
+        }
+        int dot = v.indexOf('.');
+        if (dot >= 0) {
+            v = v.substring(0, dot);
+        }
+        try {
+            return Integer.parseInt(v.trim());
+        } catch (NumberFormatException e) {
+            return 8;
+        }
     }
 
     public static String engineVersion() {
@@ -101,6 +129,12 @@ public final class HardeningEngine {
         File mappingFile = req.getMappingFile();
 
         if (cfg.isRenameEnabled()) {
+            if (!proguardCanRunHere()) {
+                throw new HardeningException("App hardening's renamer (ProGuard " + PROGUARD_VERSION
+                        + ") must run on JDK 8-" + PROGUARD_MAX_JDK + ", but this JVM is JDK "
+                        + currentJdkFeature() + ". The Codename One build server runs the engine on "
+                        + "JDK 17; for a local hardened build, run it on JDK 8-" + PROGUARD_MAX_JDK + ".");
+            }
             File dict = new File(workDir, "cn1-dict.txt");
             Cn1NameFactory.writeDictionary(dict, Cn1NameFactory.dictionarySizeFor(classesIn));
             File renamedJar = new File(workDir, "renamed.jar");
