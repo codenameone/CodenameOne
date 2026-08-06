@@ -68,6 +68,27 @@ public class AndroidCipherFactory {
     }
 
     /**
+     * Recognises the engine's "this is not a SQLite database" report.
+     *
+     * That is what a SQLCipher database decrypted with the wrong key looks like: the plaintext it
+     * produces is not a valid header. Matched on the message because the engine raises a plain
+     * SQLiteException here rather than a subclass that would distinguish it.
+     */
+    private static boolean isNotADatabase(Throwable err) {
+        for (Throwable t = err; t != null; t = t.getCause()) {
+            String message = t.getMessage();
+            if (message != null) {
+                String lower = message.toLowerCase();
+                if (lower.indexOf("not a database") >= 0 || lower.indexOf("notadb") >= 0
+                        || lower.indexOf("file is encrypted") >= 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Opens an encrypted database.
      *
      * @param path absolute path to the database file
@@ -87,9 +108,16 @@ public class AndroidCipherFactory {
         try {
             db = SQLiteDatabase.openOrCreateDatabase(file, key, null, null);
         } catch (RuntimeException err) {
-            // An unwritable directory, a full disk or any other filesystem failure lands here,
-            // and no key can solve it. Reporting WRONG_KEY would send an application that follows
-            // the error codes into prompting for a different passphrase forever.
+            // Two very different failures arrive here. Opening reads page one to settle the page
+            // size, so a wrong key surfaces as "file is not a database" during the open itself
+            // rather than waiting for the probe below - the same place the simulator's driver
+            // reports it. Everything else is a filesystem failure that no key can solve, and
+            // reporting that as WRONG_KEY would send an application following the error codes
+            // into prompting for a passphrase forever.
+            if (isNotADatabase(err)) {
+                throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
+                        "The supplied key does not decrypt this database", err);
+            }
             throw new IOException("The database " + path + " could not be opened: "
                     + err.getMessage(), err);
         }

@@ -259,6 +259,14 @@ public class AndroidDB extends Database {
         requireSingleStatement(sql);
         checkParameterCount(sql, params == null ? 0 : params.length);
         try {
+            if (params != null && !isLegacyBehavior() && hasNull(params)) {
+                // rawQuery binds through bindString, which rejects null outright rather than
+                // storing SQL NULL. The Object[] overload already binds null correctly, so
+                // without this the same query behaves differently depending only on the declared
+                // type of the array it was handed.
+                return wrap(db.rawQueryWithFactory(new BlobBindingCursorFactory(params), sql,
+                        null, null));
+            }
             android.database.Cursor c = db.rawQuery(sql, params);
             return wrap(c);
         } catch (Exception e) {
@@ -277,9 +285,11 @@ public class AndroidDB extends Database {
         checkOpen();
         requireSingleStatement(sql);
         checkParameterCount(sql, params.length);
-        if (isLegacyBehavior()) {
+        if (isLegacyBehavior() && !hasBlob(params)) {
             // rawQuery can only carry text, which is what this port used to do to every query
-            // argument whatever its type.
+            // argument whatever its type. A blob still goes through the factory even here: blob
+            // query parameters used to throw on every port, so nothing can depend on that and
+            // the compatibility switch deliberately does not cover it.
             return executeQuery(sql, coerceToText(params, "executeQuery"));
         }
         try {
@@ -315,6 +325,24 @@ public class AndroidDB extends Database {
         });
         openCursors.add(cursor);
         return cursor;
+    }
+
+    private static boolean hasNull(Object[] params) {
+        for (int iter = 0; iter < params.length; iter++) {
+            if (params[iter] == null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasBlob(Object[] params) {
+        for (int iter = 0; iter < params.length; iter++) {
+            if (params[iter] instanceof byte[]) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Binds by runtime type onto any SQLiteProgram, which covers both statements and queries. */

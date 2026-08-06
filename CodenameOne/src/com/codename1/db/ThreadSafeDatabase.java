@@ -185,18 +185,15 @@ public class ThreadSafeDatabase extends Database {
         // flag, not this wrapper's. Without delegating, the wrapper always reported false --
         // including immediately after a successful begin -- and a caller trusting it would skip
         // the commit or rollback it still owed.
-        synchronized (dispatchLock) {
-            if (closed) {
-                return false;
-            }
-            Boolean state = (Boolean) et.run(new RunnableWithResultSync<Boolean>() {
-                @Override
-                public Boolean run() {
-                    return Boolean.valueOf(underlying.isInTransaction());
-                }
-            });
-            return state != null && state.booleanValue();
-        }
+        //
+        // Read directly rather than through the worker. This is the one method on Database with
+        // no IOException, so it reads as a cheap accessor and callers poll it from the event
+        // thread; routing it through the dispatch would block that thread behind whatever
+        // statement is currently running, which on Android is an ANR. The value is a single
+        // boolean written by the same worker that runs every transaction call, so the worst a
+        // racing read sees is the state from immediately before or after a transition -- which
+        // is all a caller on another thread could ever know anyway.
+        return underlying.isInTransaction();
     }
 
     @Override
@@ -523,12 +520,15 @@ public class ThreadSafeDatabase extends Database {
 
         @Override
         public int getCount() throws IOException {
-            return ((Integer) invokeWithException(new RunnableWithResponseOrIOException() {
+            Integer count = (Integer) invokeWithException(new RunnableWithResponseOrIOException() {
                 @Override
                 public Object run() throws IOException {
                     return Integer.valueOf(Database.count(underlyingCursor));
                 }
-            })).intValue();
+            });
+            // -1 is the documented "cannot say cheaply" answer, so it is also the right answer if
+            // the dispatch ever hands back nothing.
+            return count == null ? -1 : count.intValue();
         }
 
         @Override

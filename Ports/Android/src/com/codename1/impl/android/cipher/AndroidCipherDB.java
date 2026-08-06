@@ -287,6 +287,12 @@ class AndroidCipherDB extends Database {
         requireSingleStatement(sql);
         checkParameterCount(sql, params == null ? 0 : params.length);
         try {
+            if (params != null && !isLegacyBehavior() && hasNull(params)) {
+                // rawQuery binds through bindString, which rejects null outright rather than
+                // storing SQL NULL. See AndroidDB for the full reasoning.
+                return wrap(db.rawQueryWithFactory(new BlobBindingCursorFactory(params), sql,
+                        null, null));
+            }
             return wrap(db.rawQuery(sql, params));
         } catch (Exception e) {
             throw new IOException(e.getMessage(), e);
@@ -304,9 +310,11 @@ class AndroidCipherDB extends Database {
         checkOpen();
         requireSingleStatement(sql);
         checkParameterCount(sql, params.length);
-        if (isLegacyBehavior()) {
+        if (isLegacyBehavior() && !hasBlob(params)) {
             // rawQuery can only carry text, which is what this port used to do to every query
-            // argument whatever its type.
+            // argument whatever its type. A blob still goes through the factory even here: blob
+            // query parameters used to throw on every port, so nothing can depend on that and
+            // the compatibility switch deliberately does not cover it.
             return executeQuery(sql, coerceToText(params, "executeQuery"));
         }
         try {
@@ -337,6 +345,24 @@ class AndroidCipherDB extends Database {
         });
         openCursors.add(cursor);
         return cursor;
+    }
+
+    private static boolean hasNull(Object[] params) {
+        for (int iter = 0; iter < params.length; iter++) {
+            if (params[iter] == null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasBlob(Object[] params) {
+        for (int iter = 0; iter < params.length; iter++) {
+            if (params[iter] instanceof byte[]) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void bind(SQLiteProgram s, Object[] params) {

@@ -285,6 +285,9 @@ class DatabaseImpl extends Database {
     }
 
     private void checkParameterCount(long stmt, int supplied) throws IOException {
+        if (isLegacyBehavior()) {
+            return;
+        }
         int declared = IOSImplementation.nativeInstance.sqlStmtParameterCount(stmt);
         if (declared != supplied) {
             IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);

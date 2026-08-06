@@ -6530,7 +6530,6 @@ function cn1SqliteApplyKey(db, key) {
   }
 }
 
-/** Opens a database by name, through the pool when one is available. */
 /**
  * Applies the key and proves it works, tagging a failure as a key failure.
  *
@@ -6540,26 +6539,36 @@ function cn1SqliteApplyKey(db, key) {
  * when it never supplied one.
  */
 function cn1SqliteApplyKeyAndProbe(db, key) {
+  const keyed = key !== null && key !== undefined && key !== "";
   try {
     cn1SqliteApplyKey(db, key);
     // Read the schema either way. Key validation is lazy, so an unkeyed open of an encrypted file
     // also succeeds: without this, opening one without a key would look like proof it is plaintext.
     db.exec("SELECT count(*) FROM sqlite_master");
   } catch (err) {
-    if (err && typeof err === "object") {
+    // Only tag when a key was actually supplied. The probe also fails on a corrupt or truncated
+    // plaintext file, and reporting that as a wrong key to a caller who supplied none is a
+    // diagnosis that is impossible on its face.
+    if (keyed && err && typeof err === "object") {
       err.cn1WrongKey = true;
     }
     throw err;
   }
 }
 
+/** Opens a database by name, through the pool when one is available. */
 function cn1SqliteOpen(name, key) {
   if (cn1SqlitePool) {
     const pooled = new cn1SqlitePool.OpfsSAHPoolDb(cn1SqliteDbPath(name));
     try {
       cn1SqliteApplyKeyAndProbe(pooled, key);
     } catch (err) {
-      pooled.close();
+      try {
+        pooled.close();
+      } catch (ignored) {
+        // Must not replace the tagged error: doing so would lose the wrong-key classification
+        // and surface a raw close failure instead.
+      }
       throw err;
     }
     return pooled;

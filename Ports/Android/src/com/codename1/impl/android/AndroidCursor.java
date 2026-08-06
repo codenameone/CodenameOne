@@ -53,7 +53,9 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     private CloseListener closeListener;
 
     /** Lets the owning database drop a cursor from its list once it closes. */
-    interface CloseListener {
+    /// Public because the SQLCipher-backed database lives in a sub-package: it is deleted at
+    /// build time for applications that never encrypt, so it cannot sit alongside this class.
+    public interface CloseListener {
         void cursorClosed(AndroidCursor cursor);
     }
 
@@ -62,7 +64,7 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         this.last_read_column_index = -1;
     }
 
-    void setCloseListener(CloseListener listener) {
+    public void setCloseListener(CloseListener listener) {
         this.closeListener = listener;
     }
 
@@ -76,7 +78,7 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
      * Marks the cursor dead because the database that owned it was closed. The underlying cursor
      * belongs to the connection and is already gone.
      */
-    void invalidate() {
+    public void invalidate() {
         if (closed) {
             return;
         }

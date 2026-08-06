@@ -23,10 +23,27 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.db.Database;
+import com.codename1.db.DatabaseConfig;
 import com.codename1.testing.DatabaseConformanceSuite;
 
 /** Encrypted opens, wrong keys, re-keying and the bytes on disk. */
 public class DatabaseEncryptionTest extends DatabaseConformanceTest {
+
+    /**
+     * Makes this application a user of the encryption API, which is what the builders gate the
+     * native payload on.
+     *
+     * The gate scans the application's own classes for a reference to DatabaseConfig. Everything
+     * this test actually does goes through DatabaseConformanceSuite, which lives in the core jar
+     * and is therefore not scanned -- so before this, the suite ran on a build with no cipher in
+     * it, Database.isEncryptionSupported() answered false, and the whole group skipped. The
+     * encryption path was shipping untested on Android as a result.
+     *
+     * Reading a field of a config is enough to create the reference and cheap enough to run.
+     */
+    private static boolean referenceTheEncryptionApi() {
+        return DatabaseConfig.passphrase("gate").isEncrypted();
+    }
 
     @Override
     protected String testName() {
@@ -41,6 +58,7 @@ public class DatabaseEncryptionTest extends DatabaseConformanceTest {
     @Override
     protected void runGroup(final int mode, final DatabaseConformanceSuite.Reporter reporter)
             throws Exception {
+        reporter.info("encryption api referenced=" + referenceTheEncryptionApi());
         DatabaseConformanceSuite.runEncryption("cn1-conformance-enc.db", mode, reporter);
     }
 }

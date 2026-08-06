@@ -197,8 +197,9 @@ class LinuxDatabase extends Database {
         checkOpen();
         requireSingleStatement(sql);
         long stmt = LinuxNative.sqlStmtPrepare(peer, sql);
-        // A statement with placeholders and no arguments would otherwise run with every slot
-        // left as NULL rather than reporting the missing parameters.
+        // A statement with placeholders and no arguments would otherwise run with every slot left
+        // as NULL rather than reporting the missing parameters. The check is a no-op in legacy
+        // mode, where running it unbound is the behaviour applications were written against.
         checkParameterCount(stmt, 0);
         return register(new CursorImpl(stmt));
     }
@@ -238,6 +239,9 @@ class LinuxDatabase extends Database {
     }
 
     private void checkParameterCount(long stmt, int supplied) throws IOException {
+        if (isLegacyBehavior()) {
+            return;
+        }
         int declared = LinuxNative.sqlStmtParameterCount(stmt);
         if (declared != supplied) {
             LinuxNative.sqlStmtFinalize(stmt);

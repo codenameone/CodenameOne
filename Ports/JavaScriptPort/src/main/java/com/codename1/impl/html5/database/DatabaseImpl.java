@@ -194,8 +194,9 @@ public class DatabaseImpl extends Database {
         checkOpen();
         requireSingleStatement(sql);
         long stmt = SQLiteNative.prepare(peer, sql);
-        // A statement with placeholders and no arguments would otherwise run with every slot
-        // left as NULL rather than reporting the missing parameters.
+        // A statement with placeholders and no arguments would otherwise run with every slot left
+        // as NULL rather than reporting the missing parameters. The check is a no-op in legacy
+        // mode, where running it unbound is the behaviour applications were written against.
         checkParameterCount(stmt, 0);
         return register(new CursorImpl(stmt));
     }
@@ -235,6 +236,9 @@ public class DatabaseImpl extends Database {
     }
 
     private void checkParameterCount(long stmt, int supplied) throws IOException {
+        if (isLegacyBehavior()) {
+            return;
+        }
         int declared = SQLiteNative.parameterCount(stmt);
         if (declared != supplied) {
             SQLiteNative.finish(stmt);
