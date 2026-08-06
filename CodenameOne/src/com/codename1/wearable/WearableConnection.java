@@ -675,9 +675,11 @@ public final class WearableConnection {
                 queue.remove(i);
                 if (parked instanceof Replicated) {
                     Replicated r = (Replicated) parked;
-                    // Prefixed so the kind survives with the path: a removal recovered as an
-                    // ordinary change resolves to "nothing there" and announces nothing.
-                    droppedPaths.add((r.removal ? "-" : "+") + r.path);
+                    if (r.removal) {
+                        droppedRemovals.add(r.path);
+                    } else {
+                        droppedPaths.add(r.path);
+                    }
                 }
                 return null;
             }
@@ -832,10 +834,10 @@ public final class WearableConnection {
         /// A null path means the record itself overflowed and more was discarded than can be
         /// named: re-offer everything available rather than one path.
         ///
-        /// `wasRemoval` distinguishes the two kinds, because recovering them differs: re-resolving
-        /// a path that is now empty is "nothing to announce" under the ordinary rule, which is
-        /// exactly the wrong answer for a removal.
-        void deliveryDropped(String path, boolean wasRemoval);
+        /// Only value changes reach here. A discarded REMOVAL is re-announced by this class
+        /// directly, because the path is the whole of it and no port could rediscover one -- the
+        /// evidence of a removal is an item that is not there.
+        void deliveryDropped(String path);
     }
 
     /// Framework/port entry point: registers what to do about a discarded delivery.
@@ -858,14 +860,30 @@ public final class WearableConnection {
             java.util.Collections.newSetFromMap(new java.util.LinkedHashMap<String, Boolean>() {
                 protected boolean removeEldestEntry(java.util.Map.Entry<String, Boolean> eldest) {
                     if (size() > MAX_PENDING) {
-                        // Overflowing loses a specific path, and a removal cannot be reconstructed
-                        // from getData -- so instead of forgetting quietly, ask the port to re-offer
-                        // everything it can. One flag, however many paths overflow: the whole point
-                        // of the bound is that per-path bookkeeping has stopped being affordable.
+                        // Overflowing loses a specific path, so instead of forgetting quietly, ask
+                        // the port to re-offer everything it can. One flag, however many paths
+                        // overflow: the whole point of the bound is that per-path bookkeeping has
+                        // stopped being affordable.
                         rescanRequested = true;
                         return true;
                     }
                     return false;
+                }
+            });
+
+    /// Paths whose discarded delivery was a REMOVAL, kept apart from the changes.
+    ///
+    /// Two reasons. A removal is re-announced from here directly rather than handed to the port:
+    /// its entire content is the path, which this class already has, and no port can rediscover it
+    /// -- the evidence of a removal is the absence of an item, so there is nothing to enumerate,
+    /// nothing in a received context, and no file on disk. Asking a port to "re-offer" one is
+    /// asking it to invent something.
+    ///
+    /// And keeping them in their own set means a burst of ordinary changes cannot evict them.
+    private static final java.util.Set<String> droppedRemovals =
+            java.util.Collections.newSetFromMap(new java.util.LinkedHashMap<String, Boolean>() {
+                protected boolean removeEldestEntry(java.util.Map.Entry<String, Boolean> eldest) {
+                    return size() > MAX_PENDING;
                 }
             });
 
@@ -914,10 +932,16 @@ public final class WearableConnection {
         List<Runnable> drained;
         List<Runnable> replays = null;
         List<String> dropped = null;
+        List<String> removals = null;
         synchronized (queue) {
             // Only taken when a port can actually act on them. Clearing the set with no handler
             // registered would discard the one record that a path needs re-offering -- and iOS,
             // which registers late in its bridge's construction, would lose whatever arrived first.
+            if (queue == pendingData && !droppedRemovals.isEmpty()) {
+                // Taken whether or not a port registered a handler: these are re-announced here.
+                removals = new ArrayList<String>(droppedRemovals);
+                droppedRemovals.clear();
+            }
             if (queue == pendingData && droppedDeliveries != null && !droppedPaths.isEmpty()) {
                 dropped = new ArrayList<String>(droppedPaths);
                 droppedPaths.clear();
@@ -943,17 +967,20 @@ public final class WearableConnection {
                 Display.getInstance().callSerially(r);
             }
         }
+        // Discarded REMOVALS are simply re-announced. The path is the whole of a removal, so this
+        // is a complete recovery rather than a request for one -- and it is the only recovery
+        // available, since the item is gone and no port can enumerate an absence.
+        if (removals != null) {
+            for (int i = 0; i < removals.size(); i++) {
+                deliverDataRemoved(removals.get(i));
+            }
+        }
         // Paths the cap discarded, handed back now that a listener exists and there is room.
         if (dropped != null) {
             DroppedDeliveryHandler handler = droppedDeliveries;
             if (handler != null) {
                 for (int i = 0; i < dropped.size(); i++) {
-                    String tagged = dropped.get(i);
-                    if (tagged == null) {
-                        handler.deliveryDropped(null, false);
-                    } else {
-                        handler.deliveryDropped(tagged.substring(1), tagged.charAt(0) == '-');
-                    }
+                    handler.deliveryDropped(dropped.get(i));
                 }
             }
         }

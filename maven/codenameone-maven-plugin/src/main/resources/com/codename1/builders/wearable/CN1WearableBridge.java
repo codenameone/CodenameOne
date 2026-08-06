@@ -167,7 +167,7 @@ public class CN1WearableBridge implements WearableBridge {
         // though nothing ran. Runs after the drain, so the re-offer meets a listener.
         WearableConnection.setDroppedDeliveryHandler(
                 new WearableConnection.DroppedDeliveryHandler() {
-                    public void deliveryDropped(String path, boolean wasRemoval) {
+                    public void deliveryDropped(String path) {
                         if (path == null) {
                             // More was discarded than could be named. Forget every delivery this
                             // process has recorded and re-enumerate: the replay then treats each
@@ -176,12 +176,11 @@ public class CN1WearableBridge implements WearableBridge {
                             replayOutstandingTransfers();
                             return;
                         }
+                        // Only value changes arrive here; core re-announces a discarded removal
+                        // itself, which is the only thing that can -- a deleted item is absent from
+                        // every enumeration by definition.
                         forgetDeliveredSequence(path);
-                        // A dropped REMOVAL resolves with deletion semantics. The ordinary rule
-                        // reads an empty path as "nothing to announce" -- which is precisely the
-                        // state a removal leaves behind, so recovering one that way would announce
-                        // nothing and the listener would keep the value for good.
-                        scheduleWinnerResolution(context, path, wasRemoval);
+                        scheduleWinnerResolution(context, path);
                     }
                 });
     }

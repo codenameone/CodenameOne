@@ -93,7 +93,7 @@ class JavaSEWearableBridge implements WearableBridge {
         // the seen-marker is written before the delivery is queued.
         WearableConnection.setDroppedDeliveryHandler(
                 new WearableConnection.DroppedDeliveryHandler() {
-                    public void deliveryDropped(String path, boolean wasRemoval) {
+                    public void deliveryDropped(String path) {
                         synchronized (seenData) {
                             if (path == null) {
                                 // More was discarded than could be named: forget every file this
