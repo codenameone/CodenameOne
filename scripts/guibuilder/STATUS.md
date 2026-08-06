@@ -931,6 +931,21 @@ tools
     visually distinct, drive align/size actions, and not change simply because
     another member is dragged.
 
+## Reading the canvas styling
+
+The design canvas resolves its look and feel from a `UIManager` of its own
+(`Container#setUIManager`), holding the theme compiled from the project's
+`theme.css`. The builder's chrome keeps the global one. Both work; a canvas
+component's resolved style is reported over MCP as `style.fgColor` /
+`style.bgColor` alongside the `UIManager` that resolved it.
+
+When comparing a resolved colour against the stylesheet, account for
+`@media (prefers-color-scheme: dark)`. The builder runs in dark mode by
+default, so a dark block overrides the light declarations, and the flattened
+theme carries both. A resolved value that does not match the light-mode
+declaration is not evidence of a problem -- during this review it was
+mistaken for the project stylesheet being ignored, and it was not.
+
 ## Review pass 2026-07-28: defects found and fixed
 
 A code review of the whole change found the following defects. All of them are
