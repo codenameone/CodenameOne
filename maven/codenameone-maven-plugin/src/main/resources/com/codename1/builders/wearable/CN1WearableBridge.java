@@ -2212,20 +2212,27 @@ public class CN1WearableBridge implements WearableBridge {
                     }
                 } catch (Throwable stillUnavailable) {
                     if (attempt >= WINNER_RETRIES) {
-                        // A DELETION cannot simply be abandoned. The deleted item produces no
-                        // further callback once connectivity returns, so giving up here left the
-                        // dead value's delivery stamp and cached payload in place with nothing left
-                        // to correct them -- the listener showing a value that no longer exists,
-                        // permanently. An outage that outlasts four attempts is exactly the case
-                        // this branch exists for, so it keeps trying while the retention window
-                        // allows, on the same capped backoff the transfer retries use.
-                        if (wasAfterDeletion(path) && winnerElapsed(path) <= TRANSFER_RETENTION_MILLIS) {
+                        // A DELETION is retried until it RESOLVES, with no deadline.
+                        //
+                        // Borrowing TRANSFER_RETENTION_MILLIS here was wrong twice over: it is the
+                        // lifetime of a transfer DataItem, which has nothing to do with a deletion,
+                        // and any deadline at all reintroduces the same permanent staleness. The
+                        // deleted item produces no further callback once connectivity returns, so
+                        // whatever bound is chosen, an outage that outlasts it leaves the dead
+                        // value's stamp and cached payload in place with nothing left to correct
+                        // them.
+                        //
+                        // The cost of retrying is one task per affected path on a shared daemon
+                        // timer, waking at the capped backoff and doing nothing but a failing query
+                        // while the Data Layer is down. It stops the moment the query answers --
+                        // survivor or empty, both are resolutions -- so a reachable Data Layer ends
+                        // it immediately. That is a cheap price for not showing deleted data.
+                        if (wasAfterDeletion(path)) {
                             scheduleWinnerResolution(context, path, attempt + 1);
                             return;
                         }
                         // A non-deletion resolution can stop: the path keeps whatever it already
                         // had, stays unstamped where it was, and the next event resolves afresh.
-                        forgetWinnerStart(path);
                         forgetPendingWinner(path);
                         return;
                     }
@@ -2233,27 +2240,6 @@ public class CN1WearableBridge implements WearableBridge {
                 }
             }
         }, WINNER_RETRY_MILLIS * attempt);
-    }
-
-    private static final Map<String, Long> winnerStarts = new HashMap<String, Long>();
-
-    /// How long this path's deferred resolution has been trying, starting the clock on first ask.
-    private static long winnerElapsed(String path) {
-        long now = System.currentTimeMillis();
-        synchronized (pendingWinnerPaths) {
-            Long started = winnerStarts.get(path);
-            if (started == null) {
-                winnerStarts.put(path, Long.valueOf(now));
-                return 0L;
-            }
-            return now - started.longValue();
-        }
-    }
-
-    private static void forgetWinnerStart(String path) {
-        synchronized (pendingWinnerPaths) {
-            winnerStarts.remove(path);
-        }
     }
 
     private static void forgetPendingWinner(String path) {
@@ -2282,7 +2268,6 @@ public class CN1WearableBridge implements WearableBridge {
             boolean missed = !actedOnDeletion && deletionPaths.contains(path);
             pendingWinnerPaths.remove(path);
             deletionPaths.remove(path);
-            winnerStarts.remove(path);
             return missed;
         }
     }
