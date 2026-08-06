@@ -110,6 +110,21 @@ class KotlinUiTest : BaseTest() {
         probe.addContent("ProbeSwitch", Container(BoxLayout.y()).apply { add(Switch()) })
         step("probe-textarea")
         probe.addContent("ProbeText", Container(BoxLayout.y()).apply { add(TextArea(3, 20)) })
+        // Round one: all three plain children passed, so the difference is what the
+        // real container does beyond constructing them -- setOn() on the Switch, a
+        // hint on the TextArea, or simply holding three children at once.
+        step("probe-switch-on")
+        probe.addContent("ProbeSwitchOn", Container(BoxLayout.y()).apply {
+            add(Switch().apply { setOn() })
+        })
+        step("probe-textarea-hint")
+        probe.addContent("ProbeTextHint", Container(BoxLayout.y()).apply {
+            add(TextArea(3, 20).apply { hint = "probe hint" })
+        })
+        step("probe-three-plain")
+        probe.addContent("ProbeThree", Container(BoxLayout.y()).apply {
+            add(CheckBox("a")); add(Switch()); add(TextArea(3, 20))
+        })
         step("accordion-prefs")
         accordion.addContent("Preferences", preferences)
 
