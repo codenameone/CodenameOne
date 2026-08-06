@@ -9621,6 +9621,34 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// `#isDatabaseFileEncrypted(java.lang.String)` could not determine the answer.
+    public static final int DATABASE_ENCRYPTION_UNKNOWN = -1;
+
+    /// The database is a plaintext file.
+    public static final int DATABASE_NOT_ENCRYPTED = 0;
+
+    /// The database is encrypted.
+    public static final int DATABASE_ENCRYPTED = 1;
+
+    /// Reports whether a database is encrypted, when the platform can tell without reading the
+    /// file itself.
+    ///
+    /// The default reports `#DATABASE_ENCRYPTION_UNKNOWN`, which makes
+    /// `Database#isEncrypted(java.lang.String)` fall back to sniffing the file header. A port whose
+    /// databases do not live in a readable filesystem, such as the JavaScript one, overrides this
+    /// rather than letting the header read fail and be misread as ciphertext.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// #### Returns
+    ///
+    /// one of `#DATABASE_ENCRYPTED`, `#DATABASE_NOT_ENCRYPTED` or `#DATABASE_ENCRYPTION_UNKNOWN`
+    public int isDatabaseFileEncrypted(String databaseName) {
+        return DATABASE_ENCRYPTION_UNKNOWN;
+    }
+
     /// Indicates whether `byte[]` values may be bound as query parameters.
     ///
     /// #### Returns

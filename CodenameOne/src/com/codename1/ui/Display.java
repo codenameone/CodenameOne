@@ -6095,6 +6095,20 @@ public final class Display extends CN1Constants {
         return impl.isDatabaseManagedKeyHardwareBacked();
     }
 
+    /// Reports whether a database is encrypted, when the platform can tell without reading the
+    /// file itself.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// #### Returns
+    ///
+    /// one of the `CodenameOneImplementation` DATABASE_ENCRYPT* constants
+    public int isDatabaseFileEncrypted(String databaseName) {
+        return impl.isDatabaseFileEncrypted(databaseName);
+    }
+
     /// Indicates whether `byte[]` values may be used as query parameters.
     ///
     /// #### Returns

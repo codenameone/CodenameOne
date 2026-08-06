@@ -53,6 +53,10 @@ public class ThreadSafeDatabase extends Database {
     private final Database underlying;
     private final EasyThread et;
 
+    /// Guards against a second close. The worker is killed by the first one, so a synchronous
+    /// hand-off afterwards would queue work nothing is left to run and block forever.
+    private boolean closed;
+
     /// Wraps the given database with a threadsafe version
     ///
     /// #### Parameters
@@ -141,6 +145,12 @@ public class ThreadSafeDatabase extends Database {
 
     @Override
     public void close() {
+        if (closed) {
+            // close() is idempotent by contract, and after the first call there is no worker left
+            // to service the hand-off below.
+            return;
+        }
+        closed = true;
         // Synchronous on purpose. EasyThread.run(Runnable) is fire and forget, so this used to
         // return while the database was still open, and a delete() on the next line would race it
         // and fail with the file still in use.

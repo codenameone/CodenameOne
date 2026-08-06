@@ -22,6 +22,7 @@
  */
 package com.codename1.db;
 
+import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Util;
 import com.codename1.ui.Display;
@@ -321,6 +322,12 @@ public abstract class Database {
         validateDatabaseNameArgument(databaseName);
         if (!exists(databaseName)) {
             return false;
+        }
+        // Ports whose databases are not files answer directly; reading a header that is not there
+        // would fail, and a failed read is indistinguishable from ciphertext.
+        int platformAnswer = Display.getInstance().isDatabaseFileEncrypted(databaseName);
+        if (platformAnswer != CodenameOneImplementation.DATABASE_ENCRYPTION_UNKNOWN) {
+            return platformAnswer == CodenameOneImplementation.DATABASE_ENCRYPTED;
         }
         String path = getDatabasePath(databaseName);
         if (path == null) {

@@ -158,6 +158,11 @@ public class DatabaseImpl extends Database {
     @Override
     public void execute(String sql, Object... params) throws IOException {
         if (params == null || params.length == 0) {
+            // An explicitly empty array is still a parameterized call, so it is held to the
+            // single-statement rule; only a null array means "no parameters at all".
+            if (params != null) {
+                requireSingleStatement(sql);
+            }
             execute(sql);
             return;
         }
@@ -187,6 +192,9 @@ public class DatabaseImpl extends Database {
     @Override
     public Cursor executeQuery(String sql, Object... params) throws IOException {
         if (params == null || params.length == 0) {
+            if (params != null) {
+                requireSingleStatement(sql);
+            }
             return executeQuery(sql);
         }
         checkOpen();

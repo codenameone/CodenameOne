@@ -11517,6 +11517,26 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
+    public int isDatabaseFileEncrypted(String databaseName) {
+        // Databases live in a browser storage pool, not a filesystem, so there is no header to
+        // read. Ask the engine: opening without a key succeeds only for a plaintext database.
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()
+                || !com.codename1.impl.html5.database.SQLiteNative.exists(databaseName)) {
+            return DATABASE_NOT_ENCRYPTED;
+        }
+        try {
+            long peer = com.codename1.impl.html5.database.SQLiteNative.open(databaseName, null);
+            if (peer == 0) {
+                return DATABASE_ENCRYPTED;
+            }
+            com.codename1.impl.html5.database.SQLiteNative.close(peer);
+            return DATABASE_NOT_ENCRYPTED;
+        } catch (IOException cannotOpenUnkeyed) {
+            return DATABASE_ENCRYPTED;
+        }
+    }
+
+    @Override
     public String getDatabasePath(String databaseName) {
         // The name inside the storage pool. Not a real filesystem path, and deliberately not
         // presented as one: FileSystemStorage cannot open it.

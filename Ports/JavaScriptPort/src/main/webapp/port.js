@@ -6524,6 +6524,34 @@ function cn1SqliteOpen(name, key) {
   return db;
 }
 
+
+/**
+ * Java longs cross the bridge as a BigInt on the exact-longs runtime, as a {__l,l,h} record on the
+ * legacy one, or as a plain Number. Round-tripping through Number silently rounds anything past
+ * 2^53, which is exactly the range identifiers and epoch-microsecond values live in, so convert
+ * through BigInt instead and hand the engine a value it stores exactly.
+ */
+function cn1SqliteToBigInt(v) {
+  if (typeof v === "bigint") {
+    return v;
+  }
+  if (v && typeof v === "object" && v.__l === 1) {
+    return (BigInt(v.h | 0) << 32n) | BigInt(v.l >>> 0);
+  }
+  return BigInt(Math.trunc(Number(v)));
+}
+
+/** Converts an engine integer back into whatever this runtime uses for a Java long. */
+function cn1SqliteFromBigInt(v) {
+  const big = typeof v === "bigint" ? v : BigInt(Math.trunc(Number(v)));
+  if (typeof jvm.longFromBigInt === "function") {
+    return jvm.longFromBigInt(big);
+  }
+  // Exact-longs runtime: BigInt is the representation. Otherwise fall back to a Number, which is
+  // what that runtime already uses everywhere else.
+  return typeof 0n === "bigint" && jvm.exactLongs !== false ? big : Number(big);
+}
+
 function cn1SqliteDbPath(name) {
   return name.charAt(0) === "/" ? name : "/" + name;
 }
@@ -6629,7 +6657,7 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob_long_in
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong_long_int_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong___long_int_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong_long_int_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong___long_int_long_R_void"],
   function(stmtId, index, value) {
-    cn1SqliteLookup(Number(stmtId)).bind(index | 0, Number(value));
+    cn1SqliteLookup(Number(stmtId)).bind(index | 0, cn1SqliteToBigInt(value));
     return null;
   });
 
@@ -6710,7 +6738,7 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnBlob_long_
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnDouble_long_int_R_double", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnDouble___long_int_R_double"],
   function(stmtId, col) {
     const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
-    return v === null || v === undefined ? 0 : Number(v);
+    return v === null || v === undefined ? cn1SqliteFromBigInt(0n) : cn1SqliteFromBigInt(v);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong_long_int_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong___long_int_R_long"],
