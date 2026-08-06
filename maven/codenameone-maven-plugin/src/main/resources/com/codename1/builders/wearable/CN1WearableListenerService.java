@@ -153,6 +153,13 @@ public class CN1WearableListenerService extends WearableListenerService {
         for (DataEvent event : events) {
             android.net.Uri uri = event.getDataItem().getUri();
             String path = uri.getPath();
+            // An echo of this device's own publish. It stays fully visible to getData() and to the
+            // ordering bookkeeping below -- it IS the path's current value -- but it is not a peer
+            // event, and WearableDataListener documents its callbacks as peer changes. iOS and the
+            // simulator already suppress self-authored changes; forwarding them here made the same
+            // app code fire an extra callback on Android only, so an app that acts on a change
+            // processed its own write twice.
+            boolean ownEcho = CN1WearableBridge.isLocallyAuthored(this, uri.getHost());
             boolean transferItem = CN1WearableBridge.isTransferPath(path);
             if (path == null || !isFromAKnownHost(uri)
                     || (!transferItem && !path.startsWith(CN1WearableBridge.pathPrefix()))) {
@@ -162,7 +169,20 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // A file transfer arrives as a DataMap carrying an Asset rather than an inline
                 // payload. Turn it back into the WearableMessage the receiver expects; this callback
                 // already runs off the main thread, so resolving the asset here is fine.
-                if (event.getType() == DataEvent.TYPE_DELETED) {
+                if (event.getType() == DataEvent.TYPE_DELETED && ownEcho) {
+                // This device's own removeData coming back. The app already knows -- it made the
+                // call -- so announcing it would break the peer-only contract in the other
+                // direction.
+                //
+                // The recorded stamp is deliberately left as it is. It means "the newest thing this
+                // process has delivered", and dropping it would reset the baseline to empty, so an
+                // older replica from another authority arriving next would pass the ordering test
+                // and be delivered as though it were new. Leaving it costs nothing: a local
+                // republish always draws a higher sequence from the monotonic clock, and a peer
+                // item is still judged on its own sequence.
+                continue;
+            }
+            if (event.getType() == DataEvent.TYPE_DELETED) {
                     // Our own consumeTransfer, or the sender clearing up. Not an app-visible removal:
                     // the logical path may well still hold a replicated value.
                     continue;
@@ -171,7 +191,7 @@ public class CN1WearableListenerService extends WearableListenerService {
                         CN1WearableBridge.decodeTransfer(this, event.getDataItem());
                 long transferSeq = CN1WearableBridge.sequenceOf(
                         CN1WearableBridge.valueOrTransferMap(event.getDataItem()));
-                if (transfer.payload != null
+                if (transfer.payload != null && !ownEcho
                         && CN1WearableBridge.claimTransfer(uri, transferSeq)) {
                     // On the path the sender passed to transferFile, not the filename-suffixed
                     // storage path this item happens to live at: a listener routes on what it asked
@@ -315,8 +335,15 @@ public class CN1WearableListenerService extends WearableListenerService {
             //
             // An older item arriving after a newer one is ordinary, not exotic: a reconnect does it
             // whenever both nodes publish the same path. deliverIfOutranks declines those silently.
-            CN1WearableBridge.deliverIfOutranks(appPath, CN1WearableBridge.sequenceOf(value),
-                    uri.getHost(), CN1WearableBridge.payloadOf(value));
+            if (ownEcho) {
+                // Bookkeeping only: the stamp still has to move so a later peer item is judged
+                // against what this device actually published, but no listener is told.
+                CN1WearableBridge.setDeliveredSequenceIfOutranks(
+                        appPath, CN1WearableBridge.sequenceOf(value), uri.getHost());
+            } else {
+                CN1WearableBridge.deliverIfOutranks(appPath, CN1WearableBridge.sequenceOf(value),
+                        uri.getHost(), CN1WearableBridge.payloadOf(value));
+            }
         }
     }
 

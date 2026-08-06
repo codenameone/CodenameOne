@@ -47,6 +47,7 @@ import com.google.android.gms.wearable.Wearable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -306,6 +307,68 @@ public class CN1WearableBridge implements WearableBridge {
             return null;
         }
         return known;
+    }
+
+    /**
+     * Whether a data item was published by THIS device.
+     *
+     * <p>Play services echoes an app's own {@code putData}/{@code removeData} back to it, with the
+     * local node as the item's authority. Those echoes have to stay visible to reads and to the
+     * ordering bookkeeping -- they are genuinely the current value of the path -- but they are not
+     * peer events, and {@code WearableDataListener} documents its callbacks as peer changes. iOS and
+     * the simulator already suppress self-authored changes, so forwarding them made identical app
+     * code fire an extra callback on Android only, and an app that acts on a change would process
+     * its own write twice.
+     *
+     * @param context any context
+     * @param host the item Uri's authority
+     * @return true when the item came from this device
+     */
+    /**
+     * Last known value per path, and the last successful path enumeration.
+     *
+     * <p>Exists so a read from a latency-sensitive thread has something truthful to answer with.
+     * getData/getDataPaths reach Play services through a blocking await, and on the EDT that is up
+     * to five seconds of frozen painting and input -- the same stall the state queries in this
+     * class already refuse to take. Bounded like the other caches; a value falling out only costs
+     * an EDT caller a null it would otherwise have blocked five seconds for.</p>
+     */
+    private static final int VALUE_CACHE_MAX = 256;
+    private static final Map<String, byte[]> valueCache =
+            new LinkedHashMap<String, byte[]>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, byte[]> eldest) {
+                    return size() > VALUE_CACHE_MAX;
+                }
+            };
+    private static volatile String[] pathsCache;
+
+    /** Records what a successful read saw, so a later EDT caller can be answered without blocking. */
+    static void rememberValue(String path, byte[] payload) {
+        if (path == null) {
+            return;
+        }
+        synchronized (valueCache) {
+            if (payload == null) {
+                valueCache.remove(path);
+            } else {
+                valueCache.put(path, payload);
+            }
+        }
+    }
+
+    private static byte[] cachedValue(String path) {
+        synchronized (valueCache) {
+            return valueCache.get(path);
+        }
+    }
+
+    static boolean isLocallyAuthored(Context context, String host) {
+        if (host == null) {
+            return false;
+        }
+        String local = localNodeId(context);
+        return local != null && local.equals(host);
     }
 
     /**
@@ -1016,13 +1079,24 @@ public class CN1WearableBridge implements WearableBridge {
     private static long lastSequence;
 
     public byte[] getData(String path) {
+        // On the EDT (or Android's main thread) answer from the last known snapshot instead of
+        // blocking. resolveValue() waits on Play services for up to TIMEOUT_SECONDS, and taking
+        // that on the EDT freezes painting and input for the duration -- the state queries in this
+        // class already refuse to do it, and this public getter had no such guard. A caller that
+        // needs an authoritative read can make one off the EDT; a caller that is painting cannot
+        // afford five seconds either way.
+        if (isCallerLatencySensitive()) {
+            return cachedValue(path);
+        }
         // Deliberately the same resolution the listener uses. This used to have its own loop, which
         // kept whichever item the buffer yielded first -- so once resolveValue() gained the
         // publisher tie-break, getData() could return a different value than the listener had just
         // delivered for the same path. One implementation, one answer.
         try {
             ResolvedValue v = resolveValue(context, path);
-            return v == null ? null : v.payload;
+            byte[] out = v == null ? null : v.payload;
+            rememberValue(path, out);
+            return out;
         } catch (java.io.IOException unavailable) {
             return null;
         }
@@ -1060,6 +1134,13 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     public String[] getDataPaths() {
+        // Same reasoning as getData: this await can stall a painting thread for TIMEOUT_SECONDS.
+        // An EDT caller gets the last successful enumeration, or an empty array if there has not
+        // been one yet, rather than a frozen UI.
+        if (isCallerLatencySensitive()) {
+            String[] known = pathsCache;
+            return known == null ? new String[0] : known.clone();
+        }
         try {
             DataItemBuffer items = Tasks.await(dataClient.getDataItems(),
                     TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -1082,7 +1163,10 @@ public class CN1WearableBridge implements WearableBridge {
                         out.add(logical);
                     }
                 }
-                return out.toArray(new String[out.size()]);
+                String[] enumerated = out.toArray(new String[out.size()]);
+                // Remembered so a later EDT caller has a real answer instead of a five-second wait.
+                pathsCache = enumerated;
+                return enumerated.clone();
             } finally {
                 items.release();
             }
@@ -1478,6 +1562,7 @@ public class CN1WearableBridge implements WearableBridge {
             if (!setDeliveredSequenceIfOutranks(path, sequence, node)) {
                 return false;
             }
+            rememberValue(path, payload);
             WearableConnection.deliverDataChanged(path, payload);
             return true;
         }
@@ -1490,6 +1575,7 @@ public class CN1WearableBridge implements WearableBridge {
             if (!setDeliveredSequenceIfStampUnchanged(path, expected, sequence, node)) {
                 return false;
             }
+            rememberValue(path, payload);
             WearableConnection.deliverDataChanged(path, payload);
             return true;
         }
@@ -1509,6 +1595,9 @@ public class CN1WearableBridge implements WearableBridge {
             if (expected == null || !forgetDeliveredSequenceIfUnchanged(path, expected)) {
                 return false;
             }
+            // Drop the snapshot with the stamp, or an EDT getData would keep answering with a value
+            // the app has just been told was removed.
+            rememberValue(path, null);
             WearableConnection.deliverDataRemoved(path);
             return true;
         }
