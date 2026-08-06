@@ -6449,3 +6449,272 @@ bindNative([
     id: jvm.toNativeString(deviceId), iid: iid | 0, enable: !!enable
   }]);
 });
+
+// ---------------------------------------------------------------------------
+// SQLite, compiled to WebAssembly.
+//
+// Replaces WebSQL, which Chrome removed in 119 and Firefox never implemented.
+// The engine is loaded into this worker on first use, so every call after the
+// initial load is an ordinary synchronous call with no host round trip.
+//
+// Storage uses the opfs-sahpool VFS. The default OPFS VFS needs
+// crossOriginIsolated, which needs COOP/COEP response headers, which we cannot
+// require: Codename One JavaScript apps are deployed to arbitrary static
+// hosting. opfs-sahpool needs only OPFS plus createSyncAccessHandle in a
+// worker, acquires its file handles once during install, and is fully
+// synchronous afterwards.
+// ---------------------------------------------------------------------------
+let cn1Sqlite = null;          // the sqlite3 namespace once initialised
+let cn1SqlitePool = null;      // the opfs-sahpool utility, when persistent
+let cn1SqliteInitPromise = null;
+let cn1SqliteHandles = new Map();
+let cn1SqliteNextHandle = 1;
+
+function cn1SqliteRegister(obj) {
+  const id = cn1SqliteNextHandle++;
+  cn1SqliteHandles.set(id, obj);
+  return id;
+}
+
+function cn1SqliteLookup(id) {
+  const obj = cn1SqliteHandles.get(id);
+  if (!obj) {
+    throw new Error("this database handle has been closed");
+  }
+  return obj;
+}
+
+function cn1SqliteStartInit() {
+  if (cn1SqliteInitPromise) {
+    return cn1SqliteInitPromise;
+  }
+  cn1SqliteInitPromise = (async function() {
+    // Classic worker, so importScripts is the load mechanism and is synchronous.
+    importScripts("js/sqlite3mc.js");
+    cn1Sqlite = await sqlite3InitModule();
+    try {
+      cn1SqlitePool = await cn1Sqlite.installOpfsSAHPoolVfs({ name: "cn1-db" });
+    } catch (err) {
+      // Firefox before 111 and Safari before 15.2 have no createSyncAccessHandle.
+      // Degrade to memory, but say so: silently losing every write on reload is
+      // exactly the kind of failure that should not be discovered in production.
+      console.warn("Codename One: this browser has no synchronous OPFS access, so databases "
+        + "are kept in memory only and are lost when the page closes. Reported cause: " + err);
+      cn1SqlitePool = null;
+    }
+    return true;
+  })();
+  return cn1SqliteInitPromise;
+}
+
+/** Opens a database by name, through the pool when one is available. */
+function cn1SqliteOpen(name, key) {
+  const db = cn1SqlitePool
+    ? new cn1SqlitePool.OpfsSAHPoolDb(cn1SqliteDbPath(name))
+    : new cn1Sqlite.oo1.DB(":memory:", "c");
+  if (key !== null && key !== undefined && key !== "") {
+    // Select the SQLCipher 4 scheme before applying the key, or the engine uses
+    // its own and the file cannot be read on any other platform.
+    db.exec("PRAGMA cipher = 'sqlcipher'");
+    db.exec("PRAGMA legacy = 4");
+    db.exec("PRAGMA key = \"" + key.replace(/"/g, '""') + "\"");
+    // SQLCipher applies keys lazily; read something so a wrong key fails here.
+    db.exec("SELECT count(*) FROM sqlite_master");
+  }
+  return db;
+}
+
+function cn1SqliteDbPath(name) {
+  return name.charAt(0) === "/" ? name : "/" + name;
+}
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_init_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_init___R_boolean"], function*() {
+  if (cn1Sqlite) {
+    return true;
+  }
+  yield { op: "await", promise: cn1SqliteStartInit() };
+  return !!cn1Sqlite;
+});
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_isPersistent_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_isPersistent___R_boolean"],
+  function() { return !!cn1SqlitePool; });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_isCipherAvailable_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_isCipherAvailable___R_boolean"],
+  function() { return !!cn1Sqlite; });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_exists_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_exists___java_lang_String_R_boolean"],
+  function(name) {
+    if (!cn1SqlitePool) {
+      return false;
+    }
+    return cn1SqlitePool.getFileNames().indexOf(cn1SqliteDbPath(jvm.toNativeString(name))) >= 0;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_delete___java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang_String_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_delete___java_lang_String_R_void"],
+  function(name) {
+    if (cn1SqlitePool) {
+      cn1SqlitePool.unlink(cn1SqliteDbPath(jvm.toNativeString(name)));
+    }
+    return null;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_open_java_lang_String_java_lang_String_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_open___java_lang_String_java_lang_String_R_long"],
+  function(name, key) {
+    try {
+      return cn1SqliteRegister(cn1SqliteOpen(jvm.toNativeString(name), key === null ? null : jvm.toNativeString(key)));
+    } catch (err) {
+      // 0 means "the key did not work"; the Java side turns that into WRONG_KEY.
+      return 0;
+    }
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_close_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_close___long", "cn1_com_codename1_impl_html5_database_SQLiteNative_close_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_close___long_R_void"],
+  function(dbId) {
+    const db = cn1SqliteHandles.get(Number(dbId));
+    if (db) {
+      db.close();
+      cn1SqliteHandles.delete(Number(dbId));
+    }
+    return null;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_rekey_long_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_rekey___long_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_rekey_long_java_lang_String_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_rekey___long_java_lang_String_R_void"],
+  function(dbId, key) {
+    const db = cn1SqliteLookup(Number(dbId));
+    db.exec("PRAGMA cipher = 'sqlcipher'");
+    db.exec("PRAGMA legacy = 4");
+    const k = key === null ? "" : jvm.toNativeString(key);
+    db.exec("PRAGMA rekey = \"" + k.replace(/"/g, '""') + "\"");
+    return null;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_execScript_long_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_execScript___long_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_execScript_long_java_lang_String_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_execScript___long_java_lang_String_R_void"],
+  function(dbId, sql) {
+    cn1SqliteLookup(Number(dbId)).exec(jvm.toNativeString(sql));
+    return null;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_prepare_long_java_lang_String_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_prepare___long_java_lang_String_R_long"],
+  function(dbId, sql) {
+    const db = cn1SqliteLookup(Number(dbId));
+    return cn1SqliteRegister(db.prepare(jvm.toNativeString(sql)));
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_parameterCount_long_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_parameterCount___long_R_int"],
+  function(stmtId) { return cn1SqliteLookup(Number(stmtId)).parameterCount; });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull_long_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull___long_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull_long_int_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull___long_int_R_void"],
+  function(stmtId, index) { cn1SqliteLookup(Number(stmtId)).bind(index | 0, null); return null; });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindString_long_int_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindString___long_int_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindString_long_int_java_lang_String_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindString___long_int_java_lang_String_R_void"],
+  function(stmtId, index, value) {
+    cn1SqliteLookup(Number(stmtId)).bind(index | 0, value === null ? null : jvm.toNativeString(value));
+    return null;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob_long_int_byte_1ARRAY", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob___long_int_byte_1ARRAY", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob_long_int_byte_1ARRAY_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob___long_int_byte_1ARRAY_R_void"],
+  function(stmtId, index, value) {
+    if (value === null) {
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0, null);
+      return null;
+    }
+    // Java bytes are signed; the engine wants raw octets.
+    const bytes = new Uint8Array(value.length);
+    for (let i = 0; i < value.length; i++) {
+      bytes[i] = value[i] & 0xff;
+    }
+    cn1SqliteLookup(Number(stmtId)).bind(index | 0, bytes);
+    return null;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong_long_int_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong___long_int_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong_long_int_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong___long_int_long_R_void"],
+  function(stmtId, index, value) {
+    cn1SqliteLookup(Number(stmtId)).bind(index | 0, Number(value));
+    return null;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble_long_int_double", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble___long_int_double", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble_long_int_double_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble___long_int_double_R_void"],
+  function(stmtId, index, value) {
+    cn1SqliteLookup(Number(stmtId)).bind(index | 0, value);
+    return null;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_step_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_step___long_R_boolean"],
+  function(stmtId) { return cn1SqliteLookup(Number(stmtId)).step(); });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_reset_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_reset___long", "cn1_com_codename1_impl_html5_database_SQLiteNative_reset_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_reset___long_R_void"],
+  function(stmtId) {
+    // Keep the bindings: re-stepping a parameterised query is how a backward seek works.
+    cn1SqliteLookup(Number(stmtId)).reset(false);
+    return null;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_finish_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_finish___long", "cn1_com_codename1_impl_html5_database_SQLiteNative_finish_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_finish___long_R_void"],
+  function(stmtId) {
+    const stmt = cn1SqliteHandles.get(Number(stmtId));
+    if (stmt) {
+      stmt.finalize();
+      cn1SqliteHandles.delete(Number(stmtId));
+    }
+    return null;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish___long", "cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish___long_R_void"],
+  function(stmtId) {
+    const stmt = cn1SqliteHandles.get(Number(stmtId));
+    if (stmt) {
+      try {
+        while (stmt.step()) {
+          // A statement that returns rows still has to run to completion.
+        }
+      } finally {
+        stmt.finalize();
+        cn1SqliteHandles.delete(Number(stmtId));
+      }
+    }
+    return null;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnCount_long_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnCount___long_R_int"],
+  function(stmtId) { return cn1SqliteLookup(Number(stmtId)).columnCount; });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnName_long_int_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnName___long_int_R_java_lang_String"],
+  function(stmtId, col) {
+    const name = cn1SqliteLookup(Number(stmtId)).getColumnName(col | 0);
+    return name === null || name === undefined ? null : jvm.createStringLiteral(String(name));
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull_long_int_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull___long_int_R_boolean"],
+  function(stmtId, col) { return cn1SqliteLookup(Number(stmtId)).get(col | 0) === null; });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnString_long_int_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnString___long_int_R_java_lang_String"],
+  function(stmtId, col) {
+    const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
+    return v === null || v === undefined ? null : jvm.createStringLiteral(String(v));
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnBlob_long_int_R_byte_1ARRAY", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnBlob___long_int_R_byte_1ARRAY"],
+  function(stmtId, col) {
+    const v = cn1SqliteLookup(Number(stmtId)).get(col | 0, new Uint8Array(0).constructor);
+    if (v === null || v === undefined) {
+      return null;
+    }
+    const out = jvm.newArray(v.length, "JAVA_BYTE", 1);
+    for (let i = 0; i < v.length; i++) {
+      // Back to signed Java bytes.
+      out[i] = v[i] > 127 ? v[i] - 256 : v[i];
+    }
+    return out;
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnDouble_long_int_R_double", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnDouble___long_int_R_double"],
+  function(stmtId, col) {
+    const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
+    return v === null || v === undefined ? 0 : Number(v);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong_long_int_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong___long_int_R_long"],
+  function(stmtId, col) {
+    const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
+    return v === null || v === undefined ? 0 : Number(v);
+  });

@@ -114,6 +114,8 @@ public class IPhoneBuilder extends Executor {
     private boolean usesCryptoGcm;
     private boolean usesBiometrics;
     private boolean usesNfc;
+    private boolean usesDatabase;
+    private boolean usesDatabaseCipher;
     private boolean usesBluetooth;
     private boolean usesBluetoothPeripheral;
 
@@ -1009,6 +1011,14 @@ public class IPhoneBuilder extends Executor {
                         } else {
                             usesCryptoAPI = true;
                         }
+                    }
+                    // The bundled cipher-capable SQLite replaces the system libsqlite3, so it
+                    // is only linked for applications that actually encrypt a database.
+                    if (cls.equals("com/codename1/db/DatabaseConfig")) {
+                        usesDatabaseCipher = true;
+                    }
+                    if (cls.indexOf("com/codename1/db/") == 0) {
+                        usesDatabase = true;
                     }
                     if (!usesNfc && cls.indexOf("com/codename1/nfc/") == 0) {
                         usesNfc = true;
@@ -3489,6 +3499,8 @@ public class IPhoneBuilder extends Executor {
                 parparCmd.add("-DsaveUnitTests=" + isUnitTestMode());
                 parparCmd.add("-DfieldNullChecks=" + fieldNullChecks);
                 parparCmd.add("-DINCLUDE_NPE_CHECKS=" + includeNullChecks);
+                parparCmd.add("-Dcn1.sqlite=" + usesDatabaseCipher);
+                parparCmd.add("-Dcn1.sqlcipher=" + usesDatabaseCipher);
                 parparCmd.add("-Dcn1.onDeviceDebug=" + onDeviceDebug);
                 parparCmd.add("-DbundleVersionNumber=" + bundleVersionNumber);
                 if (macNativeBuilder.isEnabled()) {

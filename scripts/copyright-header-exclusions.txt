@@ -24,3 +24,5 @@ Ports/JavaScriptPort/src/main/webapp/js/videojs/videojs.record.min.js | videojs-
 Ports/JavaScriptPort/src/main/webapp/sw.js | Codename One service-worker adapter containing the UpUp 1.0.0 MIT-licensed service worker
 vm/ByteCodeTranslator/src/cn1_sqlite3.h | SQLite3 Multiple Ciphers public header, upstream MIT notice over public-domain SQLite
 vm/ByteCodeTranslator/src/cn1_sqlite3_amalgamation.h | SQLite3 Multiple Ciphers amalgamation, upstream MIT notice over public-domain SQLite
+Ports/JavaScriptPort/src/main/webapp/js/sqlite3mc.js | SQLite3 Multiple Ciphers WebAssembly loader, Emscripten generated, MIT over public-domain SQLite
+Ports/JavaScriptPort/src/main/webapp/js/sqlite3-opfs-async-proxy.js | SQLite3 Multiple Ciphers OPFS proxy worker, MIT over public-domain SQLite

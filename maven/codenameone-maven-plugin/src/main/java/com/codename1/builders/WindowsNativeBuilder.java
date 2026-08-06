@@ -247,6 +247,10 @@ public class WindowsNativeBuilder extends Executor {
         // path of cn1_windows_ble.c and ship cn1ble.dll next to the exe --
         // the usage-gated approach the iOS builder uses for CoreBluetooth.
         final boolean[] usesBluetoothHolder = {false};
+        // The bundled SQLite engine is emitted only for applications that use com.codename1.db,
+        // and its cipher only for those that configure encryption, so nobody else pays for either.
+        final boolean[] usesDatabaseHolder = {false};
+        final boolean[] usesDatabaseCipherHolder = {false};
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
                 @Override
@@ -258,6 +262,12 @@ public class WindowsNativeBuilder extends Executor {
                     if (cls != null && cls.startsWith("com/codename1/bluetooth/")) {
                         usesBluetoothHolder[0] = true;
                     }
+                    if (cls != null && cls.startsWith("com/codename1/db/")) {
+                        usesDatabaseHolder[0] = true;
+                        if (cls.equals("com/codename1/db/DatabaseConfig")) {
+                            usesDatabaseCipherHolder[0] = true;
+                        }
+                    }
                 }
 
                 @Override
@@ -268,6 +278,8 @@ public class WindowsNativeBuilder extends Executor {
             throw new BuildException("Failed to scan for Bluetooth usage", ex);
         }
         boolean usesBluetooth = usesBluetoothHolder[0];
+        boolean usesDatabase = usesDatabaseHolder[0];
+        boolean usesDatabaseCipher = usesDatabaseCipherHolder[0];
 
         List<String> parparCmd = new ArrayList<String>();
         parparCmd.add("java");
@@ -288,6 +300,8 @@ public class WindowsNativeBuilder extends Executor {
         if (!heapOverridden) {
             parparCmd.add("-Xmx" + heapMB + "m");
         }
+        parparCmd.add("-Dcn1.sqlite=" + usesDatabase);
+        parparCmd.add("-Dcn1.sqlcipher=" + usesDatabaseCipher);
         parparCmd.add("-jar");
         parparCmd.add(parparVMCompilerJar.getAbsolutePath());
         // Output type: the portable "clean" C target. The "windows" app type

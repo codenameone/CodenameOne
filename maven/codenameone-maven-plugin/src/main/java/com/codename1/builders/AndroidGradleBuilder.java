@@ -614,6 +614,7 @@ public class AndroidGradleBuilder extends Executor {
     private boolean migrateToAndroidX;
     private boolean shouldIncludeGoogleImpl;
     private boolean arSupport;
+    boolean dbCipherSupport;
     private boolean visionSupport;
     private boolean inferenceSupport;
     private boolean languageSupport;
@@ -1544,6 +1545,11 @@ public class AndroidGradleBuilder extends Executor {
                     if (aiAdapter != null
                             && cls.indexOf("com/codename1/ai/language/") == 0) {
                         languageSupport = true;
+                    }
+                    if (cls.equals("com/codename1/db/DatabaseConfig")) {
+                        // Keeps the SQLCipher-backed impl package, which is deleted below for
+                        // apps that never encrypt, and pulls in the AAR through the catalog.
+                        dbCipherSupport = true;
                     }
                     if (cls.indexOf("com/codename1/ar/") == 0) {
                         // Keeps the ARCore-backed impl sources (deleted for
@@ -3234,6 +3240,21 @@ public class AndroidGradleBuilder extends Executor {
                 }
             }
             arPackage.delete();
+        }
+
+        if (!dbCipherSupport) {
+            // The SQLCipher-backed database impl compiles against net.zetetic, which is only on
+            // the classpath when the catalog has added the dependency. AndroidImplementation
+            // reaches it through reflection only, so deleting it here costs nothing for apps that
+            // never open an encrypted database, and saves them the native library.
+            File cipherPackage = new File(srcDir, "com/codename1/impl/android/cipher");
+            File[] cipherFiles = cipherPackage.listFiles();
+            if (cipherFiles != null) {
+                for (File f : cipherFiles) {
+                    f.delete();
+                }
+            }
+            cipherPackage.delete();
         }
 
         pruneOptionalAiSources(srcDir);

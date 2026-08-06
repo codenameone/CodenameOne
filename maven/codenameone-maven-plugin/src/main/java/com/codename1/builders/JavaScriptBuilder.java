@@ -219,6 +219,37 @@ public class JavaScriptBuilder extends Executor {
      * {@code Samplerate} global ("use libsamplerate if it is available"), and
      * no script tag, ScriptTool call or bridge ever defines one.
      */
+    /**
+     * True when the application references com.codename1.db, so the SQLite engine has to ship.
+     * Set by {@link #scanForDatabaseUsage(File)} before the assets are pruned.
+     */
+    private boolean usesDatabase;
+
+    /**
+     * Records whether the application touches the database API at all. The WebAssembly engine is
+     * about 1.5MB of the bundle, so an application that never opens a database should not carry it.
+     */
+    private void scanForDatabaseUsage(File classesDir) throws IOException {
+        scanClassesForPermissions(classesDir, new ClassScanner() {
+            @Override
+            public void usesClass(String cls) {
+                if (cls != null && cls.startsWith("com/codename1/db/")) {
+                    usesDatabase = true;
+                }
+            }
+
+            @Override
+            public void usesClassMethod(String cls, String method) {
+                usesClass(cls);
+            }
+
+            @Override
+            public void implementsInterface(String cls, String interfaceName) {
+                usesClass(interfaceName);
+            }
+        });
+    }
+
     private void pruneOptionalPortAssets(File webApp, BuildRequest request) {
         File js = new File(webApp, "js");
         if (!js.isDirectory()) {
@@ -242,6 +273,18 @@ public class JavaScriptBuilder extends Executor {
             // Not fatal -- the bundle just carries a dead 485KB file -- but say
             // so rather than silently shipping what we claim to have pruned.
             log("WARNING: could not delete " + samplerate + "; it will ship in the bundle");
+        }
+        if (!usesDatabase) {
+            // About 1.5MB of engine that an application which never opens a database
+            // has no use for.
+            String[] sqliteAssets = {"sqlite3mc.js", "sqlite3.wasm", "sqlite3-opfs-async-proxy.js"};
+            for (String asset : sqliteAssets) {
+                File f = new File(js, asset);
+                if (f.isFile() && !f.delete()) {
+                    log("WARNING: could not delete " + f + "; it will ship in the bundle");
+                }
+            }
+            debug("Omitting the SQLite engine; this application does not use com.codename1.db");
         }
     }
 
@@ -313,6 +356,7 @@ public class JavaScriptBuilder extends Executor {
                         delTree(stagedWebApp, true);
                     }
                     jsPortWebApp = dest;
+                    scanForDatabaseUsage(stageClasses);
                     pruneOptionalPortAssets(dest, request);
                 }
                 return stageClasses;
