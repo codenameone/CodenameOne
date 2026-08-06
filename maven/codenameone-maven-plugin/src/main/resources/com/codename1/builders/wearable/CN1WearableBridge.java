@@ -461,6 +461,14 @@ public class CN1WearableBridge implements WearableBridge {
             if (known == null) {
                 // No enumeration has succeeded yet, so there is no snapshot to keep consistent;
                 // inventing a one-element one would claim this is the only path that exists.
+                //
+                // The GENERATION still moves. An enumeration already in flight may have captured
+                // the Data Layer before this change, and the generation is the only thing that
+                // tells it so -- leaving it untouched let that query install a snapshot missing a
+                // path just published, or still holding one just removed, and a latency-sensitive
+                // getDataPaths() would answer from it indefinitely because the callback that would
+                // have corrected it has already fired.
+                pathsGeneration++;
                 return;
             }
             boolean present = false;
