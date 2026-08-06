@@ -25,8 +25,8 @@ package bsh.cn1.gen;
 
 import bsh.cn1.CN1AccessException;
 
-public final class GeneratedAccess_java_time_format {
-    private GeneratedAccess_java_time_format() {
+public final class GeneratedAccess_com_codename1_wearable_spi {
+    private GeneratedAccess_com_codename1_wearable_spi() {
     }
 
     public static Class<?> findClass(String name) {
@@ -52,62 +52,27 @@ public final class GeneratedAccess_java_time_format {
 
 
     private static Class<?> findClassChunk0(String simpleName) {
-        if ("DateTimeFormatter".equals(simpleName)) {
-            return java.time.format.DateTimeFormatter.class;
-        }
-        if ("DateTimeParseException".equals(simpleName)) {
-            return java.time.format.DateTimeParseException.class;
+        if ("WearableBridge".equals(simpleName)) {
+            return com.codename1.wearable.spi.WearableBridge.class;
         }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
-        if (type == java.time.format.DateTimeParseException.class) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.CharSequence.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.CharSequence.class, java.lang.Integer.class}, false);
-                return new java.time.format.DateTimeParseException((java.lang.String) adaptedArgs[0], (java.lang.CharSequence) adaptedArgs[1], toIntValue(adaptedArgs[2]));
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.CharSequence.class, java.lang.Integer.class, java.lang.Throwable.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.CharSequence.class, java.lang.Integer.class, java.lang.Throwable.class}, false);
-                return new java.time.format.DateTimeParseException((java.lang.String) adaptedArgs[0], (java.lang.CharSequence) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.Throwable) adaptedArgs[3]);
-            }
-        }
         throw unsupportedConstruct(type, safeArgs);
     }
 
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
-        if (type == java.time.format.DateTimeFormatter.class) return invokeStatic0(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
-    }
-
-    private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
-        if ("ofPattern".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                return java.time.format.DateTimeFormatter.ofPattern((java.lang.String) adaptedArgs[0]);
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.util.Locale.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.util.Locale.class}, false);
-                return java.time.format.DateTimeFormatter.ofPattern((java.lang.String) adaptedArgs[0], (java.util.Locale) adaptedArgs[1]);
-            }
-        }
-        throw unsupportedStatic(java.time.format.DateTimeFormatter.class, name, safeArgs);
     }
 
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
-        if (target instanceof java.time.format.DateTimeFormatter) {
+        if (target instanceof com.codename1.wearable.spi.WearableBridge) {
             try {
-                return invoke0((java.time.format.DateTimeFormatter) target, name, safeArgs);
-            } catch (CN1AccessException ex) {
-                unsupported = ex;
-            }
-        }
-        if (target instanceof java.time.format.DateTimeParseException) {
-            try {
-                return invoke1((java.time.format.DateTimeParseException) target, name, safeArgs);
+                return invoke0((com.codename1.wearable.spi.WearableBridge) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -118,49 +83,78 @@ public final class GeneratedAccess_java_time_format {
         throw unsupportedInstance(target, name, safeArgs);
     }
 
-    private static Object invoke0(java.time.format.DateTimeFormatter typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("format".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.time.temporal.TemporalAccessor.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.time.temporal.TemporalAccessor.class}, false);
-                return typedTarget.format((java.time.temporal.TemporalAccessor) adaptedArgs[0]);
-            }
-        }
-        if ("parse".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.CharSequence.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.CharSequence.class}, false);
-                return typedTarget.parse((java.lang.CharSequence) adaptedArgs[0]);
-            }
-        }
-        throw unsupportedInstance(typedTarget, name, safeArgs);
-    }
-
-    private static Object invoke1(java.time.format.DateTimeParseException typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("getErrorIndex".equals(name)) {
+    private static Object invoke0(com.codename1.wearable.spi.WearableBridge typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getConnectedNodes".equals(name)) {
             if (safeArgs.length == 0) {
-                return typedTarget.getErrorIndex();
+                return typedTarget.getConnectedNodes();
             }
         }
-        if ("getParsedString".equals(name)) {
+        if ("getData".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getData((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("getDataPaths".equals(name)) {
             if (safeArgs.length == 0) {
-                return typedTarget.getParsedString();
+                return typedTarget.getDataPaths();
+            }
+        }
+        if ("isCompanionAppInstalled".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isCompanionAppInstalled();
+            }
+        }
+        if ("isPaired".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isPaired();
+            }
+        }
+        if ("isReachable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isReachable();
+            }
+        }
+        if ("isSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSupported();
+            }
+        }
+        if ("putData".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class}, false);
+                typedTarget.putData((java.lang.String) adaptedArgs[0], (byte[]) adaptedArgs[1]); return null;
+            }
+        }
+        if ("removeData".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.removeData((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("sendMessage".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class, java.lang.Integer.class}, false);
+                typedTarget.sendMessage((java.lang.String) adaptedArgs[0], (byte[]) adaptedArgs[1], toIntValue(adaptedArgs[2])); return null;
+            }
+        }
+        if ("sendReply".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, byte[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, byte[].class}, false);
+                typedTarget.sendReply(toIntValue(adaptedArgs[0]), (byte[]) adaptedArgs[1]); return null;
+            }
+        }
+        if ("transferFile".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, byte[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, byte[].class}, false);
+                typedTarget.transferFile((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (byte[]) adaptedArgs[2]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == java.time.format.DateTimeFormatter.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
-    }
-
-    private static Object getStaticField0(String name) throws Exception {
-        if ("ISO_INSTANT".equals(name)) return java.time.format.DateTimeFormatter.ISO_INSTANT;
-        if ("ISO_LOCAL_DATE".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
-        if ("ISO_LOCAL_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        if ("ISO_LOCAL_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_TIME;
-        if ("ISO_OFFSET_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
-        if ("ISO_ZONED_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_ZONED_DATE_TIME;
-        throw unsupportedStaticField(java.time.format.DateTimeFormatter.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

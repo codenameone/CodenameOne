@@ -25,8 +25,8 @@ package bsh.cn1.gen;
 
 import bsh.cn1.CN1AccessException;
 
-public final class GeneratedAccess_java_time_format {
-    private GeneratedAccess_java_time_format() {
+public final class GeneratedAccess_com_codename1_security_shield_spi {
+    private GeneratedAccess_com_codename1_security_shield_spi() {
     }
 
     public static Class<?> findClass(String name) {
@@ -52,62 +52,66 @@ public final class GeneratedAccess_java_time_format {
 
 
     private static Class<?> findClassChunk0(String simpleName) {
-        if ("DateTimeFormatter".equals(simpleName)) {
-            return java.time.format.DateTimeFormatter.class;
+        if ("EngineContext".equals(simpleName)) {
+            return com.codename1.security.shield.spi.EngineContext.class;
         }
-        if ("DateTimeParseException".equals(simpleName)) {
-            return java.time.format.DateTimeParseException.class;
+        if ("ShieldEngine".equals(simpleName)) {
+            return com.codename1.security.shield.spi.ShieldEngine.class;
+        }
+        if ("ShieldEngineRegistry".equals(simpleName)) {
+            return com.codename1.security.shield.spi.ShieldEngineRegistry.class;
         }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
-        if (type == java.time.format.DateTimeParseException.class) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.CharSequence.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.CharSequence.class, java.lang.Integer.class}, false);
-                return new java.time.format.DateTimeParseException((java.lang.String) adaptedArgs[0], (java.lang.CharSequence) adaptedArgs[1], toIntValue(adaptedArgs[2]));
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.CharSequence.class, java.lang.Integer.class, java.lang.Throwable.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.CharSequence.class, java.lang.Integer.class, java.lang.Throwable.class}, false);
-                return new java.time.format.DateTimeParseException((java.lang.String) adaptedArgs[0], (java.lang.CharSequence) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.Throwable) adaptedArgs[3]);
-            }
-        }
         throw unsupportedConstruct(type, safeArgs);
     }
 
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
-        if (type == java.time.format.DateTimeFormatter.class) return invokeStatic0(name, safeArgs);
+        if (type == com.codename1.security.shield.spi.ShieldEngineRegistry.class) return invokeStatic0(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
-        if ("ofPattern".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                return java.time.format.DateTimeFormatter.ofPattern((java.lang.String) adaptedArgs[0]);
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.util.Locale.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.util.Locale.class}, false);
-                return java.time.format.DateTimeFormatter.ofPattern((java.lang.String) adaptedArgs[0], (java.util.Locale) adaptedArgs[1]);
+        if ("getDefaultContext".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.security.shield.spi.ShieldEngineRegistry.getDefaultContext();
             }
         }
-        throw unsupportedStatic(java.time.format.DateTimeFormatter.class, name, safeArgs);
+        if ("getEngine".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.security.shield.spi.ShieldEngineRegistry.getEngine();
+            }
+        }
+        if ("isEngineRegistered".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.security.shield.spi.ShieldEngineRegistry.isEngineRegistered();
+            }
+        }
+        if ("setEngine".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.security.shield.spi.ShieldEngine.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.security.shield.spi.ShieldEngine.class}, false);
+                com.codename1.security.shield.spi.ShieldEngineRegistry.setEngine((com.codename1.security.shield.spi.ShieldEngine) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedStatic(com.codename1.security.shield.spi.ShieldEngineRegistry.class, name, safeArgs);
     }
 
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
-        if (target instanceof java.time.format.DateTimeFormatter) {
+        if (target instanceof com.codename1.security.shield.spi.EngineContext) {
             try {
-                return invoke0((java.time.format.DateTimeFormatter) target, name, safeArgs);
+                return invoke0((com.codename1.security.shield.spi.EngineContext) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
-        if (target instanceof java.time.format.DateTimeParseException) {
+        if (target instanceof com.codename1.security.shield.spi.ShieldEngine) {
             try {
-                return invoke1((java.time.format.DateTimeParseException) target, name, safeArgs);
+                return invoke1((com.codename1.security.shield.spi.ShieldEngine) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -118,49 +122,129 @@ public final class GeneratedAccess_java_time_format {
         throw unsupportedInstance(target, name, safeArgs);
     }
 
-    private static Object invoke0(java.time.format.DateTimeFormatter typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("format".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.time.temporal.TemporalAccessor.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.time.temporal.TemporalAccessor.class}, false);
-                return typedTarget.format((java.time.temporal.TemporalAccessor) adaptedArgs[0]);
+    private static Object invoke0(com.codename1.security.shield.spi.EngineContext typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("confirmPlatformAttestation".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.confirmPlatformAttestation((java.lang.String) adaptedArgs[0]); return null;
             }
         }
-        if ("parse".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.CharSequence.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.CharSequence.class}, false);
-                return typedTarget.parse((java.lang.CharSequence) adaptedArgs[0]);
+        if ("getAppSignerDigests".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAppSignerDigests();
+            }
+        }
+        if ("getEnabledAccessibilityServices".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getEnabledAccessibilityServices();
+            }
+        }
+        if ("getPlatformCompromiseReasons".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPlatformCompromiseReasons();
+            }
+        }
+        if ("getProperty".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.getProperty((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        if ("getSecureStorage".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSecureStorage();
+            }
+        }
+        if ("isPlatformAttestationSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isPlatformAttestationSupported();
+            }
+        }
+        if ("log".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.log((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("publishSignal".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.security.shield.ShieldSignal.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.security.shield.ShieldSignal.class}, false);
+                typedTarget.publishSignal((com.codename1.security.shield.ShieldSignal) adaptedArgs[0]); return null;
+            }
+        }
+        if ("requestPlatformAttestation".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.requestPlatformAttestation((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("resetPlatformAttestation".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.resetPlatformAttestation(); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke1(java.time.format.DateTimeParseException typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("getErrorIndex".equals(name)) {
+    private static Object invoke1(com.codename1.security.shield.spi.ShieldEngine typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("collectSignals".equals(name)) {
             if (safeArgs.length == 0) {
-                return typedTarget.getErrorIndex();
+                return typedTarget.collectSignals();
             }
         }
-        if ("getParsedString".equals(name)) {
+        if ("fetchToken".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.fetchToken((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("getCachedToken".equals(name)) {
             if (safeArgs.length == 0) {
-                return typedTarget.getParsedString();
+                return typedTarget.getCachedToken();
+            }
+        }
+        if ("getName".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getName();
+            }
+        }
+        if ("getPinSet".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPinSet();
+            }
+        }
+        if ("initialize".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.security.shield.spi.EngineContext.class, com.codename1.security.shield.ShieldConfig.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.security.shield.spi.EngineContext.class, com.codename1.security.shield.ShieldConfig.class}, false);
+                typedTarget.initialize((com.codename1.security.shield.spi.EngineContext) adaptedArgs[0], (com.codename1.security.shield.ShieldConfig) adaptedArgs[1]); return null;
+            }
+        }
+        if ("invalidate".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.invalidate(); return null;
+            }
+        }
+        if ("isAvailable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isAvailable();
+            }
+        }
+        if ("shutdown".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.shutdown(); return null;
+            }
+        }
+        if ("verifyPins".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class, java.lang.String[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class, java.lang.String[].class}, false);
+                return typedTarget.verifyPins((java.lang.String) adaptedArgs[0], (java.lang.String[]) adaptedArgs[1], (java.lang.String[]) adaptedArgs[2]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == java.time.format.DateTimeFormatter.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
-    }
-
-    private static Object getStaticField0(String name) throws Exception {
-        if ("ISO_INSTANT".equals(name)) return java.time.format.DateTimeFormatter.ISO_INSTANT;
-        if ("ISO_LOCAL_DATE".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
-        if ("ISO_LOCAL_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        if ("ISO_LOCAL_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_LOCAL_TIME;
-        if ("ISO_OFFSET_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
-        if ("ISO_ZONED_DATE_TIME".equals(name)) return java.time.format.DateTimeFormatter.ISO_ZONED_DATE_TIME;
-        throw unsupportedStaticField(java.time.format.DateTimeFormatter.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

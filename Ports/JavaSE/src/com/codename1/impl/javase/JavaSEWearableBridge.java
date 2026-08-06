@@ -221,6 +221,14 @@ class JavaSEWearableBridge implements WearableBridge {
             File tmp = new File(f.getParentFile(), f.getName() + stagingSuffix());
             FileOutputStream out = new FileOutputStream(tmp);
             try {
+                // The author travels INSIDE the value. It used to live in a ".author" sidecar, and
+                // two files are two operations however they are ordered: A could write its author,
+                // B could overwrite that author, and A could then publish its value -- leaving A's
+                // bytes permanently labelled as B's, so B suppressed the genuine peer callback and
+                // A reported its own write as remote. Prefixing the payload makes the label and the
+                // bytes one object, and the rename below publishes both or neither.
+                out.write(VALUE_MAGIC);
+                out.write(watchSide ? 'w' : 'p');
                 out.write(payload == null ? new byte[0] : payload);
                 out.flush();
             } finally {
@@ -233,12 +241,6 @@ class JavaSEWearableBridge implements WearableBridge {
             // single atomic step that can only ever touch this writer's own bytes.
             long stamp = nextStamp(f);
             tmp.setLastModified(stamp);
-            // Written BEFORE the value is published, not after. The watcher notices a path by the
-            // value file's mtime, so a scan landing between the move and a later sidecar write read
-            // the PREVIOUS publisher's sidecar, classified the new value as locally authored, and
-            // recorded its mtime without delivering it -- and updating the sidecar afterwards
-            // triggers no rescan, so that value was simply never announced.
-            recordAuthor(f);
             try {
                 // An atomic replace, not delete-then-rename. The old fallback deleted whatever was
                 // published before retrying, so a peer publishing the same path in that gap had its
@@ -281,7 +283,7 @@ class JavaSEWearableBridge implements WearableBridge {
             return null;
         }
         try {
-            return readFully(f);
+            return readPayload(f);
         } catch (IOException err) {
             return null;
         }
@@ -412,8 +414,7 @@ class JavaSEWearableBridge implements WearableBridge {
         while (!closed) {
             try {
                 Socket s = server.accept();
-                adoptPeer(s);
-                readLoop(s);
+                readLoop(s, adoptPeer(s));
             } catch (IOException err) {
                 if (closed) {
                     return;
@@ -426,8 +427,7 @@ class JavaSEWearableBridge implements WearableBridge {
         while (!closed) {
             try {
                 Socket s = new Socket(InetAddress.getByName("127.0.0.1"), port());
-                adoptPeer(s);
-                readLoop(s);
+                readLoop(s, adoptPeer(s));
             } catch (IOException notUpYet) {
                 // The peer app is not running. Wait and retry -- the user may open it at any point.
             }
@@ -442,25 +442,33 @@ class JavaSEWearableBridge implements WearableBridge {
         }
     }
 
-    private void adoptPeer(Socket s) throws IOException {
+    /// Connects and says hello, returning the output stream WITHOUT publishing it.
+    ///
+    /// The stream stays private until the peer's own hello checks out. Assigning `peerOut` here
+    /// made `isReachable()` true and let `sendMessage()` write application traffic into whatever
+    /// held the derived port -- an unrelated local service, or a colliding project -- for the whole
+    /// five seconds before the identity check timed out. The hello itself is the one thing written
+    /// before verification, which is what verification is for.
+    private DataOutputStream adoptPeer(Socket s) throws IOException {
         s.setTcpNoDelay(true);
         // A read deadline, because a service that merely ACCEPTS on our derived port and then says
         // nothing would otherwise leave the reader blocked in readByte() forever -- with the
         // simulator reporting itself reachable the whole time.
         s.setSoTimeout(HELLO_TIMEOUT_MILLIS);
-        peerOut = new DataOutputStream(s.getOutputStream());
+        DataOutputStream out = new DataOutputStream(s.getOutputStream());
         // The hello carries the project identity. The port is derived from a hash of the shared
         // directory truncated to 10,000 values, so two unrelated projects whose paths collide -- or
         // any other local service already sitting on that port -- would otherwise connect, both
         // report reachable, and exchange live messages and replies between unrelated apps. A
         // successful connection to a small shared port range proves nothing about who is on it.
-        writeFrame(peerOut, FRAME_HELLO, projectIdentity(), new byte[0], 0);
-        // `peer` is assigned by the reader once the peer's own hello is verified, NOT here.
-        // Publishing reachability on a bare accepted socket meant an unrelated local service
-        // holding the port made isReachable() true and live messages went into it.
+        writeFrame(out, FRAME_HELLO, projectIdentity(), new byte[0], 0);
+        // `peer` and `peerOut` are both assigned by the reader once the peer's own hello is
+        // verified, NOT here. Publishing either on a bare accepted socket meant an unrelated local
+        // service holding the port made isReachable() true and live messages went into it.
+        return out;
     }
 
-    private void readLoop(Socket s) {
+    private void readLoop(Socket s, DataOutputStream unverified) {
         boolean helloVerified = false;
         try {
             DataInputStream in = new DataInputStream(s.getInputStream());
@@ -488,9 +496,10 @@ class JavaSEWearableBridge implements WearableBridge {
                                     + "different project (" + path + ")");
                         }
                         helloVerified = true;
-                        // Only now is this a peer. Reachability and the state change follow the
-                        // identity, not the connection.
+                        // Only now is this a peer. Reachability, the writable stream and the state
+                        // change all follow the identity, not the connection.
                         peer = s;
+                        peerOut = unverified;
                         s.setSoTimeout(0);
                         WearableConnection.notifyStateChanged();
                         break;
@@ -640,7 +649,7 @@ class JavaSEWearableBridge implements WearableBridge {
                     // lost it outright if the simulator closed before the listener ran, or if the
                     // delivery was merely parked because no listener had registered yet.
                     WearableConnection.deliverDataChangedTracked(deliveryPath(f.getName()),
-                            readFully(f), inbound ? new Runnable() {
+                            readPayload(f), inbound ? new Runnable() {
                                 public void run() {
                                     delivered.delete();
                                     synchronized (seenData) {
@@ -741,10 +750,10 @@ class JavaSEWearableBridge implements WearableBridge {
      * watch publication as locally authored and suppresses its callback, which is the pairing
      * silently not working rather than failing.
      *
-     * <p>So the author is also recorded next to the file, in a sidecar the filesystem cannot round.
-     * The stamp stays authoritative when the sidecar is missing (an older file, or a write that
-     * failed), because a wrong-but-present answer is worse than the previous behaviour only if it
-     * disagrees, and the sidecar is written under the same lock as the publication.</p>
+     * <p>So the author is also written into the value's own header, which the filesystem cannot
+     * round. The stamp stays authoritative when no header is present (a value left by an older
+     * build), because a wrong-but-present answer is worse than the previous behaviour only if it
+     * disagrees, and the header is published by the same rename as the bytes it describes.</p>
      */
     private boolean authoredLocallyFor(File f, long stamp) {
         Boolean recorded = recordedAuthor(f);
@@ -754,19 +763,19 @@ class JavaSEWearableBridge implements WearableBridge {
         return authoredLocally(stamp);
     }
 
-    /** The ".author" sidecar for a published value: "watch" or "phone", or null when absent. */
+    /// The author recorded in the value's own header: TRUE for the watch, FALSE for the phone,
+    /// null when the file predates the header or is too short to carry one.
     private Boolean recordedAuthor(File f) {
-        File side = new File(f.getParentFile(), f.getName() + AUTHOR_SUFFIX);
         try {
-            if (!side.isFile()) {
+            byte[] head = readHeader(f);
+            if (head == null) {
                 return null;
             }
-            byte[] b = readFully(side);
-            String v = new String(b, "UTF-8").trim();
-            if ("watch".equals(v)) {
+            byte who = head[VALUE_MAGIC.length];
+            if (who == 'w') {
                 return Boolean.TRUE;
             }
-            if ("phone".equals(v)) {
+            if (who == 'p') {
                 return Boolean.FALSE;
             }
             return null;
@@ -775,22 +784,54 @@ class JavaSEWearableBridge implements WearableBridge {
         }
     }
 
-    private void recordAuthor(File f) {
-        File side = new File(f.getParentFile(), f.getName() + AUTHOR_SUFFIX);
+    /// Marks a framed value file. Chosen so a stale sandbox written before the header existed still
+    /// reads correctly: no magic simply means "fall back to the stamp's side bit".
+    private static final byte[] VALUE_MAGIC = {'C', 'N', '1', 'W', 'A', '1'};
+
+    /// Returns magic + author byte when the file carries the frame, else null.
+    private static byte[] readHeader(File f) throws IOException {
+        byte[] head = new byte[VALUE_MAGIC.length + 1];
+        FileInputStream in = new FileInputStream(f);
         try {
-            FileOutputStream out = new FileOutputStream(side);
-            try {
-                out.write((watchSide ? "watch" : "phone").getBytes("UTF-8"));
-            } finally {
-                out.close();
+            int off = 0;
+            while (off < head.length) {
+                int r = in.read(head, off, head.length - off);
+                if (r < 0) {
+                    return null;
+                }
+                off += r;
             }
-        } catch (IOException err) {
-            // The stamp's side bit remains the fallback.
+        } finally {
+            in.close();
         }
+        for (int i = 0; i < VALUE_MAGIC.length; i++) {
+            if (head[i] != VALUE_MAGIC[i]) {
+                return null;
+            }
+        }
+        return head;
     }
 
-    /** Suffix of the author sidecar. Ends in a dot-suffix so the watcher skips it like a staging file. */
-    private static final String AUTHOR_SUFFIX = ".author.tmp";
+    /// The value's bytes with the author frame removed. An unframed file is returned whole, so a
+    /// value left by an older build still reads as itself rather than losing its first seven bytes.
+    private static byte[] readPayload(File f) throws IOException {
+        // One read, then inspect the prefix in memory. Reading the file twice -- once for the
+        // header, once for the bytes -- could straddle a republication and return one file's
+        // header with another file's payload.
+        byte[] all = readFully(f);
+        int skip = VALUE_MAGIC.length + 1;
+        if (all.length < skip) {
+            return all;
+        }
+        for (int i = 0; i < VALUE_MAGIC.length; i++) {
+            if (all[i] != VALUE_MAGIC[i]) {
+                return all;
+            }
+        }
+        byte[] body = new byte[all.length - skip];
+        System.arraycopy(all, skip, body, 0, body.length);
+        return body;
+    }
 
     private static long lastStamp;
 

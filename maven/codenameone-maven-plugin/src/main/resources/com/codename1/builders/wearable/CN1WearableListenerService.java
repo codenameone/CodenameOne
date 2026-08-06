@@ -180,14 +180,18 @@ public class CN1WearableListenerService extends WearableListenerService {
         for (DataEvent e : events) {
             frozen.add(e.freeze());
         }
+        // Captured HERE, at arrival, not in the handler. The handler may run after a removeData
+        // that this event predates, and clearing whatever marker it finds by then would wipe a
+        // newer one. The generation pins the handler to the state it actually observed.
+        final long removalGeneration = CN1WearableBridge.currentRemovalGeneration();
         WORKER.execute(new Runnable() {
             public void run() {
-                handleDataChanged(frozen);
+                handleDataChanged(frozen, removalGeneration);
             }
         });
     }
 
-    private void handleDataChanged(java.lang.Iterable<DataEvent> events) {
+    private void handleDataChanged(java.lang.Iterable<DataEvent> events, long removalGeneration) {
         // NOT before the loop. This service is exported and there is no binding permission that
         // would narrow it to Play services, so starting the app first let an untrusted caller bring
         // the UI forward with an empty or forged callback -- the provenance check below stops the
@@ -371,7 +375,7 @@ public class CN1WearableListenerService extends WearableListenerService {
             // meant a publication arriving with no delivery stamp recorded took that exit and never
             // cleared the marker, so a peer removing its brand-new value inside the window still
             // had that removal swallowed.
-            CN1WearableBridge.clearLocalRemoval(path);
+            CN1WearableBridge.clearLocalRemoval(path, removalGeneration);
             if (!CN1WearableBridge.hasDeliveredStamp(appPath)) {
                 // First sight of this path in this process -- after a restart there is no baseline,
                 // so accepting the event on the strength of "nothing recorded" would hand the app a

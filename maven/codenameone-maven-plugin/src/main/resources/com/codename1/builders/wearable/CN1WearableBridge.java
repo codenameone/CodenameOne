@@ -1228,16 +1228,45 @@ public class CN1WearableBridge implements WearableBridge {
      * per replica, so the entry has to outlive all of them, while a peer's genuine removal of the
      * same path later must still reach the app.</p>
      */
-    private static final Map<String, Long> localRemovals = new HashMap<String, Long>();
+    private static final Map<String, Removal> localRemovals = new HashMap<String, Removal>();
     private static final long LOCAL_REMOVAL_WINDOW_MILLIS = 30 * 1000L;
+
+    /**
+     * A local removal, tagged with the order in which it was recorded.
+     *
+     * <p>The generation is what lets a queued event tell "the marker I saw" from "a marker recorded
+     * after me". Callbacks are handled on a worker, so handler time and event time are no longer
+     * the same instant, and a publication received BEFORE a {@code removeData} can run after it.
+     * Time alone cannot express that ordering safely -- {@code currentTimeMillis} ties and can go
+     * backwards -- so removals are numbered.</p>
+     */
+    private static final class Removal {
+        final long at;
+        final long generation;
+
+        Removal(long at, long generation) {
+            this.at = at;
+            this.generation = generation;
+        }
+    }
+
+    private static long removalGeneration;
+
+    /// The current removal generation, captured by a listener when an event ARRIVES so it can later
+    /// tell whether the marker it is about to clear is the one it actually saw.
+    static long currentRemovalGeneration() {
+        synchronized (localRemovals) {
+            return removalGeneration;
+        }
+    }
 
     private static void noteLocalRemoval(String storagePath) {
         long now = System.currentTimeMillis();
         synchronized (localRemovals) {
-            localRemovals.put(storagePath, Long.valueOf(now));
-            java.util.Iterator<Map.Entry<String, Long>> it = localRemovals.entrySet().iterator();
+            localRemovals.put(storagePath, new Removal(now, ++removalGeneration));
+            java.util.Iterator<Map.Entry<String, Removal>> it = localRemovals.entrySet().iterator();
             while (it.hasNext()) {
-                if (now - it.next().getValue().longValue() > LOCAL_REMOVAL_WINDOW_MILLIS) {
+                if (now - it.next().getValue().at > LOCAL_REMOVAL_WINDOW_MILLIS) {
                     it.remove();
                 }
             }
@@ -1253,10 +1282,23 @@ public class CN1WearableBridge implements WearableBridge {
      * removed its new value inside the window had that genuine deletion classified as part of this
      * device's earlier delete -- the removal was swallowed and the listener kept a value that no
      * longer existed, with no later callback to correct it.</p>
+     *
+     * <p>Only a marker the caller actually saw is cleared. Callbacks are handled on a worker, so a
+     * publication received before a {@code removeData} can be handled after it; clearing
+     * unconditionally then wiped a NEWER marker, and the wildcard tombstones that followed were no
+     * longer recognised as this device's own delete -- with a replica on each device the
+     * peer-authority tombstone bypasses the echo check and the app was handed a peer removal
+     * callback for its own operation.</p>
+     *
+     * @param observedGeneration the value {@link #currentRemovalGeneration()} returned when the
+     *                           event being handled arrived
      */
-    static void clearLocalRemoval(String storagePath) {
+    static void clearLocalRemoval(String storagePath, long observedGeneration) {
         synchronized (localRemovals) {
-            localRemovals.remove(storagePath);
+            Removal r = localRemovals.get(storagePath);
+            if (r != null && r.generation <= observedGeneration) {
+                localRemovals.remove(storagePath);
+            }
         }
     }
 
@@ -1264,8 +1306,8 @@ public class CN1WearableBridge implements WearableBridge {
     static boolean isLocallyRemoved(String storagePath) {
         long now = System.currentTimeMillis();
         synchronized (localRemovals) {
-            Long at = localRemovals.get(storagePath);
-            return at != null && now - at.longValue() <= LOCAL_REMOVAL_WINDOW_MILLIS;
+            Removal r = localRemovals.get(storagePath);
+            return r != null && now - r.at <= LOCAL_REMOVAL_WINDOW_MILLIS;
         }
     }
 
@@ -2246,13 +2288,12 @@ public class CN1WearableBridge implements WearableBridge {
                         // while the Data Layer is down. It stops the moment the query answers --
                         // survivor or empty, both are resolutions -- so a reachable Data Layer ends
                         // it immediately. That is a cheap price for not showing deleted data.
-                        if (wasAfterDeletion(path)) {
+                        if (retireUnlessDeletion(path)) {
                             scheduleWinnerResolution(context, path, attempt + 1);
                             return;
                         }
                         // A non-deletion resolution can stop: the path keeps whatever it already
                         // had, stays unstamped where it was, and the next event resolves afresh.
-                        forgetPendingWinner(path);
                         return;
                     }
                     scheduleWinnerResolution(context, path, attempt + 1);
@@ -2280,10 +2321,30 @@ public class CN1WearableBridge implements WearableBridge {
 
     private static final long WINNER_RETRY_CAP_MILLIS = 60 * 1000L;
 
-    private static void forgetPendingWinner(String path) {
+    /**
+     * Retires an exhausted resolution unless a deletion is owed one, in a single step.
+     *
+     * <p>The terminal-failure branch used to test {@link #wasAfterDeletion} and then call
+     * clear the markers in a separate step. A deletion arriving between the two saw the path
+     * still pending and therefore deliberately scheduled nothing, and the clear that followed
+     * dropped both markers -- so the only resolution that deletion would ever get was thrown away
+     * and the deleted value stayed on screen indefinitely. This is the same hazard the success
+     * path already handles through {@link #finishPendingWinner}.</p>
+     *
+     * <p>When a deletion is owed the markers are deliberately LEFT in place, so the path never
+     * stops looking pending and a concurrent deletion cannot slip a duplicate task in behind the
+     * caller's rescheduled one.</p>
+     *
+     * @return true when a deletion is owed and the caller must schedule the next attempt
+     */
+    private static boolean retireUnlessDeletion(String path) {
         synchronized (pendingWinnerPaths) {
+            if (deletionPaths.contains(path)) {
+                return true;
+            }
             pendingWinnerPaths.remove(path);
             deletionPaths.remove(path);
+            return false;
         }
     }
 
