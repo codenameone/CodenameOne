@@ -873,6 +873,13 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     }
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
+    if (err != nil) {
+        // The tombstone never entered the session context, so its birth record has nothing to be
+        // discovered through: pruning walks tombstones in the context, and one with no tombstone is
+        // unreachable for good. Repeated failed removals of unique paths would grow the defaults
+        // dictionary without bound.
+        cn1WearableForgetTombstoneBirth(path);
+    }
     [ctxLock unlock];
     [ctx release];
 }
@@ -1178,12 +1185,28 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         [ctxLock lock];
         NSMutableDictionary *mineCtx = [[session applicationContext] mutableCopy];
         if (mineCtx != nil) {
+            BOOL acknowledged = NO;
             for (NSString *path in acknowledge) {
+                // Re-decided against the context as it is NOW, under the lock. The decision to
+                // acknowledge was taken against a snapshot read before this lock was held, and the
+                // app can republish the path in between -- removing the value on the strength of
+                // the old snapshot would then delete a NEWER, higher-stamped publication and lose
+                // it silently. If our current entry still loses to the peer's tombstone the
+                // acknowledgement stands; if it now wins, the republish is the newer fact and the
+                // peer will see it and drop its tombstone in turn.
+                CN1WearableEntry current = cn1WearableEntryFor(mineCtx, path);
+                CN1WearableEntry tomb = cn1WearableEntryFor(applicationContext, path);
+                if (cn1WearableLocalWins(current, tomb)) {
+                    continue;
+                }
                 [mineCtx removeObjectForKey:cn1WearableValueKey(path)];
                 [mineCtx removeObjectForKey:cn1WearableStampKey(path)];
+                acknowledged = YES;
             }
-            NSError *ackErr = nil;
-            [session updateApplicationContext:mineCtx error:&ackErr];
+            if (acknowledged) {
+                NSError *ackErr = nil;
+                [session updateApplicationContext:mineCtx error:&ackErr];
+            }
             [mineCtx release];
         }
         [ctxLock unlock];
