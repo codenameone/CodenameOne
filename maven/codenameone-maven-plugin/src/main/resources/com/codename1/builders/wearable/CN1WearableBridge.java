@@ -1810,10 +1810,19 @@ public class CN1WearableBridge implements WearableBridge {
                                 // publishers and records the delivery stamp, and a path this
                                 // process HAS already delivered has a stamp, so nothing is
                                 // delivered twice.
-                                if (p.startsWith(PATH_PREFIX) && valueMap(item) != null) {
+                                if (p.startsWith(PATH_PREFIX) && valueMap(item) != null
+                                        && !replayNode.equals(uri.getHost())) {
+                                    // Items THIS device published are skipped, and the resolver is
+                                    // not asked about them. Its non-deletion branch delivers
+                                    // whatever wins without the local-author check the callback
+                                    // path applies, so scheduling one for our own persisted write
+                                    // would hand the app its own value as a peer change on every
+                                    // cold start. If a peer also published this path, that peer's
+                                    // item is in this same enumeration and schedules the
+                                    // resolution -- which then correctly compares both.
                                     String appPath = decode(p.substring(PATH_PREFIX.length()));
                                     if (!hasDeliveredStamp(appPath)) {
-                                        scheduleWinnerResolution(context, appPath);
+                                        scheduleReplayResolution(context, appPath);
                                     }
                                 }
                                 continue;
@@ -2910,7 +2919,7 @@ public class CN1WearableBridge implements WearableBridge {
      */
     private static boolean retireUnlessDeletion(String path) {
         synchronized (pendingWinnerPaths) {
-            if (deletionPaths.containsKey(path)) {
+            if (deletionPaths.containsKey(path) || replayPaths.contains(path)) {
                 return true;
             }
             pendingWinnerPaths.remove(path);
@@ -2918,6 +2927,30 @@ public class CN1WearableBridge implements WearableBridge {
             return false;
         }
     }
+
+    /**
+     * Schedules the winner resolution for a value recovered by the startup replay.
+     *
+     * <p>Identical to the ordinary first-sight resolution except that it is not allowed to give up.
+     * The ordinary policy retires after {@code WINNER_RETRIES} because another event will come
+     * along; that is exactly what is NOT true here -- the item is unchanged, so nothing else will
+     * announce it, and the enclosing replay pass has already counted its enumeration as successful
+     * and will not run again. Retiring on a transient failure would lose the very value this path
+     * exists to recover.</p>
+     */
+    private static void scheduleReplayResolution(Context context, String path) {
+        if (path == null) {
+            return;
+        }
+        synchronized (pendingWinnerPaths) {
+            replayPaths.add(path);
+        }
+        scheduleWinnerResolution(context, path);
+    }
+
+    /// Paths whose resolution came from the startup replay and must therefore keep retrying.
+    /// Guarded by {@link #pendingWinnerPaths}; cleared when the resolution finally completes.
+    private static final java.util.Set<String> replayPaths = new java.util.HashSet<String>();
 
     /**
      * Retires a finished resolution, reporting whether a deletion upgrade arrived too late to be
@@ -2935,6 +2968,8 @@ public class CN1WearableBridge implements WearableBridge {
      */
     private static boolean finishPendingWinner(String path, long actedOnGeneration) {
         synchronized (pendingWinnerPaths) {
+            // A resolution that COMPLETED discharges the replay's obligation, whatever it found.
+            replayPaths.remove(path);
             long current = deletionGenerationFor(path);
             // Missed when a deletion is recorded that this task did not act on -- either it acted
             // on none (generation 0) or it acted on an OLDER one, which is the republish-then-delete
