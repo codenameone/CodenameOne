@@ -159,11 +159,22 @@ class WatchNativeBuilder {
         // entitlement, which is not derivable from anything else.
         standalone = "true".equals(request.getArg("watchStandalone", "false"));
         bundleId = request.getPackageName() + ".watchkitapp";
-        teamId = request.getArg("ios.release.teamId",
-                request.getArg("ios.teamId",
-                        request.getArg("ios.debug.teamId", "")));
+        // Selected by BUILD TYPE, exactly as the phone target selects it. Preferring the release
+        // team unconditionally meant a debug build paired a debug provisioning profile with the
+        // release team's DEVELOPMENT_TEAM, and manual signing of the embedded watch target failed
+        // on the mismatch -- for a project that simply set both hints.
+        String watchTeamDefault = request.getArg("ios.teamId", "");
+        teamId = "debug".equals(request.getArg("ios.buildType", "debug"))
+                ? request.getArg("ios.debug.teamId", watchTeamDefault)
+                : request.getArg("ios.release.teamId", watchTeamDefault);
         displayName = request.getDisplayName() != null
                 ? request.getDisplayName() : request.getMainClass();
+    }
+
+    /// The team id this build resolved for the watch target, selected by build type like the
+    /// phone's. Package-visible for the tests that pin that selection.
+    String getTeamId() {
+        return teamId;
     }
 
     boolean isStandalone() {

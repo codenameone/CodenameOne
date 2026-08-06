@@ -315,6 +315,33 @@ class WatchNativeBuilderTest {
                 "a companion watch app must name its container: " + plist);
     }
 
+    /// The watch team must follow ios.buildType exactly as the phone's does. Pairing a debug
+    /// profile with the release team's DEVELOPMENT_TEAM fails manual signing of the embedded target.
+    @Test
+    void watchTeamFollowsBuildType() {
+        BuildRequest debug = request();
+        debug.putArgument("watchMain", WATCH_MAIN);
+        debug.putArgument("ios.debug.teamId", "DEBUGTEAM");
+        debug.putArgument("ios.release.teamId", "RELTEAM");
+        debug.putArgument("ios.buildType", "debug");
+        assertEquals("DEBUGTEAM", parse(debug).getTeamId(),
+                "a debug build must use the debug team");
+
+        BuildRequest release = request();
+        release.putArgument("watchMain", WATCH_MAIN);
+        release.putArgument("ios.debug.teamId", "DEBUGTEAM");
+        release.putArgument("ios.release.teamId", "RELTEAM");
+        release.putArgument("ios.buildType", "release");
+        assertEquals("RELTEAM", parse(release).getTeamId(),
+                "a release build must use the release team");
+
+        BuildRequest plain = request();
+        plain.putArgument("watchMain", WATCH_MAIN);
+        plain.putArgument("ios.teamId", "PLAINTEAM");
+        assertEquals("PLAINTEAM", parse(plain).getTeamId(),
+                "ios.teamId remains the fallback for both");
+    }
+
     private static WatchNativeBuilder parse(BuildRequest req) {
         WatchNativeBuilder b = new WatchNativeBuilder(new IPhoneBuilder());
         b.parseHints(req);

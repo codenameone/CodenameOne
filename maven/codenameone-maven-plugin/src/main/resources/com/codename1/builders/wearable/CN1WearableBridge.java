@@ -2376,6 +2376,27 @@ public class CN1WearableBridge implements WearableBridge {
      * already tracked the newer peer value. A newer update landing between the two calls did the
      * same.</p>
      */
+    /**
+     * Records a locally authored winner after a deletion: the anchored replacement, and the
+     * snapshot, as ONE step.
+     *
+     * <p>Two separate anchored calls would leave a window between them. A peer publication landing
+     * there advances the stamp and caches its own payload, and the second call then finds the
+     * anchor stale and does nothing -- or, worse, an unanchored one would overwrite the value
+     * alone, so {@code getData} answered with local bytes while the stamp and the listener tracked
+     * the peer's. Nothing is dispatched: this is the suppressed local-winner path.</p>
+     */
+    static boolean recordLocalWinnerIfStampUnchanged(String path, String expected, long sequence,
+            String node, byte[] payload) {
+        synchronized (deliveredSequences) {
+            if (!setDeliveredSequenceIfStampUnchanged(path, expected, sequence, node)) {
+                return false;
+            }
+            rememberValue(path, payload);
+            return true;
+        }
+    }
+
     static boolean recordLocalEcho(String path, long sequence, String node, byte[] payload) {
         synchronized (deliveredSequences) {
             if (!setDeliveredSequenceIfOutranks(path, sequence, node)) {
@@ -2876,8 +2897,24 @@ public class CN1WearableBridge implements WearableBridge {
                         // Recording the stamp still matters: it is what stops the same item being
                         // resolved again and again.
                         if (isLocallyAuthored(context, winner.node)) {
-                            setDeliveredSequenceIfOutranks(path, winner.sequence, winner.node);
-                            rememberValue(path, winner.payload);
+                            // Recorded by the SAME rule the dispatching branches use -- only the
+                            // dispatch is suppressed, not the bookkeeping.
+                            //
+                            // After a deletion that means the anchored REPLACEMENT, not the
+                            // monotonic one: the stamp describes the item that was just removed and
+                            // a survivor routinely carries a lower sequence, so an outranks test
+                            // would leave the baseline sitting on a dead item and filter out every
+                            // later peer publication beneath it. And both updates go through one
+                            // atomic call, because splitting the stamp from the snapshot let a peer
+                            // publication land in between -- advancing the stamp and caching its
+                            // payload -- after which this older resolver overwrote the value alone
+                            // and getData answered with stale local bytes the listener never saw.
+                            if (afterDeletion) {
+                                recordLocalWinnerIfStampUnchanged(path, before, winner.sequence,
+                                        winner.node, winner.payload);
+                            } else {
+                                recordLocalEcho(path, winner.sequence, winner.node, winner.payload);
+                            }
                         } else if (afterDeletion) {
                             deliverIfStampUnchanged(path, before, winner.sequence, winner.node,
                                     winner.payload);
