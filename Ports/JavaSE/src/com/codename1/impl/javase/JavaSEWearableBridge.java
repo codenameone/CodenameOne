@@ -88,6 +88,18 @@ class JavaSEWearableBridge implements WearableBridge {
     /// @param watchSide true when this JVM is running the watch app
     /// @param paired true when the project declares a watch app
     JavaSEWearableBridge(File home, boolean watchSide, boolean paired) {
+        // A delivery the pending-delivery cap discarded is offered again by forgetting that this
+        // scan ever saw the file: the next 500ms pass then treats it as new. Nothing else would --
+        // the seen-marker is written before the delivery is queued.
+        WearableConnection.setDroppedDeliveryHandler(
+                new WearableConnection.DroppedDeliveryHandler() {
+                    public void deliveryDropped(String path) {
+                        synchronized (seenData) {
+                            seenData.remove(encodePath(path));
+                            seenData.remove(encodePath(path) + TOMB_SUFFIX);
+                        }
+                    }
+                });
         this.watchSide = watchSide;
         this.paired = paired;
         File root = new File(home, "wearable");
@@ -214,15 +226,24 @@ class JavaSEWearableBridge implements WearableBridge {
         // first leaves only a window in which neither exists, and the next scan finds the value:
         // every observable ordering converges on the replacement.
         File tomb = new File(dataDir, encodePath(path) + TOMB_SUFFIX);
-        if (tomb.delete()) {
+        boolean hadTombstone = tomb.delete();
+        if (hadTombstone) {
             synchronized (seenData) {
                 seenData.remove(tomb.getName());
             }
         }
-        writeValue(dataFile(path), payload, path);
+        if (!writeValue(dataFile(path), payload, path) && hadTombstone) {
+            // The replacement did not land -- a full disk, a failed move -- and the tombstone that
+            // recorded the removal has already gone. A peer that was offline would then see
+            // neither the new value nor the removal and keep its pre-removal value for good. Put
+            // the tombstone back: the removal is still the last thing that actually happened.
+            writeValue(tomb, new byte[0], path);
+        }
     }
 
-    private void writeValue(File f, byte[] payload, String path) {
+    /// @return true when the value was published; false when it could not be written, so a caller
+    /// that has already discarded state on the strength of this publication can put it back
+    private boolean writeValue(File f, byte[] payload, String path) {
         try {
             f.getParentFile().mkdirs();
             // Write-then-rename: the peer polls this directory every 500ms, and writing in place
@@ -301,8 +322,10 @@ class JavaSEWearableBridge implements WearableBridge {
             synchronized (seenData) {
                 seenData.put(f.getName(), Long.valueOf(seenKey(stamp, recorded, true)));
             }
+            return true;
         } catch (IOException err) {
             com.codename1.io.Log.p("Wearable simulator: failed to publish " + path + ": " + err);
+            return false;
         }
     }
 
@@ -777,10 +800,19 @@ class JavaSEWearableBridge implements WearableBridge {
                     if (authoredLocallyFor(snapshot, stamp)) {
                         // Ours. Keep it for the peer to find, and drop it once it is old enough
                         // that any peer which was going to see it has had every chance.
-                        // DECODED first. nextStamp encodes wallMillis * 2 + sideBit, so comparing
-                        // the raw value against currentTimeMillis stays negative for decades and
-                        // the cleanup would never have run -- tombstones would simply accumulate.
-                        if (System.currentTimeMillis() - (stamp / 2) > TOMB_TTL_MILLIS) {
+                        // Aged from the stamp INSIDE the file, not from its mtime. The mtime is
+                        // normally the encoded stamp, but setLastModified can be refused outright
+                        // -- writeValue says so -- and then the mtime is an ordinary wall-clock
+                        // value whose half looks decades old, so the author would delete its own
+                        // tombstone on the very next scan and an offline peer would never see the
+                        // removal. Decoded, because the stamp encodes wallMillis * 2 + sideBit;
+                        // comparing it undecoded reads as about minus fifty-seven years, which is
+                        // why this cleanup never fired at all before.
+                        long born = framedStamp(snapshot);
+                        long age = born == Long.MIN_VALUE
+                                ? System.currentTimeMillis() - stamp
+                                : System.currentTimeMillis() - (born / 2);
+                        if (age > TOMB_TTL_MILLIS) {
                             f.delete();
                             synchronized (seenData) {
                                 seenData.remove(f.getName());

@@ -161,6 +161,17 @@ public class CN1WearableBridge implements WearableBridge {
         // Ordering matters more than promptness: the claim store is bounded by the periodic prune
         // as well, so deferring it costs nothing.
         replayOutstandingTransfers();
+        // What to do when the pending-delivery cap has to discard one of our callbacks: forget that
+        // the path was delivered and resolve it again. Without forgetting, every replay skips it --
+        // the stamp is recorded before the delivery is queued, so the path looks delivered even
+        // though nothing ran. Runs after the drain, so the re-offer meets a listener.
+        WearableConnection.setDroppedDeliveryHandler(
+                new WearableConnection.DroppedDeliveryHandler() {
+                    public void deliveryDropped(String path) {
+                        forgetDeliveredSequence(path);
+                        scheduleWinnerResolution(context, path);
+                    }
+                });
     }
 
     // --- state --------------------------------------------------------------

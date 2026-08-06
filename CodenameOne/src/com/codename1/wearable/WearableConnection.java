@@ -655,12 +655,18 @@ public final class WearableConnection {
                 }
             }
         }
-        // Nothing superseded. Then the oldest replicated entry: its value is still readable with
-        // getData, so a listener that missed the callback can at least see the state, which is not
-        // true of a transfer.
+        // Nothing superseded. Then the oldest replicated entry -- but its path is REMEMBERED, and
+        // handed to the port after the drain. The ports record a delivery as made before queueing
+        // it, so their own replay would skip this path as already delivered; and a removal cannot
+        // be reconstructed from getData at all. Without that hand-back the listener stays
+        // permanently wrong about a path nothing will mention again.
         for (int i = 0; i < queue.size(); i++) {
-            if (!(queue.get(i) instanceof OneShot)) {
+            Runnable parked = queue.get(i);
+            if (!(parked instanceof OneShot)) {
                 queue.remove(i);
+                if (parked instanceof Replicated) {
+                    droppedPaths.add(((Replicated) parked).path);
+                }
                 return null;
             }
         }
@@ -795,6 +801,33 @@ public final class WearableConnection {
         }, dataListeners, pendingData, onRelinquished, onDelivered != null, path);
     }
 
+    /// What a port does about a replicated delivery the cap had to discard, or null when it has
+    /// registered nothing. See [#setDroppedDeliveryHandler].
+    private static volatile DroppedDeliveryHandler droppedDeliveries;
+
+    /// How a port recovers a parked delivery the cap discarded.
+    ///
+    /// Dropping the runnable is not enough on its own: the port recorded the delivery as made
+    /// before queueing it, so its own replay will skip that path as already delivered. The port has
+    /// to forget that record and offer the path again.
+    public interface DroppedDeliveryHandler {
+        /// Called once per discarded path, on the EDT, after the queue has drained and listeners
+        /// exist -- so a re-offer can actually be delivered rather than parked and dropped again.
+        void deliveryDropped(String path);
+    }
+
+    /// Framework/port entry point: registers what to do about a discarded delivery.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handler`: the port's recovery action, or null to remove it
+    public static void setDroppedDeliveryHandler(DroppedDeliveryHandler handler) {
+        droppedDeliveries = handler;
+    }
+
+    /// Paths whose parked delivery was discarded and not superseded, awaiting the drain.
+    private static final List<String> droppedPaths = new ArrayList<String>();
+
     /// Actions a port asked to run once deliveries can actually reach a listener, keyed so repeated
     /// requests for the same operation collapse into one.
     private static final java.util.LinkedHashMap<String, Runnable> replayRequests =
@@ -835,7 +868,12 @@ public final class WearableConnection {
     private static void drainPending(List<Runnable> queue) {
         List<Runnable> drained;
         List<Runnable> replays = null;
+        List<String> dropped = null;
         synchronized (queue) {
+            if (queue == pendingData && !droppedPaths.isEmpty()) {
+                dropped = new ArrayList<String>(droppedPaths);
+                droppedPaths.clear();
+            }
             if (queue == pendingData && !replayRequests.isEmpty()) {
                 replays = new ArrayList<Runnable>(replayRequests.values());
                 replayRequests.clear();
@@ -850,6 +888,15 @@ public final class WearableConnection {
         if (drained != null) {
             for (Runnable r : drained) {
                 Display.getInstance().callSerially(r);
+            }
+        }
+        // Paths the cap discarded, handed back now that a listener exists and there is room.
+        if (dropped != null) {
+            DroppedDeliveryHandler handler = droppedDeliveries;
+            if (handler != null) {
+                for (int i = 0; i < dropped.size(); i++) {
+                    handler.deliveryDropped(dropped.get(i));
+                }
             }
         }
         // After the drain, so a re-offered payload finds room and a registered listener rather than
