@@ -78,7 +78,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private Hashtable projectTheme;
     /// The look and feel of the design canvas. The preview hierarchy owns it so the project theme
     /// and the builder's own chrome can coexist; they cannot share the global UIManager.
-    private final UIManager previewUIManager = UIManager.createInstance();
+    private UIManager previewUIManager = UIManager.createInstance();
+    /// The device surface the canvas UIManager is attached to, so a new one can replace it.
+    private Container deviceSurface;
+    private int themeApplyCount;
     private Hashtable builderTheme;
     private Component previewRoot;
     private Component formToolbarPreview;
@@ -584,6 +587,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         previewRoot = preview;
         // The whole device surface resolves its look and feel from the canvas UIManager, so the
         // project CSS styles the preview and the builder's own theme never leaks into it.
+        deviceSurface = device;
         device.setUIManager(previewUIManager);
         if (preview instanceof Container previewContainer) previewContainer.setUIManager(previewUIManager);
         refreshProjectThemeOnPreview();
@@ -4093,7 +4097,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // preview only held the project styling for the instant of that call: every later
         // re-resolution -- a repaint, a revalidate, any refreshTheme cascade -- resolved against
         // the builder chrome again, so CSS edits appeared to do nothing.
+        // A brand new manager each time rather than reinstalling props into the existing one.
+        // Installing into a live manager left components resolving styles it had already cached,
+        // so the canvas kept the previous look and the stylesheet appeared to have no effect.
+        themeApplyCount++;
+        previewUIManager = UIManager.createInstance();
         previewUIManager.setThemeProps(projectTheme);
+        if (deviceSurface != null) deviceSurface.setUIManager(previewUIManager);
+        if (previewRoot instanceof Container previewContainer) {
+            previewContainer.setUIManager(previewUIManager);
+        }
         if (previewRoot != null) {
             previewRoot.refreshTheme(false);
             ComponentPreviewFactory.stabilizeDesignStyles(previewRoot);
@@ -4534,6 +4547,21 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         for (String path : guiFiles) forms.add(relativeFormName(path));
         out.put("forms", forms);
         if (canvasHost != null) out.put("canvasBounds", componentBounds(canvasHost));
+        out.put("previewUIManager", String.valueOf(System.identityHashCode(previewUIManager)));
+        out.put("globalUIManager", String.valueOf(System.identityHashCode(UIManager.getInstance())));
+        out.put("projectThemeLoaded", Boolean.valueOf(projectTheme != null));
+        out.put("themeApplyCount", Integer.valueOf(themeApplyCount));
+        // What each manager resolves for a plain Label, so the stylesheet on disk, the compiled
+        // theme and what the canvas resolves can be compared from outside the process.
+        out.put("previewLabelFg", String.format("%06x",
+                Integer.valueOf(previewUIManager.getComponentStyle("Label").getFgColor())));
+        out.put("globalLabelFg", String.format("%06x",
+                Integer.valueOf(UIManager.getInstance().getComponentStyle("Label").getFgColor())));
+        if (projectTheme != null) {
+            out.put("projectThemeLabelFg", String.valueOf(projectTheme.get("Label.fgColor")));
+            out.put("projectThemeKeys", Integer.valueOf(projectTheme.size()));
+        }
+        if (binding != null) out.put("cssFile", binding.cssFile());
         if (document == null) return out;
         normalizeSelection();
         out.put("activeForm", relativeFormName(document.path()));
@@ -4577,6 +4605,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             item.put("attributes", attributes);
             Component preview = componentForElement(canvasHost, element);
             if (preview != null) {
+                // The resolved style, not the stylesheet's text. This is what the canvas is actually
+                // drawing with, so it is the only way to tell from outside whether a CSS edit
+                // reached the preview or stopped somewhere on the way.
+                Map<String, Object> style = new LinkedHashMap<String, Object>();
+                style.put("uiid", preview.getUIID());
+                style.put("fgColor", String.format("%06x", Integer.valueOf(preview.getUnselectedStyle().getFgColor())));
+                style.put("bgColor", String.format("%06x", Integer.valueOf(preview.getUnselectedStyle().getBgColor())));
+                style.put("bgTransparency", Integer.valueOf(preview.getUnselectedStyle().getBgTransparency() & 0xff));
+                style.put("uiManager", String.valueOf(System.identityHashCode(preview.getUIManager())));
+                item.put("style", style);
                 item.put("bounds", componentBounds(preview));
                 item.put("visible", Boolean.valueOf(preview.isVisible() && preview.getWidth() > 0 && preview.getHeight() > 0));
                 item.put("accessibilityIdentifier", preview.getSemantics().getIdentifier());
