@@ -2077,6 +2077,9 @@ public class CN1WearableBridge implements WearableBridge {
                     // deliver a newer publication for this path while it does; both branches below
                     // have to notice that rather than act on a view of the world that has expired.
                     String before = deliveredStamp(path);
+                    // Read ONCE, and remember what we acted on. Calling wasAfterDeletion() again
+                    // below would let an upgrade landing mid-task change the rule half way through.
+                    boolean afterDeletion = wasAfterDeletion(path);
                     ResolvedValue winner = resolveValue(context, path);
                     if (winner != null) {
                         // Two different rules, because the recorded stamp means two different things.
@@ -2092,13 +2095,13 @@ public class CN1WearableBridge implements WearableBridge {
                         //
                         // Otherwise the stamp describes a live value, and the ordinary monotonic
                         // rule is right.
-                        if (wasAfterDeletion(path)) {
+                        if (afterDeletion) {
                             deliverIfStampUnchanged(path, before, winner.sequence, winner.node,
                                     winner.payload);
                         } else {
                             deliverIfOutranks(path, winner.sequence, winner.node, winner.payload);
                         }
-                    } else if (wasAfterDeletion(path)
+                    } else if (afterDeletion
                             && deliverRemovalIfStampUnchanged(path, before)) {
                         // Empty AND nothing landed while we were asking. Announcing a removal for a
                         // path a concurrent publication has since refilled is the one error the app
@@ -2107,7 +2110,15 @@ public class CN1WearableBridge implements WearableBridge {
                         // a value republished later with a lower sequence must not be filtered as
                         // older.
                     }
-                    forgetPendingWinner(path);
+                    if (finishPendingWinner(path, afterDeletion)) {
+                        // A deletion upgrade arrived while this task was running and we applied the
+                        // non-deletion rule, so the deleted winner may still be recorded as
+                        // delivered. The scheduler that set the flag saw the path already pending
+                        // and scheduled nothing, so if we simply cleared the state here that
+                        // deletion would have no task left to resolve it, and no later callback
+                        // either -- a deleted value shown indefinitely. Run again for it.
+                        scheduleWinnerResolution(context, path, true);
+                    }
                 } catch (Throwable stillUnavailable) {
                     if (attempt >= WINNER_RETRIES) {
                         // Give up rather than deliver something unverified. The path stays unstamped,
@@ -2125,6 +2136,29 @@ public class CN1WearableBridge implements WearableBridge {
         synchronized (pendingWinnerPaths) {
             pendingWinnerPaths.remove(path);
             deletionPaths.remove(path);
+        }
+    }
+
+    /**
+     * Retires a finished resolution, reporting whether a deletion upgrade arrived too late to be
+     * honoured by it.
+     *
+     * <p>The read of the flag and the release of the pending marker have to be one step. Between a
+     * task reading "not a deletion" and clearing its pending state, a deletion whose inline
+     * attempts failed can set the flag -- and because the path still looks pending, that scheduler
+     * deliberately schedules nothing. Clearing the flag on the way out would then discard a
+     * deletion that has no task left to resolve it and no callback coming, leaving a deleted value
+     * on screen indefinitely.</p>
+     *
+     * @param actedOnDeletion whether this task applied the deletion rule
+     * @return true when a deletion upgrade was missed and a fresh resolution is owed
+     */
+    private static boolean finishPendingWinner(String path, boolean actedOnDeletion) {
+        synchronized (pendingWinnerPaths) {
+            boolean missed = !actedOnDeletion && deletionPaths.contains(path);
+            pendingWinnerPaths.remove(path);
+            deletionPaths.remove(path);
+            return missed;
         }
     }
 

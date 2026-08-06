@@ -305,6 +305,14 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // Under our prefix but not written by this API -- nothing to deliver.
                 continue;
             }
+            // A publication for this path ends any local-removal window: the wildcard delete it
+            // covered is demonstrably over, so a peer's later removal must not be mistaken for it.
+            //
+            // Hoisted ABOVE the first-sight branch, which exits by `continue` -- leaving it below
+            // meant a publication arriving with no delivery stamp recorded took that exit and never
+            // cleared the marker, so a peer removing its brand-new value inside the window still
+            // had that removal swallowed.
+            CN1WearableBridge.clearLocalRemoval(path);
             if (!CN1WearableBridge.hasDeliveredStamp(appPath)) {
                 // First sight of this path in this process -- after a restart there is no baseline,
                 // so accepting the event on the strength of "nothing recorded" would hand the app a
@@ -355,9 +363,6 @@ public class CN1WearableListenerService extends WearableListenerService {
             //
             // An older item arriving after a newer one is ordinary, not exotic: a reconnect does it
             // whenever both nodes publish the same path. deliverIfOutranks declines those silently.
-            // A publication for this path ends any local-removal window: the wildcard delete it
-            // covered is demonstrably over, so a peer's later removal must not be mistaken for it.
-            CN1WearableBridge.clearLocalRemoval(path);
             if (ownEcho) {
                 // The ONE deliberate use of the raw setter. Bookkeeping only: the stamp still has
                 // to move so a later peer item is judged against what this device actually
