@@ -225,9 +225,15 @@ public final class DatabaseConformanceSuite {
 
         String path = Database.getDatabasePath(databaseName);
         r.check(path != null, "getDatabasePath returns a path for an existing database");
-        if (path != null) {
+        if (path != null && Database.isCustomPathSupported()) {
+            // Only meaningful where databases live on a filesystem. A platform that reports no
+            // custom-path support is saying its databases are keyed by name inside a storage
+            // pool, and there the returned value is an opaque handle rather than something
+            // FileSystemStorage could open - the JavaScript port is the case in point.
             r.check(FileSystemStorage.getInstance().exists(path),
                     "the path from getDatabasePath resolves through FileSystemStorage");
+        } else if (path != null) {
+            r.info("databases are not filesystem backed here, so the path is an opaque handle");
         }
 
         r.check(!Database.isEncrypted(databaseName),

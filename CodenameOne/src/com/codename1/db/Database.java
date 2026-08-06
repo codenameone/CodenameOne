@@ -225,7 +225,9 @@ public abstract class Database {
     ///                     paths (i.e. `#isCustomPathSupported()` return true), will also accept a file path here.
     ///
     ///
-    /// **NOTE:** This method will return null in the Javascript port.
+    /// **NOTE:** Where `#isCustomPathSupported()` is false the databases are not filesystem
+    /// backed, so what comes back identifies the database inside the platform's storage but is
+    /// not a path `com.codename1.io.FileSystemStorage` can open.
     ///
     /// #### Returns
     ///
