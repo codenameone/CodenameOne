@@ -3211,10 +3211,13 @@ public class CN1WearableBridge implements WearableBridge {
                     c.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE);
             android.content.SharedPreferences.Editor edit = prefs.edit();
             edit.putString(key, stamp);
-            pruneInto(prefs, edit);
             edit.apply();
-            // Also pruned on a timer: writing the next claim is not something that is guaranteed to
-            // happen, and the store's bound must not depend on it.
+            // NO inline prune. Writing one claim says nothing about whether OTHER items are still
+            // published, and the sender retries a failed deletion indefinitely -- so age-pruning
+            // here could drop a live transfer's claim while recording an unrelated one, and the
+            // next replay or restart would hand the app that one-shot file again. Every prune now
+            // goes through a replay pass that has just refreshed what still exists; the
+            // maintenance timer below is what keeps the store bounded.
             scheduleClaimPrune(c);
         } catch (Throwable unavailable) {
             // Best effort: the in-memory claim still holds for this process.
@@ -3297,6 +3300,10 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     /// Marks every expired entry for removal on the editor, returning how many survive.
+    ///
+    /// Reachable ONLY from a replay pass that has already refreshed the claims of items still
+    /// published. There is no age-only caller by design: expiring a claim whose item still exists
+    /// is what lets a restart redeliver a one-shot transfer.
     private static int pruneInto(android.content.SharedPreferences prefs,
                                  android.content.SharedPreferences.Editor edit) {
         int kept = 0;
