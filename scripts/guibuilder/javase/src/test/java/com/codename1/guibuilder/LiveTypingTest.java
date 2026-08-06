@@ -6,6 +6,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.editor.EditorView;
+import com.codename1.xml.Element;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -74,6 +75,60 @@ class LiveTypingTest {
         String after = textOf(editor);
         assertNotEquals(before, after, "the CSS editor is dead to the keyboard");
         assertTrue(after.contains("PINK"), "typing must insert the whole word, not drop characters");
+    }
+
+    @Test
+    void typingACssColourRestylesTheCanvas() throws Exception {
+        CodenameOneGUIBuilder builder = workspace();
+        open(builder, "openCss", null, null);
+        settle();
+
+        CodeEditor editor = builder.activeEditorForTest();
+        assertNotNull(editor, "the CSS editor was never created");
+        EditorView view = viewOf(editor);
+        click(view);
+
+        Component label = previewOf(builder, "nestedDescription");
+        assertNotNull(label, "the demo form does not render the label under test");
+        int before = label.getUnselectedStyle().getFgColor();
+
+        // Replace the stylesheet by selecting everything and typing over it, which is what a person
+        // does. The earlier CSS test called the recompile directly and so never exercised the path
+        // from a keystroke to a repainted canvas -- the path that was actually broken.
+        Display.getInstance().callSeriallyAndWait(() -> view.selectAll());
+        type(view, "Label { color: #00ff00; }\n");
+        settleForLiveCss();
+
+        Component after = previewOf(builder, "nestedDescription");
+        assertNotNull(after, "the label vanished after the CSS edit");
+        assertEquals(0x00ff00, after.getUnselectedStyle().getFgColor(),
+                "typing a colour into theme.css must restyle the canvas; the editor text was: "
+                        + textOf(editor));
+    }
+
+    private static Component previewOf(CodenameOneGUIBuilder builder, String name) {
+        return findByElementName(builder.canvasHostForTest(), name);
+    }
+
+    private static Component findByElementName(Container root, String name) {
+        for (int i = 0; i < root.getComponentCount(); i++) {
+            Component component = root.getComponentAt(i);
+            Object element = component.getClientProperty("gui.element");
+            if (element instanceof Element e && name.equals(e.getAttribute("name"))) return component;
+            if (component instanceof Container container) {
+                Component nested = findByElementName(container, name);
+                if (nested != null) return nested;
+            }
+        }
+        return null;
+    }
+
+    /** The live CSS path debounces twice, so it needs longer than an ordinary EDT flush. */
+    private static void settleForLiveCss() {
+        for (int i = 0; i < 8; i++) {
+            try { Thread.sleep(300); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            Display.getInstance().callSeriallyAndWait(() -> { });
+        }
     }
 
     // ---- harness ----------------------------------------------------------------------------
