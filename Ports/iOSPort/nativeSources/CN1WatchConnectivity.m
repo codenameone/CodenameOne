@@ -68,13 +68,23 @@ static NSLock *cn1WearableClockLock(void) {
 }
 
 /// The high-water mark: wall time, our own prior writes, AND every stamp a peer has shown us.
+/// The highest value this process has PERSISTED, which is what a new write has to beat.
+///
+/// Seeded from the stored floor on first use and raised on every write. Re-reading only the value
+/// restored at startup was wrong the moment a second observation arrived: after persisting 1000, a
+/// later stamp of 900 still exceeded the ORIGINAL floor and overwrote the stored value with the
+/// lower one -- so a process that exited before its next local publication came back with a floor
+/// beneath the peer's existing entry, and published values that lost to it until wall time caught
+/// up. Guarded by the same lock as cn1WearableLast.
+static int64_t cn1WearablePersistedFloor = 0;
+
 static int64_t cn1WearableClockFloor(void) {
     static dispatch_once_t once;
-    static int64_t restored = 0;
     dispatch_once(&once, ^{
-        restored = (int64_t) [[NSUserDefaults standardUserDefaults] doubleForKey:kCn1WearableClockKey];
+        cn1WearablePersistedFloor =
+                (int64_t) [[NSUserDefaults standardUserDefaults] doubleForKey:kCn1WearableClockKey];
     });
-    return restored;
+    return cn1WearablePersistedFloor;
 }
 
 static int64_t cn1WearableLast = 0;
@@ -98,7 +108,9 @@ static void cn1WearableObserveSequence(int64_t seen) {
     }
     if (seen > floorValue) {
         // Persist so the floor outlives this process; a relaunch that forgot it would hand the
-        // peer the advantage back.
+        // peer the advantage back. The high-water mark moves with it, so a lower later stamp
+        // cannot overwrite this one.
+        cn1WearablePersistedFloor = seen;
         [[NSUserDefaults standardUserDefaults] setDouble:(double) seen forKey:kCn1WearableClockKey];
     }
     [lock unlock];
@@ -337,6 +349,11 @@ static int64_t cn1WearableNextSequence(void) {
     }
     cn1WearableLast = now > cn1WearableLast ? now : cn1WearableLast + 1;
     int64_t result = cn1WearableLast;
+    // This write must move the high-water mark too. Leaving it behind would let a later, LOWER
+    // observation still look like a rise against a stale mark and overwrite this value -- the same
+    // regression cn1WearableObserveSequence guards against, reintroduced through the other writer.
+    // The sequence is monotonic, so result is always the highest value yet persisted.
+    cn1WearablePersistedFloor = result;
     [[NSUserDefaults standardUserDefaults] setDouble:(double) result forKey:kCn1WearableClockKey];
     [lock unlock];
     return result;
