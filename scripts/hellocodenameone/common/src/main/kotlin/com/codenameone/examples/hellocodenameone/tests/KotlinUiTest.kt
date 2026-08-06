@@ -184,6 +184,33 @@ class KotlinUiTest : BaseTest() {
         step("probe-off-preferredsize")
         Switch().preferredSize
         step("probe-off-preferredsize-ok")
+        // OFF preferred size works, ON throws, and the ONLY thing the ON path does
+        // that the OFF path does not is getThumbOnImage -- which hard-codes a
+        // shadowSpread of 2, while the OFF thumb takes it from
+        // switchThumbShadowSpreadInt (Material 3 sets that to 0 for a flat thumb).
+        // A spread of 0 skips the drop-shadow/blur branch entirely, so the ON thumb
+        // is the only one that ever blurs. Report the constant, then walk the branch
+        // as it really runs: create through the factory, DRAW into it, blur the
+        // drawn image, and take graphics on the result. The earlier blur probe
+        // blurred a blank image, which is not the same thing on a Direct2D target
+        // that has an open draw batch.
+        val um = com.codename1.ui.plaf.UIManager.getInstance()
+        step("probe-shadowspread=" + um.getThemeConstant("switchThumbShadowSpreadInt", 2))
+        step("probe-drawn-create")
+        val drawn = com.codename1.ui.ImageFactory.createImage(soSwitch, 34, 34, 0)
+        val dg = drawn.graphics
+        dg.isAntiAliased = true
+        step("probe-drawn-fill")
+        dg.color = 0
+        dg.fillRoundRect(2, 2, 30, 30, 30, 30)
+        step("probe-drawn-blur")
+        val drawnBlur = com.codename1.ui.Display.getInstance().gaussianBlurImage(drawn, 5f)
+        step("probe-drawn-blur-null=" + (drawnBlur == null))
+        step("probe-drawn-blur-graphics")
+        val dbg = drawnBlur.graphics
+        step("probe-drawn-blur-g-null=" + (dbg == null))
+        dbg.isAntiAliased = true
+        step("probe-drawn-ok")
         step("probe-so-preferredsize")
         soSwitch.preferredSize
         step("probe-so-addcontent")
