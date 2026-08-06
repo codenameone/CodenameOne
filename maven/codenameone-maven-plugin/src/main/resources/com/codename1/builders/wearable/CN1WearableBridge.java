@@ -154,10 +154,11 @@ public class CN1WearableBridge implements WearableBridge {
         // stops would otherwise never run the sweep again, leaving its last transfers published
         // indefinitely -- the post-publish sweep only helps an app that keeps transferring.
         expireOwnTransfers();
-        // And prune the RECEIVER's durable claims, for the same reason in the other direction: the
-        // prune timer is process-local while the claims are not, so a process that exits before it
-        // fires leaves them for the next cold start to clear.
-        pruneClaims(this.context);
+        // The receiver's durable claims are pruned by the replay itself, once it has succeeded --
+        // NOT here. Pruning first deleted an aged claim before the replay could see that its item
+        // is still published, and the replay then delivered that one-shot file a second time.
+        // Ordering matters more than promptness: the claim store is bounded by the periodic prune
+        // as well, so deferring it costs nothing.
         replayOutstandingTransfers();
     }
 
@@ -1761,6 +1762,12 @@ public class CN1WearableBridge implements WearableBridge {
                     }
                 } catch (Throwable unavailable) {
                     replayFailed = true;
+                }
+                if (!replayFailed) {
+                    // Only now, with every still-published item examined and its claim refreshed,
+                    // is it safe to drop the aged ones: whatever is left describes an item that is
+                    // genuinely gone. This is the startup prune the constructor used to do first.
+                    pruneClaims(context);
                 }
                 if (replayFailed
                         && System.currentTimeMillis() - startedAt < TRANSFER_RETENTION_MILLIS) {
