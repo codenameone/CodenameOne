@@ -447,29 +447,38 @@ class JavaSEWearableBridge implements WearableBridge {
         try {
             acknowledged = Long.parseLong(recorded);
         } catch (NumberFormatException notAStamp) {
-            // Includes the EMPTY payload the previous build wrote, which acknowledged by existence
-            // alone. Not honoured, deliberately: accepting it would mean an acknowledgement that
-            // matches every tombstone at its path forever, which is the failure this whole change
-            // is about -- and it would make deleting the stale file in putData load-bearing rather
-            // than tidying, so a failed delete would silently reintroduce it.
+            // Refused outright, NOT folded into a sentinel value. Includes the EMPTY payload the
+            // previous build wrote, which acknowledged by existence alone -- accepting that would
+            // mean an acknowledgement matching every tombstone at its path forever, the failure
+            // this whole change is about.
+            //
+            // Not by assigning Long.MIN_VALUE either, which is what this did: that is also what
+            // framedStamp reports for a tombstone written before the frame existed, so an
+            // unreadable acknowledgement compared EQUAL to an unframed tombstone and retired it.
+            // Two different unknowns are not the same value.
             //
             // The cost of refusing is bounded and small: a tombstone the peer already saw under
             // the old build is kept until MAX_TOMBS evicts it, in a sandbox shared by two
             // processes of one simulator run. Against that, an unacknowledged tombstone erroneously
             // retired is a peer that never learns of a removal at all.
-            acknowledged = Long.MIN_VALUE;
+            forgetStaleAcknowledgement(ack);
+            return false;
         }
         if (acknowledged == tombstoneStamp) {
             return true;
         }
-        // Stale, or unreadable, or from the previous format: discarded rather than left to be
-        // re-examined on every scan. The peer rewrites a real one the next time it sees the
-        // tombstone undelivered.
+        forgetStaleAcknowledgement(ack);
+        return false;
+    }
+
+    /// Discards an acknowledgement that confirms nothing -- stale, unreadable, or from the previous
+    /// format -- rather than leaving it to be re-examined on every scan. The peer writes a real one
+    /// the next time it sees the tombstone undelivered.
+    private void forgetStaleAcknowledgement(File ack) {
         ack.delete();
         synchronized (seenData) {
             seenData.remove(ack.getName());
         }
-        return false;
     }
 
     /// Marks a tombstone file. A removal's durable record, consumed by the peer's scan.
