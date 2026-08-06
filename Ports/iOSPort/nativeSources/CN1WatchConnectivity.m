@@ -547,7 +547,13 @@ static int64_t cn1WearableTombstoneAge(NSString *path) {
 /// stopped holding an older value for that path -- otherwise dropping it lets that value win the
 /// next comparison and the removal silently undoes itself. Age alone is not evidence of that: a peer
 /// that has been offline for a week still has its old value when it comes back.
-static void cn1WearablePruneTombstones(NSMutableDictionary *ctx, NSDictionary *peerCtx) {
+/// `retired` collects the paths whose tombstones were dropped. Their birth records are NOT
+/// forgotten here: the context this prunes has not been published yet, and an update that then
+/// fails leaves the tombstone authoritative with no birth record -- so the next pass reads it as
+/// newly born and grants it another full retention window. The caller forgets them once the
+/// publication has actually succeeded.
+static void cn1WearablePruneTombstones(NSMutableDictionary *ctx, NSDictionary *peerCtx,
+                                       NSMutableArray *retired) {
     NSMutableArray *tombKeys = [NSMutableArray array];
     for (NSString *key in ctx.allKeys) {
         if ([key isKindOfClass:[NSString class]] && [key hasPrefix:kTombPrefix]) {
@@ -573,7 +579,7 @@ static void cn1WearablePruneTombstones(NSMutableDictionary *ctx, NSDictionary *p
             continue;
         }
         [ctx removeObjectForKey:key];
-        cn1WearableForgetTombstoneBirth(path);
+        [retired addObject:path];
     }
     if (ctx.count <= kCN1MaxTombstones) {
         return;
@@ -610,11 +616,11 @@ static void cn1WearablePruneTombstones(NSMutableDictionary *ctx, NSDictionary *p
             continue;
         }
         [ctx removeObjectForKey:key];
-        // The birth record goes with it. Pruning finds those records only through tombstones still
-        // in the context, so an entry dropped here becomes unreachable -- churn through unique
-        // paths would grow the defaults dictionary without bound. Same reason as the TTL and
-        // republish paths.
-        cn1WearableForgetTombstoneBirth([key substringFromIndex:kTombPrefix.length]);
+        // The birth record goes with it, once the caller has published. Pruning finds those
+        // records only through tombstones still in the context, so an entry dropped here becomes
+        // unreachable -- churn through unique paths would grow the defaults dictionary without
+        // bound. Same reason as the TTL and republish paths.
+        [retired addObject:[key substringFromIndex:kTombPrefix.length]];
         keep--;
     }
 }
@@ -824,20 +830,31 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // any tombstone: republishing a removed path brings it back.
     ctx[cn1WearableValueKey(path)] = (payload == nil ? [NSData data] : payload);
     ctx[cn1WearableStampKey(path)] = @(cn1WearableNextSequence());
-    [ctx removeObjectForKey:cn1WearableTombKey(path)];
-    // And its birth record. Pruning only visits tombstones still in the context, so a path that is
-    // republished leaves an entry nothing will ever revisit -- an app cycling through changing
-    // paths would grow that dictionary without bound.
-    cn1WearableForgetTombstoneBirth(path);
+    NSMutableArray *retiredBirths = [NSMutableArray array];
+    if (ctx[cn1WearableTombKey(path)] != nil) {
+        [ctx removeObjectForKey:cn1WearableTombKey(path)];
+        // Its birth record goes too, but only once this context is actually published -- see
+        // cn1WearablePruneTombstones. Pruning only visits tombstones still in the context, so a
+        // republished path would otherwise leave an entry nothing will ever revisit.
+        [retiredBirths addObject:path];
+    }
     // Pruned here as well, not only in removeData. Tombstones raised while the peer was offline
     // become prunable the moment it reconnects and acknowledges them -- but an app that then only
     // ever calls putData() never reached the sweep, because removeData() held its only call site.
     // The context kept growing until a perfectly ordinary value publication was rejected for size,
     // with every tombstone in it eligible for removal. Publishing is exactly when that matters,
     // since publishing is what the oversized context breaks.
-    cn1WearablePruneTombstones(ctx, [s receivedApplicationContext]);
+    cn1WearablePruneTombstones(ctx, [s receivedApplicationContext], retiredBirths);
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
+    if (err == nil) {
+        // Only now: the pruned context is live, so the birth records describe tombstones that are
+        // genuinely gone. Forgetting them earlier would restart the retention clock of every
+        // tombstone this publish failed to remove.
+        for (NSString *retiredPath in retiredBirths) {
+            cn1WearableForgetTombstoneBirth(retiredPath);
+        }
+    }
     // Released before the error branch below, not after it: an early return there would leave the
     // lock held for the life of the process and every later putData/removeData would block on it.
     [ctxLock unlock];
@@ -882,7 +899,8 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     [ctx removeObjectForKey:cn1WearableStampKey(path)];
     ctx[cn1WearableTombKey(path)] = @(cn1WearableNextSequence());
     cn1WearableNoteTombstoneBirth(path);
-    cn1WearablePruneTombstones(ctx, [s receivedApplicationContext]);
+    NSMutableArray *retiredBirths = [NSMutableArray array];
+    cn1WearablePruneTombstones(ctx, [s receivedApplicationContext], retiredBirths);
     // Also swept when THIS tombstone comes of age. Pruning ran only from putData and removeData, so
     // an app whose last act is a removal kept that final batch in its persisted context for good --
     // the tombstone is necessarily younger than its TTL at the moment it is written, and nothing
@@ -910,7 +928,14 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         // discovered through: pruning walks tombstones in the context, and one with no tombstone is
         // unreachable for good. Repeated failed removals of unique paths would grow the defaults
         // dictionary without bound.
+        //
+        // The records the prune retired are deliberately KEPT: their tombstones are still in the
+        // published context, and forgetting them would hand each one a fresh retention window.
         cn1WearableForgetTombstoneBirth(path);
+    } else {
+        for (NSString *retiredPath in retiredBirths) {
+            cn1WearableForgetTombstoneBirth(retiredPath);
+        }
     }
     [ctxLock unlock];
     [ctx release];
@@ -969,7 +994,8 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         return;
     }
     NSUInteger before = ctx.count;
-    cn1WearablePruneTombstones(ctx, [s receivedApplicationContext]);
+    NSMutableArray *retiredBirths = [NSMutableArray array];
+    cn1WearablePruneTombstones(ctx, [s receivedApplicationContext], retiredBirths);
     BOOL stillHeld = NO;
     for (NSString *key in ctx.allKeys) {
         if ([key isKindOfClass:[NSString class]] && [key hasPrefix:kTombPrefix]) {
@@ -997,6 +1023,11 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
         // is a wasted transfer, and on the peer it looks like a fresh context to re-examine.
         NSError *err = nil;
         [s updateApplicationContext:ctx error:&err];
+        if (err == nil) {
+            for (NSString *retiredPath in retiredBirths) {
+                cn1WearableForgetTombstoneBirth(retiredPath);
+            }
+        }
     }
     [ctxLock unlock];
     [ctx release];
