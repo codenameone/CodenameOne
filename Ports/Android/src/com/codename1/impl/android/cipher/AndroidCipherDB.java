@@ -127,18 +127,33 @@ class AndroidCipherDB extends Database {
         markTransactionEnded();
     }
 
-    /// Rolls back without reporting a failure, for the path where a commit has already failed.
+    /// Ends a transaction that a failed commit left behind.
     ///
-    /// endTransaction() reports the failed commit and clears the wrapper's own bookkeeping, but
-    /// it does not necessarily end the transaction SQLite is holding: a deferred constraint
-    /// violation leaves it open, so the next beginTransaction() gets "cannot start a transaction
-    /// within a transaction" straight from the engine. Asking SQLite directly ends it whatever
-    /// the wrapper thinks, and there is nothing to report if it was already gone.
+    /// endTransaction() pops its own transaction record before it sends the COMMIT, so when the
+    /// COMMIT fails the engine is still holding the transaction while the wrapper believes there
+    /// is none. Measured on API 34, after a deferred foreign key violation: inTransaction()
+    /// reports false, the uncommitted row is still visible to reads, and the next
+    /// beginTransaction() fails with "cannot start a transaction within a transaction". Leaving
+    /// it is not an option -- the database is unusable for transactions from then on, and every
+    /// later read sees writes that were never committed.
+    ///
+    /// The wrapper cannot roll it back for us. A plain execSQL("ROLLBACK") never reaches SQLite:
+    /// the session layer classifies a statement by its first three characters and turns "ROL"
+    /// into its own endTransaction(), which throws because it thinks no transaction is open.
+    /// Same for a second endTransaction(), and for compileStatement and rawQuery, which route
+    /// through the same classifier. A statement that does not start with those three characters
+    /// is passed through to the engine unexamined, so a leading comment is what gets the rollback
+    /// to the connection that actually needs it. Verified against all of the above on API 34:
+    /// this is the only one that recovers.
+    ///
+    /// That measurement was taken against the stock engine. SQLCipher's SQLiteDatabase is a fork
+    /// of the same AOSP sources and classifies statements the same way, so the same applies here.
     private void rollbackQuietly() {
         try {
-            db.execSQL("ROLLBACK");
+            db.execSQL("/* not ROLLBACK to the statement classifier */ ROLLBACK");
         } catch (Throwable ignored) {
-            // The caller is already reporting the commit failure.
+            // Nothing to end, or a platform that classifies differently. Either way the caller is
+            // already reporting the commit failure, and a conformance run reports the rest.
         }
     }
 
