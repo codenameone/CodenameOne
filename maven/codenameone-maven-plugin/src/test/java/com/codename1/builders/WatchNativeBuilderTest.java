@@ -515,7 +515,9 @@ class WatchNativeBuilderTest {
                 "ios.health.backgroundDelivery",
                 "ios.health.recalibrateEstimates",
                 "ios.entitlements.com.apple.developer.healthkit.background-delivery",
-                "ios.entitlements.com.apple.developer.healthkit.recalibrate-estimates"}) {
+                "ios.entitlements.com.apple.developer.healthkit.recalibrate-estimates",
+                // The plainest declaration of all, and the one the sub-capability list missed.
+                "ios.entitlements.com.apple.developer.healthkit"}) {
             BuildRequest req = request();
             req.putArgument("watchMain", "com.mycompany.myapp.MyApp");
             req.putArgument(hint, "true");

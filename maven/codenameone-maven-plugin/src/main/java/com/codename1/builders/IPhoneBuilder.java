@@ -150,6 +150,13 @@ public class IPhoneBuilder extends Executor {
     /// app uses HealthKit.
     boolean phoneUsesHealthData(BuildRequest request) {
         return usesHealthRead || usesHealthWrite || usesHealthWorkout
+                // The parent entitlement asked for outright. Enumerating only the two
+                // sub-capabilities missed the plainest declaration of all: a project with native
+                // health code that says com.apple.developer.healthkit=true and supplies its purpose
+                // string. The phone kept the entitlement it was handed and the watch, signed
+                // independently, went without it.
+                || "true".equalsIgnoreCase(request.getArg(
+                        "ios.entitlements.com.apple.developer.healthkit", "false"))
                 || healthCapabilityRequested(request, "ios.health.backgroundDelivery",
                         "background-delivery")
                 || healthCapabilityRequested(request, "ios.health.recalibrateEstimates",
