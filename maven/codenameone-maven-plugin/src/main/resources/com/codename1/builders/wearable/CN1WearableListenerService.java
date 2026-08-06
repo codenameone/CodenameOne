@@ -199,6 +199,9 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // the strength of this event alone would tell the listener the value disappeared
                 // while getData(path) still returned it. Ask what is left and report that instead.
                 try {
+                    // Snapshot BEFORE the query: resolveValueWithRetry blocks and retries, so a
+                    // newer publication can be delivered and stamped while it runs.
+                    String beforeQuery = CN1WearableBridge.deliveredStamp(appPath);
                     // Retry, because a deletion is the ONLY callback for this state: if the path is
                     // now empty, or an unchanged lower-ranked replica is the survivor, nothing else
                     // will fire and staying silent leaves the listener permanently wrong while
@@ -211,18 +214,22 @@ public class CN1WearableListenerService extends WearableListenerService {
                         // survivor carries a lower sequence than the winner just deleted (which is
                         // ordinary: the winner is gone precisely because it was removed), leaving
                         // the dead item's higher stamp recorded and filtering out any later item
-                        // that falls between the two. So this is the ONE caller that deliberately
-                        // keeps the unconditional setDeliveredSequence rather than the
-                        // outranks-guarded form the resolution paths use: the stamp being replaced
-                        // describes an item that no longer exists, so there is no newer live value
-                        // to protect here.
+                        // that falls between the two. So the outranks-guarded form is wrong here.
+                        //
+                        // But an UNconditional replace is wrong too: the query above blocks, and a
+                        // newer publication delivered while it ran would be overwritten by this
+                        // older survivor -- the newer callback has already fired and may not
+                        // repeat, so the listener would sit regressed while getData() answered with
+                        // the newer item. Anchoring on the pre-query stamp gets both: the dead
+                        // winner's stamp is replaced whatever its number, and anything that landed
+                        // meanwhile wins instead.
                         //
                         // Only when the winner actually changed. Deleting a lower-ranked SHADOW
                         // replica leaves the same item winning, and re-announcing a value the app
                         // already holds is a spurious change -- listeners re-render, and anything
                         // that treats a change as an event would act on it twice.
-                        if (CN1WearableBridge.setDeliveredSequence(
-                                appPath, remaining.sequence, remaining.node)) {
+                        if (CN1WearableBridge.setDeliveredSequenceIfStampUnchanged(
+                                appPath, beforeQuery, remaining.sequence, remaining.node)) {
                             WearableConnection.deliverDataChanged(appPath, remaining.payload);
                         }
                     } else if (CN1WearableBridge.forgetDeliveredSequenceIfPresent(appPath)) {

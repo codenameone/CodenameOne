@@ -166,6 +166,18 @@ public class IPhoneBuilder extends Executor {
     // phone target and the watch target -- WCSession is symmetric, so both halves of a pair need
     // it. Apps that never touch the API see no change.
     private boolean usesWearable;
+
+    /**
+     * Whether the API scan saw {@code com.codename1.wearable}.
+     *
+     * <p>Package-private for {@link WatchNativeBuilder}, which links WatchConnectivity onto the
+     * watch target it generates. The phone target gets the framework through {@code addLibs}, but
+     * that list is consumed before the watch target exists, so the watch half has to ask.</p>
+     */
+    boolean usesWearable() {
+        return usesWearable;
+    }
+
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;

@@ -3059,7 +3059,12 @@ public class AndroidGradleBuilder extends Executor {
             playServicesWear = true;
             // The capability the peer half advertises, so isCompanionAppInstalled() can tell a
             // watch running this app from a watch that merely exists.
-            File wearValues = new File(projectDir, "app/src/main/res/values");
+            // resDir, NOT projectDir + "app/...". projectDir already IS the generated app module,
+            // so the extra segment put this at <app>/app/src/main/res/values -- a directory Gradle
+            // never packages. The failure is silent and total: the capability is never advertised,
+            // so after the first query isCompanionAppInstalled() and isReachable() answer false and
+            // message fan-out filters out every valid peer as "not running the app".
+            File wearValues = new File(resDir, "values");
             wearValues.mkdirs();
             try {
                 createFile(new File(wearValues, "cn1_wearable.xml"),

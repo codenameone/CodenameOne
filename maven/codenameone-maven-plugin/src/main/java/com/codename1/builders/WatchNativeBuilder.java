@@ -887,6 +887,30 @@ class WatchNativeBuilder {
                 .append("  bf.remove_from_project if gl.include?(File.basename(ref.path))\n")
                 .append("end\n");
 
+        // WatchConnectivity is linked EXPLICITLY on the watch target when the app uses the wearable
+        // API, rather than left to the module auto-link above.
+        //
+        // IPhoneBuilder appends the framework to addLibs, and addLibs is consumed while generating
+        // the PHONE target -- the watch target is created here, afterwards, and copies sources and
+        // resources but not that list. What currently saves the link is CLANG_ENABLE_MODULES plus
+        // the '#import <WatchConnectivity/WatchConnectivity.h>' in CN1WatchConnectivity.h, which
+        // makes clang emit an autolink directive. That works, but it means the watch slice links a
+        // framework it never names: turn modules off, or reach WCSession through a header that does
+        // not import the umbrella, and the target compiles and then fails at link with no
+        // indication of which build setting withdrew the framework.
+        if (owner.usesWearable()) {
+            s.append("wc = xcproj.frameworks_group.files.find { |f| f.path && "
+                            + "File.basename(f.path) == 'WatchConnectivity.framework' }\n")
+                    .append("if wc.nil?\n")
+                    .append("  wc = xcproj.frameworks_group.new_file("
+                            + "'System/Library/Frameworks/WatchConnectivity.framework')\n")
+                    .append("  wc.source_tree = 'SDKROOT'\n")
+                    .append("end\n")
+                    .append("unless watch_target.frameworks_build_phase.files_references.include?(wc)\n")
+                    .append("  watch_target.frameworks_build_phase.add_file_reference(wc)\n")
+                    .append("end\n");
+        }
+
         // Mirror the iOS app's bundle resources into the watch target. The CN1
         // runtime loads its theme + assets from the app bundle at runtime
         // (Resources.open(\"/iOS7Theme.res\"), the app theme.res / CN1Resource.res,

@@ -1455,6 +1455,33 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
+    /**
+     * Replaces a path's stamp only while it still matches {@code expected}, atomically.
+     *
+     * <p>The rule the deletion paths need, and neither of the other two primitives expresses it.
+     * {@link #setDeliveredSequence} would clobber a newer publication that landed mid-query;
+     * {@link #setDeliveredSequenceIfOutranks} would refuse the survivor, because after a deletion
+     * the recorded stamp belongs to the item that was just removed and a survivor is very often
+     * older than it. Anchoring on the pre-query snapshot gets both: the dead item's stamp is
+     * replaced whatever its number, and anything that arrived while we were asking wins instead.</p>
+     *
+     * @param expected the stamp read before the query, or null if the path had none
+     * @return true when the stamp was taken and the payload should be delivered
+     */
+    static boolean setDeliveredSequenceIfStampUnchanged(String path, String expected,
+            long sequence, String node) {
+        String stamp = sequence + "|" + (node == null ? "" : node);
+        synchronized (deliveredSequences) {
+            String current = deliveredSequences.get(path);
+            boolean unchanged = current == null ? expected == null : current.equals(expected);
+            if (!unchanged) {
+                return false;
+            }
+            String old = deliveredSequences.put(path, stamp);
+            return !stamp.equals(old);
+        }
+    }
+
     /** The recorded stamp for a path, or null -- an opaque snapshot for {@link #forgetDeliveredSequenceIfUnchanged}. */
     static String deliveredStamp(String path) {
         synchronized (deliveredSequences) {
@@ -1754,10 +1781,24 @@ public class CN1WearableBridge implements WearableBridge {
                     String before = deliveredStamp(path);
                     ResolvedValue winner = resolveValue(context, path);
                     if (winner != null) {
-                        // Compare-and-replace under one lock. A plain replace would overwrite the
-                        // newer stamp with this older one and hand the app the older payload, and
-                        // the newer value would then stay hidden behind the stamp it just lost to.
-                        if (setDeliveredSequenceIfOutranks(path, winner.sequence, winner.node)) {
+                        // Two different rules, because the recorded stamp means two different things.
+                        //
+                        // After a DELETION the stamp describes the item that was just removed, and
+                        // the survivor routinely carries a LOWER sequence than it -- so an outranks
+                        // test rejects the survivor, nothing is delivered, and the listener keeps
+                        // showing the deleted value while later publications stay suppressed until
+                        // they climb past a dead item's number. It has to replace instead. But it
+                        // still must not clobber a NEWER live delivery that landed while this query
+                        // was in flight, so it replaces only while the stamp is still the one we
+                        // saw before asking.
+                        //
+                        // Otherwise the stamp describes a live value, and the ordinary monotonic
+                        // rule is right.
+                        boolean delivered = wasAfterDeletion(path)
+                                ? setDeliveredSequenceIfStampUnchanged(
+                                        path, before, winner.sequence, winner.node)
+                                : setDeliveredSequenceIfOutranks(path, winner.sequence, winner.node);
+                        if (delivered) {
                             WearableConnection.deliverDataChanged(path, winner.payload);
                         }
                     } else if (wasAfterDeletion(path) && before != null
