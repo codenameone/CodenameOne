@@ -2477,6 +2477,16 @@ public class CN1WearableBridge implements WearableBridge {
             // Drop the snapshot with the stamp, or an EDT getData would keep answering with a value
             // the app has just been told was removed.
             rememberValue(path, null);
+            // A sentinel in its place, so the SIBLINGS of this delete find one. Consuming the
+            // stamp and leaving the path absent meant the next tombstone of the same wildcard
+            // delete -- a replica published by another node -- read as first sight and announced
+            // the same logical removal a second time; only the third onwards were suppressed. The
+            // stamped branch and the first-sight branch now leave the path in the same state.
+            //
+            // Harmless to ordering: a sentinel carries no sequence, so stampSequence reads it as
+            // the weakest possible value and any real republication outranks it -- which is the
+            // same reason dropping the stamp was safe.
+            markRemovalAnnounced(path);
             WearableConnection.deliverDataRemoved(path);
             return true;
         }
