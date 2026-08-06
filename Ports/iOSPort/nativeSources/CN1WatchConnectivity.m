@@ -767,6 +767,10 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     ctx[cn1WearableValueKey(path)] = (payload == nil ? [NSData data] : payload);
     ctx[cn1WearableStampKey(path)] = @(cn1WearableNextSequence());
     [ctx removeObjectForKey:cn1WearableTombKey(path)];
+    // And its birth record. Pruning only visits tombstones still in the context, so a path that is
+    // republished leaves an entry nothing will ever revisit -- an app cycling through changing
+    // paths would grow that dictionary without bound.
+    cn1WearableForgetTombstoneBirth(path);
     // Pruned here as well, not only in removeData. Tombstones raised while the peer was offline
     // become prunable the moment it reconnects and acknowledges them -- but an app that then only
     // ever calls putData() never reached the sweep, because removeData() held its only call site.

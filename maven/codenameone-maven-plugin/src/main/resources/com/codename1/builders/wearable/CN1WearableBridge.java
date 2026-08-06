@@ -1717,16 +1717,7 @@ public class CN1WearableBridge implements WearableBridge {
                                 continue;
                             }
                             final long seq = sequenceOf(valueOrTransferMap(item));
-                            // Any record at all, ignoring its age. The sender retries a failed
-                            // retention deletion indefinitely, so an item can still be published
-                            // long after the claim's grace has run out -- and expiring the claim by
-                            // age alone then let this replay hand the app a one-shot file it had
-                            // already received. The item's continued existence is the better
-                            // evidence, so a claim survives as long as the thing it describes does.
-                            if (hasAnyClaim(context, uri)) {
-                                refreshClaim(context, uri);
-                                continue;
-                            }
+                            // claimTransfer applies the age-independent rule for both paths.
                             if (!claimTransfer(context, uri, seq)) {
                                 // Already delivered, in this process or a previous one.
                                 continue;
@@ -2932,6 +2923,16 @@ public class CN1WearableBridge implements WearableBridge {
     static boolean claimTransfer(Context context, Uri uri, long sequence) {
         if (uri == null) {
             return true;
+        }
+        // Any record at all counts, whatever its age -- the same rule the startup replay uses, and
+        // for the same reason. Reaching here means the item is in front of us, so it is still
+        // published; the sender retries a failed retention deletion indefinitely, so a claim that
+        // merely aged out says nothing about whether the app already received the payload. Age
+        // alone would have let a normal callback redeliver a one-shot file after a cold start.
+        // Restamped so pruning cannot drop it while the item it describes is demonstrably alive.
+        if (hasAnyClaim(context, uri)) {
+            refreshClaim(context, uri);
+            return false;
         }
         // Keyed by the publishing node as well as the path. Two devices may transfer the same
         // logical path and file name; their items differ only in the Uri authority, so dropping it

@@ -219,6 +219,10 @@ class JavaSEWearableBridge implements WearableBridge {
             // "<path>.tmp" lets each truncate the other's staging file, and the delete-then-rename
             // fallback below can then destroy the winner's file outright.
             File tmp = new File(f.getParentFile(), f.getName() + stagingSuffix());
+            // Chosen BEFORE the bytes are written, because it now travels inside them. It still
+            // depends only on the target file's current stamp, so moving it earlier changes
+            // nothing about the value it picks.
+            long stamp = nextStamp(f);
             FileOutputStream out = new FileOutputStream(tmp);
             try {
                 // The author travels INSIDE the value. It used to live in a ".author" sidecar, and
@@ -229,6 +233,9 @@ class JavaSEWearableBridge implements WearableBridge {
                 // bytes one object, and the rename below publishes both or neither.
                 out.write(VALUE_MAGIC);
                 out.write(watchSide ? 'w' : 'p');
+                for (int i = 7; i >= 0; i--) {
+                    out.write((int) ((stamp >>> (i * 8)) & 0xff));
+                }
                 out.write(payload == null ? new byte[0] : payload);
                 out.flush();
             } finally {
@@ -239,7 +246,6 @@ class JavaSEWearableBridge implements WearableBridge {
             // modification time on B's file and record that time as its own -- so A's watcher would
             // skip B's winning value forever. Renaming an already-stamped file makes publication a
             // single atomic step that can only ever touch this writer's own bytes.
-            long stamp = nextStamp(f);
             tmp.setLastModified(stamp);
             // Read from the STAGING file, before it is published. Reading f.lastModified() after
             // the move could see a peer's replacement -- both JVMs publish into this directory --
@@ -279,7 +285,7 @@ class JavaSEWearableBridge implements WearableBridge {
             // encoding the scan compares against, and always as locally authored -- this IS our
             // publication.
             synchronized (seenData) {
-                seenData.put(f.getName(), Long.valueOf(seenKey(recorded, true)));
+                seenData.put(f.getName(), Long.valueOf(seenKey(stamp, recorded, true)));
             }
         } catch (IOException err) {
             com.codename1.io.Log.p("Wearable simulator: failed to publish " + path + ": " + err);
@@ -660,7 +666,7 @@ class JavaSEWearableBridge implements WearableBridge {
                 // timestamp, so the peer's file matched and was skipped without being looked at,
                 // and nothing delivered it until some later write happened to move the stamp. A
                 // cheap header peek separates them -- the two sides never write the same author.
-                long seenKey = seenKey(stamp, peekAuthoredLocally(f, stamp));
+                long seenKey = peekSeenKey(f, stamp);
                 if (previous != null && previous.longValue() == seenKey) {
                     continue;
                 }
@@ -695,7 +701,8 @@ class JavaSEWearableBridge implements WearableBridge {
                 // a different key and deliver it a second time.
                 synchronized (seenData) {
                     seenData.put(f.getName(),
-                            Long.valueOf(seenKey(stamp, authoredLocallyFor(snapshot, stamp))));
+                            Long.valueOf(seenKey(framedStamp(snapshot), stamp,
+                                    authoredLocallyFor(snapshot, stamp))));
                 }
                 if (f.lastModified() != stamp) {
                     // Replaced while we were reading it, so this snapshot belongs to neither the
@@ -837,17 +844,56 @@ class JavaSEWearableBridge implements WearableBridge {
      * build), because a wrong-but-present answer is worse than the previous behaviour only if it
      * disagrees, and the header is published by the same rename as the bytes it describes.</p>
      */
-    /// Folds the author into the seen-marker, so two files sharing a coarse timestamp but written
-    /// by different sides are never mistaken for one another.
-    private static long seenKey(long stamp, boolean authoredLocally) {
-        return stamp * 2 + (authoredLocally ? 1 : 0);
+    /// The writer's own stamp out of the frame, or Long.MIN_VALUE when the bytes carry none.
+    private static long framedStamp(byte[] all) {
+        if (!framed(all)) {
+            return Long.MIN_VALUE;
+        }
+        long v = 0;
+        for (int i = 0; i < 8; i++) {
+            v = (v << 8) | (all[VALUE_MAGIC.length + 1 + i] & 0xffL);
+        }
+        return v;
+    }
+
+    /// Identifies a version of a file.
+    ///
+    /// The writer's embedded stamp when there is one, because it is unique per write and cannot be
+    /// blurred by a filesystem that rounds timestamps -- two writes by the same side within one
+    /// coarse tick were otherwise identical here, so the second was skipped as already-seen and the
+    /// listener kept the older value indefinitely.
+    ///
+    /// Falls back to mtime folded with the author for bytes that carry no frame, which is the best
+    /// available answer for a file this build did not write.
+    private static long seenKey(long framedStamp, long mtime, boolean authoredLocally) {
+        if (framedStamp != Long.MIN_VALUE) {
+            return framedStamp;
+        }
+        return mtime * 2 + (authoredLocally ? 1 : 0);
     }
 
     /// Reads just the frame header to decide authorship, so a 500ms scan does not pull whole
     /// transfer payloads into memory. The delivery path re-derives this from the full snapshot it
     /// actually hands over, so a file replaced between the two is still caught there.
+    /// The version marker from the header alone, so a 500ms scan does not pull whole transfer
+    /// payloads into memory. The delivery path recomputes this from the full snapshot it hands
+    /// over, so a file replaced between the two is recorded as the file actually delivered.
+    private long peekSeenKey(File f, long mtime) {
+        byte[] head = readHead(f);
+        if (head == null) {
+            return seenKey(Long.MIN_VALUE, mtime, authoredLocally(mtime));
+        }
+        return seenKey(framedStamp(head), mtime, authoredLocallyFor(head, mtime));
+    }
+
     private boolean peekAuthoredLocally(File f, long stamp) {
-        byte[] head = new byte[VALUE_MAGIC.length + 1];
+        byte[] head = readHead(f);
+        return head == null ? authoredLocally(stamp) : authoredLocallyFor(head, stamp);
+    }
+
+    /// The frame header, or null when the file is shorter than one or unreadable.
+    private static byte[] readHead(File f) {
+        byte[] head = new byte[VALUE_HEADER_LENGTH];
         FileInputStream in = null;
         try {
             in = new FileInputStream(f);
@@ -860,10 +906,10 @@ class JavaSEWearableBridge implements WearableBridge {
                 off += r;
             }
             if (off < head.length) {
-                return authoredLocally(stamp);
+                return null;
             }
         } catch (IOException unreadable) {
-            return authoredLocally(stamp);
+            return null;
         } finally {
             if (in != null) {
                 try {
@@ -872,7 +918,7 @@ class JavaSEWearableBridge implements WearableBridge {
                 }
             }
         }
-        return authoredLocallyFor(head, stamp);
+        return head;
     }
 
     private boolean authoredLocallyFor(byte[] snapshot, long stamp) {
@@ -910,7 +956,7 @@ class JavaSEWearableBridge implements WearableBridge {
 
     /// True when these bytes carry the author frame.
     private static boolean framed(byte[] all) {
-        if (all == null || all.length < VALUE_MAGIC.length + 1) {
+        if (all == null || all.length < VALUE_HEADER_LENGTH) {
             return false;
         }
         for (int i = 0; i < VALUE_MAGIC.length; i++) {
@@ -926,7 +972,7 @@ class JavaSEWearableBridge implements WearableBridge {
         if (!framed(all)) {
             return all;
         }
-        int skip = VALUE_MAGIC.length + 1;
+        int skip = VALUE_HEADER_LENGTH;
         byte[] body = new byte[all.length - skip];
         System.arraycopy(all, skip, body, 0, body.length);
         return body;
@@ -934,7 +980,18 @@ class JavaSEWearableBridge implements WearableBridge {
 
     /// Marks a framed value file. Chosen so a stale sandbox written before the header existed still
     /// reads correctly: no magic simply means "fall back to the stamp's side bit".
-    private static final byte[] VALUE_MAGIC = {'C', 'N', '1', 'W', 'A', '1'};
+    private static final byte[] VALUE_MAGIC = {'C', 'N', '1', 'W', 'A', '2'};
+
+    /// magic + author + the writer's own 8-byte stamp.
+    ///
+    /// The stamp is in the FILE because the filesystem cannot be trusted to keep it. mtime is what
+    /// the scan used to identify a version, and on a coarse-granularity filesystem two writes by
+    /// the same side within one tick are indistinguishable by mtime and author alike -- so the
+    /// second value was skipped as already-seen and the listener sat on the older one until some
+    /// unrelated write moved the clock. nextStamp already produces a value that is unique per write
+    /// and monotonic per side; writing it down makes the identity exact and independent of what the
+    /// filesystem chose to record.
+    private static final int VALUE_HEADER_LENGTH = VALUE_MAGIC.length + 1 + 8;
 
 
     /// The value's bytes with the author frame removed. An unframed file is returned whole, so a
