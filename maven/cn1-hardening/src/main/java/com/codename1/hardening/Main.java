@@ -62,7 +62,7 @@ public final class Main {
         try {
             if (args.length == 0 || !"harden".equals(args[0])) {
                 System.err.println("usage: harden --in <jar> --out <jar> --mapping <file> "
-                        + "--report <file> --config <properties>");
+                        + "--report <file> [--r8keep <file>] --config <properties>");
                 return EXIT_FAILED;
             }
             Map<String, String> opts = parseOptions(args);
@@ -70,6 +70,7 @@ public final class Main {
             File out = fileOpt(opts, "out");
             File mapping = fileOpt(opts, "mapping");
             File report = opts.containsKey("report") ? new File(opts.get("report")) : null;
+            File r8Keep = opts.containsKey("r8keep") ? new File(opts.get("r8keep")) : null;
             File configFile = fileOpt(opts, "config");
 
             Properties props = new Properties();
@@ -131,6 +132,7 @@ public final class Main {
                     .outputJar(out)
                     .mappingFile(mapping)
                     .reportFile(report)
+                    .r8KeepFile(r8Keep)
                     .workDir(out.getAbsoluteFile().getParentFile())
                     .config(cfg)
                     .mainClass(mainClass)

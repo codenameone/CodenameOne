@@ -102,5 +102,16 @@ public final class InputJarKeepScanner {
                 }
             };
         }
+
+        @Override
+        public org.objectweb.asm.FieldVisitor visitField(int access, String name, String descriptor,
+                                                         String signature, Object value) {
+            // A reflective class name may live only in a static-final String field's ConstantValue
+            // attribute, never as an LDC (e.g. read by an external framework). Collect those too.
+            if (value instanceof String) {
+                stringConstants.add((String) value);
+            }
+            return null;
+        }
     }
 }

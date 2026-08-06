@@ -133,6 +133,18 @@ public final class HardeningEngine {
         keepRules.addAll(serviceDescriptorKeeps(nonClass));
         keepRules.addAll(cfg.getExtraKeepRules());
 
+        // Export the derived keep rules for a downstream renamer the engine doesn't drive itself.
+        // On Android R8 is the sole renamer (isRenameEnabled()==false), so without this the classes
+        // the scanner found reflectively (Class.forName targets, service providers, name-bound
+        // property objects, the app's own harden.keep) would be invisible to R8 and get renamed.
+        if (req.getR8KeepFile() != null) {
+            StringBuilder r8 = new StringBuilder();
+            for (String rule : keepRules) {
+                r8.append(rule).append('\n');
+            }
+            writeText(req.getR8KeepFile(), r8.toString());
+        }
+
         Map<String, byte[]> renamed;
         int renamedCount = 0;
         File mappingFile = req.getMappingFile();
@@ -206,7 +218,12 @@ public final class HardeningEngine {
             }
         }
 
-        MangleCollisionCheck.check(renamed.keySet());
+        // The a.b_c / a.b.c -> a_b_c collision only exists in the ParparVM C symbol mangle. On
+        // Android (R8/DEX -- and the engine does not even rename there) and JavaSE (plain JVM),
+        // '.' vs '_' stay distinct, so two legal classes must not abort the build.
+        if (translatesThroughParparVMC(cfg.getPlatform())) {
+            MangleCollisionCheck.check(renamed.keySet());
+        }
         OutputVerifier.verify(renamed, hierarchy);
 
         // Idempotence marker: a nested builder delegation must not harden twice.
@@ -297,6 +314,17 @@ public final class HardeningEngine {
     static boolean controlFlowSafeFor(String platform) {
         return "and".equals(platform) || "android".equals(platform)
                 || "javase".equals(platform) || "desktop".equals(platform);
+    }
+
+    /**
+     * The ports whose classes are translated to C by ParparVM, where the class/package mangle
+     * ({@code . / $} all collapse to {@code _}) can make two legal Java names share one C symbol.
+     * The collision guard is meaningful only for these; Android (DEX) and JavaSE (JVM) keep the
+     * names distinct, and JavaScript uses a different mangling entirely.
+     */
+    static boolean translatesThroughParparVMC(String platform) {
+        return "ios".equals(platform) || "mac".equals(platform) || "watch".equals(platform)
+                || "tv".equals(platform) || "win".equals(platform) || "linux".equals(platform);
     }
 
     /**

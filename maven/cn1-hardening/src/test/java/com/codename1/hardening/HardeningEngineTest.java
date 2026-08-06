@@ -72,6 +72,12 @@ public class HardeningEngineTest {
     }
 
     private void putClass(ZipOutputStream zos, String internal) throws Exception {
+        zos.putNextEntry(new ZipEntry(internal + ".class"));
+        zos.write(resourceBytes(internal));
+        zos.closeEntry();
+    }
+
+    private byte[] resourceBytes(String internal) throws Exception {
         InputStream in = getClass().getResourceAsStream("/" + internal + ".class");
         ByteArrayOutputStream b = new ByteArrayOutputStream();
         byte[] buf = new byte[4096];
@@ -80,9 +86,23 @@ public class HardeningEngineTest {
             b.write(buf, 0, r);
         }
         in.close();
-        zos.putNextEntry(new ZipEntry(internal + ".class"));
-        zos.write(b.toByteArray());
-        zos.closeEntry();
+        return b.toByteArray();
+    }
+
+    /**
+     * A synthetic class whose only reference to {@code targetBinaryName} is a static-final String
+     * field carrying it as a {@code ConstantValue} attribute -- never an LDC. Models a class name a
+     * framework reads reflectively from a constant field.
+     */
+    private static byte[] classWithConstantNamingField(String internalName, String targetBinaryName) {
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
+        cw.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                internalName, null, "java/lang/Object", null);
+        cw.visitField(org.objectweb.asm.Opcodes.ACC_PUBLIC | org.objectweb.asm.Opcodes.ACC_STATIC
+                | org.objectweb.asm.Opcodes.ACC_FINAL, "TARGET", "Ljava/lang/String;",
+                null, targetBinaryName).visitEnd();
+        cw.visitEnd();
+        return cw.toByteArray();
     }
 
     private HardeningResult harden(HardeningProfile profile, String platform, boolean renameSupported)
@@ -270,6 +290,62 @@ public class HardeningEngineTest {
         // On JS the bridge could break, so string encryption is off; renaming still happens.
         assertEquals(0, r.getEncryptedStrings());
         assertTrue(r.getRenamedClasses() >= 1);
+    }
+
+    @Test
+    public void scannerKeepsClassNamedOnlyByAFieldConstant() throws Exception {
+        // The class name lives solely in a static-final String field's ConstantValue attribute,
+        // never as an LDC, so a method-instruction-only scan would miss it.
+        byte[] ref = classWithConstantNamingField(
+                "com/codename1/hardening/fixture/Ref", "com.codename1.hardening.fixture.Helper");
+        Map<String, byte[]> classes = new HashMap<String, byte[]>();
+        classes.put("com/codename1/hardening/fixture/Ref", ref);
+        classes.put(HELPER, resourceBytes(HELPER));
+        InputJarKeepScanner scanner = new InputJarKeepScanner();
+        scanner.scan(classes);
+        assertTrue("class named by a field ConstantValue must be kept",
+                scanner.keepRules().contains(
+                        "-keep class com.codename1.hardening.fixture.Helper { *; }"));
+    }
+
+    @Test
+    public void androidExportsReflectionKeepsToR8() throws Exception {
+        // On Android the engine does not rename (R8 does), so the classes the scanner found
+        // reflectively must be written to the R8 keep file or R8 renames them out from under the
+        // reflective lookup. Ref names Helper only via a field constant.
+        File jar = tmp.newFile("r8.jar");
+        FileOutputStream fo = new FileOutputStream(jar);
+        ZipOutputStream zos = new ZipOutputStream(fo);
+        putClass(zos, SECRETS);
+        putClass(zos, HELPER);
+        zos.putNextEntry(new ZipEntry("com/codename1/hardening/fixture/Ref.class"));
+        zos.write(classWithConstantNamingField(
+                "com/codename1/hardening/fixture/Ref", "com.codename1.hardening.fixture.Helper"));
+        zos.closeEntry();
+        zos.finish();
+        fo.close();
+
+        File out = tmp.newFile("r8-hardened.jar");
+        File r8Keep = tmp.newFile("cn1-r8-keep.pro");
+        Map<String, String> hints = new HashMap<String, String>();
+        hints.put("harden.level", "standard");
+        hints.put("harden.keep", "-keep class com.example.Manual { *; }");
+        HardeningRequest req = new HardeningRequest()
+                .inputJar(jar).outputJar(out).mappingFile(tmp.newFile("r8-map.txt"))
+                .r8KeepFile(r8Keep)
+                .workDir(tmp.newFolder("r8-work"))
+                .config(HardeningConfig.from(hints, "and", false))
+                .mainClass("com.codename1.hardening.fixture.Secrets");
+        HardeningResult r = HardeningEngine.harden(req);
+        assertTrue(r.isHardened());
+        assertTrue("engine must emit the R8 keep file", r8Keep.isFile());
+        String keep = new String(Files.readAllBytes(r8Keep.toPath()), Charset.forName("UTF-8"));
+        assertTrue("reflectively referenced class must reach R8",
+                keep.contains("-keep class com.codename1.hardening.fixture.Helper { *; }"));
+        assertTrue("the main class must reach R8",
+                keep.contains("com.codename1.hardening.fixture.Secrets"));
+        assertTrue("the user's harden.keep must reach R8",
+                keep.contains("-keep class com.example.Manual { *; }"));
     }
 
     private boolean hasZqClass(java.util.Set<String> names) {

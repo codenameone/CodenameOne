@@ -769,6 +769,17 @@ public class AndroidGradleBuilder extends Executor {
         if (level == null || level.trim().length() == 0 || "off".equalsIgnoreCase(level.trim())) {
             return "";
         }
+        // Prefer the full keep set the engine derived from the input jar: besides the name-bound
+        // property-object rule and the user's harden.keep, it covers the classes the ASM scanner
+        // found reflectively (Class.forName targets, META-INF/services providers, GUI-builder
+        // references). Those are invisible to R8, so without them R8 would rename a reflectively
+        // referenced class and the hardened release would fail to resolve its original name.
+        String engineKeep = getLastHardeningR8Keep();
+        if (engineKeep != null && engineKeep.trim().length() > 0) {
+            return engineKeep.endsWith("\n") ? engineKeep : engineKeep + "\n";
+        }
+        // Fallback when the engine emitted no keep file (e.g. build() invoked without runBuild):
+        // keep at least the load-bearing rules so a hardened build still resolves.
         StringBuilder sb = new StringBuilder();
         sb.append("-keepclassmembernames class * implements "
                 + "com.codename1.properties.PropertyBusinessObject { *; }\n");

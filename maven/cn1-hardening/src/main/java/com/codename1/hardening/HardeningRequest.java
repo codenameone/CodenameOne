@@ -37,6 +37,7 @@ public final class HardeningRequest {
     private File outputJar;
     private File mappingFile;
     private File reportFile;
+    private File r8KeepFile;
     private File workDir;
     private HardeningConfig config;
     private String mainClass;
@@ -76,6 +77,15 @@ public final class HardeningRequest {
 
     public HardeningRequest reportFile(File f) {
         this.reportFile = f;
+        return this;
+    }
+
+    public File getR8KeepFile() {
+        return r8KeepFile;
+    }
+
+    public HardeningRequest r8KeepFile(File f) {
+        this.r8KeepFile = f;
         return this;
     }
 

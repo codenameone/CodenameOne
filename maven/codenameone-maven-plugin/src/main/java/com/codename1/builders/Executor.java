@@ -2398,10 +2398,21 @@ public abstract class Executor {
 
     private File lastHardeningMapping;
     private String lastHardeningMappingId = "";
+    private String lastHardeningR8Keep = "";
 
     /** The cross-platform obfuscation mapping produced by the last {@link #hardenSourceJar} call, or null. */
     public File getLastHardeningMapping() {
         return lastHardeningMapping;
+    }
+
+    /**
+     * The keep rules the engine derived from the input jar (reflective {@code Class.forName}
+     * targets, service providers, name-bound property objects, the app's {@code harden.keep}),
+     * for a downstream renamer the engine does not drive itself -- specifically R8 on Android.
+     * Empty when hardening did not run or emitted no rules.
+     */
+    public String getLastHardeningR8Keep() {
+        return lastHardeningR8Keep;
     }
 
     /** The mapping id produced by the last {@link #hardenSourceJar} call, or empty. */
@@ -2447,6 +2458,7 @@ public abstract class Executor {
             File hardened = new File(workDir, "hardened.jar");
             File mapping = new File(workDir, "cn1-mapping.txt");
             File report = new File(workDir, "cn1-harden-report.json");
+            File r8Keep = new File(workDir, "cn1-r8-keep.pro");
             File config = new File(workDir, "config.properties");
             writeHardeningConfig(config, request);
 
@@ -2464,6 +2476,8 @@ public abstract class Executor {
             cmd.add(mapping.getAbsolutePath());
             cmd.add("--report");
             cmd.add(report.getAbsolutePath());
+            cmd.add("--r8keep");
+            cmd.add(r8Keep.getAbsolutePath());
             cmd.add("--config");
             cmd.add(config.getAbsolutePath());
 
@@ -2471,6 +2485,7 @@ public abstract class Executor {
             if (exit == 0) {
                 lastHardeningMapping = mapping.isFile() ? mapping : null;
                 lastHardeningMappingId = readMappingId(mapping);
+                lastHardeningR8Keep = r8Keep.isFile() ? readFileToString(r8Keep) : "";
                 // Propagate the mapping id / hardened flag / level into the request BEFORE the
                 // builder generates its stubs, so the stubs stamp them as runtime properties
                 // (Hardening.isHardened(), the crash report's mappingId/hardenLevel).

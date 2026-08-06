@@ -194,8 +194,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
         String level = settings.getProperty("codename1.arg.harden.level", "off");
         // A per-platform opt-out (harden.<platform>.enabled=false) means hardening won't run for
-        // this target, so the pre-flight must not reject it -- treat the level as off.
-        String hardenPlatform = normalizeHardenPlatform(platform);
+        // this target, so the pre-flight must not reject it -- treat the level as off. The native-Mac
+        // targets ride the iOS pipeline with platform=ios, so derive their opt-out key from the
+        // build target instead (matching IPhoneBuilder, which reports "mac" for them).
+        String hardenPlatform = hardenPlatformForBuildTarget(buildTarget);
+        if (hardenPlatform == null) {
+            hardenPlatform = normalizeHardenPlatform(platform);
+        }
         if (hardenPlatform != null && "false".equalsIgnoreCase(
                 settings.getProperty("codename1.arg.harden." + hardenPlatform + ".enabled", "true").trim())) {
             level = "off";
@@ -239,6 +244,21 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         } else {
             System.clearProperty("cn1.hardening.libraryJars");
         }
+    }
+
+    /**
+     * The {@code harden.<platform>.enabled} opt-out key implied by the build target, for targets
+     * whose {@code codename1.platform} does not name their real hardening platform. The native-Mac
+     * targets (mac-source / mac-os-x-native) run with platform=ios but harden as "mac", so their
+     * opt-out is {@code harden.mac.enabled}. Returns {@code null} when the target carries no such
+     * override and the platform value should be used.
+     */
+    private static String hardenPlatformForBuildTarget(String buildTarget) {
+        if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)) {
+            return "mac";
+        }
+        return null;
     }
 
     /** Maps {@code codename1.platform} to the {@code harden.<platform>.enabled} opt-out key. */
