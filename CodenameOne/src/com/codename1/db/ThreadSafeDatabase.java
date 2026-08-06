@@ -144,6 +144,19 @@ public class ThreadSafeDatabase extends Database {
     }
 
     @Override
+    public void changeKey(final DatabaseConfig config) throws IOException {
+        // Without this the wrapper inherits the base implementation, which always reports
+        // NOT_SUPPORTED, so a wrapped database could never be re-keyed however capable the
+        // underlying port is.
+        invokeWithException(new RunnableWithIOException() {
+            @Override
+            public void run() throws IOException {
+                underlying.changeKey(config);
+            }
+        });
+    }
+
+    @Override
     public void close() {
         if (closed) {
             // close() is idempotent by contract, and after the first call there is no worker left

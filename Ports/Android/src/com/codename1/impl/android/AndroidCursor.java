@@ -45,9 +45,25 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     private int last_read_column_index = -1;
     private boolean closed;
 
+    /**
+     * Notified when this cursor closes, so the database can stop tracking it. Without this a long
+     * lived database that opens and closes many cursors would retain every one of them until the
+     * database itself closed.
+     */
+    private CloseListener closeListener;
+
+    /** Lets the owning database drop a cursor from its list once it closes. */
+    interface CloseListener {
+        void cursorClosed(AndroidCursor cursor);
+    }
+
     public AndroidCursor(android.database.Cursor c) {
         this.c = c;
         this.last_read_column_index = -1;
+    }
+
+    void setCloseListener(CloseListener listener) {
+        this.closeListener = listener;
     }
 
     private void checkOpen() throws IOException {
@@ -162,6 +178,9 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
             return;
         }
         closed = true;
+        if (closeListener != null) {
+            closeListener.cursorClosed(this);
+        }
         c.close();
     }
 

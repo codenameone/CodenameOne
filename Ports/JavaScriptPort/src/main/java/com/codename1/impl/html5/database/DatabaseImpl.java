@@ -269,7 +269,18 @@ public class DatabaseImpl extends Database {
         }
 
         void databaseClosed() {
-            stmt = 0;
+            // Finalize first. sqlite3_close_v2 with an outstanding statement leaves a zombie
+            // connection alive until that statement is finalized, and dropping the only handle to
+            // it here would mean that could never happen.
+            if (stmt != 0) {
+                long closing = stmt;
+                stmt = 0;
+                try {
+                    SQLiteNative.finish(closing);
+                } catch (Throwable alreadyGone) {
+                    // The connection is going away regardless; nothing useful to report.
+                }
+            }
             invalidate();
         }
 

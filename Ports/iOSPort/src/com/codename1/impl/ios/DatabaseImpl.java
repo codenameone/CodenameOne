@@ -171,7 +171,12 @@ class DatabaseImpl extends Database {
     public void execute(String sql, String[] params) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
-        IOSImplementation.nativeInstance.sqlDbExec(peer, sql, params);
+        // Bind through the statement API rather than the older sqlDbExec, which binds only the
+        // values it is given and ignores the placeholder count: too few left placeholders bound to
+        // NULL and extra values were discarded, both silently.
+        long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+        bindText(stmt, params);
+        IOSImplementation.nativeInstance.sqlStmtExecuteAndFinalize(stmt);
     }
 
     @Override
@@ -201,8 +206,9 @@ class DatabaseImpl extends Database {
     public Cursor executeQuery(String sql, String[] params) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
-        return register(new CursorImpl(
-                IOSImplementation.nativeInstance.sqlDbExecQuery(peer, sql, params)));
+        long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+        bindText(stmt, params);
+        return register(new CursorImpl(stmt));
     }
 
     @Override
@@ -241,14 +247,31 @@ class DatabaseImpl extends Database {
         openCursors.removeElement(cursor);
     }
 
-    /** Binds by runtime type, so an Integer is stored as INTEGER rather than as its text form. */
-    private void bind(long stmt, Object[] params) throws IOException {
+    /** Binds every value as text, rejecting a count that does not match the statement. */
+    private void bindText(long stmt, String[] params) throws IOException {
+        int len = params == null ? 0 : params.length;
+        checkParameterCount(stmt, len);
+        for (int iter = 0; iter < len; iter++) {
+            if (params[iter] == null) {
+                IOSImplementation.nativeInstance.sqlStmtBindNull(stmt, iter + 1);
+            } else {
+                IOSImplementation.nativeInstance.sqlStmtBindString(stmt, iter + 1, params[iter]);
+            }
+        }
+    }
+
+    private void checkParameterCount(long stmt, int supplied) throws IOException {
         int declared = IOSImplementation.nativeInstance.sqlStmtParameterCount(stmt);
-        if (declared != params.length) {
+        if (declared != supplied) {
             IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
             throw new IOException("The statement has " + declared + " parameters but "
-                    + params.length + " were supplied");
+                    + supplied + " were supplied");
         }
+    }
+
+    /** Binds by runtime type, so an Integer is stored as INTEGER rather than as its text form. */
+    private void bind(long stmt, Object[] params) throws IOException {
+        checkParameterCount(stmt, params.length);
         for (int iter = 0; iter < params.length; iter++) {
             Object p = params[iter];
             int index = iter + 1;
@@ -292,7 +315,18 @@ class DatabaseImpl extends Database {
 
         /** Marks the cursor dead because the connection that owned its statement has gone. */
         void databaseClosed() {
-            stmt = 0;
+            // Finalize first. sqlite3_close_v2 with an outstanding statement leaves a zombie
+            // connection alive until that statement is finalized, and dropping the only handle to
+            // it here would mean that could never happen.
+            if (stmt != 0) {
+                long closing = stmt;
+                stmt = 0;
+                try {
+                    IOSImplementation.nativeInstance.sqlStmtFinalize(closing);
+                } catch (Throwable alreadyGone) {
+                    // The connection is going away regardless; nothing useful to report.
+                }
+            }
             invalidate();
         }
 

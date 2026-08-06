@@ -238,7 +238,13 @@ public class AndroidDB extends Database {
             // the first next() instead of from executeQuery.
             c.getCount();
         }
-        AndroidCursor cursor = new AndroidCursor(c);
+        final AndroidCursor cursor = new AndroidCursor(c);
+        cursor.setCloseListener(new AndroidCursor.CloseListener() {
+            @Override
+            public void cursorClosed(AndroidCursor closing) {
+                openCursors.remove(closing);
+            }
+        });
         openCursors.add(cursor);
         return cursor;
     }

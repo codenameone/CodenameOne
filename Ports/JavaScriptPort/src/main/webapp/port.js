@@ -6498,8 +6498,9 @@ function cn1SqliteStartInit() {
       // Firefox before 111 and Safari before 15.2 have no createSyncAccessHandle.
       // Degrade to memory, but say so: silently losing every write on reload is
       // exactly the kind of failure that should not be discovered in production.
-      console.warn("Codename One: this browser has no synchronous OPFS access, so databases "
-        + "are kept in memory only and are lost when the page closes. Reported cause: " + err);
+      console.warn("Codename One: this browser has no synchronous OPFS access, so databases are "
+        + "kept in memory for the lifetime of this page and are lost when it closes. Reported "
+        + "cause: " + err);
       cn1SqlitePool = null;
     }
     return true;
@@ -6507,11 +6508,30 @@ function cn1SqliteStartInit() {
   return cn1SqliteInitPromise;
 }
 
+/**
+ * In-memory databases, by name, for the degraded path.
+ *
+ * Without this every open produced a fresh anonymous ":memory:" database, so closing and reopening
+ * one lost its contents immediately rather than at page close, two connections to the same name
+ * saw unrelated data, and exists() was always false. Keying them by name gives the fallback the
+ * same lifecycle semantics as the real one, for as long as the page lives.
+ */
+const cn1SqliteMemoryDbs = new Map();
+
 /** Opens a database by name, through the pool when one is available. */
 function cn1SqliteOpen(name, key) {
-  const db = cn1SqlitePool
-    ? new cn1SqlitePool.OpfsSAHPoolDb(cn1SqliteDbPath(name))
-    : new cn1Sqlite.oo1.DB(":memory:", "c");
+  let db;
+  if (cn1SqlitePool) {
+    db = new cn1SqlitePool.OpfsSAHPoolDb(cn1SqliteDbPath(name));
+  } else {
+    db = cn1SqliteMemoryDbs.get(name);
+    if (!db) {
+      // filename: gives the connection a name inside the VFS, so reopening finds it again.
+      db = new cn1Sqlite.oo1.DB({ filename: "file:" + encodeURIComponent(name)
+        + "?vfs=memdb", flags: "c" });
+      cn1SqliteMemoryDbs.set(name, db);
+    }
+  }
   if (key !== null && key !== undefined && key !== "") {
     // Select the SQLCipher 4 scheme before applying the key, or the engine uses
     // its own and the file cannot be read on any other platform.
@@ -6572,16 +6592,24 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_isCipherAvailabl
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_exists_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_exists___java_lang_String_R_boolean"],
   function(name) {
+    const n = jvm.toNativeString(name);
     if (!cn1SqlitePool) {
-      return false;
+      return cn1SqliteMemoryDbs.has(n);
     }
-    return cn1SqlitePool.getFileNames().indexOf(cn1SqliteDbPath(jvm.toNativeString(name))) >= 0;
+    return cn1SqlitePool.getFileNames().indexOf(cn1SqliteDbPath(n)) >= 0;
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_delete___java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang_String_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_delete___java_lang_String_R_void"],
   function(name) {
+    const n = jvm.toNativeString(name);
     if (cn1SqlitePool) {
-      cn1SqlitePool.unlink(cn1SqliteDbPath(jvm.toNativeString(name)));
+      cn1SqlitePool.unlink(cn1SqliteDbPath(n));
+    } else {
+      const existing = cn1SqliteMemoryDbs.get(n);
+      if (existing) {
+        existing.close();
+        cn1SqliteMemoryDbs.delete(n);
+      }
     }
     return null;
   });
@@ -6600,7 +6628,13 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_close_long", "cn
   function(dbId) {
     const db = cn1SqliteHandles.get(Number(dbId));
     if (db) {
-      db.close();
+      // A memdb-backed database survives its connection closing, which is what makes reopening
+      // find the same contents, so only pooled connections are actually closed here.
+      let isMemory = false;
+      cn1SqliteMemoryDbs.forEach(function(v) { if (v === db) { isMemory = true; } });
+      if (!isMemory) {
+        db.close();
+      }
       cn1SqliteHandles.delete(Number(dbId));
     }
     return null;

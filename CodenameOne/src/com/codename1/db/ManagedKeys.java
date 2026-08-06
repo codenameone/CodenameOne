@@ -105,17 +105,28 @@ class ManagedKeys {
         return SecureStorage.getInstance().remove(accountName(alias));
     }
 
-    /// Maps an alias to the `SecureStorage` account name, folding away characters
-    /// that a platform key store may not accept in an identifier.
+    /// Maps an alias to the `SecureStorage` account name.
+    ///
+    /// A platform key store may not accept every character an application can put in a database
+    /// name, so unsafe ones are escaped -- but escaped reversibly, as `%` followed by two hex
+    /// digits. Folding them all to `_` would make `customer/db` and `customer_db` the same
+    /// account: two databases would silently share a key, and forgetting one would destroy the
+    /// other. `%` itself is escaped so the encoding stays unambiguous.
     private static String accountName(String alias) {
-        StringBuilder b = new StringBuilder(ACCOUNT_PREFIX.length() + alias.length());
+        StringBuilder b = new StringBuilder(ACCOUNT_PREFIX.length() + alias.length() + 8);
         b.append(ACCOUNT_PREFIX);
         for (int iter = 0; iter < alias.length(); iter++) {
             char c = alias.charAt(iter);
-            if (c == '/' || c == '\\' || c == ':' || c == ' ') {
-                b.append('_');
-            } else {
+            boolean safe = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_';
+            if (safe) {
                 b.append(c);
+            } else {
+                b.append('%');
+                b.append("0123456789abcdef".charAt((c >> 12) & 0x0f));
+                b.append("0123456789abcdef".charAt((c >> 8) & 0x0f));
+                b.append("0123456789abcdef".charAt((c >> 4) & 0x0f));
+                b.append("0123456789abcdef".charAt(c & 0x0f));
             }
         }
         return b.toString();
