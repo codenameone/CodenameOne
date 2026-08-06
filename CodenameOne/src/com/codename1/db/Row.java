@@ -27,35 +27,20 @@ import java.io.IOException;
 /// The `Row` interface is returned by  `com.codename1.db.Cursor#getRow()` to provide
 /// access to the content of an individual row.
 ///
-/// There is more thorough coverage of the `Database API here`.
-///
-/// The sample code below presents a Database Explorer tool that allows executing arbitrary SQL and
-/// viewing the tabular results:
+/// Column indexes are zero-based. A SQL NULL reads back as null from `#getString(int)` and
+/// `#getBlob(int)`, and as 0 from the numeric getters; use `RowExt#wasNull()` to tell a stored
+/// zero from a NULL.
 ///
 /// ```java
-/// Toolbar.setGlobalToolbar(true);
-/// Style s = UIManager.getInstance().getComponentStyle("TitleCommand");
-/// FontImage icon = FontImage.createMaterial(FontImage.MATERIAL_QUERY_BUILDER, s);
-/// Form hi = new Form("SQL Explorer", new BorderLayout());
-/// hi.getToolbar().addCommandToRightBar("", icon, (e) -> {
-///     TextArea query = new TextArea(3, 80);
-///     Command ok = new Command("Execute");
-///     Command cancel = new Command("Cancel");
-///     if(Dialog.show("Query", query, ok, cancel) == ok) {
-///         Database db = null;
-///         Cursor cur = null;
-///         try {
-///             db = Display.getInstance().openOrCreate("MyDB.db");
-///             if(query.getText().startsWith("select")) {
-///                 cur = db.executeQuery(query.getText());
-///                 int columns = cur.getColumnCount();
-///                 hi.removeAll();
-///                 if(columns > 0) {
-///                     boolean next = cur.next();
-///                     if(next) {
-///                         ArrayList data = new ArrayList<>();
-///                         String[] columnNames = new String[columns];
-///                         for(int iter = 0 ; iter
+/// while (cur.next()) {
+///     Row row = cur.getRow();
+///     int id = row.getInteger(0);
+///     String body = row.getString(1);
+///     System.out.println(id + ": " + body);
+/// }
+/// ```
+///
+/// See the `com.codename1.db` package documentation for the full contract.
 ///
 /// @author Chen
 public interface Row {

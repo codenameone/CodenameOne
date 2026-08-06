@@ -32,6 +32,8 @@ import com.codename1.components.FileTreeModel;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
+import com.codename1.db.DatabaseConfig;
+import com.codename1.db.DatabaseEncryptionException;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Cookie;
 import com.codename1.io.FileSystemStorage;
@@ -9548,6 +9550,63 @@ public abstract class CodenameOneImplementation {
     /// - `IOException`: if database cannot be created
     public Database openOrCreateDB(String databaseName) throws IOException {
         return null;
+    }
+
+    /// Opens or creates an encrypted database.
+    ///
+    /// Ports that support encryption override this. The default implementation handles the
+    /// plaintext case by delegating, and refuses anything else -- returning an unencrypted
+    /// database to a caller who asked for encryption would be a silent security downgrade.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// - `config`: how the database should be keyed
+    ///
+    /// #### Returns
+    ///
+    /// the open database
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database cannot be opened or the platform cannot encrypt
+    public Database openOrCreateDB(String databaseName, DatabaseConfig config) throws IOException {
+        if (config == null || !config.isEncrypted()) {
+            return openOrCreateDB(databaseName);
+        }
+        throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
+                "Encrypted databases are not supported on this platform");
+    }
+
+    /// Indicates whether this platform can open encrypted databases.
+    ///
+    /// #### Returns
+    ///
+    /// false unless the port overrides this
+    public boolean isDatabaseEncryptionSupported() {
+        return false;
+    }
+
+    /// Indicates whether managed database keys are protected by a hardware backed key store.
+    ///
+    /// Ports with a real key store override this. Returning false is the safe answer: it tells
+    /// security sensitive applications not to rely on hardware protection.
+    ///
+    /// #### Returns
+    ///
+    /// false unless the port overrides this
+    public boolean isDatabaseManagedKeyHardwareBacked() {
+        return false;
+    }
+
+    /// Indicates whether `byte[]` values may be bound as query parameters.
+    ///
+    /// #### Returns
+    ///
+    /// false unless the port overrides this
+    public boolean isBlobQueryParameterSupported() {
+        return false;
     }
 
     /// Deletes database

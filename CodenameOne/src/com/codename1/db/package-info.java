@@ -1,77 +1,193 @@
-/// SQLite database access API
+/// SQLite database access, with optional encryption at rest.
 ///
-/// Most new devices contain one version of sqlite or another; sqlite is a very lightweight SQL database
-/// designed for embedding into devices. For portability we recommend avoiding SQL altogether since
-/// it is both fragmented between devices (different sqlite versions) and isn't supported on all devices.
+/// SQLite is a small embedded SQL database available on every platform Codename One targets. This
+/// package is a thin, portable API over it: similar in spirit to JDBC, but without the pluggable
+/// driver abstractions that make no sense for a local file.
 ///
-/// In general SQL seems overly complex for most embedded device programming tasks.
-///
-/// Portability Of SQLite
-///
-/// SQLite is supported on iOS, Android, UWP (Universal Windows Platform), RIM, Desktop & JavaScript builds. However,
-/// the JavaScript
-/// version of SQL has been deprecated and isn't supported on all platforms.
-///
-/// You will notice that at this time support is still missing from the Windows builds.
-///
-/// The biggest issue with SQLite portability is in iOS. The SQLite version for most platforms is
-/// threadsafe and as a result very stable. However, the iOS version is not!
-///
-/// This might not seem like a big deal normally, however if you forget to close a connection the GC might
-/// close it for you thus producing a crash. This is such a common occurrence that Codename One logs
-/// a warning when the GC collects a database resource on the simulator.
-///
-/// Using SQLite
-///
-/// SQL is pretty powerful and very well suited for common tabular data. The Codename One SQL
-/// API is similar in spirit to JDBC but considerably simpler since many of the abstractions of JDBC
-/// designed for pluggable database architecture make no sense for a local database.
-///
-/// The `com.codename1.db.Database` API is a high level abstraction that allows you to open an
-/// arbitrary database file using syntax such as:
+/// For a handful of values prefer `com.codename1.io.Storage`, which is simpler and more portable.
+/// Reach for SQL when you have tabular data, need queries over it, or have enough of it that
+/// loading the lot into memory is not reasonable.
 ///
 /// ```java
-/// Database db = Display.getInstance().openOrCreate("databaseName");
+/// Database db = Database.openOrCreate("myapp.db");
+/// db.execute("CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, body TEXT)");
+/// db.execute("INSERT INTO notes (body) VALUES (?)", new Object[] {"remember the milk"});
+/// Cursor cur = db.executeQuery("SELECT id, body FROM notes ORDER BY id");
+/// while (cur.next()) {
+///     Row row = cur.getRow();
+///     System.out.println(row.getInteger(0) + ": " + row.getString(1));
+/// }
+/// cur.close();
+/// db.close();
 /// ```
 ///
-/// Some SQLite apps ship with a "ready made" database. We allow you to replace the DB file by using the code:
+/// # The portable contract
+///
+/// Everything below holds on every platform that provides a database. Where a platform used to
+/// behave differently, `Database#isLegacyBehavior()` restores the old behaviour; see
+/// **Legacy compatibility** at the end.
+///
+/// ## Cursors and positions
+///
+/// Positions are counted from **zero**. A freshly returned cursor sits **before** the first row.
+///
+/// - `Cursor#getPosition()` reports -1 before any successful move, then 0 on the first row. Once
+///   the result set is exhausted it reports the row count, one past the last row.
+/// - `Cursor#next()` advances one row and returns false at the end.
+/// - `Cursor#first()` moves **onto** the first row and returns true only if a row exists. It
+///   returns false for an empty result set.
+/// - `Cursor#last()` moves onto the last row, false if there are none.
+/// - `Cursor#prev()` moves back one row, false when already at or before the first.
+/// - `Cursor#position(int)` moves to an absolute row, false if out of range. Passing -1 rewinds to
+///   before the first row and returns false.
+/// - `Cursor#getRow()` is valid only while the cursor is on a row, and throws otherwise.
+/// - Column metadata -- `getColumnCount`, `getColumnName`, `getColumnIndex` -- is available as soon
+///   as the query returns, before the first `next()`.
+/// - `getColumnIndex` is case-insensitive, returns -1 for an unknown name, and matches the
+///   **result set label**, so a column selected as `SELECT a AS b` is found under `b`.
+///
+/// Forward iteration with `next()` costs the same everywhere. Seeking backwards or to an absolute
+/// row is cheap on Android and costs O(distance from the start) elsewhere, because SQLite
+/// statements only step forward and a backward seek is a rewind and re-step. A consequence worth
+/// knowing: a cursor is a repeatable read only inside a transaction, since a concurrent write
+/// between the two passes can change what the second one sees.
+///
+/// ## Statements
+///
+/// `Database#execute(java.lang.String)` runs **every** statement in the string, separated by
+/// semicolons. Semicolons inside string literals, quoted identifiers, comments and
+/// `CREATE TRIGGER` bodies do not separate statements.
+///
+/// The parameterized forms -- `execute(String, String[])`, `execute(String, Object[])` and all the
+/// `executeQuery` variants -- take exactly **one** statement, and throw if given more. They do not
+/// silently discard the remainder.
+///
+/// `executeQuery` validates and executes the statement before it returns, so a malformed query
+/// fails there rather than from the first `next()`.
+///
+/// ## Parameters
+///
+/// The `Object[]` forms bind by runtime type:
+///
+/// | Java type | bound as |
+/// | --- | --- |
+/// | `null` | NULL |
+/// | `byte[]` | BLOB |
+/// | `String`, `Character` | TEXT |
+/// | `Byte`, `Short`, `Integer`, `Long` | INTEGER |
+/// | `Float`, `Double` | REAL |
+/// | `Boolean` | INTEGER, 0 or 1 |
+/// | anything else | TEXT, via `toString()` |
+///
+/// `java.util.Date` is deliberately not special-cased; it falls through to `toString()`. Store
+/// dates as an explicit epoch value if you want them comparable in SQL.
+///
+/// The `String[]` forms bind every element as TEXT, and a null element binds SQL NULL rather than
+/// throwing. Passing null instead of a parameter array is the same as calling the form that takes
+/// no parameters. Supplying a different number of parameters than the statement has placeholders
+/// throws.
+///
+/// Blob values can always be written. Using one as a *query* parameter needs engine support that
+/// not every port has, so check `Database#isBlobQueryParameterSupported()` first.
+///
+/// ## Reading values
+///
+/// Column indexes are zero-based. `getString` and `getBlob` return null for a SQL NULL, and the
+/// numeric getters return 0. `RowExt#wasNull()` distinguishes a stored zero from a NULL and
+/// reports **false** before any value has been read.
+///
+/// `getInteger` and `getShort` narrow the stored 64-bit value; `getFloat` narrows the stored
+/// double. That narrowing is defined, not undefined.
+///
+/// ## Transactions
+///
+/// Transactions are **flat**. Only that model is expressible on all of the engines behind this
+/// API, so it is the one guaranteed here.
+///
+/// - `beginTransaction` throws if a transaction is already open.
+/// - `commitTransaction` and `rollbackTransaction` throw if none is open, and both return the
+///   connection to autocommit.
+/// - Closing a database with an open transaction rolls it back.
+/// - Transactions belong to a single `Database` instance, not to the process.
+///
+/// ## Errors and lifecycle
+///
+/// Every failure is an `java.io.IOException` carrying the engine's message and, where there is
+/// one, the underlying cause. No port throws `RuntimeException` from these methods or logs a stack
+/// trace on its way out.
+///
+/// `close()` is idempotent on both `Database` and `Cursor`. Any other method on a closed object
+/// throws. Closing a database invalidates its cursors.
+///
+/// A `Database` and its cursors are **not thread safe**. Use one per thread, or wrap it in
+/// `ThreadSafeDatabase`.
+///
+/// ## Paths
+///
+/// When `Database#isCustomPathSupported()` is true the name may instead be a `file://` URL from
+/// `com.codename1.io.FileSystemStorage`. When it is false the name must not contain a path
+/// separator, and passing one throws `IllegalArgumentException`.
+///
+/// # Encryption
+///
+/// Pass a `DatabaseConfig` to encrypt a database at rest:
 ///
 /// ```java
-/// String path = Display.getInstance().getDatabasePath("databaseName");
+/// if (Database.isEncryptionSupported()) {
+///     DatabaseConfig config = DatabaseConfig.managed();
+///     Database db = Database.openOrCreate("secure.db", config);
+///     config.wipe();
+/// }
 /// ```
 ///
-/// You can then use the `com.codename1.io.FileSystemStorage` class to write the content of your
-/// DB file into the path. Notice that it must be a valid SQLite file!
+/// Requesting encryption on a platform that cannot provide it always fails with
+/// `DatabaseEncryptionException#NOT_SUPPORTED`. It never quietly returns a plaintext database.
 ///
-/// This is very useful for applications that need to synchronize with a central server or applications that
-/// ship with a large database as part of their core product.
+/// An existing database can be converted in place with `Database#encrypt(java.lang.String,
+/// com.codename1.db.DatabaseConfig)` and back with `Database#decrypt(java.lang.String,
+/// com.codename1.db.DatabaseConfig)`, and an open one re-keyed with
+/// `Database#changeKey(com.codename1.db.DatabaseConfig)`. The engine performs each conversion as a
+/// single transaction and preserves schema metadata such as `PRAGMA user_version`.
 ///
-/// Working with a database is pretty trivial, the application logic below can send arbitrary queries to the
-/// database and present the results in a `com.codename1.ui.table.Table`. You can probably integrate
-/// this code into your app as a debugging tool:
+/// ## On-disk format
 ///
-/// ```java
-/// Toolbar.setGlobalToolbar(true);
-/// Style s = UIManager.getInstance().getComponentStyle("TitleCommand");
-/// FontImage icon = FontImage.createMaterial(FontImage.MATERIAL_QUERY_BUILDER, s);
-/// Form hi = new Form("SQL Explorer", new BorderLayout());
-/// hi.getToolbar().addCommandToRightBar("", icon, (e) -> {
-///     TextArea query = new TextArea(3, 80);
-///     Command ok = new Command("Execute");
-///     Command cancel = new Command("Cancel");
-///     if(Dialog.show("Query", query, ok, cancel) == ok) {
-///         Database db = null;
-///         Cursor cur = null;
-///         try {
-///             db = Display.getInstance().openOrCreate("MyDB.db");
-///             if(query.getText().startsWith("select")) {
-///                 cur = db.executeQuery(query.getText());
-///                 int columns = cur.getColumnCount();
-///                 hi.removeAll();
-///                 if(columns > 0) {
-///                     boolean next = cur.next();
-///                     if(next) {
-///                         ArrayList data = new ArrayList<>();
-///                         String[] columnNames = new String[columns];
-///                         for(int iter = 0 ; iter
+/// Every platform reads and writes one format, so a database file is portable between them and can
+/// be opened in the simulator for debugging. The parameters are fixed: AES-256 in CBC mode,
+/// PBKDF2-HMAC-SHA512 key derivation at 256000 iterations, a 4096 byte page size and per-page
+/// HMAC-SHA512. Raw and managed keys are applied directly, with no key derivation.
+///
+/// ## Security
+///
+/// Read `DatabaseConfig` before choosing a key mode. In short: a passphrase compiled into your
+/// source is not a secret, encryption protects data at rest and nothing else, managed keys are not
+/// recoverable if the platform key store entry is lost, and the simulator's key storage is
+/// software only and must not be treated as evidence that a real device is protected.
+///
+/// # Legacy compatibility
+///
+/// This API predates the contract above, and its behaviour used to differ between platforms.
+/// Setting the `db.legacy` build hint, or calling `Database#setLegacyBehavior(boolean)` before the
+/// first database call, restores each platform's previous behaviour exactly:
+///
+/// | Restored behaviour | Platforms |
+/// | --- | --- |
+/// | `first()` rewinds without landing on a row and always reports success | iOS |
+/// | `getPosition()` counts from one | Simulator |
+/// | `wasNull()` reports true before any value has been read | Android, iOS |
+/// | Parameters are bound as text rather than by type | iOS |
+/// | `execute(String)` runs only the first statement of a script | Simulator |
+/// | The parameterized forms silently discard statements after the first | all |
+/// | A nested `beginTransaction()` is accepted | Android |
+/// | Malformed SQL surfaces from `next()` rather than from `executeQuery` | Android |
+/// | `rollbackTransaction` leaves the connection outside autocommit | Simulator |
+/// | `getColumnName` reports the table column rather than the result set label | Simulator |
+///
+/// The flag deliberately does **not** cover defects, nor capabilities that previously threw and
+/// now work -- `last()`, `prev()` and `position(int)` on iOS and the simulator, blob reads on iOS,
+/// blob query parameters, binding null in a `String[]`, or the existence of a database at all on
+/// the native Windows and Linux ports. No application can depend on those.
+///
+/// # Platform notes
+///
+/// The UWP port is not maintained and is outside this contract.
 package com.codename1.db;

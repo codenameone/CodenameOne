@@ -22,9 +22,12 @@
  */
 package com.codename1.db;
 
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Util;
 import com.codename1.ui.Display;
 
 import java.io.IOException;
+import java.io.InputStream;
 
 /// Allows access to SQLite specifically connecting to a database and executing sql queries on the data.
 /// There is more thorough coverage of the `Database API here`.
@@ -37,36 +40,55 @@ import java.io.IOException;
 /// SQLite should be used for very large data handling, for small storage
 /// refer to `com.codename1.io.Storage` which is more portable.
 ///
-/// The sample code below presents a Database Explorer tool that allows executing arbitrary SQL and
-/// viewing the tabular results:
+/// #### Example
 ///
 /// ```java
-/// Toolbar.setGlobalToolbar(true);
-/// Style s = UIManager.getInstance().getComponentStyle("TitleCommand");
-/// FontImage icon = FontImage.createMaterial(FontImage.MATERIAL_QUERY_BUILDER, s);
-/// Form hi = new Form("SQL Explorer", new BorderLayout());
-/// hi.getToolbar().addCommandToRightBar("", icon, (e) -> {
-///     TextArea query = new TextArea(3, 80);
-///     Command ok = new Command("Execute");
-///     Command cancel = new Command("Cancel");
-///     if(Dialog.show("Query", query, ok, cancel) == ok) {
-///         Database db = null;
-///         Cursor cur = null;
-///         try {
-///             db = Display.getInstance().openOrCreate("MyDB.db");
-///             if(query.getText().startsWith("select")) {
-///                 cur = db.executeQuery(query.getText());
-///                 int columns = cur.getColumnCount();
-///                 hi.removeAll();
-///                 if(columns > 0) {
-///                     boolean next = cur.next();
-///                     if(next) {
-///                         ArrayList data = new ArrayList<>();
-///                         String[] columnNames = new String[columns];
-///                         for(int iter = 0 ; iter
+/// Database db = null;
+/// Cursor cur = null;
+/// try {
+///     db = Database.openOrCreate("MyDB.db");
+///     db.execute("CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT)");
+///     db.execute("INSERT INTO people (name) VALUES (?)", new Object[] {"Alice"});
+///
+///     cur = db.executeQuery("SELECT id, name FROM people ORDER BY id");
+///     while (cur.next()) {
+///         Row row = cur.getRow();
+///         System.out.println(row.getInteger(0) + " " + row.getString(1));
+///     }
+/// } finally {
+///     if (cur != null) {
+///         cur.close();
+///     }
+///     if (db != null) {
+///         db.close();
+///     }
+/// }
+/// ```
+///
+/// #### Encryption
+///
+/// Pass a `DatabaseConfig` to `#openOrCreate(java.lang.String, com.codename1.db.DatabaseConfig)`
+/// to encrypt the database at rest. Check `#isEncryptionSupported()` first, and read the security
+/// notes on `DatabaseConfig` before choosing how to key it.
 ///
 /// @author Chen
 public abstract class Database {
+
+    /// The first 16 bytes of every unencrypted SQLite database file.
+    private static final byte[] PLAINTEXT_HEADER = {
+        'S', 'Q', 'L', 'i', 't', 'e', ' ', 'f', 'o', 'r', 'm', 'a', 't', ' ', '3', 0
+    };
+
+    /// Backs `#isLegacyBehavior()`. Deliberately not volatile: it is read once, lazily, and
+    /// treated as a startup-time constant thereafter. PMD forbids volatile in the core anyway.
+    private static boolean legacyBehavior;
+
+    private static boolean legacyBehaviorChecked;
+
+    /// Tracks whether a transaction is open on this instance, so the flat-transaction rules in
+    /// the package documentation are enforced identically on every port rather than being
+    /// re-derived from each engine's very different native semantics.
+    protected boolean inTransaction;
 
     /// Checks if this platform supports custom database paths.  On platforms that
     /// support this, you can pass a file path to `#openOrCreate(java.lang.String)`, `#exists(java.lang.String)`,
@@ -77,6 +99,55 @@ public abstract class Database {
     /// True on platorms that support custom database paths.
     public static boolean isCustomPathSupported() {
         return Display.getInstance().isDatabaseCustomPathSupported();
+    }
+
+    /// Returns whether the database API is running in legacy compatibility mode.
+    ///
+    /// The behaviour of this API used to differ substantially between platforms. Those
+    /// differences have been reconciled into the single contract documented in the
+    /// `com.codename1.db` package, but applications written against the old, divergent
+    /// behaviour may depend on it. Legacy mode restores each platform's previous behaviour
+    /// exactly, and is intended as a transition aid rather than a permanent setting.
+    ///
+    /// Enable it with the `db.legacy` build hint, or from code before the first database call:
+    ///
+    /// ```java
+    /// Database.setLegacyBehavior(true);
+    /// ```
+    ///
+    /// The package documentation lists precisely which behaviours the flag covers. Fixes for
+    /// outright defects, and capabilities that previously threw and now work, are **not**
+    /// covered, because no application can depend on those.
+    ///
+    /// #### Returns
+    ///
+    /// true when the pre-normalization behaviour is in effect
+    public static boolean isLegacyBehavior() {
+        if (!legacyBehaviorChecked) {
+            // Read lazily rather than in a static initializer. The generated application stubs
+            // on iOS and desktop call setProperty AFTER Display.init, and Android's runs inside
+            // an isInitialized guard, so an eager read would miss the build hint entirely.
+            legacyBehaviorChecked = true;
+            legacyBehavior = "true".equals(Display.getInstance().getProperty("db.legacy", "false"));
+        }
+        return legacyBehavior;
+    }
+
+    /// Turns legacy compatibility mode on or off.
+    ///
+    /// Call this before opening any database; cursors and connections capture the mode as they
+    /// are created, so flipping it mid-session gives inconsistent results.
+    ///
+    /// #### Parameters
+    ///
+    /// - `legacy`: true to restore the pre-normalization behaviour
+    ///
+    /// #### See also
+    ///
+    /// - #isLegacyBehavior()
+    public static void setLegacyBehavior(boolean legacy) {
+        legacyBehavior = legacy;
+        legacyBehaviorChecked = true;
     }
 
     private static void validateDatabaseNameArgument(String databaseName) {
@@ -158,6 +229,270 @@ public abstract class Database {
         return Display.getInstance().getDatabasePath(databaseName);
     }
 
+    /// Opens an encrypted database, creating it if it does not exist.
+    ///
+    /// The database is encrypted at rest using the key described by `config`. Every platform
+    /// that supports encryption writes the same on-disk format, so a database created on one
+    /// device can be opened on another and in the simulator.
+    ///
+    /// If `config` is null or describes a plaintext database this behaves exactly like
+    /// `#openOrCreate(java.lang.String)`.
+    ///
+    /// #### Example
+    ///
+    /// ```java
+    /// if (!Database.isEncryptionSupported()) {
+    ///     throw new IOException("This build cannot store data securely");
+    /// }
+    /// DatabaseConfig config = DatabaseConfig.managed();
+    /// Database db = Database.openOrCreate("secure.db", config);
+    /// config.wipe();
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: @param databaseName the name of the database. Platforms that support custom
+    ///                     database paths (see `#isCustomPathSupported()`) also accept a file path.
+    ///
+    /// - `config`: how to key the database, or null for plaintext
+    ///
+    /// #### Returns
+    ///
+    /// the open database
+    ///
+    /// #### Throws
+    ///
+    /// - `DatabaseEncryptionException`: @throws DatabaseEncryptionException with `DatabaseEncryptionException#NOT_SUPPORTED`
+    ///                     if encryption was requested on a platform that cannot provide it, or with
+    ///                     `DatabaseEncryptionException#WRONG_KEY` if the key does not decrypt an
+    ///                     existing database
+    ///
+    /// - `IOException`: if the database cannot be opened or created
+    public static Database openOrCreate(String databaseName, DatabaseConfig config) throws IOException {
+        validateDatabaseNameArgument(databaseName);
+        if (config == null || !config.isEncrypted()) {
+            return Display.getInstance().openOrCreate(databaseName);
+        }
+        // Refuse rather than silently handing back a plaintext database. An application that
+        // asked for encryption and got none is the worst possible outcome here.
+        if (!isEncryptionSupported()) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
+                    "Encrypted databases are not supported on this platform");
+        }
+        return Display.getInstance().openOrCreate(databaseName, config);
+    }
+
+    /// Indicates whether this platform can open encrypted databases.
+    ///
+    /// #### Returns
+    ///
+    /// true if `#openOrCreate(java.lang.String, com.codename1.db.DatabaseConfig)` accepts an
+    /// encrypting config
+    public static boolean isEncryptionSupported() {
+        return Display.getInstance().isDatabaseEncryptionSupported();
+    }
+
+    /// Indicates whether managed keys on this platform are held in hardware backed storage.
+    static boolean isManagedKeyHardwareBacked() {
+        return Display.getInstance().isDatabaseManagedKeyHardwareBacked();
+    }
+
+    /// Indicates whether a database file appears to be encrypted.
+    ///
+    /// This inspects the file header: an unencrypted SQLite database begins with the ASCII bytes
+    /// `SQLite format 3` followed by a zero byte, and an encrypted one does not. It is therefore a
+    /// **header sniff, not a cryptographic assertion** -- a truncated or corrupt file also reports
+    /// true, and a false result only means the file is a readable plaintext SQLite database.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// #### Returns
+    ///
+    /// false if the file exists and starts with a plaintext SQLite header, true otherwise
+    public static boolean isEncrypted(String databaseName) {
+        validateDatabaseNameArgument(databaseName);
+        if (!exists(databaseName)) {
+            return false;
+        }
+        String path = getDatabasePath(databaseName);
+        if (path == null) {
+            return false;
+        }
+        InputStream in = null;
+        try {
+            in = FileSystemStorage.getInstance().openInputStream(path);
+            byte[] header = new byte[PLAINTEXT_HEADER.length];
+            int offset = 0;
+            while (offset < header.length) {
+                int read = in.read(header, offset, header.length - offset);
+                if (read < 0) {
+                    return true;
+                }
+                offset += read;
+            }
+            for (int iter = 0; iter < header.length; iter++) {
+                if (header[iter] != PLAINTEXT_HEADER[iter]) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (IOException err) {
+            return true;
+        } finally {
+            Util.cleanup(in);
+        }
+    }
+
+    /// Encrypts an existing plaintext database in place.
+    ///
+    /// The conversion is performed by the database engine as a single transaction, so an
+    /// interruption leaves the original file intact rather than half-converted. Schema metadata
+    /// such as `PRAGMA user_version` is preserved.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of an existing plaintext database
+    ///
+    /// - `config`: how the encrypted database should be keyed
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database cannot be converted
+    public static void encrypt(String databaseName, DatabaseConfig config) throws IOException {
+        if (config == null || !config.isEncrypted()) {
+            throw new IllegalArgumentException("encrypt() requires a config that describes an encrypted database");
+        }
+        if (!isEncryptionSupported()) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
+                    "Encrypted databases are not supported on this platform");
+        }
+        Database db = openOrCreate(databaseName);
+        try {
+            db.changeKey(config);
+        } finally {
+            db.close();
+        }
+    }
+
+    /// Decrypts an existing encrypted database in place, leaving a plain SQLite file.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of an existing encrypted database
+    ///
+    /// - `config`: the config that currently opens the database
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database cannot be converted
+    public static void decrypt(String databaseName, DatabaseConfig config) throws IOException {
+        if (config == null || !config.isEncrypted()) {
+            throw new IllegalArgumentException("decrypt() requires the config that currently opens the database");
+        }
+        Database db = openOrCreate(databaseName, config);
+        try {
+            db.changeKey(DatabaseConfig.plain());
+        } finally {
+            db.close();
+        }
+    }
+
+    /// Removes the stored managed key for an alias.
+    ///
+    /// `#delete(java.lang.String)` deliberately leaves the managed key in place, because deleting
+    /// and recreating a database is a normal thing to do and should not discard the identity that
+    /// protects it. Call this explicitly when the key really should be forgotten -- after which any
+    /// remaining database encrypted with it is permanently unreadable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyAlias`: @param keyAlias the alias passed to `DatabaseConfig#managed(java.lang.String)`, or
+    ///                 the database name when `DatabaseConfig#managed()` was used
+    ///
+    /// #### Returns
+    ///
+    /// true if a key was removed
+    public static boolean forgetManagedKey(String keyAlias) {
+        return ManagedKeys.forget(keyAlias);
+    }
+
+    /// Rewinds a cursor to before its first row.
+    ///
+    /// Uses `CursorExt#beforeFirst()` when the cursor provides it, and falls back to
+    /// `Cursor#position(int)` with -1 otherwise.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cursor`: the cursor to rewind
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the cursor is closed or the rewind fails
+    public static void beforeFirst(Cursor cursor) throws IOException {
+        if (cursor instanceof CursorExt) {
+            ((CursorExt) cursor).beforeFirst();
+        } else {
+            cursor.position(-1);
+        }
+    }
+
+    /// Returns the number of rows a cursor holds, or -1 when that is not cheaply knowable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cursor`: the cursor to measure
+    ///
+    /// #### Returns
+    ///
+    /// the row count, or -1 when unknown
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the cursor is closed
+    public static int count(Cursor cursor) throws IOException {
+        if (cursor instanceof CursorExt) {
+            return ((CursorExt) cursor).getCount();
+        }
+        return -1;
+    }
+
+    /// Indicates whether `#executeQuery(java.lang.String, java.lang.Object[])` accepts `byte[]`
+    /// parameters on this platform.
+    ///
+    /// Blob values can always be written with `#execute(java.lang.String, java.lang.Object[])`.
+    /// Using one as a query parameter, for example in `WHERE digest = ?`, needs engine support
+    /// that not every port can provide.
+    ///
+    /// #### Returns
+    ///
+    /// true if blobs may be used as query parameters
+    public static boolean isBlobQueryParameterSupported() {
+        return Display.getInstance().isBlobQueryParameterSupported();
+    }
+
+    /// Changes the key of this open database, or removes it entirely.
+    ///
+    /// Passing a plaintext config decrypts the database. The engine performs the conversion as a
+    /// single transaction and preserves schema metadata such as `PRAGMA user_version`.
+    ///
+    /// Ports that support encryption override this. The default implementation reports that the
+    /// platform cannot do it; it is deliberately concrete rather than abstract, because `Database`
+    /// is public and is subclassed outside this repository.
+    ///
+    /// #### Parameters
+    ///
+    /// - `config`: the new key, or `DatabaseConfig#plain()` to decrypt
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the key cannot be changed
+    public void changeKey(DatabaseConfig config) throws IOException {
+        throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
+                "Changing the database key is not supported on this platform");
+    }
+
     /// Checks if the last value accessed from a given row was null.  Not all platforms
     /// support wasNull().  If the platform does not support it, this will just return false.
     ///
@@ -213,13 +548,56 @@ public abstract class Database {
         return row instanceof RowExt;
     }
 
-    /// Starts a transaction
+    /// Reports whether a transaction is currently open on this database.
     ///
-    /// **NOTE:** Not supported in Javascript port.  This method will do nothing when running in Javascript.
+    /// #### Returns
+    ///
+    /// true between a successful `#beginTransaction()` and its commit or rollback
+    public boolean isInTransaction() {
+        return inTransaction;
+    }
+
+    /// Rejects a nested `#beginTransaction()`, then records that one is open.
+    ///
+    /// Transactions are flat: only that model is expressible on all of the engines behind this
+    /// API. Ports call this at the top of `#beginTransaction()`. In legacy mode the check is
+    /// skipped, because a nested begin used to be accepted on Android.
     ///
     /// #### Throws
     ///
-    /// - `IOException`: if database is not opened
+    /// - `IOException`: if a transaction is already open
+    protected void checkBeginTransaction() throws IOException {
+        if (inTransaction && !isLegacyBehavior()) {
+            throw new IOException("A transaction is already in progress on this database. "
+                    + "Transactions do not nest; commit or roll back the current one first.");
+        }
+        inTransaction = true;
+    }
+
+    /// Rejects a commit or rollback with no open transaction, then records that it closed.
+    ///
+    /// Ports call this at the top of `#commitTransaction()` and `#rollbackTransaction()`. In
+    /// legacy mode the check is skipped.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if no transaction is open
+    protected void checkEndTransaction() throws IOException {
+        if (!inTransaction && !isLegacyBehavior()) {
+            throw new IOException("No transaction is in progress on this database");
+        }
+        inTransaction = false;
+    }
+
+    /// Starts a transaction.
+    ///
+    /// Transactions are flat. Calling this while a transaction is already open throws, and
+    /// committing or rolling back returns the connection to autocommit. Closing a database with
+    /// an open transaction rolls it back.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database is not open, or a transaction is already in progress
     public abstract void beginTransaction() throws IOException;
 
     /// Commits current transaction
@@ -291,25 +669,48 @@ public abstract class Database {
     ///
     /// - `IOException`
     public void execute(String sql, Object... params) throws IOException {
-        if (params == null) {
+        if (params == null || params.length == 0) {
             execute(sql);
         } else {
-            //throw new RuntimeException("not implemented");
-            int len = params.length;
-            String[] strParams = new String[len];
-            for (int i = 0; i < len; i++) {
-                if (params[i] instanceof byte[]) {
-                    throw new RuntimeException("Blobs aren't supported on this platform");
-                }
-                if (params[i] == null) {
-                    strParams[i] = null;
-                } else {
-                    strParams[i] = params[i].toString();
-                }
-            }
-            execute(sql, strParams);
+            execute(sql, coerceToText(params, "execute"));
         }
+    }
 
+    /// Renders parameters as text for ports that have not implemented typed binding.
+    ///
+    /// This is the fallback path only. Ports that can bind by type override the varargs methods
+    /// and never reach here, which is why hitting a `byte[]` is an error rather than something to
+    /// paper over: silently storing the result of `byte[].toString()` would write the array's
+    /// identity hash into the database.
+    ///
+    /// #### Parameters
+    ///
+    /// - `params`: the parameters supplied by the caller
+    ///
+    /// - `operation`: the calling method name, used in the error message
+    ///
+    /// #### Returns
+    ///
+    /// the parameters rendered as text, preserving nulls
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if a parameter is a `byte[]` and this port cannot bind blobs
+    protected static String[] coerceToText(Object[] params, String operation) throws IOException {
+        int len = params.length;
+        String[] strParams = new String[len];
+        for (int i = 0; i < len; i++) {
+            if (params[i] instanceof byte[]) {
+                throw new IOException("This platform cannot bind a byte[] parameter in " + operation
+                        + "(). Check Database.isBlobQueryParameterSupported() before passing blobs.");
+            }
+            if (params[i] == null) {
+                strParams[i] = null;
+            } else {
+                strParams[i] = params[i].toString();
+            }
+        }
+        return strParams;
     }
 
     /// This method should be called with SELECT type statements that return
@@ -350,21 +751,8 @@ public abstract class Database {
     public Cursor executeQuery(String sql, Object... params) throws IOException {
         if (params == null || params.length == 0) {
             return executeQuery(sql);
-        } else {
-            int len = params.length;
-            String[] strParams = new String[len];
-            for (int i = 0; i < len; i++) {
-                if (params[i] instanceof byte[]) {
-                    throw new RuntimeException("Blobs aren't supported on this platform");
-                }
-                if (params[i] == null) {
-                    strParams[i] = null;
-                } else {
-                    strParams[i] = params[i].toString();
-                }
-            }
-            return executeQuery(sql, strParams);
         }
+        return executeQuery(sql, coerceToText(params, "executeQuery"));
     }
 
     /// This method should be called with SELECT type statements that return

@@ -29,6 +29,7 @@ import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
+import com.codename1.db.DatabaseConfig;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.CodenameOneThread;
 import com.codename1.impl.ImplementationFactory;
@@ -4012,6 +4013,12 @@ public final class Display extends CN1Constants {
         if ("Component.revalidateOnStyleChange".equals(key)) {
             Component.setRevalidateOnStyleChange("true".equalsIgnoreCase(value));
         }
+        if ("db.legacy".equals(key)) {
+            // Keep the static flag and the property in step, so setting this through the
+            // generated application stub, through CN.setProperty or through
+            // Database.setLegacyBehavior all behave identically.
+            Database.setLegacyBehavior("true".equalsIgnoreCase(value));
+        }
         if (key.startsWith("platformHint.")) {
             impl.setPlatformHint(key, value);
             return;
@@ -6031,6 +6038,60 @@ public final class Display extends CN1Constants {
         return impl.openOrCreateDB(databaseName);
     }
 
+    /// Opens an encrypted database or creates one if it does not exist.
+    ///
+    /// Prefer `com.codename1.db.Database#openOrCreate(java.lang.String, com.codename1.db.DatabaseConfig)`,
+    /// which validates the name and the platform's capability before delegating here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// - `config`: how the database should be keyed
+    ///
+    /// #### Returns
+    ///
+    /// the open database
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database cannot be opened, created or decrypted
+    public Database openOrCreate(String databaseName, DatabaseConfig config) throws IOException {
+        return impl.openOrCreateDB(databaseName, config);
+    }
+
+    /// Indicates whether this platform can open encrypted databases.
+    ///
+    /// #### Returns
+    ///
+    /// true if encrypted databases are supported
+    public boolean isDatabaseEncryptionSupported() {
+        return impl.isDatabaseEncryptionSupported();
+    }
+
+    /// Indicates whether managed database keys are held in hardware backed storage here.
+    ///
+    /// #### Returns
+    ///
+    /// true when a hardware backed key store protects managed keys
+    public boolean isDatabaseManagedKeyHardwareBacked() {
+        return impl.isDatabaseManagedKeyHardwareBacked();
+    }
+
+    /// Indicates whether `byte[]` values may be used as query parameters.
+    ///
+    /// #### Returns
+    ///
+    /// true if blobs are accepted as query parameters
+    public boolean isBlobQueryParameterSupported() {
+        return impl.isBlobQueryParameterSupported();
+    }
+
+    /// Indicates whether this platform accepts a file path as a database name.
+    ///
+    /// #### Returns
+    ///
+    /// true if custom database paths are supported
     public boolean isDatabaseCustomPathSupported() {
         return impl.isDatabaseCustomPathSupported();
     }
