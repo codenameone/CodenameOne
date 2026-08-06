@@ -736,6 +736,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /// The companion watch process, so "Launch Watch App" runs one rather than one per click.
     private static Process watchProcess;
+    /// The shutdown hook that kills the launched watch is installed once, not once per launch.
+    private static boolean watchShutdownHookInstalled;
     private static final Object WATCH_PROCESS_LOCK = new Object();
 
     static {
@@ -5773,6 +5775,24 @@ public class JavaSEPort extends CodenameOneImplementation {
                     return;
                 }
                 watchProcess = new ProcessBuilder(cmd).inheritIO().start();
+                // The child does NOT outlive the phone. An orphaned watch keeps the rendezvous
+                // port, pairs with the next phone run, and then the watch launched from THAT run
+                // cannot connect -- so the developer is talking to the previous build's watch
+                // while looking at the new one. Registered once, on first launch.
+                if (!watchShutdownHookInstalled) {
+                    watchShutdownHookInstalled = true;
+                    Runtime.getRuntime().addShutdownHook(new Thread() {
+                        public void run() {
+                            Process p;
+                            synchronized (WATCH_PROCESS_LOCK) {
+                                p = watchProcess;
+                            }
+                            if (p != null && p.isAlive()) {
+                                p.destroy();
+                            }
+                        }
+                    });
+                }
             }
         } catch (Exception err) {
             javax.swing.JOptionPane.showMessageDialog(window,

@@ -311,6 +311,28 @@ class JavaSEWearableBridge implements WearableBridge {
                 seenData.remove(f.getName());
             }
         }
+        // A durable tombstone, because deleting the file says nothing to a peer that is not
+        // running. That peer starts with an empty seenData, sees only a path that is not there, and
+        // never learns the value was removed -- so an app that persisted it stays stale forever.
+        // The other two platforms both keep a tombstone for exactly this; the simulator was the
+        // odd one out.
+        writeValue(new File(dataDir, encodePath(path) + TOMB_SUFFIX), new byte[0], path);
+    }
+
+    /// Marks a tombstone file. A removal's durable record, consumed by the peer's scan.
+    private static final String TOMB_SUFFIX = ".tomb";
+
+    /// How long a tombstone is kept before its author drops it. Long enough for a peer that was
+    /// closed to be reopened; the alternative -- keeping it forever -- fills the shared directory.
+    private static final long TOMB_TTL_MILLIS = 24 * 60 * 60 * 1000L;
+
+    private static boolean isTombstone(String storageName) {
+        return storageName.endsWith(TOMB_SUFFIX);
+    }
+
+    /// The logical path a tombstone stands for.
+    private static String tombstonePath(String storageName) {
+        return decodePath(storageName.substring(0, storageName.length() - TOMB_SUFFIX.length()));
     }
 
     public String[] getDataPaths() {
@@ -734,6 +756,23 @@ class JavaSEWearableBridge implements WearableBridge {
                     }
                     continue;
                 }
+                if (isTombstone(f.getName())) {
+                    // A peer's removal. Delivered once -- the seen-marker above has already been
+                    // updated, so a tombstone that does not change is not re-announced.
+                    if (authoredLocallyFor(snapshot, stamp)) {
+                        // Ours. Keep it for the peer to find, and drop it once it is old enough
+                        // that any peer which was going to see it has had every chance.
+                        if (System.currentTimeMillis() - stamp > TOMB_TTL_MILLIS) {
+                            f.delete();
+                            synchronized (seenData) {
+                                seenData.remove(f.getName());
+                            }
+                        }
+                        continue;
+                    }
+                    WearableConnection.deliverDataRemoved(tombstonePath(f.getName()));
+                    continue;
+                }
                 if (!isTransfer(f.getName()) && authoredLocallyFor(snapshot, stamp)) {
                     // Our own VALUE, for the same reason. primeSeenData() records nothing so that a
                     // value published while this side was down still replays on startup -- but that
@@ -790,6 +829,16 @@ class JavaSEWearableBridge implements WearableBridge {
                 // its job -- not the logical path being removed. Reporting dataRemoved here would
                 // tell the sender's own listeners that a path it never removed had gone, and that
                 // path may well still hold an unrelated replicated value.
+                continue;
+            }
+            if (isTombstone(name)) {
+                // The tombstone itself expiring is housekeeping, not a removal.
+                continue;
+            }
+            if (new File(dataDir, name + TOMB_SUFFIX).isFile()) {
+                // A tombstone covers this disappearance and announces it exactly once -- for a live
+                // peer AND for one that was closed when the removal happened. Announcing here too
+                // would deliver the same removal twice to a peer that happened to be running.
                 continue;
             }
             WearableConnection.deliverDataRemoved(deliveryPath(name));

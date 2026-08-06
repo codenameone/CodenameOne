@@ -1812,14 +1812,11 @@ public class CN1WearableBridge implements WearableBridge {
                                 // delivered twice.
                                 if (p.startsWith(PATH_PREFIX) && valueMap(item) != null
                                         && !replayNode.equals(uri.getHost())) {
-                                    // Items THIS device published are skipped, and the resolver is
-                                    // not asked about them. Its non-deletion branch delivers
-                                    // whatever wins without the local-author check the callback
-                                    // path applies, so scheduling one for our own persisted write
-                                    // would hand the app its own value as a peer change on every
-                                    // cold start. If a peer also published this path, that peer's
-                                    // item is in this same enumeration and schedules the
-                                    // resolution -- which then correctly compares both.
+                                    // Items THIS device published are not worth a resolution: the
+                                    // resolver now suppresses a local winner anyway, so asking
+                                    // would cost a blocking query to reach the same silence. A path
+                                    // a peer also published is scheduled by that peer's item, which
+                                    // is in this same enumeration.
                                     String appPath = decode(p.substring(PATH_PREFIX.length()));
                                     if (!hasDeliveredStamp(appPath)) {
                                         scheduleReplayResolution(context, appPath);
@@ -2097,6 +2094,16 @@ public class CN1WearableBridge implements WearableBridge {
                             Wearable.getDataClient(context.getApplicationContext()).getDataItems(uri),
                             TIMEOUT_SECONDS, TimeUnit.SECONDS);
                     try {
+                        if (items.getCount() == 0) {
+                            // An authoritative EMPTY answer: the item is gone. Typically the
+                            // sender's retention sweep reached it while its asset was still
+                            // unreadable here. Rescheduling would then poll a deleted URI every few
+                            // minutes for the rest of the retention window, on the single timer
+                            // that startup replay and cleanup also use, and no attempt could ever
+                            // succeed. Stop and forget the chain.
+                            forgetRetryStart(uri);
+                            return;
+                        }
                         for (DataItem item : items) {
                             Transfer t = decodeTransferOnce(context, item);
                             // Recheck authorship. The listener suppressed this as our own echo and
@@ -2483,6 +2490,30 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
+    /**
+     * Records that a removal has been announced for a path with no stamp of its own, returning
+     * false when one already was.
+     *
+     * <p>For the cold-process case: the first event a fresh process handles is a deletion, so there
+     * is no delivery stamp to drop and the ordinary atomic path declines. Announcing needs a way to
+     * happen exactly once all the same, because one wildcard delete produces a tombstone per
+     * replica. The sentinel is a stamp like any other, so those later tombstones take the ordinary
+     * route and dedupe against it.</p>
+     */
+    static boolean markRemovalAnnounced(String path) {
+        synchronized (deliveredSequences) {
+            if (deliveredSequences.containsKey(path)) {
+                return false;
+            }
+            deliveredSequences.put(path, REMOVAL_ANNOUNCED);
+            return true;
+        }
+    }
+
+    /// Stands in for "this path's removal has been reported" where no real stamp exists. A real
+    /// stamp is "sequence|node", so a value with neither cannot collide with one.
+    private static final String REMOVAL_ANNOUNCED = "removed";
+
     /** The recorded stamp for a path, or null -- an opaque snapshot for {@link #forgetDeliveredSequenceIfUnchanged}. */
     static String deliveredStamp(String path) {
         synchronized (deliveredSequences) {
@@ -2827,7 +2858,17 @@ public class CN1WearableBridge implements WearableBridge {
                         //
                         // Otherwise the stamp describes a live value, and the ordinary monotonic
                         // rule is right.
-                        if (afterDeletion) {
+                        // A winner published by THIS device is recorded, never dispatched. The
+                        // inline callback path applies that rule and this shared resolver did not,
+                        // so any route into it -- a retry after an inline failure, a lower-ranked
+                        // peer replica scheduling a resolution that our own item then wins, the
+                        // startup replay -- could hand the app its own write as a peer change.
+                        // Recording the stamp still matters: it is what stops the same item being
+                        // resolved again and again.
+                        if (isLocallyAuthored(context, winner.node)) {
+                            setDeliveredSequenceIfOutranks(path, winner.sequence, winner.node);
+                            rememberValue(path, winner.payload);
+                        } else if (afterDeletion) {
                             deliverIfStampUnchanged(path, before, winner.sequence, winner.node,
                                     winner.payload);
                         } else {
