@@ -82,6 +82,7 @@ public class AndroidDB extends Database {
         checkEndTransaction();
         db.setTransactionSuccessful();
         db.endTransaction();
+        markTransactionEnded();
     }
 
     @Override
@@ -90,6 +91,7 @@ public class AndroidDB extends Database {
         checkEndTransaction();
         // Ending without setTransactionSuccessful is what rolls back.
         db.endTransaction();
+        markTransactionEnded();
     }
 
     @Override

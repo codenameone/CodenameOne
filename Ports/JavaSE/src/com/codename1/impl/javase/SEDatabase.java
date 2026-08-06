@@ -45,12 +45,24 @@ public class SEDatabase extends Database {
     private java.sql.Connection conn;
 
     /**
+     * The name this database was opened under. Retained because a managed key resolves its
+     * keystore alias from the database name, and changeKey() would otherwise have nothing to
+     * resolve against.
+     */
+    private String databaseName;
+
+    /**
      * Cursors created from this connection. Closing the database has to invalidate them, because
      * their statements belong to the connection and are gone once it closes.
      */
     private final List<SECursor> openCursors = new ArrayList<SECursor>();
 
     public SEDatabase(java.sql.Connection conn) {
+        this(conn, null);
+    }
+
+    public SEDatabase(java.sql.Connection conn, String databaseName) {
+        this.databaseName = databaseName;
         this.conn = conn;
         try {
             conn.setAutoCommit(true);
@@ -81,7 +93,7 @@ public class SEDatabase extends Database {
         try {
             conn.setAutoCommit(false);
         } catch (SQLException ex) {
-            inTransaction = false;
+            markTransactionEnded();
             throw new IOException(ex.getMessage(), ex);
         }
     }
@@ -93,6 +105,7 @@ public class SEDatabase extends Database {
         try {
             conn.commit();
             conn.setAutoCommit(true);
+            markTransactionEnded();
         } catch (SQLException ex) {
             throw new IOException(ex.getMessage(), ex);
         }
@@ -109,6 +122,7 @@ public class SEDatabase extends Database {
                 // statement silently joins a new implicit transaction.
                 conn.setAutoCommit(true);
             }
+            markTransactionEnded();
         } catch (SQLException ex) {
             throw new IOException(ex.getMessage(), ex);
         }
@@ -329,7 +343,8 @@ public class SEDatabase extends Database {
             if (config == null || !config.isEncrypted()) {
                 s.execute("PRAGMA rekey = ''");
             } else {
-                s.execute("PRAGMA rekey = \"" + JavaSEPort.databaseKeyMaterial(config, null) + "\"");
+                s.execute("PRAGMA rekey = "
+                        + toPragmaLiteral(JavaSEPort.databaseKeyMaterial(config, databaseName)));
             }
         } catch (SQLException ex) {
             throw new IOException(ex.getMessage(), ex);

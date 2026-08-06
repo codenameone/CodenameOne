@@ -41,16 +41,25 @@ class DatabaseImpl extends Database {
     private long peer;
 
     /**
+     * The name this database was opened under. Retained because a managed key resolves its
+     * keystore alias from the database name, and changeKey() would otherwise have nothing to
+     * resolve against.
+     */
+    private final String databaseName;
+
+    /**
      * Cursors opened from this database. Closing the database finalizes its statements, so the
      * cursors have to be marked dead rather than left holding freed pointers.
      */
     private final Vector openCursors = new Vector();
 
-    public DatabaseImpl(String path) {
+    public DatabaseImpl(String databaseName, String path) {
+        this.databaseName = databaseName;
         peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(path);
     }
 
-    public DatabaseImpl(String path, String key) throws IOException {
+    public DatabaseImpl(String databaseName, String path, String key) throws IOException {
+        this.databaseName = databaseName;
         peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(path);
         if (!IOSImplementation.nativeInstance.sqlDbApplyKey(peer, key)) {
             IOSImplementation.nativeInstance.sqlDbClose(peer);
@@ -101,6 +110,7 @@ class DatabaseImpl extends Database {
         checkOpen();
         checkEndTransaction();
         executeScript("COMMIT");
+        markTransactionEnded();
     }
 
     @Override
@@ -108,6 +118,7 @@ class DatabaseImpl extends Database {
         checkOpen();
         checkEndTransaction();
         executeScript("ROLLBACK");
+        markTransactionEnded();
     }
 
     @Override
@@ -140,7 +151,7 @@ class DatabaseImpl extends Database {
         checkOpen();
         String key = null;
         if (config != null && config.isEncrypted()) {
-            key = config.resolveKeyMaterial(null);
+            key = config.resolveKeyMaterial(databaseName);
         }
         IOSImplementation.nativeInstance.sqlDbRekey(peer, key);
     }

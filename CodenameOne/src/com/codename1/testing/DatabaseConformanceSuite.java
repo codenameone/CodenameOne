@@ -275,7 +275,9 @@ public class DatabaseConformanceSuite {
             multiThrew = true;
         }
         int created = countTables(db, "conf_m1", "conf_m2");
-        if (mode == MODE_LEGACY && portKind() == PORT_SIMULATOR) {
+        // In legacy mode only iOS ran a whole script: it used sqlite3_exec. Android's execSQL and
+        // the simulator's PreparedStatement each ran the first statement and dropped the rest.
+        if (mode == MODE_LEGACY && portKind() != PORT_IOS) {
             r.check(!multiThrew && created == 1,
                     "legacy: execute(String) runs only the first statement of a script, got "
                     + created + " of 2");
@@ -302,7 +304,7 @@ public class DatabaseConformanceSuite {
         boolean blobWriteSupported = true;
         try {
             db.execute("INSERT INTO conf_stmt (id, t, i, d, b) VALUES (?, ?, ?, ?, ?)",
-                    new Object[] {new Integer(1), "text", new Long(42), new Double(1.5),
+                    new Object[] {Integer.valueOf(1), "text", Long.valueOf(42), Double.valueOf(1.5),
                         new byte[] {1, 2, 3}});
         } catch (IOException err) {
             blobWriteSupported = false;
@@ -402,7 +404,7 @@ public class DatabaseConformanceSuite {
         if (blobWriteSupported) {
             db.execute("DELETE FROM conf_stmt");
             db.execute("INSERT INTO conf_stmt (id, b) VALUES (?, ?)",
-                    new Object[] {new Integer(3), new byte[] {9, 8, 7}});
+                    new Object[] {Integer.valueOf(3), new byte[] {9, 8, 7}});
             boolean queried = false;
             boolean threw = false;
             Cursor cur = null;
@@ -415,11 +417,11 @@ public class DatabaseConformanceSuite {
             } finally {
                 closeQuietly(cur);
             }
-            Boolean advertised = blobQueryParametersSupported();
-            if (Boolean.TRUE.equals(advertised)) {
+            int advertised = blobQueryParametersSupported();
+            if (advertised == CAPABILITY_YES) {
                 r.check(queried && !threw,
                         "isBlobQueryParameterSupported() is true, so a blob query parameter works");
-            } else if (Boolean.FALSE.equals(advertised)) {
+            } else if (advertised == CAPABILITY_NO) {
                 r.check(threw,
                         "isBlobQueryParameterSupported() is false, so a blob query parameter "
                         + "raises a clean IOException rather than silently misbehaving");
@@ -457,7 +459,7 @@ public class DatabaseConformanceSuite {
         db.execute("CREATE TABLE conf_cur (id INTEGER PRIMARY KEY, name TEXT)");
         for (int iter = 0; iter < 5; iter++) {
             db.execute("INSERT INTO conf_cur (id, name) VALUES (?, ?)",
-                    new Object[] {new Integer(iter), "row" + iter});
+                    new Object[] {Integer.valueOf(iter), "row" + iter});
         }
 
         // ---- metadata is available before the first next()
@@ -504,6 +506,27 @@ public class DatabaseConformanceSuite {
                 r.check(!cur.position(-1), "position(-1) returns false");
                 r.check(cur.getPosition() == -1 + base, "position(-1) rewinds to before the first row");
             }
+        } finally {
+            closeQuietly(cur);
+        }
+
+        // ---- stepping past the end repeatedly must not move the row count
+        cur = db.executeQuery("SELECT id FROM conf_cur ORDER BY id");
+        try {
+            while (cur.next()) {
+                // walk to the end
+            }
+            int countAfterFirstExhaustion = Database.count(cur);
+            cur.next();
+            cur.next();
+            cur.next();
+            if (countAfterFirstExhaustion >= 0) {
+                r.check(Database.count(cur) == countAfterFirstExhaustion,
+                        "calling next() past the end repeatedly does not inflate the row count, was "
+                        + countAfterFirstExhaustion + " now " + Database.count(cur));
+            }
+            r.check(cur.last(), "last() still finds a row after the cursor was over-stepped");
+            r.check(cur.getPosition() == 4, "last() lands on the final row after over-stepping");
         } finally {
             closeQuietly(cur);
         }
@@ -628,6 +651,42 @@ public class DatabaseConformanceSuite {
                 "a statement after a rollback autocommits rather than joining an open transaction");
 
         if (mode == MODE_STRICT) {
+            // ---- a failed commit leaves the transaction open, so a rollback must still work
+            db.execute("DROP TABLE IF EXISTS conf_fk_child");
+            db.execute("DROP TABLE IF EXISTS conf_fk_parent");
+            db.execute("CREATE TABLE conf_fk_parent (id INTEGER PRIMARY KEY)");
+            db.execute("CREATE TABLE conf_fk_child (id INTEGER PRIMARY KEY, parent INTEGER "
+                    + "REFERENCES conf_fk_parent(id) DEFERRABLE INITIALLY DEFERRED)");
+            boolean deferredConstraintsWork = true;
+            try {
+                db.execute("PRAGMA foreign_keys = ON");
+                db.beginTransaction();
+                db.execute("INSERT INTO conf_fk_child (id, parent) VALUES (1, 999)");
+                db.commitTransaction();
+                // The engine did not enforce the constraint, so there is nothing to recover from.
+                deferredConstraintsWork = false;
+            } catch (IOException expected) {
+                // The commit failed, which is the interesting case: the transaction is still open.
+                boolean recovered = true;
+                try {
+                    db.rollbackTransaction();
+                } catch (IOException err) {
+                    recovered = false;
+                }
+                r.check(recovered, "a rollback after a failed commit is accepted rather than "
+                        + "rejected as having no transaction");
+            }
+            if (!deferredConstraintsWork) {
+                r.info("this engine did not enforce the deferred foreign key, so the "
+                        + "failed-commit recovery path was not exercised");
+                if (db.isInTransaction()) {
+                    db.rollbackTransaction();
+                }
+            }
+            db.execute("PRAGMA foreign_keys = OFF");
+            db.execute("DROP TABLE IF EXISTS conf_fk_child");
+            db.execute("DROP TABLE IF EXISTS conf_fk_parent");
+
             // ---- nesting is rejected
             db.beginTransaction();
             boolean nestedThrew = false;
@@ -871,15 +930,25 @@ public class DatabaseConformanceSuite {
         return PORT_OTHER;
     }
 
-    /// Reads the blob-query capability, or null when it cannot be determined.
+    /// The blob-query capability could not be determined.
+    private static final int CAPABILITY_UNKNOWN = -1;
+
+    /// The platform reports that it does not support blob query parameters.
+    private static final int CAPABILITY_NO = 0;
+
+    /// The platform reports that it supports blob query parameters.
+    private static final int CAPABILITY_YES = 1;
+
+    /// Reads the blob-query capability.
     ///
-    /// Returns null rather than a guess when the display is not up, so that a harness driving a
-    /// `Database` directly does not assert the opposite of what the port actually supports.
-    private static Boolean blobQueryParametersSupported() {
+    /// Reports `#CAPABILITY_UNKNOWN` rather than guessing when the display is not up, so that a
+    /// harness driving a `Database` directly does not assert the opposite of what the port
+    /// actually supports.
+    private static int blobQueryParametersSupported() {
         try {
-            return Database.isBlobQueryParameterSupported() ? Boolean.TRUE : Boolean.FALSE;
+            return Database.isBlobQueryParameterSupported() ? CAPABILITY_YES : CAPABILITY_NO;
         } catch (Throwable displayNotUp) {
-            return null;
+            return CAPABILITY_UNKNOWN;
         }
     }
 
@@ -900,7 +969,15 @@ public class DatabaseConformanceSuite {
                 }
                 offset += read;
             }
-            return "SQLite format 3".equals(new String(header, 0, 15));
+            // Compare bytes rather than decoding: the header is fixed ASCII, and decoding it
+            // would depend on the platform default charset.
+            byte[] expected = {'S', 'Q', 'L', 'i', 't', 'e', ' ', 'f', 'o', 'r', 'm', 'a', 't', ' ', '3'};
+            for (int iter = 0; iter < expected.length; iter++) {
+                if (header[iter] != expected[iter]) {
+                    return false;
+                }
+            }
+            return true;
         } catch (IOException err) {
             return false;
         } finally {

@@ -11163,7 +11163,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException{
-        return new DatabaseImpl(resolveDatabasePath(databaseName));
+        return new DatabaseImpl(databaseName, resolveDatabasePath(databaseName));
     }
 
     @Override
@@ -11175,7 +11175,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
                     "This build was not compiled with encrypted database support");
         }
-        return new DatabaseImpl(resolveDatabasePath(databaseName),
+        return new DatabaseImpl(databaseName, resolveDatabasePath(databaseName),
                 config.resolveKeyMaterial(databaseName));
     }
 

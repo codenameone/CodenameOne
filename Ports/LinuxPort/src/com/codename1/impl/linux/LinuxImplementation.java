@@ -2957,7 +2957,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
         if (config != null && config.isEncrypted()) {
             key = config.resolveKeyMaterial(databaseName);
         }
-        return new LinuxDatabase(path, key);
+        return new LinuxDatabase(databaseName, path, key);
     }
 
     @Override

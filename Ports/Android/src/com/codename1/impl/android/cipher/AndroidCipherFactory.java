@@ -71,11 +71,12 @@ public class AndroidCipherFactory {
      * Opens an encrypted database.
      *
      * @param path absolute path to the database file
+     * @param databaseName the name the database was opened under, needed to resolve a managed key on rekey
      * @param key  the key literal, either a passphrase or an x'...' raw key
      * @return the open database
      * @throws IOException if the database cannot be opened, or the key does not decrypt it
      */
-    public static Database open(String path, String key) throws IOException {
+    public static Database open(String path, String databaseName, String key) throws IOException {
         loadLibraries();
         File file = new File(path);
         File parent = file.getParentFile();
@@ -88,7 +89,7 @@ public class AndroidCipherFactory {
             // SQLCipher applies the key lazily, so without reading something now a wrong key
             // would not surface until some later and apparently unrelated query.
             db.rawQuery("SELECT count(*) FROM sqlite_master", null).close();
-            return new AndroidCipherDB(db);
+            return new AndroidCipherDB(db, databaseName);
         } catch (RuntimeException err) {
             if (db != null) {
                 try {

@@ -392,6 +392,41 @@ public final class AndroidSecureStorage extends SecureStorage {
      * null when the key is absent and {@code create} is false, or when
      * generation fails.
      */
+    /**
+     * Whether the non-prompting tier's key is held in dedicated security hardware.
+     *
+     * An API level only says the AndroidKeyStore API exists; emulators and plenty of real devices
+     * back its keys in software. Callers use this to decide whether the platform is good enough
+     * for genuinely sensitive data, so it asks the key what it actually is.
+     *
+     * @return true when a TEE or StrongBox holds the key
+     */
+    static boolean isPlainKeyInsideSecureHardware() {
+        try {
+            AndroidSecureStorage storage = new AndroidSecureStorage();
+            SecretKey key = storage.plainKey(true);
+            if (key == null) {
+                return false;
+            }
+            javax.crypto.SecretKeyFactory factory = javax.crypto.SecretKeyFactory.getInstance(
+                    key.getAlgorithm(), ANDROID_KEY_STORE);
+            java.security.spec.KeySpec spec = factory.getKeySpec(key,
+                    Class.forName("android.security.keystore.KeyInfo")
+                            .asSubclass(java.security.spec.KeySpec.class));
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                // getSecurityLevel() replaced the deprecated isInsideSecureHardware() in API 31.
+                // Reflective because the port compiles against an older SDK than it runs on.
+                // Anything above SECURITY_LEVEL_SOFTWARE (0) is a TEE or StrongBox.
+                Object level = spec.getClass().getMethod("getSecurityLevel").invoke(spec);
+                return ((Integer) level).intValue() > 0;
+            }
+            return ((android.security.keystore.KeyInfo) spec).isInsideSecureHardware();
+        } catch (Throwable cannotTell) {
+            // Unable to determine, so report the weaker answer rather than overstating it.
+            return false;
+        }
+    }
+
     private SecretKey plainKey(boolean create) throws Exception {
         // The whole load-check-generate sequence is serialized, not just the
         // generation. Two first writers that each saw the alias absent would each

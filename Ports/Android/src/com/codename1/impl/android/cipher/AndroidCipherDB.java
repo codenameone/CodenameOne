@@ -54,8 +54,15 @@ class AndroidCipherDB extends Database {
     private SQLiteDatabase db;
     private final List<AndroidCursor> openCursors = new ArrayList<AndroidCursor>();
 
-    AndroidCipherDB(SQLiteDatabase db) {
+    /**
+     * The name this database was opened under. Retained because a managed key resolves its
+     * keystore alias from the database name.
+     */
+    private final String databaseName;
+
+    AndroidCipherDB(SQLiteDatabase db, String databaseName) {
         this.db = db;
+        this.databaseName = databaseName;
     }
 
     private void checkOpen() throws IOException {
@@ -88,6 +95,7 @@ class AndroidCipherDB extends Database {
         checkEndTransaction();
         db.setTransactionSuccessful();
         db.endTransaction();
+        markTransactionEnded();
     }
 
     @Override
@@ -95,6 +103,7 @@ class AndroidCipherDB extends Database {
         checkOpen();
         checkEndTransaction();
         db.endTransaction();
+        markTransactionEnded();
     }
 
     @Override
@@ -127,7 +136,10 @@ class AndroidCipherDB extends Database {
             if (config == null || !config.isEncrypted()) {
                 db.execSQL("PRAGMA rekey = ''");
             } else {
-                db.execSQL("PRAGMA rekey = \"" + config.resolveKeyMaterial(null) + "\"");
+                // Quote through the shared helper: a passphrase may contain quotes, and
+                // interpolating it directly would let one change the statement.
+                db.execSQL("PRAGMA rekey = "
+                        + toPragmaLiteral(config.resolveKeyMaterial(databaseName)));
             }
         } catch (SQLiteException err) {
             throw new IOException(err.getMessage(), err);

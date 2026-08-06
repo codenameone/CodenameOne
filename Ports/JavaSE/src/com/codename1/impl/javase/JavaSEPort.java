@@ -16705,7 +16705,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (config != null && config.isEncrypted()) {
                 probeKey(conn);
             }
-            SEDatabase result = new SEDatabase(conn);
+            SEDatabase result = new SEDatabase(conn, databaseName);
             conn = null;
             return result;
         } catch (SQLException ex) {

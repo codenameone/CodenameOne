@@ -2845,7 +2845,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
         if (config != null && config.isEncrypted()) {
             key = config.resolveKeyMaterial(databaseName);
         }
-        return new WindowsDatabase(path, key);
+        return new WindowsDatabase(databaseName, path, key);
     }
 
     @Override

@@ -9588,6 +9588,27 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// Opens a plaintext database through an engine that is able to encrypt it in place.
+    ///
+    /// Most ports use one engine for both, so the default simply opens normally. Android does not:
+    /// the system SQLite has no cipher, so a database opened through it can never be re-keyed, and
+    /// that port routes this through SQLCipher instead.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// #### Returns
+    ///
+    /// the open database
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database cannot be opened
+    public Database openOrCreateDBForRekey(String databaseName) throws IOException {
+        return openOrCreateDB(databaseName);
+    }
+
     /// Indicates whether managed database keys are protected by a hardware backed key store.
     ///
     /// Ports with a real key store override this. Returning false is the safe answer: it tells

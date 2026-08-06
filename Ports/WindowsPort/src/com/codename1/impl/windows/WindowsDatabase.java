@@ -42,9 +42,18 @@ import java.util.List;
 class WindowsDatabase extends Database {
 
     private long peer;
+
+    /**
+     * The name this database was opened under. Retained because a managed key resolves its
+     * keystore alias from the database name, and changeKey() would otherwise have nothing to
+     * resolve against.
+     */
+    private final String databaseName;
+
     private final List<CursorImpl> openCursors = new ArrayList<CursorImpl>();
 
-    WindowsDatabase(String path, String key) throws IOException {
+    WindowsDatabase(String databaseName, String path, String key) throws IOException {
+        this.databaseName = databaseName;
         peer = WindowsNative.sqlDbOpen(path);
         if (key != null) {
             if (!WindowsNative.sqlDbApplyKey(peer, key)) {
@@ -90,6 +99,7 @@ class WindowsDatabase extends Database {
         checkOpen();
         checkEndTransaction();
         WindowsNative.sqlDbExecScript(peer, "COMMIT");
+        markTransactionEnded();
     }
 
     @Override
@@ -97,6 +107,7 @@ class WindowsDatabase extends Database {
         checkOpen();
         checkEndTransaction();
         WindowsNative.sqlDbExecScript(peer, "ROLLBACK");
+        markTransactionEnded();
     }
 
     @Override
@@ -127,7 +138,7 @@ class WindowsDatabase extends Database {
         checkOpen();
         String key = null;
         if (config != null && config.isEncrypted()) {
-            key = config.resolveKeyMaterial(null);
+            key = config.resolveKeyMaterial(databaseName);
         }
         WindowsNative.sqlDbRekey(peer, key);
     }

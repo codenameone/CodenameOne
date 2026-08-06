@@ -197,7 +197,7 @@
 /// | `getPosition()` counts from one | Simulator |
 /// | `wasNull()` reports true before any value has been read | Android, iOS |
 /// | Parameters are bound as text rather than by type | iOS |
-/// | `execute(String)` runs only the first statement of a script | Simulator |
+/// | `execute(String)` runs only the first statement of a script | Android, Simulator |
 /// | The parameterized forms silently discard statements after the first | all |
 /// | A nested `beginTransaction()` is accepted | Android |
 /// | Malformed SQL surfaces from `next()` rather than from `executeQuery` | Android |

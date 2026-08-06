@@ -10991,7 +10991,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             Class c = Class.forName("com.codename1.impl.android.cipher.AndroidCipherFactory");
             java.lang.reflect.Method open = c.getMethod("open", String.class, String.class);
             return (Database) open.invoke(null,
-                    getDatabasePath(databaseName), config.resolveKeyMaterial(databaseName));
+                    resolveNativeDatabasePath(databaseName), databaseName,
+                    config.resolveKeyMaterial(databaseName));
         } catch (java.lang.reflect.InvocationTargetException err) {
             Throwable cause = err.getCause();
             if (cause instanceof IOException) {
@@ -11019,9 +11020,48 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public boolean isDatabaseManagedKeyHardwareBacked() {
-        // SecureStorage wraps the key with an AndroidKeyStore key, which is non-exportable and
-        // hardware backed on devices with a TEE or StrongBox.
-        return android.os.Build.VERSION.SDK_INT >= 23;
+        // Ask the key itself. An API level says only that the API exists: emulators, and plenty of
+        // real devices, back AndroidKeyStore keys in software. Applications are told they may use
+        // this to refuse to store sensitive data, so it has to describe the actual key.
+        return AndroidSecureStorage.isPlainKeyInsideSecureHardware();
+    }
+
+    /**
+     * Absolute filesystem path for a database name, converting a custom file:// URL.
+     *
+     * getDatabasePath() deliberately echoes a file:// URL back unchanged, which is right for
+     * callers that hand it to FileSystemStorage but wrong for anything constructing a java.io.File
+     * from it.
+     */
+    private String resolveNativeDatabasePath(String databaseName) {
+        if (databaseName.startsWith("file://")) {
+            return FileSystemStorage.getInstance().toNativePath(databaseName);
+        }
+        return getDatabasePath(databaseName);
+    }
+
+    @Override
+    public Database openOrCreateDBForRekey(String databaseName) throws IOException {
+        // The stock android.database.sqlite engine has no cipher, so a plaintext database opened
+        // through it can never be encrypted in place. Route the migration through SQLCipher, which
+        // opens an unencrypted file when given an empty key and can then rekey it.
+        if (!isDatabaseEncryptionSupported()) {
+            return openOrCreateDB(databaseName);
+        }
+        try {
+            Class c = Class.forName("com.codename1.impl.android.cipher.AndroidCipherFactory");
+            java.lang.reflect.Method open = c.getMethod("open", String.class, String.class, String.class);
+            return (Database) open.invoke(null,
+                    resolveNativeDatabasePath(databaseName), databaseName, "");
+        } catch (java.lang.reflect.InvocationTargetException err) {
+            Throwable cause = err.getCause();
+            if (cause instanceof IOException) {
+                throw (IOException) cause;
+            }
+            throw new IOException(cause == null ? err.toString() : cause.getMessage(), cause);
+        } catch (Throwable err) {
+            return openOrCreateDB(databaseName);
+        }
     }
 
     @Override

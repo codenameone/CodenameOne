@@ -6069,6 +6069,23 @@ public final class Display extends CN1Constants {
         return impl.isDatabaseEncryptionSupported();
     }
 
+    /// Opens a plaintext database through an engine able to encrypt it in place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// #### Returns
+    ///
+    /// the open database
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database cannot be opened
+    public Database openOrCreateForRekey(String databaseName) throws IOException {
+        return impl.openOrCreateDBForRekey(databaseName);
+    }
+
     /// Indicates whether managed database keys are held in hardware backed storage here.
     ///
     /// #### Returns

@@ -42,9 +42,18 @@ import java.util.List;
 class LinuxDatabase extends Database {
 
     private long peer;
+
+    /**
+     * The name this database was opened under. Retained because a managed key resolves its
+     * keystore alias from the database name, and changeKey() would otherwise have nothing to
+     * resolve against.
+     */
+    private final String databaseName;
+
     private final List<CursorImpl> openCursors = new ArrayList<CursorImpl>();
 
-    LinuxDatabase(String path, String key) throws IOException {
+    LinuxDatabase(String databaseName, String path, String key) throws IOException {
+        this.databaseName = databaseName;
         peer = LinuxNative.sqlDbOpen(path);
         if (key != null) {
             if (!LinuxNative.sqlDbApplyKey(peer, key)) {
@@ -90,6 +99,7 @@ class LinuxDatabase extends Database {
         checkOpen();
         checkEndTransaction();
         LinuxNative.sqlDbExecScript(peer, "COMMIT");
+        markTransactionEnded();
     }
 
     @Override
@@ -97,6 +107,7 @@ class LinuxDatabase extends Database {
         checkOpen();
         checkEndTransaction();
         LinuxNative.sqlDbExecScript(peer, "ROLLBACK");
+        markTransactionEnded();
     }
 
     @Override
@@ -127,7 +138,7 @@ class LinuxDatabase extends Database {
         checkOpen();
         String key = null;
         if (config != null && config.isEncrypted()) {
-            key = config.resolveKeyMaterial(null);
+            key = config.resolveKeyMaterial(databaseName);
         }
         LinuxNative.sqlDbRekey(peer, key);
     }

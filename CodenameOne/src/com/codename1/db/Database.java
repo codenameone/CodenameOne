@@ -374,7 +374,10 @@ public abstract class Database {
             throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
                     "Encrypted databases are not supported on this platform");
         }
-        Database db = openOrCreate(databaseName);
+        // Not openOrCreate: on Android the system SQLite has no cipher, so a database opened
+        // through it could never be re-keyed. The platform decides which engine can do this.
+        validateDatabaseNameArgument(databaseName);
+        Database db = Display.getInstance().openOrCreateForRekey(databaseName);
         try {
             db.changeKey(config);
         } finally {
@@ -563,6 +566,40 @@ public abstract class Database {
         return inTransaction;
     }
 
+    /// Renders a key literal for use as a `PRAGMA` argument.
+    ///
+    /// Raw keys are already the blob literal `x'...'`, which has to reach the engine unquoted as a
+    /// literal rather than as a string. Passphrases are arbitrary text, so they are single quoted
+    /// with any embedded single quote doubled. Interpolating a passphrase directly would let one
+    /// containing a quote change the statement.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyMaterial`: the value from `DatabaseConfig#resolveKeyMaterial(java.lang.String)`
+    ///
+    /// #### Returns
+    ///
+    /// the text to place after `PRAGMA key =` or `PRAGMA rekey =`
+    protected static String toPragmaLiteral(String keyMaterial) {
+        if (keyMaterial == null) {
+            return "''";
+        }
+        if (keyMaterial.length() > 2 && keyMaterial.startsWith("x'") && keyMaterial.endsWith("'")) {
+            return keyMaterial;
+        }
+        StringBuilder b = new StringBuilder(keyMaterial.length() + 8);
+        b.append('\'');
+        for (int iter = 0; iter < keyMaterial.length(); iter++) {
+            char c = keyMaterial.charAt(iter);
+            if (c == '\'') {
+                b.append('\'');
+            }
+            b.append(c);
+        }
+        b.append('\'');
+        return b.toString();
+    }
+
     /// Rejects a nested `#beginTransaction()`, then records that one is open.
     ///
     /// Transactions are flat: only that model is expressible on all of the engines behind this
@@ -580,10 +617,15 @@ public abstract class Database {
         inTransaction = true;
     }
 
-    /// Rejects a commit or rollback with no open transaction, then records that it closed.
+    /// Rejects a commit or rollback with no open transaction.
     ///
-    /// Ports call this at the top of `#commitTransaction()` and `#rollbackTransaction()`. In
-    /// legacy mode the check is skipped.
+    /// Ports call this at the top of `#commitTransaction()` and `#rollbackTransaction()`, and
+    /// `#markTransactionEnded()` once the engine has actually ended it. The two are separate
+    /// because a commit can fail -- a deferred foreign key violation, for instance -- and the
+    /// transaction is then still open. Clearing the flag first would make the recovering rollback
+    /// look like it had no transaction to roll back.
+    ///
+    /// In legacy mode the check is skipped.
     ///
     /// #### Throws
     ///
@@ -592,6 +634,11 @@ public abstract class Database {
         if (!inTransaction && !isLegacyBehavior()) {
             throw new IOException("No transaction is in progress on this database");
         }
+    }
+
+    /// Records that a transaction has actually ended. Call only after the engine has committed or
+    /// rolled back successfully.
+    protected void markTransactionEnded() {
         inTransaction = false;
     }
 

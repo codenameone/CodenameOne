@@ -43,9 +43,18 @@ import java.util.List;
 public class DatabaseImpl extends Database {
 
     private long peer;
+
+    /**
+     * The name this database was opened under. Retained because a managed key resolves its
+     * keystore alias from the database name, and changeKey() would otherwise have nothing to
+     * resolve against.
+     */
+    private final String databaseName;
+
     private final List<CursorImpl> openCursors = new ArrayList<CursorImpl>();
 
     public DatabaseImpl(String name, String key) throws IOException {
+        this.databaseName = name;
         peer = SQLiteNative.open(name, key);
         if (peer == 0) {
             throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
@@ -87,6 +96,7 @@ public class DatabaseImpl extends Database {
         checkOpen();
         checkEndTransaction();
         SQLiteNative.execScript(peer, "COMMIT");
+        markTransactionEnded();
     }
 
     @Override
@@ -94,6 +104,7 @@ public class DatabaseImpl extends Database {
         checkOpen();
         checkEndTransaction();
         SQLiteNative.execScript(peer, "ROLLBACK");
+        markTransactionEnded();
     }
 
     @Override
@@ -124,7 +135,7 @@ public class DatabaseImpl extends Database {
         checkOpen();
         String key = null;
         if (config != null && config.isEncrypted()) {
-            key = config.resolveKeyMaterial(null);
+            key = config.resolveKeyMaterial(databaseName);
         }
         SQLiteNative.rekey(peer, key);
     }

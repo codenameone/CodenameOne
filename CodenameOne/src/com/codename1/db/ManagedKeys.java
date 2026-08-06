@@ -57,7 +57,11 @@ class ManagedKeys {
     /// #### Throws
     ///
     /// - `IOException`: if the platform cannot store or retrieve the key
-    static byte[] keyFor(String alias) throws IOException {
+    static synchronized byte[] keyFor(String alias) throws IOException {
+        // Synchronized because the read-generate-store sequence below is not atomic. Two threads
+        // opening the same managed database for the first time could otherwise both see nothing
+        // stored, generate different keys, and each overwrite the other: whichever key lost the
+        // race would still have written a database nobody can ever read again.
         String account = accountName(alias);
         SecureStorage storage = SecureStorage.getInstance();
 

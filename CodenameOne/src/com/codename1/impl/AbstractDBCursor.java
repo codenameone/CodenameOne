@@ -169,7 +169,9 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
     /// Records that the result set is exhausted, which also establishes the row count.
     private void markExhausted() {
         onRow = false;
-        knownCount = position + 1;
+        if (knownCount < 0) {
+            knownCount = position + 1;
+        }
         position = knownCount;
     }
 
