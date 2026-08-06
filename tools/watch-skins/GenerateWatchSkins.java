@@ -43,7 +43,7 @@ import javax.imageio.ImageIO;
  *
  * Regenerate the shipped skins with:
  *   javac -d /tmp/wskin tools/watch-skins/GenerateWatchSkins.java
- *   java  -cp /tmp/wskin GenerateWatchSkins Ports/JavaSE/src/iPhoneX.skin Ports/JavaSE/src
+ *   java  -cp /tmp/wskin GenerateWatchSkins path/to/iPhoneX.skin outDir Themes/AndroidMaterialTheme.res
  */
 public class GenerateWatchSkins {
     static class Model {
@@ -52,10 +52,18 @@ public class GenerateWatchSkins {
         final boolean circular;    // a round Wear OS face rather than a rounded rectangle
         final String platformName; // drives the skin's platform overrides
         final String overrides;
+        /// The theme packaged INSIDE the skin, named as JavaSEPort expects to find it.
+        ///
+        /// It is not decoration: the simulator's "Embedded" native-theme option, and a project
+        /// with nativeTheme=custom, both fall back to this resource. Giving every skin the theme
+        /// lifted out of iPhoneX.skin meant a Wear preview rendered as iOS at exactly the moment
+        /// the developer asked for the platform's own look.
+        final String themeEntry;
         Model(String file, String label, int dw, int dh, boolean circular,
-              String platformName, String overrides) {
+              String platformName, String overrides, String themeEntry) {
             this.file = file; this.label = label; this.dw = dw; this.dh = dh;
             this.circular = circular; this.platformName = platformName; this.overrides = overrides;
+            this.themeEntry = themeEntry;
         }
     }
 
@@ -64,27 +72,41 @@ public class GenerateWatchSkins {
         File outDir = new File(args[1]);
         outDir.mkdirs();
 
-        byte[] themeRes = extractEntry(srcSkin, ".res");
-        if (themeRes == null) {
+        byte[] iosTheme = extractEntry(srcSkin, ".res");
+        if (iosTheme == null) {
             throw new IllegalStateException("No .res theme found in " + srcSkin);
         }
+        // The Wear skins carry Android's own theme, passed in explicitly rather than looked for in
+        // the output directory: the build copies the shipped themes there AFTER this runs, so
+        // reading from there would find nothing and the ordering would be a trap for whoever
+        // rearranged the pom next.
+        if (args.length < 3) {
+            throw new IllegalStateException("usage: GenerateWatchSkins <iPhoneX.skin> <outDir> <"
+                    + ANDROID_THEME + ">");
+        }
+        File androidThemeFile = new File(args[2]);
+        if (!androidThemeFile.isFile()) {
+            throw new IllegalStateException("No Android theme at " + androidThemeFile
+                    + "; the Wear skins must not fall back to an iOS theme");
+        }
+        byte[] androidTheme = readFully(androidThemeFile);
 
         Model[] models = new Model[] {
             // Apple Watch logical point resolutions.
             new Model("AppleWatch41mm.skin", "Apple Watch 41mm", 352, 430, false,
-                    "ios", "watch,ios,applewatch"),
+                    "ios", "watch,ios,applewatch", IOS_THEME),
             new Model("AppleWatch45mm.skin", "Apple Watch 45mm", 396, 484, false,
-                    "ios", "watch,ios,applewatch"),
+                    "ios", "watch,ios,applewatch", IOS_THEME),
             // Wear OS. The round face is the one worth designing against: it is what most Wear
             // hardware ships and it is where a layout that assumes a rectangle falls apart.
             new Model("WearRound.skin", "Wear OS Round", 454, 454, true,
-                    "and", "watch,android,android-watch"),
+                    "and", "watch,android,android-watch", ANDROID_THEME),
             new Model("WearSquare.skin", "Wear OS Square", 400, 400, false,
-                    "and", "watch,android,android-watch"),
+                    "and", "watch,android,android-watch", ANDROID_THEME),
         };
 
         for (Model m : models) {
-            generate(m, themeRes, outDir);
+            generate(m, ANDROID_THEME.equals(m.themeEntry) ? androidTheme : iosTheme, outDir);
             System.out.println("Wrote " + new File(outDir, m.file));
         }
     }
@@ -184,8 +206,26 @@ public class GenerateWatchSkins {
         putEntry(zos, "skin.png", skinPng);
         putEntry(zos, "skin_l.png", skinPng);
         putEntry(zos, "skin.properties", p.toString().getBytes("UTF-8"));
-        putEntry(zos, "iOS7Theme.res", themeRes);
+        putEntry(zos, m.themeEntry, themeRes);
         zos.close();
+    }
+
+    static final String IOS_THEME = "iOS7Theme.res";
+    static final String ANDROID_THEME = "AndroidMaterialTheme.res";
+
+    static byte[] readFully(File f) throws IOException {
+        java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+        java.io.FileInputStream in = new java.io.FileInputStream(f);
+        try {
+            byte[] buf = new byte[8192];
+            int r;
+            while ((r = in.read(buf)) > 0) {
+                bos.write(buf, 0, r);
+            }
+        } finally {
+            in.close();
+        }
+        return bos.toByteArray();
     }
 
     static void putEntry(ZipOutputStream zos, String name, byte[] data) throws IOException {

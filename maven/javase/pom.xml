@@ -277,6 +277,15 @@
                                     </classpath>
                                     <arg value="${project.build.directory}/skins/codenameone-skins/OTA/iPhoneX.skin"/>
                                     <arg value="${project.build.outputDirectory}"/>
+                                    <!-- The Wear skins embed Android's theme, not the one lifted
+                                         out of iPhoneX.skin: the simulator's "Embedded" native
+                                         theme option falls back to whatever a skin carries, so an
+                                         iOS theme there would style the Wear preview as iOS at
+                                         exactly the moment the platform look was asked for.
+                                         Passed from Themes/ rather than read out of the output
+                                         directory, because the themes below are copied there
+                                         after this task runs. -->
+                                    <arg value="${project.basedir}/../../Themes/AndroidMaterialTheme.res"/>
                                 </java>
                                 <!-- Bundle every shipped native theme into the
                                      simulator fat jar so JavaSEPort.loadSkinFile can
