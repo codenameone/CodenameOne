@@ -29,6 +29,7 @@ import com.codename1.wearable.WearableConnection;
 import com.codename1.wearable.WearableMessage;
 import com.codename1.wearable.spi.WearableBridge;
 
+import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.Tasks;
 import com.google.android.gms.wearable.CapabilityClient;
 import com.google.android.gms.wearable.CapabilityInfo;
@@ -1407,9 +1408,31 @@ public class CN1WearableBridge implements WearableBridge {
         // tombstones whose authority is a PEER node even though this app initiated the removal.
         // Tombstone authorship therefore does not identify who asked, and suppressing only the
         // local-authority one still reported the app's own removal back to it.
-        noteLocalRemoval(dataPath(path));
-        Uri uri = new Uri.Builder().scheme("wear").authority("*").path(dataPath(path)).build();
-        dataClient.deleteDataItems(uri);
+        final String storagePath = dataPath(path);
+        final long generation = noteLocalRemoval(storagePath);
+        Uri uri = new Uri.Builder().scheme("wear").authority("*").path(storagePath).build();
+        // The marker is dropped again if the delete FAILS. Left standing for its full window, it
+        // would swallow a genuine peer removal of the same path arriving inside it -- the listener
+        // reads the path as this device's own pending delete and stays silent, for a removal that
+        // never happened here. Nothing else would correct that.
+        //
+        // Only this operation's own marker: the generation makes a later removeData for the same
+        // path a different marker, so a failure reported after it cannot clear the newer one.
+        dataClient.deleteDataItems(uri).addOnFailureListener(new OnFailureListener() {
+            public void onFailure(Exception e) {
+                forgetLocalRemovalIfGeneration(storagePath, generation);
+            }
+        });
+    }
+
+    /// Drops a local-removal marker, but only while it is still the one the caller recorded.
+    private static void forgetLocalRemovalIfGeneration(String storagePath, long generation) {
+        synchronized (localRemovals) {
+            Removal r = localRemovals.get(storagePath);
+            if (r != null && r.generation == generation) {
+                localRemovals.remove(storagePath);
+            }
+        }
     }
 
     /**
@@ -1455,10 +1478,13 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
-    private static void noteLocalRemoval(String storagePath) {
+    /// @return the generation recorded, so the caller can withdraw exactly this marker
+    private static long noteLocalRemoval(String storagePath) {
         long now = System.currentTimeMillis();
+        long generation;
         synchronized (localRemovals) {
-            localRemovals.put(storagePath, new Removal(now, ++removalGeneration));
+            generation = ++removalGeneration;
+            localRemovals.put(storagePath, new Removal(now, generation));
             java.util.Iterator<Map.Entry<String, Removal>> it = localRemovals.entrySet().iterator();
             while (it.hasNext()) {
                 if (now - it.next().getValue().at > LOCAL_REMOVAL_WINDOW_MILLIS) {
@@ -1466,6 +1492,7 @@ public class CN1WearableBridge implements WearableBridge {
                 }
             }
         }
+        return generation;
     }
 
     /**
