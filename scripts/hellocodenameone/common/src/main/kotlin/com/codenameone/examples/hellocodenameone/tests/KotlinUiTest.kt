@@ -123,6 +123,18 @@ class KotlinUiTest : BaseTest() {
         step("probe-so-container")
         val soContainer = Container(BoxLayout.y())
         soContainer.add(soSwitch)
+        // addContent on a container holding an ON switch is the failing statement.
+        // The only state the ON path reaches that the OFF path does not is
+        // getSelectedStyle() (getThumbOnImage uses it; getThumbOffImage uses the
+        // unselected style), and calcPreferredSize is what asks for the thumb.
+        // Both are public, so the accessor that throws can be named from here
+        // without probes in Switch itself.
+        step("probe-so-unselectedstyle")
+        soSwitch.unselectedStyle
+        step("probe-so-selectedstyle")
+        soSwitch.selectedStyle
+        step("probe-so-preferredsize")
+        soSwitch.preferredSize
         step("probe-so-addcontent")
         probe.addContent("ProbeSwitchOn", soContainer)
         step("probe-so-done")

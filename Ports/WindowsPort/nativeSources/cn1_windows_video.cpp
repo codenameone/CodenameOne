@@ -275,17 +275,32 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
     }
     unsigned char* pcm = NULL;
     size_t pcmLen = 0, pcmCap = 0;
+    /* Diagnostics: readAudio returning empty is reported by the suite as
+     * "reports audio but no PCM samples were returned", which says nothing about
+     * WHY Media Foundation produced nothing -- and this only reproduces on a
+     * Windows runner. Report the reason once so the next run names it instead of
+     * inviting another guess. */
+    int loops = 0, nullSamples = 0;
+    HRESULT lastHr = S_OK;
+    DWORD lastFlags = 0;
     for (;;) {
         DWORD streamFlags = 0;
         LONGLONG timestamp = 0;
         ComPtr<IMFSample> sample;
-        if (FAILED(st->reader->ReadSample((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, NULL, &streamFlags, &timestamp, &sample))) {
+        loops++;
+        lastHr = st->reader->ReadSample((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, NULL, &streamFlags, &timestamp, &sample);
+        lastFlags = streamFlags;
+        if (FAILED(lastHr)) {
             break;
         }
         if (streamFlags & MF_SOURCE_READERF_ENDOFSTREAM) {
             break;
         }
         if (sample == NULL) {
+            nullSamples++;
+            if (nullSamples > 512) {
+                break;   /* a stream that only ever ticks would spin here forever */
+            }
             continue;
         }
         ComPtr<IMFMediaBuffer> buffer;
@@ -310,6 +325,10 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
             buffer->Unlock();
         }
     }
+    printf("CN1SS:INFO:winAudio reads=%d nullSamples=%d bytes=%u lastHr=0x%08lx lastFlags=0x%lx rate=%d ch=%d\n",
+           loops, nullSamples, (unsigned) pcmLen, (unsigned long) lastHr,
+           (unsigned long) lastFlags, st->audioRate, st->audioChannels);
+    fflush(stdout);
     JAVA_OBJECT result = JAVA_NULL;
     if (pcm != NULL && pcmLen > 0) {
         result = allocArray(threadStateData, (int) pcmLen, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
