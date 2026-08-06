@@ -400,16 +400,24 @@ class JavaSEWearableBridge implements WearableBridge {
     private void startRendezvous() {
         Thread t = new Thread(new Runnable() {
             public void run() {
-                ServerSocket server = null;
-                try {
-                    server = new ServerSocket(port(), 1, InetAddress.getByName("127.0.0.1"));
-                } catch (IOException alreadyBound) {
-                    server = null;
-                }
-                if (server != null) {
-                    acceptLoop(server);
-                } else {
-                    connectLoop();
+                // Re-run for as long as the bridge lives, because the role is not permanent. A
+                // bind that fails only because an unrelated process momentarily held the port used
+                // to make this half a connector for good: once that process let go, neither half
+                // would bind again, both kept dialling a server that did not exist, and the pair
+                // stayed unreachable until a restart. Losing the election is a fact about right
+                // now, not about the run.
+                while (!closed) {
+                    ServerSocket server = null;
+                    try {
+                        server = new ServerSocket(port(), 1, InetAddress.getByName("127.0.0.1"));
+                    } catch (IOException alreadyBound) {
+                        server = null;
+                    }
+                    if (server != null) {
+                        acceptLoop(server);
+                    } else {
+                        connectOnce();
+                    }
                 }
             }
         }, "CN1 wearable link");
@@ -418,34 +426,46 @@ class JavaSEWearableBridge implements WearableBridge {
     }
 
     private void acceptLoop(ServerSocket server) {
-        while (!closed) {
-            try {
-                Socket s = server.accept();
-                readLoop(s, adoptPeer(s));
-            } catch (IOException err) {
-                if (closed) {
-                    return;
+        try {
+            while (!closed) {
+                try {
+                    Socket s = server.accept();
+                    readLoop(s, adoptPeer(s));
+                } catch (IOException err) {
+                    if (closed) {
+                        return;
+                    }
                 }
+            }
+        } finally {
+            // Released on the way out, so the election that follows can bind again rather than
+            // losing to this thread's own abandoned socket.
+            try {
+                server.close();
+            } catch (IOException ignored) {
             }
         }
     }
 
-    private void connectLoop() {
-        while (!closed) {
-            try {
-                Socket s = new Socket(InetAddress.getByName("127.0.0.1"), port());
-                readLoop(s, adoptPeer(s));
-            } catch (IOException notUpYet) {
-                // The peer app is not running. Wait and retry -- the user may open it at any point.
-            }
-            if (closed) {
-                return;
-            }
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException ignored) {
-                return;
-            }
+    /// ONE attempt to reach the server, then returns so the election can run again.
+    ///
+    /// It used to loop internally for the bridge's lifetime, which is what made a lost election
+    /// permanent -- the caller never got the chance to try binding again.
+    private void connectOnce() {
+        try {
+            Socket s = new Socket(InetAddress.getByName("127.0.0.1"), port());
+            readLoop(s, adoptPeer(s));
+        } catch (IOException notUpYet) {
+            // The peer app is not running. The caller waits and re-elects -- the user may open it
+            // at any point, and by then this half may be the one that can bind.
+        }
+        if (closed) {
+            return;
+        }
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -531,6 +551,14 @@ class JavaSEWearableBridge implements WearableBridge {
             // Falls through to dropPeer: the peer app exited or the link broke.
         } finally {
             dropPeer();
+            // And close THIS socket, which dropPeer does not: it clears the globally verified peer,
+            // and a socket rejected for a failed or timed-out hello never became one. The connector
+            // retries every second, so leaking one descriptor per attempt against an unrelated
+            // service on the derived port would eventually exhaust the simulator's file handles.
+            try {
+                s.close();
+            } catch (IOException ignored) {
+            }
         }
     }
 

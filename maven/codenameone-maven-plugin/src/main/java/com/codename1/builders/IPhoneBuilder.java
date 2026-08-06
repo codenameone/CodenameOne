@@ -3536,18 +3536,40 @@ public class IPhoneBuilder extends Executor {
                 parparCmd.add("-DINCLUDE_NPE_CHECKS=" + includeNullChecks);
                 parparCmd.add("-Dcn1.onDeviceDebug=" + onDeviceDebug);
                 parparCmd.add("-DbundleVersionNumber=" + bundleVersionNumber);
+                // The UNION of every enabled product's list, in ONE argument. These used to be
+                // mutually exclusive branches on the claim that the Mac list already covered the
+                // others; it does not -- the watch additionally needs Metal, MapKit, WebKit,
+                // StoreKit, CarPlay and SceneKit weak-linked. With macNative and a companion watch
+                // both enabled, the phone archive builds the watch target as a dependency and its
+                // link failed on symbols nobody had marked optional. Only one
+                // -Doptional.frameworks can take effect, so the lists are merged rather than added
+                // twice. Weak-linking a framework a slice does not need costs that slice nothing,
+                // which is why the union is safe.
+                java.util.LinkedHashSet<String> optionalFrameworks =
+                        new java.util.LinkedHashSet<String>();
                 if (macNativeBuilder.isEnabled()) {
-                    parparCmd.add(macNativeBuilder.parparvmOptionalFrameworksArg());
-                } else if (watchNativeBuilder.isEnabled()) {
-                    // Weak-link the watch-incompatible frameworks so the shared
-                    // sources link on both the iOS app target and the watch
-                    // target. (macNative already widens the set when both apply.)
-                    parparCmd.add(watchNativeBuilder.parparvmOptionalFrameworksArg());
-                } else if (tvNativeBuilder.isEnabled()) {
-                    // Weak-link the tvOS-incompatible frameworks (OpenGL ES, GLKit,
-                    // WebKit, MessageUI, AddressBook) so the shared sources link on
-                    // both the iOS app target and the tvOS target.
-                    parparCmd.add(tvNativeBuilder.parparvmOptionalFrameworksArg());
+                    collectOptionalFrameworks(optionalFrameworks,
+                            macNativeBuilder.parparvmOptionalFrameworksArg());
+                }
+                if (watchNativeBuilder.isEnabled()) {
+                    collectOptionalFrameworks(optionalFrameworks,
+                            watchNativeBuilder.parparvmOptionalFrameworksArg());
+                }
+                if (tvNativeBuilder.isEnabled()) {
+                    collectOptionalFrameworks(optionalFrameworks,
+                            tvNativeBuilder.parparvmOptionalFrameworksArg());
+                }
+                if (!optionalFrameworks.isEmpty()) {
+                    StringBuilder frameworksArg = new StringBuilder("-Doptional.frameworks=");
+                    boolean firstFramework = true;
+                    for (String framework : optionalFrameworks) {
+                        if (!firstFramework) {
+                            frameworksArg.append(';');
+                        }
+                        frameworksArg.append(framework);
+                        firstFramework = false;
+                    }
+                    parparCmd.add(frameworksArg.toString());
                 }
                 // Pass through extra translator JVM options (notably a larger
                 // -Xmx) from the CN1_TRANSLATOR_OPTS environment variable. The
@@ -6296,4 +6318,21 @@ public class IPhoneBuilder extends Executor {
         }
         return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
+
+    /// Splits a {@code -Doptional.frameworks=a;b;c} argument into {@code set}, so several products'
+    /// lists can be merged into the single argument the translator honours.
+    static void collectOptionalFrameworks(java.util.Set<String> set, String arg) {
+        if (arg == null) {
+            return;
+        }
+        int eq = arg.indexOf('=');
+        String list = eq < 0 ? arg : arg.substring(eq + 1);
+        for (String framework : list.split(";")) {
+            String trimmed = framework.trim();
+            if (trimmed.length() > 0) {
+                set.add(trimmed);
+            }
+        }
+    }
+
 }
