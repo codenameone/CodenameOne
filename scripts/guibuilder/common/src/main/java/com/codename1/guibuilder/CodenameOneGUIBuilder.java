@@ -3973,20 +3973,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             activeCodeEditor = editor;
             editor.setTheme(darkMode ? "dark" : "light");
             editor.setEditable(true);
-            editor.setProtectedRegionMarkers("// <gui-builder-generated>", "// </gui-builder-generated>");
+            // No protected regions here. Marking the generated blocks read-only meant the caret
+            // landing anywhere in them -- which is most of the file, and where it lands after a
+            // click -- refused every keystroke, so the editor read as completely dead. It bought
+            // nothing either: saveSourceAndModel keeps only the user region and regenerates the
+            // rest from the model, so edits to generated code are discarded on save regardless.
             int userMarker = source.indexOf("// <gui-builder-user-code>");
             final int editableOffset = userMarker < 0 ? 0
                     : userMarker + "// <gui-builder-user-code>".length() + 1;
-            // Most of a companion file is generated and therefore protected. Refusing those edits
-            // without a word is indistinguishable from an editor that ignores the keyboard, which
-            // is exactly how it was read, so say what happened and where typing does work.
-            // Report the refusal and nothing else. Moving the caret into the user region looked
-            // helpful and was awful: the rejected keystroke was already gone, so typing "PINK" in a
-            // generated block dropped the P, jumped the caret to the user region and typed "INK"
-            // there. A refused edit must leave the caret exactly where the user put it.
-            editor.addProtectedEditListener(e -> setStatus(
-                    "That block is generated from the design and cannot be edited"
-                            + " - type between the USER CODE markers"));
             Component stage = canvasHost.getComponentCount() == 0 ? new Label() : canvasHost.getComponentAt(0);
             Container editorPane = editorPane(handler == null ? "Companion Java source • edit inside USER CODE markers" : "Handler: " + handler, editor,
                     () -> editor.getText(value -> saveSourceAndModel(sourcePath, value)), this::refreshEditor);
@@ -3995,14 +3989,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             canvasHost.removeAll();
             canvasHost.add(BorderLayout.CENTER, split);
             canvasHost.revalidate();
-            // Only now: requestFocus does nothing for a component that is not yet in the form, and
-            // a caret left at offset zero sits inside the first generated block.
+            // Only now: requestFocus does nothing for a component that is not yet in the form.
             editor.onReady(() -> {
                 editor.setCursorPosition(editableOffset);
                 editor.focusEditor();
             });
             setStatus("Editing " + relativeFormName(document.path()) + " Java behavior"
-                    + " - type between the USER CODE markers");
+                    + " - only the USER CODE region is kept on save");
         } catch (IOException ex) {
             ToastBar.showErrorMessage("Unable to open source: " + ex.getMessage());
         }
