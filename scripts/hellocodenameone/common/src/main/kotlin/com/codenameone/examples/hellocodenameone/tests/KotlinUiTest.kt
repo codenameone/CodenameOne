@@ -165,6 +165,25 @@ class KotlinUiTest : BaseTest() {
                 step("probe-blur-ok")
             }
         }
+        // Switch does not call Image.createImage directly -- it goes through
+        // ImageFactory with the component as context, which walks the parent chain
+        // for a per-component factory. Probe that exact call, at the size the
+        // switch computes from its font, before asking for the preferred size.
+        step("probe-factory-image")
+        val fh = if (f == null) 20 else f.height
+        val factoryImg = com.codename1.ui.ImageFactory.createImage(soSwitch, fh * 3 + 4, (fh * 0.9).toInt(), 0)
+        step("probe-factory-null=" + (factoryImg == null))
+        step("probe-factory-graphics")
+        val fg = factoryImg.graphics
+        step("probe-factory-g-null=" + (fg == null))
+        step("probe-factory-antialias")
+        fg.isAntiAliased = true
+        step("probe-factory-ok")
+        // Is the ON/OFF split real, or did the OFF probe simply never compute a
+        // preferred size? Ask an OFF switch for one.
+        step("probe-off-preferredsize")
+        Switch().preferredSize
+        step("probe-off-preferredsize-ok")
         step("probe-so-preferredsize")
         soSwitch.preferredSize
         step("probe-so-addcontent")
