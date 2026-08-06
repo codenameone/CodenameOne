@@ -52,10 +52,19 @@ public class EDTTestInterceptor  implements InvocationInterceptor {
             }
         });
 
+        // A deadline loop, not a single wait. Object.wait may return before the
+        // timeout for reasons of its own, and the previous `if` treated any such
+        // return as expiry -- reporting "timed out after 5000ms" without having
+        // waited 5000ms, from a run that was about to succeed.
         try {
+            long deadline = System.currentTimeMillis() + DEFAULT_TIMEOUT_MILLIS;
             synchronized (lock) {
-                if (!completed[0]) {
-                    lock.wait(DEFAULT_TIMEOUT_MILLIS);
+                while (!completed[0]) {
+                    long remaining = deadline - System.currentTimeMillis();
+                    if (remaining <= 0) {
+                        break;
+                    }
+                    lock.wait(remaining);
                 }
             }
         } catch (InterruptedException ie) {
@@ -64,7 +73,8 @@ public class EDTTestInterceptor  implements InvocationInterceptor {
         }
 
         if (!completed[0]) {
-            throw new AssertionError("FormTest timed out after " + DEFAULT_TIMEOUT_MILLIS + "ms");
+            throw new AssertionError("FormTest timed out after " + DEFAULT_TIMEOUT_MILLIS
+                    + "ms; edt=" + edtState());
         }
 
         Throwable t = thrown.get();
@@ -74,5 +84,26 @@ public class EDTTestInterceptor  implements InvocationInterceptor {
     protected void beforePretest() {}
 
     protected void pretest(String testName) {
+    }
+
+    /// Whether the dispatch thread was even running when the wait expired. A
+    /// timeout means one of two very different things -- the work was slow, or it
+    /// was never going to run -- and the message could not tell them apart.
+    private static String edtState() {
+        try {
+            if (!com.codename1.ui.Display.isInitialized()) {
+                return "display-not-initialized";
+            }
+            // Serial calls queued but undrained is the signature of a dispatch that
+            // was discarded rather than one that ran slowly.
+            java.lang.reflect.Field f =
+                    com.codename1.ui.Display.class.getDeclaredField("pendingSerialCalls");
+            f.setAccessible(true);
+            Object pending = f.get(com.codename1.ui.Display.getInstance());
+            int queued = pending instanceof java.util.List ? ((java.util.List<?>) pending).size() : -1;
+            return "initialized pendingSerialCalls=" + queued;
+        } catch (Throwable unavailable) {
+            return "unavailable";
+        }
     }
 }

@@ -98,13 +98,15 @@ public abstract class UITestBase {
                 pending.clear();
             }
 
-            Field runningField = Display.class.getDeclaredField("runningSerialCallsQueue");
-            runningField.setAccessible(true);
-            @SuppressWarnings("unchecked")
-            Deque<Runnable> running = (Deque<Runnable>) runningField.get(display);
-            if (running != null) {
-                running.clear();
-            }
+            // runningSerialCallsQueue is NOT cleared. This teardown is itself
+            // dispatched onto the EDT by EDTTestInterceptor, so it runs while that
+            // queue is being drained -- and emptying it discards any sibling
+            // @AfterEach dispatch still waiting in it. The waiter for that dispatch
+            // then burns its full timeout and reports "FormTest timed out after
+            // 5000ms" from a test that was never slow, which is how FileTreeTest and
+            // SpanLabelWidthCapTest failed intermittently on CI and never locally.
+            // flushEdt() above has already drained the queue; there is nothing left
+            // to clear that is not someone else's work in flight.
         } catch (Exception ignored) {
         }
 

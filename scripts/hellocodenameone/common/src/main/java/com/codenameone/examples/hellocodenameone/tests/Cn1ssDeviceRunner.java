@@ -669,12 +669,21 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     /// - the test actually takes a screenshot (non-screenshot tests may have
     ///   side effects that aren't safe to repeat, and a missing tile is the
     ///   only failure mode this retry exists to prevent).
+    /// One retry for a test that timed out having neither failed nor started a
+    /// capture -- the show -> settle-timer -> DONE chain was swallowed.
+    ///
+    /// Deliberately NOT conditioned on shouldTakeScreenshot(). It used to be, on
+    /// the reasoning that the retry existed to recover a missing screenshot, but
+    /// the stall is in the show/EDT chain and hits any test: AccessibilityTest and
+    /// MutableImageClipReadbackTest capture nothing, so a transient stall that a
+    /// screenshot test shrugs off failed them outright, on a different test each
+    /// run. A test that is genuinely broken still fails -- it times out the second
+    /// time too, and the retry is one-shot per index.
     private boolean shouldRetryAfterSilentTimeout(int index, BaseTest testClass) {
         return retriedTestIndex != index
                 && !"HTML5".equals(Display.getInstance().getPlatformName())
                 && !testClass.isFailed()
-                && !testClass.isCaptureStarted()
-                && testClass.shouldTakeScreenshot();
+                && !testClass.isCaptureStarted();
     }
 
     private boolean shouldRetryAfterTransportFailure(int index, BaseTest testClass) {
