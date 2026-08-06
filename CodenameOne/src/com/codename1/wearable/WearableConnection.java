@@ -254,6 +254,11 @@ public final class WearableConnection {
             }
             return;
         }
+        // Serialized BEFORE the handler is registered. toByteArray refuses a message with more
+        // entries than the wire format can express, and throwing after the registration left a
+        // handler waiting on a request that was never sent -- no reply, and no port timeout to
+        // release it either, so it was retained for the life of the process.
+        byte[] wire = message.toByteArray();
         int token = 0;
         if (reply != null) {
             synchronized (pendingReplies) {
@@ -262,7 +267,7 @@ public final class WearableConnection {
                         new PendingReply(reply, message.getPath()));
             }
         }
-        b.sendMessage(message.getPath(), message.toByteArray(), token);
+        b.sendMessage(message.getPath(), wire, token);
     }
 
     /// Publishes the current value at a path, replacing whatever was there.

@@ -1545,14 +1545,24 @@ public class CN1WearableBridge implements WearableBridge {
         synchronized (localRemovals) {
             generation = ++removalGeneration;
             localRemovals.put(storagePath, new Removal(now, generation));
-            java.util.Iterator<Map.Entry<String, Removal>> it = localRemovals.entrySet().iterator();
-            while (it.hasNext()) {
-                if (now - it.next().getValue().at > LOCAL_REMOVAL_WINDOW_MILLIS) {
-                    it.remove();
-                }
-            }
+            purgeExpiredRemovals(now);
         }
         return generation;
+    }
+
+    /// Drops markers whose window has passed. Caller holds the localRemovals monitor.
+    ///
+    /// Called from the READ paths as well as from noteLocalRemoval, because expiry that happens
+    /// only when another removal arrives never happens at all for an app that deletes a burst of
+    /// record-specific paths and then stops: the markers were retained for the life of the process
+    /// and every later Data Layer event walked past them.
+    private static void purgeExpiredRemovals(long now) {
+        java.util.Iterator<Map.Entry<String, Removal>> it = localRemovals.entrySet().iterator();
+        while (it.hasNext()) {
+            if (now - it.next().getValue().at > LOCAL_REMOVAL_WINDOW_MILLIS) {
+                it.remove();
+            }
+        }
     }
 
     /**
@@ -1598,10 +1608,11 @@ public class CN1WearableBridge implements WearableBridge {
         long now = System.currentTimeMillis();
         java.util.Set<String> open = new java.util.HashSet<String>();
         synchronized (localRemovals) {
+            // Purged rather than merely skipped: this walk is already O(size), so dropping the
+            // expired entries as it goes costs nothing and is what keeps the map from growing.
+            purgeExpiredRemovals(now);
             for (Map.Entry<String, Removal> e : localRemovals.entrySet()) {
-                if (now - e.getValue().at <= LOCAL_REMOVAL_WINDOW_MILLIS) {
-                    open.add(e.getKey());
-                }
+                open.add(e.getKey());
             }
         }
         return open;
@@ -1611,8 +1622,9 @@ public class CN1WearableBridge implements WearableBridge {
     static boolean isLocallyRemoved(String storagePath) {
         long now = System.currentTimeMillis();
         synchronized (localRemovals) {
+            purgeExpiredRemovals(now);
             Removal r = localRemovals.get(storagePath);
-            return r != null && now - r.at <= LOCAL_REMOVAL_WINDOW_MILLIS;
+            return r != null;
         }
     }
 
@@ -2559,6 +2571,12 @@ public class CN1WearableBridge implements WearableBridge {
                 return false;
             }
             deliveredSequences.put(path, REMOVAL_ANNOUNCED);
+            // Removed before it is put back, so the entry moves to the END of the eviction order.
+            // An insertion-ordered LinkedHashMap does not reposition an existing key on put, so a
+            // path removed, republished and removed again kept the FIRST removal's place in the
+            // queue -- and could be evicted by the next unrelated deletion, leaving a delayed
+            // sibling of the second delete to read as first sight and announce a duplicate.
+            removalSentinels.remove(path);
             // Tracked so it can be retired. Unlike a real stamp, a sentinel describes a path that
             // is GONE, so nothing will ever publish over it -- on an app that deletes
             // record-specific paths, every one of them would sit in the map for the life of the
@@ -2580,16 +2598,28 @@ public class CN1WearableBridge implements WearableBridge {
     /// enumeration and produces no further callback, so an app that persisted the value across the
     /// restart kept showing it indefinitely.
     static void announceResolvedRemoval(String path, String before) {
-        if (before == null) {
-            if (markRemovalAnnounced(path)) {
-                rememberValue(path, null);
-                WearableConnection.deliverDataRemoved(path);
+        // Under the delivery-stamp monitor for the whole first-sight branch, as the stamped path
+        // already was. Taking the lock only for markRemovalAnnounced let a publication commit
+        // between the sentinel and the dispatch: it replaced the sentinel, cached its value and
+        // queued the change, and then this branch cleared that fresh cache entry and queued a
+        // removal behind it -- leaving the listener removed while the durable value existed, with
+        // the publication's own callback already spent.
+        //
+        // Safe to hold across the dispatch for the same reason the other paths are:
+        // deliverDataRemoved runs no listener code on this thread, it queues or hands to the EDT.
+        synchronized (deliveredSequences) {
+            if (before == null) {
+                if (markRemovalAnnounced(path)) {
+                    rememberValue(path, null);
+                    WearableConnection.deliverDataRemoved(path);
+                }
+            } else if (!isRemovalAnnounced(before)) {
+                // A sentinel means this logical removal has already been reported, by an earlier
+                // tombstone of the same wildcard delete. The ordinary path CONSUMES the stamp it
+                // finds and announces, so passing one in would report the removal again, once per
+                // replica.
+                deliverRemovalIfStampUnchanged(path, before);
             }
-        } else if (!isRemovalAnnounced(before)) {
-            // A sentinel means this logical removal has already been reported, by an earlier
-            // tombstone of the same wildcard delete. The ordinary path CONSUMES the stamp it finds
-            // and announces, so passing one in would report the removal again, once per replica.
-            deliverRemovalIfStampUnchanged(path, before);
         }
     }
 
