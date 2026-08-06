@@ -367,6 +367,14 @@ public final class GuiDocument {
             if (parent == null) parent = root;
             uniquifyPastedNames(pasted);
             parent.addChild(pasted);
+            // Pasted XML keeps the cell it was copied from, so pasting a table child back into its
+            // own table put two components in one cell. The cell it carries is dropped and a free
+            // one assigned, exactly as for a component added from the palette.
+            if ("TableLayout".equals(parent.getAttribute("layout"))) {
+                setNormalizedAttribute(pasted, "tableRow", null);
+                setNormalizedAttribute(pasted, "tableColumn", null);
+                assignFreeTableCell(parent, pasted);
+            }
             selected = pasted;
             modified = true;
         } finally {
