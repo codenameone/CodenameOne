@@ -185,6 +185,25 @@ public class HardeningEngineTest {
     }
 
     @Test
+    public void nonOffLevelWithAllTransformsDisabledIsSkipped() throws Exception {
+        // standard, but rename off and strings off -> nothing to do -> not stamped hardened.
+        File in = buildInputJar();
+        File out = tmp.newFile("noop-hardened.jar");
+        Map<String, String> hints = new HashMap<String, String>();
+        hints.put("harden.level", "standard");
+        hints.put("harden.rename", "false");
+        hints.put("harden.strings", "off");
+        HardeningRequest req = new HardeningRequest()
+                .inputJar(in).outputJar(out).mappingFile(tmp.newFile("noop-map.txt"))
+                .workDir(tmp.newFolder("noop-work"))
+                .config(HardeningConfig.from(hints, "ios", true))
+                .mainClass("com.codename1.hardening.fixture.Secrets");
+        HardeningResult r = HardeningEngine.harden(req);
+        assertFalse("a config that applies no transform must not be marked hardened", r.isHardened());
+        assertEquals(HardeningResult.Outcome.SKIPPED_NOT_REQUESTED, r.getOutcome());
+    }
+
+    @Test
     public void androidDoesNotRenameButStillEncrypts() throws Exception {
         // renameSupported=false models Android, where R8 is the sole renamer.
         HardeningResult r = harden(HardeningProfile.STANDARD, "and", false);

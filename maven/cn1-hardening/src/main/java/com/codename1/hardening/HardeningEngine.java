@@ -96,6 +96,12 @@ public final class HardeningEngine {
         if (!cfg.isPlatformEnabled()) {
             return HardeningResult.skipped(HardeningResult.Outcome.SKIPPED_PLATFORM_DISABLED, req.getInputJar());
         }
+        // A non-off level whose transforms are all individually disabled (e.g. harden.rename=false +
+        // harden.strings=off + no control flow) does nothing -- don't rebuild the jar and stamp it
+        // "hardened" with an empty transform set. Treat it as not requested.
+        if (!willApplyAnyTransform(cfg)) {
+            return HardeningResult.skipped(HardeningResult.Outcome.SKIPPED_NOT_REQUESTED, req.getInputJar());
+        }
 
         File workDir = req.getWorkDir();
         if (workDir == null) {
@@ -255,6 +261,17 @@ public final class HardeningEngine {
      * encrypting one would break the bridge. Every other port is safe (the decoder is ordinary
      * translated/compiled code).
      */
+    /** True when at least one transform will actually run for this config and platform. */
+    static boolean willApplyAnyTransform(HardeningConfig cfg) {
+        if (cfg.isRenameEnabled()) {
+            return true;
+        }
+        if (cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform())) {
+            return true;
+        }
+        return cfg.isControlFlow() && controlFlowSafeFor(cfg.getPlatform());
+    }
+
     static boolean stringEncryptionSafeFor(String platform) {
         return !"javascript".equals(platform);
     }

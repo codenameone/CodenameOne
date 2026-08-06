@@ -102,6 +102,29 @@ public class StringEncryptTransformTest {
         assertEquals(GREETING, c.getMethod("greet").invoke(null));
     }
 
+    @Test
+    public void encryptsInterfaceDefaultAndStaticMethodLiterals() throws Exception {
+        InputStream in = getClass().getResourceAsStream(
+                "/com/codename1/hardening/fixture/Iface.class");
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        int r;
+        while ((r = in.read(buf)) >= 0) {
+            b.write(buf, 0, r);
+        }
+        in.close();
+        StringEncryptTransform t = new StringEncryptTransform(true, 99);
+        byte[] out = t.transform(b.toByteArray());
+        assertTrue("interface method literals should be encrypted", t.getEncryptedCount() >= 2);
+        assertFalse(StringEncryptTransform.containsStringLiteral(out, "interface default secret"));
+        assertFalse(StringEncryptTransform.containsStringLiteral(out, "interface static secret"));
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        // The static method round-trips when loaded.
+        Class<?> c = new ByteLoader().define("com.codename1.hardening.fixture.Iface", out);
+        assertEquals("interface static secret", c.getMethod("staticSecret").invoke(null));
+    }
+
     /** Defines transformed bytes as a fresh class distinct from the already-loaded fixture. */
     private static final class ByteLoader extends ClassLoader {
         Class<?> define(String name, byte[] b) {

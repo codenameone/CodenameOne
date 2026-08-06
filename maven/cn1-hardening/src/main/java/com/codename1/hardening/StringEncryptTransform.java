@@ -118,16 +118,11 @@ public final class StringEncryptTransform {
         ClassNode cn = new ClassNode();
         new ClassReader(classBytes).accept(cn, ClassReader.SKIP_FRAMES);
 
-        // Interfaces (including annotations) are skipped: their fields are implicitly
-        // constant, they have no place for a decode call in a Java-5-compatible way,
-        // and their methods carry no encryptable literals.
-        if ((cn.access & Opcodes.ACC_INTERFACE) != 0) {
-            return classBytes;
-        }
         // If the class already defines a member colliding with the decoder, leave it alone.
         if (hasDecoderCollision(cn)) {
             return classBytes;
         }
+        boolean isInterface = (cn.access & Opcodes.ACC_INTERFACE) != 0;
 
         int base = keyBase(cn.name);
         boolean changed = false;
@@ -148,14 +143,17 @@ public final class StringEncryptTransform {
             }
         }
 
-        // Channel 2: static final String ConstantValue attributes (both modes).
-        changed |= encryptStaticFinalStrings(cn, base);
+        // Channel 2: static final String ConstantValue attributes (both modes). Skipped on
+        // interfaces, whose fields are implicitly constant and have no rewritable init slot.
+        if (!isInterface) {
+            changed |= encryptStaticFinalStrings(cn, base);
+        }
 
         if (!changed) {
             return classBytes;
         }
 
-        addDecoder(cn, base);
+        addDecoder(cn, base, isInterface);
 
         ClassWriter cw = new FrameClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, hierarchy);
         cn.accept(cw);
@@ -231,10 +229,12 @@ public final class StringEncryptTransform {
         }
     }
 
-    private void addDecoder(ClassNode cn, int base) {
-        MethodNode m = new MethodNode(Opcodes.ASM9,
-                Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
-                DECODER_NAME, DECODER_DESC, null, null);
+    private void addDecoder(ClassNode cn, int base, boolean isInterface) {
+        // A Java 8 interface may only have public static methods (private statics are 9+), so the
+        // decoder is public there; in a class it stays private.
+        int access = (isInterface ? Opcodes.ACC_PUBLIC : Opcodes.ACC_PRIVATE)
+                | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC;
+        MethodNode m = new MethodNode(Opcodes.ASM9, access, DECODER_NAME, DECODER_DESC, null, null);
         InsnList in = m.instructions;
         // char[] c = s.toCharArray();  (local 1)
         in.add(new VarInsnNode(Opcodes.ALOAD, 0));
