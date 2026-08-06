@@ -434,6 +434,61 @@ public final class DatabaseConformanceSuite {
             }
         }
 
+        if (mode == MODE_STRICT) {
+            // ---- the argument list has to match the placeholders
+            //
+            // Supplying too few is the dangerous direction: an engine that binds what it is given
+            // and leaves the rest NULL runs a different statement than the caller wrote, silently
+            // and with no error. Too many is checked as well, since it means the same confusion.
+            db.execute("DROP TABLE IF EXISTS conf_args");
+            db.execute("CREATE TABLE conf_args (a TEXT, b TEXT)");
+
+            boolean tooFewThrew = false;
+            try {
+                db.execute("INSERT INTO conf_args (a, b) VALUES (?, ?)", new String[] {"only one"});
+            } catch (IOException expected) {
+                tooFewThrew = true;
+            }
+            r.check(tooFewThrew, "execute() with fewer arguments than placeholders throws rather "
+                    + "than binding the missing ones as NULL");
+
+            boolean tooManyThrew = false;
+            try {
+                db.execute("INSERT INTO conf_args (a, b) VALUES (?, ?)",
+                        new String[] {"one", "two", "three"});
+            } catch (IOException expected) {
+                tooManyThrew = true;
+            }
+            r.check(tooManyThrew, "execute() with more arguments than placeholders throws");
+
+            boolean queryTooFewThrew = false;
+            Cursor argCursor = null;
+            try {
+                argCursor = db.executeQuery("SELECT a FROM conf_args WHERE a = ? AND b = ?",
+                        new String[] {"only one"});
+            } catch (IOException expected) {
+                queryTooFewThrew = true;
+            } finally {
+                closeQuietly(argCursor);
+            }
+            r.check(queryTooFewThrew,
+                    "executeQuery() with fewer arguments than placeholders throws");
+
+            // A literal question mark inside a string is not a placeholder, so a port that counts
+            // them by scanning the text has to skip quoted content.
+            boolean literalOk = true;
+            try {
+                db.execute("INSERT INTO conf_args (a, b) VALUES ('is it? yes', ?)",
+                        new String[] {"bound"});
+            } catch (IOException err) {
+                literalOk = false;
+            }
+            r.check(literalOk, "a question mark inside a string literal is not counted as a "
+                    + "placeholder");
+
+            db.execute("DROP TABLE IF EXISTS conf_args");
+        }
+
         db.execute("DROP TABLE IF EXISTS conf_m1");
         db.execute("DROP TABLE IF EXISTS conf_m2");
     }
@@ -652,7 +707,7 @@ public final class DatabaseConformanceSuite {
                 "a statement after a rollback autocommits rather than joining an open transaction");
 
         if (mode == MODE_STRICT) {
-            // ---- a failed commit leaves the transaction open, so a rollback must still work
+            // ---- a failed commit ends the transaction rather than wedging the database
             db.execute("DROP TABLE IF EXISTS conf_fk_child");
             db.execute("DROP TABLE IF EXISTS conf_fk_parent");
             db.execute("CREATE TABLE conf_fk_parent (id INTEGER PRIMARY KEY)");
@@ -667,15 +722,21 @@ public final class DatabaseConformanceSuite {
                 // The engine did not enforce the constraint, so there is nothing to recover from.
                 deferredConstraintsWork = false;
             } catch (IOException expected) {
-                // The commit failed, which is the interesting case: the transaction is still open.
-                boolean recovered = true;
+                // The commit failed, which is the interesting case. The engines disagree about
+                // what they leave behind - Android has already ended the transaction, the SQLite
+                // C API and JDBC have not - so the contract is that the port reconciles that and
+                // the database comes back with no transaction open either way.
+                r.check(!db.isInTransaction(),
+                        "a failed commit leaves no transaction open rather than wedging the "
+                        + "database with one that can never be committed");
+                boolean reusable = true;
                 try {
+                    db.beginTransaction();
                     db.rollbackTransaction();
                 } catch (IOException err) {
-                    recovered = false;
+                    reusable = false;
                 }
-                r.check(recovered, "a rollback after a failed commit is accepted rather than "
-                        + "rejected as having no transaction");
+                r.check(reusable, "a new transaction can be started after a failed commit");
             } catch (RuntimeException unchecked) {
                 // Caught deliberately: the contract is that every failure is an IOException, so an
                 // engine exception escaping unwrapped is itself the finding, and reporting it beats
@@ -684,7 +745,9 @@ public final class DatabaseConformanceSuite {
                 r.check(false, "a failed commit raises IOException rather than "
                         + unchecked.getClass().getName());
                 try {
-                    db.rollbackTransaction();
+                    if (db.isInTransaction()) {
+                        db.rollbackTransaction();
+                    }
                 } catch (Throwable ignored) {
                     // Already reported.
                 }

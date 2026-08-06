@@ -98,8 +98,24 @@ class WindowsDatabase extends Database {
     public void commitTransaction() throws IOException {
         checkOpen();
         checkEndTransaction();
-        WindowsNative.sqlDbExecScript(peer, "COMMIT");
+        try {
+            WindowsNative.sqlDbExecScript(peer, "COMMIT");
+        } catch (IOException err) {
+            // SQLite leaves the transaction open when COMMIT fails, so discard it here.
+            rollbackQuietly();
+            throw abandonFailedCommit(err);
+        }
         markTransactionEnded();
+    }
+
+    /// Rolls back without reporting a failure, for the path where a commit has already failed and
+    /// the engine may or may not have left the transaction open.
+    private void rollbackQuietly() {
+        try {
+            WindowsNative.sqlDbExecScript(peer, "ROLLBACK");
+        } catch (Throwable ignored) {
+            // Nothing to recover: the caller is already reporting the commit failure.
+        }
     }
 
     @Override

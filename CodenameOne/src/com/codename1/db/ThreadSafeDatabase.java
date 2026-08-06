@@ -55,7 +55,22 @@ public class ThreadSafeDatabase extends Database {
 
     /// Guards against a second close. The worker is killed by the first one, so a synchronous
     /// hand-off afterwards would queue work nothing is left to run and block forever.
+    ///
+    /// Only ever read or written while holding `#dispatchLock`.
     private boolean closed;
+
+    /// Serializes the closed check against the hand-off it guards.
+    ///
+    /// Testing the flag and queueing the work have to be one step. Otherwise two threads both see
+    /// an open database, one of them closes it and kills the worker, and the other hands its task
+    /// to a worker that is already gone and waits for a result that can never arrive. This class
+    /// exists to be shared between threads, so that race is its main use case rather than an
+    /// exotic one.
+    ///
+    /// Holding the lock across the hand-off costs nothing: the worker is a single thread and the
+    /// hand-off is synchronous, so calls were already serialized. It is safe because no task
+    /// queued here calls back into this wrapper -- every task body runs against `#underlying`.
+    private final Object dispatchLock = new Object();
 
     /// Wraps the given database with a threadsafe version
     ///
@@ -92,6 +107,8 @@ public class ThreadSafeDatabase extends Database {
     /// Guarding only close() was not enough: every other method still queued work and waited
     /// synchronously, so closing a cursor after its owning database had closed -- an ordinary
     /// cleanup order -- blocked forever instead of throwing.
+    ///
+    /// Call only while holding `#dispatchLock`, and queue the work it guards without releasing it.
     private void checkOpen() throws IOException {
         if (closed) {
             throw new IOException("This database has been closed");
@@ -99,37 +116,43 @@ public class ThreadSafeDatabase extends Database {
     }
 
     private void invokeWithException(final RunnableWithIOException r) throws IOException {
-        checkOpen();
-        IOException err = et.run(new RunnableWithResultSync<IOException>() {
-            @Override
-            @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
-            public IOException run() {
-                try {
-                    r.run();
-                    return null;
-                } catch (IOException err) {
-                    return err;
+        IOException err;
+        synchronized (dispatchLock) {
+            checkOpen();
+            err = et.run(new RunnableWithResultSync<IOException>() {
+                @Override
+                @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
+                public IOException run() {
+                    try {
+                        r.run();
+                        return null;
+                    } catch (IOException err) {
+                        return err;
+                    }
                 }
-            }
-        });
+            });
+        }
         if (err != null) {
             throw err;
         }
     }
 
     private Object invokeWithException(final RunnableWithResponseOrIOException r) throws IOException {
-        checkOpen();
-        Object ret = et.run(new RunnableWithResultSync<Object>() {
-            @Override
-            @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
-            public Object run() {
-                try {
-                    return r.run();
-                } catch (IOException err) {
-                    return err;
+        Object ret;
+        synchronized (dispatchLock) {
+            checkOpen();
+            ret = et.run(new RunnableWithResultSync<Object>() {
+                @Override
+                @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
+                public Object run() {
+                    try {
+                        return r.run();
+                    } catch (IOException err) {
+                        return err;
+                    }
                 }
-            }
-        });
+            });
+        }
         if (ret instanceof IOException) {
             throw (IOException) ret;
         }
@@ -171,29 +194,34 @@ public class ThreadSafeDatabase extends Database {
 
     @Override
     public void close() {
-        if (closed) {
-            // close() is idempotent by contract, and after the first call there is no worker left
-            // to service the hand-off below.
-            return;
-        }
-        closed = true;
-        // Synchronous on purpose. EasyThread.run(Runnable) is fire and forget, so this used to
-        // return while the database was still open, and a delete() on the next line would race it
-        // and fail with the file still in use.
-        et.run(new RunnableWithResultSync<Object>() {
-            @Override
-            public Object run() {
-                try {
-                    underlying.close();
-                } catch (IOException err) {
-                    // close() cannot report a failure through its signature, so log it rather
-                    // than dropping it silently.
-                    Log.e(err);
-                }
-                return null;
+        synchronized (dispatchLock) {
+            if (closed) {
+                // close() is idempotent by contract, and after the first call there is no worker
+                // left to service the hand-off below.
+                return;
             }
-        });
-        et.kill();
+            // Flip the flag and shut down without releasing the lock, so a concurrent operation
+            // either queues before this point or is rejected by checkOpen() after it. In between
+            // it would hand work to a dead worker and wait on it forever.
+            closed = true;
+            // Synchronous on purpose. EasyThread.run(Runnable) is fire and forget, so this used to
+            // return while the database was still open, and a delete() on the next line would race
+            // it and fail with the file still in use.
+            et.run(new RunnableWithResultSync<Object>() {
+                @Override
+                public Object run() {
+                    try {
+                        underlying.close();
+                    } catch (IOException err) {
+                        // close() cannot report a failure through its signature, so log it rather
+                        // than dropping it silently.
+                        Log.e(err);
+                    }
+                    return null;
+                }
+            });
+            et.kill();
+        }
     }
 
     @Override
@@ -460,18 +488,23 @@ public class ThreadSafeDatabase extends Database {
 
         @Override
         public void close() throws IOException {
-            if (closed) {
-                // Closing the database already invalidated its cursors, and cursor close is
-                // idempotent, so closing one afterwards is a no-op rather than an error. Closing
-                // the cursor after the database is an ordinary cleanup order.
-                return;
-            }
-            invokeWithException(new RunnableWithIOException() {
-                @Override
-                public void run() throws IOException {
-                    underlyingCursor.close();
+            // Under the lock so the database cannot close between the check and the hand-off,
+            // which would turn this no-op into a spurious "database has been closed". The monitor
+            // is reentrant, so the nested acquisition inside invokeWithException is free.
+            synchronized (dispatchLock) {
+                if (closed) {
+                    // Closing the database already invalidated its cursors, and cursor close is
+                    // idempotent, so closing one afterwards is a no-op rather than an error.
+                    // Closing the cursor after the database is an ordinary cleanup order.
+                    return;
                 }
-            });
+                invokeWithException(new RunnableWithIOException() {
+                    @Override
+                    public void run() throws IOException {
+                        underlyingCursor.close();
+                    }
+                });
+            }
         }
 
         @Override

@@ -107,7 +107,19 @@ public class SEDatabase extends Database {
             conn.setAutoCommit(true);
             markTransactionEnded();
         } catch (SQLException ex) {
-            throw new IOException(ex.getMessage(), ex);
+            // JDBC leaves the transaction open when the commit fails, so discard it here rather
+            // than leaving the connection wedged with no way back to autocommit.
+            try {
+                conn.rollback();
+            } catch (SQLException ignored) {
+                // The commit failure is the one worth reporting.
+            }
+            try {
+                conn.setAutoCommit(true);
+            } catch (SQLException ignored) {
+                // Same.
+            }
+            throw abandonFailedCommit(ex);
         }
     }
 
@@ -222,6 +234,31 @@ public class SEDatabase extends Database {
         }
     }
 
+    /// Rejects a call that supplies the wrong number of bind arguments.
+    ///
+    /// The driver does not check this itself: too few leaves the trailing placeholders unbound,
+    /// and too many walks off the end of its parameter array and raises an
+    /// ArrayIndexOutOfBoundsException, which is not the IOException this API promises.
+    private void checkParameterCount(PreparedStatement s, int supplied) throws IOException {
+        if (isLegacyBehavior()) {
+            return;
+        }
+        int declared;
+        try {
+            declared = s.getParameterMetaData().getParameterCount();
+        } catch (SQLException ex) {
+            // The driver could not say. Binding below will report anything it does detect.
+            return;
+        }
+        if (declared != supplied) {
+            // Closed here rather than by the caller: the query paths only clean up from their
+            // SQLException handler, which this does not go through.
+            cleanup(s);
+            throw new IOException("The statement has " + declared + " parameters but "
+                    + supplied + " were supplied");
+        }
+    }
+
     @Override
     public void execute(String sql, String[] params) throws IOException {
         checkOpen();
@@ -229,6 +266,7 @@ public class SEDatabase extends Database {
         PreparedStatement s = null;
         try {
             s = conn.prepareStatement(sql);
+            checkParameterCount(s, params == null ? 0 : params.length);
             if (params != null) {
                 for (int i = 0; i < params.length; i++) {
                     if (params[i] == null) {
@@ -262,6 +300,7 @@ public class SEDatabase extends Database {
         PreparedStatement s = null;
         try {
             s = conn.prepareStatement(sql);
+            checkParameterCount(s, params.length);
             bind(s, params);
             s.execute();
         } catch (SQLException ex) {
@@ -278,6 +317,7 @@ public class SEDatabase extends Database {
         PreparedStatement s = null;
         try {
             s = conn.prepareStatement(sql);
+            checkParameterCount(s, params == null ? 0 : params.length);
             if (params != null) {
                 for (int i = 0; i < params.length; i++) {
                     if (params[i] == null) {
@@ -310,6 +350,7 @@ public class SEDatabase extends Database {
         PreparedStatement s = null;
         try {
             s = conn.prepareStatement(sql);
+            checkParameterCount(s, params.length);
             bind(s, params);
             ResultSet resultSet = s.executeQuery();
             SECursor cursor = new SECursor(this, s, resultSet);

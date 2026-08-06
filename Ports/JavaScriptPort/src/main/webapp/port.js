@@ -6509,29 +6509,18 @@ function cn1SqliteStartInit() {
 }
 
 /**
- * In-memory databases, by name, for the degraded path.
+ * Anchor connections for the degraded in-memory path, by database name.
  *
- * Without this every open produced a fresh anonymous ":memory:" database, so closing and reopening
- * one lost its contents immediately rather than at page close, two connections to the same name
- * saw unrelated data, and exists() was always false. Keying them by name gives the fallback the
- * same lifecycle semantics as the real one, for as long as the page lives.
+ * The memdb VFS frees a named store as soon as its last connection closes, so without a connection
+ * held open here, closing a database would discard it instead of leaving it readable until the page
+ * closes. These are never handed out: every open gets its own connection, because handing the same
+ * one back would make a second open skip key validation entirely and report an encrypted database
+ * as plaintext.
  */
-const cn1SqliteMemoryDbs = new Map();
+const cn1SqliteMemoryAnchors = new Map();
 
-/** Opens a database by name, through the pool when one is available. */
-function cn1SqliteOpen(name, key) {
-  let db;
-  if (cn1SqlitePool) {
-    db = new cn1SqlitePool.OpfsSAHPoolDb(cn1SqliteDbPath(name));
-  } else {
-    db = cn1SqliteMemoryDbs.get(name);
-    if (!db) {
-      // filename: gives the connection a name inside the VFS, so reopening finds it again.
-      db = new cn1Sqlite.oo1.DB({ filename: "file:" + encodeURIComponent(name)
-        + "?vfs=memdb", flags: "c" });
-      cn1SqliteMemoryDbs.set(name, db);
-    }
-  }
+/** Applies the key, if there is one, selecting the portable cipher scheme first. */
+function cn1SqliteApplyKey(db, key) {
   if (key !== null && key !== undefined && key !== "") {
     // Select the SQLCipher 4 scheme before applying the key, or the engine uses
     // its own and the file cannot be read on any other platform.
@@ -6539,9 +6528,39 @@ function cn1SqliteOpen(name, key) {
     db.exec("PRAGMA legacy = 4");
     db.exec("PRAGMA key = \"" + key.replace(/"/g, '""') + "\"");
   }
-  // Read the schema either way. Key validation is lazy, so an unkeyed open of an encrypted file
-  // also succeeds: without this, opening one without a key would look like proof it is plaintext.
-  db.exec("SELECT count(*) FROM sqlite_master");
+}
+
+/** Opens a database by name, through the pool when one is available. */
+function cn1SqliteOpen(name, key) {
+  if (cn1SqlitePool) {
+    const pooled = new cn1SqlitePool.OpfsSAHPoolDb(cn1SqliteDbPath(name));
+    cn1SqliteApplyKey(pooled, key);
+    // Read the schema either way. Key validation is lazy, so an unkeyed open of an encrypted file
+    // also succeeds: without this, opening one without a key would look like proof it is plaintext.
+    pooled.exec("SELECT count(*) FROM sqlite_master");
+    return pooled;
+  }
+  // filename: gives the connection a name inside the VFS, so reopening finds it again.
+  const uri = "file:" + encodeURIComponent(name) + "?vfs=memdb";
+  const anchored = cn1SqliteMemoryAnchors.has(name);
+  const db = new cn1Sqlite.oo1.DB({ filename: uri, flags: "c" });
+  try {
+    cn1SqliteApplyKey(db, key);
+    db.exec("SELECT count(*) FROM sqlite_master");
+  } catch (err) {
+    // Closing releases the store if this connection was the one that created it, so a rejected
+    // key leaves nothing behind.
+    db.close();
+    throw err;
+  }
+  if (!anchored) {
+    // Created after the real connection so the store already exists. The anchor takes the same
+    // key, but only so that opening it succeeds; it never reads or writes a page afterwards, so
+    // a later rekey through another connection leaves it holding a key it no longer needs.
+    const anchor = new cn1Sqlite.oo1.DB({ filename: uri, flags: "c" });
+    cn1SqliteApplyKey(anchor, key);
+    cn1SqliteMemoryAnchors.set(name, anchor);
+  }
   return db;
 }
 
@@ -6595,7 +6614,7 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_exists_java_lang
   function(name) {
     const n = jvm.toNativeString(name);
     if (!cn1SqlitePool) {
-      return cn1SqliteMemoryDbs.has(n);
+      return cn1SqliteMemoryAnchors.has(n);
     }
     return cn1SqlitePool.getFileNames().indexOf(cn1SqliteDbPath(n)) >= 0;
   });
@@ -6606,10 +6625,11 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang
     if (cn1SqlitePool) {
       cn1SqlitePool.unlink(cn1SqliteDbPath(n));
     } else {
-      const existing = cn1SqliteMemoryDbs.get(n);
-      if (existing) {
-        existing.close();
-        cn1SqliteMemoryDbs.delete(n);
+      const anchor = cn1SqliteMemoryAnchors.get(n);
+      if (anchor) {
+        // Dropping the anchor releases the store once every other connection to it has closed.
+        anchor.close();
+        cn1SqliteMemoryAnchors.delete(n);
       }
     }
     return null;
@@ -6629,13 +6649,9 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_close_long", "cn
   function(dbId) {
     const db = cn1SqliteHandles.get(Number(dbId));
     if (db) {
-      // A memdb-backed database survives its connection closing, which is what makes reopening
-      // find the same contents, so only pooled connections are actually closed here.
-      let isMemory = false;
-      cn1SqliteMemoryDbs.forEach(function(v) { if (v === db) { isMemory = true; } });
-      if (!isMemory) {
-        db.close();
-      }
+      // Always close: this is a connection of its own, never the anchor, and the anchor is what
+      // keeps a memdb-backed database readable after its last application connection goes away.
+      db.close();
       cn1SqliteHandles.delete(Number(dbId));
     }
     return null;

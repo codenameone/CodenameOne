@@ -129,6 +129,12 @@
 /// - `beginTransaction` throws if a transaction is already open.
 /// - `commitTransaction` and `rollbackTransaction` throw if none is open, and both return the
 ///   connection to autocommit.
+/// - A commit that throws still ends the transaction. A deferred constraint is checked at commit
+///   time, so that is where a commit fails, and the engines disagree about what they leave
+///   behind: Android has already ended the transaction by the time it reports the failure, while
+///   the SQLite C API and JDBC leave it open. The port reconciles that, so a failed commit always
+///   leaves the database with no transaction open and ready for a new one. Do not roll back
+///   afterwards -- there is nothing left to roll back, and the call throws.
 /// - Closing a database with an open transaction rolls it back.
 /// - Transactions belong to a single `Database` instance, not to the process.
 ///

@@ -173,7 +173,7 @@ memory is unreasonable. For a handful of values `Storage` is simpler.
 ****
 The database API behaves the same on every platform Codename One targets: Android, iOS, the native
 Windows and Linux builds, JavaScript and the simulator. One contract, documented in the
-`com.codename1.db` package javadoc, and a single test suite that every port has to pass.
+`com.codename1.db` package documentation, and a single test suite that every port has to pass.
 
 This wasn't always the case, and it's worth knowing what changed if you have existing code.
 Cursors used to count rows from zero on some platforms and from one on others; `first()` reported
@@ -244,7 +244,7 @@ from a shipped .ipa or .apk in minutes, so a constant passphrase buys you nothin
 holding the file. If your application can't ask a human for one, use `managed()`: a random key in
 the platform key store beats a constant compiled into the binary.
 
-Encryption protects data *at rest*, and nothing else. It's no defence against a rooted or
+Encryption protects data *at rest*, and nothing else. It's no defense against a rooted or
 jailbroken device, a debugger attached to the running process, or a memory dump, because the key is
 in memory for as long as the database is open.
 
@@ -280,6 +280,20 @@ mode, PBKDF2-HMAC-SHA512 key derivation at 256000 iterations, a 4096 byte page s
 HMAC-SHA512. This is the SQLCipher 4 format, so standard tools such as the `sqlcipher` command line
 client can open these files too.
 
+==== Transactions
+
+Transactions are flat, because that's the only model all the underlying engines can express. A
+`beginTransaction()` while one is already open throws, and so does a `commitTransaction()` or
+`rollbackTransaction()` with none open. Both end the transaction and return the connection to
+autocommit, and closing a database with one open rolls it back.
+
+A commit can fail. SQLite checks a deferred constraint when the transaction commits, not when the
+offending row is inserted, so that's where the failure surfaces. When it does, the transaction is
+over: the port ends it for you and `beginTransaction()` works again straight away. Don't roll back
+afterward, because there's nothing left to roll back and the call throws. The engines don't agree
+here on their own -- Android ends the transaction before it reports the failure, while the SQLite C
+API and JDBC leave it open -- so the port reconciles them and your code sees one behaviour.
+
 ==== Threading
 
 A `Database` and its cursors aren't thread safe. Either give each thread its own connection, or
@@ -301,8 +315,7 @@ the start elsewhere, because a SQLite statement only steps forward and seeking b
 and stepping again. Prefer `next()` for large result sets.
 
 One consequence is worth knowing: because a backward seek re-runs the statement, a cursor is a
-repeatable read only inside a transaction. Outside one, a concurrent write between the two passes
-can change what the second pass sees.
+repeatable read only inside a transaction. Outside one, another thread can write between the two passes, changing what the second pass sees.
 
 [[sql-legacy]]
 ==== Compatibility with the previous behaviour

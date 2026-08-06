@@ -166,6 +166,76 @@ public final class SQLStatementSplitter {
         return countStatements(sql) > 1;
     }
 
+    /// Reported by `#countPositionalParameters(String)` for a statement whose parameters cannot be
+    /// counted by reading the text.
+    public static final int PARAMETER_COUNT_UNKNOWN = -1;
+
+    /// Counts the `?` placeholders in a statement.
+    ///
+    /// For ports whose engine cannot be asked. The SQLite C API answers this directly through
+    /// `sqlite3_bind_parameter_count`, and JDBC through `ParameterMetaData`, but the Android
+    /// engine exposes no equivalent, so the count has to come from the text. Quoted strings,
+    /// quoted identifiers, bracketed identifiers and comments are skipped, so a literal `?` inside
+    /// any of them is not miscounted.
+    ///
+    /// SQLite also accepts numbered and named placeholders -- `?NNN`, `:name`, `@name` and
+    /// `$name` -- whose count is not the number of markers, because one may repeat and `?NNN` may
+    /// skip indices. Rather than guess, this reports `#PARAMETER_COUNT_UNKNOWN` when it sees one,
+    /// and the caller skips the check instead of rejecting a valid statement.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: the statement to inspect
+    ///
+    /// #### Returns
+    ///
+    /// the number of `?` placeholders, or `#PARAMETER_COUNT_UNKNOWN` if the statement uses a form
+    /// this cannot count
+    public static int countPositionalParameters(String sql) {
+        if (sql == null) {
+            return 0;
+        }
+        int count = 0;
+        int length = sql.length();
+        int iter = 0;
+        while (iter < length) {
+            char c = sql.charAt(iter);
+            if (c == '\'' || c == '"' || c == '`') {
+                iter = skipQuoted(sql, iter, c);
+                continue;
+            }
+            if (c == '[') {
+                iter = skipUntil(sql, iter + 1, ']');
+                continue;
+            }
+            if (c == '-' && iter + 1 < length && sql.charAt(iter + 1) == '-') {
+                iter = skipLineComment(sql, iter + 2);
+                continue;
+            }
+            if (c == '/' && iter + 1 < length && sql.charAt(iter + 1) == '*') {
+                iter = skipBlockComment(sql, iter + 2);
+                continue;
+            }
+            if (c == ':' || c == '@' || c == '$') {
+                // A named parameter, but only when a name actually follows: "::" and a bare "@"
+                // are not, and neither is the ":" of a cast or an assignment.
+                if (iter + 1 < length && isWordPart(sql.charAt(iter + 1))) {
+                    return PARAMETER_COUNT_UNKNOWN;
+                }
+                iter++;
+                continue;
+            }
+            if (c == '?') {
+                if (iter + 1 < length && sql.charAt(iter + 1) >= '0' && sql.charAt(iter + 1) <= '9') {
+                    return PARAMETER_COUNT_UNKNOWN;
+                }
+                count++;
+            }
+            iter++;
+        }
+        return count;
+    }
+
     private static void addIfNotBlank(List statements, String candidate) {
         String trimmed = stripToContent(candidate);
         if (trimmed.length() > 0) {

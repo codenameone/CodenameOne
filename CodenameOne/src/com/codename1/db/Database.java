@@ -629,10 +629,9 @@ public abstract class Database {
     /// Rejects a commit or rollback with no open transaction.
     ///
     /// Ports call this at the top of `#commitTransaction()` and `#rollbackTransaction()`, and
-    /// `#markTransactionEnded()` once the engine has actually ended it. The two are separate
-    /// because a commit can fail -- a deferred foreign key violation, for instance -- and the
-    /// transaction is then still open. Clearing the flag first would make the recovering rollback
-    /// look like it had no transaction to roll back.
+    /// `#markTransactionEnded()` once the engine has ended it. The two are separate so that a
+    /// port can end the transaction on a path that does not commit it, which is what
+    /// `#abandonFailedCommit(Throwable)` does.
     ///
     /// In legacy mode the check is skipped.
     ///
@@ -649,6 +648,31 @@ public abstract class Database {
     /// rolled back successfully.
     protected void markTransactionEnded() {
         inTransaction = false;
+    }
+
+    /// Discards a transaction whose commit failed, and builds the exception to report it with.
+    ///
+    /// A commit that fails cannot be retried, so the only remaining outcome is a rollback. The
+    /// engines disagree about what they leave behind: Android has already ended the transaction
+    /// by the time it reports the failure, while the SQLite C API and JDBC leave it open. Ports
+    /// call this from the failure path of `#commitTransaction()`, after making a best effort to
+    /// roll back, so that callers see one behavior everywhere -- no transaction is open, and
+    /// `#beginTransaction()` works again.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cause`: the failure the engine reported
+    ///
+    /// #### Returns
+    ///
+    /// the exception the caller should throw
+    protected IOException abandonFailedCommit(Throwable cause) {
+        markTransactionEnded();
+        String message = cause == null ? null : cause.getMessage();
+        if (message == null) {
+            message = "The transaction could not be committed";
+        }
+        return new IOException(message, cause);
     }
 
     /// Starts a transaction.

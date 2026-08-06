@@ -58,6 +58,22 @@ public class AndroidDB extends Database {
         }
     }
 
+    /// Rejects a call that supplies the wrong number of bind arguments.
+    ///
+    /// The Android engine binds what it is given and leaves any remaining placeholder as NULL, so
+    /// a short argument list silently executes a different statement than the caller wrote. Every
+    /// other port gets this check from its engine; here it comes from the text.
+    private void checkParameterCount(String sql, int supplied) throws IOException {
+        if (isLegacyBehavior()) {
+            return;
+        }
+        int declared = SQLStatementSplitter.countPositionalParameters(sql);
+        if (declared != SQLStatementSplitter.PARAMETER_COUNT_UNKNOWN && declared != supplied) {
+            throw new IOException("The statement has " + declared + " parameters but "
+                    + supplied + " were supplied");
+        }
+    }
+
     private void requireSingleStatement(String sql) throws IOException {
         if (isLegacyBehavior()) {
             return;
@@ -88,11 +104,12 @@ public class AndroidDB extends Database {
         try {
             db.setTransactionSuccessful();
             // A deferred constraint is checked here, so this is where a commit fails. The engine
-            // reports it as an unchecked SQLiteException; the contract for this API is that every
-            // failure is an IOException, and the transaction stays open so a rollback can recover.
+            // reports it as an unchecked SQLiteException, while the contract for this API is that
+            // every failure is an IOException. endTransaction() ends the transaction either way,
+            // so there is nothing left to roll back - only the flag has to follow.
             db.endTransaction();
         } catch (Exception err) {
-            throw new IOException(err.getMessage(), err);
+            throw abandonFailedCommit(err);
         }
         markTransactionEnded();
     }
@@ -156,6 +173,7 @@ public class AndroidDB extends Database {
     public void execute(String sql, String[] params) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
+        checkParameterCount(sql, params == null ? 0 : params.length);
         SQLiteStatement s = null;
         try {
             s = db.compileStatement(sql);
@@ -193,6 +211,7 @@ public class AndroidDB extends Database {
         }
         checkOpen();
         requireSingleStatement(sql);
+        checkParameterCount(sql, params.length);
         SQLiteStatement s = null;
         try {
             s = db.compileStatement(sql);
@@ -211,6 +230,7 @@ public class AndroidDB extends Database {
     public Cursor executeQuery(String sql, String[] params) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
+        checkParameterCount(sql, params == null ? 0 : params.length);
         try {
             android.database.Cursor c = db.rawQuery(sql, params);
             return wrap(c);
@@ -229,6 +249,7 @@ public class AndroidDB extends Database {
         }
         checkOpen();
         requireSingleStatement(sql);
+        checkParameterCount(sql, params.length);
         if (!hasBlob(params)) {
             return executeQuery(sql, coerceToText(params, "executeQuery"));
         }

@@ -109,8 +109,24 @@ class DatabaseImpl extends Database {
     public void commitTransaction() throws IOException {
         checkOpen();
         checkEndTransaction();
-        executeScript("COMMIT");
+        try {
+            executeScript("COMMIT");
+        } catch (IOException err) {
+            // SQLite leaves the transaction open when COMMIT fails, so discard it here.
+            rollbackQuietly();
+            throw abandonFailedCommit(err);
+        }
         markTransactionEnded();
+    }
+
+    /// Rolls back without reporting a failure, for the path where a commit has already failed and
+    /// the engine may or may not have left the transaction open.
+    private void rollbackQuietly() {
+        try {
+            executeScript("ROLLBACK");
+        } catch (Throwable ignored) {
+            // Nothing to recover: the caller is already reporting the commit failure.
+        }
     }
 
     @Override
