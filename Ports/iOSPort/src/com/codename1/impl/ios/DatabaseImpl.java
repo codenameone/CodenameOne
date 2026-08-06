@@ -263,7 +263,7 @@ class DatabaseImpl extends Database {
      * when a requested row falls outside its window. Buffering rows instead would mean copying
      * every column of every row stepped past, blobs included.
      */
-    class CursorImpl extends AbstractDBCursor {
+    static class CursorImpl extends AbstractDBCursor {
         private long stmt;
         DatabaseImpl owner;
 

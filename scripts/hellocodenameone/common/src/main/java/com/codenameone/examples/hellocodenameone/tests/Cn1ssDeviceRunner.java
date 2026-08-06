@@ -368,6 +368,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new SimdBenchmarkTest(),
             new CommonWorkloadBenchmarkTest(),
             new SecureStorageTest(),
+            // Database conformance. Assertion only, so no screenshots and no effect on the
+            // ordering-sensitive graphics baselines further down.
+            new DatabaseLifecycleTest(),
+            new DatabaseStatementTest(),
+            new DatabaseCursorTest(),
+            new DatabaseTransactionTest(),
+            new DatabaseEncryptionTest(),
+            new DatabaseStatementLegacyTest(),
+            new DatabaseCursorLegacyTest(),
             // Exercises com.codename1.camera.* end-to-end against the
             // JavaSE simulator's synthetic camera backend (no permission
             // prompts). Self-skips on iOS / Android / JS where the open

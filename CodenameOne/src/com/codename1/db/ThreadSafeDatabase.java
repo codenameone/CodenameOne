@@ -29,13 +29,26 @@ import com.codename1.util.RunnableWithResultSync;
 
 import java.io.IOException;
 
-/// Wraps all database calls in a single thread so they are all proxied thru that thread
+/// Confines a database and its cursors to a single thread.
+///
+/// A `Database` is not thread safe, and neither are the cursors it hands out. Wrapping one in this
+/// class routes every call through one worker thread, so several application threads can share a
+/// connection without coordinating.
+///
+/// ```java
+/// Database db = new ThreadSafeDatabase(Database.openOrCreate("shared.db"));
+/// ```
+///
+/// The cost is that every call is a thread handoff, so a tight loop over a large result set is
+/// meaningfully slower than using a connection per thread. Prefer one database per thread when the
+/// threads do not actually need to share state.
+///
+/// This class used to be deprecated, on the grounds that platform specific behaviour had defeated
+/// it. That behaviour has since been fixed: the iOS port no longer closes SQLite handles from the
+/// garbage collector thread, and it opens each connection in serialised mode rather than trying to
+/// configure the whole process.
 ///
 /// @author Shai Almog
-///
-/// #### Deprecated
-///
-/// platform specific nuances prevented this approach from working out, we improved the native iOS support for thread safety instead
 public class ThreadSafeDatabase extends Database {
     private final Database underlying;
     private final EasyThread et;
@@ -128,18 +141,23 @@ public class ThreadSafeDatabase extends Database {
 
     @Override
     public void close() {
-        // close should NEVER throw an exception...
-        et.run(new Runnable() {
+        // Synchronous on purpose. EasyThread.run(Runnable) is fire and forget, so this used to
+        // return while the database was still open, and a delete() on the next line would race it
+        // and fail with the file still in use.
+        et.run(new RunnableWithResultSync<Object>() {
             @Override
-            public void run() {
+            public Object run() {
                 try {
                     underlying.close();
                 } catch (IOException err) {
+                    // close() cannot report a failure through its signature, so log it rather
+                    // than dropping it silently.
                     Log.e(err);
                 }
-                et.kill();
+                return null;
             }
         });
+        et.kill();
     }
 
     @Override

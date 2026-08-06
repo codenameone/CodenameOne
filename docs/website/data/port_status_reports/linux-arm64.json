@@ -56,10 +56,10 @@
   "schema_version": 1,
   "suite_finished": false,
   "summary": {
-    "fail": 7,
-    "not-run": 3,
     "pass": 161,
-    "skip": 0
+    "fail": 7,
+    "skip": 0,
+    "not-run": 10
   },
   "tests": {
     "ARApiTest": {
@@ -269,6 +269,34 @@
     "DarkLightShowcaseThemeScreenshotTest": {
       "feature": "theme-palette-css",
       "status": "pass"
+    },
+    "DatabaseCursorLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "not-run"
+    },
+    "DatabaseCursorTest": {
+      "feature": "sqlite-database",
+      "status": "not-run"
+    },
+    "DatabaseEncryptionTest": {
+      "feature": "sqlite-transactions",
+      "status": "not-run"
+    },
+    "DatabaseLifecycleTest": {
+      "feature": "sqlite-database",
+      "status": "not-run"
+    },
+    "DatabaseStatementLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "not-run"
+    },
+    "DatabaseStatementTest": {
+      "feature": "sqlite-database",
+      "status": "not-run"
+    },
+    "DatabaseTransactionTest": {
+      "feature": "sqlite-transactions",
+      "status": "not-run"
     },
     "DesktopModeScreenshotTest": {
       "feature": "desktop-mode",

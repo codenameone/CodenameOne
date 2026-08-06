@@ -241,7 +241,7 @@ public class DatabaseImpl extends Database {
     }
 
     /** Cursor over a compiled statement; seeks by resetting and stepping again. */
-    class CursorImpl extends AbstractDBCursor {
+    static class CursorImpl extends AbstractDBCursor {
         private long stmt;
         DatabaseImpl owner;
 
