@@ -164,6 +164,61 @@ static NSString *cn1WearableStashInbox(NSString *path, NSData *wrapped) {
     return name;
 }
 
+/// Inbox entries this process has already handed to the runtime and is still waiting to have
+/// confirmed.
+///
+/// Delivery is asynchronous -- the payload sits in WearableConnection's queue until the EDT runs
+/// it -- and cn1WearableDrainInbox runs on every session activation, not only the first. A session
+/// that deactivates and reactivates while a delivery is still queued (the watch-switch flow does
+/// exactly this) would otherwise find the same entry on disk and replay it, so the app would
+/// receive one one-shot transfer twice. Entries leave this set when they are confirmed, which is
+/// also when the file goes.
+static NSMutableSet *cn1WearableInFlight(void) {
+    static NSMutableSet *inFlight = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        inFlight = [[NSMutableSet alloc] init];
+    });
+    return inFlight;
+}
+
+/// Serializes access to the in-flight set: deliveries are handed over from the WCSession delegate
+/// queue while confirmations arrive from the EDT.
+static NSLock *cn1WearableInFlightLock(void) {
+    static NSLock *lock = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        lock = [[NSLock alloc] init];
+    });
+    return lock;
+}
+
+/// Marks an entry as handed to the runtime. Returns NO when it already was.
+static BOOL cn1WearableMarkInFlight(NSString *name) {
+    if (name == nil) {
+        return NO;
+    }
+    NSLock *lock = cn1WearableInFlightLock();
+    [lock lock];
+    NSMutableSet *inFlight = cn1WearableInFlight();
+    BOOL fresh = ![inFlight containsObject:name];
+    if (fresh) {
+        [inFlight addObject:name];
+    }
+    [lock unlock];
+    return fresh;
+}
+
+static void cn1WearableClearInFlight(NSString *name) {
+    if (name == nil) {
+        return;
+    }
+    NSLock *lock = cn1WearableInFlightLock();
+    [lock lock];
+    [cn1WearableInFlight() removeObject:name];
+    [lock unlock];
+}
+
 /// Redelivers anything left in the inbox by a previous run, then clears it.
 ///
 /// Called on session activation: reaching that point means this process is alive and the CN1
@@ -179,6 +234,11 @@ static void cn1WearableDrainInbox(void) {
             // consumed them, so nothing writes these any more. An app updated across that change
             // can still find one parked here, and it was already delivered.
             [[NSFileManager defaultManager] removeItemAtPath:full error:NULL];
+            continue;
+        }
+        if (!cn1WearableMarkInFlight(name)) {
+            // Already handed to the runtime by this process and still awaiting confirmation.
+            // Replaying it now would deliver one one-shot transfer twice.
             continue;
         }
         NSData *blob = [NSData dataWithContentsOfFile:full];
@@ -201,6 +261,7 @@ static void cn1WearableDrainInbox(void) {
             }
         }
         // Unreadable or malformed: nothing to deliver and replaying it forever helps nobody.
+        cn1WearableClearInFlight(name);
         [[NSFileManager defaultManager] removeItemAtPath:full error:NULL];
     }
 }
@@ -219,6 +280,7 @@ void cn1_wearable_confirmInbox(const char *inboxToken) {
     }
     NSString *full = [cn1WearableInboxDir() stringByAppendingPathComponent:name];
     [[NSFileManager defaultManager] removeItemAtPath:full error:NULL];
+    cn1WearableClearInFlight(name);
 }
 
 /// Serializes the whole applicationContext read-modify-write.
@@ -964,6 +1026,8 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // and nothing redelivers it -- the sender's copy is gone too.
     NSData *wrapped = cn1WearableWrapFile(file.fileURL.lastPathComponent, body);
     NSString *stashed = cn1WearableStashInbox(path, wrapped);
+    // Marked before the hand-off, so a reactivation that drains the inbox mid-flight skips it.
+    cn1WearableMarkInFlight(stashed);
     // Retired from the EDT once the app actually has the payload, not here. Deleting or marking at
     // this point discards the only durable copy while the delivery is still merely queued, and a
     // process death in that window loses a one-shot transfer the sender was already told arrived.

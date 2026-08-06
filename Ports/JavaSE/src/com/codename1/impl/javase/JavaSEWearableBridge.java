@@ -656,6 +656,16 @@ class JavaSEWearableBridge implements WearableBridge {
                                         seenData.remove(delivered.getName());
                                     }
                                 }
+                            } : null, inbound ? new Runnable() {
+                                public void run() {
+                                    // Evicted from the pending queue before a listener existed. The
+                                    // file is still on disk, but this scan already recorded it as
+                                    // seen, so nothing would offer it again until a restart.
+                                    // Forgetting it puts it back in front of the next scan.
+                                    synchronized (seenData) {
+                                        seenData.remove(delivered.getName());
+                                    }
+                                }
                             } : null);
                     // The deletion that used to live here now runs inside the delivery callback
                     // above. A transfer is one-shot, so the delivered file goes -- leaving it would

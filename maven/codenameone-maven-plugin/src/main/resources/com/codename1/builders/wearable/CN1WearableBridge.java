@@ -2539,6 +2539,27 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
+    /**
+     * Gives up the in-memory claim on a transfer that was never delivered.
+     *
+     * <p>Called when the pending-delivery queue evicts a parked transfer to stay under its cap.
+     * Dropping the runnable alone left the claim standing, and the claim is precisely what stops
+     * the next scan offering the payload again -- so within a live process the file was gone for
+     * good, and the sender's retention window could expire before a restart cleared it.</p>
+     *
+     * <p>Only the in-memory claim is released. The durable one is written on delivery, so an
+     * undelivered transfer never had one.</p>
+     */
+    static void relinquishTransfer(Uri uri) {
+        if (uri == null) {
+            return;
+        }
+        String key = uri.getHost() + ":" + uri.getPath();
+        synchronized (transferClaims) {
+            transferClaims.remove(key);
+        }
+    }
+
     /** Preference store for durable transfer claims; see {@link #claimTransfer}. */
     private static final String CLAIM_PREFS = "cn1.wearable.claims";
 

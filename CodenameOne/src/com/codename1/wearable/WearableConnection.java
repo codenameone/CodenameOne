@@ -545,7 +545,7 @@ public final class WearableConnection {
     /// app has finished wiring itself up. Parking rather than dropping is what makes it safe to
     /// register listeners in `init()`.
     private static boolean deliver(Runnable delivery, List<?> listeners, List<Runnable> queue) {
-        return deliver(delivery, listeners, queue, false);
+        return deliver(delivery, listeners, queue, null, false);
     }
 
     /// Runs a delivery on the EDT, or parks it until a listener exists.
@@ -553,23 +553,42 @@ public final class WearableConnection {
     /// `oneShot` marks a delivery whose payload has no other copy in this process -- a file
     /// transfer. It changes only what the cap evicts.
     private static boolean deliver(Runnable delivery, List<?> listeners, List<Runnable> queue,
-            boolean oneShot) {
+            Runnable onDropped, boolean oneShot) {
+        List<Runnable> release = null;
+        boolean parked;
         // The listener check and the enqueue share the queue's monitor with drainPending, so a
         // delivery can never be parked after the drain that would have replayed it.
         synchronized (queue) {
-            if (listeners.isEmpty()) {
+            parked = listeners.isEmpty();
+            if (parked) {
                 while (queue.size() >= MAX_PENDING) {
-                    evictOne(queue);
+                    Runnable evicted = evictOne(queue);
+                    if (evicted != null) {
+                        if (release == null) {
+                            release = new ArrayList<Runnable>();
+                        }
+                        release.add(evicted);
+                    }
                 }
-                queue.add(oneShot ? new OneShot(delivery) : delivery);
-                return false;
+                queue.add(oneShot ? new OneShot(delivery, onDropped) : delivery);
             }
+        }
+        // Run outside the monitor: this calls back into the port, and holding the queue's lock
+        // across foreign code invites a deadlock with whatever the port synchronises on.
+        if (release != null) {
+            for (int i = 0; i < release.size(); i++) {
+                release.get(i).run();
+            }
+        }
+        if (parked) {
+            return false;
         }
         Display.getInstance().callSerially(delivery);
         return true;
     }
 
-    /// Makes room for one delivery, taking a replaceable one first.
+    /// Makes room for one delivery, taking a replaceable one first, and returns anything whose
+    /// port-side claim has to be released. Run OUTSIDE the queue's monitor.
     ///
     /// The cap used to take the oldest entry outright, and replicated updates share this queue with
     /// file transfers. A replicated update is safely replaceable -- a later publication of the same
@@ -581,22 +600,27 @@ public final class WearableConnection {
     /// merely drops the runnable: the confirmation callback is NOT invoked, so the port's durable
     /// copy -- the iOS inbox entry, the JavaSE file, the Android transfer claim -- is left
     /// unretired and the payload is redelivered on the next activation instead of being lost.
-    private static void evictOne(List<Runnable> queue) {
+    private static Runnable evictOne(List<Runnable> queue) {
         for (int i = 0; i < queue.size(); i++) {
             if (!(queue.get(i) instanceof OneShot)) {
                 queue.remove(i);
-                return;
+                return null;
             }
         }
-        queue.remove(0);
+        OneShot dropped = (OneShot) queue.remove(0);
+        return dropped.onDropped;
     }
 
     /// Marks a parked delivery as the only copy of its payload. See [#evictOne].
     private static final class OneShot implements Runnable {
         private final Runnable delivery;
+        /// Releases the port's in-process claim on this payload when the delivery is evicted, or
+        /// null when the port has nothing to release.
+        final Runnable onDropped;
 
-        OneShot(Runnable delivery) {
+        OneShot(Runnable delivery, Runnable onDropped) {
             this.delivery = delivery;
+            this.onDropped = onDropped;
         }
 
         @Override
@@ -645,6 +669,31 @@ public final class WearableConnection {
     /// `true` when a listener was registered and the delivery was dispatched.
     public static boolean deliverDataChangedTracked(final String path, final byte[] payload,
             final Runnable onDelivered) {
+        return deliverDataChangedTracked(path, payload, onDelivered, null);
+    }
+
+    /// As above, additionally releasing the port's in-process claim if the parked delivery is
+    /// evicted to make room under the queue cap.
+    ///
+    /// Dropping the runnable alone is not enough for a one-shot transfer. The ports suppress a
+    /// second callback for a payload they have already handed over -- Android holds an in-memory
+    /// transfer claim, JavaSE has recorded the file in its seen set -- so nothing would redeliver
+    /// it while this process stays alive, and Android's sender-side retention can expire in the
+    /// meantime. `onRelinquished` undoes exactly that bookkeeping, so the payload is offered again
+    /// on the next scan instead of waiting for a restart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path whose value changed
+    /// - `payload`: the encoded new value
+    /// - `onDelivered`: run on the EDT after the listeners, or null
+    /// - `onRelinquished`: run when the parked delivery is evicted undelivered, or null
+    ///
+    /// #### Returns
+    ///
+    /// `true` when a listener was registered and the delivery was dispatched.
+    public static boolean deliverDataChangedTracked(final String path, final byte[] payload,
+            final Runnable onDelivered, final Runnable onRelinquished) {
         return deliver(new Runnable() {
             @Override
             public void run() {
@@ -658,7 +707,7 @@ public final class WearableConnection {
                     onDelivered.run();
                 }
             }
-        }, dataListeners, pendingData, onDelivered != null);
+        }, dataListeners, pendingData, onRelinquished, onDelivered != null);
     }
 
     /// Replays what was queued for one listener type, once a listener of that type exists.

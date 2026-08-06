@@ -258,6 +258,14 @@ public class CN1WearableListenerService extends WearableListenerService {
                                     CN1WearableBridge.confirmTransferDelivered(
                                             svc, claimed, claimedSeq, true);
                                 }
+                            }, new Runnable() {
+                                public void run() {
+                                    // Evicted from the pending queue before any listener existed.
+                                    // The in-memory claim would otherwise keep suppressing this
+                                    // payload for the life of the process, so the next scan can
+                                    // offer it again.
+                                    CN1WearableBridge.relinquishTransfer(claimed);
+                                }
                             });
                 }
                 // An unreadable asset delivers nothing now; decodeTransfer has scheduled a re-read,
@@ -267,14 +275,18 @@ public class CN1WearableListenerService extends WearableListenerService {
             String appPath = CN1WearableBridge.decode(
                     path.substring(CN1WearableBridge.pathPrefix().length()));
             if (event.getType() == DataEvent.TYPE_DELETED
-                    && (ownEcho || CN1WearableBridge.isLocallyRemoved(path))) {
+                    && CN1WearableBridge.isLocallyRemoved(path)) {
                 // This device's own removeData coming back, for an ordinary value. The app made the
                 // call, so announcing it would break the peer-only contract in the other direction.
                 //
-                // ownEcho alone is not enough: removeData deletes wear://*/... , a WILDCARD, so one
-                // local removal produces a tombstone per replica and the peer-authority ones are
-                // not locally authored. isLocallyRemoved tracks what this device ASKED to remove,
-                // which is the question that actually matters here.
+                // isLocallyRemoved is the ONLY test here, deliberately. ownEcho asks who published
+                // the item, which for a tombstone is the wrong question twice over: a wildcard
+                // removal produces a tombstone per replica and the peer-authority ones are not
+                // locally authored (so ownEcho misses them), while a peer deleting a path THIS
+                // device published leaves our authority on the tombstone (so ownEcho claims it as
+                // ours and swallowed a genuine peer removal, with no later event guaranteed to
+                // correct it). What matters is what this device ASKED to remove, which is what
+                // isLocallyRemoved records.
                 //
                 // The recorded stamp is deliberately left as it is. It means "the newest thing this
                 // process delivered", and clearing it would reset the baseline to empty, so an older

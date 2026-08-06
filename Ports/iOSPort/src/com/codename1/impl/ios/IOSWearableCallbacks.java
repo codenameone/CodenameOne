@@ -98,6 +98,8 @@ final class IOSWearableCallbacks {
             WearableConnection.deliverDataChanged(path, payload);
             return;
         }
+        // No release callback: iOS keeps the inbox entry on disk until the EDT confirms, so an
+        // evicted delivery already replays on the next activation with nothing to undo.
         WearableConnection.deliverDataChangedTracked(path, payload, new Runnable() {
             public void run() {
                 IOSImplementation.nativeInstance.wearableConfirmInbox(token);
