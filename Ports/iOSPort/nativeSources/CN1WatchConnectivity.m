@@ -174,6 +174,12 @@ static void cn1WearableDrainInbox(void) {
                                                                                      error:NULL];
     for (NSString *name in names) {
         NSString *full = [dir stringByAppendingPathComponent:name];
+        if ([name hasSuffix:@".done"]) {
+            // Delivered by an earlier run and kept only until we got here. Reaching activation
+            // proves that run stayed alive past the delivery, so it can go now.
+            [[NSFileManager defaultManager] removeItemAtPath:full error:NULL];
+            continue;
+        }
         NSData *blob = [NSData dataWithContentsOfFile:full];
         if (blob != nil) {
             NSSet *classes = [NSSet setWithObjects:[NSDictionary class], [NSString class],
@@ -187,7 +193,13 @@ static void cn1WearableDrainInbox(void) {
                 cn1_wearable_deliverDataChanged(path.UTF8String, body.bytes, (int) body.length);
             }
         }
-        [[NSFileManager defaultManager] removeItemAtPath:full error:NULL];
+        // Marked, not deleted. Deleting here would drop the payload the moment the replay was
+        // QUEUED, so a process death before the EDT ran it would lose the file for good -- the
+        // exact failure this inbox exists to prevent. The marker is cleared on the next activation,
+        // which this run has to survive to reach.
+        [[NSFileManager defaultManager] moveItemAtPath:full
+                                                toPath:[full stringByAppendingString:@".done"]
+                                                 error:NULL];
     }
 }
 
@@ -909,11 +921,16 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     NSData *wrapped = cn1WearableWrapFile(file.fileURL.lastPathComponent, body);
     NSString *stashed = cn1WearableStashInbox(path, wrapped);
     cn1_wearable_deliverDataChanged(path.UTF8String, wrapped.bytes, (int) wrapped.length);
-    // Deliberately NOT deleted here. The stash is cleared on the next session activation, by which
-    // point this process has demonstrably survived long enough to run the delivery. Replaying a
-    // file the app did receive is a duplicate; dropping one it did not is a loss, and a duplicate
-    // is the recoverable side of that trade.
-    (void) stashed;
+    // Marked delivered rather than deleted or left alone. Leaving it meant every activation
+    // replayed a transfer the app already had; deleting it here would discard the payload while the
+    // delivery was still only queued. The ".done" marker records "this run got as far as
+    // delivering", and the next activation -- which the run must survive to reach -- clears it.
+    if (stashed != nil) {
+        NSString *full = [cn1WearableInboxDir() stringByAppendingPathComponent:stashed];
+        [[NSFileManager defaultManager] moveItemAtPath:full
+                                                toPath:[full stringByAppendingString:@".done"]
+                                                 error:NULL];
+    }
 }
 
 @end

@@ -207,8 +207,21 @@ public class CN1WearableBridge implements WearableBridge {
         if (sourceNodeId.equals(localNodeId(context))) {
             return true;
         }
+        // The capability set is consulted BEFORE this rejection, not after it. With several paired
+        // watches, a durable item from a disconnected watch A can arrive while watch B is online:
+        // the snapshot is then populated and simply does not contain A, so treating "populated but
+        // absent" as evidence dropped an event from a genuinely paired device. Connectivity says
+        // who is reachable now; the capability set says who is paired and running this app, and for
+        // a stored item that is the question.
+        for (String id : capabilityNodeIds(context)) {
+            rememberNode(id);
+        }
+        if (recentlySeen(sourceNodeId)) {
+            return true;
+        }
         if (!connected.isEmpty()) {
-            // A populated snapshot that does not contain the sender is real evidence against it.
+            // Reachable peers exist, the sender is not among them, and it advertises no capability
+            // either. That is real evidence against it.
             return false;
         }
         // The query established nothing at all: the sender may have disconnected while we were
@@ -234,21 +247,7 @@ public class CN1WearableBridge implements WearableBridge {
                 return true;
             }
         }
-        // Last resort: the CAPABILITY set rather than the connected set.
-        //
-        // A DataItem is durable, so it can wake this process long after its publisher went away --
-        // a watch that published and then powered off is the ordinary case. getConnectedNodes()
-        // then answers empty on every retry, by definition, and the event was dropped even though
-        // it came from a paired app. Connectivity is simply the wrong question for a stored item.
-        //
-        // FILTER_ALL returns nodes that advertise our capability whether or not they are reachable
-        // now, which is exactly "a device that has this app installed and paired". That keeps the
-        // security property intact -- a forged intent from another app on this device still names
-        // no node that advertises cn1_wearable -- while no longer requiring the sender to still be
-        // online at the moment we look.
-        for (String id : capabilityNodeIds(context)) {
-            rememberNode(id);
-        }
+        // The capability set was already consulted above, before the populated-snapshot rejection.
         return recentlySeen(sourceNodeId);
     }
 
@@ -376,6 +375,9 @@ public class CN1WearableBridge implements WearableBridge {
                 }
             };
     private static volatile String[] pathsCache;
+    /// Bumped whenever the path snapshot changes, so a blocking enumeration can tell whether a
+    /// delivery maintained it while the query was in flight. Guarded by {@link #valueCache}.
+    private static int pathsGeneration;
 
     /**
      * Records what a delivery or a successful read saw, so a later EDT caller can be answered
@@ -417,11 +419,13 @@ public class CN1WearableBridge implements WearableBridge {
                     }
                 }
                 pathsCache = out.toArray(new String[out.size()]);
+                pathsGeneration++;
             } else if (payload != null && !present) {
                 String[] out = new String[known.length + 1];
                 System.arraycopy(known, 0, out, 0, known.length);
                 out[known.length] = path;
                 pathsCache = out;
+                pathsGeneration++;
             }
         }
     }
@@ -1273,6 +1277,10 @@ public class CN1WearableBridge implements WearableBridge {
             String[] known = pathsCache;
             return known == null ? new String[0] : known.clone();
         }
+        int startedGeneration;
+        synchronized (valueCache) {
+            startedGeneration = pathsGeneration;
+        }
         try {
             DataItemBuffer items = Tasks.await(dataClient.getDataItems(),
                     TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -1296,8 +1304,16 @@ public class CN1WearableBridge implements WearableBridge {
                     }
                 }
                 String[] enumerated = out.toArray(new String[out.size()]);
-                // Remembered so a later EDT caller has a real answer instead of a five-second wait.
-                pathsCache = enumerated;
+                // Only if no delivery maintained the snapshot while this enumeration was blocked.
+                // rememberValue adds and removes paths as callbacks arrive, and those callbacks
+                // have already fired and may not repeat -- so an older enumeration landing on top
+                // would leave every EDT getDataPaths() answering from it indefinitely.
+                synchronized (valueCache) {
+                    if (pathsGeneration == startedGeneration) {
+                        pathsCache = enumerated;
+                        pathsGeneration++;
+                    }
+                }
                 return enumerated.clone();
             } finally {
                 items.release();
@@ -1522,9 +1538,18 @@ public class CN1WearableBridge implements WearableBridge {
                             // Recheck authorship. The listener suppressed this as our own echo and
                             // only an unreadable Asset sent it down the retry path -- arriving here
                             // does not make our own transfer someone else's.
-                            if (t.payload != null && !isLocallyAuthored(context, uri.getHost())) {
+                            if (t.payload != null && isLocallyAuthored(context, uri.getHost())) {
+                                // Decoded, and it is ours. Nothing to deliver -- but the chain must
+                                // STOP here rather than fall through and reschedule: it would
+                                // otherwise reopen and re-read our own file every few minutes for
+                                // the whole 24-hour retention window, occupying the shared transfer
+                                // timer and re-reading a potentially large asset each time.
+                                forgetRetryStart(uri);
+                                return;
+                            }
+                            if (t.payload != null) {
                                 long tseq = sequenceOf(valueOrTransferMap(item));
-                                if (claimTransfer(uri, tseq)) {
+                                if (claimTransfer(context, uri, tseq)) {
                                     // Confirmed from INSIDE the delivery, not from its dispatch.
                                     // deliverDataChangedTracked returning true only means the
                                     // runnable reached the EDT; a process death before it ran would
@@ -1535,7 +1560,7 @@ public class CN1WearableBridge implements WearableBridge {
                                     WearableConnection.deliverDataChangedTracked(
                                             t.logicalPath, t.payload, new Runnable() {
                                                 public void run() {
-                                                    confirmTransferDelivered(claimed, claimedSeq, true);
+                                                    confirmTransferDelivered(context, claimed, claimedSeq, true);
                                                 }
                                             });
                                 }
@@ -2187,8 +2212,20 @@ public class CN1WearableBridge implements WearableBridge {
                     }
                 } catch (Throwable stillUnavailable) {
                     if (attempt >= WINNER_RETRIES) {
-                        // Give up rather than deliver something unverified. The path stays unstamped,
-                        // so the next event for it resolves from scratch.
+                        // A DELETION cannot simply be abandoned. The deleted item produces no
+                        // further callback once connectivity returns, so giving up here left the
+                        // dead value's delivery stamp and cached payload in place with nothing left
+                        // to correct them -- the listener showing a value that no longer exists,
+                        // permanently. An outage that outlasts four attempts is exactly the case
+                        // this branch exists for, so it keeps trying while the retention window
+                        // allows, on the same capped backoff the transfer retries use.
+                        if (wasAfterDeletion(path) && winnerElapsed(path) <= TRANSFER_RETENTION_MILLIS) {
+                            scheduleWinnerResolution(context, path, attempt + 1);
+                            return;
+                        }
+                        // A non-deletion resolution can stop: the path keeps whatever it already
+                        // had, stays unstamped where it was, and the next event resolves afresh.
+                        forgetWinnerStart(path);
                         forgetPendingWinner(path);
                         return;
                     }
@@ -2196,6 +2233,27 @@ public class CN1WearableBridge implements WearableBridge {
                 }
             }
         }, WINNER_RETRY_MILLIS * attempt);
+    }
+
+    private static final Map<String, Long> winnerStarts = new HashMap<String, Long>();
+
+    /// How long this path's deferred resolution has been trying, starting the clock on first ask.
+    private static long winnerElapsed(String path) {
+        long now = System.currentTimeMillis();
+        synchronized (pendingWinnerPaths) {
+            Long started = winnerStarts.get(path);
+            if (started == null) {
+                winnerStarts.put(path, Long.valueOf(now));
+                return 0L;
+            }
+            return now - started.longValue();
+        }
+    }
+
+    private static void forgetWinnerStart(String path) {
+        synchronized (pendingWinnerPaths) {
+            winnerStarts.remove(path);
+        }
     }
 
     private static void forgetPendingWinner(String path) {
@@ -2224,6 +2282,7 @@ public class CN1WearableBridge implements WearableBridge {
             boolean missed = !actedOnDeletion && deletionPaths.contains(path);
             pendingWinnerPaths.remove(path);
             deletionPaths.remove(path);
+            winnerStarts.remove(path);
             return missed;
         }
     }
@@ -2317,7 +2376,7 @@ public class CN1WearableBridge implements WearableBridge {
      * @param sequence the transfer's publication stamp
      * @return true when this is the first delivery of that transfer
      */
-    static boolean claimTransfer(Uri uri, long sequence) {
+    static boolean claimTransfer(Context context, Uri uri, long sequence) {
         if (uri == null) {
             return true;
         }
@@ -2334,7 +2393,7 @@ public class CN1WearableBridge implements WearableBridge {
                 // re-delivers it on the next connection -- so a receiver that restarted in between
                 // would hand the app the same one-shot file again and repeat whatever the app does
                 // with it. The claim has to outlive the process for the contract to mean anything.
-                previous = persistedClaim(key);
+                previous = persistedClaim(context, key);
             }
             if (previous != null) {
                 // seq|node in memory, seq|node|receivedAt on disk -- so the node is delimited on
@@ -2376,7 +2435,8 @@ public class CN1WearableBridge implements WearableBridge {
      * queue before dying -- deliberately the direction to err in, because a duplicate is something
      * an app can recognise and a lost one-shot file is not.</p>
      */
-    static void confirmTransferDelivered(Uri uri, long sequence, boolean reachedListener) {
+    static void confirmTransferDelivered(Context context, Uri uri, long sequence,
+            boolean reachedListener) {
         if (uri == null || !reachedListener) {
             return;
         }
@@ -2389,7 +2449,8 @@ public class CN1WearableBridge implements WearableBridge {
             // and since every transfer gets a unique sequence-suffixed URI the store would grow
             // without bound. Pruning needs a clock that measures elapsed time; the sequence is not
             // one.
-            persistClaim(key, sequence + "|" + (uri.getHost() == null ? "" : uri.getHost())
+            persistClaim(context, key, sequence + "|"
+                    + (uri.getHost() == null ? "" : uri.getHost())
                     + "|" + System.currentTimeMillis());
         }
     }
@@ -2403,14 +2464,21 @@ public class CN1WearableBridge implements WearableBridge {
      * <p>Read only on an in-memory miss, so the common path stays a map lookup and the disk read
      * happens once per key per process.</p>
      */
-    private static String persistedClaim(String key) {
-        CN1WearableBridge b = current;
-        if (b == null) {
+    private static String persistedClaim(Context context, String key) {
+        // Takes a Context rather than reading `current`. A redelivered transfer arrives in a COLD
+        // service process where no bridge exists yet -- ensureAppRunning only starts the activity,
+        // asynchronously -- so keying off `current` returned null and the durable claim was invisible
+        // exactly when it matters, handing the app a one-shot file it already received.
+        Context c = context;
+        if (c == null) {
+            CN1WearableBridge b = current;
+            c = b == null ? null : b.context;
+        }
+        if (c == null) {
             return null;
         }
         try {
-            return b.context.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE)
-                    .getString(key, null);
+            return c.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE).getString(key, null);
         } catch (Throwable unavailable) {
             return null;
         }
@@ -2423,14 +2491,18 @@ public class CN1WearableBridge implements WearableBridge {
      * gone there is nothing left to re-deliver, so the claim has no one to stop and keeping it
      * would grow this store without limit.</p>
      */
-    private static void persistClaim(String key, String stamp) {
-        CN1WearableBridge b = current;
-        if (b == null) {
+    private static void persistClaim(Context context, String key, String stamp) {
+        Context c = context;
+        if (c == null) {
+            CN1WearableBridge b = current;
+            c = b == null ? null : b.context;
+        }
+        if (c == null) {
             return;
         }
         try {
             android.content.SharedPreferences prefs =
-                    b.context.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE);
+                    c.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE);
             android.content.SharedPreferences.Editor edit = prefs.edit();
             edit.putString(key, stamp);
             long cutoff = System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;

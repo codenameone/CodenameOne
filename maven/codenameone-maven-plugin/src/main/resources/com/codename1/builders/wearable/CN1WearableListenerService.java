@@ -189,7 +189,7 @@ public class CN1WearableListenerService extends WearableListenerService {
                 long transferSeq = CN1WearableBridge.sequenceOf(
                         CN1WearableBridge.valueOrTransferMap(event.getDataItem()));
                 if (transfer.payload != null && !ownEcho
-                        && CN1WearableBridge.claimTransfer(uri, transferSeq)) {
+                        && CN1WearableBridge.claimTransfer(this, uri, transferSeq)) {
                     // On the path the sender passed to transferFile, not the filename-suffixed
                     // storage path this item happens to live at: a listener routes on what it asked
                     // for. The decoded payload carries the same path internally.
@@ -208,11 +208,12 @@ public class CN1WearableListenerService extends WearableListenerService {
                     // that would have replaced it.
                     final android.net.Uri claimed = uri;
                     final long claimedSeq = transferSeq;
+                    final android.content.Context svc = this;
                     WearableConnection.deliverDataChangedTracked(
                             transfer.logicalPath, transfer.payload, new Runnable() {
                                 public void run() {
                                     CN1WearableBridge.confirmTransferDelivered(
-                                            claimed, claimedSeq, true);
+                                            svc, claimed, claimedSeq, true);
                                 }
                             });
                 }

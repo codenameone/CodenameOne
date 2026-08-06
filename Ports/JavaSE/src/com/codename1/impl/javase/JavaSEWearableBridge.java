@@ -62,6 +62,8 @@ class JavaSEWearableBridge implements WearableBridge {
     private static final int FRAME_MESSAGE = 1;
     private static final int FRAME_REPLY = 2;
     private static final int FRAME_HELLO = 3;
+    /// How long a freshly accepted socket has to identify itself before it is dropped.
+    private static final int HELLO_TIMEOUT_MILLIS = 5000;
     /// Ceiling on a single frame. Generous for any real payload, small enough that a corrupt length
     /// cannot exhaust the heap.
     private static final int MAX_FRAME_BYTES = 64 * 1024 * 1024;
@@ -231,6 +233,12 @@ class JavaSEWearableBridge implements WearableBridge {
             // single atomic step that can only ever touch this writer's own bytes.
             long stamp = nextStamp(f);
             tmp.setLastModified(stamp);
+            // Written BEFORE the value is published, not after. The watcher notices a path by the
+            // value file's mtime, so a scan landing between the move and a later sidecar write read
+            // the PREVIOUS publisher's sidecar, classified the new value as locally authored, and
+            // recorded its mtime without delivering it -- and updating the sidecar afterwards
+            // triggers no rescan, so that value was simply never announced.
+            recordAuthor(f);
             try {
                 // An atomic replace, not delete-then-rename. The old fallback deleted whatever was
                 // published before retrying, so a peer publishing the same path in that gap had its
@@ -258,8 +266,6 @@ class JavaSEWearableBridge implements WearableBridge {
             if (recorded <= 0) {
                 recorded = stamp;
             }
-            // Alongside the stamp, so a filesystem that rounds mtimes cannot erase who wrote this.
-            recordAuthor(f);
             // Our own write must not come back to us as a peer change.
             synchronized (seenData) {
                 seenData.put(f.getName(), Long.valueOf(recorded));
@@ -438,7 +444,10 @@ class JavaSEWearableBridge implements WearableBridge {
 
     private void adoptPeer(Socket s) throws IOException {
         s.setTcpNoDelay(true);
-        peer = s;
+        // A read deadline, because a service that merely ACCEPTS on our derived port and then says
+        // nothing would otherwise leave the reader blocked in readByte() forever -- with the
+        // simulator reporting itself reachable the whole time.
+        s.setSoTimeout(HELLO_TIMEOUT_MILLIS);
         peerOut = new DataOutputStream(s.getOutputStream());
         // The hello carries the project identity. The port is derived from a hash of the shared
         // directory truncated to 10,000 values, so two unrelated projects whose paths collide -- or
@@ -446,7 +455,9 @@ class JavaSEWearableBridge implements WearableBridge {
         // report reachable, and exchange live messages and replies between unrelated apps. A
         // successful connection to a small shared port range proves nothing about who is on it.
         writeFrame(peerOut, FRAME_HELLO, projectIdentity(), new byte[0], 0);
-        WearableConnection.notifyStateChanged();
+        // `peer` is assigned by the reader once the peer's own hello is verified, NOT here.
+        // Publishing reachability on a bare accepted socket meant an unrelated local service
+        // holding the port made isReachable() true and live messages went into it.
     }
 
     private void readLoop(Socket s) {
@@ -477,6 +488,11 @@ class JavaSEWearableBridge implements WearableBridge {
                                     + "different project (" + path + ")");
                         }
                         helloVerified = true;
+                        // Only now is this a peer. Reachability and the state change follow the
+                        // identity, not the connection.
+                        peer = s;
+                        s.setSoTimeout(0);
+                        WearableConnection.notifyStateChanged();
                         break;
                     case FRAME_MESSAGE:
                         if (!helloVerified) {
