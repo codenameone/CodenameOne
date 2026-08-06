@@ -552,24 +552,24 @@ class WatchNativeBuilder {
         // the phone's plist does not cover it, so authorization fails or watchOS terminates the app
         // when the API is exercised, on a project that configured the hint correctly. Collected the
         // same way the phone builder collects them, from every ios.NS*UsageDescription argument.
+        // ONE map, from both sources, resolved before anything is written. An explicit argument
+        // wins over the same key in ios.plistInject, so nothing is emitted twice, and the checks
+        // further down read the same map rather than re-deriving a narrower view of it -- which is
+        // how the HealthKit validation came to reject a purpose string the plist already carried.
+        java.util.Map<String, String> purposeStrings = new java.util.LinkedHashMap<String, String>();
+        for (String injectedKey : injectedPlistKeys(request)) {
+            if (injectedKey.startsWith("NS") && injectedKey.endsWith("UsageDescription")) {
+                String description = injectedPlistString(request, injectedKey);
+                if (description != null && description.length() > 0) {
+                    purposeStrings.put(injectedKey, description);
+                }
+            }
+        }
         for (String arg : request.getArgs()) {
             if (arg.startsWith("ios.NS") && arg.endsWith("UsageDescription")) {
                 String description = trimToNull(request.getArg(arg, null));
                 if (description != null) {
-                    plistString(sb, arg.substring(arg.lastIndexOf('.') + 1), description);
-                }
-            }
-        }
-        // Purpose strings supplied through ios.plistInject as well. That fragment is a supported
-        // way to set plist keys and the phone honours it, but it is a raw blob rather than
-        // arguments, so a loop over ios.NS* alone never sees them -- and the watch bundle is
-        // terminated when its lifecycle exercises the API the project did declare.
-        for (String injectedKey : injectedPlistKeys(request)) {
-            if (injectedKey.startsWith("NS") && injectedKey.endsWith("UsageDescription")
-                    && trimToNull(request.getArg("ios." + injectedKey, null)) == null) {
-                String description = injectedPlistString(request, injectedKey);
-                if (description != null && description.length() > 0) {
-                    plistString(sb, injectedKey, description);
+                    purposeStrings.put(arg.substring(arg.lastIndexOf('.') + 1), description);
                 }
             }
         }
@@ -580,16 +580,23 @@ class WatchNativeBuilder {
         // with no purpose string while the project is configured correctly.
         String locationFallback = trimToNull(request.getArg("ios.locationUsageDescription", null));
         if (locationFallback != null
-                && trimToNull(request.getArg("ios.NSLocationWhenInUseUsageDescription", null))
-                        == null) {
-            plistString(sb, "NSLocationWhenInUseUsageDescription", locationFallback);
+                && !purposeStrings.containsKey("NSLocationWhenInUseUsageDescription")) {
+            // Only when nothing else supplied that key -- from an argument OR from the injected
+            // fragment. Checking arguments alone let the fallback be emitted a second time under a
+            // key the injection had already set, which both duplicates the entry and lets a default
+            // overwrite the developer's own disclosure.
+            purposeStrings.put("NSLocationWhenInUseUsageDescription", locationFallback);
+        }
+        for (java.util.Map.Entry<String, String> purpose : purposeStrings.entrySet()) {
+            plistString(sb, purpose.getKey(), purpose.getValue());
         }
         // Read again, not re-emitted: the HealthKit pair is already in the plist from the loop
         // above, but the entitlement checks below need to know whether they were declared.
-        String healthShare = trimToNull(request.getArg(
-                "ios.NSHealthShareUsageDescription", null));
-        String healthUpdate = trimToNull(request.getArg(
-                "ios.NSHealthUpdateUsageDescription", null));
+        // From the resolved map, so a purpose string supplied through ios.plistInject counts. Read
+        // from arguments alone, this validation aborted the build over a key the plist it had just
+        // written did contain.
+        String healthShare = purposeStrings.get("NSHealthShareUsageDescription");
+        String healthUpdate = purposeStrings.get("NSHealthUpdateUsageDescription");
         // HKWorkoutSession keeps the app running while a workout records;
         // without this background mode watchOS suspends it mid-run.
         if ("true".equalsIgnoreCase(workoutProcessingHint)) {

@@ -406,6 +406,46 @@ class WatchNativeBuilderTest {
                 "only privacy keys are mirrored, not the whole fragment: " + plist);
     }
 
+    /// An injected NSLocation key must suppress the ios.locationUsageDescription fallback, or the
+    /// plist carries the key twice and a default overwrites the developer's own disclosure.
+    @Test
+    void injectedLocationKeySuppressesTheFallback(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.plistInject",
+                "<key>NSLocationWhenInUseUsageDescription</key><string>injected text</string>");
+        req.putArgument("ios.locationUsageDescription", "fallback text");
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("injected text"), plist);
+        assertFalse(plist.contains("fallback text"),
+                "the injected key wins over the fallback: " + plist);
+        assertEquals(1, countOccurrences(plist, "<key>NSLocationWhenInUseUsageDescription</key>"),
+                "the key must appear exactly once: " + plist);
+    }
+
+    /// A HealthKit purpose string supplied through the injection satisfies the validation that
+    /// otherwise aborts the build -- it used to read arguments only and reject its own plist.
+    @Test
+    void injectedHealthDescriptionSatisfiesValidation(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("watchNative.health", "true");
+        req.putArgument("ios.plistInject",
+                "<key>NSHealthShareUsageDescription</key><string>Reads heart rate</string>"
+                        + "<key>NSHealthUpdateUsageDescription</key><string>Saves workouts</string>");
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("Reads heart rate"),
+                "the injected HealthKit string must reach the plist: " + plist);
+    }
+
+    private static int countOccurrences(String haystack, String needle) {
+        int n = 0;
+        for (int i = haystack.indexOf(needle); i >= 0; i = haystack.indexOf(needle, i + 1)) {
+            n++;
+        }
+        return n;
+    }
+
     private static WatchNativeBuilder parse(BuildRequest req) {
         WatchNativeBuilder b = new WatchNativeBuilder(new IPhoneBuilder());
         b.parseHints(req);
