@@ -353,10 +353,18 @@ class JavaSEWearableBridge implements WearableBridge {
 
     public void removeData(String path) {
         File f = dataFile(path);
-        if (f.delete()) {
-            synchronized (seenData) {
-                seenData.remove(f.getName());
-            }
+        if (f.isFile() && !f.delete()) {
+            // The value is still there. Publishing the tombstone anyway would leave BOTH durable,
+            // and a peer reading them in whatever order listFiles() gives could settle in the
+            // removed state while getData still returns the value -- and once the tombstone
+            // expires, the value has long been marked seen and is never re-delivered. A delete
+            // that failed is not a removal, so nothing is recorded as one.
+            com.codename1.io.Log.p("Wearable simulator: could not delete " + path
+                    + "; the removal was not published");
+            return;
+        }
+        synchronized (seenData) {
+            seenData.remove(f.getName());
         }
         // A durable tombstone, because deleting the file says nothing to a peer that is not
         // running. That peer starts with an empty seenData, sees only a path that is not there, and

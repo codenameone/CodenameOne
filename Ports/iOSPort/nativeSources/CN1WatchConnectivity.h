@@ -91,6 +91,9 @@
 /// Drops a path's received marker so the next whole-context update delivers it again.
 - (void)forgetReceivedPath:(NSString *)path;
 
+/// Re-runs the received-context delivery once, after any number of paths have been forgotten.
+- (void)scheduleReceivedContextReplay;
+
 @end
 
 #endif // CN1_USE_WATCHCONNECTIVITY

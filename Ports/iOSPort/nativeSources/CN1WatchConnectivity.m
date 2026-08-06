@@ -321,6 +321,13 @@ void cn1_wearable_forgetReceived(const char *path) {
     @synchronized (shared) {
         [shared forgetReceivedPath:p];
     }
+    // Forgetting alone recovers nothing: it makes the path eligible again, and then waits for a
+    // context update that the peer may never send -- it has already published this value. The
+    // context currently held IS the value, so re-run the delivery over it.
+    //
+    // Coalesced onto one pass: core hands paths back one at a time, and re-processing the whole
+    // context per path would deliver every other path in it that many times over.
+    [shared scheduleReceivedContextReplay];
 }
 
 /// Retires a delivered inbox entry.
@@ -672,6 +679,8 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     BOOL _tombstoneSweepScheduled;
     /// Guards the post-removal deadline sweep to one block, however many paths are removed.
     BOOL _tombstoneDeadlineScheduled;
+    /// Guards the received-context replay to one pass, however many paths are forgotten.
+    BOOL _receivedReplayScheduled;
     int _nextInboundToken;
     /// Keys the peer's last context carried, so a key that vanishes is reported as a removal.
     /// What the peer's context last said for each path: the authoritative stamp we delivered, or
@@ -907,6 +916,30 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
 /// Drops a path's received marker; see cn1_wearable_forgetReceived.
 - (void)forgetReceivedPath:(NSString *)path {
     [_lastReceived removeObjectForKey:path];
+}
+
+/// Re-runs the received-context delivery once, after any number of paths have been forgotten.
+- (void)scheduleReceivedContextReplay {
+    @synchronized (self) {
+        if (_receivedReplayScheduled) {
+            return;
+        }
+        _receivedReplayScheduled = YES;
+    }
+    CN1WatchConnectivity *keepAlive = [self retain];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        @synchronized (keepAlive) {
+            keepAlive->_receivedReplayScheduled = NO;
+        }
+        WCSession *s = [keepAlive session];
+        NSDictionary *ctx = s == nil ? nil : [s receivedApplicationContext];
+        if (ctx != nil && ctx.count > 0) {
+            // The ordinary delivery path, so every rule about winners, tombstones and
+            // acknowledgement applies exactly as it does for a context that just arrived.
+            [keepAlive session:s didReceiveApplicationContext:ctx];
+        }
+        [keepAlive release];
+    });
 }
 
 /// Prunes without publishing anything else, for the scheduled sweep, on activation, and whenever
