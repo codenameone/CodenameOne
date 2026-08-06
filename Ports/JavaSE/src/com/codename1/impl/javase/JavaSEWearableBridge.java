@@ -275,9 +275,11 @@ class JavaSEWearableBridge implements WearableBridge {
             if (recorded <= 0) {
                 recorded = stamp;
             }
-            // Our own write must not come back to us as a peer change.
+            // Our own write must not come back to us as a peer change. Stored in the same
+            // encoding the scan compares against, and always as locally authored -- this IS our
+            // publication.
             synchronized (seenData) {
-                seenData.put(f.getName(), Long.valueOf(recorded));
+                seenData.put(f.getName(), Long.valueOf(seenKey(recorded, true)));
             }
         } catch (IOException err) {
             com.codename1.io.Log.p("Wearable simulator: failed to publish " + path + ": " + err);
@@ -652,11 +654,18 @@ class JavaSEWearableBridge implements WearableBridge {
                     previous = seenData.get(f.getName());
                 }
                 long stamp = f.lastModified();
-                if (previous != null && previous.longValue() == stamp) {
+                // The AUTHOR is part of what makes a file "already seen", not the timestamp alone.
+                // On a filesystem with coarse mtime granularity a local publication and a peer
+                // replacement can land in the same tick: the local write has already stored that
+                // timestamp, so the peer's file matched and was skipped without being looked at,
+                // and nothing delivered it until some later write happened to move the stamp. A
+                // cheap header peek separates them -- the two sides never write the same author.
+                long seenKey = seenKey(stamp, peekAuthoredLocally(f, stamp));
+                if (previous != null && previous.longValue() == seenKey) {
                     continue;
                 }
                 synchronized (seenData) {
-                    seenData.put(f.getName(), Long.valueOf(stamp));
+                    seenData.put(f.getName(), Long.valueOf(seenKey));
                 }
                 if (isTransfer(f.getName()) && !isInboundTransfer(f.getName())) {
                     // Our own outbound transfer, seen again because primeSeenData() deliberately
@@ -819,6 +828,44 @@ class JavaSEWearableBridge implements WearableBridge {
      * build), because a wrong-but-present answer is worse than the previous behaviour only if it
      * disagrees, and the header is published by the same rename as the bytes it describes.</p>
      */
+    /// Folds the author into the seen-marker, so two files sharing a coarse timestamp but written
+    /// by different sides are never mistaken for one another.
+    private static long seenKey(long stamp, boolean authoredLocally) {
+        return stamp * 2 + (authoredLocally ? 1 : 0);
+    }
+
+    /// Reads just the frame header to decide authorship, so a 500ms scan does not pull whole
+    /// transfer payloads into memory. The delivery path re-derives this from the full snapshot it
+    /// actually hands over, so a file replaced between the two is still caught there.
+    private boolean peekAuthoredLocally(File f, long stamp) {
+        byte[] head = new byte[VALUE_MAGIC.length + 1];
+        FileInputStream in = null;
+        try {
+            in = new FileInputStream(f);
+            int off = 0;
+            while (off < head.length) {
+                int r = in.read(head, off, head.length - off);
+                if (r < 0) {
+                    break;
+                }
+                off += r;
+            }
+            if (off < head.length) {
+                return authoredLocally(stamp);
+            }
+        } catch (IOException unreadable) {
+            return authoredLocally(stamp);
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                }
+            }
+        }
+        return authoredLocallyFor(head, stamp);
+    }
+
     private boolean authoredLocallyFor(byte[] snapshot, long stamp) {
         Boolean recorded = authorOf(snapshot);
         if (recorded != null) {

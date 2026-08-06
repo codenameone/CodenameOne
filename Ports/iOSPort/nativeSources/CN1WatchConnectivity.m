@@ -439,6 +439,53 @@ static BOOL cn1WearableLocalWins(CN1WearableEntry mine, CN1WearableEntry theirs)
 static const int64_t kCN1TombstoneTTLMillis = 24 * 60 * 60 * 1000LL;
 static const NSUInteger kCN1MaxTombstones = 256;
 
+/// When each tombstone was actually created, in local wall-clock milliseconds.
+///
+/// Kept OUTSIDE the application context deliberately. The context value is the ordering stamp, and
+/// that is a Lamport sequence: cn1WearableObserveSequence drags it ahead of local time whenever a
+/// peer's clock is ahead, so comparing it against `now` kept a tombstone for the clock offset PLUS
+/// the advertised day. Changing the context value's shape would also change the wire format the
+/// peer parses, so the age lives here instead, in this device's own defaults.
+static NSString *const kCN1TombBirthKey = @"cn1.wearable.tombstoneBirth";
+
+static int64_t cn1WearableNowMillis(void) {
+    return (int64_t) ([[NSDate date] timeIntervalSince1970] * 1000.0);
+}
+
+static void cn1WearableNoteTombstoneBirth(NSString *path) {
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    NSMutableDictionary *births =
+            [[d dictionaryForKey:kCN1TombBirthKey] mutableCopy] ?: [NSMutableDictionary dictionary];
+    births[path] = @(cn1WearableNowMillis());
+    [d setObject:births forKey:kCN1TombBirthKey];
+    [births release];
+}
+
+static void cn1WearableForgetTombstoneBirth(NSString *path) {
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    NSDictionary *stored = [d dictionaryForKey:kCN1TombBirthKey];
+    if (stored[path] == nil) {
+        return;
+    }
+    NSMutableDictionary *births = [stored mutableCopy];
+    [births removeObjectForKey:path];
+    [d setObject:births forKey:kCN1TombBirthKey];
+    [births release];
+}
+
+/// The tombstone's age in millis. An entry with no recorded birth -- written by an earlier build,
+/// or restored -- starts its clock now, which delays pruning by at most one TTL and never shortens
+/// it, so a removal cannot undo itself because of missing bookkeeping.
+static int64_t cn1WearableTombstoneAge(NSString *path) {
+    NSDictionary *births = [[NSUserDefaults standardUserDefaults] dictionaryForKey:kCN1TombBirthKey];
+    id born = births[path];
+    if (![born isKindOfClass:[NSNumber class]]) {
+        cn1WearableNoteTombstoneBirth(path);
+        return 0;
+    }
+    return cn1WearableNowMillis() - [born longLongValue];
+}
+
 /// Drops tombstones that have outlived their purpose, oldest first.
 ///
 /// `peerCtx` is what the peer last told us it holds. A tombstone may only go once the peer has
@@ -452,7 +499,6 @@ static void cn1WearablePruneTombstones(NSMutableDictionary *ctx, NSDictionary *p
             [tombKeys addObject:key];
         }
     }
-    int64_t now = (int64_t) ([[NSDate date] timeIntervalSince1970] * 1000.0);
     for (NSString *key in tombKeys) {
         id stamp = ctx[key];
         if (![stamp isKindOfClass:[NSNumber class]]) {
@@ -460,17 +506,19 @@ static void cn1WearablePruneTombstones(NSMutableDictionary *ctx, NSDictionary *p
             [ctx removeObjectForKey:key];
             continue;
         }
-        if (now - [stamp longLongValue] <= kCN1TombstoneTTLMillis) {
+        NSString *path = [key substringFromIndex:kTombPrefix.length];
+        // Age from the recorded birth, never from the ordering stamp -- see kCN1TombBirthKey.
+        if (cn1WearableTombstoneAge(path) <= kCN1TombstoneTTLMillis) {
             continue;
         }
         // Old enough to consider -- but only actually drop it once the peer has acknowledged the
         // removal, meaning it no longer holds a value for that path older than the tombstone.
-        NSString *path = [key substringFromIndex:kTombPrefix.length];
         CN1WearableEntry theirs = cn1WearableEntryFor(peerCtx, path);
         if (theirs.known && !theirs.removed && theirs.stamp < [stamp longLongValue]) {
             continue;
         }
         [ctx removeObjectForKey:key];
+        cn1WearableForgetTombstoneBirth(path);
     }
     if (ctx.count <= kCN1MaxTombstones) {
         return;
@@ -763,9 +811,46 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     [ctx removeObjectForKey:cn1WearableValueKey(path)];
     [ctx removeObjectForKey:cn1WearableStampKey(path)];
     ctx[cn1WearableTombKey(path)] = @(cn1WearableNextSequence());
+    cn1WearableNoteTombstoneBirth(path);
     cn1WearablePruneTombstones(ctx, [s receivedApplicationContext]);
+    // Also swept when THIS tombstone comes of age. Pruning ran only from putData and removeData, so
+    // an app whose last act is a removal kept that final batch in its persisted context for good --
+    // the tombstone is necessarily younger than its TTL at the moment it is written, and nothing
+    // else would ever look again.
+    CN1WatchConnectivity *keepAlive = [self retain];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                 (int64_t) (kCN1TombstoneTTLMillis + 1000) * NSEC_PER_MSEC),
+                   dispatch_get_main_queue(), ^{
+        [keepAlive pruneTombstonesNow];
+        [keepAlive release];
+    });
     NSError *err = nil;
     [s updateApplicationContext:ctx error:&err];
+    [ctxLock unlock];
+    [ctx release];
+}
+
+/// Prunes without publishing anything else, for the scheduled sweep and on activation.
+- (void)pruneTombstonesNow {
+    WCSession *s = [self session];
+    if (s == nil) {
+        return;
+    }
+    NSLock *ctxLock = cn1WearableContextLock();
+    [ctxLock lock];
+    NSMutableDictionary *ctx = [[s applicationContext] mutableCopy];
+    if (ctx == nil) {
+        [ctxLock unlock];
+        return;
+    }
+    NSUInteger before = ctx.count;
+    cn1WearablePruneTombstones(ctx, [s receivedApplicationContext]);
+    if (ctx.count != before) {
+        // Only when something actually went: updateApplicationContext with an unchanged dictionary
+        // is a wasted transfer, and on the peer it looks like a fresh context to re-examine.
+        NSError *err = nil;
+        [s updateApplicationContext:ctx error:&err];
+    }
     [ctxLock unlock];
     [ctx release];
 }
@@ -869,6 +954,10 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // process is up and the CN1 runtime with it, so a file still sitting in the inbox belongs to a
     // run that did not get this far.
     cn1WearableDrainInbox();
+    // And sweep tombstones, which covers the case a timer cannot: an app whose last act was a
+    // removal and which then exited takes its scheduled sweep with it, so the next launch is the
+    // only thing that will ever look at that batch again.
+    [self pruneTombstonesNow];
     cn1_wearable_notifyStateChanged();
 }
 

@@ -1656,13 +1656,28 @@ public class CN1WearableBridge implements WearableBridge {
      * a durable claim, so {@code claimTransfer} refuses it here and nothing is delivered twice.</p>
      */
     private void replayOutstandingTransfers() {
+        replayOutstandingTransfers(1);
+    }
+
+    private static final int REPLAY_RETRIES = 5;
+    private static final long REPLAY_RETRY_MILLIS = 5000;
+
+    private void replayOutstandingTransfers(final int attempt) {
         transferTimer.schedule(new java.util.TimerTask() {
             public void run() {
+                boolean replayFailed = false;
                 try {
+                    // The local identity FIRST, and no replay at all without it. A transient
+                    // getLocalNode() failure returning null used to read as "not local", so the
+                    // replay claimed this device's OWN outbound transfers and handed the sender its
+                    // own one-shot file through its own data listener.
+                    String localNode = localNodeId(context);
+                    if (localNode == null) {
+                        throw new java.io.IOException("local node identity unavailable");
+                    }
                     DataItemBuffer items = Tasks.await(dataClient.getDataItems(),
                             TIMEOUT_SECONDS, TimeUnit.SECONDS);
                     try {
-                        String localNode = localNodeId(context);
                         for (DataItem item : items) {
                             final Uri uri = item.getUri();
                             String p = uri == null ? null : uri.getPath();
@@ -1671,7 +1686,7 @@ public class CN1WearableBridge implements WearableBridge {
                             }
                             // Our own outbound transfer: handing it back would deliver the sender
                             // its own file.
-                            if (localNode != null && localNode.equals(uri.getHost())) {
+                            if (localNode.equals(uri.getHost())) {
                                 continue;
                             }
                             Transfer t = decodeTransfer(context, item);
@@ -1698,10 +1713,18 @@ public class CN1WearableBridge implements WearableBridge {
                         items.release();
                     }
                 } catch (Throwable unavailable) {
-                    // Best effort at startup; a reachable Data Layer also delivers changes normally.
+                    replayFailed = true;
+                }
+                if (replayFailed && attempt < REPLAY_RETRIES) {
+                    // Retried, because this pass is the ONLY cover for a transfer whose cold-start
+                    // delivery died with the service process: the DataItem is unchanged, so no
+                    // normal callback is guaranteed, and an app that stays open until the sender's
+                    // retention sweep loses the file outright. Bounded, because a Data Layer that
+                    // is still unreachable after this many tries is not a transient failure.
+                    replayOutstandingTransfers(attempt + 1);
                 }
             }
-        }, 0);
+        }, attempt == 1 ? 0 : REPLAY_RETRY_MILLIS);
     }
 
     /// The sweep itself, coalesced. Schedules no follow-up beyond a deferred retry when coalescing
