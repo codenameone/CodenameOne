@@ -3159,7 +3159,7 @@ public class Form extends Container {
     @Override
     public void keyPressed(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
-        if (menuBar.handlesKeycode(keyCode)) {
+        if (menuBar.handlesKeycode(keyCode) && !focusedHandlesInput()) {
             menuBar.keyPressed(keyCode);
             return;
         }
@@ -3224,11 +3224,24 @@ public class Form extends Container {
         menuBar.setMinimizeOnBack(minimizeOnBack);
     }
 
+    /// True when the focused component has claimed raw keyboard input via
+    /// `Component#setHandlesInput(boolean)`, so soft key mapping must not intercept keys ahead of it.
+    ///
+    /// A port is free to map a soft key onto any key code, and the desktop port uses the function
+    /// keys: `VK_F1` is 112, which is also the character code of a lowercase `p`. Key codes and
+    /// character codes share one value space here, so a text component would silently never receive
+    /// that character -- one letter of the alphabet simply stopped working. A component editing text
+    /// has already declared that it owns the keyboard, so it is served first.
+    private boolean focusedHandlesInput() {
+        return focused != null && focused.handlesInput() && focused.isEnabled()
+                && focused.getComponentForm() == this;
+    }
+
     /// {@inheritDoc}
     @Override
     public void keyReleased(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
-        if (menuBar.handlesKeycode(keyCode)) {
+        if (menuBar.handlesKeycode(keyCode) && !focusedHandlesInput()) {
             menuBar.keyReleased(keyCode);
             return;
         }

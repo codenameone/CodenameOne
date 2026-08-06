@@ -3500,11 +3500,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             }
             lastInputEvent = e;
-            if (System.getProperty("cn1.key.trace") != null) {
-                System.out.println("AWT-TRACE keyPressed vk=" + e.getKeyCode() + " char=" + e.getKeyChar()
-                        + " shift=" + e.isShiftDown() + " meta=" + e.isMetaDown() + " ctrl=" + e.isControlDown()
-                        + " alt=" + e.isAltDown() + " editorFocused=" + editorFocused);
-            }
             // block key combos that might generate unreadable events, unless a pure editor is focused and
             // wants the modifier combos (word / line navigation, clipboard shortcuts)
             if (!editorFocused && (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown())) {
@@ -3531,12 +3526,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void keyReleased(KeyEvent e) {
-            if (System.getProperty("cn1.key.trace") != null) {
-                System.out.println("AWT-TRACE keyReleased vk=" + e.getKeyCode() + " char=" + e.getKeyChar()
-                        + " shift=" + e.isShiftDown() + " meta=" + e.isMetaDown() + " ctrl=" + e.isControlDown()
-                        + " alt=" + e.isAltDown() + " staleIgnore=" + ignorePressedKeys.contains(e.getKeyCode())
-                        + " editorFocused=" + isPureEditorFocused());
-            }
             boolean ignore = ignorePressedKeys.remove(e.getKeyCode());
             // A blocked press records its key so the matching release is dropped too. When the
             // platform never delivers that release -- a system shortcut such as Cmd+P on macOS
