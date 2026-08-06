@@ -698,12 +698,42 @@ public final class IOSNative {
     
     native boolean sqlDbExists(String name);
     native long sqlDbCreateAndOpen(String name);
+    /**
+     * Applies an encryption key to an open connection, returning false when the key does not
+     * decrypt the database. Reporting rather than throwing keeps the distinction between a wrong
+     * key and a failure to open the file, without the native layer having to name a core class.
+     */
+    native boolean sqlDbApplyKey(long db, String key);
     native void sqlDbDelete(String name);
     native void sqlDbClose(long db);
+    /** Re-keys an open database, or removes the key when passed null. */
+    native void sqlDbRekey(long db, String key);
+    /** True when the linked SQLite build understands the cipher pragmas. */
+    native boolean sqlDbIsCipherAvailable();
+    /** Resolves a database name to its absolute path, honouring a file:// prefix. */
+    native String sqlDbPath(String name);
 
     native void sqlDbExec(long dbPeer, String sql, String[] args);
+    /** Runs an entire script through sqlite3_exec, which handles multiple statements. */
+    native void sqlDbExecScript(long dbPeer, String sql);
 
     native long sqlDbExecQuery(long dbPeer, String sql, String[] args);
+
+    /** Compiles a statement, returning the sqlite3_stmt peer. */
+    native long sqlStmtPrepare(long dbPeer, String sql);
+    native int sqlStmtParameterCount(long statementPeer);
+    native void sqlStmtBindNull(long statementPeer, int index);
+    native void sqlStmtBindString(long statementPeer, int index, String value);
+    native void sqlStmtBindBlob(long statementPeer, int index, byte[] value);
+    native void sqlStmtBindLong(long statementPeer, int index, long value);
+    native void sqlStmtBindDouble(long statementPeer, int index, double value);
+    /** Steps a statement, returning true when it landed on a row. */
+    native boolean sqlStmtStep(long statementPeer);
+    /** Resets a statement back to before its first row, keeping its bindings. */
+    native void sqlStmtReset(long statementPeer);
+    native void sqlStmtFinalize(long statementPeer);
+    /** Steps a statement to completion and finalizes it, for non-query use. */
+    native void sqlStmtExecuteAndFinalize(long statementPeer);
 
     native boolean sqlCursorFirst(long statementPeer);
     native boolean sqlCursorNext(long statementPeer);
