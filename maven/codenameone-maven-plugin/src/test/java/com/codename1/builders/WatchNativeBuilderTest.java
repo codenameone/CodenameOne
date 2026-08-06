@@ -453,6 +453,57 @@ class WatchNativeBuilderTest {
                 "the entity must not be escaped a second time: " + plist);
     }
 
+    /// Numeric references are ordinary XML, and a single left-to-right pass must not decode its
+    /// own output -- "&amp;#38;" is an author writing a literal "&#38;", not an escaped ampersand.
+    @Test
+    void injectedNumericReferencesAreDecodedOnce(@TempDir Path tmp) throws IOException {
+        assertEquals("Health & Fitness",
+                WatchNativeBuilder.decodeXmlEntities("Health &#38; Fitness"));
+        assertEquals("Health & Fitness",
+                WatchNativeBuilder.decodeXmlEntities("Health &#x26; Fitness"));
+        assertEquals("Health & Fitness",
+                WatchNativeBuilder.decodeXmlEntities("Health &amp; Fitness"));
+        assertEquals("a &#38; b", WatchNativeBuilder.decodeXmlEntities("a &amp;#38; b"),
+                "a literal reference must survive, not be decoded a second time");
+        assertEquals("100% & more", WatchNativeBuilder.decodeXmlEntities("100% & more"),
+                "a bare ampersand is left exactly as written");
+
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.plistInject", "<key>NSHealthShareUsageDescription</key>"
+                + "<string>Health &#38; Fitness</string>");
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("Health &amp; Fitness"), plist);
+        assertFalse(plist.contains("&amp;#38;"), plist);
+    }
+
+    /// The plist pass and the code-signing setting must reach the SAME HealthKit verdict. They
+    /// used to resolve it from different inputs, so a purpose string supplied only through
+    /// ios.plistInject produced a bundle that declared HealthKit and was signed without the
+    /// entitlement -- authorization then fails on device. Detected usage is the single source of
+    /// truth, matching the BuildDaemon mirror, so a stale privacy string entitles nothing.
+    @Test
+    void plistAndEntitlementsAgreeOnHealth(@TempDir Path tmp) throws IOException {
+        BuildRequest stale = request();
+        stale.putArgument("watchMain", WATCH_MAIN);
+        stale.putArgument("ios.plistInject", "<key>NSHealthShareUsageDescription</key>"
+                + "<string>Reads your heart rate</string>");
+        String stalePlist = writeInfoPlist(stale, tmp);
+        assertTrue(stalePlist.contains("NSHealthShareUsageDescription"),
+                "the description is still carried -- it is the ENTITLEMENT that needs evidence");
+        assertFalse(stalePlist.contains("com.apple.developer.healthkit"), stalePlist);
+        assertEquals("", parse(stale).watchEntitlementsSetting(stale, stale.getMainClass()),
+                "a privacy string alone must not sign the watch target with HealthKit");
+
+        BuildRequest declared = request();
+        declared.putArgument("watchMain", WATCH_MAIN);
+        declared.putArgument("watchNative.health", "true");
+        declared.putArgument("ios.NSHealthShareUsageDescription", "Reads your heart rate");
+        assertTrue(parse(declared).watchEntitlementsSetting(declared, declared.getMainClass())
+                        .contains("CODE_SIGN_ENTITLEMENTS"),
+                "declared health usage must sign the watch target with the entitlements file");
+    }
+
     private static int countOccurrences(String haystack, String needle) {
         int n = 0;
         for (int i = haystack.indexOf(needle); i >= 0; i = haystack.indexOf(needle, i + 1)) {

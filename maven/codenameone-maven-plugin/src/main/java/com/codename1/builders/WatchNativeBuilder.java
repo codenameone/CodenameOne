@@ -489,11 +489,74 @@ class WatchNativeBuilder {
         if (value == null || value.indexOf('&') < 0) {
             return value;
         }
-        return value.replace("&lt;", "<")
-                .replace("&gt;", ">")
-                .replace("&quot;", "\"")
-                .replace("&apos;", "'")
-                .replace("&amp;", "&");
+        // ONE left-to-right pass, not a sequence of replaces. Chained replacements decode their own
+        // output: turning "&amp;" into "&" first makes "&amp;#38;" -- an author writing a literal
+        // "&#38;" -- come out as "&", and no ordering of replaces fixes that in general. Scanning
+        // once consumes each reference exactly as written.
+        StringBuilder out = new StringBuilder(value.length());
+        int i = 0;
+        while (i < value.length()) {
+            char c = value.charAt(i);
+            if (c != '&') {
+                out.append(c);
+                i++;
+                continue;
+            }
+            int end = value.indexOf(';', i + 1);
+            // A bare ampersand is not a reference; leave it exactly as the author wrote it.
+            if (end < 0 || end - i > 12) {
+                out.append(c);
+                i++;
+                continue;
+            }
+            String body = value.substring(i + 1, end);
+            String decoded = decodeReference(body);
+            if (decoded == null) {
+                out.append(c);
+                i++;
+                continue;
+            }
+            out.append(decoded);
+            i = end + 1;
+        }
+        return out.toString();
+    }
+
+    /// The character a reference body stands for, or null when it is not one this decoder knows.
+    ///
+    /// Numeric forms are included because they are ordinary XML: a purpose string written with
+    /// {@code &#38;} is as valid as one written with {@code &amp;}, and leaving it encoded put the
+    /// literal text in front of the user in the permission dialog.
+    private static String decodeReference(String body) {
+        if ("lt".equals(body)) {
+            return "<";
+        }
+        if ("gt".equals(body)) {
+            return ">";
+        }
+        if ("quot".equals(body)) {
+            return "\"";
+        }
+        if ("apos".equals(body)) {
+            return "'";
+        }
+        if ("amp".equals(body)) {
+            return "&";
+        }
+        if (body.length() < 2 || body.charAt(0) != '#') {
+            return null;
+        }
+        try {
+            int code = body.charAt(1) == 'x' || body.charAt(1) == 'X'
+                    ? Integer.parseInt(body.substring(2), 16)
+                    : Integer.parseInt(body.substring(1));
+            if (code <= 0 || code > 0x10FFFF) {
+                return null;
+            }
+            return new String(Character.toChars(code));
+        } catch (RuntimeException notANumber) {
+            return null;
+        }
     }
 
     static String shortVersion(BuildRequest request) {
@@ -639,8 +702,12 @@ class WatchNativeBuilder {
                     + " the two hints.",
                     new RuntimeException("contradictory watch health hints"));
         }
-        boolean watchHealth =
-                watchUsesHealth(healthShare != null || healthUpdate != null);
+        // The detected usage, not the purpose strings. A string can outlive the code that needed
+        // it, and treating it as evidence entitled the watch bundle for an app that no longer
+        // touches HealthKit -- which then failed codesigning against an App ID without the
+        // capability, with nothing in the output to say why. Same rule, same accessor, as the
+        // BuildDaemon mirror: a cloud build and a local build must reach the same verdict.
+        boolean watchHealth = watchUsesHealth(owner.phoneUsesHealthData());
         boolean workoutProcessing =
                 "true".equalsIgnoreCase(workoutProcessingHint);
         if (needsPurposeString(watchHealth, healthShare, healthUpdate,
@@ -819,20 +886,17 @@ class WatchNativeBuilder {
      * The CODE_SIGN_ENTITLEMENTS setting for the watch target, or an empty
      * string when the watch does not use HealthKit.
      */
-    private String watchEntitlementsSetting(BuildRequest request,
+    String watchEntitlementsSetting(BuildRequest request,
             String mainClass) {
         // The same gate the entitlements file itself uses. Pointing the
         // target at a file that is not written, or writing one the target
         // never signs with, are two different ways to be wrong.
-        // Trimmed, exactly as writeWatchInfoPlist trims them. A raw null
-        // check here saw a whitespace-only hint as health usage and
-        // pointed CODE_SIGN_ENTITLEMENTS at an entitlements file the plist
-        // pass had decided not to write, so Xcode failed on a missing
-        // file.
-        boolean phoneUsesHealth = trimToNull(request.getArg(
-                "ios.NSHealthShareUsageDescription", null)) != null
-                || trimToNull(request.getArg(
-                        "ios.NSHealthUpdateUsageDescription", null)) != null;
+        // The SAME source of truth writeWatchInfoPlist uses -- detected usage, not the privacy
+        // strings. Resolving it twice from different inputs is how these two came apart: reading
+        // ios.NSHealth* here while the plist pass read the merged purpose strings meant a
+        // description supplied through ios.plistInject produced a bundle that declared HealthKit
+        // and was signed without the entitlement, so authorization failed on device.
+        boolean phoneUsesHealth = owner.phoneUsesHealthData();
         if (!watchUsesHealth(phoneUsesHealth)) {
             return "";
         }

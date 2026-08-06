@@ -135,6 +135,16 @@ public class IPhoneBuilder extends Executor {
     /// them the generated factory can actually construct.
     private final HealthListenerScan healthScan = new HealthListenerScan();
 
+    /// Whether the scan found real health data access on the phone.
+    ///
+    /// The watch builder asks, because the phone's privacy strings are not evidence of use: a
+    /// project can retain an `ios.NSHealth*UsageDescription` hint long after the code that needed
+    /// it is gone, and entitling the watch on that basis fails codesigning against an App ID with
+    /// no HealthKit capability.
+    boolean phoneUsesHealthData() {
+        return usesHealthRead || usesHealthWrite || usesHealthWorkout;
+    }
+
     private boolean usesHealthRead;
     private boolean usesHealthWrite;
     private boolean usesHealthWorkout;
