@@ -38,7 +38,7 @@
 #include <wrl/client.h>
 #include <stdlib.h>
 #include <string.h>
-#include <string>
+#include <wchar.h>
 #include "cn1_windows.h"
 
 using Microsoft::WRL::ComPtr;
@@ -74,8 +74,14 @@ static void cn1StripFileWide(const char* utf8, wchar_t* out, int outLen) {
 
 struct CN1VideoReader {
     ComPtr<IMFSourceReader> reader;
-    /* The source URL, so readAudio can open a reader of its own. */
-    std::wstring url;
+    /* The source URL, so readAudio can open a reader of its own. A plain
+     * malloc'd copy rather than std::wstring: including <string> drags in the
+     * MSVC STL, which hard-asserts on the compiler version (STL1000) and broke
+     * the cross-compile job, whose clang is not pinned to 19 the way the
+     * build+run job's is. Freed in the destructor below. */
+    wchar_t* url;
+    CN1VideoReader() : url(NULL) {}
+    ~CN1VideoReader() { free(url); }
     int width;
     int height;
     LONGLONG durationMs;
@@ -124,7 +130,13 @@ static JAVA_LONG cn1ReaderOpen(const wchar_t* url) {
 
     CN1VideoReader* st = new CN1VideoReader();
     st->reader = reader;
-    st->url = url;
+    if (url != NULL) {
+        size_t urlChars = wcslen(url) + 1;
+        st->url = (wchar_t*) malloc(urlChars * sizeof(wchar_t));
+        if (st->url != NULL) {
+            memcpy(st->url, url, urlChars * sizeof(wchar_t));
+        }
+    }
     st->width = 0;
     st->height = 0;
     st->durationMs = -1;
@@ -276,10 +288,10 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
     // beginning by construction, so the audio track no longer depends on seek
     // semantics or on what the video pass did to the shared position.
     ComPtr<IMFSourceReader> audioReader;
-    if (!st->url.empty()) {
+    if (st->url != NULL) {
         ComPtr<IMFAttributes> attrs;
         if (SUCCEEDED(MFCreateAttributes(&attrs, 1))) {
-            MFCreateSourceReaderFromURL(st->url.c_str(), attrs.Get(), &audioReader);
+            MFCreateSourceReaderFromURL(st->url, attrs.Get(), &audioReader);
         }
     }
     if (audioReader != NULL) {

@@ -137,6 +137,34 @@ class KotlinUiTest : BaseTest() {
         // createMutableImage hand back a broken peer. Report the number.
         val f = soSwitch.style.font
         step("probe-so-fontheight=" + (if (f == null) "null-font" else f.height.toString()))
+        // Switch sizes its thumb by building an image, blurring it for the drop
+        // shadow, and drawing on the result. Font height and styles are healthy on
+        // Windows (20 and non-null), so the failure is in one of those primitives.
+        // Walk the same sequence through the public API, which names the one that
+        // breaks; a platform whose blur returns something undrawable cannot render
+        // a Switch at all, so this earns its place as a standing check.
+        step("probe-img-create")
+        val probeImg = com.codename1.ui.Image.createImage(32, 24, 0)
+        step("probe-img-null=" + (probeImg == null))
+        step("probe-img-graphics")
+        val probeG = probeImg.graphics
+        step("probe-img-g-null=" + (probeG == null))
+        step("probe-img-antialias")
+        probeG.isAntiAliased = true
+        step("probe-blur-supported=" + com.codename1.ui.Display.getInstance().isGaussianBlurSupported)
+        if (com.codename1.ui.Display.getInstance().isGaussianBlurSupported) {
+            step("probe-blur-call")
+            val blurred = com.codename1.ui.Display.getInstance().gaussianBlurImage(probeImg, 5f)
+            step("probe-blur-null=" + (blurred == null))
+            if (blurred != null) {
+                step("probe-blur-graphics")
+                val bg = blurred.graphics
+                step("probe-blur-g-null=" + (bg == null))
+                step("probe-blur-antialias")
+                bg.isAntiAliased = true
+                step("probe-blur-ok")
+            }
+        }
         step("probe-so-preferredsize")
         soSwitch.preferredSize
         step("probe-so-addcontent")
