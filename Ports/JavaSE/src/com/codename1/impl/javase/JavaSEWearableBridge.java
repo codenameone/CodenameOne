@@ -235,8 +235,10 @@ class JavaSEWearableBridge implements WearableBridge {
         boolean hadTombstone = tomb.isFile();
         // The acknowledgement goes with it. It describes a tombstone that is about to stop
         // existing, and leaving it behind is what let a later removal at the same path inherit it.
-        // Best-effort: acknowledges() checks the stamp regardless, so a failed delete here costs
-        // nothing but a stale file.
+        // Genuinely best-effort, and it has to stay that way: acknowledges() compares stamps and
+        // accepts nothing it cannot parse, so a leftover file confirms no tombstone and is deleted
+        // by the next scan that looks at it. Aborting the publication over a bookkeeping file
+        // would be the worse failure -- a value refused because a stale marker would not delete.
         new File(dataDir, tomb.getName() + ACK_SUFFIX).delete();
         if (hadTombstone && !tomb.delete()) {
             // A delete that FAILED is not the same as a tombstone that was not there, and the
@@ -389,8 +391,8 @@ class JavaSEWearableBridge implements WearableBridge {
     /// acknowledged, in decimal.
     ///
     /// A tombstone born before this framing existed reports {@link Long#MIN_VALUE}, and that is
-    /// written out as-is -- {@link #acknowledges} then accepts it, because such a file predates the
-    /// republish problem and refusing it would strand a tombstone that can never be acknowledged.
+    /// written out as-is: it still identifies that tombstone as distinct from a later one, which is
+    /// all the comparison needs.
     private static byte[] acknowledgementFor(byte[] tombstone) {
         try {
             return Long.toString(framedStamp(tombstone)).getBytes("UTF-8");
@@ -424,20 +426,28 @@ class JavaSEWearableBridge implements WearableBridge {
             return false;
         }
         String recorded = new String(payloadOf(all), java.nio.charset.Charset.forName("UTF-8")).trim();
-        if (recorded.length() == 0) {
-            // Written by the previous build, which acknowledged by existence alone. Honoured, so
-            // an upgrade does not strand tombstones whose peer already saw them.
-            return true;
-        }
         long acknowledged;
         try {
             acknowledged = Long.parseLong(recorded);
         } catch (NumberFormatException notAStamp) {
-            return false;
+            // Includes the EMPTY payload the previous build wrote, which acknowledged by existence
+            // alone. Not honoured, deliberately: accepting it would mean an acknowledgement that
+            // matches every tombstone at its path forever, which is the failure this whole change
+            // is about -- and it would make deleting the stale file in putData load-bearing rather
+            // than tidying, so a failed delete would silently reintroduce it.
+            //
+            // The cost of refusing is bounded and small: a tombstone the peer already saw under
+            // the old build is kept until MAX_TOMBS evicts it, in a sandbox shared by two
+            // processes of one simulator run. Against that, an unacknowledged tombstone erroneously
+            // retired is a peer that never learns of a removal at all.
+            acknowledged = Long.MIN_VALUE;
         }
         if (acknowledged == tombstoneStamp) {
             return true;
         }
+        // Stale, or unreadable, or from the previous format: discarded rather than left to be
+        // re-examined on every scan. The peer rewrites a real one the next time it sees the
+        // tombstone undelivered.
         ack.delete();
         synchronized (seenData) {
             seenData.remove(ack.getName());
