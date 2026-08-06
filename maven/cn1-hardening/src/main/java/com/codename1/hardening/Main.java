@@ -103,6 +103,17 @@ public final class Main {
                         + "off, standard, aggressive, paranoid.");
                 return EXIT_FAILED;
             }
+            // An unrecognized harden.strings must fail rather than silently enabling the most
+            // invasive ("all") mode on a typo.
+            String rawStrings = hints.get("harden.strings");
+            if (rawStrings != null && rawStrings.trim().length() > 0) {
+                String s = rawStrings.trim().toLowerCase();
+                if (!"off".equals(s) && !"constants".equals(s) && !"all".equals(s)) {
+                    System.err.println("Invalid harden.strings '" + rawStrings + "'. Valid values "
+                            + "are: off, constants, all.");
+                    return EXIT_FAILED;
+                }
+            }
 
             HardeningConfig cfg = HardeningConfig.from(hints, platform, renameSupported);
 

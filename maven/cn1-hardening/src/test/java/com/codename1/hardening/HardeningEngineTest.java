@@ -185,6 +185,26 @@ public class HardeningEngineTest {
     }
 
     @Test
+    public void androidRenameOnlyIsHardenedViaR8() throws Exception {
+        // Android (renameSupported=false), standard with strings off: the engine renames nothing,
+        // but R8 will, so the build must be marked hardened rather than skipped.
+        File in = buildInputJar();
+        File out = tmp.newFile("and-hardened.jar");
+        Map<String, String> hints = new HashMap<String, String>();
+        hints.put("harden.level", "standard");
+        hints.put("harden.strings", "off");
+        HardeningRequest req = new HardeningRequest()
+                .inputJar(in).outputJar(out).mappingFile(tmp.newFile("and-map.txt"))
+                .workDir(tmp.newFolder("and-work"))
+                .config(HardeningConfig.from(hints, "and", false))
+                .mainClass("com.codename1.hardening.fixture.Secrets");
+        HardeningResult r = HardeningEngine.harden(req);
+        assertTrue("Android rename-only must be marked hardened (R8 renames)", r.isHardened());
+        assertEquals(0, r.getRenamedClasses());
+        assertTrue(r.getTransformsApplied().contains("rename:r8"));
+    }
+
+    @Test
     public void nonOffLevelWithAllTransformsDisabledIsSkipped() throws Exception {
         // standard, but rename off and strings off -> nothing to do -> not stamped hardened.
         File in = buildInputJar();

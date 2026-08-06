@@ -233,6 +233,9 @@ public final class HardeningEngine {
         // transform it skipped. This is what the downstream verifier checks against.
         if (cfg.isRenameEnabled()) {
             result.getTransformsApplied().add("rename");
+        } else if (cfg.isRenameRequested()) {
+            // Android: the engine doesn't rename, R8 does. Still a rename, still hardened.
+            result.getTransformsApplied().add("rename:r8");
         }
         if (stringsApplied && encryptedStrings > 0) {
             result.getTransformsApplied().add(cfg.isEncryptAllStrings() ? "strings:all" : "strings:constants");
@@ -263,7 +266,9 @@ public final class HardeningEngine {
      */
     /** True when at least one transform will actually run for this config and platform. */
     static boolean willApplyAnyTransform(HardeningConfig cfg) {
-        if (cfg.isRenameEnabled()) {
+        // renameRequested (not renameEnabled): on Android the engine does not rename, but R8 does,
+        // so a rename-only Android build is still a hardened build and must not be skipped.
+        if (cfg.isRenameRequested()) {
             return true;
         }
         if (cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform())) {

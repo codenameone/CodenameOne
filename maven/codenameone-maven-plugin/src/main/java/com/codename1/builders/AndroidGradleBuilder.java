@@ -829,7 +829,9 @@ public class AndroidGradleBuilder extends Executor {
         // level that promises renaming cannot be honored with R8 turned off. Fail rather than ship a
         // build stamped "hardened" that was never renamed. (harden.rename=false opts out explicitly.)
         String hardenLevel = request.getArg("harden.level", "off");
-        boolean hardenRenames = hardenLevel != null && !"off".equalsIgnoreCase(hardenLevel.trim())
+        boolean androidHardeningEnabled = !"false".equalsIgnoreCase(request.getArg("harden.and.enabled", "true"));
+        boolean hardenRenames = androidHardeningEnabled
+                && hardenLevel != null && !"off".equalsIgnoreCase(hardenLevel.trim())
                 && hardenLevel.trim().length() > 0
                 && !"false".equalsIgnoreCase(request.getArg("harden.rename", "true"));
         if (hardenRenames && request.getArg("android.enableProguard", "true").equals("false")) {

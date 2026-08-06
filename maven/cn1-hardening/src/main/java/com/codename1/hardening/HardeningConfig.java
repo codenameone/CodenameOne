@@ -37,6 +37,7 @@ import java.util.Map;
  */
 public final class HardeningConfig {
     private final HardeningProfile profile;
+    private final boolean renameRequested;
     private final boolean renameEnabled;
     private final boolean encryptConstantStrings;
     private final boolean encryptAllStrings;
@@ -46,11 +47,12 @@ public final class HardeningConfig {
     private final String seed;
     private final List<String> extraKeepRules;
 
-    private HardeningConfig(HardeningProfile profile, boolean renameEnabled,
+    private HardeningConfig(HardeningProfile profile, boolean renameRequested, boolean renameEnabled,
                             boolean encryptConstantStrings, boolean encryptAllStrings,
                             boolean controlFlow, boolean platformEnabled, String platform,
                             String seed, List<String> extraKeepRules) {
         this.profile = profile;
+        this.renameRequested = renameRequested;
         this.renameEnabled = renameEnabled;
         this.encryptConstantStrings = encryptConstantStrings;
         this.encryptAllStrings = encryptAllStrings;
@@ -76,7 +78,10 @@ public final class HardeningConfig {
         }
         boolean platformEnabled = boolTri(get(hints, "harden." + platform + ".enabled", "true"), true);
 
-        boolean rename = renameSupported && boolTri(get(hints, "harden.rename", null), level.renamesByDefault());
+        // renameRequested is the developer's intent; renameEnabled is whether the *engine* renames.
+        // On Android renameEnabled is false but the rename is still requested and delivered by R8.
+        boolean renameRequested = boolTri(get(hints, "harden.rename", null), level.renamesByDefault());
+        boolean renameEnabled = renameSupported && renameRequested;
 
         String strings = get(hints, "harden.strings", null);
         boolean encConst;
@@ -86,16 +91,20 @@ public final class HardeningConfig {
             encAll = level.encryptsAllStringsByDefault();
         } else {
             String v = strings.trim().toLowerCase();
-            if ("off".equals(v) || "false".equals(v) || "0".equals(v)) {
+            if ("off".equals(v)) {
                 encConst = false;
                 encAll = false;
-            } else if ("constants".equals(v) || "1".equals(v)) {
+            } else if ("constants".equals(v)) {
                 encConst = true;
                 encAll = false;
-            } else {
-                // "all", "true", "2", "3"
+            } else if ("all".equals(v)) {
                 encConst = true;
                 encAll = true;
+            } else {
+                // Unknown value: fall back to the level default rather than silently enabling the
+                // most invasive mode. The CLI (Main) rejects an unknown harden.strings up front.
+                encConst = level.encryptsConstantStringsByDefault();
+                encAll = level.encryptsAllStringsByDefault();
             }
         }
 
@@ -116,7 +125,8 @@ public final class HardeningConfig {
             }
         }
 
-        return new HardeningConfig(level, rename, encConst, encAll, cf, platformEnabled, platform, seed, keep);
+        return new HardeningConfig(level, renameRequested, renameEnabled, encConst, encAll, cf,
+                platformEnabled, platform, seed, keep);
     }
 
     private static String get(Map<String, String> hints, String key, String def) {
@@ -155,6 +165,14 @@ public final class HardeningConfig {
 
     public boolean isRenameEnabled() {
         return renameEnabled;
+    }
+
+    /**
+     * Whether renaming was requested, independent of whether this engine performs it. On Android
+     * this is true while {@link #isRenameEnabled()} is false, because R8 does the rename externally.
+     */
+    public boolean isRenameRequested() {
+        return renameRequested;
     }
 
     public boolean isEncryptConstantStrings() {
