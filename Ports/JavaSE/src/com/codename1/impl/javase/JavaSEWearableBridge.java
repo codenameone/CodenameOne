@@ -166,7 +166,7 @@ class JavaSEWearableBridge implements WearableBridge {
                 scheduleReplyTimeout(replyToken);
             }
         } catch (IOException err) {
-            dropPeer();
+            dropPeer(out);
             if (replyToken != 0) {
                 WearableConnection.deliverReply(replyToken, null, "Link lost: " + err);
             }
@@ -216,7 +216,7 @@ class JavaSEWearableBridge implements WearableBridge {
         try {
             writeFrame(out, FRAME_REPLY, "", payload, replyToken);
         } catch (IOException err) {
-            dropPeer();
+            dropPeer(out);
         }
     }
 
@@ -654,7 +654,23 @@ class JavaSEWearableBridge implements WearableBridge {
         }
     }
 
+    /// Drops the CURRENT peer, whatever it is. For the reader, which owns the connection it is
+    /// reading, and for shutdown.
     private void dropPeer() {
+        dropPeer(null);
+    }
+
+    /// Drops the peer only if `failed` is still the stream in use, or unconditionally when null.
+    ///
+    /// A write captures `peerOut` before it blocks, so its IOException can surface after the
+    /// rendezvous thread has already verified a REPLACEMENT connection. Tearing down on that stale
+    /// failure closed a link that was working, and the next election had to run before anything
+    /// could be sent again -- a self-inflicted outage caused by the previous connection's death.
+    private void dropPeer(DataOutputStream failed) {
+        if (failed != null && failed != peerOut) {
+            // A newer connection has taken over; the failure describes one already gone.
+            return;
+        }
         Socket s = peer;
         peer = null;
         peerOut = null;
