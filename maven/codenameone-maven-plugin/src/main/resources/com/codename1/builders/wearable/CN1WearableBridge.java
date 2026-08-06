@@ -2809,34 +2809,32 @@ public class CN1WearableBridge implements WearableBridge {
     private static int pruneInto(android.content.SharedPreferences prefs,
                                  android.content.SharedPreferences.Editor edit) {
         int kept = 0;
-        {
-            long cutoff = System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;
-            for (Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
-                Object v = e.getValue();
-                if (!(v instanceof String)) {
-                    continue;
-                }
-                // seq|node|receivedAt. Pruned on receivedAt, never on seq -- see
-                // confirmTransferDelivered for why the sequence cannot serve as a timestamp. An
-                // entry written before this field existed has no receipt time and is dropped:
-                // it is at most one retention window old, and keeping an unprunable record
-                // forever is the failure being fixed.
-                String recorded = (String) v;
-                int lastBar = recorded.lastIndexOf('|');
-                int firstBar = recorded.indexOf('|');
-                if (lastBar <= 0 || lastBar == firstBar) {
+        long cutoff = System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;
+        for (Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
+            Object v = e.getValue();
+            if (!(v instanceof String)) {
+                continue;
+            }
+            // seq|node|receivedAt. Pruned on receivedAt, never on seq -- see
+            // confirmTransferDelivered for why the sequence cannot serve as a timestamp. An
+            // entry written before this field existed has no receipt time and is dropped:
+            // it is at most one retention window old, and keeping an unprunable record
+            // forever is the failure being fixed.
+            String recorded = (String) v;
+            int lastBar = recorded.lastIndexOf('|');
+            int firstBar = recorded.indexOf('|');
+            if (lastBar <= 0 || lastBar == firstBar) {
+                edit.remove(e.getKey());
+                continue;
+            }
+            try {
+                if (Long.parseLong(recorded.substring(lastBar + 1)) < cutoff) {
                     edit.remove(e.getKey());
-                    continue;
+                } else {
+                    kept++;
                 }
-                try {
-                    if (Long.parseLong(recorded.substring(lastBar + 1)) < cutoff) {
-                        edit.remove(e.getKey());
-                    } else {
-                        kept++;
-                    }
-                } catch (NumberFormatException unparsable) {
-                    edit.remove(e.getKey());
-                }
+            } catch (NumberFormatException unparsable) {
+                edit.remove(e.getKey());
             }
         }
         return kept;
