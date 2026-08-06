@@ -342,6 +342,27 @@ class WatchNativeBuilderTest {
                 "ios.teamId remains the fallback for both");
     }
 
+    /// The watch bundle needs its OWN purpose strings: the phone's plist does not cover an API the
+    /// watch app exercises, and watchOS terminates the app rather than merely refusing access.
+    @Test
+    void watchPlistCarriesEveryPrivacyDescription(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.NSLocationWhenInUseUsageDescription", "Shows nearby stops");
+        req.putArgument("ios.NSMicrophoneUsageDescription", "Records a voice note");
+        req.putArgument("ios.NSHealthShareUsageDescription", "Reads your heart rate");
+        req.putArgument("ios.NSMotionUsageDescription", "   ");
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("<key>NSLocationWhenInUseUsageDescription</key>"),
+                "location description must reach the watch plist: " + plist);
+        assertTrue(plist.contains("<key>NSMicrophoneUsageDescription</key>"),
+                "microphone description must reach the watch plist: " + plist);
+        assertTrue(plist.contains("<key>NSHealthShareUsageDescription</key>"),
+                "the HealthKit pair must still be carried: " + plist);
+        assertFalse(plist.contains("NSMotionUsageDescription"),
+                "a whitespace-only description is absent, not blank: " + plist);
+    }
+
     private static WatchNativeBuilder parse(BuildRequest req) {
         WatchNativeBuilder b = new WatchNativeBuilder(new IPhoneBuilder());
         b.parseHints(req);

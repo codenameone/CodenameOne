@@ -518,7 +518,7 @@ public final class WearableConnection {
     /// - `path`: the path whose value changed
     /// - `payload`: the encoded new value
     public static void deliverDataChanged(final String path, final byte[] payload) {
-        deliver(new Runnable() {
+        deliverTagged(path, new Runnable() {
             @Override
             public void run() {
                 WearableMessage m = WearableMessage.fromByteArray(path, payload);
@@ -528,7 +528,7 @@ public final class WearableConnection {
                     l.dataChanged(m);
                 }
             }
-        }, dataListeners, pendingData);
+        });
     }
 
     /// Framework/port entry point: reports that the peer removed a replicated value. Called by the
@@ -538,7 +538,7 @@ public final class WearableConnection {
     ///
     /// - `path`: the path whose value is gone
     public static void deliverDataRemoved(final String path) {
-        deliver(new Runnable() {
+        deliverTagged(path, new Runnable() {
             @Override
             public void run() {
                 WearableDataListener[] copy =
@@ -547,7 +547,7 @@ public final class WearableConnection {
                     l.dataRemoved(path);
                 }
             }
-        }, dataListeners, pendingData);
+        });
     }
 
     /// Framework/port entry point: reports that reachability, pairing or peer-app installation
@@ -566,6 +566,12 @@ public final class WearableConnection {
         });
     }
 
+    /// Parks a replicated delivery TAGGED with its path, so the cap can prefer an entry the
+    /// incoming one actually supersedes.
+    private static void deliverTagged(String path, Runnable delivery) {
+        deliver(delivery, dataListeners, pendingData, null, false, path);
+    }
+
     /// Runs a delivery on the EDT, or parks it until a listener exists.
     ///
     /// The platform starts an app to hand it a payload, so the payload routinely arrives before the
@@ -581,6 +587,11 @@ public final class WearableConnection {
     /// transfer. It changes only what the cap evicts.
     private static boolean deliver(Runnable delivery, List<?> listeners, List<Runnable> queue,
             Runnable onDropped, boolean oneShot) {
+        return deliver(delivery, listeners, queue, onDropped, oneShot, null);
+    }
+
+    private static boolean deliver(Runnable delivery, List<?> listeners, List<Runnable> queue,
+            Runnable onDropped, boolean oneShot, String path) {
         List<Runnable> release = null;
         boolean parked;
         // The listener check and the enqueue share the queue's monitor with drainPending, so a
@@ -589,7 +600,7 @@ public final class WearableConnection {
             parked = listeners.isEmpty();
             if (parked) {
                 while (queue.size() >= MAX_PENDING) {
-                    Runnable evicted = evictOne(queue);
+                    Runnable evicted = evictOne(queue, path);
                     if (evicted != null) {
                         if (release == null) {
                             release = new ArrayList<Runnable>();
@@ -597,7 +608,8 @@ public final class WearableConnection {
                         release.add(evicted);
                     }
                 }
-                queue.add(oneShot ? new OneShot(delivery, onDropped) : delivery);
+                queue.add(oneShot ? new OneShot(delivery, onDropped)
+                        : (path != null ? new Replicated(delivery, path) : delivery));
             }
         }
         // Run outside the monitor: this calls back into the port, and holding the queue's lock
@@ -627,7 +639,25 @@ public final class WearableConnection {
     /// merely drops the runnable: the confirmation callback is NOT invoked, so the port's durable
     /// copy -- the iOS inbox entry, the JavaSE file, the Android transfer claim -- is left
     /// unretired and the payload is redelivered on the next activation instead of being lost.
-    private static Runnable evictOne(List<Runnable> queue) {
+    private static Runnable evictOne(List<Runnable> queue, String incomingPath) {
+        // SUPERSEDED first: an older delivery for the same path as the one arriving, which the
+        // newcomer genuinely replaces. That is the case the "safely replaceable" reasoning above
+        // actually describes, and it was applied to any replicated entry regardless of path -- so a
+        // burst across many paths discarded callbacks nothing would replace, for paths the ports
+        // have already marked as seen.
+        if (incomingPath != null) {
+            for (int i = 0; i < queue.size(); i++) {
+                Runnable parked = queue.get(i);
+                if (parked instanceof Replicated
+                        && incomingPath.equals(((Replicated) parked).path)) {
+                    queue.remove(i);
+                    return null;
+                }
+            }
+        }
+        // Nothing superseded. Then the oldest replicated entry: its value is still readable with
+        // getData, so a listener that missed the callback can at least see the state, which is not
+        // true of a transfer.
         for (int i = 0; i < queue.size(); i++) {
             if (!(queue.get(i) instanceof OneShot)) {
                 queue.remove(i);
@@ -636,6 +666,23 @@ public final class WearableConnection {
         }
         OneShot dropped = (OneShot) queue.remove(0);
         return dropped.onDropped;
+    }
+
+    /// A parked replicated delivery, tagged with its path so the cap can drop one the incoming
+    /// delivery actually supersedes. See [#evictOne].
+    private static final class Replicated implements Runnable {
+        private final Runnable delivery;
+        final String path;
+
+        Replicated(Runnable delivery, String path) {
+            this.delivery = delivery;
+            this.path = path;
+        }
+
+        @Override
+        public void run() {
+            delivery.run();
+        }
     }
 
     /// Marks a parked delivery as the only copy of its payload. See [#evictOne].
@@ -745,7 +792,7 @@ public final class WearableConnection {
                     onDelivered.run();
                 }
             }
-        }, dataListeners, pendingData, onRelinquished, onDelivered != null);
+        }, dataListeners, pendingData, onRelinquished, onDelivered != null, path);
     }
 
     /// Actions a port asked to run once deliveries can actually reach a listener, keyed so repeated

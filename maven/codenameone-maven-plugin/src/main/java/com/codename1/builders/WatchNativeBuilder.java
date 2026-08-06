@@ -519,16 +519,25 @@ class WatchNativeBuilder {
         // works this way. A whitespace-only hint used to emit a blank
         // purpose string that satisfied the check below, producing an
         // entitled watch bundle whose disclosure said nothing.
+        // EVERY privacy description the project declares, not only the HealthKit pair. A watch app
+        // that uses location, the microphone or motion needs its own purpose string in ITS bundle:
+        // the phone's plist does not cover it, so authorization fails or watchOS terminates the app
+        // when the API is exercised, on a project that configured the hint correctly. Collected the
+        // same way the phone builder collects them, from every ios.NS*UsageDescription argument.
+        for (String arg : request.getArgs()) {
+            if (arg.startsWith("ios.NS") && arg.endsWith("UsageDescription")) {
+                String description = trimToNull(request.getArg(arg, null));
+                if (description != null) {
+                    plistString(sb, arg.substring(arg.lastIndexOf('.') + 1), description);
+                }
+            }
+        }
+        // Read again, not re-emitted: the HealthKit pair is already in the plist from the loop
+        // above, but the entitlement checks below need to know whether they were declared.
         String healthShare = trimToNull(request.getArg(
                 "ios.NSHealthShareUsageDescription", null));
-        if (healthShare != null) {
-            plistString(sb, "NSHealthShareUsageDescription", healthShare);
-        }
         String healthUpdate = trimToNull(request.getArg(
                 "ios.NSHealthUpdateUsageDescription", null));
-        if (healthUpdate != null) {
-            plistString(sb, "NSHealthUpdateUsageDescription", healthUpdate);
-        }
         // HKWorkoutSession keeps the app running while a workout records;
         // without this background mode watchOS suspends it mid-run.
         if ("true".equalsIgnoreCase(workoutProcessingHint)) {
