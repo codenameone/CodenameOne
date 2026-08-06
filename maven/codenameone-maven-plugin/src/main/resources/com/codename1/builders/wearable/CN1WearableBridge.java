@@ -174,9 +174,27 @@ public class CN1WearableBridge implements WearableBridge {
         // connected node, and the API promises these are different questions. The capability query
         // behind bondedNodeIds() uses FILTER_ALL, so it still lists a paired peer that is currently
         // disconnected, which is as close to "paired" as the Data Layer gets. A paired watch that
-        // has never run this app is invisible to both queries because Android exposes no such list.
-        return !connectedNodes().isEmpty() || !bondedNodeIds().isEmpty();
+        // has never run this app is invisible to both queries because Android exposes no such list;
+        // that limit is stated in the public contract rather than papered over here.
+        boolean paired = !connectedNodes().isEmpty() || !bondedNodeIds().isEmpty();
+        if (paired) {
+            pairingObserved = true;
+            return true;
+        }
+        // An empty answer from a query that has not actually run yet is not evidence. Both caches
+        // start empty and fill asynchronously off the EDT, so the first calls during startup would
+        // otherwise report "not paired" for a device that is -- long enough for an app to decide
+        // its setup UI on it. Once either query has genuinely completed, an empty result means what
+        // it says and this returns false, including after a real unpairing.
+        return pairingObserved && !bondedQueryCompleted;
     }
+
+    /// True once either query has actually answered, so an empty result can be trusted.
+    /// Guarded by the same monitor as the bonded cache it describes.
+    private volatile boolean bondedQueryCompleted;
+
+    /// True once a peer has ever been seen, so a not-yet-run query is not read as "no counterpart".
+    private volatile boolean pairingObserved;
 
     /// Whether an event's source node may be trusted, for the listener service's caller check.
     ///
@@ -555,6 +573,7 @@ public class CN1WearableBridge implements WearableBridge {
             }
             cachedBonded = out;
             bondedStamp = System.currentTimeMillis();
+            bondedQueryCompleted = true;
             bondedKnown = true;
             bondedGeneration++;
         }
@@ -643,6 +662,7 @@ public class CN1WearableBridge implements WearableBridge {
             changed = !sameIds(b.cachedBonded, out);
             b.cachedBonded = out;
             b.bondedStamp = System.currentTimeMillis();
+            b.bondedQueryCompleted = true;
             b.bondedKnown = true;
             b.bondedGeneration++;
         }
@@ -744,6 +764,7 @@ public class CN1WearableBridge implements WearableBridge {
                             changed = !sameIds(cachedBonded, out);
                             cachedBonded = out;
                             bondedStamp = System.currentTimeMillis();
+                            bondedQueryCompleted = true;
                             bondedKnown = true;
                             bondedGeneration++;
                         }
