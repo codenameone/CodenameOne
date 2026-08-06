@@ -241,6 +241,12 @@ class JavaSEWearableBridge implements WearableBridge {
             // single atomic step that can only ever touch this writer's own bytes.
             long stamp = nextStamp(f);
             tmp.setLastModified(stamp);
+            // Read from the STAGING file, before it is published. Reading f.lastModified() after
+            // the move could see a peer's replacement -- both JVMs publish into this directory --
+            // and this writer would then record the PEER's timestamp as its own, so the scan would
+            // skip that value as locally authored and the peer's publication would never be
+            // announced. The staging file is ours alone until the rename.
+            long staged = tmp.lastModified();
             try {
                 // An atomic replace, not delete-then-rename. The old fallback deleted whatever was
                 // published before retrying, so a peer publishing the same path in that gap had its
@@ -262,9 +268,10 @@ class JavaSEWearableBridge implements WearableBridge {
             // can be refused outright or quantized (FAT to 2s, some network mounts coarser), and
             // recording the requested value then left the real mtime unseen -- so the next scan
             // read this side's own publication as a peer update and invoked its own data listener.
+            // A rename preserves the mtime, so the staged value is what lands on disk.
             // Coarse timestamps can also erase the phone/watch side bit, which is encoded in the
             // stamp's low bit.
-            long recorded = f.lastModified();
+            long recorded = staged;
             if (recorded <= 0) {
                 recorded = stamp;
             }

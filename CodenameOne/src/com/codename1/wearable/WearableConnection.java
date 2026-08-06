@@ -700,6 +700,17 @@ public final class WearableConnection {
                 WearableMessage m = WearableMessage.fromByteArray(path, payload);
                 WearableDataListener[] copy =
                         dataListeners.toArray(new WearableDataListener[dataListeners.size()]);
+                if (copy.length == 0) {
+                    // Every listener went away between the dispatch and this runnable -- an app
+                    // shutting down, or one that deregisters on pause. Confirming here would be a
+                    // lie with consequences: for a one-shot transfer the confirmation DELETES the
+                    // port's durable copy, so the payload would be destroyed having reached nobody.
+                    // Hand it back instead, exactly as an eviction does.
+                    if (onRelinquished != null) {
+                        onRelinquished.run();
+                    }
+                    return;
+                }
                 for (WearableDataListener l : copy) {
                     l.dataChanged(m);
                 }
