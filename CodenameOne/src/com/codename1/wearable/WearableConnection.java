@@ -315,8 +315,16 @@ public final class WearableConnection {
     /// - `name`: the file name to present to the peer
     /// - `contents`: the file bytes
     public static void transferFile(String path, String name, byte[] contents) {
+        // Empty is rejected here, alongside null, because WearableMessage rejects it too and the
+        // receiving side builds one. Letting it through made the failure platform-dependent and
+        // put it in the worst possible place: JavaSE threw immediately in the caller's own frame,
+        // while Android and iOS sent it happily and threw IllegalArgumentException later on the
+        // EDT, where it aborts the delivery pass and takes unrelated deliveries with it.
+        if (path == null || path.length() == 0 || contents == null) {
+            return;
+        }
         WearableBridge b = bridge();
-        if (b != null && b.isSupported() && path != null && contents != null) {
+        if (b != null && b.isSupported()) {
             b.transferFile(path, name, contents);
         }
     }

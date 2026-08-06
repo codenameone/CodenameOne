@@ -15271,7 +15271,20 @@ void com_codename1_impl_ios_IOSNative_wearableRemoveData___java_lang_String(CN1_
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_wearableDataPaths__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     POOL_BEGIN();
     NSArray<NSString *> *paths = [[CN1WatchConnectivity shared] dataPaths];
-    JAVA_OBJECT r = fromNSString(CN1_THREAD_STATE_PASS_ARG [paths componentsJoinedByString:@"\n"]);
+    // Escaped before joining, because a newline is only "impossible" in a path by convention and
+    // nothing enforces it: WearableMessage rejects null and empty paths and nothing else, and
+    // Android and JavaSE both carry a path containing one perfectly well. Joining raw meant
+    // "/sync\nstate" came back to the app as two phantom paths that getData() could not read,
+    // making getDataPaths() disagree with the other two platforms about what exists.
+    //
+    // '%' first, so unescaping cannot turn a literal "%0a" in a path into a delimiter.
+    NSMutableArray<NSString *> *escaped = [NSMutableArray arrayWithCapacity:paths.count];
+    for (NSString *p in paths) {
+        NSString *e = [p stringByReplacingOccurrencesOfString:@"%" withString:@"%25"];
+        e = [e stringByReplacingOccurrencesOfString:@"\n" withString:@"%0a"];
+        [escaped addObject:e];
+    }
+    JAVA_OBJECT r = fromNSString(CN1_THREAD_STATE_PASS_ARG [escaped componentsJoinedByString:@"\n"]);
     POOL_END();
     return r;
 }

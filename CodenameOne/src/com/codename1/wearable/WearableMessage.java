@@ -401,6 +401,12 @@ public class WearableMessage {
         if (data == null || data.length == 0) {
             return m;
         }
+        // Decoded into a SEPARATE message and only adopted once the whole payload has validated.
+        // Filling `m` as it went meant a payload that was fine for three fields and then truncated
+        // handed the app those three -- an incomplete update that looks like a valid one, which is
+        // worse than the empty message this method documents as its fallback, because nothing
+        // distinguishes it from a real partial write.
+        WearableMessage decoded = new WearableMessage(path);
         DataInputStream in = new DataInputStream(new ByteArrayInputStream(data));
         try {
             int version = in.readByte();
@@ -418,31 +424,33 @@ public class WearableMessage {
                 int type = in.readByte();
                 switch (type) {
                     case TYPE_STRING:
-                        m.put(key, readLongUTF(in));
+                        decoded.put(key, readLongUTF(in));
                         break;
                     case TYPE_INT:
-                        m.put(key, in.readInt());
+                        decoded.put(key, in.readInt());
                         break;
                     case TYPE_LONG:
-                        m.put(key, in.readLong());
+                        decoded.put(key, in.readLong());
                         break;
                     case TYPE_DOUBLE:
-                        m.put(key, in.readDouble());
+                        decoded.put(key, in.readDouble());
                         break;
                     case TYPE_BOOLEAN:
-                        m.put(key, in.readBoolean());
+                        decoded.put(key, in.readBoolean());
                         break;
                     case TYPE_BYTES:
                         byte[] b = new byte[readLength(in)];
                         in.readFully(b);
-                        m.put(key, b);
+                        decoded.put(key, b);
                         break;
                     default:
                         com.codename1.io.Log.p("Wearable: unknown value type " + type
                                 + " on " + path + "; the rest of the payload is unreadable");
-                        return m;
+                        return m;   // nothing adopted: the partial fields are dropped with it
                 }
             }
+            // Complete and well-formed, so publish it.
+            return decoded;
         } catch (IOException err) {
             com.codename1.io.Log.p("Wearable: unreadable payload on " + path + ": " + err);
         }

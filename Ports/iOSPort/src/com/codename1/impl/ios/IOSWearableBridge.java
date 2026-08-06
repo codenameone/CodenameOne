@@ -100,10 +100,19 @@ final class IOSWearableBridge implements WearableBridge {
         if (joined == null || joined.length() == 0) {
             return new String[0];
         }
-        // Newline-separated: a CN1 path is URL-shaped and never contains one, and a single string
-        // keeps the native signature to primitives.
+        // Newline-separated with the newlines escaped, because "a CN1 path never contains one" was
+        // a convention rather than a rule -- WearableMessage rejects only null and empty paths, and
+        // Android and JavaSE carry a path with a newline in it without complaint. The native side
+        // percent-escapes '%' and then '\n'; unescaping in the reverse order is what keeps a
+        // literal "%0a" in a path from becoming a delimiter on the way back.
         java.util.List<String> parts = com.codename1.util.StringUtil.tokenize(joined, '\n');
-        return parts.toArray(new String[parts.size()]);
+        String[] out = new String[parts.size()];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = com.codename1.util.StringUtil.replaceAll(
+                    com.codename1.util.StringUtil.replaceAll(parts.get(i), "%0a", "\n"),
+                    "%25", "%");
+        }
+        return out;
     }
 
     public void transferFile(String path, String name, byte[] contents) {
