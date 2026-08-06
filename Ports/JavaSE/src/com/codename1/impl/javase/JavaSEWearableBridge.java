@@ -95,6 +95,12 @@ class JavaSEWearableBridge implements WearableBridge {
                 new WearableConnection.DroppedDeliveryHandler() {
                     public void deliveryDropped(String path) {
                         synchronized (seenData) {
+                            if (path == null) {
+                                // More was discarded than could be named: forget every file this
+                                // scan has seen, so the next pass re-offers the whole directory.
+                                seenData.clear();
+                                return;
+                            }
                             seenData.remove(encodePath(path));
                             seenData.remove(encodePath(path) + TOMB_SUFFIX);
                         }
@@ -863,9 +869,15 @@ class JavaSEWearableBridge implements WearableBridge {
                     WearableConnection.deliverDataChangedTracked(deliveryPath(f.getName()),
                             payloadOf(snapshot), inbound ? new Runnable() {
                                 public void run() {
-                                    delivered.delete();
-                                    synchronized (seenData) {
-                                        seenData.remove(delivered.getName());
+                                    // The marker goes only if the file actually did. A delete that
+                                    // fails -- a read-only directory, a Windows handle still open
+                                    // -- would otherwise leave an unchanged one-shot file that the
+                                    // next 500ms scan reads as new, delivering it again and again
+                                    // for as long as the deletion keeps failing.
+                                    if (delivered.delete()) {
+                                        synchronized (seenData) {
+                                            seenData.remove(delivered.getName());
+                                        }
                                     }
                                 }
                             } : null, inbound ? new Runnable() {

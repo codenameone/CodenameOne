@@ -813,6 +813,9 @@ public final class WearableConnection {
     public interface DroppedDeliveryHandler {
         /// Called once per discarded path, on the EDT, after the queue has drained and listeners
         /// exist -- so a re-offer can actually be delivered rather than parked and dropped again.
+        ///
+        /// A null path means the record itself overflowed and more was discarded than can be
+        /// named: re-offer everything available rather than one path.
         void deliveryDropped(String path);
     }
 
@@ -835,9 +838,21 @@ public final class WearableConnection {
     private static final java.util.Set<String> droppedPaths =
             java.util.Collections.newSetFromMap(new java.util.LinkedHashMap<String, Boolean>() {
                 protected boolean removeEldestEntry(java.util.Map.Entry<String, Boolean> eldest) {
-                    return size() > MAX_PENDING;
+                    if (size() > MAX_PENDING) {
+                        // Overflowing loses a specific path, and a removal cannot be reconstructed
+                        // from getData -- so instead of forgetting quietly, ask the port to re-offer
+                        // everything it can. One flag, however many paths overflow: the whole point
+                        // of the bound is that per-path bookkeeping has stopped being affordable.
+                        rescanRequested = true;
+                        return true;
+                    }
+                    return false;
                 }
             });
+
+    /// Set when the dropped-path set overflowed, so the port is asked for a full rescan instead of
+    /// a list of paths it can no longer be given. Read and cleared with [#droppedPaths]'s monitor.
+    private static boolean rescanRequested;
 
     /// Actions a port asked to run once deliveries can actually reach a listener, keyed so repeated
     /// requests for the same operation collapse into one.
@@ -887,6 +902,11 @@ public final class WearableConnection {
             if (queue == pendingData && droppedDeliveries != null && !droppedPaths.isEmpty()) {
                 dropped = new ArrayList<String>(droppedPaths);
                 droppedPaths.clear();
+                if (rescanRequested) {
+                    rescanRequested = false;
+                    // A null path is the rescan request: more was lost than can be named.
+                    dropped.add(null);
+                }
             }
             if (queue == pendingData && !replayRequests.isEmpty()) {
                 replays = new ArrayList<Runnable>(replayRequests.values());

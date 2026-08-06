@@ -310,16 +310,19 @@ void cn1_wearable_replayInbox(void) {
 /// _lastReceived, so every later context replace treats it as unchanged and the app never sees it.
 /// Dropping the record makes the very next update look new.
 void cn1_wearable_forgetReceived(const char *path) {
-    if (path == NULL) {
-        return;
-    }
-    NSString *p = [NSString stringWithUTF8String:path];
     CN1WatchConnectivity *shared = [CN1WatchConnectivity shared];
-    if (shared == nil || p.length == 0) {
+    if (shared == nil) {
         return;
     }
+    NSString *p = path == NULL ? nil : [NSString stringWithUTF8String:path];
     @synchronized (shared) {
-        [shared forgetReceivedPath:p];
+        if (p == nil || p.length == 0) {
+            // The rescan request: more was discarded than could be named, so every received marker
+            // goes and the replay below re-offers the whole held context.
+            [shared forgetAllReceived];
+        } else {
+            [shared forgetReceivedPath:p];
+        }
     }
     // Forgetting alone recovers nothing: it makes the path eligible again, and then waits for a
     // context update that the peer may never send -- it has already published this value. The
@@ -918,6 +921,11 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     [_lastReceived removeObjectForKey:path];
 }
 
+/// Drops every received marker, for the overflow rescan.
+- (void)forgetAllReceived {
+    [_lastReceived removeAllObjects];
+}
+
 /// Re-runs the received-context delivery once, after any number of paths have been forgotten.
 - (void)scheduleReceivedContextReplay {
     @synchronized (self) {
@@ -1177,6 +1185,18 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
 
 - (void)session:(WCSession *)session
         didReceiveApplicationContext:(NSDictionary<NSString *, id> *)applicationContext {
+    // SERIALIZED against itself. WCSession delivers this on its own delegate queue, and the
+    // recovery replay re-runs the very same handler from the main queue -- so two executions could
+    // iterate, mutate, release and replace _lastReceived at once. The narrow @synchronized blocks
+    // elsewhere cover the replay flag and a single forget; they do not cover this handler's state.
+    // Taking the instance monitor for the whole body is what makes those two callers exclusive.
+    @synchronized (self) {
+        [self handleReceivedContext:session context:applicationContext];
+    }
+}
+
+- (void)handleReceivedContext:(WCSession *)session
+                      context:(NSDictionary<NSString *, id> *)applicationContext {
     // The peer replaces its whole context on every publish. Two things follow.
     //
     // First, a path the peer removed either carries a tombstone or has simply stopped being there,

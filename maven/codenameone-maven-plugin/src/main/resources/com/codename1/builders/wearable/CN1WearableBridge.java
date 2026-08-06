@@ -168,6 +168,14 @@ public class CN1WearableBridge implements WearableBridge {
         WearableConnection.setDroppedDeliveryHandler(
                 new WearableConnection.DroppedDeliveryHandler() {
                     public void deliveryDropped(String path) {
+                        if (path == null) {
+                            // More was discarded than could be named. Forget every delivery this
+                            // process has recorded and re-enumerate: the replay then treats each
+                            // still-published path as first sight and offers it again.
+                            forgetAllDeliveredSequences();
+                            replayOutstandingTransfers();
+                            return;
+                        }
                         forgetDeliveredSequence(path);
                         scheduleWinnerResolution(context, path);
                     }
@@ -2615,6 +2623,18 @@ public class CN1WearableBridge implements WearableBridge {
     static boolean hasDeliveredStamp(String path) {
         synchronized (deliveredSequences) {
             return deliveredSequences.containsKey(path);
+        }
+    }
+
+    /// Forgets every recorded delivery, so a full replay treats each path as first sight.
+    ///
+    /// Only for the overflow case: the pending-delivery record lost track of which paths were
+    /// discarded, and re-offering everything still published is the honest recovery. A path the app
+    /// already has arrives again -- a duplicate an app can recognise, against a missing update it
+    /// cannot.
+    static void forgetAllDeliveredSequences() {
+        synchronized (deliveredSequences) {
+            deliveredSequences.clear();
         }
     }
 

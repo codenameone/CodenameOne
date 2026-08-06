@@ -54,6 +54,8 @@ final class IOSWearableBridge implements WearableBridge {
         WearableConnection.setDroppedDeliveryHandler(
                 new WearableConnection.DroppedDeliveryHandler() {
                     public void deliveryDropped(String path) {
+                        // A null path is the rescan request; the native side reads it as "forget
+                        // every received marker" and re-runs the delivery over the held context.
                         nativeInstance.wearableForgetReceived(path);
                     }
                 });
