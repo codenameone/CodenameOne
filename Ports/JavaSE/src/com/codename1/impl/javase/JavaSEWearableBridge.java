@@ -233,6 +233,11 @@ class JavaSEWearableBridge implements WearableBridge {
         // every observable ordering converges on the replacement.
         File tomb = new File(dataDir, encodePath(path) + TOMB_SUFFIX);
         boolean hadTombstone = tomb.isFile();
+        // The acknowledgement goes with it. It describes a tombstone that is about to stop
+        // existing, and leaving it behind is what let a later removal at the same path inherit it.
+        // Best-effort: acknowledges() checks the stamp regardless, so a failed delete here costs
+        // nothing but a stale file.
+        new File(dataDir, tomb.getName() + ACK_SUFFIX).delete();
         if (hadTombstone && !tomb.delete()) {
             // A delete that FAILED is not the same as a tombstone that was not there, and the
             // previous boolean could not tell them apart. Publishing anyway would leave both
@@ -378,6 +383,66 @@ class JavaSEWearableBridge implements WearableBridge {
         // The other two platforms both keep a tombstone for exactly this; the simulator was the
         // odd one out.
         writeValue(new File(dataDir, encodePath(path) + TOMB_SUFFIX), new byte[0], path);
+    }
+
+    /// The acknowledgement payload for a tombstone: the stamp of the tombstone being
+    /// acknowledged, in decimal.
+    ///
+    /// A tombstone born before this framing existed reports {@link Long#MIN_VALUE}, and that is
+    /// written out as-is -- {@link #acknowledges} then accepts it, because such a file predates the
+    /// republish problem and refusing it would strand a tombstone that can never be acknowledged.
+    private static byte[] acknowledgementFor(byte[] tombstone) {
+        try {
+            return Long.toString(framedStamp(tombstone)).getBytes("UTF-8");
+        } catch (java.io.UnsupportedEncodingException everyJvmHasUtf8) {
+            throw new IllegalStateException(everyJvmHasUtf8);
+        }
+    }
+
+    /// Whether this acknowledgement is for THIS tombstone rather than an earlier one at the same
+    /// path.
+    ///
+    /// The file name alone is not enough: putData deletes the tombstone it publishes over but the
+    /// acknowledgement outlived it, so a path removed, republished and removed again found the
+    /// first removal's acknowledgement waiting for the second. The author then retired a tombstone
+    /// no peer had ever seen, which is the exact failure the tombstone exists to prevent.
+    ///
+    /// A stale acknowledgement is deleted rather than merely ignored: leaving it would have the
+    /// peer's next scan see an acknowledged tombstone again the moment the stamps happened to line
+    /// up, and it is dead weight in a directory that is also size-capped.
+    private boolean acknowledges(File ack, long tombstoneStamp) {
+        if (!ack.isFile()) {
+            return false;
+        }
+        byte[] all;
+        try {
+            all = readFully(ack);
+        } catch (IOException unreadable) {
+            // Unreadable is not acknowledged. The tombstone stays, which is the safe direction:
+            // the cost is one file kept past its window, against a peer never learning of a
+            // removal.
+            return false;
+        }
+        String recorded = new String(payloadOf(all), java.nio.charset.Charset.forName("UTF-8")).trim();
+        if (recorded.length() == 0) {
+            // Written by the previous build, which acknowledged by existence alone. Honoured, so
+            // an upgrade does not strand tombstones whose peer already saw them.
+            return true;
+        }
+        long acknowledged;
+        try {
+            acknowledged = Long.parseLong(recorded);
+        } catch (NumberFormatException notAStamp) {
+            return false;
+        }
+        if (acknowledged == tombstoneStamp) {
+            return true;
+        }
+        ack.delete();
+        synchronized (seenData) {
+            seenData.remove(ack.getName());
+        }
+        return false;
     }
 
     /// Marks a tombstone file. A removal's durable record, consumed by the peer's scan.
@@ -889,7 +954,7 @@ class JavaSEWearableBridge implements WearableBridge {
                         // to prevent, reintroduced by its own expiry. The device ports keep theirs
                         // until the peer acknowledges; so does this one now.
                         File ack = new File(dataDir, f.getName() + ACK_SUFFIX);
-                        boolean acknowledged = ack.isFile();
+                        boolean acknowledged = acknowledges(ack, born);
                         // The cap is the backstop, so an app whose peer never runs cannot fill the
                         // directory: past it the oldest go, acknowledged or not.
                         if ((acknowledged && age > TOMB_TTL_MILLIS) || ownTombstones() > MAX_TOMBS) {
@@ -907,8 +972,14 @@ class JavaSEWearableBridge implements WearableBridge {
                     // to know the removal was ever seen and can only guess by age -- and a peer
                     // that was closed for longer than the window comes back to find neither the
                     // value nor the tombstone, so it never learns of the removal at all.
-                    writeValue(new File(dataDir, f.getName() + ACK_SUFFIX), new byte[0],
-                            tombstonePath(f.getName()));
+                    //
+                    // Carrying the stamp of the tombstone it acknowledges, not merely existing. A
+                    // path can be removed, republished and removed again inside the window, and a
+                    // name-only check read the FIRST removal's acknowledgement as confirmation of
+                    // the second -- so the author retired a tombstone no peer had seen, and an
+                    // offline peer came back to neither the value nor the removal.
+                    writeValue(new File(dataDir, f.getName() + ACK_SUFFIX),
+                            acknowledgementFor(snapshot), tombstonePath(f.getName()));
                     continue;
                 }
                 if (!isTransfer(f.getName()) && authoredLocallyFor(snapshot, stamp)) {
