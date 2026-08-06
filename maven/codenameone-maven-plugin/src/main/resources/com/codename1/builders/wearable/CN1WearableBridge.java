@@ -243,6 +243,14 @@ public class CN1WearableBridge implements WearableBridge {
             for (String id : connectedNodeIds(context)) {
                 rememberNode(id);
             }
+            // Re-attempt the CAPABILITY set as well, not just the connected nodes. It is the only
+            // query that can see a paired-but-disconnected sender, so a single transient failure of
+            // it on a cold start left the item permanently unverifiable: retrying connected nodes
+            // can never rediscover a node that is not connected, and the unchanged item is then
+            // discarded with no later callback guaranteed.
+            for (String id : capabilityNodeIds(context)) {
+                rememberNode(id);
+            }
             // Re-attempt the local identity too. A peer query can never return this device, so if
             // getLocalNode() failed transiently on the first pass, an event from our OWN putData()
             // -- which the Data Layer echoes back with the local node as host -- would be rejected
@@ -1142,16 +1150,37 @@ public class CN1WearableBridge implements WearableBridge {
      */
     private static void persistClock(long value) {
         CN1WearableBridge b = current;
-        if (b == null || value <= persistedClock) {
+        // The listener's context stands in when no bridge exists. A peer item can wake the service
+        // alone, and returning early there left the observation in static memory only: if Android
+        // then refused the background activity launch and killed the process, the next launch
+        // restored the OLDER floor, and an immediate local publication could draw a sequence below
+        // the peer item that is still published -- silently losing as the older replica.
+        Context c = b != null ? b.context : serviceContext;
+        if (c == null || value <= persistedClock) {
             return;
         }
         persistedClock = value;
         try {
-            b.context.getSharedPreferences(CLOCK_PREFS, Context.MODE_PRIVATE)
+            c.getSharedPreferences(CLOCK_PREFS, Context.MODE_PRIVATE)
                     .edit().putLong(CLOCK_KEY, value).apply();
         } catch (Throwable unavailable) {
             // Best effort: the in-memory floor still holds for this process.
         }
+    }
+
+    /// A context for a cold service process, where the clock still has to be durable.
+    private static volatile Context serviceContext;
+
+    /// Called by the listener service before it handles anything, so a process that never starts an
+    /// activity can still restore and persist the logical clock.
+    static void noteServiceContext(Context context) {
+        if (context == null || serviceContext != null) {
+            return;
+        }
+        serviceContext = context.getApplicationContext();
+        // Restore FIRST: an observation compared against an unrestored floor would look new and
+        // overwrite a higher stored value with a lower one.
+        restoreClock(serviceContext);
     }
 
     /** Restores the persisted floor, so the first publish after a restart cannot regress. */
