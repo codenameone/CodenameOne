@@ -2465,7 +2465,10 @@ public abstract class Executor {
             }
         }
         p.setProperty("cn1.platform", hardeningPlatform());
-        p.setProperty("cn1.mainClass", request.getMainClass() == null ? "" : request.getMainClass());
+        // The keep rule must name the FULLY QUALIFIED main class: getMainClass() is the simple name
+        // (the stubs combine it with getPackageName()), so passing it bare would keep a default-package
+        // class and let ProGuard rename the real application class out from under the generated stub.
+        p.setProperty("cn1.mainClass", fullyQualifiedMainClass(request));
         p.setProperty("cn1.renameSupported", Boolean.toString(hardeningRenameSupported()));
         // Local plugin builds are ungated: the engine is open source and a developer must be able
         // to reproduce a cloud failure locally. The cloud daemon sets this from the account tier.
@@ -2487,6 +2490,23 @@ public abstract class Executor {
         } finally {
             fo.close();
         }
+    }
+
+    /** The fully qualified main class: {@code getPackageName().getMainClass()} unless already qualified. */
+    private String fullyQualifiedMainClass(BuildRequest request) {
+        String main = request.getMainClass();
+        if (main == null || main.trim().length() == 0) {
+            return "";
+        }
+        main = main.trim();
+        if (main.indexOf('.') >= 0) {
+            return main;
+        }
+        String pkg = request.getPackageName();
+        if (pkg == null || pkg.trim().length() == 0) {
+            return main;
+        }
+        return pkg.trim() + "." + main;
     }
 
     private int runForked(java.util.List<String> cmd, File workDir) throws IOException, InterruptedException {

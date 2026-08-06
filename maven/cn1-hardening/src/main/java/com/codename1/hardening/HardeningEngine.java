@@ -127,6 +127,7 @@ public final class HardeningEngine {
         Map<String, byte[]> renamed;
         int renamedCount = 0;
         File mappingFile = req.getMappingFile();
+        File hierarchyJar;
 
         if (cfg.isRenameEnabled()) {
             if (!proguardCanRunHere()) {
@@ -142,19 +143,26 @@ public final class HardeningEngine {
                     req.getLibraryJars(), keepRules, dict, workDir);
             renamed = JarDemuxer.readClasses(renamedJar);
             renamedCount = countRenamed(inClasses.keySet(), renamed.keySet());
+            hierarchyJar = renamedJar;
         } else {
             renamed = new LinkedHashMap<String, byte[]>(inClasses);
+            hierarchyJar = classesJar;
             if (mappingFile != null) {
                 writeText(mappingFile, "");
             }
         }
+
+        // Classloader over the (renamed) app classes plus the library jars, so stack-map frame
+        // computation resolves the class hierarchy without loading types through the engine's own
+        // classloader (see FrameClassWriter).
+        ClassLoader hierarchy = buildHierarchyLoader(hierarchyJar, req.getLibraryJars());
 
         int seed = deriveSeed(cfg, req.getBuildKey());
         int encryptedStrings = 0;
         boolean stringsApplied = cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform());
         if (stringsApplied) {
             for (Map.Entry<String, byte[]> e : renamed.entrySet()) {
-                StringEncryptTransform t = new StringEncryptTransform(cfg.isEncryptAllStrings(), seed);
+                StringEncryptTransform t = new StringEncryptTransform(cfg.isEncryptAllStrings(), seed, hierarchy);
                 byte[] out = t.transform(e.getValue());
                 if (out != e.getValue()) {
                     e.setValue(out);
@@ -167,7 +175,7 @@ public final class HardeningEngine {
         boolean controlFlowApplied = cfg.isControlFlow() && controlFlowSafeFor(cfg.getPlatform());
         if (controlFlowApplied) {
             for (Map.Entry<String, byte[]> e : renamed.entrySet()) {
-                ControlFlowTransform t = new ControlFlowTransform();
+                ControlFlowTransform t = new ControlFlowTransform(hierarchy);
                 byte[] out = t.transform(e.getValue());
                 if (out != e.getValue()) {
                     e.setValue(out);
@@ -242,6 +250,32 @@ public final class HardeningEngine {
     static boolean controlFlowSafeFor(String platform) {
         return "and".equals(platform) || "android".equals(platform)
                 || "javase".equals(platform) || "desktop".equals(platform);
+    }
+
+    /**
+     * A classloader over the (renamed) application classes plus the library jars, for stack-map
+     * frame computation. JDK library classes resolve through the parent (bootstrap) loader, so the
+     * jmods are intentionally not added -- URLClassLoader can't read them and java.* resolves via
+     * the parent anyway. Never initializes classes (FrameClassWriter uses initialize=false).
+     */
+    private static ClassLoader buildHierarchyLoader(File hierarchyJar, List<File> libraryJars) {
+        List<java.net.URL> urls = new ArrayList<java.net.URL>();
+        try {
+            if (hierarchyJar != null && hierarchyJar.isFile()) {
+                urls.add(hierarchyJar.toURI().toURL());
+            }
+            if (libraryJars != null) {
+                for (File lib : libraryJars) {
+                    if (lib != null && lib.isFile()) {
+                        urls.add(lib.toURI().toURL());
+                    }
+                }
+            }
+        } catch (java.net.MalformedURLException e) {
+            return HardeningEngine.class.getClassLoader();
+        }
+        return new java.net.URLClassLoader(urls.toArray(new java.net.URL[urls.size()]),
+                HardeningEngine.class.getClassLoader());
     }
 
     private static int deriveSeed(HardeningConfig cfg, String buildKey) {

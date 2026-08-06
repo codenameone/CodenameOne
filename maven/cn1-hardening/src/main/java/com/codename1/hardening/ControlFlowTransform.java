@@ -57,7 +57,20 @@ public final class ControlFlowTransform {
     static final String GUARD_FIELD = "zq$cf";
     static final String GUARD_DESC = "I";
 
+    private final ClassLoader hierarchy;
     private int guardedMethods;
+
+    public ControlFlowTransform() {
+        this(null);
+    }
+
+    /**
+     * @param hierarchy a classloader over the (renamed) input classes plus the library jars, used
+     *                  for stack-map frame computation; may be {@code null} in tests
+     */
+    public ControlFlowTransform(ClassLoader hierarchy) {
+        this.hierarchy = hierarchy;
+    }
 
     public int getGuardedMethods() {
         return guardedMethods;
@@ -92,7 +105,7 @@ public final class ControlFlowTransform {
         addGuardField(cn);
         initGuardField(cn);
 
-        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        ClassWriter cw = new FrameClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, hierarchy);
         cn.accept(cw);
         return cw.toByteArray();
     }

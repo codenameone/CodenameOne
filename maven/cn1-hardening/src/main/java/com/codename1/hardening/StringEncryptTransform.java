@@ -64,11 +64,22 @@ public final class StringEncryptTransform {
 
     private final boolean encryptAllStrings;
     private final int seed;
+    private final ClassLoader hierarchy;
     private int encryptedCount;
 
     public StringEncryptTransform(boolean encryptAllStrings, int seed) {
+        this(encryptAllStrings, seed, null);
+    }
+
+    /**
+     * @param hierarchy a classloader over the (renamed) input classes plus the library jars, used
+     *                  for stack-map frame computation so it never loads types through the engine's
+     *                  own classloader; may be {@code null} in tests with no app-type merges
+     */
+    public StringEncryptTransform(boolean encryptAllStrings, int seed, ClassLoader hierarchy) {
         this.encryptAllStrings = encryptAllStrings;
         this.seed = seed;
+        this.hierarchy = hierarchy;
     }
 
     public int getEncryptedCount() {
@@ -116,7 +127,7 @@ public final class StringEncryptTransform {
 
         addDecoder(cn, base);
 
-        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        ClassWriter cw = new FrameClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, hierarchy);
         cn.accept(cw);
         return cw.toByteArray();
     }
