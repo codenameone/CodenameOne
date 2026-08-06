@@ -1736,22 +1736,56 @@ public class CN1WearableBridge implements WearableBridge {
      * propagate and rob a second watch of the file.
      */
     private void expireOwnTransfers() {
-        // The deadline sweep is scheduled UNCONDITIONALLY, before the coalescing check, because it
-        // belongs to the item that was just published rather than to this call. Scheduling it after
-        // the check meant a transfer published inside the five-minute coalescing window never got
-        // one: the earlier task woke at the FIRST item's deadline, found the later item still too
-        // young, and put its next sweep a full day out -- so that item could stay published for
-        // nearly 48 hours while receiver claims are pruned at 24, and a reconnect could redeliver a
-        // supposedly one-shot file. Retention is a promise about the item.
+        // The deadline is armed UNCONDITIONALLY, before the coalescing check, because it belongs to
+        // the item that was just published rather than to this call. Arming it after the check
+        // meant a transfer published inside the five-minute coalescing window never got one: the
+        // earlier task woke at the FIRST item's deadline, found the later item still too young, and
+        // put its next sweep a full day out -- so that item could stay published for nearly 48
+        // hours while receiver claims are pruned at 24, and a reconnect could redeliver a supposedly
+        // one-shot file. Retention is a promise about the item.
         //
-        // This schedules a sweep per published transfer, not per call chain: the task runs
-        // sweepOwnTransfers(), which does not schedule anything further, so the chain terminates.
-        transferTimer.schedule(new java.util.TimerTask() {
-            public void run() {
-                sweepOwnTransfers();
-            }
-        }, TRANSFER_RETENTION_MILLIS + 1000L);
+        // ONE task for the earliest outstanding deadline, not one per item. Every task did the same
+        // global sweep, so an app sending continuously retained tens of thousands of them for a day
+        // and then woke the shared timer in a burst. When the task fires, the sweep rearms it for
+        // the oldest item that is still published -- which is exact, needs no queue of deadlines,
+        // and stops on its own when nothing is left.
+        armSweepDeadline(System.currentTimeMillis() + TRANSFER_RETENTION_MILLIS + 1000L);
         sweepOwnTransfers();
+    }
+
+    /// The absolute time the pending deadline task will fire, or 0 when none is pending.
+    private long sweepDeadlineAt;
+
+    private java.util.TimerTask sweepDeadlineTask;
+
+    /// Ensures a deadline sweep happens no later than {@code at}.
+    ///
+    /// An existing task that already fires by then is left alone -- that is what collapses a burst
+    /// of transfers into a single timer entry, since their deadlines only ever move later. A task
+    /// is replaced only when something genuinely needs an EARLIER sweep, which is why the cancelled
+    /// one is purged rather than left to expire in the queue.
+    private void armSweepDeadline(long at) {
+        synchronized (sweepLock) {
+            if (sweepDeadlineTask != null && sweepDeadlineAt <= at) {
+                return;
+            }
+            if (sweepDeadlineTask != null) {
+                sweepDeadlineTask.cancel();
+                transferTimer.purge();
+            }
+            sweepDeadlineAt = at;
+            sweepDeadlineTask = new java.util.TimerTask() {
+                public void run() {
+                    synchronized (sweepLock) {
+                        sweepDeadlineTask = null;
+                        sweepDeadlineAt = 0;
+                    }
+                    sweepOwnTransfers();
+                }
+            };
+            long delay = at - System.currentTimeMillis();
+            transferTimer.schedule(sweepDeadlineTask, delay < 0 ? 0 : delay);
+        }
     }
 
     private boolean deferredSweepScheduled;
@@ -1945,6 +1979,8 @@ public class CN1WearableBridge implements WearableBridge {
             lastSweepAt = now;
         }
         final long cutoff = System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;
+        // A one-element array because the anonymous task below needs to write it.
+        final long[] oldestKept = {Long.MAX_VALUE};
         transferTimer.schedule(new java.util.TimerTask() {
             public void run() {
                 boolean failed = false;
@@ -1981,6 +2017,14 @@ public class CN1WearableBridge implements WearableBridge {
                             // this item was published.
                             long publishedAt = map == null
                                     ? Long.MIN_VALUE : map.getLong(PUBLISHED_AT_KEY, Long.MIN_VALUE);
+                            if (publishedAt != Long.MIN_VALUE && publishedAt >= cutoff
+                                    && publishedAt < oldestKept[0]) {
+                                // The oldest item this sweep is LEAVING behind. Its deadline is
+                                // when the single shared task must next fire; without it the task
+                                // that just ran would be the last one and the remaining items would
+                                // outlive their retention.
+                                oldestKept[0] = publishedAt;
+                            }
                             if (publishedAt != Long.MIN_VALUE && publishedAt < cutoff) {
                                 // Awaited, so a deletion that fails is not counted as a sweep that
                                 // succeeded. Firing and forgetting left `failed` false while the
@@ -1999,6 +2043,12 @@ public class CN1WearableBridge implements WearableBridge {
                 } finally {
                     synchronized (sweepLock) {
                         sweepScheduled = false;
+                        if (!failed && oldestKept[0] != Long.MAX_VALUE) {
+                            // Rearmed for what is still published. Outside the failure branch: a
+                            // sweep that threw enumerated nothing reliable, and its retry below
+                            // rearms this when it succeeds.
+                            armSweepDeadline(oldestKept[0] + TRANSFER_RETENTION_MILLIS + 1000L);
+                        }
                         if (failed) {
                             // Retried, not abandoned. "The next transfer sweeps again" assumes
                             // there IS a next transfer: an app that sends its last file and then
