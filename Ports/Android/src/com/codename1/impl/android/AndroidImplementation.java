@@ -11054,11 +11054,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     /// Suffix used by the encrypted-database migration for the copy it moves aside.
     ///
+    /// Public because the SQLCipher-backed database is in a sub-package, which is compiled
+    /// separately inside the generated application rather than into the port jar, so
+    /// package-private members of this class are not reachable from it.
+    ///
     /// Declared here rather than only in the cipher package because that package is deleted from
     /// builds that never encrypt, while recovery has to happen on every open: the migration
     /// leaves the live name missing for an instant, and a plaintext open in that window would
     /// create an empty database on top of the real one.
-    static final String DATABASE_BACKUP_SUFFIX = ".cn1backup";
+    public static final String DATABASE_BACKUP_SUFFIX = ".cn1backup";
 
     /// Restores a database whose conversion was interrupted between the two renames.
     ///
@@ -11066,7 +11070,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// and install the converted file in its place, so a process death in that gap leaves a
     /// complete database under the backup name and nothing under the live one. Putting it back
     /// first is what makes the window recoverable rather than a silent empty database.
-    static void recoverInterruptedDatabaseMigration(String path) throws IOException {
+    public static void recoverInterruptedDatabaseMigration(String path) throws IOException {
         if (path == null) {
             return;
         }
