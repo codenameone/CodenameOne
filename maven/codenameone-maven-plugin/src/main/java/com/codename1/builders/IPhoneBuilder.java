@@ -4936,6 +4936,28 @@ public class IPhoneBuilder extends Executor {
             throw new BuildException("surfaces.json declares neither widget kinds nor "
                     + "\"liveActivities\": true; there is nothing to build");
         }
+        // Whether anything in this manifest can appear on iOS, decided HERE -- before the app
+        // group, CN1_USE_WIDGETS and the app-target Swift glue are gated on
+        // surfacesExtensionEnabled. Turning the flag off later, at the point the extension target
+        // would have been generated, was too late: the host app had already been given an
+        // application-groups entitlement and compiled widget support for an extension that is
+        // never produced, and a release profile without that group then fails code signing.
+        boolean anyIosSurface = surfacesLiveActivities;
+        for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
+            if (!IOSWidgetExtensionBuilder.isWatchOnly(kind)) {
+                anyIosSurface = true;
+                break;
+            }
+        }
+        if (!anyIosSurface) {
+            log("[surfaces] Every declared kind is a watch complication family, so no iOS "
+                    + "extension is generated and the iOS surface lowering is skipped entirely "
+                    + "-- no app group, no widget support compiled into the app.");
+            surfacesExtensionEnabled = false;
+            // Nothing further to prepare, and in particular no xcodeproj gem to require: that
+            // check exists for wiring an extension into the project, and there is no extension.
+            return;
+        }
         // The extension is wired into the Xcode project through the ruby xcodeproj gem;
         // fail early with a friendly message when it is missing.
         ensureXcodeprojInstalled();
