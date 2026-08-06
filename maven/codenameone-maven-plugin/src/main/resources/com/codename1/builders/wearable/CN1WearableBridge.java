@@ -218,15 +218,26 @@ public class CN1WearableBridge implements WearableBridge {
         // absent" as evidence dropped an event from a genuinely paired device. Connectivity says
         // who is reachable now; the capability set says who is paired and running this app, and for
         // a stored item that is the question.
-        for (String id : capabilityNodeIds(context)) {
-            rememberNode(id);
+        boolean capabilityQueried = false;
+        List<String> capable = capabilityNodeIds(context);
+        if (capable != null) {
+            capabilityQueried = true;
+            for (String id : capable) {
+                rememberNode(id);
+            }
         }
         if (recentlySeen(sourceNodeId)) {
             return true;
         }
-        if (!connected.isEmpty()) {
+        if (!connected.isEmpty() && capabilityQueried) {
             // Reachable peers exist, the sender is not among them, and it advertises no capability
             // either. That is real evidence against it.
+            //
+            // Gated on the capability query having actually ANSWERED. With several paired watches,
+            // a durable item from disconnected watch A arriving while watch B is online leaves the
+            // connected snapshot populated -- so a transient failure of the one query that can see
+            // A would have been read as evidence against A and rejected it outright, and an
+            // unchanged item may raise no later callback to put that right.
             return false;
         }
         // The query established nothing at all: the sender may have disconnected while we were
@@ -249,8 +260,11 @@ public class CN1WearableBridge implements WearableBridge {
             // it on a cold start left the item permanently unverifiable: retrying connected nodes
             // can never rediscover a node that is not connected, and the unchanged item is then
             // discarded with no later callback guaranteed.
-            for (String id : capabilityNodeIds(context)) {
-                rememberNode(id);
+            List<String> retryCapable = capabilityNodeIds(context);
+            if (retryCapable != null) {
+                for (String id : retryCapable) {
+                    rememberNode(id);
+                }
             }
             // Re-attempt the local identity too. A peer query can never return this device, so if
             // getLocalNode() failed transiently on the first pass, an event from our OWN putData()
@@ -265,6 +279,8 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     /// Ids of the nodes advertising this app's capability, reachable or not. Blocking.
+    /// Null when the query FAILED, which is not the same as a peer set that is genuinely empty --
+    /// the caller uses the difference to decide whether a populated connected snapshot is evidence.
     private static List<String> capabilityNodeIds(Context context) {
         List<String> out = new ArrayList<String>();
         try {
@@ -278,7 +294,9 @@ public class CN1WearableBridge implements WearableBridge {
                 }
             }
         } catch (Throwable unavailable) {
-            // Nothing established; the caller falls back to refusing the event.
+            // Nothing established. Reported as null so the caller can tell "could not ask" from
+            // "asked, and this node is not paired".
+            return null;
         }
         return out;
     }
@@ -1308,6 +1326,12 @@ public class CN1WearableBridge implements WearableBridge {
                 try {
                     getDataPaths();
                 } catch (Throwable unavailable) {
+                    // Not the usual case: getDataPaths swallows a Data Layer failure itself.
+                }
+                // So the OUTCOME is what decides, not an exception. A transient failure leaves
+                // pathsCache null, and marking the attempt done on that basis meant every later
+                // latency-sensitive call answered empty forever without ever asking again.
+                if (pathsCache == null) {
                     synchronized (primedValues) {
                         primedValues.remove(PATHS_PRIMED_KEY);
                     }
@@ -1732,7 +1756,13 @@ public class CN1WearableBridge implements WearableBridge {
                             long publishedAt = map == null
                                     ? Long.MIN_VALUE : map.getLong(PUBLISHED_AT_KEY, Long.MIN_VALUE);
                             if (publishedAt != Long.MIN_VALUE && publishedAt < cutoff) {
-                                dataClient.deleteDataItems(item.getUri());
+                                // Awaited, so a deletion that fails is not counted as a sweep that
+                                // succeeded. Firing and forgetting left `failed` false while the
+                                // item stayed published, and for the LAST transfer there may be no
+                                // later sweep -- so it outlived the receiver claims that expire at
+                                // the same age, and a reconnect could redeliver a one-shot file.
+                                Tasks.await(dataClient.deleteDataItems(item.getUri()),
+                                        TIMEOUT_SECONDS, TimeUnit.SECONDS);
                             }
                         }
                     } finally {

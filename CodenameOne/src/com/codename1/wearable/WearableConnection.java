@@ -441,7 +441,12 @@ public final class WearableConnection {
                         reply = r;
                     }
                 }
-                if (replyToken != 0) {
+                // Nothing answers for an app that has no listener left. The snapshot can empty
+                // between the dispatch and this runnable -- an app shutting down, or one that
+                // deregisters on pause -- and replying anyway handed the sender an empty SUCCESS,
+                // so replyReceived fired for a request no application code ever saw. Staying
+                // silent lets the sender's own timeout report the failure it actually had.
+                if (replyToken != 0 && copy.length > 0) {
                     WearableBridge b = bridge();
                     if (b != null) {
                         b.sendReply(replyToken,

@@ -339,6 +339,16 @@ public class CN1WearableListenerService extends WearableListenerService {
                     // getData() reports otherwise. Same reasoning as the first-sight path.
                     CN1WearableBridge.ResolvedValue remaining =
                             CN1WearableBridge.resolveValueWithRetry(this, appPath);
+                    // Recorded for EVERY deletion that resolves, survivor or not, and before the
+                    // stamp tests below rather than inside either of them.
+                    //
+                    // Both restrictions were wrong. An older first-sight resolution may be in
+                    // flight holding the item this deletion removed: if it captured the now-deleted
+                    // HIGHER-ranked replica it can still pass deliverIfOutranks afterwards and
+                    // restore a deleted value, which the survivor branch did nothing about. And
+                    // when such a resolver is pending the path has no delivery stamp yet, so
+                    // anything placed inside a stamp test never ran at all.
+                    CN1WearableBridge.notePendingDeletion(appPath);
                     if (remaining != null) {
                         // Record the survivor's stamp outright -- the state of the path IS this
                         // item now. Using the newer-than test here would decline whenever the
@@ -362,31 +372,30 @@ public class CN1WearableListenerService extends WearableListenerService {
                         CN1WearableBridge.deliverIfStampUnchanged(appPath, beforeQuery,
                                 remaining.sequence, remaining.node, remaining.payload);
                     } else {
-                        // Recorded against any pending resolver BEFORE the stamp test, and outside
-                        // it. An older first-sight resolution may still be in flight holding an
-                        // item it captured before the deletion -- and in exactly that case the path
-                        // has no delivery stamp yet, so deliverRemovalIfStampUnchanged returns
-                        // false on the null beforeQuery and the upgrade inside its branch never
-                        // ran. The resolution succeeded and the path is empty; that is what the
-                        // pending resolver has to be told, whether or not there was a stamp to
-                        // drop.
-                        CN1WearableBridge.notePendingDeletion(appPath);
+                        // Genuinely empty, so the stamp can go: a value republished here later
+                        // with a lower stamp than the removed one carried must not be filtered as
+                        // older.
+                        //
+                        // Announced only when that drop actually took a stamp. Deleting a
+                        // replicated path deletes every authority's copy, and one buffer can carry
+                        // a TYPE_DELETED event per item -- each would otherwise resolve empty and
+                        // announce the same logical removal again, so a listener that treats
+                        // removal as an event would act on it once per replica. The first event
+                        // takes the stamp and reports; the rest find nothing and stay quiet.
+                        //
+                        // Anchored on beforeQuery, not merely "was something there": the query
+                        // above blocks, so a newer publication delivered while it ran would
+                        // otherwise have its stamp removed and a removal announced for a path
+                        // that has already been refilled -- the newer callback has already fired
+                        // and may not repeat.
+                        //
+                        // Inside this branch, never outside it: hoisting the call meant deleting a
+                        // lower-ranked SHADOW replica -- where the winner survives and
+                        // deliverIfStampUnchanged leaves the stamp as it found it -- dropped the
+                        // LIVE winner's stamp, cleared its cached value and told the app the value
+                        // had gone.
+                        CN1WearableBridge.deliverRemovalIfStampUnchanged(appPath, beforeQuery);
                     }
-                    // Genuinely empty, so the stamp can go: a value republished here later with a
-                    // lower stamp than the removed one carried must not be filtered as older.
-                    //
-                    // Announced only when that drop actually took a stamp. Deleting a replicated
-                    // path deletes every authority's copy, and one buffer can carry a TYPE_DELETED
-                    // event per item -- each would otherwise resolve empty and announce the same
-                    // logical removal again, so a listener that treats removal as an event would
-                    // act on it once per replica. The first event takes the stamp and reports; the
-                    // rest find nothing and stay quiet.
-                    //
-                    // Anchored on beforeQuery, not merely "was something there": the query above
-                    // blocks, so a newer publication delivered while it ran would otherwise have
-                    // its stamp removed and a removal announced for a path that has already been
-                    // refilled -- the newer callback has already fired and may not repeat.
-                    CN1WearableBridge.deliverRemovalIfStampUnchanged(appPath, beforeQuery);
                 } catch (java.io.IOException couldNotResolve) {
                     // The follow-up query failed rather than answering "nothing here". Still do not
                     // report a removal on that: it would tell the app a path had gone while another
