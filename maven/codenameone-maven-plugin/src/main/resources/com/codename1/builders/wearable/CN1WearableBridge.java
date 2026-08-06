@@ -3101,8 +3101,23 @@ public class CN1WearableBridge implements WearableBridge {
                 synchronized (transferClaims) {
                     claimPruneScheduled = false;
                 }
-                boolean remaining = pruneClaims(app);
-                if (remaining) {
+                // A REPLAY PASS, not a bare prune. Pruning by age alone here bypassed the
+                // live-item check the startup path was given: a sender retrying a failed deletion
+                // can hold an item well past the claim's grace, and dropping the claim while the
+                // item is still published lets the next restart deliver that one-shot file again.
+                // The replay refreshes the claim of everything still there and prunes only
+                // afterwards, so age retires a record exactly when its item is genuinely gone.
+                CN1WearableBridge b = current;
+                if (b != null) {
+                    b.replayOutstandingTransfers();
+                } else {
+                    // No bridge in this process (a cold service): nothing can enumerate, so leave
+                    // the claims alone rather than expiring records that may still be needed.
+                    // Storage stays bounded because the next process with a bridge sweeps them.
+                    scheduleClaimPrune(app);
+                    return;
+                }
+                if (hasAnyStoredClaim(app)) {
                     scheduleClaimPrune(app);
                 }
             }
@@ -3250,20 +3265,34 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
-    /// Prunes expired claims, returning true when anything is still stored.
-    private static boolean pruneClaims(Context context) {
-        if (context == null) {
+    /// Whether the durable store holds anything at all, so the maintenance timer knows to re-arm.
+    private static boolean hasAnyStoredClaim(Context context) {
+        try {
+            return !context.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE)
+                    .getAll().isEmpty();
+        } catch (Throwable unavailable) {
             return false;
+        }
+    }
+
+    /// Prunes expired claims.
+    ///
+    /// Called ONLY from a successful replay pass, which has just refreshed the claim of every item
+    /// still published -- so anything left aged out describes an item that is genuinely gone. There
+    /// is deliberately no age-only caller: expiring a claim while its item still exists is what
+    /// lets a restart redeliver a one-shot transfer.
+    private static void pruneClaims(Context context) {
+        if (context == null) {
+            return;
         }
         try {
             android.content.SharedPreferences prefs =
                     context.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE);
             android.content.SharedPreferences.Editor edit = prefs.edit();
-            int kept = pruneInto(prefs, edit);
+            pruneInto(prefs, edit);
             edit.apply();
-            return kept > 0;
         } catch (Throwable unavailable) {
-            return false;
+            // Best effort: the next replay prunes again.
         }
     }
 
