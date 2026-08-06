@@ -133,6 +133,10 @@ class KotlinUiTest : BaseTest() {
         soSwitch.unselectedStyle
         step("probe-so-selectedstyle")
         soSwitch.selectedStyle
+        // The track image is sized from the font height, and a zero height made
+        // createMutableImage hand back a broken peer. Report the number.
+        val f = soSwitch.style.font
+        step("probe-so-fontheight=" + (if (f == null) "null-font" else f.height.toString()))
         step("probe-so-preferredsize")
         soSwitch.preferredSize
         step("probe-so-addcontent")

@@ -441,8 +441,17 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_createMutableImage___int_int_
     D2D1_COLOR_F clearColor;
     uint32_t a, r, g, b;
 
-    if (width <= 0 || height <= 0) {
-        return 0;
+    /* A zero or negative extent used to return 0, and a 0 peer is worse than a
+     * tiny image: Image.getGraphics() then answers null and the caller dies with
+     * a NullPointerException far from the cause -- which is how Switch's
+     * preferred-size calculation crashed on this port, since its track image is
+     * sized from the font height. Clamp to 1x1 so the object is always usable;
+     * a caller asking for an empty image gets an empty-looking one. */
+    if (width <= 0) {
+        width = 1;
+    }
+    if (height <= 0) {
+        height = 1;
     }
 
     img = (CN1Image*)malloc(sizeof(CN1Image));

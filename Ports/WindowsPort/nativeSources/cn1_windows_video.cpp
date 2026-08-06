@@ -38,6 +38,7 @@
 #include <wrl/client.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
 #include "cn1_windows.h"
 
 using Microsoft::WRL::ComPtr;
@@ -73,6 +74,8 @@ static void cn1StripFileWide(const char* utf8, wchar_t* out, int outLen) {
 
 struct CN1VideoReader {
     ComPtr<IMFSourceReader> reader;
+    /* The source URL, so readAudio can open a reader of its own. */
+    std::wstring url;
     int width;
     int height;
     LONGLONG durationMs;
@@ -121,6 +124,7 @@ static JAVA_LONG cn1ReaderOpen(const wchar_t* url) {
 
     CN1VideoReader* st = new CN1VideoReader();
     st->reader = reader;
+    st->url = url;
     st->width = 0;
     st->height = 0;
     st->durationMs = -1;
@@ -261,11 +265,35 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
     if (!st->hasAudio) {
         return JAVA_NULL;
     }
-    // readAudio() promises the entire audio track. A prior frameAt()/readFrames()
-    // may have repositioned the shared source reader via SetCurrentPosition, which
-    // moves every stream (not just video), so rewind to the start before draining
-    // the audio stream -- otherwise audio would begin at the last video seek.
-    {
+    // readAudio() promises the entire audio track, and the shared reader has
+    // usually been driven to end-of-file by frameAt()/readFrames() first. Rewinding
+    // it with SetCurrentPosition did not bring the audio stream back: the very
+    // first ReadSample after the seek returned MF_SOURCE_READERF_ENDOFSTREAM with
+    // zero bytes (reads=1 lastFlags=0x2), which is what left VideoIORoundTripTest
+    // reporting "reports audio but no PCM samples were returned" on Windows.
+    //
+    // Open a reader of our own instead. A fresh source reader starts at the
+    // beginning by construction, so the audio track no longer depends on seek
+    // semantics or on what the video pass did to the shared position.
+    ComPtr<IMFSourceReader> audioReader;
+    if (!st->url.empty()) {
+        ComPtr<IMFAttributes> attrs;
+        if (SUCCEEDED(MFCreateAttributes(&attrs, 1))) {
+            MFCreateSourceReaderFromURL(st->url.c_str(), attrs.Get(), &audioReader);
+        }
+    }
+    if (audioReader != NULL) {
+        audioReader->SetStreamSelection((DWORD) MF_SOURCE_READER_ALL_STREAMS, FALSE);
+        audioReader->SetStreamSelection((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, TRUE);
+        ComPtr<IMFMediaType> pcmType;
+        if (SUCCEEDED(MFCreateMediaType(&pcmType))) {
+            pcmType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
+            pcmType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
+            pcmType->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
+            audioReader->SetCurrentMediaType((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, NULL, pcmType.Get());
+        }
+    } else {
+        /* No fresh reader: fall back to rewinding the shared one. */
         PROPVARIANT pos;
         PropVariantInit(&pos);
         pos.vt = VT_I8;
@@ -273,6 +301,7 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
         st->reader->SetCurrentPosition(GUID_NULL, pos);
         PropVariantClear(&pos);
     }
+    IMFSourceReader* src = audioReader != NULL ? audioReader.Get() : st->reader.Get();
     unsigned char* pcm = NULL;
     size_t pcmLen = 0, pcmCap = 0;
     /* Diagnostics: readAudio returning empty is reported by the suite as
@@ -288,7 +317,7 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
         LONGLONG timestamp = 0;
         ComPtr<IMFSample> sample;
         loops++;
-        lastHr = st->reader->ReadSample((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, NULL, &streamFlags, &timestamp, &sample);
+        lastHr = src->ReadSample((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, NULL, &streamFlags, &timestamp, &sample);
         lastFlags = streamFlags;
         if (FAILED(lastHr)) {
             break;
