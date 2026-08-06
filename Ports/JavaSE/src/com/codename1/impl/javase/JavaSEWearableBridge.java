@@ -391,6 +391,32 @@ class JavaSEWearableBridge implements WearableBridge {
         return storageName.endsWith(TOMB_SUFFIX);
     }
 
+    /// Marks a peer's acknowledgement of a tombstone. Bookkeeping between the two simulators:
+    /// never delivered to a listener and never enumerated as a path.
+    private static final String ACK_SUFFIX = ".ack";
+
+    private static boolean isTombstoneAck(String storageName) {
+        return storageName.endsWith(ACK_SUFFIX);
+    }
+
+    /// How many tombstones this side may keep while waiting for a peer that never runs.
+    private static final int MAX_TOMBS = 256;
+
+    /// Tombstones currently in the shared directory, the cap's input.
+    private int ownTombstones() {
+        File[] files = dataDir.listFiles();
+        if (files == null) {
+            return 0;
+        }
+        int n = 0;
+        for (File f : files) {
+            if (isTombstone(f.getName())) {
+                n++;
+            }
+        }
+        return n;
+    }
+
     /// The logical path a tombstone stands for.
     private static String tombstonePath(String storageName) {
         return decodePath(storageName.substring(0, storageName.length() - TOMB_SUFFIX.length()));
@@ -406,7 +432,7 @@ class JavaSEWearableBridge implements WearableBridge {
             // A transfer is not a readable replicated path -- getData() on its storage name is not
             // part of the API -- so it is left out, matching the device ports.
             if (f.isFile() && !f.getName().endsWith(".tmp") && !isTransfer(f.getName())
-                    && !isTombstone(f.getName())) {
+                    && !isTombstone(f.getName()) && !isTombstoneAck(f.getName())) {
                 out.add(decodePath(f.getName()));
             }
         }
@@ -834,6 +860,11 @@ class JavaSEWearableBridge implements WearableBridge {
                     }
                     continue;
                 }
+                if (isTombstoneAck(f.getName())) {
+                    // Bookkeeping between the two simulators. Delivering it would announce a path
+                    // ending in ".tomb.ack" that no app ever published.
+                    continue;
+                }
                 if (isTombstone(f.getName())) {
                     // A peer's removal. Delivered once -- the seen-marker above has already been
                     // updated, so a tombstone that does not change is not re-announced.
@@ -852,15 +883,32 @@ class JavaSEWearableBridge implements WearableBridge {
                         long age = born == Long.MIN_VALUE
                                 ? System.currentTimeMillis() - stamp
                                 : System.currentTimeMillis() - (born / 2);
-                        if (age > TOMB_TTL_MILLIS) {
+                        // Age alone is NOT permission to forget. A peer that stayed closed longer
+                        // than the window would come back to neither a value nor a tombstone and
+                        // never learn of the removal -- which is the failure the tombstone exists
+                        // to prevent, reintroduced by its own expiry. The device ports keep theirs
+                        // until the peer acknowledges; so does this one now.
+                        File ack = new File(dataDir, f.getName() + ACK_SUFFIX);
+                        boolean acknowledged = ack.isFile();
+                        // The cap is the backstop, so an app whose peer never runs cannot fill the
+                        // directory: past it the oldest go, acknowledged or not.
+                        if ((acknowledged && age > TOMB_TTL_MILLIS) || ownTombstones() > MAX_TOMBS) {
                             f.delete();
+                            ack.delete();
                             synchronized (seenData) {
                                 seenData.remove(f.getName());
+                                seenData.remove(ack.getName());
                             }
                         }
                         continue;
                     }
                     WearableConnection.deliverDataRemoved(tombstonePath(f.getName()));
+                    // Acknowledged, so the author can retire it. Without this the author has no way
+                    // to know the removal was ever seen and can only guess by age -- and a peer
+                    // that was closed for longer than the window comes back to find neither the
+                    // value nor the tombstone, so it never learns of the removal at all.
+                    writeValue(new File(dataDir, f.getName() + ACK_SUFFIX), new byte[0],
+                            tombstonePath(f.getName()));
                     continue;
                 }
                 if (!isTransfer(f.getName()) && authoredLocallyFor(snapshot, stamp)) {
@@ -927,8 +975,8 @@ class JavaSEWearableBridge implements WearableBridge {
                 // path may well still hold an unrelated replicated value.
                 continue;
             }
-            if (isTombstone(name)) {
-                // The tombstone itself expiring is housekeeping, not a removal.
+            if (isTombstone(name) || isTombstoneAck(name)) {
+                // A tombstone or its acknowledgement expiring is housekeeping, not a removal.
                 continue;
             }
             if (new File(dataDir, name + TOMB_SUFFIX).isFile()) {
