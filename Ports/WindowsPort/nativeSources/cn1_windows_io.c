@@ -280,14 +280,45 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_fileRename___java_lang_String
     UINT32 len1 = 0, len2 = 0;
     WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len1);
     /*
-     * Per the CN1 FileSystemStorage contract newName is the full target path,
-     * so it is passed directly to MoveFileExW. If a caller ever passes a bare
-     * leaf name the move would land in the process working directory; that
-     * would be a contract violation on the Java side.
+     * FileSystemStorage.rename documents newName as "relative to the current
+     * folder" -- a leaf name -- and the Linux port resolves it that way. This
+     * passed it straight to MoveFileExW as a full target, so a leaf name moved
+     * the file into the process working directory instead of renaming it in
+     * place. WAVWriter.close() does exactly that (it renames the recording to
+     * <name>.pcm via new File(...).getName()) and then reopens the .pcm, which
+     * was not where it expected: AudioMixerApiTest failed on Windows with
+     * "No such file" for a file the port had quietly moved elsewhere.
+     *
+     * A leaf name is now joined to the source's parent directory. An absolute
+     * target -- one carrying a drive letter, a UNC prefix or a leading
+     * separator -- is still honoured as-is, so any caller relying on the old
+     * behaviour keeps working.
      */
     WCHAR* newName = cn1WinJavaStringToWide(threadStateData, __cn1Arg2, &len2);
+    WCHAR* target = NULL;
     if (path != NULL && newName != NULL) {
-        MoveFileExW(path, newName, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED);
+        int absolute = (newName[0] == L'\\' || newName[0] == L'/'
+                        || (newName[0] != 0 && newName[1] == L':'));
+        if (absolute) {
+            MoveFileExW(path, newName, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED);
+        } else {
+            WCHAR* lastBack = wcsrchr(path, L'\\');
+            WCHAR* lastFwd = wcsrchr(path, L'/');
+            WCHAR* sep = lastBack > lastFwd ? lastBack : lastFwd;
+            size_t dirLen = sep != NULL ? (size_t) (sep - path) + 1 : 0;
+            size_t nameLen = wcslen(newName);
+            target = (WCHAR*) malloc((dirLen + nameLen + 1) * sizeof(WCHAR));
+            if (target != NULL) {
+                if (dirLen > 0) {
+                    memcpy(target, path, dirLen * sizeof(WCHAR));
+                }
+                memcpy(target + dirLen, newName, (nameLen + 1) * sizeof(WCHAR));
+                MoveFileExW(path, target, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED);
+            }
+        }
+    }
+    if (target != NULL) {
+        free(target);
     }
     if (path != NULL) {
         free(path);
