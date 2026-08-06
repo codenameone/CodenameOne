@@ -710,18 +710,61 @@ public final class WearableConnection {
         }, dataListeners, pendingData, onRelinquished, onDelivered != null);
     }
 
+    /// Actions a port asked to run once deliveries can actually reach a listener.
+    private static final List<Runnable> replayRequests = new ArrayList<Runnable>();
+
+    /// Framework/port entry point: asks for `replay` to run once a listener exists.
+    ///
+    /// A port whose payload was evicted from the pending queue cannot simply re-offer it: nothing
+    /// has changed yet, so the delivery would be parked, immediately evict another one-shot to make
+    /// room, and that one would re-offer in turn. Deferring to the moment the queue drains breaks
+    /// that cycle -- by then a listener exists and deliveries dispatch instead of parking.
+    ///
+    /// Runs immediately when a data listener is already registered.
+    ///
+    /// #### Parameters
+    ///
+    /// - `replay`: the port's re-offer action
+    public static void requestReplayAfterDrain(Runnable replay) {
+        if (replay == null) {
+            return;
+        }
+        synchronized (pendingData) {
+            if (dataListeners.isEmpty()) {
+                replayRequests.add(replay);
+                return;
+            }
+        }
+        replay.run();
+    }
+
     /// Replays what was queued for one listener type, once a listener of that type exists.
     private static void drainPending(List<Runnable> queue) {
         List<Runnable> drained;
+        List<Runnable> replays = null;
         synchronized (queue) {
-            if (queue.isEmpty()) {
-                return;
+            if (queue == pendingData && !replayRequests.isEmpty()) {
+                replays = new ArrayList<Runnable>(replayRequests);
+                replayRequests.clear();
             }
-            drained = new ArrayList<Runnable>(queue);
-            queue.clear();
+            if (!queue.isEmpty()) {
+                drained = new ArrayList<Runnable>(queue);
+                queue.clear();
+            } else {
+                drained = null;
+            }
         }
-        for (Runnable r : drained) {
-            Display.getInstance().callSerially(r);
+        if (drained != null) {
+            for (Runnable r : drained) {
+                Display.getInstance().callSerially(r);
+            }
+        }
+        // After the drain, so a re-offered payload finds room and a registered listener rather than
+        // landing straight back in a full queue.
+        if (replays != null) {
+            for (int i = 0; i < replays.size(); i++) {
+                replays.get(i).run();
+            }
         }
     }
 

@@ -282,6 +282,15 @@ void cn1_wearable_releaseInbox(const char *inboxToken) {
     cn1WearableClearInFlight(name);
 }
 
+/// Re-offers everything still parked in the inbox.
+///
+/// Called from Java once a data listener exists, after a delivery was evicted from the pending
+/// queue. Clearing the in-flight mark only makes the entry ELIGIBLE again; without this nothing
+/// would look at it until the next session activation or a restart.
+void cn1_wearable_replayInbox(void) {
+    cn1WearableDrainInbox();
+}
+
 /// Retires a delivered inbox entry.
 ///
 /// Invoked from Java on the EDT after the payload has been handed to the application, which is the

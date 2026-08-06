@@ -975,20 +975,50 @@ public class CN1WearableBridge implements WearableBridge {
     /// {@link CN1WearableListenerService} as the request arrives.
     static int rememberRequestOrigin(int peerToken, String nodeId) {
         synchronized (inboundNodes) {
-            // An app that never answers a path would otherwise grow this map for its whole life.
-            // The sender gives up after its own timeout, so an entry older than that can go.
-            long cutoff = System.currentTimeMillis() - INBOUND_TTL_MILLIS;
-            java.util.Iterator<Map.Entry<Integer, InboundRequest>> it =
-                    inboundNodes.entrySet().iterator();
-            while (it.hasNext()) {
-                if (it.next().getValue().created < cutoff) {
-                    it.remove();
-                }
-            }
+            pruneInboundOrigins();
             int local = nextLocalToken++;
             inboundNodes.put(Integer.valueOf(local), new InboundRequest(nodeId, peerToken));
+            // Also swept on a timer. Pruning only here meant a FINAL request -- or a final burst --
+            // to an app that never answers kept its origin records for the rest of the process,
+            // long after every sender had timed out. A TTL that needs future traffic to take effect
+            // is not a TTL.
+            scheduleInboundPrune();
             return local;
         }
+    }
+
+    /// Drops origins older than the TTL. Caller holds {@link #inboundNodes}.
+    private static void pruneInboundOrigins() {
+        // An app that never answers a path would otherwise grow this map for its whole life.
+        // The sender gives up after its own timeout, so an entry older than that can go.
+        long cutoff = System.currentTimeMillis() - INBOUND_TTL_MILLIS;
+        java.util.Iterator<Map.Entry<Integer, InboundRequest>> it =
+                inboundNodes.entrySet().iterator();
+        while (it.hasNext()) {
+            if (it.next().getValue().created < cutoff) {
+                it.remove();
+            }
+        }
+    }
+
+    private static boolean inboundPruneScheduled;
+
+    /// Arms one prune, and only one: the task re-arms itself while anything is still remembered, so
+    /// a burst of requests does not queue a task each. Caller holds {@link #inboundNodes}.
+    private static void scheduleInboundPrune() {
+        if (inboundPruneScheduled || inboundNodes.isEmpty()) {
+            return;
+        }
+        inboundPruneScheduled = true;
+        replyTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                synchronized (inboundNodes) {
+                    inboundPruneScheduled = false;
+                    pruneInboundOrigins();
+                    scheduleInboundPrune();
+                }
+            }
+        }, INBOUND_TTL_MILLIS + 1000L);
     }
 
     /** How long an unanswered inbound request is remembered; outlives the sender's own timeout. */
@@ -1453,7 +1483,27 @@ public class CN1WearableBridge implements WearableBridge {
         sweepOwnTransfers();
     }
 
-    /// The sweep itself, coalesced. Schedules no follow-up: see [#expireOwnTransfers].
+    private boolean deferredSweepScheduled;
+
+    /// Re-runs a sweep once the coalescing interval has elapsed. At most one is pending; it is not
+    /// a per-call chain. Caller holds {@link #sweepLock}.
+    private void scheduleDeferredSweep(long delay) {
+        if (deferredSweepScheduled) {
+            return;
+        }
+        deferredSweepScheduled = true;
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                synchronized (sweepLock) {
+                    deferredSweepScheduled = false;
+                }
+                sweepOwnTransfers();
+            }
+        }, delay < 0 ? 0 : delay + 1000L);
+    }
+
+    /// The sweep itself, coalesced. Schedules no follow-up beyond a deferred retry when coalescing
+    /// suppressed it: see [#expireOwnTransfers].
     private void sweepOwnTransfers() {
         // One sweep at a time, and not more often than the interval. A burst of transfers used to
         // schedule one immediate task per call, each blocking on a full DataItem query and scan --
@@ -1462,6 +1512,15 @@ public class CN1WearableBridge implements WearableBridge {
         synchronized (sweepLock) {
             long now = System.currentTimeMillis();
             if (sweepScheduled || now - lastSweepAt < SWEEP_MIN_INTERVAL_MILLIS) {
+                // Deferred, not dropped. An item's own deadline task can land inside the coalescing
+                // window opened by a neighbouring transfer -- the earlier sweep ran just before
+                // this deadline and found this item too young -- and simply returning left the next
+                // guaranteed sweep at some other item's deadline up to a day later. The item then
+                // outlived its retention window while receiver claims expired on time, which is
+                // exactly the stale-redelivery case retention exists to prevent.
+                if (!sweepScheduled) {
+                    scheduleDeferredSweep(SWEEP_MIN_INTERVAL_MILLIS - (now - lastSweepAt));
+                }
                 return;
             }
             sweepScheduled = true;
@@ -2248,7 +2307,13 @@ public class CN1WearableBridge implements WearableBridge {
             // Only ever set, never cleared: once a deletion is folded into a pending resolution,
             // a later non-deletion caller must not downgrade it back.
             if (afterDeletion) {
-                deletionPaths.add(path);
+                // Numbered, not flagged. A second deletion arriving while a resolution is in flight
+                // used to re-add an entry that was already there, so it left no trace: the running
+                // task had itself acted on a deletion, reported no missed upgrade, and cleared the
+                // only pending marker -- while its query predated the republication and could not
+                // have seen the newer deletion at all. The generation lets the finishing task
+                // notice that the deletion it handled is no longer the latest one.
+                deletionPaths.put(path, Long.valueOf(++deletionGeneration));
             }
             if (!fresh) {
                 return;
@@ -2273,7 +2338,13 @@ public class CN1WearableBridge implements WearableBridge {
                     String before = deliveredStamp(path);
                     // Read ONCE, and remember what we acted on. Calling wasAfterDeletion() again
                     // below would let an upgrade landing mid-task change the rule half way through.
-                    boolean afterDeletion = wasAfterDeletion(path);
+                    // The generation is captured with it, so a SECOND deletion arriving while this
+                    // query is in flight is distinguishable from the one being handled.
+                    long actedGeneration;
+                    synchronized (pendingWinnerPaths) {
+                        actedGeneration = deletionGenerationFor(path);
+                    }
+                    boolean afterDeletion = actedGeneration != 0L;
                     ResolvedValue winner = resolveValue(context, path);
                     if (winner != null) {
                         // Two different rules, because the recorded stamp means two different things.
@@ -2304,7 +2375,7 @@ public class CN1WearableBridge implements WearableBridge {
                         // a value republished later with a lower sequence must not be filtered as
                         // older.
                     }
-                    if (finishPendingWinner(path, afterDeletion)) {
+                    if (finishPendingWinner(path, actedGeneration)) {
                         // A deletion upgrade arrived while this task was running and we applied the
                         // non-deletion rule, so the deleted winner may still be recorded as
                         // delivered. The scheduler that set the flag saw the path already pending
@@ -2381,7 +2452,7 @@ public class CN1WearableBridge implements WearableBridge {
      */
     private static boolean retireUnlessDeletion(String path) {
         synchronized (pendingWinnerPaths) {
-            if (deletionPaths.contains(path)) {
+            if (deletionPaths.containsKey(path)) {
                 return true;
             }
             pendingWinnerPaths.remove(path);
@@ -2404,9 +2475,15 @@ public class CN1WearableBridge implements WearableBridge {
      * @param actedOnDeletion whether this task applied the deletion rule
      * @return true when a deletion upgrade was missed and a fresh resolution is owed
      */
-    private static boolean finishPendingWinner(String path, boolean actedOnDeletion) {
+    private static boolean finishPendingWinner(String path, long actedOnGeneration) {
         synchronized (pendingWinnerPaths) {
-            boolean missed = !actedOnDeletion && deletionPaths.contains(path);
+            long current = deletionGenerationFor(path);
+            // Missed when a deletion is recorded that this task did not act on -- either it acted
+            // on none (generation 0) or it acted on an OLDER one, which is the republish-then-delete
+            // case: the task's query predates the second deletion, so its result cannot speak for
+            // it, and treating "I handled a deletion" as "I handled every deletion" discarded the
+            // newer one's only resolution.
+            boolean missed = current != 0L && current != actedOnGeneration;
             pendingWinnerPaths.remove(path);
             deletionPaths.remove(path);
             return missed;
@@ -2418,11 +2495,22 @@ public class CN1WearableBridge implements WearableBridge {
      * {@link #pendingWinnerPaths} and under the same monitor so the flag cannot outlive the
      * resolution that owns it.
      */
-    private static final java.util.Set<String> deletionPaths = new java.util.HashSet<String>();
+    private static final Map<String, Long> deletionPaths = new HashMap<String, Long>();
+
+    /// Ever-increasing, so two deletions of the same path are distinguishable. Guarded by
+    /// {@link #pendingWinnerPaths}.
+    private static long deletionGeneration;
+
+    /// The deletion generation a task is acting on, or 0 when it is not a deletion resolution.
+    /// Guarded by {@link #pendingWinnerPaths}.
+    private static long deletionGenerationFor(String path) {
+        Long g = deletionPaths.get(path);
+        return g == null ? 0L : g.longValue();
+    }
 
     private static boolean wasAfterDeletion(String path) {
         synchronized (pendingWinnerPaths) {
-            return deletionPaths.contains(path);
+            return deletionPaths.containsKey(path);
         }
     }
 
@@ -2608,6 +2696,38 @@ public class CN1WearableBridge implements WearableBridge {
         scheduleTransferRetry(context, uri);
     }
 
+    private static boolean claimPruneScheduled;
+
+    /// Arms one prune of the durable claim store.
+    ///
+    /// The store was pruned only from {@code persistClaim}, so a receiver that handled a finite
+    /// burst of transfers and then saw no more kept every one of those unique-URI claims forever --
+    /// an unbounded permanent SharedPreferences store, despite a documented 24-hour bound. The task
+    /// re-arms itself while anything is left, so it stops on its own once the store is empty.
+    private static void scheduleClaimPrune(final Context context) {
+        if (context == null) {
+            return;
+        }
+        final Context app = context.getApplicationContext();
+        synchronized (transferClaims) {
+            if (claimPruneScheduled) {
+                return;
+            }
+            claimPruneScheduled = true;
+        }
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                synchronized (transferClaims) {
+                    claimPruneScheduled = false;
+                }
+                boolean remaining = pruneClaims(app);
+                if (remaining) {
+                    scheduleClaimPrune(app);
+                }
+            }
+        }, TRANSFER_RETENTION_MILLIS + 1000L);
+    }
+
     /** Preference store for durable transfer claims; see {@link #claimTransfer}. */
     private static final String CLAIM_PREFS = "cn1.wearable.claims";
 
@@ -2658,6 +2778,38 @@ public class CN1WearableBridge implements WearableBridge {
                     c.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE);
             android.content.SharedPreferences.Editor edit = prefs.edit();
             edit.putString(key, stamp);
+            pruneInto(prefs, edit);
+            edit.apply();
+            // Also pruned on a timer: writing the next claim is not something that is guaranteed to
+            // happen, and the store's bound must not depend on it.
+            scheduleClaimPrune(c);
+        } catch (Throwable unavailable) {
+            // Best effort: the in-memory claim still holds for this process.
+        }
+    }
+
+    /// Prunes expired claims, returning true when anything is still stored.
+    private static boolean pruneClaims(Context context) {
+        if (context == null) {
+            return false;
+        }
+        try {
+            android.content.SharedPreferences prefs =
+                    context.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE);
+            android.content.SharedPreferences.Editor edit = prefs.edit();
+            int kept = pruneInto(prefs, edit);
+            edit.apply();
+            return kept > 0;
+        } catch (Throwable unavailable) {
+            return false;
+        }
+    }
+
+    /// Marks every expired entry for removal on the editor, returning how many survive.
+    private static int pruneInto(android.content.SharedPreferences prefs,
+                                 android.content.SharedPreferences.Editor edit) {
+        int kept = 0;
+        {
             long cutoff = System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;
             for (Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
                 Object v = e.getValue();
@@ -2679,15 +2831,15 @@ public class CN1WearableBridge implements WearableBridge {
                 try {
                     if (Long.parseLong(recorded.substring(lastBar + 1)) < cutoff) {
                         edit.remove(e.getKey());
+                    } else {
+                        kept++;
                     }
                 } catch (NumberFormatException unparsable) {
                     edit.remove(e.getKey());
                 }
             }
-            edit.apply();
-        } catch (Throwable unavailable) {
-            // Best effort: the in-memory claim still holds for this process.
         }
+        return kept;
     }
 
     /**

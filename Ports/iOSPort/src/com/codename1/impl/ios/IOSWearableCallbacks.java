@@ -108,6 +108,14 @@ final class IOSWearableCallbacks {
                 // but the native in-flight mark has to go, or every later drain in this process
                 // skips the very entry it is protecting and the transfer is never offered again.
                 IOSImplementation.nativeInstance.wearableReleaseInbox(token);
+                // Clearing the mark only makes it eligible. Re-offer it once a listener exists:
+                // doing it now would park the delivery, evict another one-shot to make room, and
+                // set off a cycle of mutual evictions.
+                WearableConnection.requestReplayAfterDrain(new Runnable() {
+                    public void run() {
+                        IOSImplementation.nativeInstance.wearableReplayInbox();
+                    }
+                });
             }
         });
     }

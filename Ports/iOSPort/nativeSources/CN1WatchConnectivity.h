@@ -107,6 +107,8 @@ void cn1_wearable_confirmInbox(const char *inboxToken);
 /// Gives up an undelivered entry, keeping the file but clearing its in-flight mark so a later
 /// activation can replay it.
 void cn1_wearable_releaseInbox(const char *inboxToken);
+/// Re-offers everything still parked in the inbox. Called once a listener exists.
+void cn1_wearable_replayInbox(void);
 void cn1_wearable_deliverDataRemoved(const char *path);
 void cn1_wearable_notifyStateChanged(void);
 
