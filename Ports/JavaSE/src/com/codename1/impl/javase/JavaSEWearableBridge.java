@@ -974,7 +974,14 @@ class JavaSEWearableBridge implements WearableBridge {
             return;
         }
         File ack = new File(dataDir, tomb.getName() + ACK_SUFFIX);
-        tomb.delete();
+        if (!tomb.delete() && tomb.isFile()) {
+            // The tombstone is STILL THERE -- a read-only directory, or another process holding
+            // the file. Everything else stays with it. Dropping the acknowledgement here stranded
+            // the tombstone permanently: the peer has already marked the unchanged file as seen and
+            // will not acknowledge it a second time, so once the directory falls back under the cap
+            // no later pass can retire it either.
+            return;
+        }
         ack.delete();
         synchronized (seenData) {
             seenData.remove(tomb.getName());
