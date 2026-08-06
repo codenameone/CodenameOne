@@ -222,11 +222,7 @@ Pass a `DatabaseConfig` to encrypt a database at rest. Check that the platform c
 
 [source,java]
 ----
-if (Database.isEncryptionSupported()) {
-    DatabaseConfig config = DatabaseConfig.managed();
-    Database db = Database.openOrCreate("secure.db", config);
-    config.wipe();
-}
+include::../demos/common/src/main/snippets/developer-guide/IoSnippets.java[tag=io-java-001,indent=0]
 ----
 
 There are three ways to key a database.
@@ -268,9 +264,7 @@ An application that already ships a plaintext database can convert it in place:
 
 [source,java]
 ----
-if (!Database.isEncrypted("myapp.db")) {
-    Database.encrypt("myapp.db", DatabaseConfig.managed());
-}
+include::../demos/common/src/main/snippets/developer-guide/IoSnippets.java[tag=io-java-002,indent=0]
 ----
 
 `Database.decrypt` is the reverse, and `Database.changeKey` re-keys a database that is already open.
@@ -292,7 +286,7 @@ wrap one in `ThreadSafeDatabase`, which routes every call through a single worke
 
 [source,java]
 ----
-Database db = new ThreadSafeDatabase(Database.openOrCreate("shared.db"));
+include::../demos/common/src/main/snippets/developer-guide/IoSnippets.java[tag=io-java-003,indent=0]
 ----
 
 The wrapper costs a thread handoff per call, so a connection per thread is faster when the threads

@@ -286,6 +286,11 @@ public class ByteCodeTranslator {
         // com.codename1.db, so everyone else pays nothing for it. cn1_sqlite3.c is gated on
         // CN1_INCLUDE_SQLITE internally as well, so an emitted-but-undefined build compiles it
         // to an empty object rather than failing.
+        // Always emitted: it defines the native entry points either way, as real bindings when
+        // the engine is present and as stubs when it is not, so an application that references
+        // com.codename1.db links regardless of how the translator was invoked.
+        File sqliteBindings = new File(srcRoot, "cn1_db_sqlite_impl.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_db_sqlite_impl.h"), Files.newOutputStream(sqliteBindings.toPath()));
         if (isBundledSqliteEnabled()) {
             File sqliteUnity = new File(srcRoot, "cn1_sqlite3.c");
             copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3.c"), Files.newOutputStream(sqliteUnity.toPath()));
@@ -626,6 +631,11 @@ public class ByteCodeTranslator {
         // com.codename1.db, so everyone else pays nothing for it. cn1_sqlite3.c is gated on
         // CN1_INCLUDE_SQLITE internally as well, so an emitted-but-undefined build compiles it
         // to an empty object rather than failing.
+        // Always emitted: it defines the native entry points either way, as real bindings when
+        // the engine is present and as stubs when it is not, so an application that references
+        // com.codename1.db links regardless of how the translator was invoked.
+        File sqliteBindings = new File(srcRoot, "cn1_db_sqlite_impl.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_db_sqlite_impl.h"), Files.newOutputStream(sqliteBindings.toPath()));
         if (isBundledSqliteEnabled()) {
             File sqliteUnity = new File(srcRoot, "cn1_sqlite3.c");
             copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3.c"), Files.newOutputStream(sqliteUnity.toPath()));

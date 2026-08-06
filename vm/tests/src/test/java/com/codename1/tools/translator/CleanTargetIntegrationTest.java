@@ -1646,6 +1646,13 @@ class CleanTargetIntegrationTest {
             java.lang.reflect.Field verboseField = translatorClass.getField("verbose");
             boolean originalVerbose = verboseField.getBoolean(null);
             verboseField.setBoolean(null, false);
+            // The builders set these from a class scan; this test drives the translator directly,
+            // so ask for the bundled SQLite engine explicitly. The sample suite exercises
+            // com.codename1.db, and without the engine those tests would only ever self-skip.
+            String originalSqlite = System.getProperty("cn1.sqlite");
+            String originalSqlCipher = System.getProperty("cn1.sqlcipher");
+            System.setProperty("cn1.sqlite", "true");
+            System.setProperty("cn1.sqlcipher", "true");
             Method main = translatorClass.getMethod("main", String[].class);
             String[] args = new String[]{
                     "clean",
@@ -1668,6 +1675,8 @@ class CleanTargetIntegrationTest {
                 throw new RuntimeException(cause);
             } finally {
                 verboseField.setBoolean(null, originalVerbose);
+                restoreProperty("cn1.sqlite", originalSqlite);
+                restoreProperty("cn1.sqlcipher", originalSqlCipher);
             }
         } finally {
             Thread.currentThread().setContextClassLoader(originalLoader);
@@ -1785,4 +1794,12 @@ class CleanTargetIntegrationTest {
                 "}\n";
     }
 
+
+    private static void restoreProperty(String key, String value) {
+        if (value == null) {
+            System.clearProperty(key);
+        } else {
+            System.setProperty(key, value);
+        }
+    }
 }

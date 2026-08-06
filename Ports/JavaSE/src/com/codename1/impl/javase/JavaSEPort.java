@@ -210,7 +210,6 @@ import javax.xml.parsers.DocumentBuilderFactory;
 
 import com.jhlabs.image.ShadowFilter;
 import org.sqlite.SQLiteConfig;
-import org.sqlite.mc.SQLiteMCSqlCipherConfig;
 import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
@@ -16694,13 +16693,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             java.util.Properties properties;
             if (config != null && config.isEncrypted()) {
                 warnAboutSimulatorKeyStorage(config);
-                // getV4Defaults() selects legacy=4, which is the genuine SQLCipher 4 format that
-                // every other Codename One platform reads and writes. getDefault() would select
-                // legacy=0, this driver's own variant, producing a file nothing else can open.
-                properties = SQLiteMCSqlCipherConfig.getV4Defaults()
-                        .withKey(databaseKeyMaterial(config, databaseName))
-                        .build()
-                        .toProperties();
+                properties = sqlCipherProperties(databaseKeyMaterial(config, databaseName));
             } else {
                 SQLiteConfig plain = new SQLiteConfig();
                 plain.enableLoadExtension(true);
@@ -16815,7 +16808,60 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public boolean isDatabaseEncryptionSupported() {
-        return true;
+        return isCipherCapableDriverPresent();
+    }
+
+    private static Boolean cipherCapableDriver;
+
+    /**
+     * Whether the SQLite JDBC driver on the classpath carries the encryption extension.
+     *
+     * The Maven build ships the cipher-capable driver, but the Ant build links whichever
+     * sqlite-jdbc is pinned in cn1-binaries, which may not. Probing rather than assuming means the
+     * simulator reports honestly instead of failing at open time.
+     */
+    private static boolean isCipherCapableDriverPresent() {
+        if (cipherCapableDriver == null) {
+            try {
+                Class.forName("org.sqlite.mc.SQLiteMCConfig");
+                cipherCapableDriver = Boolean.TRUE;
+            } catch (Throwable notPresent) {
+                cipherCapableDriver = Boolean.FALSE;
+            }
+        }
+        return cipherCapableDriver.booleanValue();
+    }
+
+    /**
+     * Connection properties selecting the SQLCipher 4 on-disk format.
+     *
+     * These are the values the driver's own SQLCipher-v4 preset produces, written out literally so
+     * that this file does not need the driver's builder API on its compile classpath. The Ant build
+     * links an older sqlite-jdbc without it, and importing the class would break that build even
+     * for applications that never encrypt anything.
+     *
+     * legacy=4 is the load-bearing value: it selects genuine SQLCipher 4. The driver's own default
+     * of 0 is a different scheme that no other Codename One platform, and no SQLCipher tool, can
+     * read.
+     */
+    private static java.util.Properties sqlCipherProperties(String key) {
+        java.util.Properties p = new java.util.Properties();
+        p.setProperty("config_class_name", "org.sqlite.mc.SQLiteMCConfig");
+        p.setProperty("cipher", "sqlcipher");
+        p.setProperty("legacy", "4");
+        p.setProperty("legacy_page_size", "4096");
+        p.setProperty("kdf_iter", "256000");
+        p.setProperty("fast_kdf_iter", "2");
+        p.setProperty("kdf_algorithm", "2");
+        p.setProperty("hmac_algorithm", "2");
+        p.setProperty("hmac_use", "1");
+        p.setProperty("hmac_pgno", "1");
+        p.setProperty("hmac_salt_mask", "58");
+        p.setProperty("plaintext_header_size", "0");
+        p.setProperty("hexkey_mode", "NONE");
+        p.setProperty("key", key);
+        p.setProperty("password", key);
+        return p;
     }
 
     @Override

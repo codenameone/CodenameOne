@@ -20,21 +20,12 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-/*
- * SQLite bindings for the native windows port.
- *
- * The implementation is shared with the other native C port; see cn1_db_sqlite_impl.h. That header
- * is emitted by the translator only for applications that use com.codename1.db, so its absence is
- * the signal that this build has no database and the file compiles to nothing.
- */
-#if defined(__has_include)
-#  if __has_include("cn1_db_sqlite_impl.h")
-#    define CN1_DB_AVAILABLE 1
-#  endif
-#endif
 
-#ifdef CN1_DB_AVAILABLE
+/*
+ * SQLite bindings. The implementation is shared with the other native C port; see
+ * cn1_db_sqlite_impl.h, which is always emitted and provides either the real engine bindings or
+ * stubs that report no database support, so this always links.
+ */
 #include "cn1_db_sqlite_impl.h"
 
 CN1_DB_DEFINE_NATIVES(com_codename1_impl_windows_WindowsNative)
-#endif
