@@ -113,10 +113,19 @@ class KotlinUiTest : BaseTest() {
         // Round one: all three plain children passed, so the difference is what the
         // real container does beyond constructing them -- setOn() on the Switch, a
         // hint on the TextArea, or simply holding three children at once.
-        step("probe-switch-on")
-        probe.addContent("ProbeSwitchOn", Container(BoxLayout.y()).apply {
-            add(Switch().apply { setOn() })
-        })
+        // Split to the statement, because the composite probe cannot distinguish
+        // constructing an on-switch from adding one to an Accordion -- and the
+        // real test already shows Switch()+setOn() on its own is fine.
+        step("probe-so-ctor")
+        val soSwitch = Switch()
+        step("probe-so-seton")
+        soSwitch.setOn()
+        step("probe-so-container")
+        val soContainer = Container(BoxLayout.y())
+        soContainer.add(soSwitch)
+        step("probe-so-addcontent")
+        probe.addContent("ProbeSwitchOn", soContainer)
+        step("probe-so-done")
         step("probe-textarea-hint")
         probe.addContent("ProbeTextHint", Container(BoxLayout.y()).apply {
             add(TextArea(3, 20).apply { hint = "probe hint" })

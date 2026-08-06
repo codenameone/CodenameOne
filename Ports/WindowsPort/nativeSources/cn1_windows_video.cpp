@@ -108,6 +108,17 @@ static JAVA_LONG cn1ReaderOpen(const wchar_t* url) {
         return 0;
     }
 
+    // Select the streams explicitly. Which streams a source reader starts with
+    // depends on the presentation descriptor, and SetCurrentMediaType succeeds on
+    // a stream that is not selected -- so the audio configuration below reported
+    // success, hasAudio became true, and ReadSample then produced nothing at all.
+    // That is exactly what VideoIORoundTripTest saw on Windows: "decoded clip
+    // reports audio but no PCM samples were returned". Deselect everything, then
+    // turn on the two streams this reader actually consumes.
+    reader->SetStreamSelection((DWORD) MF_SOURCE_READER_ALL_STREAMS, FALSE);
+    reader->SetStreamSelection((DWORD) MF_SOURCE_READER_FIRST_VIDEO_STREAM, TRUE);
+    reader->SetStreamSelection((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, TRUE);
+
     CN1VideoReader* st = new CN1VideoReader();
     st->reader = reader;
     st->width = 0;
