@@ -1671,8 +1671,10 @@ public class CN1WearableBridge implements WearableBridge {
                     // getLocalNode() failure returning null used to read as "not local", so the
                     // replay claimed this device's OWN outbound transfers and handed the sender its
                     // own one-shot file through its own data listener.
-                    String localNode = localNodeId(context);
-                    if (localNode == null) {
+                    // Named apart from the `localNode` FIELD, which is a cache: this must be the
+                    // value just resolved.
+                    String replayNode = localNodeId(context);
+                    if (replayNode == null) {
                         throw new java.io.IOException("local node identity unavailable");
                     }
                     DataItemBuffer items = Tasks.await(dataClient.getDataItems(),
@@ -1686,7 +1688,7 @@ public class CN1WearableBridge implements WearableBridge {
                             }
                             // Our own outbound transfer: handing it back would deliver the sender
                             // its own file.
-                            if (localNode.equals(uri.getHost())) {
+                            if (replayNode.equals(uri.getHost())) {
                                 continue;
                             }
                             Transfer t = decodeTransfer(context, item);
@@ -1756,10 +1758,20 @@ public class CN1WearableBridge implements WearableBridge {
             public void run() {
                 boolean failed = false;
                 try {
+                    // Resolved BEFORE the enumeration, and an unavailable identity is a FAILED
+                    // sweep. Treating null as "every item is remote" skipped them all while
+                    // reporting success, so the retry never armed and an outbound transfer could
+                    // stay published past the point where receiver claims expire.
+                    //
+                    // Named apart from the `localNode` FIELD on purpose: this must be the value
+                    // just resolved, not whatever the cache happens to hold.
+                    String sweepNode = localNodeId(context);
+                    if (sweepNode == null) {
+                        throw new java.io.IOException("local node identity unavailable");
+                    }
                     DataItemBuffer items = Tasks.await(dataClient.getDataItems(),
                             TIMEOUT_SECONDS, TimeUnit.SECONDS);
                     try {
-                        String localNode = localNodeId(context);
                         for (DataItem item : items) {
                             String p = item.getUri().getPath();
                             if (p == null || !isTransferPath(p)) {
@@ -1769,7 +1781,7 @@ public class CN1WearableBridge implements WearableBridge {
                             // from other nodes, and deleting one of those propagates -- which is
                             // precisely how a second watch loses a file it has not collected yet.
                             // A publisher is responsible for its own items and nobody else's.
-                            if (localNode == null || !localNode.equals(item.getUri().getHost())) {
+                            if (!sweepNode.equals(item.getUri().getHost())) {
                                 continue;
                             }
                             DataMap map = valueOrTransferMap(item);
@@ -3066,6 +3078,15 @@ public class CN1WearableBridge implements WearableBridge {
 
     /// True when a stored {@code seq|node|receivedAt} record is past the retention window, or is
     /// malformed -- an entry with no receipt time cannot be bounded and is not worth trusting.
+    /// How long a durable claim is kept BEYOND the sender's retention window.
+    ///
+    /// The sender does not delete at exactly the window: its deadline sweep fires at retention +
+    /// 1s, and coalescing can defer that by another SWEEP_MIN_INTERVAL. Expiring a claim at exactly
+    /// the window therefore left a gap in which the item is still published and no longer claimed,
+    /// so a receiver restarting inside it replayed a one-shot file the app already had. The grace
+    /// covers the whole worst case with room to spare.
+    private static final long CLAIM_GRACE_MILLIS = 2 * SWEEP_MIN_INTERVAL_MILLIS + 60 * 1000L;
+
     private static boolean claimExpired(String recorded) {
         int lastBar = recorded.lastIndexOf('|');
         int firstBar = recorded.indexOf('|');
@@ -3074,7 +3095,7 @@ public class CN1WearableBridge implements WearableBridge {
         }
         try {
             return Long.parseLong(recorded.substring(lastBar + 1))
-                    < System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;
+                    < System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS - CLAIM_GRACE_MILLIS;
         } catch (NumberFormatException unparsable) {
             return true;
         }
@@ -3132,7 +3153,9 @@ public class CN1WearableBridge implements WearableBridge {
     private static int pruneInto(android.content.SharedPreferences prefs,
                                  android.content.SharedPreferences.Editor edit) {
         int kept = 0;
-        long cutoff = System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;
+        // Same grace as claimExpired: the two must agree, or the sweep would drop a record the
+        // lookup still considers live.
+        long cutoff = System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS - CLAIM_GRACE_MILLIS;
         for (Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
             Object v = e.getValue();
             if (!(v instanceof String)) {

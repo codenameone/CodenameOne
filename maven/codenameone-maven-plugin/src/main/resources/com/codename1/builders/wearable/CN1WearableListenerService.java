@@ -219,12 +219,17 @@ public class CN1WearableListenerService extends WearableListenerService {
             // simulator already suppress self-authored changes; forwarding them here made the same
             // app code fire an extra callback on Android only, so an app that acts on a change
             // processed its own write twice.
-            boolean ownEcho = CN1WearableBridge.isLocallyAuthored(this, uri.getHost());
             boolean transferItem = CN1WearableBridge.isTransferPath(path);
             if (path == null || !isFromAKnownHost(uri)
                     || (!transferItem && !path.startsWith(CN1WearableBridge.pathPrefix()))) {
                 continue;
             }
+            // Computed AFTER the provenance check, not before it. isFromAKnownHost retries the
+            // identity queries, so a getLocalNode() that failed on the first attempt can succeed
+            // inside it -- and an ownEcho decided beforehand was still false, so this device's own
+            // putData came back through the peer-change path and an app acting on changes
+            // processed its own write twice.
+            boolean ownEcho = CN1WearableBridge.isLocallyAuthored(this, uri.getHost());
             if (!started) {
                 ensureAppRunning();
                 started = true;
