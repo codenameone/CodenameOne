@@ -111,7 +111,9 @@ final class IOSWearableCallbacks {
                 // Clearing the mark only makes it eligible. Re-offer it once a listener exists:
                 // doing it now would park the delivery, evict another one-shot to make room, and
                 // set off a cycle of mutual evictions.
-                WearableConnection.requestReplayAfterDrain(new Runnable() {
+                // One key for every eviction: the native drain re-offers the WHOLE inbox, so a
+                // request per evicted transfer would rescan the entire backlog once per eviction.
+                WearableConnection.requestReplayAfterDrain("ios-wearable-inbox", new Runnable() {
                     public void run() {
                         IOSImplementation.nativeInstance.wearableReplayInbox();
                     }

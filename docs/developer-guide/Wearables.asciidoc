@@ -328,11 +328,15 @@ so keep watch screens light.
 
 ==== Building and Debugging
 
-A companion build produces an iOS `.ipa` that carries the embedded watch app; a
-standalone build produces a watch-only product. The generated project is a
-standard Xcode project, so you can open it and debug or profile the watch target
-with the native Xcode tools as usual. Cloud builds produce the watch app through
-the same iOS build -- declare the watch main class and build for iOS.
+A companion build produces an iOS `.ipa` that carries the embedded watch app. A
+standalone build generates the watch target, but the archive step still targets
+the phone scheme, so the artifact handed back is the iOS app: open the generated
+project and archive the watch scheme yourself to produce the watch application.
+The build logs this. The generated project is a standard Xcode project, so you
+can open it and debug or profile the watch target with the native Xcode tools as
+usual. Cloud builds generate the watch target through the same iOS build --
+declare the watch main class and build for iOS -- and the same applies there,
+so a standalone cloud build returns the iOS archive.
 
 === Android (Wear OS)
 [[wear-os-android]]

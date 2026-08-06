@@ -154,6 +154,10 @@ public class CN1WearableBridge implements WearableBridge {
         // stops would otherwise never run the sweep again, leaving its last transfers published
         // indefinitely -- the post-publish sweep only helps an app that keeps transferring.
         expireOwnTransfers();
+        // And prune the RECEIVER's durable claims, for the same reason in the other direction: the
+        // prune timer is process-local while the claims are not, so a process that exits before it
+        // fires leaves them for the next cold start to clear.
+        pruneClaims(this.context);
     }
 
     // --- state --------------------------------------------------------------
@@ -2822,9 +2826,37 @@ public class CN1WearableBridge implements WearableBridge {
             return null;
         }
         try {
-            return c.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE).getString(key, null);
+            String recorded =
+                    c.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE).getString(key, null);
+            // Expiry is checked on the way OUT, not only by the sweep. The prune runs on a daemon
+            // timer, which dies with the process while the claims outlive it -- so a receiver that
+            // took a burst of transfers and then restarted would honour records long past the
+            // retention window they were bounded by. An entry older than the window is treated as
+            // absent, which is what the sweep would have made it.
+            if (recorded == null || !claimExpired(recorded)) {
+                return recorded;
+            }
+            // Also drop it, so the store shrinks on read even if the sweep never runs.
+            c.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE).edit().remove(key).apply();
+            return null;
         } catch (Throwable unavailable) {
             return null;
+        }
+    }
+
+    /// True when a stored {@code seq|node|receivedAt} record is past the retention window, or is
+    /// malformed -- an entry with no receipt time cannot be bounded and is not worth trusting.
+    private static boolean claimExpired(String recorded) {
+        int lastBar = recorded.lastIndexOf('|');
+        int firstBar = recorded.indexOf('|');
+        if (lastBar <= 0 || lastBar == firstBar) {
+            return true;
+        }
+        try {
+            return Long.parseLong(recorded.substring(lastBar + 1))
+                    < System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;
+        } catch (NumberFormatException unparsable) {
+            return true;
         }
     }
 

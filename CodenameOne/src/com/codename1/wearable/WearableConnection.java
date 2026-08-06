@@ -721,8 +721,10 @@ public final class WearableConnection {
         }, dataListeners, pendingData, onRelinquished, onDelivered != null);
     }
 
-    /// Actions a port asked to run once deliveries can actually reach a listener.
-    private static final List<Runnable> replayRequests = new ArrayList<Runnable>();
+    /// Actions a port asked to run once deliveries can actually reach a listener, keyed so repeated
+    /// requests for the same operation collapse into one.
+    private static final java.util.LinkedHashMap<String, Runnable> replayRequests =
+            new java.util.LinkedHashMap<String, Runnable>();
 
     /// Framework/port entry point: asks for `replay` to run once a listener exists.
     ///
@@ -731,18 +733,24 @@ public final class WearableConnection {
     /// room, and that one would re-offer in turn. Deferring to the moment the queue drains breaks
     /// that cycle -- by then a listener exists and deliveries dispatch instead of parking.
     ///
+    /// Requests are keyed, and a repeat replaces the pending one. A port whose replay re-offers
+    /// EVERYTHING it is holding -- as a rescan does -- should pass a constant key: one such action
+    /// covers any number of evictions, and queueing one per evicted payload would both grow this
+    /// map past the delivery cap and rescan the whole backlog once per eviction.
+    ///
     /// Runs immediately when a data listener is already registered.
     ///
     /// #### Parameters
     ///
+    /// - `key`: identifies the operation; a later request with the same key supersedes this one
     /// - `replay`: the port's re-offer action
-    public static void requestReplayAfterDrain(Runnable replay) {
+    public static void requestReplayAfterDrain(String key, Runnable replay) {
         if (replay == null) {
             return;
         }
         synchronized (pendingData) {
             if (dataListeners.isEmpty()) {
-                replayRequests.add(replay);
+                replayRequests.put(key == null ? replay.toString() : key, replay);
                 return;
             }
         }
@@ -755,7 +763,7 @@ public final class WearableConnection {
         List<Runnable> replays = null;
         synchronized (queue) {
             if (queue == pendingData && !replayRequests.isEmpty()) {
-                replays = new ArrayList<Runnable>(replayRequests);
+                replays = new ArrayList<Runnable>(replayRequests.values());
                 replayRequests.clear();
             }
             if (!queue.isEmpty()) {
