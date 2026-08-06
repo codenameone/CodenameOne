@@ -132,6 +132,65 @@ static void cn1WearableExpireReplies(NSMutableDictionary *replies, NSMutableDict
     }
 }
 
+/// Where received transfers are parked so a process death cannot lose them.
+static NSString *cn1WearableInboxDir(void) {
+    NSArray *dirs = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory,
+                                                        NSUserDomainMask, YES);
+    NSString *base = dirs.count > 0 ? dirs[0] : NSTemporaryDirectory();
+    NSString *dir = [base stringByAppendingPathComponent:@"cn1-wearable-inbox"];
+    [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES
+                                               attributes:nil error:NULL];
+    return dir;
+}
+
+/// Writes the encoded transfer to the inbox and returns its file name, or nil.
+static NSString *cn1WearableStashInbox(NSString *path, NSData *wrapped) {
+    if (wrapped == nil) {
+        return nil;
+    }
+    NSString *name = [[NSUUID UUID] UUIDString];
+    NSString *full = [cn1WearableInboxDir() stringByAppendingPathComponent:name];
+    NSMutableDictionary *entry = [NSMutableDictionary dictionary];
+    entry[@"p"] = path == nil ? @"" : path;
+    entry[@"b"] = wrapped;
+    if (![NSKeyedArchiver respondsToSelector:@selector(archivedDataWithRootObject:requiringSecureCoding:error:)]) {
+        return nil;
+    }
+    NSData *blob = [NSKeyedArchiver archivedDataWithRootObject:entry
+                                        requiringSecureCoding:NO error:NULL];
+    if (blob == nil || ![blob writeToFile:full atomically:YES]) {
+        return nil;
+    }
+    return name;
+}
+
+/// Redelivers anything left in the inbox by a previous run, then clears it.
+///
+/// Called on session activation: reaching that point means this process is alive and the CN1
+/// runtime is up, so anything still parked was written by a run that did not get that far.
+static void cn1WearableDrainInbox(void) {
+    NSString *dir = cn1WearableInboxDir();
+    NSArray<NSString *> *names = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir
+                                                                                     error:NULL];
+    for (NSString *name in names) {
+        NSString *full = [dir stringByAppendingPathComponent:name];
+        NSData *blob = [NSData dataWithContentsOfFile:full];
+        if (blob != nil) {
+            NSSet *classes = [NSSet setWithObjects:[NSDictionary class], [NSString class],
+                                                    [NSData class], nil];
+            NSDictionary *entry = [NSKeyedUnarchiver unarchivedObjectOfClasses:classes
+                                                                      fromData:blob
+                                                                         error:NULL];
+            NSString *path = entry[@"p"];
+            NSData *body = entry[@"b"];
+            if ([path isKindOfClass:[NSString class]] && [body isKindOfClass:[NSData class]]) {
+                cn1_wearable_deliverDataChanged(path.UTF8String, body.bytes, (int) body.length);
+            }
+        }
+        [[NSFileManager defaultManager] removeItemAtPath:full error:NULL];
+    }
+}
+
 /// Serializes the whole applicationContext read-modify-write.
 ///
 /// WCSession has no merge: updateApplicationContext REPLACES the dictionary. putData and removeData
@@ -682,6 +741,10 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
 - (void)session:(WCSession *)session
         activationDidCompleteWithState:(WCSessionActivationState)activationState
                                  error:(NSError *)error {
+    // Anything a previous run parked but may not have delivered. Reaching activation means this
+    // process is up and the CN1 runtime with it, so a file still sitting in the inbox belongs to a
+    // run that did not get this far.
+    cn1WearableDrainInbox();
     cn1_wearable_notifyStateChanged();
 }
 
@@ -838,8 +901,19 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     if (body == nil) {
         return;
     }
+    // Copied somewhere durable BEFORE this returns. WatchConnectivity deletes its temporary file as
+    // soon as the delegate returns and considers the transfer complete, while the payload at that
+    // point exists only in WearableConnection's in-process queue or an un-run callSerially. A
+    // process death in between loses a one-shot file that the sender has already been told arrived,
+    // and nothing redelivers it -- the sender's copy is gone too.
     NSData *wrapped = cn1WearableWrapFile(file.fileURL.lastPathComponent, body);
+    NSString *stashed = cn1WearableStashInbox(path, wrapped);
     cn1_wearable_deliverDataChanged(path.UTF8String, wrapped.bytes, (int) wrapped.length);
+    // Deliberately NOT deleted here. The stash is cleared on the next session activation, by which
+    // point this process has demonstrably survived long enough to run the delivery. Replaying a
+    // file the app did receive is a duplicate; dropping one it did not is a loss, and a duplicate
+    // is the recoverable side of that trade.
+    (void) stashed;
 }
 
 @end

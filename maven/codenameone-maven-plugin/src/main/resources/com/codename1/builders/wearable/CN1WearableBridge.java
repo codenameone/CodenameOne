@@ -234,7 +234,41 @@ public class CN1WearableBridge implements WearableBridge {
                 return true;
             }
         }
-        return false;
+        // Last resort: the CAPABILITY set rather than the connected set.
+        //
+        // A DataItem is durable, so it can wake this process long after its publisher went away --
+        // a watch that published and then powered off is the ordinary case. getConnectedNodes()
+        // then answers empty on every retry, by definition, and the event was dropped even though
+        // it came from a paired app. Connectivity is simply the wrong question for a stored item.
+        //
+        // FILTER_ALL returns nodes that advertise our capability whether or not they are reachable
+        // now, which is exactly "a device that has this app installed and paired". That keeps the
+        // security property intact -- a forged intent from another app on this device still names
+        // no node that advertises cn1_wearable -- while no longer requiring the sender to still be
+        // online at the moment we look.
+        for (String id : capabilityNodeIds(context)) {
+            rememberNode(id);
+        }
+        return recentlySeen(sourceNodeId);
+    }
+
+    /// Ids of the nodes advertising this app's capability, reachable or not. Blocking.
+    private static List<String> capabilityNodeIds(Context context) {
+        List<String> out = new ArrayList<String>();
+        try {
+            CapabilityInfo info = Tasks.await(
+                    Wearable.getCapabilityClient(context.getApplicationContext())
+                            .getCapability(CAPABILITY_NAME, CapabilityClient.FILTER_ALL),
+                    TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (info != null) {
+                for (Node n : info.getNodes()) {
+                    out.add(n.getId());
+                }
+            }
+        } catch (Throwable unavailable) {
+            // Nothing established; the caller falls back to refusing the event.
+        }
+        return out;
     }
 
     /// Ids of the nodes the Data Layer currently reports. Blocking; never call on the EDT.

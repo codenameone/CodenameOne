@@ -617,23 +617,27 @@ class JavaSEWearableBridge implements WearableBridge {
                     continue;
                 }
                 try {
-                    WearableConnection.deliverDataChanged(deliveryPath(f.getName()), readFully(f));
-                    if (isInboundTransfer(f.getName())) {
-                        // A transfer is one-shot, so the delivered file goes. Leaving it would make
-                        // every restart of the receiving simulator replay it -- primeSeenData()
-                        // deliberately records nothing so that offline values DO replay, and without
-                        // this a transfer would be caught by the same rule. Distinct path/name pairs
-                        // would also pile up in the shared directory indefinitely.
-                        //
-                        // Only an INBOUND transfer, though: deleting our own would destroy a
-                        // transfer still waiting for the peer to start. Unlike the device ports
-                        // there is exactly one peer here, so consuming an inbound file cannot
-                        // deprive a second watch of it.
-                        f.delete();
-                        synchronized (seenData) {
-                            seenData.remove(f.getName());
-                        }
-                    }
+                    final File delivered = f;
+                    final boolean inbound = isInboundTransfer(f.getName());
+                    // Deleted from INSIDE the delivery, not beside it. This file is the only durable
+                    // copy of a one-shot transfer: deleting it as soon as the delivery was queued
+                    // lost it outright if the simulator closed before the listener ran, or if the
+                    // delivery was merely parked because no listener had registered yet.
+                    WearableConnection.deliverDataChangedTracked(deliveryPath(f.getName()),
+                            readFully(f), inbound ? new Runnable() {
+                                public void run() {
+                                    delivered.delete();
+                                    synchronized (seenData) {
+                                        seenData.remove(delivered.getName());
+                                    }
+                                }
+                            } : null);
+                    // The deletion that used to live here now runs inside the delivery callback
+                    // above. A transfer is one-shot, so the delivered file goes -- leaving it would
+                    // make every restart of the receiving simulator replay it, since
+                    // primeSeenData() deliberately records nothing so that offline VALUES do
+                    // replay. Only an INBOUND transfer is deleted: removing our own would destroy
+                    // one still waiting for the peer to start.
                 } catch (IOException stillBeingWritten) {
                     // Re-reported on the next pass once the writer has finished.
                     synchronized (seenData) {
