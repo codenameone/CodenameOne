@@ -65,16 +65,16 @@ public final class WearableConnection {
     /// Queued separately per listener type: an app that registers its data listener first would
     /// otherwise drain a queued *message* while messageListeners was still empty, losing it for
     /// good.
-    /**
-     * Deliveries parked until a listener exists.
-     *
-     * <p>Bounded. A peer that keeps sending to an app version which never registers the matching
-     * listener -- a retired message path, a build that dropped the feature -- would otherwise grow
-     * these without limit, and each queued runnable captures its whole payload, so the cost is the
-     * traffic rather than the count. When the cap is reached the OLDEST delivery is dropped: for a
-     * replicated value the newest is the one that matters, and for a message a listener that has
-     * never appeared was never going to read the old ones either.</p>
-     */
+    /// How many deliveries may be parked while no listener exists.
+    ///
+    /// Bounded on purpose. A peer that keeps sending to an app version which never registers the
+    /// matching listener -- a retired message path, a build that dropped the feature -- would
+    /// otherwise grow these without limit, and each queued runnable captures its whole payload, so
+    /// the cost tracks traffic rather than count.
+    ///
+    /// At the cap the OLDEST delivery is dropped: for a replicated value the newest is the one that
+    /// matters, and for a live message a listener that has never appeared was not going to read the
+    /// old ones either.
     private static final int MAX_PENDING = 256;
     private static final List<Runnable> pendingMessages = new ArrayList<Runnable>();
     private static final List<Runnable> pendingData = new ArrayList<Runnable>();
