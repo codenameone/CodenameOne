@@ -137,7 +137,7 @@ public class JavaScriptBuilder extends Executor {
             List<File> generatedImpls = generateNativeInterfaceImpls(buildDir, nativeInterfaces);
 
             String translatorAppName = sanitizeIdentifier(request.getMainClass()) + "JavaScriptMain";
-            File launcherJava = writeLauncher(buildDir, translatorAppName, request.getPackageName(), request.getMainClass(), stageClasses, nativeInterfaces);
+            File launcherJava = writeLauncher(buildDir, translatorAppName, request.getPackageName(), request.getMainClass(), stageClasses, nativeInterfaces, request);
             compileLauncher(launcherJava, generatedImpls, stageClasses, portClassesStaged);
 
             File parparvmCompilerJar = extractParparVMCompiler();
@@ -392,7 +392,7 @@ public class JavaScriptBuilder extends Executor {
     }
 
     private File writeLauncher(File workDir, String launcherName, String packageName, String mainClass, File stageClasses,
-                               List<Class<?>> nativeInterfaces) throws IOException {
+                               List<Class<?>> nativeInterfaces, BuildRequest request) throws IOException {
         // If the build-time SVG transcoder generated com.codename1.generated.svg.SVGRegistry
         // for this app, register the transcoded SVGs at startup -- the JS-port analogue of
         // JavaSEPort.init's reflective installGlobal(). A DIRECT call (not reflection) is
@@ -422,6 +422,12 @@ public class JavaScriptBuilder extends Executor {
                 }
             }
             pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "());");
+            // bootstrap() runs Display.init followed by the app's init/start synchronously, so
+            // Display is live once it returns; stamp the hardening metadata now so
+            // Hardening.isHardened() and crash reports carry the mapping id / level on this port
+            // too (parity with iOS and Android). hardeningRuntimeProperties emits 8-space-indented
+            // Display.getInstance().setProperty(...) lines.
+            pw.print(hardeningRuntimeProperties(request));
             pw.println("    }");
             pw.println("}");
         } finally {

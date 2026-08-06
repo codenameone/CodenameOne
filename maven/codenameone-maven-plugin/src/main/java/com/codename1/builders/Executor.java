@@ -2430,6 +2430,31 @@ public abstract class Executor {
     }
 
     /**
+     * Reads a {@code harden.*} boolean argument with the same tri-state rules the engine's
+     * {@code HardeningConfig.boolTri} applies: {@code true/1/2/3/on} are true, {@code false/0/off}
+     * are false, and anything else (including unset/blank) falls back to {@code def}. Builders must
+     * use this rather than a bare {@code "false".equals(...)} so a documented alias like
+     * {@code harden.rename=off} is not silently misread.
+     */
+    protected boolean hardenBoolArg(BuildRequest request, String key, boolean def) {
+        String v = request.getArg(key, null);
+        if (v == null) {
+            return def;
+        }
+        String t = v.trim().toLowerCase();
+        if (t.length() == 0) {
+            return def;
+        }
+        if ("true".equals(t) || "1".equals(t) || "2".equals(t) || "3".equals(t) || "on".equals(t)) {
+            return true;
+        }
+        if ("false".equals(t) || "0".equals(t) || "off".equals(t)) {
+            return false;
+        }
+        return def;
+    }
+
+    /**
      * Applies the app-hardening transform to the merged application jar and returns the jar the
      * build should proceed with. When hardening is not requested (or already applied, or declined
      * by the engine) the input jar is returned unchanged; when the engine reports the build is not

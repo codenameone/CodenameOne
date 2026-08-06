@@ -642,6 +642,9 @@ public class LinuxNativeBuilder extends Executor {
         src.append(registerNatives);
         src.append("        final ").append(main).append(" app = new ").append(main).append("();\n");
         src.append("        Display.init(null);\n");
+        // Stamp the hardening metadata so Hardening.isHardened() and crash reports carry the
+        // mapping id / level on this port too (parity with iOS and Android).
+        src.append(hardeningRuntimeProperties(request));
         src.append(svgInstall);
         src.append("        Display.getInstance().callSerially(new Runnable() {\n");
         src.append("            public void run() {\n");

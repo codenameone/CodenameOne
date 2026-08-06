@@ -560,6 +560,7 @@ transcoder
 # throughout the Crash Protection chapter and standard in the field.
 [Ss]ymbolicated
 [Ss]ymbolicate
+[Ss]ymbolicates
 [Ss]ymbolication
 # Short for "deduplication" -- "dedup the same crash" is how everyone
 # in the crash-reporting space talks. Shows up in CrashReportPayload
