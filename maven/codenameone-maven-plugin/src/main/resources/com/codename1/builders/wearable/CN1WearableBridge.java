@@ -1370,33 +1370,6 @@ public class CN1WearableBridge implements WearableBridge {
         return TRANSFER_PREFIX;
     }
 
-    /**
-     * Whether a received item is newer than the last thing delivered for its logical path.
-     *
-     * <p>Both nodes may publish the same path, which the Data Layer stores as two items under two
-     * authorities. A reconnect can then hand us the older one after the newer, and forwarding it
-     * would walk a listener-driven UI back to stale state while an immediate {@code getData()} still
-     * returned the newer value -- the listener and the getter disagreeing about the same path.
-     *
-     * @param path the logical path
-     * @param sequence the item's publication stamp
-     * @return true when the event should be delivered
-     */
-    static boolean isNewerThanDelivered(String path, long sequence, String node) {
-        synchronized (deliveredSequences) {
-            String previous = deliveredSequences.get(path);
-            if (previous != null) {
-                int split = previous.indexOf('|');
-                long prevSeq = Long.parseLong(previous.substring(0, split));
-                String prevNode = previous.substring(split + 1);
-                if (!outranks(sequence, node, prevSeq, prevNode.length() == 0 ? null : prevNode)) {
-                    return false;
-                }
-            }
-            deliveredSequences.put(path, sequence + "|" + (node == null ? "" : node));
-            return true;
-        }
-    }
 
     /**
      * Forgets a path's delivery stamp, so a value republished after a removal is delivered even if
@@ -1407,7 +1380,7 @@ public class CN1WearableBridge implements WearableBridge {
     /**
      * Records a delivery stamp outright, replacing whatever was there.
      *
-     * <p>Distinct from {@link #isNewerThanDelivered}, which refuses to go backwards. After a
+     * <p>Distinct from the outranks-guarded delivery, which refuses to go backwards. After a
      * deletion the surviving item can legitimately carry a LOWER sequence than the winner that was
      * just removed, so the newer-than test would decline to record it and leave the dead winner's
      * stamp in place -- filtering out a later item that sits between the two.
@@ -1998,9 +1971,17 @@ public class CN1WearableBridge implements WearableBridge {
                 previous = persistedClaim(key);
             }
             if (previous != null) {
+                // seq|node in memory, seq|node|receivedAt on disk -- so the node is delimited on
+                // BOTH sides, not "everything after the first bar". Taking the rest of the string
+                // would fold the receipt time into the node id and make every persisted claim
+                // compare unequal to the live one.
                 int split = previous.indexOf('|');
+                int nodeEnd = previous.indexOf('|', split + 1);
+                if (nodeEnd < 0) {
+                    nodeEnd = previous.length();
+                }
                 long prevSeq = Long.parseLong(previous.substring(0, split));
-                String prevNode = previous.substring(split + 1);
+                String prevNode = previous.substring(split + 1, nodeEnd);
                 if (!outranks(sequence, uri.getHost(), prevSeq,
                         prevNode.length() == 0 ? null : prevNode)) {
                     return false;
@@ -2035,7 +2016,15 @@ public class CN1WearableBridge implements WearableBridge {
         }
         String key = uri.getHost() + ":" + uri.getPath();
         synchronized (transferClaims) {
-            persistClaim(key, sequence + "|" + (uri.getHost() == null ? "" : uri.getHost()));
+            // The persisted form carries a RECEIPT TIME that the in-memory form does not need. The
+            // stamp is a Lamport sequence, and observeSequence deliberately drags that ahead of
+            // wall time whenever a peer's clock is ahead -- so comparing it against a wall-clock
+            // cutoff would keep such a claim until real time caught up with a fabricated future,
+            // and since every transfer gets a unique sequence-suffixed URI the store would grow
+            // without bound. Pruning needs a clock that measures elapsed time; the sequence is not
+            // one.
+            persistClaim(key, sequence + "|" + (uri.getHost() == null ? "" : uri.getHost())
+                    + "|" + System.currentTimeMillis());
         }
     }
 
@@ -2084,13 +2073,20 @@ public class CN1WearableBridge implements WearableBridge {
                 if (!(v instanceof String)) {
                     continue;
                 }
+                // seq|node|receivedAt. Pruned on receivedAt, never on seq -- see
+                // confirmTransferDelivered for why the sequence cannot serve as a timestamp. An
+                // entry written before this field existed has no receipt time and is dropped:
+                // it is at most one retention window old, and keeping an unprunable record
+                // forever is the failure being fixed.
                 String recorded = (String) v;
-                int split = recorded.indexOf('|');
-                if (split <= 0) {
+                int lastBar = recorded.lastIndexOf('|');
+                int firstBar = recorded.indexOf('|');
+                if (lastBar <= 0 || lastBar == firstBar) {
+                    edit.remove(e.getKey());
                     continue;
                 }
                 try {
-                    if (Long.parseLong(recorded.substring(0, split)) < cutoff) {
+                    if (Long.parseLong(recorded.substring(lastBar + 1)) < cutoff) {
                         edit.remove(e.getKey());
                     }
                 } catch (NumberFormatException unparsable) {

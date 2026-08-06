@@ -307,14 +307,16 @@ public class CN1WearableListenerService extends WearableListenerService {
                     continue;
                 }
             }
-            if (!CN1WearableBridge.isNewerThanDelivered(
-                    appPath, CN1WearableBridge.sequenceOf(value), uri.getHost())) {
-                // An older item arriving after a newer one, which a reconnect can do when both nodes
-                // publish this path. getData() would return the newer value, so delivering this would
-                // make the listener and the getter disagree.
-                continue;
-            }
-            WearableConnection.deliverDataChanged(appPath, CN1WearableBridge.payloadOf(value));
+            // Ordering test and dispatch as ONE step, the same as the resolution paths. Testing
+            // first and dispatching after leaves the window between them: a deferred resolution or
+            // another callback can advance this path in between, emit the newer payload, and then
+            // this callback emits the older one after it -- with the cache holding the newer stamp,
+            // so that publication is rejected if seen again and nothing corrects the listener.
+            //
+            // An older item arriving after a newer one is ordinary, not exotic: a reconnect does it
+            // whenever both nodes publish the same path. deliverIfOutranks declines those silently.
+            CN1WearableBridge.deliverIfOutranks(appPath, CN1WearableBridge.sequenceOf(value),
+                    uri.getHost(), CN1WearableBridge.payloadOf(value));
         }
     }
 
