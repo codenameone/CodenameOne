@@ -184,14 +184,20 @@ public class CN1WearableListenerService extends WearableListenerService {
         // that this event predates, and clearing whatever marker it finds by then would wipe a
         // newer one. The generation pins the handler to the state it actually observed.
         final long removalGeneration = CN1WearableBridge.currentRemovalGeneration();
+        // Which removals were in progress AT ARRIVAL. The 30-second window has to be judged from
+        // here: a worker delayed past it -- two first-sight resolutions timing out is enough --
+        // would otherwise find the marker expired and announce this device's own wildcard tombstone
+        // back to the app as a peer removal.
+        final java.util.Set<String> openRemovals = CN1WearableBridge.openRemovals();
         WORKER.execute(new Runnable() {
             public void run() {
-                handleDataChanged(frozen, removalGeneration);
+                handleDataChanged(frozen, removalGeneration, openRemovals);
             }
         });
     }
 
-    private void handleDataChanged(java.lang.Iterable<DataEvent> events, long removalGeneration) {
+    private void handleDataChanged(java.lang.Iterable<DataEvent> events, long removalGeneration,
+            java.util.Set<String> openRemovals) {
         // NOT before the loop. This service is exported and there is no binding permission that
         // would narrow it to Play services, so starting the app first let an untrusted caller bring
         // the UI forward with an empty or forged callback -- the provenance check below stops the
@@ -262,9 +268,10 @@ public class CN1WearableListenerService extends WearableListenerService {
                                 public void run() {
                                     // Evicted from the pending queue before any listener existed.
                                     // The in-memory claim would otherwise keep suppressing this
-                                    // payload for the life of the process, so the next scan can
-                                    // offer it again.
-                                    CN1WearableBridge.relinquishTransfer(claimed);
+                                    // payload for the life of the process, and an unchanged
+                                    // DataItem raises no new callback -- so this both releases the
+                                    // claim and schedules a fresh read of the item.
+                                    CN1WearableBridge.relinquishTransfer(svc, claimed);
                                 }
                             });
                 }
@@ -274,19 +281,18 @@ public class CN1WearableListenerService extends WearableListenerService {
             }
             String appPath = CN1WearableBridge.decode(
                     path.substring(CN1WearableBridge.pathPrefix().length()));
-            if (event.getType() == DataEvent.TYPE_DELETED
-                    && CN1WearableBridge.isLocallyRemoved(path)) {
+            if (event.getType() == DataEvent.TYPE_DELETED && openRemovals.contains(path)) {
                 // This device's own removeData coming back, for an ordinary value. The app made the
                 // call, so announcing it would break the peer-only contract in the other direction.
                 //
-                // isLocallyRemoved is the ONLY test here, deliberately. ownEcho asks who published
+                // The arrival snapshot is the ONLY test here, deliberately. ownEcho asks who published
                 // the item, which for a tombstone is the wrong question twice over: a wildcard
                 // removal produces a tombstone per replica and the peer-authority ones are not
                 // locally authored (so ownEcho misses them), while a peer deleting a path THIS
                 // device published leaves our authority on the tombstone (so ownEcho claims it as
                 // ours and swallowed a genuine peer removal, with no later event guaranteed to
-                // correct it). What matters is what this device ASKED to remove, which is what
-                // isLocallyRemoved records.
+                // correct it). What matters is what this device ASKED to remove, which is what the
+                // removal markers record -- read at arrival, not at handler time.
                 //
                 // The recorded stamp is deliberately left as it is. It means "the newest thing this
                 // process delivered", and clearing it would reset the baseline to empty, so an older

@@ -266,6 +266,22 @@ static void cn1WearableDrainInbox(void) {
     }
 }
 
+/// Gives up a delivery without retiring it.
+///
+/// The pending-delivery queue evicted the payload before any listener saw it. The file must STAY
+/// on disk -- it is still the only copy -- but the in-flight mark has to go, or every later drain
+/// in this process skips the entry it is protecting and the transfer is never offered again.
+void cn1_wearable_releaseInbox(const char *inboxToken) {
+    if (inboxToken == NULL) {
+        return;
+    }
+    NSString *name = [NSString stringWithUTF8String:inboxToken];
+    if (name.length == 0) {
+        return;
+    }
+    cn1WearableClearInFlight(name);
+}
+
 /// Retires a delivered inbox entry.
 ///
 /// Invoked from Java on the EDT after the payload has been handed to the application, which is the
@@ -901,6 +917,21 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
             void (^stored)(NSDictionary<NSString *, id> *) = [replyHandler copy];
             _pendingReplies[@(token)] = stored;
             _pendingReplyAt[@(token)] = @([[NSDate date] timeIntervalSince1970]);
+            // Also swept when THIS batch expires. Expiry ran only when the next request arrived, so
+            // a finite burst -- or a single request -- to an app that never registers a message
+            // listener held its copied reply blocks for the rest of the process, long after every
+            // sender had given up. The retention window is a promise about the request, not about
+            // how often requests happen to arrive.
+            CN1WatchConnectivity *keepAlive = [self retain];
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                         (int64_t) ((kCN1ReplyExpirySeconds + 1) * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                // Same monitor the insert holds: _pendingReplies guards both maps.
+                @synchronized (keepAlive->_pendingReplies) {
+                    cn1WearableExpireReplies(keepAlive->_pendingReplies, keepAlive->_pendingReplyAt);
+                }
+                [keepAlive release];
+            });
             [stored release];
         }
     }

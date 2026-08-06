@@ -98,11 +98,16 @@ final class IOSWearableCallbacks {
             WearableConnection.deliverDataChanged(path, payload);
             return;
         }
-        // No release callback: iOS keeps the inbox entry on disk until the EDT confirms, so an
-        // evicted delivery already replays on the next activation with nothing to undo.
         WearableConnection.deliverDataChangedTracked(path, payload, new Runnable() {
             public void run() {
                 IOSImplementation.nativeInstance.wearableConfirmInbox(token);
+            }
+        }, new Runnable() {
+            public void run() {
+                // Evicted before any listener saw it. The file stays -- it is still the only copy --
+                // but the native in-flight mark has to go, or every later drain in this process
+                // skips the very entry it is protecting and the transfer is never offered again.
+                IOSImplementation.nativeInstance.wearableReleaseInbox(token);
             }
         });
     }

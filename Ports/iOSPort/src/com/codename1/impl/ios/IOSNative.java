@@ -1197,6 +1197,10 @@ public final class IOSNative {
     /// listener has run -- is allowed to discard it.
     native void wearableConfirmInbox(String token);
 
+    /// Gives up an inbox entry that was never delivered, keeping the file so a later activation can
+    /// replay it. Only the in-process marker that suppresses replay is cleared.
+    native void wearableReleaseInbox(String token);
+
     // --- Secure storage (Security.framework keychain) -----------------------
 
     /** Sets the kSecAttrAccessGroup applied to subsequent keychain operations. {@code null} clears. */

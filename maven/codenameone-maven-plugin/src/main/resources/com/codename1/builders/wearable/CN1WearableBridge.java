@@ -1302,6 +1302,29 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
+    /**
+     * The set of paths whose local-removal window is open right now.
+     *
+     * <p>Captured when a callback ARRIVES, because the worker can run it much later -- two
+     * first-sight resolutions timing out and retrying is enough to push a handler past the 30-second
+     * window. Classifying with {@link #isLocallyRemoved} at handler time then found the marker
+     * expired and announced the app's own wildcard tombstone back to it as a peer removal. The
+     * window is measured from when the event arrived, which is when the removal was actually still
+     * in progress.</p>
+     */
+    static java.util.Set<String> openRemovals() {
+        long now = System.currentTimeMillis();
+        java.util.Set<String> open = new java.util.HashSet<String>();
+        synchronized (localRemovals) {
+            for (Map.Entry<String, Removal> e : localRemovals.entrySet()) {
+                if (now - e.getValue().at <= LOCAL_REMOVAL_WINDOW_MILLIS) {
+                    open.add(e.getKey());
+                }
+            }
+        }
+        return open;
+    }
+
     /** Whether a tombstone for this storage path came from a removal this device asked for. */
     static boolean isLocallyRemoved(String storagePath) {
         long now = System.currentTimeMillis();
@@ -1412,6 +1435,26 @@ public class CN1WearableBridge implements WearableBridge {
      * propagate and rob a second watch of the file.
      */
     private void expireOwnTransfers() {
+        // The deadline sweep is scheduled UNCONDITIONALLY, before the coalescing check, because it
+        // belongs to the item that was just published rather than to this call. Scheduling it after
+        // the check meant a transfer published inside the five-minute coalescing window never got
+        // one: the earlier task woke at the FIRST item's deadline, found the later item still too
+        // young, and put its next sweep a full day out -- so that item could stay published for
+        // nearly 48 hours while receiver claims are pruned at 24, and a reconnect could redeliver a
+        // supposedly one-shot file. Retention is a promise about the item.
+        //
+        // This schedules a sweep per published transfer, not per call chain: the task runs
+        // sweepOwnTransfers(), which does not schedule anything further, so the chain terminates.
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                sweepOwnTransfers();
+            }
+        }, TRANSFER_RETENTION_MILLIS + 1000L);
+        sweepOwnTransfers();
+    }
+
+    /// The sweep itself, coalesced. Schedules no follow-up: see [#expireOwnTransfers].
+    private void sweepOwnTransfers() {
         // One sweep at a time, and not more often than the interval. A burst of transfers used to
         // schedule one immediate task per call, each blocking on a full DataItem query and scan --
         // on the same single timer the unreadable-asset retries use, so transfer traffic starved
@@ -1425,16 +1468,6 @@ public class CN1WearableBridge implements WearableBridge {
             lastSweepAt = now;
         }
         final long cutoff = System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;
-        // Also scheduled for when THIS item expires. The immediate sweep cannot include the
-        // transfer just published -- its cutoff predates it -- so an app that sends a final
-        // transfer and then simply keeps running left it published forever, since nothing else
-        // would ever run the sweep. The retention window is a promise about the item, not about
-        // how often the app happens to transfer.
-        transferTimer.schedule(new java.util.TimerTask() {
-            public void run() {
-                expireOwnTransfers();
-            }
-        }, TRANSFER_RETENTION_MILLIS + 1000L);
         transferTimer.schedule(new java.util.TimerTask() {
             public void run() {
                 try {
@@ -1617,6 +1650,15 @@ public class CN1WearableBridge implements WearableBridge {
                                             t.logicalPath, t.payload, new Runnable() {
                                                 public void run() {
                                                     confirmTransferDelivered(context, claimed, claimedSeq, true);
+                                                }
+                                            }, new Runnable() {
+                                                public void run() {
+                                                    // The direct callback path releases an evicted
+                                                    // claim; this one has to as well. It is in fact
+                                                    // the worse case: the retry chain stops right
+                                                    // below, so without this nothing would look at
+                                                    // this item again for the life of the process.
+                                                    relinquishTransfer(context, claimed);
                                                 }
                                             });
                                 }
@@ -2548,9 +2590,10 @@ public class CN1WearableBridge implements WearableBridge {
      * good, and the sender's retention window could expire before a restart cleared it.</p>
      *
      * <p>Only the in-memory claim is released. The durable one is written on delivery, so an
-     * undelivered transfer never had one.</p>
+     * undelivered transfer never had one. A fresh read of the item is then scheduled, because
+     * releasing the claim alone does not make the Data Layer say anything new.</p>
      */
-    static void relinquishTransfer(Uri uri) {
+    static void relinquishTransfer(Context context, Uri uri) {
         if (uri == null) {
             return;
         }
@@ -2558,6 +2601,11 @@ public class CN1WearableBridge implements WearableBridge {
         synchronized (transferClaims) {
             transferClaims.remove(key);
         }
+        // Releasing the claim is necessary but not sufficient. The DataItem has not changed, and an
+        // unchanged item produces no further callback -- the unreadable-asset path above exists for
+        // exactly that reason -- so on a connection that simply stays up, nothing would ever offer
+        // this payload again and it could expire at the sender. Go back and read it.
+        scheduleTransferRetry(context, uri);
     }
 
     /** Preference store for durable transfer claims; see {@link #claimTransfer}. */

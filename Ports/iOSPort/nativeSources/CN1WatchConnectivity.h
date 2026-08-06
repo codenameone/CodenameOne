@@ -104,6 +104,9 @@ void cn1_wearable_deliverDataChangedTracked(const char *path, const void *payloa
                                             const char *inboxToken);
 /// Retires an inbox entry. Called from Java once the delivery has run on the EDT.
 void cn1_wearable_confirmInbox(const char *inboxToken);
+/// Gives up an undelivered entry, keeping the file but clearing its in-flight mark so a later
+/// activation can replay it.
+void cn1_wearable_releaseInbox(const char *inboxToken);
 void cn1_wearable_deliverDataRemoved(const char *path);
 void cn1_wearable_notifyStateChanged(void);
 
