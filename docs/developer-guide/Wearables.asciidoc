@@ -215,6 +215,11 @@ Ask the other three about the counterpart. `isPaired()`,
 telling a user about: no watch, a watch without your watch app installed, and a
 sleeping watch.
 
+Don't decide your UI from one call at startup. These answers come from state
+queried asynchronously, so the first calls in a cold process can report false for
+a device that's paired -- nothing is known until the first query lands. Register
+a `WearableStateListener` and react when the answer changes.
+
 One Android limit is worth knowing. The Data Layer exposes pairing only through
 the nodes it knows about, so a paired watch that has never run your watch app
 appears in no list and `isPaired()` reports false until it runs once. Treat

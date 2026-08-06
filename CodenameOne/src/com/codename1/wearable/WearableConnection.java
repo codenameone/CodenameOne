@@ -143,8 +143,13 @@ public final class WearableConnection {
     /// Returns true when a counterpart device is paired, whether or not it is switched on or in
     /// range. Distinct from [#isReachable()], which asks whether its app can receive something now.
     ///
-    /// On Android there is one case this cannot see: a paired watch that has never run your watch
-    /// app. The Data Layer exposes pairing only through the nodes it knows about, and a watch that
+    /// Do not decide your UI from a single call at startup. Both platforms answer from state that
+    /// is queried asynchronously, so the first calls in a cold process can report false for a
+    /// device that is paired -- there is nothing to report until the first query lands. Register a
+    /// [WearableStateListener] and react when the answer changes; that is what it is for.
+    ///
+    /// On Android there is one case this cannot see at all: a paired watch that has never run your
+    /// watch app. The Data Layer exposes pairing only through the nodes it knows about, and a watch that
     /// never ran the app appears in no such list -- so a phone that is genuinely paired reports
     /// false until the watch app has run once. Treat false as "no counterpart known", not as proof
     /// that none exists, and prefer showing setup guidance over hiding it. Apple's API answers the

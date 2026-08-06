@@ -176,25 +176,22 @@ public class CN1WearableBridge implements WearableBridge {
         // disconnected, which is as close to "paired" as the Data Layer gets. A paired watch that
         // has never run this app is invisible to both queries because Android exposes no such list;
         // that limit is stated in the public contract rather than papered over here.
-        boolean paired = !connectedNodes().isEmpty() || !bondedNodeIds().isEmpty();
-        if (paired) {
-            pairingObserved = true;
-            return true;
-        }
-        // An empty answer from a query that has not actually run yet is not evidence. Both caches
-        // start empty and fill asynchronously off the EDT, so the first calls during startup would
-        // otherwise report "not paired" for a device that is -- long enough for an app to decide
-        // its setup UI on it. Once either query has genuinely completed, an empty result means what
-        // it says and this returns false, including after a real unpairing.
-        return pairingObserved && !bondedQueryCompleted;
+        // Cold start: both caches are empty until the first query completes, and a latency-sensitive
+        // caller cannot be made to wait for it, so the honest answer here is "not known yet" and
+        // the only value this signature can carry for that is false.
+        //
+        // An earlier attempt to paper over it -- remembering that a peer had once been seen -- was
+        // no help at all, because on a cold start nothing has been seen yet; that is the whole
+        // situation. What actually closes the window is the refresh completing: it sets
+        // bondedQueryCompleted, and when the answer CHANGES it fires the state listeners. So the
+        // contract tells callers to decide from a WearableStateListener rather than from one call
+        // at startup, and this stays a plain report of what is currently known.
+        return !connectedNodes().isEmpty() || !bondedNodeIds().isEmpty();
     }
 
-    /// True once either query has actually answered, so an empty result can be trusted.
-    /// Guarded by the same monitor as the bonded cache it describes.
+    /// True once the capability query has actually answered, so an empty cache can be told apart
+    /// from one that has not been filled yet. Guarded by the bonded cache's monitor.
     private volatile boolean bondedQueryCompleted;
-
-    /// True once a peer has ever been seen, so a not-yet-run query is not read as "no counterpart".
-    private volatile boolean pairingObserved;
 
     /// Whether an event's source node may be trusted, for the listener service's caller check.
     ///
