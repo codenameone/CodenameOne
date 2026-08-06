@@ -472,7 +472,28 @@ class WatchNativeBuilder {
         if (close < 0) {
             return null;
         }
-        return inject.substring(open + "<string>".length(), close).trim();
+        return decodeXmlEntities(inject.substring(open + "<string>".length(), close).trim());
+    }
+
+    /// Turns the five predefined XML entities back into their characters.
+    ///
+    /// The value read out of {@code ios.plistInject} is SERIALIZED text: a disclosure written as
+    /// "Health &amp;amp; Fitness" arrives with the entity intact, and re-emitting it through
+    /// {@code plistString} escapes the ampersand again -- so the phone shows the intended text
+    /// while the watch permission dialog shows "&amp;amp;" literally. Decoding here puts the value
+    /// back into the plain form the escaper expects.
+    ///
+    /// {@code &amp;amp;} is decoded LAST. Doing it first would turn "&amp;amp;lt;" into "&lt;"
+    /// rather than the literal "&amp;lt;" the author wrote.
+    static String decodeXmlEntities(String value) {
+        if (value == null || value.indexOf('&') < 0) {
+            return value;
+        }
+        return value.replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&apos;", "'")
+                .replace("&amp;", "&");
     }
 
     static String shortVersion(BuildRequest request) {

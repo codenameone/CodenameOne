@@ -438,6 +438,21 @@ class WatchNativeBuilderTest {
                 "the injected HealthKit string must reach the plist: " + plist);
     }
 
+    /// A value read out of ios.plistInject is serialized text, so re-emitting it through the
+    /// escaper without decoding first shows the entity literally in the permission dialog.
+    @Test
+    void injectedEntitiesAreNotDoubleEscaped(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.plistInject", "<key>NSHealthShareUsageDescription</key>"
+                + "<string>Uses Health &amp; Fitness data</string>");
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("Uses Health &amp; Fitness data"),
+                "the ampersand must be escaped exactly once: " + plist);
+        assertFalse(plist.contains("&amp;amp;"),
+                "the entity must not be escaped a second time: " + plist);
+    }
+
     private static int countOccurrences(String haystack, String needle) {
         int n = 0;
         for (int i = haystack.indexOf(needle); i >= 0; i = haystack.indexOf(needle, i + 1)) {
