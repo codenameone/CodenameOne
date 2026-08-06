@@ -664,7 +664,31 @@ class JavaSEWearableBridge implements WearableBridge {
                     // hand the sender its own file through its own data listener.
                     continue;
                 }
-                if (!isTransfer(f.getName()) && authoredLocallyFor(f, stamp)) {
+                // ONE read, used for both the author test and the payload. Classifying from the
+                // file and then reading it again let this JVM's own putData land in between: the
+                // author check inspected the peer's file, the read returned our freshly published
+                // bytes, and the peer-only listener was handed this device's own publication --
+                // with writeValue having already recorded the local stamp, so no later scan
+                // corrected it.
+                byte[] snapshot;
+                try {
+                    snapshot = readFully(f);
+                } catch (IOException stillBeingWritten) {
+                    synchronized (seenData) {
+                        seenData.remove(f.getName());
+                    }
+                    continue;
+                }
+                if (f.lastModified() != stamp) {
+                    // Replaced while we were reading it, so this snapshot belongs to neither the
+                    // file we classified nor the one now on disk. Forget it and let the next scan
+                    // see the winner whole.
+                    synchronized (seenData) {
+                        seenData.remove(f.getName());
+                    }
+                    continue;
+                }
+                if (!isTransfer(f.getName()) && authoredLocallyFor(snapshot, stamp)) {
                     // Our own VALUE, for the same reason. primeSeenData() records nothing so that a
                     // value published while this side was down still replays on startup -- but that
                     // also replayed values THIS side published before it restarted, reporting them
@@ -676,7 +700,7 @@ class JavaSEWearableBridge implements WearableBridge {
                     // a restart because it lives in the file's own timestamp.
                     continue;
                 }
-                try {
+                {
                     final File delivered = f;
                     final boolean inbound = isInboundTransfer(f.getName());
                     // Deleted from INSIDE the delivery, not beside it. This file is the only durable
@@ -684,7 +708,7 @@ class JavaSEWearableBridge implements WearableBridge {
                     // lost it outright if the simulator closed before the listener ran, or if the
                     // delivery was merely parked because no listener had registered yet.
                     WearableConnection.deliverDataChangedTracked(deliveryPath(f.getName()),
-                            readPayload(f), inbound ? new Runnable() {
+                            payloadOf(snapshot), inbound ? new Runnable() {
                                 public void run() {
                                     delivered.delete();
                                     synchronized (seenData) {
@@ -708,11 +732,6 @@ class JavaSEWearableBridge implements WearableBridge {
                     // primeSeenData() deliberately records nothing so that offline VALUES do
                     // replay. Only an INBOUND transfer is deleted: removing our own would destroy
                     // one still waiting for the peer to start.
-                } catch (IOException stillBeingWritten) {
-                    // Re-reported on the next pass once the writer has finished.
-                    synchronized (seenData) {
-                        seenData.remove(f.getName());
-                    }
                 }
             }
         }
@@ -800,62 +819,67 @@ class JavaSEWearableBridge implements WearableBridge {
      * build), because a wrong-but-present answer is worse than the previous behaviour only if it
      * disagrees, and the header is published by the same rename as the bytes it describes.</p>
      */
-    private boolean authoredLocallyFor(File f, long stamp) {
-        Boolean recorded = recordedAuthor(f);
+    private boolean authoredLocallyFor(byte[] snapshot, long stamp) {
+        Boolean recorded = authorOf(snapshot);
         if (recorded != null) {
             return recorded.booleanValue() == watchSide;
         }
         return authoredLocally(stamp);
     }
 
+    /// Convenience for callers holding a File rather than its bytes.
+    private boolean authoredLocallyFor(File f, long stamp) {
+        try {
+            return authoredLocallyFor(readFully(f), stamp);
+        } catch (IOException unreadable) {
+            return authoredLocally(stamp);
+        }
+    }
+
     /// The author recorded in the value's own header: TRUE for the watch, FALSE for the phone,
     /// null when the file predates the header or is too short to carry one.
-    private Boolean recordedAuthor(File f) {
-        try {
-            byte[] head = readHeader(f);
-            if (head == null) {
-                return null;
-            }
-            byte who = head[VALUE_MAGIC.length];
-            if (who == 'w') {
-                return Boolean.TRUE;
-            }
-            if (who == 'p') {
-                return Boolean.FALSE;
-            }
-            return null;
-        } catch (IOException unreadable) {
+    private static Boolean authorOf(byte[] snapshot) {
+        if (!framed(snapshot)) {
             return null;
         }
+        byte who = snapshot[VALUE_MAGIC.length];
+        if (who == 'w') {
+            return Boolean.TRUE;
+        }
+        if (who == 'p') {
+            return Boolean.FALSE;
+        }
+        return null;
+    }
+
+    /// True when these bytes carry the author frame.
+    private static boolean framed(byte[] all) {
+        if (all == null || all.length < VALUE_MAGIC.length + 1) {
+            return false;
+        }
+        for (int i = 0; i < VALUE_MAGIC.length; i++) {
+            if (all[i] != VALUE_MAGIC[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// The value's bytes with the author frame removed, from an in-memory snapshot.
+    private static byte[] payloadOf(byte[] all) {
+        if (!framed(all)) {
+            return all;
+        }
+        int skip = VALUE_MAGIC.length + 1;
+        byte[] body = new byte[all.length - skip];
+        System.arraycopy(all, skip, body, 0, body.length);
+        return body;
     }
 
     /// Marks a framed value file. Chosen so a stale sandbox written before the header existed still
     /// reads correctly: no magic simply means "fall back to the stamp's side bit".
     private static final byte[] VALUE_MAGIC = {'C', 'N', '1', 'W', 'A', '1'};
 
-    /// Returns magic + author byte when the file carries the frame, else null.
-    private static byte[] readHeader(File f) throws IOException {
-        byte[] head = new byte[VALUE_MAGIC.length + 1];
-        FileInputStream in = new FileInputStream(f);
-        try {
-            int off = 0;
-            while (off < head.length) {
-                int r = in.read(head, off, head.length - off);
-                if (r < 0) {
-                    return null;
-                }
-                off += r;
-            }
-        } finally {
-            in.close();
-        }
-        for (int i = 0; i < VALUE_MAGIC.length; i++) {
-            if (head[i] != VALUE_MAGIC[i]) {
-                return null;
-            }
-        }
-        return head;
-    }
 
     /// The value's bytes with the author frame removed. An unframed file is returned whole, so a
     /// value left by an older build still reads as itself rather than losing its first seven bytes.
@@ -863,19 +887,7 @@ class JavaSEWearableBridge implements WearableBridge {
         // One read, then inspect the prefix in memory. Reading the file twice -- once for the
         // header, once for the bytes -- could straddle a republication and return one file's
         // header with another file's payload.
-        byte[] all = readFully(f);
-        int skip = VALUE_MAGIC.length + 1;
-        if (all.length < skip) {
-            return all;
-        }
-        for (int i = 0; i < VALUE_MAGIC.length; i++) {
-            if (all[i] != VALUE_MAGIC[i]) {
-                return all;
-            }
-        }
-        byte[] body = new byte[all.length - skip];
-        System.arraycopy(all, skip, body, 0, body.length);
-        return body;
+        return payloadOf(readFully(f));
     }
 
     private static long lastStamp;

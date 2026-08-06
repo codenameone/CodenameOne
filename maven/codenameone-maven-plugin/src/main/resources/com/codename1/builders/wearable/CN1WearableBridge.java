@@ -1200,7 +1200,16 @@ public class CN1WearableBridge implements WearableBridge {
         // needs an authoritative read can make one off the EDT; a caller that is painting cannot
         // afford five seconds either way.
         if (isCallerLatencySensitive()) {
-            return cachedValue(path);
+            byte[] cached = cachedValue(path);
+            if (cached == null) {
+                // An empty cache is not an authoritative absence. After a process restart the Data
+                // Layer has no reason to re-announce an item it already delivered, so nothing
+                // refills the cache on its own and the getter would report "nothing published" for
+                // durable state that still exists. Answer null now -- the EDT cannot wait -- but
+                // populate in the background so the next call is right.
+                primeValue(path);
+            }
+            return cached;
         }
         // Deliberately the same resolution the listener uses. This used to have its own loop, which
         // kept whichever item the buffer yielded first -- so once resolveValue() gained the
@@ -1224,6 +1233,65 @@ public class CN1WearableBridge implements WearableBridge {
             return cachedValue(path);
         }
     }
+
+    /// Populates the cache for one path in the background, at most once per path per process.
+    ///
+    /// Only for the latency-sensitive path, which cannot block. The query itself is the ordinary
+    /// resolution, and its result is recorded exactly as a delivery would record it, so a
+    /// publication that lands meanwhile still wins.
+    private void primeValue(final String path) {
+        synchronized (primedValues) {
+            if (!primedValues.add(path)) {
+                return;
+            }
+        }
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                String before = deliveredStamp(path);
+                try {
+                    ResolvedValue v = resolveValue(context, path);
+                    if (v != null) {
+                        rememberValueIfStampUnchanged(path, before, v.payload);
+                    }
+                } catch (Throwable unavailable) {
+                    // Allow another attempt: an unreachable Data Layer now says nothing about later.
+                    synchronized (primedValues) {
+                        primedValues.remove(path);
+                    }
+                }
+            }
+        }, 0);
+    }
+
+    /// Enumerates in the background so a cold {@code getDataPaths} is only wrong once.
+    ///
+    /// Runs the off-EDT branch of {@code getDataPaths} itself, which already records the snapshot
+    /// and its generation, rather than duplicating the enumeration.
+    private void primePaths() {
+        synchronized (primedValues) {
+            if (!primedValues.add(PATHS_PRIMED_KEY)) {
+                return;
+            }
+        }
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                try {
+                    getDataPaths();
+                } catch (Throwable unavailable) {
+                    synchronized (primedValues) {
+                        primedValues.remove(PATHS_PRIMED_KEY);
+                    }
+                }
+            }
+        }, 0);
+    }
+
+    /// Not a path: paths are prefixed, so this cannot collide with one.
+    private static final String PATHS_PRIMED_KEY = "\u0000paths";
+
+    /// Paths whose cold-start population has been attempted, so a repainting caller polling
+    /// {@code getData} does not queue a query per frame.
+    private static final java.util.Set<String> primedValues = new java.util.HashSet<String>();
 
     /// The payload bytes out of a value's DataMap, never null.
     ///
@@ -1381,7 +1449,14 @@ public class CN1WearableBridge implements WearableBridge {
         // been one yet, rather than a frozen UI.
         if (isCallerLatencySensitive()) {
             String[] known = pathsCache;
-            return known == null ? new String[0] : known.clone();
+            if (known == null) {
+                // Never enumerated in this process. Same cold-start problem as getData: the Data
+                // Layer will not re-announce items it delivered before the restart, so this would
+                // keep answering "no paths" for state that exists. Enumerate in the background.
+                primePaths();
+                return new String[0];
+            }
+            return known.clone();
         }
         int startedGeneration;
         synchronized (valueCache) {
