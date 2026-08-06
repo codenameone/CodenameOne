@@ -2036,6 +2036,57 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
+    /**
+     * Drops the ordering baseline and the cached snapshot together after this device's own removal,
+     * but only while the baseline is still the one the caller observed.
+     *
+     * <p>The two have to move as one, anchored on a stamp captured BEFORE anything is cleared. A
+     * deferred resolution can deliver a peer republish concurrently with a local tombstone: reading
+     * the stamp after clearing the snapshot would read the REPUBLISH's stamp, find it unchanged,
+     * and remove it -- so the app holds a value that {@code getData} no longer returns and a later
+     * stale replica faces no baseline at all.</p>
+     *
+     * @param expected the stamp observed before the tombstone was processed, or null if there was
+     *                 none
+     * @return true when nothing had changed and both were cleared
+     */
+    static boolean forgetAfterLocalRemoval(String path, String expected) {
+        synchronized (deliveredSequences) {
+            if (expected == null) {
+                // Nothing to remove -- unless a delivery installed a baseline in the meantime, in
+                // which case that delivery owns the path now and its snapshot must survive.
+                if (hasDeliveredStamp(path)) {
+                    return false;
+                }
+            } else if (!forgetDeliveredSequenceIfUnchanged(path, expected)) {
+                return false;
+            }
+            rememberValue(path, null);
+            return true;
+        }
+    }
+
+    /**
+     * Records a deletion against a resolution that is ALREADY pending, without scheduling one.
+     *
+     * <p>Used when an inline deletion query succeeds while an older first-sight resolution is still
+     * in flight for the same path. That older query may have captured the item before it was
+     * deleted; without this it finishes as a non-deletion, reports no missed upgrade, and delivers
+     * a deleted item against the now-empty baseline, with no later callback guaranteed to correct
+     * it. Bumping the generation makes the finishing task see that it did not act on the latest
+     * deletion and resolve again.</p>
+     */
+    static void notePendingDeletion(String path) {
+        if (path == null) {
+            return;
+        }
+        synchronized (pendingWinnerPaths) {
+            if (pendingWinnerPaths.contains(path)) {
+                deletionPaths.put(path, Long.valueOf(++deletionGeneration));
+            }
+        }
+    }
+
     /** The recorded stamp for a path, or null -- an opaque snapshot for {@link #forgetDeliveredSequenceIfUnchanged}. */
     static String deliveredStamp(String path) {
         synchronized (deliveredSequences) {

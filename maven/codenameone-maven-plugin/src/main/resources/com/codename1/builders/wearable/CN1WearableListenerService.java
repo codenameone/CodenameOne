@@ -281,6 +281,10 @@ public class CN1WearableListenerService extends WearableListenerService {
             }
             String appPath = CN1WearableBridge.decode(
                     path.substring(CN1WearableBridge.pathPrefix().length()));
+            // Read before anything is cleared, so the reset below can tell this device's own
+            // removal from a republish that landed while it was being processed.
+            String beforeTombstone = event.getType() == DataEvent.TYPE_DELETED
+                    ? CN1WearableBridge.deliveredStamp(appPath) : null;
             if (event.getType() == DataEvent.TYPE_DELETED && openRemovals.contains(path)) {
                 // This device's own removeData coming back, for an ordinary value. The app made the
                 // call, so announcing it would break the peer-only contract in the other direction.
@@ -295,22 +299,20 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // removal markers record -- read at arrival, not at handler time.
                 //
                 // The cached value goes, or a latency-sensitive getData() would keep answering with
-                // a value this device has just deleted.
-                CN1WearableBridge.rememberValue(appPath, null);
-                // And so does the ordering baseline. Keeping it was wrong for a peer whose logical
-                // clock never caught up with ours: an offline peer republishing the path draws a
-                // sequence LOWER than the winner we removed, deliverIfOutranks rejects it against a
-                // stamp describing an item that no longer exists anywhere, and both the listener
-                // and getData() stay empty with no later event to correct them. After a successful
-                // removal the path holds nothing, so anything that arrives next is by definition
-                // the new winner.
+                // a value this device has just deleted -- and so does the ordering baseline.
+                // Keeping the baseline was wrong for a peer whose logical clock never caught up
+                // with ours: an offline peer republishing the path draws a sequence LOWER than the
+                // winner we removed, deliverIfOutranks rejects it against a stamp describing an
+                // item that no longer exists anywhere, and both the listener and getData() stay
+                // empty with no later event to correct them. After a successful removal the path
+                // holds nothing, so anything that arrives next is by definition the new winner.
                 //
-                // Dropped only while the stamp is still the one just observed, so a delivery that
-                // raced in behind this tombstone keeps its baseline.
-                String stamp = CN1WearableBridge.deliveredStamp(appPath);
-                if (stamp != null) {
-                    CN1WearableBridge.forgetDeliveredSequenceIfUnchanged(appPath, stamp);
-                }
+                // Both are cleared as ONE step, anchored on a stamp read BEFORE either moves. A
+                // deferred resolution can deliver a peer republish concurrently with this
+                // tombstone, and clearing first and reading after would remove the republish's own
+                // stamp and snapshot -- leaving the app holding a value getData() no longer
+                // returns, with no baseline against a later stale replica.
+                CN1WearableBridge.forgetAfterLocalRemoval(appPath, beforeTombstone);
                 continue;
             }
             if (event.getType() == DataEvent.TYPE_DELETED) {
@@ -356,6 +358,12 @@ public class CN1WearableListenerService extends WearableListenerService {
                                 remaining.sequence, remaining.node, remaining.payload);
                     } else if (CN1WearableBridge.deliverRemovalIfStampUnchanged(
                             appPath, beforeQuery)) {
+                        // An older first-sight resolution may still be in flight for this path,
+                        // holding an item it captured BEFORE the deletion. Recording the deletion
+                        // against that pending resolver -- rather than only on the failure path --
+                        // is what stops it finishing as a non-deletion and delivering a deleted
+                        // item against the baseline this branch just emptied.
+                        CN1WearableBridge.notePendingDeletion(appPath);
                         // Genuinely empty, so the stamp can go: a value republished here later with
                         // a lower stamp than the removed one carried must not be filtered as older.
                         //
