@@ -103,6 +103,32 @@ class GuiDocumentTest {
         assertEquals(3, document.components().size());
     }
 
+    /**
+     * Pasted XML carries the cell it was copied from, so pasting a table child back into its own
+     * table used to stack the copy on top of the original in the preview and the generated source.
+     */
+    @Test
+    void aPastedTableChildTakesAFreeCellInsteadOfTheOneItWasCopiedFrom() {
+        GuiDocument document = GuiDocument.parse("Form.gui",
+                "<component type=\"Form\" name=\"Form\">"
+                + "<component type=\"Container\" name=\"grid\" layout=\"TableLayout\""
+                + " tableLayoutRows=\"2\" tableLayoutColumns=\"2\">"
+                + "<component type=\"Button\" name=\"cell\" tableRow=\"0\" tableColumn=\"0\"/>"
+                + "</component></component>");
+
+        Element original = named(document, "cell");
+        document.select(original);
+        String clipboard = document.copySelectedXml();
+        document.select(named(document, "grid"));
+        Element pasted = document.pasteXml(clipboard);
+
+        assertNotNull(pasted);
+        assertNotEquals(
+                original.getAttribute("tableRow") + ":" + original.getAttribute("tableColumn"),
+                pasted.getAttribute("tableRow") + ":" + pasted.getAttribute("tableColumn"),
+                "the copy landed in the cell it was copied from");
+    }
+
     @Test
     void pastedContainerChildrenAlsoGetUniqueNamesAndKeepInternalRelationships() {
         GuiDocument document = GuiDocument.parse("Form.gui",
