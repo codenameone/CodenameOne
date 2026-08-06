@@ -210,6 +210,14 @@ class KotlinUiTest : BaseTest() {
         val dbg = drawnBlur.graphics
         step("probe-drawn-blur-g-null=" + (dbg == null))
         dbg.isAntiAliased = true
+        // calcPreferredSize does not just draw on the blurred image -- it asks it
+        // for a width. That is the one call on the blur result never probed, and
+        // Windows builds its blur result from an ARGB array rather than the
+        // mutable surface, so its dimensions come from a different native path.
+        step("probe-drawn-blur-width")
+        val bw = drawnBlur.width
+        val bh = drawnBlur.height
+        step("probe-drawn-blur-size=" + bw + "x" + bh)
         step("probe-drawn-ok")
         step("probe-so-preferredsize")
         soSwitch.preferredSize
