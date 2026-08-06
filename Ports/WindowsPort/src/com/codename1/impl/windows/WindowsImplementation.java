@@ -2813,4 +2813,71 @@ public class WindowsImplementation extends CodenameOneImplementation {
         }
         return l10n;
     }
+
+    // ---------------------------------------------------------------- database
+
+    /**
+     * Resolves a database name to an absolute path. Bare names live in a "database" directory
+     * under the application's storage directory; a file:// URL is resolved through
+     * FileSystemStorage, matching the other ports that support custom paths.
+     */
+    private String resolveDatabasePath(String databaseName) {
+        if (databaseName.startsWith("file://")) {
+            return com.codename1.io.FileSystemStorage.getInstance().toNativePath(databaseName);
+        }
+        return WindowsNative.storageDir() + "\\database\\" + databaseName;
+    }
+
+    @Override
+    public com.codename1.db.Database openOrCreateDB(String databaseName) throws java.io.IOException {
+        return openOrCreateDB(databaseName, null);
+    }
+
+    @Override
+    public com.codename1.db.Database openOrCreateDB(String databaseName,
+            com.codename1.db.DatabaseConfig config) throws java.io.IOException {
+        String path = resolveDatabasePath(databaseName);
+        int sep = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        if (sep > 0) {
+            mkdir("file://" + path.substring(0, sep));
+        }
+        String key = null;
+        if (config != null && config.isEncrypted()) {
+            key = config.resolveKeyMaterial(databaseName);
+        }
+        return new WindowsDatabase(path, key);
+    }
+
+    @Override
+    public boolean isDatabaseCustomPathSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isDatabaseEncryptionSupported() {
+        return WindowsNative.sqlDbIsCipherAvailable();
+    }
+
+    @Override
+    public boolean isBlobQueryParameterSupported() {
+        return true;
+    }
+
+    @Override
+    public void deleteDB(String databaseName) throws java.io.IOException {
+        WindowsNative.sqlDbDelete(resolveDatabasePath(databaseName));
+    }
+
+    @Override
+    public boolean existsDB(String databaseName) {
+        return WindowsNative.sqlDbExists(resolveDatabasePath(databaseName));
+    }
+
+    @Override
+    public String getDatabasePath(String databaseName) {
+        if (databaseName.startsWith("file://")) {
+            return databaseName;
+        }
+        return resolveDatabasePath(databaseName);
+    }
 }

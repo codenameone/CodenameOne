@@ -820,4 +820,48 @@ public final class LinuxNative {
     public static native void gl3dDrawArrays(long contextPeer, long pipelinePeer, long vboPeer, int strideBytes,
             int vertexCount, int primitive, float[] uniforms, int uniformFloats,
             long texturePeer, int texFilter, int texWrap);
+
+    // ---- SQLite bindings. Implemented in cn1_linux_db.c from the shared cn1_db_sqlite_impl.h. ----
+
+    /** True when a database file exists at this absolute path. */
+    public static native boolean sqlDbExists(String path);
+    /** Removes the database file at this absolute path. */
+    public static native void sqlDbDelete(String path);
+    /** Opens or creates a database, returning the sqlite3 peer. */
+    public static native long sqlDbOpen(String path) throws java.io.IOException;
+    /**
+     * Applies an encryption key and checks that it decrypts, returning false when it does not.
+     * Reporting rather than throwing keeps a wrong key distinguishable from a failure to open.
+     */
+    public static native boolean sqlDbApplyKey(long dbPeer, String key) throws java.io.IOException;
+    /** Re-keys an open database, or removes the key when passed null. */
+    public static native void sqlDbRekey(long dbPeer, String key) throws java.io.IOException;
+    /** True when the linked engine supports encryption. */
+    public static native boolean sqlDbIsCipherAvailable();
+    public static native void sqlDbClose(long dbPeer) throws java.io.IOException;
+    /** Runs a whole script, which may contain several statements. */
+    public static native void sqlDbExecScript(long dbPeer, String sql) throws java.io.IOException;
+
+    public static native long sqlStmtPrepare(long dbPeer, String sql) throws java.io.IOException;
+    public static native int sqlStmtParameterCount(long stmtPeer) throws java.io.IOException;
+    public static native void sqlStmtBindNull(long stmtPeer, int index) throws java.io.IOException;
+    public static native void sqlStmtBindString(long stmtPeer, int index, String value) throws java.io.IOException;
+    public static native void sqlStmtBindBlob(long stmtPeer, int index, byte[] value) throws java.io.IOException;
+    public static native void sqlStmtBindLong(long stmtPeer, int index, long value) throws java.io.IOException;
+    public static native void sqlStmtBindDouble(long stmtPeer, int index, double value) throws java.io.IOException;
+    /** Steps a statement, returning true when it landed on a row. */
+    public static native boolean sqlStmtStep(long stmtPeer) throws java.io.IOException;
+    /** Resets a statement to before its first row, keeping its bindings. */
+    public static native void sqlStmtReset(long stmtPeer) throws java.io.IOException;
+    public static native void sqlStmtFinalize(long stmtPeer) throws java.io.IOException;
+    /** Steps to completion and finalizes, for statements that return no rows. */
+    public static native void sqlStmtExecuteAndFinalize(long stmtPeer) throws java.io.IOException;
+
+    public static native int sqlColCount(long stmtPeer) throws java.io.IOException;
+    public static native String sqlColName(long stmtPeer, int col) throws java.io.IOException;
+    public static native boolean sqlColIsNull(long stmtPeer, int col) throws java.io.IOException;
+    public static native String sqlColString(long stmtPeer, int col) throws java.io.IOException;
+    public static native byte[] sqlColBlob(long stmtPeer, int col) throws java.io.IOException;
+    public static native double sqlColDouble(long stmtPeer, int col) throws java.io.IOException;
+    public static native long sqlColLong(long stmtPeer, int col) throws java.io.IOException;
 }
