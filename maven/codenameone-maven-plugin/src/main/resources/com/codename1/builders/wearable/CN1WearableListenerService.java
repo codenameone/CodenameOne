@@ -98,7 +98,7 @@ public class CN1WearableListenerService extends WearableListenerService {
     public void onMessageReceived(final MessageEvent event) {
         // Same reasoning as onDataChanged: isFromAKnownNode can block on a cold start.
         final MessageEvent frozen = event.freeze();
-        WORKER.execute(new Runnable() {
+        MESSAGE_WORKER.execute(new Runnable() {
             public void run() {
                 handleMessageReceived(frozen);
             }
@@ -173,6 +173,18 @@ public class CN1WearableListenerService extends WearableListenerService {
      * frozen first because the buffer is recycled as soon as the callback returns.</p>
      */
     private static final java.util.concurrent.ExecutorService WORKER =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+
+    /// Live messages get their OWN thread.
+    ///
+    /// A data event can hold the data worker for a long time and legitimately so: a cold-start
+    /// resolution runs several five-second identity and capability queries and then
+    /// resolveValueWithRetry, which is three more Data Layer attempts. Behind that, an unrelated
+    /// request could sit long enough for the SENDER's thirty-second reply deadline to expire on a
+    /// message that had already arrived -- the one kind of delivery where being late is the same as
+    /// being lost. The two kinds of traffic have no ordering relationship with each other, so there
+    /// is nothing to serialise between them.
+    private static final java.util.concurrent.ExecutorService MESSAGE_WORKER =
             java.util.concurrent.Executors.newSingleThreadExecutor();
 
     @Override
