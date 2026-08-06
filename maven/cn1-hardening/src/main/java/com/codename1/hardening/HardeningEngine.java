@@ -122,6 +122,9 @@ public final class HardeningEngine {
         InputJarKeepScanner scanner = new InputJarKeepScanner();
         scanner.scan(inClasses);
         keepRules.addAll(scanner.keepRules());
+        // Keep classes named by META-INF/services descriptors: those files are copied verbatim, so
+        // ServiceLoader would fail if the service interface or a provider class were renamed.
+        keepRules.addAll(serviceDescriptorKeeps(nonClass));
         keepRules.addAll(cfg.getExtraKeepRules());
 
         Map<String, byte[]> renamed;
@@ -196,7 +199,7 @@ public final class HardeningEngine {
         }
 
         MangleCollisionCheck.check(renamed.keySet());
-        OutputVerifier.verify(renamed);
+        OutputVerifier.verify(renamed, hierarchy);
 
         // Idempotence marker: a nested builder delegation must not harden twice.
         nonClass.asMap().put("META-INF/CN1-HARDENED",
@@ -287,6 +290,51 @@ public final class HardeningEngine {
         }
         return new java.net.URLClassLoader(urls.toArray(new java.net.URL[urls.size()]),
                 HardeningEngine.class.getClassLoader());
+    }
+
+    /**
+     * Keep rules for every class named by a {@code META-INF/services/*} descriptor -- the service
+     * interface (the file name) and each provider class listed inside. The descriptors are carried
+     * across verbatim, so renaming any of these would break {@code ServiceLoader}.
+     */
+    private static List<String> serviceDescriptorKeeps(JarDemuxer.NonClassEntries nonClass) {
+        List<String> rules = new ArrayList<String>();
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        String prefix = "META-INF/services/";
+        for (Map.Entry<String, byte[]> e : nonClass.asMap().entrySet()) {
+            String name = e.getKey();
+            if (!name.startsWith(prefix) || name.length() <= prefix.length()) {
+                continue;
+            }
+            addServiceKeep(rules, seen, name.substring(prefix.length()));
+            String body = new String(e.getValue(), java.nio.charset.Charset.forName("UTF-8"));
+            for (String line : body.split("\\r?\\n")) {
+                int hash = line.indexOf('#');
+                if (hash >= 0) {
+                    line = line.substring(0, hash);
+                }
+                addServiceKeep(rules, seen, line.trim());
+            }
+        }
+        return rules;
+    }
+
+    private static void addServiceKeep(List<String> rules, java.util.Set<String> seen, String className) {
+        String c = className.trim();
+        if (c.length() == 0 || !isPlausibleClassName(c) || !seen.add(c)) {
+            return;
+        }
+        rules.add("-keep class " + c + " { *; }");
+    }
+
+    private static boolean isPlausibleClassName(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!Character.isJavaIdentifierPart(c) && c != '.' && c != '$') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int deriveSeed(HardeningConfig cfg, String buildKey) {

@@ -83,7 +83,7 @@ final class BuildHintSchemaDefaults {
 
         set("{{#hardening#harden.level}}.label", "Hardening level");
         set("{{#hardening#harden.level}}.type", "Select");
-        set("{{#hardening#harden.level}}.values", "off,standard,aggressive,paranoid");
+        set("{{#hardening#harden.level}}.values", "off,standard,aggressive,paranoid,");
         set("{{#hardening#harden.level}}.description",
                 "off = no hardening. standard = renaming + constant-string encryption. "
                 + "aggressive = + all-string encryption + control flow. paranoid = + opaque "
@@ -92,13 +92,13 @@ final class BuildHintSchemaDefaults {
 
         set("{{#hardening#harden.strings}}.label", "String encryption");
         set("{{#hardening#harden.strings}}.type", "Select");
-        set("{{#hardening#harden.strings}}.values", "off,constants,all");
+        set("{{#hardening#harden.strings}}.values", "off,constants,all,");
         set("{{#hardening#harden.strings}}.description",
                 "Override string encryption independently of the level.");
 
         set("{{#hardening#harden.controlFlow}}.label", "Control-flow obfuscation");
         set("{{#hardening#harden.controlFlow}}.type", "Select");
-        set("{{#hardening#harden.controlFlow}}.values", "off,on");
+        set("{{#hardening#harden.controlFlow}}.values", "off,on,");
         set("{{#hardening#harden.controlFlow}}.description",
                 "Override control-flow obfuscation. Applied on Android and desktop only; left off "
                 + "the ParparVM native ports where it fights the translator's optimizer.");
@@ -111,7 +111,7 @@ final class BuildHintSchemaDefaults {
 
         set("{{#hardening#harden.allowUnhardenedLocalBuild}}.label", "Allow unhardened local build");
         set("{{#hardening#harden.allowUnhardenedLocalBuild}}.type", "Select");
-        set("{{#hardening#harden.allowUnhardenedLocalBuild}}.values", "false,true");
+        set("{{#hardening#harden.allowUnhardenedLocalBuild}}.values", "false,true,");
         set("{{#hardening#harden.allowUnhardenedLocalBuild}}.description",
                 "Let a local or source-project target build unhardened instead of failing the "
                 + "pre-flight. The output is NOT hardened.");

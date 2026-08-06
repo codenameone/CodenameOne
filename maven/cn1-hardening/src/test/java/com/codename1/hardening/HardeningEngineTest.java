@@ -143,6 +143,41 @@ public class HardeningEngineTest {
     }
 
     @Test
+    public void serviceProviderClassesAreKept() throws Exception {
+        org.junit.Assume.assumeTrue("ProGuard renamer needs JDK <=20", HardeningEngine.proguardCanRunHere());
+        // Build a jar where Helper is declared as a service provider; it must survive un-renamed
+        // so the verbatim-copied descriptor still resolves via ServiceLoader.
+        File jar = tmp.newFile("svc.jar");
+        FileOutputStream fo = new FileOutputStream(jar);
+        ZipOutputStream zos = new ZipOutputStream(fo);
+        putClass(zos, SECRETS);
+        putClass(zos, HELPER);
+        zos.putNextEntry(new ZipEntry("META-INF/services/com.example.MyService"));
+        zos.write("# a provider\ncom.codename1.hardening.fixture.Helper\n"
+                .getBytes(Charset.forName("UTF-8")));
+        zos.closeEntry();
+        zos.finish();
+        fo.close();
+
+        File out = tmp.newFile("svc-hardened.jar");
+        Map<String, String> hints = new HashMap<String, String>();
+        hints.put("harden.level", "standard");
+        HardeningRequest req = new HardeningRequest()
+                .inputJar(jar).outputJar(out).mappingFile(tmp.newFile("svc-map.txt"))
+                .workDir(tmp.newFolder("svc-work"))
+                .config(HardeningConfig.from(hints, "ios", true))
+                .mainClass("com.codename1.hardening.fixture.Secrets");
+        HardeningResult r = HardeningEngine.harden(req);
+        assertTrue(r.isHardened());
+        Map<String, byte[]> outEntries = readAll(out);
+        assertTrue("service provider class must be kept, not renamed",
+                outEntries.containsKey(HELPER + ".class"));
+        assertArrayEquals("# a provider\ncom.codename1.hardening.fixture.Helper\n"
+                        .getBytes(Charset.forName("UTF-8")),
+                outEntries.get("META-INF/services/com.example.MyService"));
+    }
+
+    @Test
     public void offProfileIsSkippedAndReturnsInput() throws Exception {
         HardeningResult r = harden(HardeningProfile.OFF, "ios", true);
         assertFalse(r.isHardened());

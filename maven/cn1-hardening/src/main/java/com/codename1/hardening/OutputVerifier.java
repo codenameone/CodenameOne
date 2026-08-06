@@ -39,12 +39,19 @@ public final class OutputVerifier {
     private OutputVerifier() {
     }
 
-    /** @throws HardeningException on the first class that fails verification, naming it. */
-    public static void verify(Map<String, byte[]> classesByInternalName) throws HardeningException {
+    /**
+     * @param hierarchy a classloader over the (renamed) input classes plus the library jars, so the
+     *                  verifier's {@code SimpleVerifier} resolves application types instead of
+     *                  loading them from the engine's own classpath (which would fail verification
+     *                  on any class with a merge between application types). May be {@code null}.
+     * @throws HardeningException on the first class that fails verification, naming it.
+     */
+    public static void verify(Map<String, byte[]> classesByInternalName, ClassLoader hierarchy)
+            throws HardeningException {
         for (Map.Entry<String, byte[]> e : classesByInternalName.entrySet()) {
             StringWriter sw = new StringWriter();
             try {
-                CheckClassAdapter.verify(new ClassReader(e.getValue()), false, new PrintWriter(sw));
+                CheckClassAdapter.verify(new ClassReader(e.getValue()), hierarchy, false, new PrintWriter(sw));
             } catch (Throwable t) {
                 throw new HardeningException("Hardened class '" + e.getKey()
                         + "' failed bytecode verification: " + t.getMessage(), t);
