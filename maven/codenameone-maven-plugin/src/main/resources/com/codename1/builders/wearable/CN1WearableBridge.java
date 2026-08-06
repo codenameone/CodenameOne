@@ -1736,6 +1736,17 @@ public class CN1WearableBridge implements WearableBridge {
                             if (replayNode.equals(uri.getHost())) {
                                 continue;
                             }
+                            // The claim is refreshed BEFORE the payload is decoded, because a
+                            // decode can fail: an unreadable asset returns early, and the prune at
+                            // the end of this pass would then drop an aged claim for an item nobody
+                            // had examined -- so the retry that decodeTransfer schedules would find
+                            // no claim and deliver the one-shot file a second time. Refreshing
+                            // first also skips reading a potentially large asset we have already
+                            // handed over.
+                            if (hasAnyClaim(context, uri)) {
+                                refreshClaim(context, uri);
+                                continue;
+                            }
                             Transfer t = decodeTransfer(context, item);
                             if (t == null || t.payload == null) {
                                 continue;
