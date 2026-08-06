@@ -106,10 +106,10 @@ public final class Main {
 
             HardeningConfig cfg = HardeningConfig.from(hints, platform, renameSupported);
 
-            // Gate entitlement only when hardening will actually run: a per-platform opt-out
-            // (harden.<platform>.enabled=false) must be able to produce an unhardened build even
-            // on a non-entitled account, rather than failing here.
-            if (cfg.isActive() && !entitled) {
+            // Gate entitlement only when a transform will actually run: a per-platform opt-out, or a
+            // level whose transforms are all individually disabled, must produce an unhardened build
+            // even on a non-entitled account (the engine would return SKIPPED), rather than failing.
+            if (HardeningEngine.willApplyAnyTransform(cfg) && !entitled) {
                 System.err.println("App hardening is an Enterprise feature and this build is not "
                         + "entitled. Refusing to produce a half-hardened binary.");
                 return EXIT_NOT_ENTITLED;

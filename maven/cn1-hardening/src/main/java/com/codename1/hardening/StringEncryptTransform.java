@@ -139,7 +139,7 @@ public final class StringEncryptTransform {
                 if (DECODER_NAME.equals(mn.name)) {
                     continue;
                 }
-                changed |= encryptMethodLiterals(cn, mn, base);
+                changed |= encryptMethodLiterals(cn, mn, base, isInterface);
             }
         }
 
@@ -160,7 +160,7 @@ public final class StringEncryptTransform {
         return cw.toByteArray();
     }
 
-    private boolean encryptMethodLiterals(ClassNode cn, MethodNode mn, int base) {
+    private boolean encryptMethodLiterals(ClassNode cn, MethodNode mn, int base, boolean isInterface) {
         boolean changed = false;
         AbstractInsnNode insn = mn.instructions.getFirst();
         while (insn != null) {
@@ -170,8 +170,11 @@ public final class StringEncryptTransform {
                 if (ldc.cst instanceof String && shouldEncryptLiteral((String) ldc.cst)) {
                     String plain = (String) ldc.cst;
                     ldc.cst = encode(plain, base);
+                    // The itf flag must be true when the decoder lives in an interface, or the JVM
+                    // writes a Methodref instead of an InterfaceMethodref and throws
+                    // IncompatibleClassChangeError at run time.
                     mn.instructions.insert(ldc, new MethodInsnNode(
-                            Opcodes.INVOKESTATIC, cn.name, DECODER_NAME, DECODER_DESC, false));
+                            Opcodes.INVOKESTATIC, cn.name, DECODER_NAME, DECODER_DESC, isInterface));
                     encryptedCount++;
                     changed = true;
                 }

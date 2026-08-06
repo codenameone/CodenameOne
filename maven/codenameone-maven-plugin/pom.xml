@@ -387,7 +387,12 @@
                          unlike copying from a sibling target/ directory. -->
                     <execution>
                         <id>embed-hardening-engine</id>
-                        <phase>generate-resources</phase>
+                        <!-- prepare-package, not generate-resources: the shaded 'standalone' classifier
+                             is attached by cn1-hardening at its package phase, which a partial test-only
+                             reactor build ("-pl codenameone-maven-plugin -am ... test") never reaches for
+                             the upstream module. Copying at prepare-package keeps the plugin-test job
+                             green (it stops at test) while package/install still embed the engine. -->
+                        <phase>prepare-package</phase>
                         <goals>
                             <goal>copy</goal>
                         </goals>
