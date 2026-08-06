@@ -1200,6 +1200,22 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
+    /**
+     * Ends the local-removal window for a path.
+     *
+     * <p>The window exists to cover the tombstones of ONE wildcard delete, and a publication for
+     * the same path is proof that delete is over. Without this the marker stood for its full
+     * duration regardless of what happened next, so a peer that republished the path and then
+     * removed its new value inside the window had that genuine deletion classified as part of this
+     * device's earlier delete -- the removal was swallowed and the listener kept a value that no
+     * longer existed, with no later callback to correct it.</p>
+     */
+    static void clearLocalRemoval(String storagePath) {
+        synchronized (localRemovals) {
+            localRemovals.remove(storagePath);
+        }
+    }
+
     /** Whether a tombstone for this storage path came from a removal this device asked for. */
     static boolean isLocallyRemoved(String storagePath) {
         long now = System.currentTimeMillis();
@@ -1441,7 +1457,17 @@ public class CN1WearableBridge implements WearableBridge {
             new java.util.Timer("cn1-wearable-transfers", true);
 
     private static void scheduleTransferRetry(final Context context, final Uri uri, final int attempt) {
-        if (uri == null || attempt > TRANSFER_RETRIES) {
+        if (uri == null) {
+            return;
+        }
+        // Bounded by the sender's RETENTION WINDOW, not by an attempt count. A fixed four tries
+        // abandoned a transfer whose Asset was merely slow -- a large file on a poor connection --
+        // while the sender keeps the DataItem for 24 hours and the item never changes, so the
+        // delivery model provides no later callback to pick it up again. The one-shot file was
+        // simply lost. Retrying until either the Asset reads or the item is gone matches the
+        // lifetime the sender actually promises.
+        if (attempt > TRANSFER_RETRIES && retryElapsed(uri) > TRANSFER_RETENTION_MILLIS) {
+            forgetRetryStart(uri);
             return;
         }
         transferTimer.schedule(new java.util.TimerTask() {
@@ -1474,7 +1500,41 @@ public class CN1WearableBridge implements WearableBridge {
                     scheduleTransferRetry(context, uri, attempt + 1);
                 }
             }
-        }, TRANSFER_RETRY_MILLIS * attempt);
+        }, retryDelay(attempt));
+    }
+
+    /**
+     * Backoff for transfer retries: linear while the failure may be momentary, then capped.
+     *
+     * <p>Capped rather than exponential because the wait has to stay short enough to catch an
+     * Asset that finishes downloading hours in -- an unbounded doubling would be sleeping for
+     * hours by then and the retention window would expire mid-sleep.</p>
+     */
+    private static long retryDelay(int attempt) {
+        long linear = TRANSFER_RETRY_MILLIS * attempt;
+        return linear > TRANSFER_RETRY_CAP_MILLIS ? TRANSFER_RETRY_CAP_MILLIS : linear;
+    }
+
+    private static final long TRANSFER_RETRY_CAP_MILLIS = 5 * 60 * 1000L;
+    private static final Map<String, Long> retryStarts = new HashMap<String, Long>();
+
+    private static long retryElapsed(Uri uri) {
+        String key = uri.toString();
+        long now = System.currentTimeMillis();
+        synchronized (retryStarts) {
+            Long started = retryStarts.get(key);
+            if (started == null) {
+                retryStarts.put(key, Long.valueOf(now));
+                return 0L;
+            }
+            return now - started.longValue();
+        }
+    }
+
+    private static void forgetRetryStart(Uri uri) {
+        synchronized (retryStarts) {
+            retryStarts.remove(uri.toString());
+        }
     }
 
     /**

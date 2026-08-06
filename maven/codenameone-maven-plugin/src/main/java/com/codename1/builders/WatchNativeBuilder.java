@@ -851,7 +851,11 @@ class WatchNativeBuilder {
                 .append(IPhoneBuilder.escapeRubyStr(mainClass)).append("-src/watchOSStubs'\n")
                 .append("  bs['HEADER_SEARCH_PATHS[sdk=watchsimulator*]'] = '$(inherited) $(SRCROOT)/")
                 .append(IPhoneBuilder.escapeRubyStr(mainClass)).append("-src/watchOSStubs'\n")
-                .append("  bs['SKIP_INSTALL'] = 'YES'\n");
+                // A standalone watch app IS the product, so it must be installable; an embedded
+                // companion is carried inside the phone app and must not be.
+                .append(standalone
+                        ? "  bs['SKIP_INSTALL'] = 'NO'\n"
+                        : "  bs['SKIP_INSTALL'] = 'YES'\n");
         if (resolvedTeamId != null && !resolvedTeamId.isEmpty()) {
             s.append("  bs['DEVELOPMENT_TEAM'] = '").append(resolvedTeamId).append("'\n");
         }
@@ -1018,6 +1022,16 @@ class WatchNativeBuilder {
             owner.log("[watchNative] Added watchOS target " + watchTargetName
                     + " (" + (isStandalone() ? "standalone" : "companion") + ", "
                     + "watchOS " + MIN_DEPLOYMENT_TARGET + ", arm64_32)");
+            if (isStandalone()) {
+                // Said out loud at build time. The target is detached from the phone app and
+                // installable, but the archive step still selects the phone scheme, so the IPA this
+                // build returns is the phone app -- and a developer who asked for a watch-only
+                // product would otherwise discover that by inspecting the artifact.
+                owner.log("[watchNative] NOTE: codename1.watchStandalone builds " + watchTargetName
+                        + " as a detached, installable product, but this build archives the phone "
+                        + "scheme. To submit the watch app, open the generated Xcode project and "
+                        + "archive the " + watchTargetName + " scheme directly.");
+            }
         } catch (BuildException ex) {
             throw ex;
         } catch (Exception ex) {

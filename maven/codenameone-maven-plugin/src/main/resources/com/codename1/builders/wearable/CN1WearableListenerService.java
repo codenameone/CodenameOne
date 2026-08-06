@@ -355,6 +355,9 @@ public class CN1WearableListenerService extends WearableListenerService {
             //
             // An older item arriving after a newer one is ordinary, not exotic: a reconnect does it
             // whenever both nodes publish the same path. deliverIfOutranks declines those silently.
+            // A publication for this path ends any local-removal window: the wildcard delete it
+            // covered is demonstrably over, so a peer's later removal must not be mistaken for it.
+            CN1WearableBridge.clearLocalRemoval(path);
             if (ownEcho) {
                 // The ONE deliberate use of the raw setter. Bookkeeping only: the stamp still has
                 // to move so a later peer item is judged against what this device actually

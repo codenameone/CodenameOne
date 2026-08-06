@@ -57,8 +57,11 @@ to pair with, declare it standalone:
 include::../demos/common/src/main/snippets/developer-guide/wearables.properties[tag=wearables-properties-002,indent=0]
 ----
 
-A standalone build produces a watch-only product on Apple, and on Android turns
-the single APK into the Wear OS app.
+On Android a standalone build turns the single APK into the Wear OS app, and that
+is what ships. On Apple the watch target is built standalone -- detached from the
+phone app rather than embedded in it -- but the archive step still targets the
+phone scheme, so submission needs one manual step in Xcode. See
+<<watch-distribution>> before you archive.
 
 === Running the Pair While You Develop
 
@@ -274,6 +277,7 @@ tap input into the runtime.
 .Codename One UI rendered on the watchOS simulator via the Core Graphics backend
 image::img/wearables/apple-watch-simulator.png[Codename One running on the Apple Watch simulator,scaledwidth=30%]
 
+[[watch-distribution]]
 ==== What the Watch App Runs Today
 [[watch-entry-point]]
 
@@ -294,7 +298,9 @@ for the watch app, which the generated project doesn't produce. Under manual
 signing the embedded watch target has no provisioning profile of its own, since
 the host app's profile is the one installed. And with
 `codename1.watchStandalone` the watch product is built but not archived, because
-the archive step targets the phone scheme.
+the archive step targets the phone scheme -- open the generated project and
+archive the watch scheme directly. The build logs this rather than leaving you to
+discover it from the contents of the IPA.
 
 None of this affects building, running or testing on the simulator or a device.
 Before you archive for submission, add an `AppIcon` set to the watch target, and
