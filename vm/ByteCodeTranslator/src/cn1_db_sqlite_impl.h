@@ -109,9 +109,11 @@ static int cn1DbProbeKey(sqlite3* db) {
 static JAVA_OBJECT cn1DbBlobToByteArray(CODENAME_ONE_THREAD_STATE, const void* bytes, int length) {
     JAVA_OBJECT arr;
     JAVA_ARRAY_BYTE* data;
-    if (bytes == NULL || length < 0) {
+    if (length < 0 || (bytes == NULL && length > 0)) {
         return JAVA_NULL;
     }
+    /* A zero length blob is a blob, not SQL NULL: SQLite may hand back a null pointer for it, and
+     * turning that into null would disagree with the column type and with wasNull(). */
     arr = allocArray(threadStateData, length, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)arr)->data;
     if (length > 0) {
@@ -161,10 +163,16 @@ JAVA_LONG PREFIX##_sqlDbOpen___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_
     int rc = sqlite3_open_v2(p, &db,                                                                \
             SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, NULL);              \
     if (rc != SQLITE_OK) {                                                                          \
-        cn1DbThrowSqlite(threadStateData, db, "Failed to open the database");                       \
+        /* Copy the message out and close before raising. throwException longjmps, so anything    \
+         * after it never runs -- and SQLite hands back a usable handle even on a failed open,    \
+         * which then leaks once per caught failure. */                                            \
+        char cn1DbOpenMessage[512];                                                                 \
+        snprintf(cn1DbOpenMessage, sizeof(cn1DbOpenMessage), "Failed to open the database: %s",     \
+                db != NULL ? sqlite3_errmsg(db) : "unknown SQLite error");                          \
         if (db != NULL) {                                                                           \
             sqlite3_close_v2(db);                                                                   \
         }                                                                                           \
+        cn1DbThrow(threadStateData, cn1DbOpenMessage);                                               \
         return 0;                                                                                   \
     }                                                                                               \
     return (JAVA_LONG)(intptr_t)db;                                                                 \

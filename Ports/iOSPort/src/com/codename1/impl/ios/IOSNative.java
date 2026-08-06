@@ -704,6 +704,14 @@ public final class IOSNative {
      * key and a failure to open the file, without the native layer having to name a core class.
      */
     native boolean sqlDbApplyKey(long db, String key);
+
+    /// Applies the key and probes it, reporting the SQLite result rather than a bare pass or fail.
+    ///
+    /// 0 is SQLITE_OK and means the key worked. 26 is SQLITE_NOTADB, which is what a key that did
+    /// not decrypt the file looks like: the plaintext it produces has no valid header. Anything
+    /// else is a corrupt image or a read error, which no key repairs, so the caller must not
+    /// report those as a wrong key.
+    native int sqlDbApplyKeyStatus(long db, String key);
     native void sqlDbDelete(String name);
     native void sqlDbClose(long db);
     /** Re-keys an open database, or removes the key when passed null. */

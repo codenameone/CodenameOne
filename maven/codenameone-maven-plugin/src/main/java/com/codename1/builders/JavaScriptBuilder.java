@@ -403,6 +403,10 @@ public class JavaScriptBuilder extends Executor {
         if (srcWebApp.isDirectory()) {
             jsPortWebApp = srcWebApp;
         }
+        // The bundled-jar path above does this too. Without it here, a build from a source
+        // checkout never sets the flag, so the compatibility default never applies and the
+        // optional assets are never pruned.
+        scanForDatabaseUsage(stageClasses);
         return stageClasses;
     }
 

@@ -245,9 +245,9 @@ class AndroidCipherDB extends Database {
      * the route both take here. The engines differ on this: the SQLite3MC build the other ports
      * carry does rekey all three directions in place, which is why only Android needs it.
      *
-     * sqlcipher_export copies schema and rows but not the header pragmas, so user_version is
-     * carried across explicitly; an application using it for schema versioning would otherwise
-     * silently come back as version zero.
+     * sqlcipher_export copies schema and rows but not the header pragmas, so user_version and
+     * application_id are carried across explicitly; an application using either for schema
+     * versioning or file identification would otherwise silently come back at zero.
      *
      * The new database is built beside the old one and swapped in only once it is complete. The
      * original is renamed aside rather than deleted, so a complete database exists under one of
@@ -255,6 +255,16 @@ class AndroidCipherDB extends Database {
      * process dies in the gap.
      */
     static final String BACKUP_SUFFIX = ".cn1backup";
+
+    /** Reads one integer header pragma, which sqlcipher_export does not carry across. */
+    private int readHeaderPragma(String pragma) {
+        android.database.Cursor c = db.rawQuery(pragma, null);
+        try {
+            return c.moveToFirst() ? c.getInt(0) : 0;
+        } finally {
+            c.close();
+        }
+    }
 
     private void migrateThroughExport(String targetKey) throws IOException {
         String path = db.getPath();
@@ -264,15 +274,10 @@ class AndroidCipherDB extends Database {
                     + "not be removed");
         }
         int userVersion = 0;
+        int applicationId = 0;
         try {
-            android.database.Cursor uv = db.rawQuery("PRAGMA user_version", null);
-            try {
-                if (uv.moveToFirst()) {
-                    userVersion = uv.getInt(0);
-                }
-            } finally {
-                uv.close();
-            }
+            userVersion = readHeaderPragma("PRAGMA user_version");
+            applicationId = readHeaderPragma("PRAGMA application_id");
             db.execSQL("ATTACH DATABASE " + toPragmaLiteral(target.getPath())
                     + " AS cn1migrate KEY " + toPragmaLiteral(targetKey));
             android.database.Cursor exported = db.rawQuery("SELECT sqlcipher_export('cn1migrate')",
@@ -280,6 +285,7 @@ class AndroidCipherDB extends Database {
             exported.moveToFirst();
             exported.close();
             db.execSQL("PRAGMA cn1migrate.user_version = " + userVersion);
+            db.execSQL("PRAGMA cn1migrate.application_id = " + applicationId);
             db.execSQL("DETACH DATABASE cn1migrate");
         } catch (RuntimeException err) {
             target.delete();

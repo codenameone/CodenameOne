@@ -58,14 +58,27 @@ class DatabaseImpl extends Database {
         peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(path);
     }
 
+    /// SQLite's success code.
+    private static final int SQLITE_OK = 0;
+
+    /// SQLite's "this is not a database file", which is what a wrong key looks like.
+    private static final int SQLITE_NOTADB = 26;
+
     public DatabaseImpl(String databaseName, String path, String key) throws IOException {
         this.databaseName = databaseName;
         peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(path);
-        if (!IOSImplementation.nativeInstance.sqlDbApplyKey(peer, key)) {
+        int status = IOSImplementation.nativeInstance.sqlDbApplyKeyStatus(peer, key);
+        if (status != SQLITE_OK) {
             IOSImplementation.nativeInstance.sqlDbClose(peer);
             peer = 0;
-            throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
-                    "The supplied key does not decrypt this database");
+            if (status == SQLITE_NOTADB) {
+                throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
+                        "The supplied key does not decrypt this database");
+            }
+            // A corrupt image or a read error. Reporting it as a wrong key would send an
+            // application that follows the error codes into prompting for a passphrase forever.
+            throw new IOException("The database " + databaseName + " could not be read, SQLite "
+                    + "result " + status);
         }
     }
 

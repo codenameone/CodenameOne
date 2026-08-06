@@ -6588,8 +6588,26 @@ const cn1SqliteMemoryAnchors = new Map();
 /** Whether the last failed open failed because of the key, rather than storage or corruption. */
 let cn1SqliteLastOpenWrongKey = false;
 
-/** The message from the last failed open, for the exception the Java side raises. */
-let cn1SqliteLastOpenError = "";
+/** The message from the last failed call, for the exception the Java side raises. */
+let cn1SqliteLastError = "";
+
+/**
+ * Runs a database operation, turning any failure into a value the caller can test.
+ *
+ * Nothing in this file may throw across the bridge. An exception raised inside a native binding
+ * does not arrive in the translated code as a Java throwable: it unwinds the worker and leaves
+ * every thread blocked on a call that never returns, so an ordinary SQL error - a syntax mistake,
+ * a constraint violation - would hang the application instead of reporting itself. Each binding
+ * therefore records the message here and answers with a sentinel the Java side checks.
+ */
+function cn1SqliteGuard(fn, failureValue) {
+  try {
+    return fn();
+  } catch (err) {
+    cn1SqliteLastError = err && err.message ? String(err.message) : String(err);
+    return failureValue;
+  }
+}
 
 /** Applies the key, if there is one, selecting the portable cipher scheme first. */
 function cn1SqliteApplyKey(db, key) {
@@ -6756,7 +6774,7 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_open_java_lang_String_java_lang_String_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_open___java_lang_String_java_lang_String_R_long"],
   function(name, key) {
     cn1SqliteLastOpenWrongKey = false;
-    cn1SqliteLastOpenError = "";
+    cn1SqliteLastError = "";
     try {
       return cn1SqliteRegister(cn1SqliteOpen(jvm.toNativeString(name), key === null ? null : jvm.toNativeString(key)));
     } catch (err) {
@@ -6765,7 +6783,7 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_open_java_lang_S
       // it unwinds the worker and leaves every thread waiting on a call that never returns, which
       // is a hang rather than an error.
       cn1SqliteLastOpenWrongKey = !!(err && err.cn1WrongKey);
-      cn1SqliteLastOpenError = err && err.message ? String(err.message) : String(err);
+      cn1SqliteLastError = err && err.message ? String(err.message) : String(err);
       return 0;
     }
   });
@@ -6773,8 +6791,8 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_open_java_lang_S
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenWasWrongKey_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenWasWrongKey___R_boolean"],
   function() { return cn1SqliteLastOpenWrongKey; });
 
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenError_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenError___R_java_lang_String"],
-  function() { return jvm.createStringLiteral(String(cn1SqliteLastOpenError)); });
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastError_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_lastError___R_java_lang_String"],
+  function() { return jvm.createStringLiteral(String(cn1SqliteLastError)); });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_close_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_close___long", "cn1_com_codename1_impl_html5_database_SQLiteNative_close_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_close___long_R_void"],
   function(dbId) {
@@ -6788,30 +6806,38 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_close_long", "cn
     return null;
   });
 
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_rekey_long_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_rekey___long_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_rekey_long_java_lang_String_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_rekey___long_java_lang_String_R_void"],
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_rekey_long_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_rekey___long_java_lang_String_R_boolean"],
   function(dbId, key) {
-    const db = cn1SqliteLookup(Number(dbId));
-    db.exec("PRAGMA cipher = 'sqlcipher'");
-    db.exec("PRAGMA legacy = 4");
-    const k = key === null ? "" : jvm.toNativeString(key);
-    db.exec("PRAGMA rekey = \"" + k.replace(/"/g, '""') + "\"");
-    return null;
+    return cn1SqliteGuard(function() {
+      const db = cn1SqliteLookup(Number(dbId));
+      db.exec("PRAGMA cipher = 'sqlcipher'");
+      db.exec("PRAGMA legacy = 4");
+      const k = key === null ? "" : jvm.toNativeString(key);
+      db.exec("PRAGMA rekey = \"" + k.replace(/"/g, '""') + "\"");
+      return true;
+    }, false);
   });
 
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_execScript_long_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_execScript___long_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_execScript_long_java_lang_String_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_execScript___long_java_lang_String_R_void"],
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_execScript_long_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_execScript___long_java_lang_String_R_boolean"],
   function(dbId, sql) {
-    cn1SqliteLookup(Number(dbId)).exec(jvm.toNativeString(sql));
-    return null;
+    return cn1SqliteGuard(function() {
+      cn1SqliteLookup(Number(dbId)).exec(jvm.toNativeString(sql));
+      return true;
+    }, false);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_prepare_long_java_lang_String_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_prepare___long_java_lang_String_R_long"],
   function(dbId, sql) {
-    const db = cn1SqliteLookup(Number(dbId));
-    return cn1SqliteRegister(db.prepare(jvm.toNativeString(sql)));
+    return cn1SqliteGuard(function() {
+      const db = cn1SqliteLookup(Number(dbId));
+      return cn1SqliteRegister(db.prepare(jvm.toNativeString(sql)));
+    }, 0);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_parameterCount_long_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_parameterCount___long_R_int"],
-  function(stmtId) { return cn1SqliteLookup(Number(stmtId)).parameterCount; });
+  function(stmtId) {
+    return cn1SqliteGuard(function() { return cn1SqliteLookup(Number(stmtId)).parameterCount; }, -1);
+  });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull_long_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull___long_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull_long_int_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull___long_int_R_void"],
   function(stmtId, index) { cn1SqliteLookup(Number(stmtId)).bind(index | 0, null); return null; });
@@ -6849,8 +6875,14 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble_long_
     return null;
   });
 
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_step_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_step___long_R_boolean"],
-  function(stmtId) { return cn1SqliteLookup(Number(stmtId)).step(); });
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_step_long_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_step___long_R_int"],
+  function(stmtId) {
+    // 1 landed on a row, 0 reached the end, -1 failed. A boolean had no room to say "failed",
+    // which is why this one is an int.
+    return cn1SqliteGuard(function() {
+      return cn1SqliteLookup(Number(stmtId)).step() ? 1 : 0;
+    }, -1);
+  });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_reset_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_reset___long", "cn1_com_codename1_impl_html5_database_SQLiteNative_reset_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_reset___long_R_void"],
   function(stmtId) {
@@ -6869,24 +6901,28 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_finish_long", "c
     return null;
   });
 
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish___long", "cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish___long_R_void"],
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish___long_R_boolean"],
   function(stmtId) {
-    const stmt = cn1SqliteHandles.get(Number(stmtId));
-    if (stmt) {
-      try {
-        while (stmt.step()) {
-          // A statement that returns rows still has to run to completion.
+    return cn1SqliteGuard(function() {
+      const stmt = cn1SqliteHandles.get(Number(stmtId));
+      if (stmt) {
+        try {
+          while (stmt.step()) {
+            // A statement that returns rows still has to run to completion.
+          }
+        } finally {
+          stmt.finalize();
+          cn1SqliteHandles.delete(Number(stmtId));
         }
-      } finally {
-        stmt.finalize();
-        cn1SqliteHandles.delete(Number(stmtId));
       }
-    }
-    return null;
+      return true;
+    }, false);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnCount_long_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnCount___long_R_int"],
-  function(stmtId) { return cn1SqliteLookup(Number(stmtId)).columnCount; });
+  function(stmtId) {
+    return cn1SqliteGuard(function() { return cn1SqliteLookup(Number(stmtId)).columnCount; }, -1);
+  });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnName_long_int_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnName___long_int_R_java_lang_String"],
   function(stmtId, col) {
@@ -6895,7 +6931,11 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnName_long_
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull_long_int_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull___long_int_R_boolean"],
-  function(stmtId, col) { return cn1SqliteLookup(Number(stmtId)).get(col | 0) === null; });
+  function(stmtId, col) {
+    return cn1SqliteGuard(function() {
+      return cn1SqliteLookup(Number(stmtId)).get(col | 0) === null;
+    }, true);
+  });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnString_long_int_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnString___long_int_R_java_lang_String"],
   function(stmtId, col) {

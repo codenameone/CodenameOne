@@ -9063,7 +9063,23 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbApplyKey___long_java_lang_Str
     if (sqlite3_key(db, keyChars, (int)strlen(keyChars)) != SQLITE_OK) {
         return JAVA_FALSE;
     }
+    // Reports the probe result rather than a bare pass/fail, so the Java side can tell a key that
+    // did not decrypt the file (SQLITE_NOTADB) from a corrupt image or a read error, which no key
+    // repairs. SQLITE_OK is 0, so a zero return means the key worked.
     return cn1SqlProbeKey(db) == SQLITE_OK ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sqlDbApplyKeyStatus___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT key) {
+    sqlite3* db = (sqlite3*)dbPeer;
+    if (cn1SqlApplyCipherProfile(db) != SQLITE_OK) {
+        return SQLITE_ERROR;
+    }
+    const char* keyChars = stringToUTF8(CN1_THREAD_STATE_PASS_ARG key);
+    int rc = sqlite3_key(db, keyChars, (int)strlen(keyChars));
+    if (rc != SQLITE_OK) {
+        return rc;
+    }
+    return cn1SqlProbeKey(db);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbIsCipherAvailable__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -12626,6 +12642,10 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlDbPath___java_lang_String_R_java
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbApplyKey___long_java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT key) {
     return com_codename1_impl_ios_IOSNative_sqlDbApplyKey___long_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, dbPeer, key);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_sqlDbApplyKeyStatus___long_java_lang_String_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT key) {
+    return com_codename1_impl_ios_IOSNative_sqlDbApplyKeyStatus___long_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, dbPeer, key);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbIsCipherAvailable___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {

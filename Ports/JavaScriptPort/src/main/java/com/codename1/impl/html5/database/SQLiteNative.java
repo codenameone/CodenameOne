@@ -76,17 +76,23 @@ public class SQLiteNative {
      */
     public static native boolean lastOpenWasWrongKey();
 
-    /** The message from the last failed {@link #open(String, String)}. */
-    public static native String lastOpenError();
+    /** The message from the last failed call, for the exception the caller raises. */
+    public static native String lastError();
 
     public static native void close(long dbPeer);
 
-    public static native void rekey(long dbPeer, String key) throws IOException;
+    /** Re-keys the database, returning false and recording {@link #lastError()} on failure. */
+    public static native boolean rekey(long dbPeer, String key);
 
-    /** Runs a whole script, which may contain several statements. */
-    public static native void execScript(long dbPeer, String sql) throws IOException;
+    /**
+     * Runs a whole script, which may contain several statements.
+     *
+     * @return false on failure, with the reason in {@link #lastError()}
+     */
+    public static native boolean execScript(long dbPeer, String sql);
 
-    public static native long prepare(long dbPeer, String sql) throws IOException;
+    /** Prepares a statement, returning 0 and recording {@link #lastError()} on failure. */
+    public static native long prepare(long dbPeer, String sql);
 
     public static native int parameterCount(long stmtPeer);
 
@@ -100,16 +106,26 @@ public class SQLiteNative {
 
     public static native void bindDouble(long stmtPeer, int index, double value);
 
-    /** Steps a statement, returning true when it landed on a row. */
-    public static native boolean step(long stmtPeer) throws IOException;
+    /**
+     * Steps a statement.
+     *
+     * @return 1 when it landed on a row, 0 at the end, -1 on failure with the reason in
+     * {@link #lastError()}. An int rather than a boolean because a boolean has no room to say
+     * "failed", and a native binding cannot report one by throwing.
+     */
+    public static native int step(long stmtPeer);
 
     /** Resets a statement to before its first row, keeping its bindings. */
     public static native void reset(long stmtPeer);
 
     public static native void finish(long stmtPeer);
 
-    /** Steps to completion and finalizes, for statements that return no rows. */
-    public static native void executeAndFinish(long stmtPeer) throws IOException;
+    /**
+     * Steps to completion and finalizes, for statements that return no rows.
+     *
+     * @return false on failure, with the reason in {@link #lastError()}
+     */
+    public static native boolean executeAndFinish(long stmtPeer);
 
     public static native int columnCount(long stmtPeer);
 

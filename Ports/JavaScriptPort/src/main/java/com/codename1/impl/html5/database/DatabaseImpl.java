@@ -65,7 +65,27 @@ public class DatabaseImpl extends Database {
             // would have an application prompting for a passphrase that cannot help, and for an
             // open with no key at all the diagnosis is impossible on its face.
             throw new IOException("The database " + name + " could not be opened: "
-                    + SQLiteNative.lastOpenError());
+                    + SQLiteNative.lastError());
+        }
+    }
+
+    /**
+     * Turns a failed native call into the IOException this API promises.
+     *
+     * The bindings report failure with a sentinel rather than by throwing: an exception raised
+     * inside one does not reach here as a Java throwable, it unwinds the worker and hangs every
+     * thread waiting on the call.
+     */
+    private static void checkNative(boolean ok) throws IOException {
+        if (!ok) {
+            throw new IOException(SQLiteNative.lastError());
+        }
+    }
+
+    /** Raises the prepare failure the binding reported through its zero sentinel. */
+    private static void checkPrepared(long stmt) throws IOException {
+        if (stmt == 0) {
+            throw new IOException(SQLiteNative.lastError());
         }
     }
 
@@ -91,7 +111,7 @@ public class DatabaseImpl extends Database {
         checkOpen();
         checkBeginTransaction();
         try {
-            SQLiteNative.execScript(peer, "BEGIN");
+            checkNative(SQLiteNative.execScript(peer, "BEGIN"));
         } catch (IOException err) {
             inTransaction = false;
             throw err;
@@ -103,7 +123,7 @@ public class DatabaseImpl extends Database {
         checkOpen();
         checkEndTransaction();
         try {
-            SQLiteNative.execScript(peer, "COMMIT");
+            checkNative(SQLiteNative.execScript(peer, "COMMIT"));
         } catch (IOException err) {
             // SQLite leaves the transaction open when COMMIT fails, so discard it here.
             rollbackQuietly();
@@ -116,7 +136,7 @@ public class DatabaseImpl extends Database {
     /// the engine may or may not have left the transaction open.
     private void rollbackQuietly() {
         try {
-            SQLiteNative.execScript(peer, "ROLLBACK");
+            checkNative(SQLiteNative.execScript(peer, "ROLLBACK"));
         } catch (Throwable ignored) {
             // Nothing to recover: the caller is already reporting the commit failure.
         }
@@ -126,7 +146,7 @@ public class DatabaseImpl extends Database {
     public void rollbackTransaction() throws IOException {
         checkOpen();
         checkEndTransaction();
-        SQLiteNative.execScript(peer, "ROLLBACK");
+        checkNative(SQLiteNative.execScript(peer, "ROLLBACK"));
         markTransactionEnded();
     }
 
@@ -138,7 +158,7 @@ public class DatabaseImpl extends Database {
         if (inTransaction) {
             inTransaction = false;
             try {
-                SQLiteNative.execScript(peer, "ROLLBACK");
+                checkNative(SQLiteNative.execScript(peer, "ROLLBACK"));
             } catch (IOException ignored) {
                 // Best effort; the close below is what matters.
             }
@@ -160,13 +180,13 @@ public class DatabaseImpl extends Database {
         if (config != null && config.isEncrypted()) {
             key = config.resolveKeyMaterial(databaseName);
         }
-        SQLiteNative.rekey(peer, key);
+        checkNative(SQLiteNative.rekey(peer, key));
     }
 
     @Override
     public void execute(String sql) throws IOException {
         checkOpen();
-        SQLiteNative.execScript(peer, sql);
+        checkNative(SQLiteNative.execScript(peer, sql));
     }
 
     @Override
@@ -174,8 +194,9 @@ public class DatabaseImpl extends Database {
         checkOpen();
         requireSingleStatement(sql);
         long stmt = SQLiteNative.prepare(peer, sql);
+        checkPrepared(stmt);
         bindText(stmt, params);
-        SQLiteNative.executeAndFinish(stmt);
+        checkNative(SQLiteNative.executeAndFinish(stmt));
     }
 
     @Override
@@ -191,8 +212,9 @@ public class DatabaseImpl extends Database {
         checkOpen();
         requireSingleStatement(sql);
         long stmt = SQLiteNative.prepare(peer, sql);
+        checkPrepared(stmt);
         bind(stmt, params);
-        SQLiteNative.executeAndFinish(stmt);
+        checkNative(SQLiteNative.executeAndFinish(stmt));
     }
 
     @Override
@@ -200,6 +222,7 @@ public class DatabaseImpl extends Database {
         checkOpen();
         requireSingleStatement(sql);
         long stmt = SQLiteNative.prepare(peer, sql);
+        checkPrepared(stmt);
         // A statement with placeholders and no arguments would otherwise run with every slot left
         // as NULL rather than reporting the missing parameters. The check is a no-op in legacy
         // mode, where running it unbound is the behaviour applications were written against.
@@ -212,6 +235,7 @@ public class DatabaseImpl extends Database {
         checkOpen();
         requireSingleStatement(sql);
         long stmt = SQLiteNative.prepare(peer, sql);
+        checkPrepared(stmt);
         bindText(stmt, params);
         return register(new CursorImpl(stmt));
     }
@@ -227,6 +251,7 @@ public class DatabaseImpl extends Database {
         checkOpen();
         requireSingleStatement(sql);
         long stmt = SQLiteNative.prepare(peer, sql);
+        checkPrepared(stmt);
         bind(stmt, params);
         return register(new CursorImpl(stmt));
     }
@@ -321,7 +346,11 @@ public class DatabaseImpl extends Database {
 
         @Override
         protected boolean stepForward() throws IOException {
-            return SQLiteNative.step(stmt);
+            int stepped = SQLiteNative.step(stmt);
+            if (stepped < 0) {
+                throw new IOException(SQLiteNative.lastError());
+            }
+            return stepped == 1;
         }
 
         @Override
