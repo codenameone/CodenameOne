@@ -1302,7 +1302,15 @@ public class CN1WearableBridge implements WearableBridge {
                         rememberValueIfStampUnchanged(path, before, v.payload);
                     }
                 } catch (Throwable unavailable) {
-                    // Allow another attempt: an unreachable Data Layer now says nothing about later.
+                    // Nothing to record; the marker is released below either way.
+                } finally {
+                    // IN-FLIGHT only, released whatever happened. Holding it for the life of the
+                    // process meant a path whose cached value was later evicted by the LRU could
+                    // never be fetched again -- getData returned null and declined to ask, so a
+                    // durable item stayed unreadable unless a new Data Layer event happened to
+                    // arrive. Releasing it still bounds the work, because a path already being
+                    // queried is not queried again and each query holds the marker for its whole
+                    // duration, so a repainting caller cannot stack them up.
                     synchronized (primedValues) {
                         primedValues.remove(path);
                     }
@@ -1709,6 +1717,16 @@ public class CN1WearableBridge implements WearableBridge {
                                 continue;
                             }
                             final long seq = sequenceOf(valueOrTransferMap(item));
+                            // Any record at all, ignoring its age. The sender retries a failed
+                            // retention deletion indefinitely, so an item can still be published
+                            // long after the claim's grace has run out -- and expiring the claim by
+                            // age alone then let this replay hand the app a one-shot file it had
+                            // already received. The item's continued existence is the better
+                            // evidence, so a claim survives as long as the thing it describes does.
+                            if (hasAnyClaim(context, uri)) {
+                                refreshClaim(context, uri);
+                                continue;
+                            }
                             if (!claimTransfer(context, uri, seq)) {
                                 // Already delivered, in this process or a previous one.
                                 continue;
@@ -3143,6 +3161,50 @@ public class CN1WearableBridge implements WearableBridge {
             scheduleClaimPrune(c);
         } catch (Throwable unavailable) {
             // Best effort: the in-memory claim still holds for this process.
+        }
+    }
+
+    /// Whether ANY durable claim is recorded for this item, expired or not.
+    ///
+    /// Used only by the startup replay, which has the item in front of it: if the DataItem is still
+    /// published then the sender has not finished retiring it, and a claim that merely aged out
+    /// says nothing about whether the app already has the payload.
+    private static boolean hasAnyClaim(Context context, Uri uri) {
+        if (uri == null || context == null) {
+            return false;
+        }
+        try {
+            String key = uri.getHost() + ":" + uri.getPath();
+            return context.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE)
+                    .getString(key, null) != null;
+        } catch (Throwable unavailable) {
+            return false;
+        }
+    }
+
+    /// Restamps a claim's receipt time, so a claim cannot be pruned out from under an item that is
+    /// demonstrably still published.
+    private static void refreshClaim(Context context, Uri uri) {
+        if (uri == null || context == null) {
+            return;
+        }
+        try {
+            String key = uri.getHost() + ":" + uri.getPath();
+            android.content.SharedPreferences prefs =
+                    context.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE);
+            String recorded = prefs.getString(key, null);
+            if (recorded == null) {
+                return;
+            }
+            int lastBar = recorded.lastIndexOf('|');
+            int firstBar = recorded.indexOf('|');
+            if (lastBar <= 0 || lastBar == firstBar) {
+                return;
+            }
+            prefs.edit().putString(key, recorded.substring(0, lastBar + 1)
+                    + System.currentTimeMillis()).apply();
+        } catch (Throwable unavailable) {
+            // Best effort: the claim simply keeps its old receipt time.
         }
     }
 
