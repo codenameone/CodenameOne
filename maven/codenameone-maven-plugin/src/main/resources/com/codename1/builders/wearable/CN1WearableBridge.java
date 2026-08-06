@@ -1306,19 +1306,20 @@ public class CN1WearableBridge implements WearableBridge {
                 String before = deliveredStamp(path);
                 try {
                     ResolvedValue v = resolveValue(context, path);
-                    if (v != null) {
-                        rememberValueIfStampUnchanged(path, before, v.payload);
-                    } else {
-                        // An AUTHORITATIVE absence -- the query answered, and the path is empty.
-                        // Recording it stops a polling UI re-asking forever: without this, every
-                        // repaint that reads a path which genuinely does not exist scheduled
-                        // another blocking query on the timer that transfer replay, retries and
-                        // cleanup all share. resolveValue THROWS when it cannot ask, so a failure
-                        // never reaches this branch and never masquerades as an absence.
-                        synchronized (valueCache) {
-                            knownAbsent.add(path);
-                        }
-                    }
+                    // Both outcomes go through the SAME stamp-guarded recorder. An AUTHORITATIVE
+                    // absence -- the query answered and the path is empty -- is worth recording,
+                    // because it stops a polling UI re-asking forever: every repaint reading a path
+                    // that genuinely does not exist otherwise scheduled another blocking query on
+                    // the timer that transfer replay, retries and cleanup all share. resolveValue
+                    // THROWS when it cannot ask, so a failure never reaches here and cannot
+                    // masquerade as an absence.
+                    //
+                    // But it has to be anchored like any other stale answer. Writing it
+                    // unconditionally let a query that started before a publication mark the path
+                    // absent AFTER that publication had recorded its value -- masked while the
+                    // cached payload survived, then permanent once the LRU evicted it, because the
+                    // stale absence stopped anything from priming the path again.
+                    rememberValueIfStampUnchanged(path, before, v == null ? null : v.payload);
                 } catch (Throwable unavailable) {
                     // Nothing to record; the marker is released below either way.
                 } finally {
