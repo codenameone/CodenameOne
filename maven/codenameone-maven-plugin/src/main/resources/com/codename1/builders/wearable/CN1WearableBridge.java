@@ -343,7 +343,15 @@ public class CN1WearableBridge implements WearableBridge {
             };
     private static volatile String[] pathsCache;
 
-    /** Records what a successful read saw, so a later EDT caller can be answered without blocking. */
+    /**
+     * Records what a delivery or a successful read saw, so a later EDT caller can be answered
+     * without blocking.
+     *
+     * <p>Maintains the path snapshot too. An enumeration-only {@code pathsCache} went stale the
+     * moment a peer published or removed anything and stayed that way until some background caller
+     * happened to enumerate again -- while the listener had already been told enough to keep it
+     * right. A path appearing or disappearing is exactly what these calls report.</p>
+     */
     static void rememberValue(String path, byte[] payload) {
         if (path == null) {
             return;
@@ -353,6 +361,33 @@ public class CN1WearableBridge implements WearableBridge {
                 valueCache.remove(path);
             } else {
                 valueCache.put(path, payload);
+            }
+            String[] known = pathsCache;
+            if (known == null) {
+                // No enumeration has succeeded yet, so there is no snapshot to keep consistent;
+                // inventing a one-element one would claim this is the only path that exists.
+                return;
+            }
+            boolean present = false;
+            for (String p : known) {
+                if (path.equals(p)) {
+                    present = true;
+                    break;
+                }
+            }
+            if (payload == null && present) {
+                List<String> out = new ArrayList<String>(known.length);
+                for (String p : known) {
+                    if (!path.equals(p)) {
+                        out.add(p);
+                    }
+                }
+                pathsCache = out.toArray(new String[out.size()]);
+            } else if (payload != null && !present) {
+                String[] out = new String[known.length + 1];
+                System.arraycopy(known, 0, out, 0, known.length);
+                out[known.length] = path;
+                pathsCache = out;
             }
         }
     }
