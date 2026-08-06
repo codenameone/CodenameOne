@@ -13400,6 +13400,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ("simulator.skin".equalsIgnoreCase(key)) {
             return getCurrentSkinName();
         }
+        if ("db.legacy".equals(key)) {
+            // No builder runs for the simulator, so the build hint has to be resolved here or
+            // testing the compatibility switch would need a device.
+            String legacy = buildHint("db.legacy");
+            if (legacy != null) {
+                return legacy;
+            }
+            return defaultValue;
+        }
         if(key.equalsIgnoreCase("cn1_push_prefix") 
                 || key.equalsIgnoreCase("cellId") 
                 || key.equalsIgnoreCase("IMEI") 

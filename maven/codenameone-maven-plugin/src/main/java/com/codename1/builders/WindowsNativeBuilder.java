@@ -70,6 +70,10 @@ import java.util.List;
  * assembly) is platform independent and unit tested.</p>
  */
 public class WindowsNativeBuilder extends Executor {
+
+    /// Whether the application touches com.codename1.db. Held as a field because the class scan
+    /// and the stub generation happen in different methods.
+    private boolean usesDatabase;
     /** Supported target architectures for {@code windows.arch}. */
     public static final String ARCH_X64 = "x64";
     public static final String ARCH_ARM64 = "arm64";
@@ -278,7 +282,7 @@ public class WindowsNativeBuilder extends Executor {
             throw new BuildException("Failed to scan for Bluetooth usage", ex);
         }
         boolean usesBluetooth = usesBluetoothHolder[0];
-        boolean usesDatabase = usesDatabaseHolder[0];
+        usesDatabase = usesDatabaseHolder[0];
         boolean usesDatabaseCipher = usesDatabaseCipherHolder[0];
 
         List<String> parparCmd = new ArrayList<String>();
@@ -1098,7 +1102,7 @@ public class WindowsNativeBuilder extends Executor {
             }
         }
 
-        writeBootstrapStub(request, classesDir, stubSource, registerNatives);
+        writeBootstrapStub(request, classesDir, stubSource, registerNatives, usesDatabase);
 
         // Compile every generated .java into classesDir (already a translator
         // source root) against the app classes + the Windows port classes.
@@ -1181,7 +1185,8 @@ public class WindowsNativeBuilder extends Executor {
      * launchers use). The clean target auto-selects this as the C {@code main}
      * because it is the only class carrying a {@code main(String[])} method.
      */
-    private void writeBootstrapStub(BuildRequest request, File classesDir, File stubSource, String registerNatives)
+    private void writeBootstrapStub(BuildRequest request, File classesDir, File stubSource, String registerNatives,
+            boolean usesDatabase)
             throws Exception {
         String pkg = request.getPackageName();
         String main = request.getMainClass();
@@ -1207,6 +1212,8 @@ public class WindowsNativeBuilder extends Executor {
         src.append(registerNatives);
         src.append("        final ").append(main).append(" app = new ").append(main).append("();\n");
         src.append("        Display.init(null);\n");
+        // Applied straight after Display.init so it is in force before any database is opened.
+        src.append(databaseLegacyStubProperty(request, usesDatabase));
         src.append(svgInstall);
         src.append("        Display.getInstance().callSerially(new Runnable() {\n");
         src.append("            public void run() {\n");

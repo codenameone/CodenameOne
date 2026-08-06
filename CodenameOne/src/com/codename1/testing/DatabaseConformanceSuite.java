@@ -63,10 +63,42 @@ public final class DatabaseConformanceSuite {
     /// Assert that legacy compatibility mode restores the previous per-platform behaviour.
     public static final int MODE_LEGACY = 1;
 
-    private static final int PORT_OTHER = 0;
-    private static final int PORT_SIMULATOR = 1;
-    private static final int PORT_IOS = 2;
-    private static final int PORT_ANDROID = 3;
+    /// A port with no legacy behaviour of its own to restore.
+    public static final int PORT_OTHER = 0;
+
+    /// The simulator, whose `getPosition()` used to be 1-based.
+    public static final int PORT_SIMULATOR = 1;
+
+    /// The iOS port, which has the most legacy behaviour to restore.
+    public static final int PORT_IOS = 2;
+
+    /// The Android port.
+    public static final int PORT_ANDROID = 3;
+
+    /// Not overridden; the port is read from the running `Display`.
+    public static final int PORT_AUTODETECT = -1;
+
+    /// Set by `#setPortKind(int)`.
+    ///
+    /// The legacy expectations are per-port, because the behaviour being restored genuinely was.
+    /// Normally the port is read from `Display`, but a harness driving a `Database` directly --
+    /// the fast simulator gate on every PR, for instance -- has no `Display` up, so autodetection
+    /// reports `#PORT_OTHER` and the legacy groups would assert the portable contract instead of
+    /// that port's own previous behaviour. Such a harness declares what it is testing.
+    private static int portKindOverride = PORT_AUTODETECT;
+
+    /// Declares which port the suite is being run against, for a harness with no `Display`.
+    ///
+    /// Pass `#PORT_AUTODETECT` to go back to reading it from `Display`, which is what an
+    /// on-device harness wants. This is global state, so a harness that sets it should reset it
+    /// afterwards.
+    ///
+    /// #### Parameters
+    ///
+    /// - `portKind`: one of the `PORT_` constants
+    public static void setPortKind(int portKind) {
+        portKindOverride = portKind;
+    }
 
     /// Receives the outcome of each individual check.
     public interface Reporter {
@@ -582,7 +614,10 @@ public final class DatabaseConformanceSuite {
                         + countAfterFirstExhaustion + " now " + Database.count(cur));
             }
             r.check(cur.last(), "last() still finds a row after the cursor was over-stepped");
-            r.check(cur.getPosition() == 4, "last() lands on the final row after over-stepping");
+            int lastBase = (mode == MODE_LEGACY && portKind() == PORT_SIMULATOR) ? 1 : 0;
+            r.check(cur.getPosition() == 4 + lastBase,
+                    "last() lands on the final row after over-stepping, position "
+                    + cur.getPosition());
         } finally {
             closeQuietly(cur);
         }
@@ -989,6 +1024,9 @@ public final class DatabaseConformanceSuite {
     /// Tolerates a display that is not up, which is how the groups taking a `Database` directly
     /// can be driven from a plain unit test.
     private static int portKind() {
+        if (portKindOverride != PORT_AUTODETECT) {
+            return portKindOverride;
+        }
         try {
             if (Display.getInstance().isSimulator()) {
                 return PORT_SIMULATOR;

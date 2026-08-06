@@ -195,7 +195,15 @@
 ///
 /// This API predates the contract above, and its behaviour used to differ between platforms.
 /// Setting the `db.legacy` build hint, or calling `Database#setLegacyBehavior(boolean)` before the
-/// first database call, restores each platform's previous behaviour exactly:
+/// first database call, restores each platform's previous behaviour exactly.
+///
+/// An Ant project that references this package is built in compatibility mode by default, because
+/// it predates the contract and a rebuild should not quietly change how its queries behave. A
+/// Maven project gets the contract above. An explicit `db.legacy` overrides that in either
+/// direction, so an Ant project can opt in with `false` and a Maven project can pin compatibility
+/// mode with `true`.
+///
+/// What compatibility mode restores:
 ///
 /// | Restored behaviour | Platforms |
 /// | --- | --- |

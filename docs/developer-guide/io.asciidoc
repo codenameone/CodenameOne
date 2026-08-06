@@ -325,6 +325,35 @@ application depends on the old behaviour, set the `db.legacy` build hint, or cal
 `Database.setLegacyBehavior(true)` before opening any database. It restores each platform's previous
 behaviour exactly.
 
+===== What your project gets by default
+
+An Ant project that uses `com.codename1.db` is built in compatibility mode automatically. Ant
+projects predate the portable contract, so a rebuild shouldn't change how their queries behave
+unless you ask for it. A Maven project gets the portable contract, which is the documented default everywhere else
+in this section.
+
+The build server decides this from the project itself, and says so in the build log when it turns
+compatibility mode on. It only applies when your application actually references
+`com.codename1.db`; an Ant project with no database is unaffected.
+
+The build hint always wins, in either direction:
+
+[options="header"]
+|====
+| `db.legacy` | Ant project | Maven project
+| unset | compatibility mode | portable contract
+| `false` | portable contract | portable contract
+| `true` | compatibility mode | compatibility mode
+|====
+
+An Ant project can therefore opt in to the portable contract by setting `db.legacy=false`, and a
+Maven project can pin compatibility mode with `db.legacy=true`. Setting it explicitly is worth doing once
+you've decided, because it makes the choice visible in the project rather than inferred from how
+it's built. If you migrate an Ant project to Maven without setting the hint, the default flips, so
+set it before you migrate if you want the behaviour to stay put.
+
+The hint works in the simulator too, so you can test either mode without a device.
+
 [options="header"]
 |====
 | Restored behaviour | Platforms

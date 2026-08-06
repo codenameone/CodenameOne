@@ -96,6 +96,9 @@ public class SEDatabaseConformanceTest {
     @BeforeEach
     public void setUp() throws Exception {
         Database.setLegacyBehavior(false);
+        // No Display is up here, so the suite cannot autodetect which port it is running against
+        // and the legacy expectations would fall back to the portable contract.
+        DatabaseConformanceSuite.setPortKind(DatabaseConformanceSuite.PORT_SIMULATOR);
         Class.forName("org.sqlite.JDBC");
         dbFile = File.createTempFile("cn1-conformance", ".db");
         assertTrue(dbFile.delete());
@@ -115,6 +118,7 @@ public class SEDatabaseConformanceTest {
             dbFile.delete();
         }
         Database.setLegacyBehavior(false);
+        DatabaseConformanceSuite.setPortKind(DatabaseConformanceSuite.PORT_AUTODETECT);
     }
 
     private static Connection openPlain(File f) throws Exception {
@@ -149,6 +153,37 @@ public class SEDatabaseConformanceTest {
         CollectingReporter r = new CollectingReporter();
         DatabaseConformanceSuite.runTransactions(db, DatabaseConformanceSuite.MODE_STRICT, r);
         r.assertClean("transactions");
+    }
+
+    /**
+     * The compatibility promise is that {@code db.legacy} restores this port's own previous
+     * behaviour, so the legacy expectations have to be exercised on every PR rather than only by
+     * the device suites. Running the groups themselves, not a sampled subset, is what catches a
+     * new strict-mode rule that forgot to check the flag: those fire in legacy mode too and this
+     * goes red.
+     */
+    @Test
+    public void statementsConformToTheLegacyContract() throws Exception {
+        Database.setLegacyBehavior(true);
+        CollectingReporter r = new CollectingReporter();
+        DatabaseConformanceSuite.runStatements(db, DatabaseConformanceSuite.MODE_LEGACY, r);
+        r.assertClean("statements (legacy)");
+    }
+
+    @Test
+    public void cursorsConformToTheLegacyContract() throws Exception {
+        Database.setLegacyBehavior(true);
+        CollectingReporter r = new CollectingReporter();
+        DatabaseConformanceSuite.runCursor(db, DatabaseConformanceSuite.MODE_LEGACY, r);
+        r.assertClean("cursor (legacy)");
+    }
+
+    @Test
+    public void transactionsConformToTheLegacyContract() throws Exception {
+        Database.setLegacyBehavior(true);
+        CollectingReporter r = new CollectingReporter();
+        DatabaseConformanceSuite.runTransactions(db, DatabaseConformanceSuite.MODE_LEGACY, r);
+        r.assertClean("transactions (legacy)");
     }
 
     /**

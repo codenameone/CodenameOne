@@ -582,6 +582,100 @@ public abstract class Executor {
         }
     }
 
+    /// Reports whether this build came from a Maven project.
+    ///
+    /// The Maven plugin stamps its own version into the settings it hands over, and the legacy
+    /// Ant build client never has, so the presence of that argument is the discriminator. It has
+    /// been written since 2021, well before the Maven transition finished, so an ordinary Maven
+    /// build is not going to be missing it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    ///
+    /// #### Returns
+    ///
+    /// true if the request was produced by the Maven plugin
+    protected boolean isMavenBuild(BuildRequest request) {
+        return request.getArg("maven.codenameone-maven-plugin", null) != null
+                || request.getArg("maven.codenameone-core.version", null) != null;
+    }
+
+    /// Decides whether the database compatibility switch should be on for this build.
+    ///
+    /// An explicit `db.legacy` always wins, in either direction. Failing that, an Ant project is
+    /// defaulted to the old behaviour, because it predates the portable contract and its author
+    /// has no reason to expect a rebuild to change how their queries behave. A Maven project
+    /// gets the portable contract, which is the documented default.
+    ///
+    /// The default only applies when the application actually uses the database. Turning it on
+    /// for an app with no database is harmless but misleading, and it would show up in the build
+    /// log of every Ant project ever built.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    /// - `usesDatabase`: whether the scanned classes reference `com.codename1.db`
+    ///
+    /// #### Returns
+    ///
+    /// true if the generated stub should switch the database into legacy mode
+    protected boolean isDatabaseLegacyMode(BuildRequest request, boolean usesDatabase) {
+        String explicit = request.getArg("db.legacy", null);
+        if (explicit != null) {
+            return "true".equalsIgnoreCase(explicit);
+        }
+        if (!usesDatabase || isMavenBuild(request)) {
+            return false;
+        }
+        debug("This is an Ant project that uses com.codename1.db, so the database is being built "
+                + "in compatibility mode: it keeps the behaviour this project was written "
+                + "against rather than the portable contract. Set the db.legacy build hint to "
+                + "false to opt in to the portable contract, or to true to pin compatibility "
+                + "mode explicitly.");
+        return true;
+    }
+
+    /// The line a generated application stub needs in order to apply the decision above.
+    ///
+    /// Empty when the switch is off, so the stub is unchanged for the common case.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    /// - `usesDatabase`: whether the scanned classes reference `com.codename1.db`
+    ///
+    /// #### Returns
+    ///
+    /// the source line to insert, or an empty string
+    protected String databaseLegacyStubProperty(BuildRequest request, boolean usesDatabase) {
+        if (!isDatabaseLegacyMode(request, usesDatabase)) {
+            return "";
+        }
+        return "        Display.getInstance().setProperty(\"db.legacy\", \"true\");\n";
+    }
+
+    /// The same decision, for a stub that runs before `Display` exists.
+    ///
+    /// `Database.setLegacyBehavior` is a plain static and needs no display, so a launcher that
+    /// only hands control to the bootstrap can still apply the switch. Referencing `Database`
+    /// pins the class, which is why this is emitted only for an application that already uses it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    /// - `usesDatabase`: whether the scanned classes reference `com.codename1.db`
+    ///
+    /// #### Returns
+    ///
+    /// the source line to insert, or an empty string
+    protected String databaseLegacyStubCall(BuildRequest request, boolean usesDatabase) {
+        if (!isDatabaseLegacyMode(request, usesDatabase)) {
+            return "";
+        }
+        return "        com.codename1.db.Database.setLegacyBehavior(true);\n";
+    }
+
     protected void scanClassesForPermissions(File directory, final ClassScanner scanner) throws IOException {
         File[] list = directory.listFiles();
         for (final File current : list) {

@@ -1865,6 +1865,7 @@ public class IPhoneBuilder extends Executor {
         if (request.getArg("ios.disableScreenshots", "false").equalsIgnoreCase("true")) {
             disableScreenshots = "        Display.getInstance().setProperty(\"DisableScreenshots\", \"true\");\n";
         }
+        String dbLegacy = databaseLegacyStubProperty(request, usesDatabase);
 
         // If the build-time SVG transcoder produced a registry class, weave
         // its installGlobal() call into the Stub right before the first
@@ -2037,6 +2038,7 @@ public class IPhoneBuilder extends Executor {
                     + "        Display.getInstance().setProperty(\"AppName\", APPLICATION_NAME);\n"
                     + newStorage
                     + disableScreenshots
+                    + dbLegacy
                     + adPadding
                     + integrateFacebook
                     + integrateGoogleConnect

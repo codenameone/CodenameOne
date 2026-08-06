@@ -118,13 +118,28 @@ class AndroidCipherDB extends Database {
             db.setTransactionSuccessful();
             // A deferred constraint is checked here, so this is where a commit fails. The engine
             // reports it as an unchecked SQLiteException, while the contract for this API is that
-            // every failure is an IOException. endTransaction() ends the transaction either way,
-            // so there is nothing left to roll back - only the flag has to follow.
+            // every failure is an IOException.
             db.endTransaction();
         } catch (RuntimeException err) {
+            rollbackQuietly();
             throw abandonFailedCommit(err);
         }
         markTransactionEnded();
+    }
+
+    /// Rolls back without reporting a failure, for the path where a commit has already failed.
+    ///
+    /// endTransaction() reports the failed commit and clears the wrapper's own bookkeeping, but
+    /// it does not necessarily end the transaction SQLite is holding: a deferred constraint
+    /// violation leaves it open, so the next beginTransaction() gets "cannot start a transaction
+    /// within a transaction" straight from the engine. Asking SQLite directly ends it whatever
+    /// the wrapper thinks, and there is nothing to report if it was already gone.
+    private void rollbackQuietly() {
+        try {
+            db.execSQL("ROLLBACK");
+        } catch (Throwable ignored) {
+            // The caller is already reporting the commit failure.
+        }
     }
 
     @Override

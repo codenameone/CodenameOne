@@ -615,6 +615,10 @@ public class AndroidGradleBuilder extends Executor {
     private boolean shouldIncludeGoogleImpl;
     private boolean arSupport;
     boolean dbCipherSupport;
+
+    /// Whether the application touches com.codename1.db at all, which is what the database
+    /// compatibility default is keyed on.
+    private boolean usesDatabase;
     private boolean visionSupport;
     private boolean inferenceSupport;
     private boolean languageSupport;
@@ -1550,6 +1554,9 @@ public class AndroidGradleBuilder extends Executor {
                         // Keeps the SQLCipher-backed impl package, which is deleted below for
                         // apps that never encrypt, and pulls in the AAR through the catalog.
                         dbCipherSupport = true;
+                    }
+                    if (cls.indexOf("com/codename1/db/") == 0) {
+                        usesDatabase = true;
                     }
                     if (cls.indexOf("com/codename1/ar/") == 0) {
                         // Keeps the ARCore-backed impl sources (deleted for
@@ -3676,6 +3683,7 @@ public class AndroidGradleBuilder extends Executor {
         if (useHMS) {
             nativeThemeStubProps += "        Display.getInstance().setProperty(\"cn1.push.transport\", \"huawei\");\n";
         }
+        nativeThemeStubProps += databaseLegacyStubProperty(request, usesDatabase);
 
         String gcmSenderId = request.getArg("gcm.sender_id", null);
         if (gcmSenderId != null) {
