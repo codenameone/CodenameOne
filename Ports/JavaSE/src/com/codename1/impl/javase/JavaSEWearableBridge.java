@@ -231,15 +231,36 @@ class JavaSEWearableBridge implements WearableBridge {
             // single atomic step that can only ever touch this writer's own bytes.
             long stamp = nextStamp(f);
             tmp.setLastModified(stamp);
-            if (!tmp.renameTo(f)) {
-                f.delete();
+            try {
+                // An atomic replace, not delete-then-rename. The old fallback deleted whatever was
+                // published before retrying, so a peer publishing the same path in that gap had its
+                // newer value destroyed and replaced by this side's older staging file -- a lost
+                // write, or a momentary removal seen by the peer's watcher.
+                java.nio.file.Files.move(tmp.toPath(), f.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.io.IOException | RuntimeException noAtomicMove) {
+                // Some filesystems cannot do it. Keep the old path as a fallback rather than
+                // failing the publish, but it carries the race described above.
                 if (!tmp.renameTo(f)) {
-                    throw new IOException("could not replace " + f);
+                    f.delete();
+                    if (!tmp.renameTo(f)) {
+                        throw new IOException("could not replace " + f, noAtomicMove);
+                    }
                 }
+            }
+            // Record what the filesystem actually stored, not what we asked for. setLastModified
+            // can be refused outright or quantized (FAT to 2s, some network mounts coarser), and
+            // recording the requested value then left the real mtime unseen -- so the next scan
+            // read this side's own publication as a peer update and invoked its own data listener.
+            // Coarse timestamps can also erase the phone/watch side bit, which is encoded in the
+            // stamp's low bit.
+            long recorded = f.lastModified();
+            if (recorded <= 0) {
+                recorded = stamp;
             }
             // Our own write must not come back to us as a peer change.
             synchronized (seenData) {
-                seenData.put(f.getName(), Long.valueOf(stamp));
+                seenData.put(f.getName(), Long.valueOf(recorded));
             }
         } catch (IOException err) {
             com.codename1.io.Log.p("Wearable simulator: failed to publish " + path + ": " + err);
@@ -550,6 +571,18 @@ class JavaSEWearableBridge implements WearableBridge {
                     // hand the sender its own file through its own data listener.
                     continue;
                 }
+                if (!isTransfer(f.getName()) && authoredLocally(stamp)) {
+                    // Our own VALUE, for the same reason. primeSeenData() records nothing so that a
+                    // value published while this side was down still replays on startup -- but that
+                    // also replayed values THIS side published before it restarted, reporting them
+                    // through WearableDataListener, whose contract is peer changes only.
+                    //
+                    // The author is already in the stamp: nextStamp puts the two JVMs in disjoint
+                    // residue classes (base * 2 + sideBit) so they cannot collide, and that bit
+                    // says which side wrote the file. No extra bookkeeping needed, and it survives
+                    // a restart because it lives in the file's own timestamp.
+                    continue;
+                }
                 try {
                     WearableConnection.deliverDataChanged(deliveryPath(f.getName()), readFully(f));
                     if (isInboundTransfer(f.getName())) {
@@ -635,6 +668,18 @@ class JavaSEWearableBridge implements WearableBridge {
         }
     }
 
+    /**
+     * Whether a published stamp was written by THIS side of the pair.
+     *
+     * <p>Reads the side bit {@link #nextStamp} encodes. Only meaningful for stamps this bridge
+     * wrote; a file whose modification time the filesystem quantized may answer either way, which
+     * is why publication records the value the filesystem actually stored rather than the one it
+     * was asked for.</p>
+     */
+    private boolean authoredLocally(long stamp) {
+        return (stamp & 1L) == (watchSide ? 1L : 0L);
+    }
+
     private static long lastStamp;
 
     /// Paths are URL-ish (`/workout/start`) and must survive a round trip through a file name on a
@@ -643,7 +688,19 @@ class JavaSEWearableBridge implements WearableBridge {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < path.length(); i++) {
             char c = path.charAt(i);
-            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '-') {
+            // '.' is deliberately NOT in this set, which fixes two problems at once and makes
+            // both structural rather than pattern matches.
+            //
+            // Staging files are named "<encoded>.<tag>.<n>.tmp". While an encoded path could
+            // itself contain a dot, a published path of "/sync/state.tmp" was indistinguishable
+            // from a staging file, so its peer callback was skipped forever and getDataPaths()
+            // hid it even though getData() could read it. With dots escaped, a literal dot in a
+            // file name can only have come from the staging suffix.
+            //
+            // It also stops "." and ".." being filesystem references: they encoded to themselves,
+            // so dataFile(".") resolved to the data directory, putData(".") could never replace
+            // it, and removeData(".") could delete the directory when empty.
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
                 sb.append(c);
             } else {
                 sb.append('%').append(Integer.toHexString(0x10000 | c).substring(1));
