@@ -6538,9 +6538,10 @@ function cn1SqliteOpen(name, key) {
     db.exec("PRAGMA cipher = 'sqlcipher'");
     db.exec("PRAGMA legacy = 4");
     db.exec("PRAGMA key = \"" + key.replace(/"/g, '""') + "\"");
-    // SQLCipher applies keys lazily; read something so a wrong key fails here.
-    db.exec("SELECT count(*) FROM sqlite_master");
   }
+  // Read the schema either way. Key validation is lazy, so an unkeyed open of an encrypted file
+  // also succeeds: without this, opening one without a key would look like proof it is plaintext.
+  db.exec("SELECT count(*) FROM sqlite_master");
   return db;
 }
 
@@ -6771,12 +6772,15 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnBlob_long_
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnDouble_long_int_R_double", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnDouble___long_int_R_double"],
   function(stmtId, col) {
+    // A REAL column is a Number. Routing it through the exact-long conversion would truncate the
+    // fractional part and hand back the wrong bridge type.
     const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
-    return v === null || v === undefined ? cn1SqliteFromBigInt(0n) : cn1SqliteFromBigInt(v);
+    return v === null || v === undefined ? 0 : Number(v);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong_long_int_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong___long_int_R_long"],
   function(stmtId, col) {
+    // Exact: Number() would round an INTEGER past 2^53 on the way back to a Java long.
     const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
-    return v === null || v === undefined ? 0 : Number(v);
+    return v === null || v === undefined ? cn1SqliteFromBigInt(0n) : cn1SqliteFromBigInt(v);
   });

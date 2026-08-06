@@ -87,7 +87,19 @@ public class ThreadSafeDatabase extends Database {
         });
     }
 
+    /// Refuses to hand work to a worker that has been killed.
+    ///
+    /// Guarding only close() was not enough: every other method still queued work and waited
+    /// synchronously, so closing a cursor after its owning database had closed -- an ordinary
+    /// cleanup order -- blocked forever instead of throwing.
+    private void checkOpen() throws IOException {
+        if (closed) {
+            throw new IOException("This database has been closed");
+        }
+    }
+
     private void invokeWithException(final RunnableWithIOException r) throws IOException {
+        checkOpen();
         IOException err = et.run(new RunnableWithResultSync<IOException>() {
             @Override
             @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
@@ -106,6 +118,7 @@ public class ThreadSafeDatabase extends Database {
     }
 
     private Object invokeWithException(final RunnableWithResponseOrIOException r) throws IOException {
+        checkOpen();
         Object ret = et.run(new RunnableWithResultSync<Object>() {
             @Override
             @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
@@ -447,6 +460,12 @@ public class ThreadSafeDatabase extends Database {
 
         @Override
         public void close() throws IOException {
+            if (closed) {
+                // Closing the database already invalidated its cursors, and cursor close is
+                // idempotent, so closing one afterwards is a no-op rather than an error. Closing
+                // the cursor after the database is an ordinary cleanup order.
+                return;
+            }
             invokeWithException(new RunnableWithIOException() {
                 @Override
                 public void run() throws IOException {

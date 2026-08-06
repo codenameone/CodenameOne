@@ -676,6 +676,18 @@ public final class DatabaseConformanceSuite {
                 }
                 r.check(recovered, "a rollback after a failed commit is accepted rather than "
                         + "rejected as having no transaction");
+            } catch (RuntimeException unchecked) {
+                // Caught deliberately: the contract is that every failure is an IOException, so an
+                // engine exception escaping unwrapped is itself the finding, and reporting it beats
+                // letting it abort the whole group.
+                deferredConstraintsWork = false;
+                r.check(false, "a failed commit raises IOException rather than "
+                        + unchecked.getClass().getName());
+                try {
+                    db.rollbackTransaction();
+                } catch (Throwable ignored) {
+                    // Already reported.
+                }
             }
             if (!deferredConstraintsWork) {
                 r.info("this engine did not enforce the deferred foreign key, so the "

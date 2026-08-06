@@ -86,15 +86,27 @@ class AndroidCipherDB extends Database {
     public void beginTransaction() throws IOException {
         checkOpen();
         checkBeginTransaction();
-        db.beginTransaction();
+        try {
+            db.beginTransaction();
+        } catch (RuntimeException err) {
+            markTransactionEnded();
+            throw new IOException(err.getMessage(), err);
+        }
     }
 
     @Override
     public void commitTransaction() throws IOException {
         checkOpen();
         checkEndTransaction();
-        db.setTransactionSuccessful();
-        db.endTransaction();
+        try {
+            db.setTransactionSuccessful();
+            // A deferred constraint is checked here, so this is where a commit fails. The engine
+            // reports it as an unchecked SQLiteException; the contract for this API is that every
+            // failure is an IOException, and the transaction stays open so a rollback can recover.
+            db.endTransaction();
+        } catch (RuntimeException err) {
+            throw new IOException(err.getMessage(), err);
+        }
         markTransactionEnded();
     }
 
@@ -102,7 +114,11 @@ class AndroidCipherDB extends Database {
     public void rollbackTransaction() throws IOException {
         checkOpen();
         checkEndTransaction();
-        db.endTransaction();
+        try {
+            db.endTransaction();
+        } catch (RuntimeException err) {
+            throw new IOException(err.getMessage(), err);
+        }
         markTransactionEnded();
     }
 

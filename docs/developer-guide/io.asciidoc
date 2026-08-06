@@ -175,13 +175,14 @@ The database API behaves the same on every platform Codename One targets: Androi
 Windows and Linux builds, JavaScript and the simulator. One contract, documented in the
 `com.codename1.db` package javadoc, and a single test suite that every port has to pass.
 
-This was not always the case, and it is worth knowing what changed if you have existing code.
+This wasn't always the case, and it's worth knowing what changed if you have existing code.
 Cursors used to count rows from zero on some platforms and from one on others; `first()` reported
-success on an empty result set on iOS; the simulator could not seek at all; `execute()` silently ran
-only the first statement of a script on some ports; and blobs could not be read on iOS. All of that
-is now uniform. If your application depended on the old behaviour, see <<sql-legacy>>.
+success on an empty result set on iOS; the simulator couldn't seek at all; `execute()` ran only the
+first statement of a script on some ports without saying so; and blobs couldn't be read on iOS.
+Every one of those is now uniform. If your application depended on the old behaviour, see
+<<sql-legacy>>.
 
-Two platforms do not compile their own SQLite. Android uses the engine in the operating system, so
+Two platforms don't compile their own SQLite. Android uses the engine in the operating system, so
 its version follows the OS. Everything else runs a single pinned engine. The file format is stable
 across SQLite versions regardless, so a database file remains portable either way.
 ****
@@ -201,7 +202,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 You can then use the `FileSystemStorage` class to write the content of your DB file into the path. Notice that it must be a valid SQLite file!
 
 NOTE: In the JavaScript port databases live in a browser storage pool rather than a filesystem, so
-`getDatabasePath()` returns the name within that pool and `FileSystemStorage` cannot open it.
+`getDatabasePath()` returns the name within that pool and `FileSystemStorage` can't open it.
 
 This is useful for applications that need to synchronize with a central server or applications that ship with a large database as part of their core product.
 
@@ -238,24 +239,24 @@ the right default when there is nobody to prompt.
 `DatabaseConfig.rawKey(byte[])`:: Thirty-two bytes of key material you already have, for instance
 issued by your server. No key derivation is applied, so the bytes must already be uniformly random.
 
-WARNING: A passphrase written into your source code is not a secret. String literals are recoverable
+WARNING: A passphrase written into your source code isn't a secret. String literals are recoverable
 from a shipped .ipa or .apk in minutes, so a constant passphrase buys you nothing against anyone
-holding the file. If your application cannot ask a human for one, use `managed()`: a random key in
-the platform key store is strictly better than a constant compiled into the binary.
+holding the file. If your application can't ask a human for one, use `managed()`: a random key in
+the platform key store beats a constant compiled into the binary.
 
-Encryption protects data *at rest*, and nothing else. It is no defence against a rooted or
+Encryption protects data *at rest*, and nothing else. It's no defence against a rooted or
 jailbroken device, a debugger attached to the running process, or a memory dump, because the key is
 in memory for as long as the database is open.
 
-Managed keys are not recoverable. Losing the key store entry, through an application uninstall, a
+Managed keys aren't recoverable. Losing the key store entry, through an application uninstall, a
 device wipe or, on Android, restoring a backup onto a different device, leaves the database
-permanently unreadable. Android keystore keys cannot be exported; iOS keychain entries do survive an
+permanently unreadable. Android keystore keys can't be exported; iOS keychain entries do survive an
 encrypted backup and restore. If the data has to outlive the device, use a passphrase your user or
 your server holds.
 
 NOTE: The simulator has no hardware key store, so a managed key there is protected only by a
-software derived key in your desktop user profile. It is fine for development, and it is not
-evidence that real user data is protected. `DatabaseConfig.isKeyHardwareBacked()` reports the
+software derived key in your desktop user profile. It's fine for development, and it's no evidence
+that real user data is protected. `DatabaseConfig.isKeyHardwareBacked()` reports the
 difference, and the simulator logs a warning the first time you use a managed key.
 
 ===== Converting an existing database
@@ -267,9 +268,9 @@ An application that already ships a plaintext database can convert it in place:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava091Snippet.java[tag=io-java-091,indent=0]
 ----
 
-`Database.decrypt` is the reverse, and `Database.changeKey` re-keys a database that is already open.
+`Database.decrypt` is the reverse, and `Database.changeKey` re-keys a database that's already open.
 The engine performs each conversion in a single transaction, so an interruption leaves the original
-file intact, and schema metadata such as `PRAGMA user_version` is preserved.
+file intact, and schema metadata such as `PRAGMA user_version` survives.
 
 ===== The on-disk format
 
@@ -281,7 +282,7 @@ client can open these files too.
 
 ==== Threading
 
-A `Database` and its cursors are not thread safe. Either give each thread its own connection, or
+A `Database` and its cursors aren't thread safe. Either give each thread its own connection, or
 wrap one in `ThreadSafeDatabase`, which routes every call through a single worker thread:
 
 [source,java]
@@ -290,7 +291,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 The wrapper costs a thread handoff per call, so a connection per thread is faster when the threads
-do not genuinely need to share one.
+don't genuinely need to share one.
 
 ==== Cursor performance
 
@@ -319,14 +320,14 @@ behaviour exactly.
 | `wasNull()` reports true before any value has been read | Android, iOS
 | Parameters bind as text rather than by type | iOS
 | `execute(String)` runs only the first statement of a script | Android, Simulator
-| The parameterized methods silently discard statements after the first | all
+| The parameterized methods discard statements after the first, without saying so | all
 | A nested `beginTransaction()` is accepted | Android
 | Malformed SQL surfaces from `next()` rather than from `executeQuery` | Android
 | `rollbackTransaction` leaves the connection outside autocommit | Simulator
 | `getColumnName` reports the table column rather than the result set label | Simulator
 |====
 
-The flag deliberately does not cover defects, nor capabilities that used to throw and now work:
+The flag doesn't cover defects, nor capabilities that used to throw and now work:
 `last()`, `prev()` and `position(int)` on iOS and the simulator, reading blobs on iOS, blob query
 parameters, binding null inside a `String[]`, or the existence of a database at all on the native
 Windows and Linux ports. No application can depend on those.
