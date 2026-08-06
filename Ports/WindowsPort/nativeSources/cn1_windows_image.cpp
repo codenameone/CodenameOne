@@ -441,17 +441,15 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_createMutableImage___int_int_
     D2D1_COLOR_F clearColor;
     uint32_t a, r, g, b;
 
-    /* A zero or negative extent used to return 0, and a 0 peer is worse than a
-     * tiny image: Image.getGraphics() then answers null and the caller dies with
-     * a NullPointerException far from the cause -- which is how Switch's
-     * preferred-size calculation crashed on this port, since its track image is
-     * sized from the font height. Clamp to 1x1 so the object is always usable;
-     * a caller asking for an empty image gets an empty-looking one. */
-    if (width <= 0) {
-        width = 1;
-    }
-    if (height <= 0) {
-        height = 1;
+    /* Refuse a degenerate extent, but say so. Returning a bare 0 makes
+     * Image.getGraphics() answer null and the caller die with a
+     * NullPointerException nowhere near the cause. Clamping to 1x1 would hide
+     * it just as badly: whatever asked for a zero-sized image has a real bug --
+     * a metric that came out zero -- and silently handing back a 1x1 surface
+     * would leave that unfixed and render wrongly instead of crashing. */
+    if (width <= 0 || height <= 0) {
+        cn1WindowsLog("createMutableImage refused a degenerate size");
+        return 0;
     }
 
     img = (CN1Image*)malloc(sizeof(CN1Image));

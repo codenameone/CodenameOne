@@ -26,6 +26,7 @@ import com.codename1.testing.DeviceRunner;
 import com.codename1.testing.TestReporting;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
+import com.codename1.ui.Font;
 import com.codename1.ui.Form;
 import com.codename1.util.StringUtil;
 import com.codenameone.examples.hellocodenameone.NativeInterfaceLanguageValidator;
@@ -788,6 +789,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             stack = "";
         }
         log("CN1SS:ERR:throwable context=" + context + " stackLength=" + stack.length());
+        logPlatformState(context);
         if (stack.length() == 0) {
             // The implementation's own capture comes back empty on some ports --
             // ParparVM Windows reports stackLength=0 for every throwable -- which
@@ -803,6 +805,41 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             }
             log("CN1SS:ERR:throwable context=" + context + " stack=" + line);
         }
+    }
+
+    /// Platform state alongside every reported throwable.
+    ///
+    /// Some ports report an exception with no stack at all -- ParparVM Windows
+    /// answers empty for both Display.getStackTrace and Throwable.getStackTrace --
+    /// so a NullPointerException arrives as a bare type name and CI is the only
+    /// place it reproduces. The numbers below are the ones that turn such a
+    /// report into a lead: a zero font height or a zero display extent is how a
+    /// component ends up asking for a zero-sized image, whose graphics come back
+    /// null. Cheap, printed only on failure, and it costs nothing to leave in.
+    private static void logPlatformState(String context) {
+        StringBuilder sb = new StringBuilder("CN1SS:ERR:platform context=");
+        sb.append(context);
+        try {
+            Display d = Display.getInstance();
+            sb.append(" display=").append(d.getDisplayWidth()).append('x').append(d.getDisplayHeight());
+            sb.append(" density=").append(d.getDeviceDensity());
+            sb.append(" edt=").append(d.isEdt());
+        } catch (Throwable unavailable) {
+            sb.append(" display=unavailable");
+        }
+        try {
+            Font def = Font.getDefaultFont();
+            sb.append(" defaultFontHeight=").append(def == null ? "null-font" : String.valueOf(def.getHeight()));
+        } catch (Throwable unavailable) {
+            sb.append(" defaultFontHeight=unavailable");
+        }
+        try {
+            Font sys = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
+            sb.append(" systemFontHeight=").append(sys == null ? "null-font" : String.valueOf(sys.getHeight()));
+        } catch (Throwable unavailable) {
+            sb.append(" systemFontHeight=unavailable");
+        }
+        log(sb.toString());
     }
 
     private static void logThrowableFrames(String context, Throwable t) {
