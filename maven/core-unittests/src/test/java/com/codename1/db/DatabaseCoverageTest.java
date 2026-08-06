@@ -7,6 +7,8 @@ import com.codename1.ui.CN;
 
 import java.util.List;
 
+import java.io.IOException;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class DatabaseCoverageTest extends UITestBase {
@@ -64,7 +66,12 @@ class DatabaseCoverageTest extends UITestBase {
                 assertNull(parameters.get(0));
                 assertArrayEquals(new String[]{"7", null, "5.0"}, parameters.get(1));
 
-                assertThrows(RuntimeException.class, () -> database.execute("insert into users values(?)", new Object[]{new byte[]{1, 2}}));
+                // A port that cannot bind blobs reports it as IOException, like every other
+                // database failure, rather than as an unchecked RuntimeException.
+                IOException blobFailure = assertThrows(IOException.class,
+                        () -> database.execute("insert into users values(?)", new Object[]{new byte[]{1, 2}}));
+                assertTrue(blobFailure.getMessage().contains("byte[]"),
+                        "the message should name the offending parameter type: " + blobFailure.getMessage());
             }
         });
     }

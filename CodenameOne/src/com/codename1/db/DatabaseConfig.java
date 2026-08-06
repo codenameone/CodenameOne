@@ -300,10 +300,13 @@ public final class DatabaseConfig {
 
     /// Produces the key literal handed to the underlying engine.
     ///
-    /// Passphrases are passed through verbatim. Raw and managed keys are rendered
-    /// as the literal `x'` followed by 64 hexadecimal characters and a closing
-    /// quote, which is the one form every supported engine interprets identically
-    /// as a raw key with no key derivation applied.
+    /// This exists for the platform implementations; applications have no reason to call it.
+    /// Passphrases are returned verbatim. Raw and managed keys are rendered as the literal `x'`
+    /// followed by 64 hexadecimal characters and a closing quote, which is the one form every
+    /// supported engine interprets identically as a raw key with no key derivation applied.
+    ///
+    /// For a managed key this is the call that generates and stores the key on first use, so it
+    /// can fail even though the config itself was built successfully.
     ///
     /// #### Parameters
     ///
@@ -316,7 +319,7 @@ public final class DatabaseConfig {
     /// #### Throws
     ///
     /// - `IOException`: if a managed key could not be produced or stored
-    String keyMaterial(String databaseName) throws IOException {
+    public String resolveKeyMaterial(String databaseName) throws IOException {
         switch (keyMode) {
             case KEY_NONE:
                 return null;

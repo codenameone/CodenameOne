@@ -6,293 +6,186 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.impl.javase;
 
-import com.codename1.db.Cursor;
-import com.codename1.db.Row;
-import com.codename1.db.RowExt;
-import com.codename1.io.Util;
+import com.codename1.db.Database;
+import com.codename1.impl.AbstractDBCursor;
+
 import java.io.IOException;
-import java.io.InputStream;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
+ * Simulator cursor.
+ *
+ * The SQLite JDBC driver only produces TYPE_FORWARD_ONLY result sets, so seeking backwards is
+ * implemented by re-executing the statement and stepping forward again. That is what gives the
+ * simulator the same random access the device ports provide; previously first(), last(), prev()
+ * and position() all threw here, which meant cursor code could not be developed in the simulator
+ * at all.
  *
  * @author Chen
  */
-public class SECursor implements Cursor, RowExt {
-    
+public class SECursor extends AbstractDBCursor {
+
+    private final SEDatabase owner;
+    private final PreparedStatement statement;
     private ResultSet resultSet;
-    private boolean closed;
-    
-    public SECursor(ResultSet resultSet) {
+
+    SECursor(SEDatabase owner, PreparedStatement statement, ResultSet resultSet) {
+        this.owner = owner;
+        this.statement = statement;
         this.resultSet = resultSet;
     }
 
     @Override
-    protected void finalize() throws Throwable {
-        if(!closed) {
-            System.out.println("**** WARNING! DB Cursor was released by the GC without being closed first! This might cause crashes on iOS *****");
-        }
-    }
-    
-    @Override
-    public boolean first() throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
+    protected void rewind() throws IOException {
         try {
-            return resultSet.first();
+            if (resultSet != null) {
+                resultSet.close();
+            }
+            resultSet = statement.executeQuery();
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
+            throw new IOException(ex.getMessage(), ex);
         }
     }
 
     @Override
-    public boolean last() throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
-        try {
-            return resultSet.last();
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
-        }
-    }
-
-    @Override
-    public boolean next() throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
+    protected boolean stepForward() throws IOException {
         try {
             return resultSet.next();
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
+            throw new IOException(ex.getMessage(), ex);
         }
     }
 
     @Override
-    public boolean prev() throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
+    protected void closeImpl() throws IOException {
+        if (owner != null) {
+            owner.unregisterCursor(this);
         }
+        SQLException failure = null;
         try {
-            return resultSet.previous();
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
-        }
-    }
-
-    public int getColumnIndex(String columnName) throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
-        try {
-            ResultSetMetaData meta = resultSet.getMetaData();
-            int colsCount = meta.getColumnCount();
-            for (int i = 0; i < colsCount; i++) {
-                String c = meta.getColumnLabel(i+1);                
-                if(c.equalsIgnoreCase(columnName)){
-                    return i;
-                }
+            if (resultSet != null) {
+                resultSet.close();
+                resultSet = null;
             }
-            return -1;
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
-        }
-    }
-
-    public String getColumnName(int columnIndex) throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
+            failure = ex;
         }
         try {
-            ResultSetMetaData meta = resultSet.getMetaData();
-            return meta.getColumnName(columnIndex + 1);
+            // The statement belongs to this cursor, not to the caller. Leaving it open leaked one
+            // prepared statement per query.
+            if (statement != null) {
+                statement.close();
+            }
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
+            if (failure == null) {
+                failure = ex;
+            }
+        }
+        if (failure != null) {
+            throw new IOException(failure.getMessage(), failure);
         }
     }
 
-    public int getPosition() throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
-        try {
-            return resultSet.getRow();
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
-        }
-    }
-
-    public Row getRow() throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
-        return this;
-    }
-
-    public boolean position(int row) throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
-        try {
-            return resultSet.absolute(row);
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
-        }
-    }
-
-    public void close() throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
-        try {
-            closed = true;
-            resultSet.close();
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
-        }
-    }
-
-    public byte[] getBlob(int index) throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
-        try {
-            return resultSet.getBytes(index+1);
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
-        }
-
-    }
-
-    public double getDouble(int index) throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
-        try {
-            return resultSet.getDouble(index+1);
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
-        }
-    }
-
-    public float getFloat(int index) throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
-        try {
-            return resultSet.getFloat(index+1);
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
-        }
-    }
-
-    public int getInteger(int index) throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
-        try {
-            return resultSet.getInt(index+1);
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
-        }
-    }
-
-    public long getLong(int index) throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
-        try {
-            return resultSet.getLong(index+1);
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
-        }
-    }
-
-    public short getShort(int index) throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
-        try {
-            return resultSet.getShort(index+1);
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
-        }
-    }
-
-    public String getString(int index) throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
-        try {
-            return resultSet.getString(index+1);
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
-        }
-    }
-    
     @Override
-    public boolean wasNull()throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
+    protected int columnCount() throws IOException {
         try {
-            return resultSet.wasNull();
+            return resultSet.getMetaData().getColumnCount();
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
+            throw new IOException(ex.getMessage(), ex);
         }
     }
-    
 
-    public int getColumnCount() throws IOException {
-        if(closed) {
-            throw new IOException("Cursor is closed");
-        }
+    @Override
+    protected String columnLabel(int columnIndex) throws IOException {
         try {
             ResultSetMetaData meta = resultSet.getMetaData();
-            return meta.getColumnCount();
+            if (Database.isLegacyBehavior()) {
+                // The simulator used to report the underlying table column here while resolving
+                // names by label, so an aliased column could not be looked up under the name
+                // getColumnIndex had found it by.
+                return meta.getColumnName(columnIndex + 1);
+            }
+            return meta.getColumnLabel(columnIndex + 1);
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
+            throw new IOException(ex.getMessage(), ex);
         }
     }
-    
+
+    @Override
+    protected boolean isNullAt(int index) throws IOException {
+        try {
+            return resultSet.getObject(index + 1) == null;
+        } catch (SQLException ex) {
+            throw new IOException(ex.getMessage(), ex);
+        }
+    }
+
+    @Override
+    protected String readString(int index) throws IOException {
+        try {
+            return resultSet.getString(index + 1);
+        } catch (SQLException ex) {
+            throw new IOException(ex.getMessage(), ex);
+        }
+    }
+
+    @Override
+    protected byte[] readBlob(int index) throws IOException {
+        try {
+            return resultSet.getBytes(index + 1);
+        } catch (SQLException ex) {
+            throw new IOException(ex.getMessage(), ex);
+        }
+    }
+
+    @Override
+    protected double readDouble(int index) throws IOException {
+        try {
+            return resultSet.getDouble(index + 1);
+        } catch (SQLException ex) {
+            throw new IOException(ex.getMessage(), ex);
+        }
+    }
+
+    @Override
+    protected long readLong(int index) throws IOException {
+        try {
+            return resultSet.getLong(index + 1);
+        } catch (SQLException ex) {
+            throw new IOException(ex.getMessage(), ex);
+        }
+    }
+
+    @Override
+    protected int legacyPositionOffset() {
+        // The simulator exposed the JDBC row number directly, which counts from one.
+        return Database.isLegacyBehavior() ? 1 : 0;
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        if (resultSet != null) {
+            System.out.println("**** WARNING! Cursor object was released by the GC without being closed first! *****");
+        }
+        super.finalize();
+    }
 }

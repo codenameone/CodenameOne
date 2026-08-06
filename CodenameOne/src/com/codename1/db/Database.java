@@ -127,8 +127,14 @@ public abstract class Database {
             // Read lazily rather than in a static initializer. The generated application stubs
             // on iOS and desktop call setProperty AFTER Display.init, and Android's runs inside
             // an isInitialized guard, so an eager read would miss the build hint entirely.
-            legacyBehaviorChecked = true;
-            legacyBehavior = "true".equals(Display.getInstance().getProperty("db.legacy", "false"));
+            try {
+                legacyBehavior = "true".equals(Display.getInstance().getProperty("db.legacy", "false"));
+                // Latch only once a real answer came back, so that a caller reaching a database
+                // before the display is up does not freeze the default in place.
+                legacyBehaviorChecked = true;
+            } catch (Throwable notReadyYet) {
+                return false;
+            }
         }
         return legacyBehavior;
     }
