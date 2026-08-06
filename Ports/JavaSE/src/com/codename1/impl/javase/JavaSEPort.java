@@ -3526,8 +3526,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void keyReleased(KeyEvent e) {
-            boolean ignore = ignorePressedKeys.contains(e.getKeyCode());
-            if (ignore) ignorePressedKeys.remove(e.getKeyCode());
+            boolean ignore = ignorePressedKeys.remove(e.getKeyCode());
+            // A blocked press records its key so the matching release is dropped too. When the
+            // platform never delivers that release -- a system shortcut such as Cmd+P on macOS
+            // consumes it -- the entry goes stale and silently eats that key from then on, which
+            // looks like one letter of the alphabet no longer existing. Honour the record only
+            // while this release still carries the modifiers that caused the press to be blocked.
+            if (ignore && !(e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown())) {
+                ignore = false;
+            }
             if (!isEnabled()) {
                 return;
             }
