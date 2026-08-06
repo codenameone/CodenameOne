@@ -1,32 +1,53 @@
 package com.codename1.flutter.animation;
 
-import com.codename1.ui.CN;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * One clock for every running animation.
+ * One clock for every running animation, driven by Codename One's animation loop.
  *
- * <p>Each controller used to chain its own {@code setTimeout(16)}, so N concurrent
- * animations meant N timers, N wakeups and — because every tick marks its listeners
- * dirty and the build owner then revalidates the affected host — N rebuild/relayout
- * passes per frame instead of one. The gallery's home screen runs several at once (an
- * entrance animation per category item, a scale per carousel card), which is why it felt
- * heavy.</p>
+ * <p>This registers a single {@link com.codename1.ui.animations.Animation} on the current
+ * Form. That is the EDT's own frame clock: a Form with a registered animation does not let
+ * the EDT sleep ({@code Display.shouldEDTSleep} consults {@code Form.hasAnimations}), so
+ * {@code animate()} is called once per frame for as long as anything is animating, and the
+ * driver deregisters itself the moment the last animation finishes.</p>
  *
- * <p>Now controllers register here and are advanced together from a single timer: one
- * wakeup, one batch of listener notifications, and therefore one build flush per frame.
- * The driver stops itself when the last animation finishes, so an idle app has no timer
- * running at all.</p>
+ * <p>It used to chain {@code CN.setTimeout(16)} per frame instead, which was wrong twice
+ * over. {@code Display.setTimeout} allocates a whole {@code java.util.Timer} thread per
+ * call, so this created and abandoned one thread per animation frame; and measured in the
+ * simulator that path delivered a tick every ~300ms whatever delay was asked for - 1ms and
+ * 16ms both came back at ~290ms. At ~3fps a 300ms curve reaches t >= 1 on its FIRST tick,
+ * so every animation snapped straight to its end value instead of tweening, and anything
+ * driven by the same clock stuttered.</p>
  */
 final class FrameDriver {
 
-    /** Target frame interval in milliseconds — 60fps. */
-    private static final int FRAME_MS = 16;
+    private static final List<AnimationController> RUNNING =
+            new ArrayList<AnimationController>();
 
-    private static final List<AnimationController> RUNNING = new ArrayList<AnimationController>();
-    private static boolean ticking;
+    /** The form the clock is currently registered on, or null when detached. */
+    private static Form registeredOn;
+    private static boolean attachPending;
+
+    private static final com.codename1.ui.animations.Animation CLOCK =
+            new com.codename1.ui.animations.Animation() {
+        @Override
+        public boolean animate() {
+            frame();
+            // False: this clock paints nothing itself. Advancing a controller notifies its
+            // listeners, which mark the affected elements dirty and repaint exactly those,
+            // so returning true would add a full-form repaint per frame on top.
+            return false;
+        }
+
+        @Override
+        public void paint(Graphics g) {
+        }
+    };
 
     private FrameDriver() {
     }
@@ -36,37 +57,77 @@ final class FrameDriver {
         if (!RUNNING.contains(c)) {
             RUNNING.add(c);
         }
-        if (!ticking) {
-            ticking = true;
-            schedule();
-        }
+        attach();
     }
 
     /** Removes a controller; the clock stops once none are left. */
     static synchronized void remove(AnimationController c) {
         RUNNING.remove(c);
+        if (RUNNING.isEmpty()) {
+            detach();
+        }
     }
 
-    private static void schedule() {
-        CN.setTimeout(FRAME_MS, new Runnable() {
+    private static synchronized void attach() {
+        if (!Display.isInitialized()) {
+            return;
+        }
+        Form f = Display.getInstance().getCurrent();
+        if (f == null) {
+            // Animations normally start inside a mounted form; if one somehow starts first,
+            // retry on the next EDT pass rather than spinning up a timer.
+            retryAttach();
+            return;
+        }
+        if (registeredOn == f) {
+            return;
+        }
+        detach();
+        f.registerAnimated(CLOCK);
+        registeredOn = f;
+    }
+
+    private static void retryAttach() {
+        if (attachPending) {
+            return;
+        }
+        attachPending = true;
+        Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                frame();
+                synchronized (FrameDriver.class) {
+                    attachPending = false;
+                    if (!RUNNING.isEmpty()) {
+                        attach();
+                    }
+                }
             }
         });
+    }
+
+    private static synchronized void detach() {
+        if (registeredOn != null) {
+            registeredOn.deregisterAnimated(CLOCK);
+            registeredOn = null;
+        }
     }
 
     private static void frame() {
         AnimationController[] due;
         synchronized (FrameDriver.class) {
             if (RUNNING.isEmpty()) {
-                ticking = false;   // nothing left to animate; let the clock stop
+                detach();
                 return;
+            }
+            // A form switch mid-animation would otherwise leave the clock on the form that
+            // is no longer being animated, and it would never tick again.
+            if (Display.isInitialized() && Display.getInstance().getCurrent() != registeredOn) {
+                attach();
             }
             due = RUNNING.toArray(new AnimationController[RUNNING.size()]);
         }
-        // Advance every animation before anything rebuilds: the build owner coalesces
-        // the dirty elements, so the whole frame costs one flush.
+        // Advance every animation before anything rebuilds: the build owner coalesces the
+        // dirty elements, so the whole frame costs one flush.
         for (int i = 0; i < due.length; i++) {
             try {
                 due[i].advance();
@@ -78,10 +139,8 @@ final class FrameDriver {
         }
         synchronized (FrameDriver.class) {
             if (RUNNING.isEmpty()) {
-                ticking = false;
-                return;
+                detach();
             }
         }
-        schedule();
     }
 }
