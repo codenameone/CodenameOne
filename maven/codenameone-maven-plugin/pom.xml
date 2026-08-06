@@ -266,8 +266,21 @@
             <groupId>com.codenameone</groupId>
             <artifactId>cn1-hardening</artifactId>
             <version>${project.version}</version>
-            <classifier>standalone</classifier>
-            <scope>runtime</scope>
+            <!-- Unclassified (not the 'standalone' classifier) purely to force the reactor to build
+                 cn1-hardening before this module: maven resolves an unclassified reactor artifact
+                 from the module's target/classes even in a test-only reactor build, whereas the
+                 'standalone' classifier is not attached until cn1-hardening's package/shade. The
+                 shaded jar itself is pulled by maven-dependency-plugin at prepare-package (below).
+                 provided + optional + a wildcard exclusion keep cn1-hardening's classes and its
+                 ProGuard/ASM off this plugin's classpath -- the engine is only ever forked. -->
+            <scope>provided</scope>
+            <optional>true</optional>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- WindowsPort 'bundle' (WindowsPort.jar + nativewindows.jar) supplies the

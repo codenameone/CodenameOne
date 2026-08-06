@@ -274,11 +274,14 @@ public final class StringEncryptTransform {
         in.add(new org.objectweb.asm.tree.IincInsnNode(2, 1));
         in.add(new org.objectweb.asm.tree.JumpInsnNode(Opcodes.GOTO, loop));
         in.add(end);
-        // return new String(c);
+        // return new String(c).intern();  -- intern so a decoded literal is the canonical String,
+        // preserving reference (==) equality that Java guarantees for string literals and constants.
         in.add(new org.objectweb.asm.tree.TypeInsnNode(Opcodes.NEW, "java/lang/String"));
         in.add(new InsnNode(Opcodes.DUP));
         in.add(new VarInsnNode(Opcodes.ALOAD, 1));
         in.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, "java/lang/String", "<init>", "([C)V", false));
+        in.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/String", "intern",
+                "()Ljava/lang/String;", false));
         in.add(new InsnNode(Opcodes.ARETURN));
         if (cn.methods == null) {
             cn.methods = new java.util.ArrayList<MethodNode>();

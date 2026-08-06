@@ -71,6 +71,16 @@ public class MappingFileTest {
     }
 
     @Test
+    public void singleLineOriginalRangeCollapses() throws Exception {
+        // Obfuscated lines 1:3 all map to original line 40 (a single-line original range).
+        MappingFile mf = MappingFile.parse(
+                "com.example.MyForm -> zqaaaa:\n"
+                + "    1:3:void f():40:40 -> a\n");
+        assertEquals(40, mf.retrace(new Frame("zqaaaa", "a", "zqaaaa.java", 3)).getLineNumber());
+        assertEquals(40, mf.retrace(new Frame("zqaaaa", "a", "zqaaaa.java", 1)).getLineNumber());
+    }
+
+    @Test
     public void unknownClassPassesThroughUnchanged() throws Exception {
         MappingFile mf = MappingFile.parse(MAPPING);
         Frame in = new Frame("some.Other", "x", "Other.java", 9);

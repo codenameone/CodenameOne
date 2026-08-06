@@ -91,6 +91,17 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void decodedLiteralsAreCanonical() throws Exception {
+        // The decoded literal must be interned, so reference (==) equality that Java guarantees
+        // for string literals still holds after encryption.
+        Class<?> c = new ByteLoader().define(CLASS, transformed());
+        Object a = c.getMethod("greet").invoke(null);
+        Object b = c.getMethod("greet").invoke(null);
+        org.junit.Assert.assertSame("decoded literals must be the canonical interned String", a, b);
+        org.junit.Assert.assertSame(GREETING.intern(), a);
+    }
+
+    @Test
     public void shortStringsAreNotEncrypted() throws Exception {
         // The control integer method has no strings; encryption count comes only from
         // the real secrets, and the transform stays a no-op on classes with nothing to do.

@@ -46,20 +46,32 @@ public final class MappingFile {
         final int startLine;         // obfuscated range start (0 if none)
         final int endLine;           // obfuscated range end
         final int originalStartLine; // original range start (0 if none / same)
+        final int originalEndLine;   // original range end (== start for a single line)
 
-        MethodMapping(String originalName, int startLine, int endLine, int originalStartLine) {
+        MethodMapping(String originalName, int startLine, int endLine,
+                      int originalStartLine, int originalEndLine) {
             this.originalName = originalName;
             this.startLine = startLine;
             this.endLine = endLine;
             this.originalStartLine = originalStartLine;
+            this.originalEndLine = originalEndLine;
         }
 
-        /** Maps an observed obfuscated line into the original source line, when both ranges are known. */
+        /**
+         * Maps an observed obfuscated line into the original source line. A single-line original
+         * range ({@code originalStart == originalEnd}) collapses every covered line to that line;
+         * otherwise the offset is applied but clamped to the original range end so a shorter
+         * original range never overshoots.
+         */
         int mapLine(int observed) {
-            if (startLine != 0 && originalStartLine != 0 && observed >= startLine && observed <= endLine) {
-                return originalStartLine + (observed - startLine);
+            if (startLine == 0 || originalStartLine == 0 || observed < startLine || observed > endLine) {
+                return observed;
             }
-            return observed;
+            if (originalEndLine <= originalStartLine) {
+                return originalStartLine;
+            }
+            int mapped = originalStartLine + (observed - startLine);
+            return mapped > originalEndLine ? originalEndLine : mapped;
         }
     }
 
@@ -137,6 +149,7 @@ public final class MappingFile {
         // left is now "returnType methodName(args)" optionally followed by ":origStart[:origEnd]"
         // (R8 / optimized ProGuard maps the obfuscated range to a distinct original range).
         int originalStartLine = 0;
+        int originalEndLine = 0;
         int closeParen = left.indexOf(')');
         if (closeParen >= 0) {
             String afterParen = left.substring(closeParen + 1);
@@ -145,6 +158,7 @@ public final class MappingFile {
                 if (parts.length >= 1) {
                     originalStartLine = parseIntSafe(parts[0]);
                 }
+                originalEndLine = parts.length >= 2 ? parseIntSafe(parts[1]) : originalStartLine;
             }
             left = left.substring(0, closeParen + 1);
         }
@@ -158,7 +172,7 @@ public final class MappingFile {
             list = new ArrayList<MethodMapping>();
             cm.methods.put(obfName, list);
         }
-        list.add(new MethodMapping(originalMethod, startLine, endLine, originalStartLine));
+        list.add(new MethodMapping(originalMethod, startLine, endLine, originalStartLine, originalEndLine));
     }
 
     /**
