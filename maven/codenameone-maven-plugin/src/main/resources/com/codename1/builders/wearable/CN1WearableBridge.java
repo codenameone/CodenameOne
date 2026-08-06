@@ -1127,10 +1127,13 @@ public class CN1WearableBridge implements WearableBridge {
         // kept whichever item the buffer yielded first -- so once resolveValue() gained the
         // publisher tie-break, getData() could return a different value than the listener had just
         // delivered for the same path. One implementation, one answer.
+        String before = deliveredStamp(path);
         try {
             ResolvedValue v = resolveValue(context, path);
             byte[] out = v == null ? null : v.payload;
-            rememberValue(path, out);
+            // Only if no delivery moved this path while the query was blocked -- otherwise this
+            // older snapshot would outlive the newer one a delivery has already recorded.
+            rememberValueIfStampUnchanged(path, before, out);
             return out;
         } catch (java.io.IOException unavailable) {
             return null;
@@ -1164,8 +1167,46 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     public void removeData(String path) {
+        // Remembered before the delete is issued. removeData targets wear://*/... -- a WILDCARD --
+        // so Play services deletes every authority's replica and the resulting buffer can carry
+        // tombstones whose authority is a PEER node even though this app initiated the removal.
+        // Tombstone authorship therefore does not identify who asked, and suppressing only the
+        // local-authority one still reported the app's own removal back to it.
+        noteLocalRemoval(dataPath(path));
         Uri uri = new Uri.Builder().scheme("wear").authority("*").path(dataPath(path)).build();
         dataClient.deleteDataItems(uri);
+    }
+
+    /**
+     * Paths this device has just asked to remove, with the time it asked.
+     *
+     * <p>Time-bounded rather than cleared on first use: one wildcard delete produces one tombstone
+     * per replica, so the entry has to outlive all of them, while a peer's genuine removal of the
+     * same path later must still reach the app.</p>
+     */
+    private static final Map<String, Long> localRemovals = new HashMap<String, Long>();
+    private static final long LOCAL_REMOVAL_WINDOW_MILLIS = 30 * 1000L;
+
+    private static void noteLocalRemoval(String storagePath) {
+        long now = System.currentTimeMillis();
+        synchronized (localRemovals) {
+            localRemovals.put(storagePath, Long.valueOf(now));
+            java.util.Iterator<Map.Entry<String, Long>> it = localRemovals.entrySet().iterator();
+            while (it.hasNext()) {
+                if (now - it.next().getValue().longValue() > LOCAL_REMOVAL_WINDOW_MILLIS) {
+                    it.remove();
+                }
+            }
+        }
+    }
+
+    /** Whether a tombstone for this storage path came from a removal this device asked for. */
+    static boolean isLocallyRemoved(String storagePath) {
+        long now = System.currentTimeMillis();
+        synchronized (localRemovals) {
+            Long at = localRemovals.get(storagePath);
+            return at != null && now - at.longValue() <= LOCAL_REMOVAL_WINDOW_MILLIS;
+        }
     }
 
     public String[] getDataPaths() {
@@ -1412,7 +1453,10 @@ public class CN1WearableBridge implements WearableBridge {
                     try {
                         for (DataItem item : items) {
                             Transfer t = decodeTransferOnce(context, item);
-                            if (t.payload != null) {
+                            // Recheck authorship. The listener suppressed this as our own echo and
+                            // only an unreadable Asset sent it down the retry path -- arriving here
+                            // does not make our own transfer someone else's.
+                            if (t.payload != null && !isLocallyAuthored(context, uri.getHost())) {
                                 long tseq = sequenceOf(valueOrTransferMap(item));
                                 if (claimTransfer(uri, tseq)) {
                                     confirmTransferDelivered(uri, tseq,
@@ -1600,6 +1644,44 @@ public class CN1WearableBridge implements WearableBridge {
             rememberValue(path, payload);
             WearableConnection.deliverDataChanged(path, payload);
             return true;
+        }
+    }
+
+    /**
+     * Records a suppressed local echo: stamp and snapshot together, or neither.
+     *
+     * <p>Doing the two separately let them disagree. The stamp update is conditional -- a newer
+     * publication recorded meanwhile makes it decline -- while the snapshot write was
+     * unconditional, so a rejected echo still replaced the cached payload with its older bytes and
+     * a latency-sensitive getData() answered from it indefinitely, even though the delivery stamp
+     * already tracked the newer peer value. A newer update landing between the two calls did the
+     * same.</p>
+     */
+    static boolean recordLocalEcho(String path, long sequence, String node, byte[] payload) {
+        synchronized (deliveredSequences) {
+            if (!setDeliveredSequenceIfOutranks(path, sequence, node)) {
+                return false;
+            }
+            rememberValue(path, payload);
+            return true;
+        }
+    }
+
+    /**
+     * Stores a read result only while the path's delivery stamp is still the one the read started
+     * from.
+     *
+     * <p>An off-EDT getData() blocks, and a delivery landing while it does has already advanced the
+     * stamp and may not fire again. Writing the query's older snapshot afterwards would leave every
+     * later latency-sensitive read answering with it.</p>
+     */
+    static void rememberValueIfStampUnchanged(String path, String expected, byte[] payload) {
+        synchronized (deliveredSequences) {
+            String current = deliveredStamp(path);
+            boolean unchanged = current == null ? expected == null : current.equals(expected);
+            if (unchanged) {
+                rememberValue(path, payload);
+            }
         }
     }
 

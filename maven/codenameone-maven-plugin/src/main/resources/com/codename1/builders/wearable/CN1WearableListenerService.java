@@ -203,9 +203,15 @@ public class CN1WearableListenerService extends WearableListenerService {
             }
             String appPath = CN1WearableBridge.decode(
                     path.substring(CN1WearableBridge.pathPrefix().length()));
-            if (event.getType() == DataEvent.TYPE_DELETED && ownEcho) {
+            if (event.getType() == DataEvent.TYPE_DELETED
+                    && (ownEcho || CN1WearableBridge.isLocallyRemoved(path))) {
                 // This device's own removeData coming back, for an ordinary value. The app made the
                 // call, so announcing it would break the peer-only contract in the other direction.
+                //
+                // ownEcho alone is not enough: removeData deletes wear://*/... , a WILDCARD, so one
+                // local removal produces a tombstone per replica and the peer-authority ones are
+                // not locally authored. isLocallyRemoved tracks what this device ASKED to remove,
+                // which is the question that actually matters here.
                 //
                 // The recorded stamp is deliberately left as it is. It means "the newest thing this
                 // process delivered", and clearing it would reset the baseline to empty, so an older
@@ -320,9 +326,8 @@ public class CN1WearableListenerService extends WearableListenerService {
                         // published the winner, which resolution may have taken from a different
                         // authority than the event that triggered it.
                         if (CN1WearableBridge.isLocallyAuthored(this, winner.node)) {
-                            CN1WearableBridge.setDeliveredSequenceIfOutranks(
-                                    appPath, winner.sequence, winner.node);
-                            CN1WearableBridge.rememberValue(appPath, winner.payload);
+                            CN1WearableBridge.recordLocalEcho(appPath, winner.sequence,
+                                    winner.node, winner.payload);
                         } else {
                             CN1WearableBridge.deliverIfOutranks(appPath, winner.sequence,
                                     winner.node, winner.payload);
@@ -356,12 +361,12 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // published, but no listener is told, so there is no dispatch to order it with.
                 // Every other stamp mutation goes through the deliver* helpers, which commit the
                 // stamp and the delivery together.
-                CN1WearableBridge.setDeliveredSequenceIfOutranks(
-                        appPath, CN1WearableBridge.sequenceOf(value), uri.getHost());
-                // The echo IS the path's new current value, and putData() does not populate the
-                // snapshot itself, so without this a latency-sensitive getData() would keep
-                // answering with the previous peer payload (or null) after a local write.
-                CN1WearableBridge.rememberValue(appPath, CN1WearableBridge.payloadOf(value));
+                // Stamp and snapshot together, or neither. The stamp update declines when a newer
+                // publication was recorded meanwhile, and an unconditional snapshot write then put
+                // this echo's older bytes in front of it -- so a latency-sensitive getData() kept
+                // answering with them while the delivery stamp already tracked the newer value.
+                CN1WearableBridge.recordLocalEcho(appPath, CN1WearableBridge.sequenceOf(value),
+                        uri.getHost(), CN1WearableBridge.payloadOf(value));
             } else {
                 CN1WearableBridge.deliverIfOutranks(appPath, CN1WearableBridge.sequenceOf(value),
                         uri.getHost(), CN1WearableBridge.payloadOf(value));
