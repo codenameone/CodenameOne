@@ -479,11 +479,10 @@ public class IPhoneBuilder extends Executor {
 
     @Override
     protected String hardeningPlatform(BuildRequest request) {
-        // A native-Mac build reports "mac" so harden.mac.enabled / harden.ios.enabled apply to the
-        // right output. (A combined iOS build that also emits a Mac slice hardens the shared jar
-        // once, under "ios".)
-        if ("true".equals(request.getArg("macNative.enabled", "false"))
-                && !"true".equals(request.getArg("ios.enabled", "true"))) {
+        // The native-Mac target sets macNative.enabled=true (BuildMacNativeMojo / CN1BuildMojo), so
+        // a build producing a Mac slice reports "mac" and honors harden.mac.enabled. The shared
+        // application jar is hardened once, so a combined build hardens the Mac output under "mac".
+        if ("true".equals(request.getArg("macNative.enabled", "false"))) {
             return "mac";
         }
         return "ios";

@@ -61,7 +61,7 @@ codename1.arg.harden.level=standard
 
 |`harden.keep`
 |_(none)_
-|Keep rules in ProGuard syntax (newline- or `;`-separated), for classes resolved by name at runtime that the automatic analysis can't see. Same syntax as `android.proguardKeep`, so existing rules port directly.
+|Keep rules in ProGuard syntax, one rule per line, for classes resolved by name at runtime that the automatic analysis can't see. Same syntax as `android.proguardKeep`, so existing rules port directly. (Rules are separated by newlines only, since a `;` is legal inside a rule body such as `{ *; }`.)
 
 |`harden.<platform>.enabled`
 |`true`
