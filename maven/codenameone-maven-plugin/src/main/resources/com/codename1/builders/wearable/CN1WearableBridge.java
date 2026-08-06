@@ -2549,7 +2549,37 @@ public class CN1WearableBridge implements WearableBridge {
                 return false;
             }
             deliveredSequences.put(path, REMOVAL_ANNOUNCED);
+            // Tracked so it can be retired. Unlike a real stamp, a sentinel describes a path that
+            // is GONE, so nothing will ever publish over it -- on an app that deletes
+            // record-specific paths, every one of them would sit in the map for the life of the
+            // process. The stamps themselves stay uncapped for the reason above; it is only these
+            // that need a bound, and they are the only entries safe to have one.
+            removalSentinels.put(path, Boolean.TRUE);
             return true;
+        }
+    }
+
+    /// Announces a removal that a resolution has just confirmed, by whichever of the two rules
+    /// applies.
+    ///
+    /// Shared because the inline handler and the deferred resolver both end here and only one of
+    /// them knew the first-sight rule. The deferred path called
+    /// {@link #deliverRemovalIfStampUnchanged} alone, which refuses a null expected stamp -- so a
+    /// fresh process whose first callback for a path was a deletion, and whose inline attempts had
+    /// failed, retired the resolution silently. A deleted item is absent from the startup
+    /// enumeration and produces no further callback, so an app that persisted the value across the
+    /// restart kept showing it indefinitely.
+    static void announceResolvedRemoval(String path, String before) {
+        if (before == null) {
+            if (markRemovalAnnounced(path)) {
+                rememberValue(path, null);
+                WearableConnection.deliverDataRemoved(path);
+            }
+        } else if (!isRemovalAnnounced(before)) {
+            // A sentinel means this logical removal has already been reported, by an earlier
+            // tombstone of the same wildcard delete. The ordinary path CONSUMES the stamp it finds
+            // and announces, so passing one in would report the removal again, once per replica.
+            deliverRemovalIfStampUnchanged(path, before);
         }
     }
 
@@ -2638,6 +2668,7 @@ public class CN1WearableBridge implements WearableBridge {
     static void forgetAllDeliveredSequences() {
         synchronized (deliveredSequences) {
             deliveredSequences.clear();
+            removalSentinels.clear();
         }
     }
 
@@ -2693,6 +2724,38 @@ public class CN1WearableBridge implements WearableBridge {
      * the app rather than by traffic.</p>
      */
     private static final Map<String, String> deliveredSequences = new HashMap<String, String>();
+
+    /// How many removal sentinels are kept. Generous: the sentinel exists to dedupe the tombstones
+    /// of ONE wildcard delete, which is one per replica -- a handful, arriving in one buffer -- so
+    /// nothing real is riding on the two hundred and fifty-sixth oldest.
+    private static final int MAX_REMOVAL_SENTINELS = 256;
+
+    /// The paths currently holding a removal sentinel, oldest first, so the oldest can be retired.
+    ///
+    /// Sentinels are the one kind of entry in {@link #deliveredSequences} that a later publication
+    /// does not replace -- the path is deleted -- so on an app that deletes record-specific paths
+    /// they accumulate for the life of the process. Retiring the oldest costs at worst a second
+    /// announcement of a removal that happened long enough ago for 256 other paths to have been
+    /// deleted since, which is not the same logical delete and so not the duplicate the sentinel
+    /// exists to prevent.
+    ///
+    /// Guarded by the deliveredSequences monitor like every other access to that map.
+    private static final Map<String, Boolean> removalSentinels =
+            new LinkedHashMap<String, Boolean>(16, 0.75f, false) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
+                    if (size() <= MAX_REMOVAL_SENTINELS) {
+                        return false;
+                    }
+                    // Only while it is still a sentinel. A real stamp can have replaced it -- a
+                    // path deleted and later republished -- and evicting THAT would drop an
+                    // ordering baseline, which is what lets a stale item through.
+                    if (REMOVAL_ANNOUNCED.equals(deliveredSequences.get(eldest.getKey()))) {
+                        deliveredSequences.remove(eldest.getKey());
+                    }
+                    return true;
+                }
+            };
 
     /**
      * Transfer claims, bounded separately from the replicated ordering stamps.
@@ -2955,14 +3018,18 @@ public class CN1WearableBridge implements WearableBridge {
                         } else {
                             deliverIfOutranks(path, winner.sequence, winner.node, winner.payload);
                         }
-                    } else if (afterDeletion
-                            && deliverRemovalIfStampUnchanged(path, before)) {
-                        // Empty AND nothing landed while we were asking. Announcing a removal for a
-                        // path a concurrent publication has since refilled is the one error the app
-                        // cannot recover from, so the drop, the check and the announcement are one
-                        // atomic step -- and dropping the stamp stays coupled to the removal, since
-                        // a value republished later with a lower sequence must not be filtered as
-                        // older.
+                    } else if (afterDeletion) {
+                        // Empty, and the announcement is anchored on the stamp read before the
+                        // query. Announcing a removal for a path a concurrent publication has since
+                        // refilled is the one error the app cannot recover from, so the drop, the
+                        // check and the announcement are one atomic step -- and dropping the stamp
+                        // stays coupled to the removal, since a value republished later with a
+                        // lower sequence must not be filtered as older.
+                        //
+                        // Through the shared rule, so first sight is handled here too: this branch
+                        // called deliverRemovalIfStampUnchanged directly, which refuses a null
+                        // expected stamp, and retired the resolution without telling anyone.
+                        announceResolvedRemoval(path, before);
                     }
                     if (finishPendingWinner(path, actedGeneration)) {
                         // A deletion upgrade arrived while this task was running and we applied the

@@ -411,28 +411,10 @@ public class CN1WearableListenerService extends WearableListenerService {
                         // deliverIfStampUnchanged leaves the stamp as it found it -- dropped the
                         // LIVE winner's stamp, cleared its cached value and told the app the value
                         // had gone.
-                        if (beforeQuery == null) {
-                            // FIRST sight of this path in this process, and the resolution says it
-                            // is empty. deliverRemovalIfStampUnchanged refuses a null expected
-                            // stamp -- rightly, since it exists to drop a stamp atomically -- so
-                            // nothing would be announced, and unlike a live value a deleted item is
-                            // absent from the startup enumeration, so no replay can recover it
-                            // either. An app that persisted the value across the restart would keep
-                            // showing it forever.
-                            //
-                            // The removal is announced once and a sentinel stamp recorded, so the
-                            // remaining tombstones of the same wildcard delete find a stamp and the
-                            // ordinary once-per-removal dedupe applies to them.
-                            if (CN1WearableBridge.markRemovalAnnounced(appPath)) {
-                                CN1WearableBridge.rememberValue(appPath, null);
-                                WearableConnection.deliverDataRemoved(appPath);
-                            }
-                        } else if (!CN1WearableBridge.isRemovalAnnounced(beforeQuery)) {
-                            CN1WearableBridge.deliverRemovalIfStampUnchanged(appPath, beforeQuery);
-                        }
-                        // A sentinel means this logical removal has already been reported, by an
-                        // earlier tombstone of the same wildcard delete. Passing it to the ordinary
-                        // path would consume it and announce again, once per replica.
+                        //
+                        // Both rules live in the bridge, because the deferred resolver reaches the
+                        // same point and knew only one of them.
+                        CN1WearableBridge.announceResolvedRemoval(appPath, beforeQuery);
                     }
                 } catch (java.io.IOException couldNotResolve) {
                     // The follow-up query failed rather than answering "nothing here". Still do not
