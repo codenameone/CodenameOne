@@ -1288,11 +1288,25 @@ class WatchNativeBuilder {
                     // translated native like UIWebViewEventDelegate.m compiles to nothing on this
                     // target instead of having to be enumerated.
                     .append("watch_existing = watch_target.source_build_phase.files.to_a.map { |bf| bf.file_ref && bf.file_ref.path ? File.basename(bf.file_ref.path) : nil }\n")
+                    // Per-file COMPILER_FLAGS, carried across by BASENAME from the app target.
+                    //
+                    // A cn1lib Objective-C source can require -fobjc-arc while the port itself
+                    // builds with ARC off, and this target forces CLANG_ENABLE_OBJC_ARC=NO. The
+                    // shared-translation branch copies bf.settings for exactly that reason; adding
+                    // fresh references here dropped them, so such a source would compile under the
+                    // wrong memory model. There is no bf to copy from when the list comes from the
+                    // watch tree, so the app target's flags are indexed by file name first.
+                    .append("app_flags = {}\n")
+                    .append("app_target.source_build_phase.files.to_a.each do |bf|\n")
+                    .append("  next unless bf.file_ref && bf.file_ref.path && bf.settings\n")
+                    .append("  app_flags[File.basename(bf.file_ref.path)] = bf.settings\n")
+                    .append("end\n")
                     .append("watch_sources.each do |name|\n")
                     .append("  next if excluded.include?(name)\n")
                     .append("  next if watch_existing.include?(name)\n")
                     .append("  ref = xcproj.main_group.new_reference(watch_group_path + '/' + name)\n")
-                    .append("  watch_target.source_build_phase.add_file_reference(ref)\n")
+                    .append("  added = watch_target.source_build_phase.add_file_reference(ref)\n")
+                    .append("  added.settings = app_flags[name].dup if added && app_flags[name]\n")
                     .append("end\n");
         } else {
             // Same entry point on both slices, so there is one translation and the watch shares it.

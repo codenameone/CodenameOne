@@ -392,7 +392,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// (`codename1.watchMain`); without one there is nothing to pair with, so the whole
     /// `com.codename1.wearable` API stays inert exactly as it would on a phone with no watch.
     @Override
-    public com.codename1.wearable.spi.WearableBridge getWearableBridge() {
+    public synchronized com.codename1.wearable.spi.WearableBridge getWearableBridge() {
+        // Synchronized because this is a lazy singleton with side effects. Two threads registering
+        // wearable listeners at once both passed the null check and built their OWN bridge: each
+        // started a data watcher and a rendezvous thread and replaced the shared dropped-delivery
+        // handler, so the loser stayed alive through its threads and the same peer file produced
+        // duplicate callbacks while its evicted deliveries recovered through the wrong instance.
         if (wearableBridge == null) {
             // Deliberately the *shared* home, not this process's sandbox: the two halves have
             // separate storage (see watchSandbox) but must rendezvous in one directory, which is the
