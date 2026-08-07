@@ -36,7 +36,16 @@ if [ "${accept_status}" -ne 0 ]; then
     *) reason="rejected by the publication gate (status ${accept_status})" ;;
   esac
   echo "Not publishing the ${port} report: ${reason}; preserving the last published one."
-  exit 0
+  # Contract drift is the one case that waits quietly: a report built before a
+  # newly registered test is expected, and the next run resolves it. Anything
+  # else -- an unusable report, or a gate failure nobody anticipated -- is a
+  # producer defect, and exiting zero here made port-status-publish.yml go green
+  # and rebuild the site off the PREVIOUS report, so the defect stayed invisible
+  # until some later nightly sweep happened to notice it.
+  if [ "${accept_status}" -eq 11 ]; then
+    exit 0
+  fi
+  exit "${accept_status}"
 fi
 
 for tool in gh jq python3; do

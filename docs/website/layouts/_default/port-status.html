@@ -168,7 +168,35 @@
         {{- with $report -}}
           {{- $result := index .tests $erratum.test -}}
           {{- with $result -}}
-            {{- if eq .status "skip" -}}{{- $skippedPortNames = $skippedPortNames | append $port.name -}}{{- end -}}
+            {{- if eq .status "skip" -}}
+              {{- /* The same predicate the feature cell uses, not the test name
+                     alone. Listing every skip of this test made the erratum claim
+                     ports it does not cover: a VideoIORoundTripTest encoder
+                     failure on Linux was filed under an erratum that explains an
+                     Apple simulator limitation, which both misdiagnoses the
+                     failure and contradicts the cell beside it, where that skip
+                     is correctly left partial as unexplained. */ -}}
+              {{- $codes := $erratum.reason_codes -}}
+              {{- $reasons := slice -}}
+              {{- with .reasons -}}{{- $reasons = . -}}{{- end -}}
+              {{- $documented := true -}}
+              {{- if $codes -}}
+                {{- $documented = gt (len $reasons) 0 -}}
+                {{- range $reasons -}}
+                  {{- $reason := . -}}
+                  {{- $ok := false -}}
+                  {{- range $codes -}}
+                    {{- $portAllowed := true -}}
+                    {{- with .ports -}}
+                      {{- $portAllowed = in . $port.id -}}
+                    {{- end -}}
+                    {{- if and $portAllowed (hasPrefix $reason .prefix) -}}{{- $ok = true -}}{{- end -}}
+                  {{- end -}}
+                  {{- if not $ok -}}{{- $documented = false -}}{{- end -}}
+                {{- end -}}
+              {{- end -}}
+              {{- if $documented -}}{{- $skippedPortNames = $skippedPortNames | append $port.name -}}{{- end -}}
+            {{- end -}}
           {{- end -}}
         {{- end -}}
       {{- end -}}

@@ -2909,8 +2909,18 @@ public class WindowsImplementation extends CodenameOneImplementation {
         if (algorithm == null || keyAlgorithm == null) {
             return;
         }
+        // The label has to be one this runtime actually knows, not merely one
+        // whose prefix looks familiar. startsWith("EC") called "ECfoo" an EC key
+        // and every other string an RSA one, so PrivateKey.fromPkcs8("garbage",
+        // der) signed happily here while JavaSE and Android hand the same label
+        // to KeyFactory.getInstance and throw NoSuchAlgorithmException. Identical
+        // public API calls must not depend on the port.
+        String key = keyAlgorithm.toUpperCase();
+        if (!"RSA".equals(key) && !"EC".equals(key)) {
+            throw new RuntimeException("Unknown key algorithm: " + keyAlgorithm);
+        }
         boolean wantsEc = algorithm.toUpperCase().indexOf("ECDSA") >= 0;
-        boolean keyIsEc = keyAlgorithm.toUpperCase().startsWith("EC");
+        boolean keyIsEc = "EC".equals(key);
         if (wantsEc != keyIsEc) {
             throw new RuntimeException(algorithm + " cannot be used with a "
                     + keyAlgorithm + " key");

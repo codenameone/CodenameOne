@@ -6,6 +6,7 @@
 {{- $label := "No stored report" -}}
 {{- if $report -}}
   {{- $failed := int (default 0 $report.summary.fail) -}}
+  {{- $notRun := int (default 0 (index $report.summary "not-run")) -}}
   {{- $bootstrapComplete := and (eq $report.bootstrap_source "successful-master-workflow") (eq $report.workflow_conclusion "success") -}}
   {{- $complete := or $report.suite_finished $bootstrapComplete -}}
   {{- $generated := time.AsTime $report.generated_at -}}
@@ -16,6 +17,14 @@
   {{- if gt $failed 0 -}}
     {{- $state = "fail" -}}
     {{- $label = printf "%d failing test%s" $failed (cond (eq $failed 1) "" "s") -}}
+  {{- else if gt $notRun 0 -}}
+    {{- /* A test that never reported is not a pass. The strict producer gate
+           fails the workflow on not-run, so a report reaching here with zero
+           failures and a pile of unreported tests came from a RED run -- and
+           looking only at summary.fail rendered it as a green "Suite completed"
+           card while its feature cells sat incomplete. */ -}}
+    {{- $state = "partial" -}}
+    {{- $label = printf "%d test%s did not run" $notRun (cond (eq $notRun 1) "" "s") -}}
   {{- else if not $complete -}}
     {{- $state = "partial" -}}
     {{- $label = "Run incomplete" -}}

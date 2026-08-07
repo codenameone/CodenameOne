@@ -315,17 +315,35 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
         }
     }
     if (audioReader != NULL) {
-        audioReader->SetStreamSelection((DWORD) MF_SOURCE_READER_ALL_STREAMS, FALSE);
-        audioReader->SetStreamSelection((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, TRUE);
-        ComPtr<IMFMediaType> pcmType;
-        if (SUCCEEDED(MFCreateMediaType(&pcmType))) {
-            pcmType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
-            pcmType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
-            pcmType->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
-            audioReader->SetCurrentMediaType((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, NULL, pcmType.Get());
+        /* Configure it completely or not at all. Every call here was previously
+         * unchecked, so a reader that opened but could not select its stream or
+         * negotiate PCM stayed non-null and was used anyway -- reading an
+         * unselected stream, or the source's COMPRESSED native format, while the
+         * bytes were handed back with the cached 16-bit PCM rate and channel
+         * count beside them. Silent garbage is worse than the seek path this
+         * replaced, so a partially configured reader is discarded and the shared
+         * reader is rewound instead. */
+        bool configured = false;
+        if (SUCCEEDED(audioReader->SetStreamSelection((DWORD) MF_SOURCE_READER_ALL_STREAMS, FALSE))
+                && SUCCEEDED(audioReader->SetStreamSelection(
+                        (DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, TRUE))) {
+            ComPtr<IMFMediaType> pcmType;
+            if (SUCCEEDED(MFCreateMediaType(&pcmType))) {
+                pcmType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
+                pcmType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
+                pcmType->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
+                configured = SUCCEEDED(audioReader->SetCurrentMediaType(
+                        (DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, NULL, pcmType.Get()));
+            }
         }
-    } else {
-        /* No fresh reader: fall back to rewinding the shared one. */
+        if (!configured) {
+            printf("CN1SS:INFO:winAudio fresh reader configuration failed; rewinding the shared reader\n");
+            fflush(stdout);
+            audioReader.Reset();
+        }
+    }
+    if (audioReader == NULL) {
+        /* No usable fresh reader: fall back to rewinding the shared one. */
         PROPVARIANT pos;
         PropVariantInit(&pos);
         pos.vt = VT_I8;

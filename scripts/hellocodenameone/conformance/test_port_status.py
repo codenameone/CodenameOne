@@ -539,6 +539,62 @@ class PortStatusTest(unittest.TestCase):
             self.manifest, "linux-x64", report
         ))
 
+    def test_publishable_requires_a_boolean_suite_completion_marker(self):
+        # bool() accepted "false" and 1 as a finished suite, and Hugo reads the
+        # same value as truthy -- so a report with no failures and a pile of
+        # not-run tests rendered a green "Suite completed" card.
+        for bad in ("false", "true", 1, 0, [], {}):
+            with self.subTest(bad=bad):
+                report = self.publishable_report("linux-x64")
+                report["suite_finished"] = bad
+                _, malformed = port_status.publishable_report_problems(
+                    self.manifest, "linux-x64", report
+                )
+                self.assertTrue(
+                    any("suite_finished" in item for item in malformed), malformed)
+
+    def test_publishable_rejects_an_unhashable_test_status(self):
+        # A list status raises TypeError out of the set-membership test, and
+        # main() catches only ContractError -- so the gate died with a status the
+        # sweep does not read as unusable and fell back quietly.
+        for bad in (["skip"], {"status": "skip"}, 3, None):
+            with self.subTest(bad=bad):
+                report = self.publishable_report("linux-x64")
+                report["tests"]["ClipboardRoundTripTest"]["status"] = bad
+                _, malformed = port_status.publishable_report_problems(
+                    self.manifest, "linux-x64", report
+                )
+                self.assertTrue(
+                    any("invalid result" in item for item in malformed), malformed)
+
+    def test_publishable_rejects_boolean_summary_counts(self):
+        # Python considers True == 1, so a count of exactly one serialized as a
+        # JSON boolean compared equal to the calculated summary and published;
+        # Hugo then rendered "true skipped".
+        report = self.publishable_report("linux-x64")
+        report["tests"]["ClipboardRoundTripTest"]["status"] = "skip"
+        report["summary"] = {
+            "pass": len(report["tests"]) - 1, "fail": 0, "skip": True, "not-run": 0
+        }
+        _, malformed = port_status.publishable_report_problems(
+            self.manifest, "linux-x64", report
+        )
+        self.assertTrue(
+            any("non-negative integers" in item for item in malformed), malformed)
+
+    def test_publishable_rejects_a_malformed_performance_status_when_unfinished(self):
+        # port-status.html does `eq .status "complete"`, and Hugo aborts the whole
+        # site build when that compares a map with a string. The unfinished branch
+        # used to skip status validation entirely.
+        report = self.publishable_report("linux-x64")
+        report["suite_finished"] = False
+        report["performance"]["status"] = {"state": "partial"}
+        _, malformed = port_status.publishable_report_problems(
+            self.manifest, "linux-x64", report
+        )
+        self.assertTrue(
+            any("performance status is" in item for item in malformed), malformed)
+
     def test_publishable_matches_every_report_the_site_serves(self):
         for port in self.manifest["ports"]:
             report_path = port_status.REPO_ROOT / self.manifest["report_directory"] / (

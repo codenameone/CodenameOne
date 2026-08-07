@@ -669,9 +669,13 @@ def publishable_report_problems(
 
     statuses = Counter()
     for test, result in tests.items():
-        if not isinstance(result, dict) or result.get("status") not in {
-            "pass", "fail", "skip", "not-run"
-        }:
+        # isinstance before membership, not just membership. An unhashable
+        # status -- a producer writing a list or an object -- raises TypeError
+        # out of the `in` test, and main() catches only ContractError, so the
+        # gate died with a status the sweep does not read as unusable and fell
+        # back to an older report while finishing green.
+        if not isinstance(result, dict) or not isinstance(result.get("status"), str) \
+                or result["status"] not in {"pass", "fail", "skip", "not-run"}:
             malformed.append(f"invalid result for {test}")
             continue
         # The reason list is optional, but when present the feature template
@@ -695,7 +699,21 @@ def publishable_report_problems(
     # predates a test -- suppressing this whenever any drift was seen let a
     # genuinely malformed report be filed as mere drift and fall back quietly,
     # which is the outcome the loud/quiet split exists to avoid.
-    if report.get("summary") != expected_summary:
+    # Types before values. Python treats True as equal to 1, so a summary count
+    # serialized as a JSON boolean compared equal to a genuine count of one and
+    # sailed through the equality below -- Android's "skip": 1 becoming "skip":
+    # true is accepted, published, and rendered by Hugo as "true skipped".
+    summary = report.get("summary")
+    if not isinstance(summary, dict):
+        malformed.append("report has no summary")
+    elif any(
+        isinstance(summary.get(key), bool)
+        or not isinstance(summary.get(key), int)
+        or summary.get(key) < 0
+        for key in ("pass", "fail", "skip", "not-run")
+    ):
+        malformed.append("summary counts are not non-negative integers")
+    elif summary != expected_summary:
         malformed.append("summary does not match the test results")
 
     expected_benchmarks = manifest.get("performance_benchmarks", [])
@@ -712,7 +730,17 @@ def publishable_report_problems(
     # suite that actually finished; a partial section simply is not presentable
     # as performance. Structural defects below stay loud either way, because
     # those are producer bugs whatever the suite did.
-    suite_finished = bool(report.get("suite_finished"))
+    # An actual boolean, not anything truthy. bool() accepted the string "false"
+    # and the integer 1 as a completed suite, and Hugo reads the same value as
+    # truthy in port-status-port-state.html -- so a report with no failures but a
+    # pile of not-run tests rendered a green "Suite completed" card.
+    suite_finished_raw = report.get("suite_finished")
+    if not isinstance(suite_finished_raw, bool):
+        malformed.append(
+            f"suite_finished is {type(suite_finished_raw).__name__}, not a boolean"
+        )
+        suite_finished_raw = False
+    suite_finished = suite_finished_raw
 
     # Validated before anything joins or iterates it. A producer emitting
     # "missing": true or a number raised TypeError out of the join below, and
@@ -728,9 +756,17 @@ def publishable_report_problems(
         malformed.append("performance missing list is not an array of workload names")
         declared_missing = []
 
+    # Validated for every report, not only finished ones. port-status.html does
+    # `eq .status "complete"`, and Hugo aborts the whole site build with an
+    # incompatible-types error when that compares a map against a string -- so a
+    # malformed status on an UNFINISHED report used to skip validation entirely
+    # (the workload keys still accounted for) and take the build down.
+    perf_status = performance.get("status")
+    if perf_status not in ("complete", "partial"):
+        malformed.append(f"performance status is {perf_status!r}")
     if suite_finished:
-        if performance.get("status") != "complete":
-            malformed.append(f"performance run is {performance.get('status')!r}")
+        if perf_status != "complete":
+            malformed.append(f"performance run is {perf_status!r}")
         if declared_missing:
             malformed.append(
                 "performance workloads never reported: " + ", ".join(declared_missing)

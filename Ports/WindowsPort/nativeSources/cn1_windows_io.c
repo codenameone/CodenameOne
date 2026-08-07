@@ -304,7 +304,23 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_fileRename___java_lang_String
         } else {
             WCHAR* lastBack = wcsrchr(path, L'\\');
             WCHAR* lastFwd = wcsrchr(path, L'/');
-            WCHAR* sep = lastBack > lastFwd ? lastBack : lastFwd;
+            WCHAR* sep;
+            /* Resolve the absent cases before comparing. An ordinary Windows
+             * path has no forward slash and a normalized one has no backslash,
+             * so one of these is NULL almost every time -- and relational
+             * comparison of a null pointer against a pointer into `path` is
+             * undefined behaviour, not merely unusual. An optimizing build is
+             * free to decide it either way, and picking NULL would drop the
+             * parent directory and put the rename back in the working
+             * directory, which is the bug this join exists to fix. Both
+             * operands below point into `path`, where `>` is well defined. */
+            if (lastBack == NULL) {
+                sep = lastFwd;
+            } else if (lastFwd == NULL) {
+                sep = lastBack;
+            } else {
+                sep = lastBack > lastFwd ? lastBack : lastFwd;
+            }
             size_t dirLen = sep != NULL ? (size_t) (sep - path) + 1 : 0;
             size_t nameLen = wcslen(newName);
             target = (WCHAR*) malloc((dirLen + nameLen + 1) * sizeof(WCHAR));

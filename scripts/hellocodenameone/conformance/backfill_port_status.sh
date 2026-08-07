@@ -181,19 +181,29 @@ while IFS= read -r workflow; do
     | jq -r --arg horizon "${horizon}" '[.[] | select((.event == "push" or .event == "schedule" or .event == "workflow_dispatch") and
           (.conclusion != null and .conclusion != "cancelled" and .conclusion != "skipped") and
           (.updatedAt >= $horizon))]
-          | sort_by(.updatedAt) | reverse | .[] | "\(.databaseId):\(.conclusion)"')"
+          | sort_by(.updatedAt) | reverse | .[] | "\(.databaseId):\(.event)"')"
   if [ -z "${candidates}" ]; then
     echo "No completed master run for ${workflow}; nothing to publish." >&2
     continue
   fi
 
   run_id=""
-  # The newest producer candidate gets stricter treatment than the ones behind
-  # it. Which run that is cannot be read off the top of the list, because a run
-  # can be a dispatch that deliberately produced no port report at all -- see
-  # the evidence-only check below -- so it is assigned to the first candidate
-  # that actually attempted to produce one.
+  # The newest SCHEDULED (or push) run gets stricter treatment than the ones
+  # behind it: it must upload an artifact, and it must report every port its
+  # workflow owns. A workflow_dispatch is deliberately excluded from that role.
+  # Dispatches carry arbitrary inputs and routinely run a subset on purpose --
+  # scripts-ios.yml with watch_only skips the GL, Metal and tv legs, and
+  # scripts-javascript.yml with port_status_browser_evidence skips its screenshot
+  # job entirely -- so treating whichever run happens to be newest as the
+  # authoritative producer failed the sweep for ports nobody asked to run. Their
+  # reports are still merged (and, being newest, still win), which is the manual
+  # recovery this sweep exists to pick up; only the strictness is scoped to the
+  # runs that are supposed to cover everything.
   newest_candidate=""
+  # Set once the strict candidate has been processed: coverage found at or
+  # before it counts as current, so a dispatch that repaired a port newer than
+  # the last scheduled run is not then reported as an omission of that run.
+  past_strict_candidate=0
   download_dir="${tmp_dir}/${workflow}"
   mkdir -p "${download_dir}"
   # Merge across candidate runs rather than stopping at the first with any
@@ -202,7 +212,10 @@ while IFS= read -r workflow; do
   owned="$(jq -r --arg workflow "${workflow}" '.ports[] | select(.workflow == $workflow) | .id' "${MANIFEST}")"
   for candidate_entry in ${candidates}; do
     candidate="${candidate_entry%%:*}"
-    candidate_conclusion="${candidate_entry##*:}"
+    candidate_event="${candidate_entry##*:}"
+    if [ -n "${newest_candidate}" ]; then
+      past_strict_candidate=1
+    fi
     missing=0
     for port in ${owned}; do
       if [ ! -f "${download_dir}/covered-${port}" ]; then
@@ -219,29 +232,13 @@ while IFS= read -r workflow; do
       # freshness check passes, and the sweep goes green while the current run
       # produced no evidence. Only the newest is reported: older candidates
       # without artifacts are just how the merge walks back.
-      if [ -z "${newest_candidate}" ]; then
+      if [ -z "${newest_candidate}" ] && [ "${candidate_event}" != "workflow_dispatch" ]; then
         newest_candidate="${candidate}"
         unusable+=("${workflow}: newest run ${candidate} uploaded no port-status artifact")
       fi
       continue
     fi
-    # A run that succeeded, uploaded the browser-evidence environment sidecar
-    # and named none of the ports this workflow owns never tried to produce a
-    # port report: scripts-javascript.yml dispatched with
-    # port_status_browser_evidence skips its screenshot job by design and only
-    # calls the reusable evidence workflow. Treating it as the newest producer
-    # made the sweep fail every time -- the environment artifact names no port,
-    # and the JavaScript port then looked omitted -- for a run in which no
-    # producer was asked to run. A producer that genuinely died before
-    # normalization is not caught by this: its job failure fails the run, so the
-    # conclusion is not success and the strict checks still apply.
-    if [ "${candidate_conclusion}" = "success" ] \
-        && [ -f "${download_dir}/run-${candidate}/port-status-environment/port-status-environment.json" ] \
-        && [ -z "$(owned_reports_in "${download_dir}/run-${candidate}" "${owned}")" ]; then
-      echo "Skipping run ${candidate}: a browser-evidence dispatch that produces no ${workflow} port report." >&2
-      continue
-    fi
-    if [ -z "${newest_candidate}" ]; then
+    if [ -z "${newest_candidate}" ] && [ "${candidate_event}" != "workflow_dispatch" ]; then
       newest_candidate="${candidate}"
     fi
     run_id="${candidate}"
@@ -290,7 +287,7 @@ while IFS= read -r workflow; do
           --port "${found}" --report "${downloaded}" >/dev/null 2>&1 || accept_status=$?
       if [ "${accept_status}" -ne 0 ]; then
         echo "Ignoring the ${found} report from run ${candidate}: $(describe_accept_status "${accept_status}")." >&2
-        if [ "${candidate}" = "${newest_candidate}" ] \
+        if [ "${past_strict_candidate}" -eq 0 ] \
             && [ "${accept_status}" -eq "${ACCEPT_CONTRACT_DRIFT}" ]; then
           # The newest run DID report this port; its report is simply built
           # against another revision of the contract, which is the one case that
@@ -315,7 +312,10 @@ while IFS= read -r workflow; do
       fi
       cp "${downloaded}" "${download_dir}/port-status-${found}.json"
       : > "${download_dir}/covered-${found}"
-      if [ "${candidate}" = "${newest_candidate}" ]; then
+      # At or before the strict candidate: a dispatch newer than the last
+      # scheduled run counts as current coverage, so a manual repair is not
+      # reported as that run having omitted the port.
+      if [ "${past_strict_candidate}" -eq 0 ]; then
         : > "${download_dir}/newest-covered-${found}"
       fi
       # Remember which run this port's report actually came from. Reports are

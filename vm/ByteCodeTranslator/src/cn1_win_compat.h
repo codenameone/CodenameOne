@@ -169,8 +169,33 @@ static __inline int unsetenv(const char* name) {
     return _putenv_s(name, "");
 }
 
+/* Civil fields to a UTC epoch second, by arithmetic rather than through the
+ * CRT. _mkgmtime is documented to support only dates from 1970-01-01 and
+ * returns -1 for anything earlier, and the timezone runtime multiplies this
+ * result by 1000 without checking it -- so EVERY pre-epoch lookup collapsed to
+ * -1 and was then evaluated at 1969-12-31T23:59:59Z. A 1900 Europe/Paris
+ * request came back with 1969's rules. Howard Hinnant's days_from_civil is
+ * exact for the whole proleptic Gregorian range and has no such limit.
+ * Deliberately arithmetic-only: this header is included by translation units
+ * that may not pull in <windows.h>. */
 static __inline time_t timegm(struct tm* tm) {
-    return _mkgmtime(tm);
+    long long year = (long long) tm->tm_year + 1900;
+    long long month = (long long) tm->tm_mon + 1;
+    long long day = (long long) tm->tm_mday;
+    long long era, yoe, doy, doe, days;
+
+    /* March-based years, so a leap day lands at the end of the cycle. */
+    year -= (month <= 2) ? 1 : 0;
+    era = (year >= 0 ? year : year - 399) / 400;
+    yoe = year - era * 400;                                       /* [0, 399]    */
+    doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+    doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;                  /* [0, 146096] */
+    days = era * 146097 + doe - 719468;                           /* since epoch */
+
+    return (time_t) (days * 86400LL
+                     + (long long) tm->tm_hour * 3600LL
+                     + (long long) tm->tm_min * 60LL
+                     + (long long) tm->tm_sec);
 }
 
 static __inline struct tm* localtime_r(const time_t* timep, struct tm* result) {
