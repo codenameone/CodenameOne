@@ -67,12 +67,6 @@ The nonce prevents a captured platform statement from becoming a permanent repla
 
 Your backend remains the enforcement point. The client reports what it sees. The service evaluates the attestation and policy. Your API decides whether to move money, return personal data, request step-up authentication, or reject the call.
 
-### We got the first App Attest path wrong
-
-App Shield also fixes two defects in the earlier iOS App Attest implementation. The native method name missed ParparVM's return-type mangling, so a build with `ios.appAttest=true` failed while linking. The old flow then generated and attested a fresh key on every request. Apple's model is one attestation followed by many assertions against the registered key.
-
-The new implementation keeps that key and its state in the keychain. It queues callers while the first attestation is in progress, recovers when iOS invalidates a key, and backs off when Apple throttles attestation. This is exactly the kind of failure that a security abstraction should remove from application code.
-
 ## The app-side setup is a host list
 
 Enable the injected engine in `codenameone_settings.properties`:
@@ -95,7 +89,7 @@ ConnectionRequest request = new ConnectionRequest(
 NetworkManager.getInstance().addToQueueAndWait(request);
 ```
 
-`ConnectionRequest`, `Rest`, `RequestBuilder`, and other code built on `NetworkManager` pick up the guard automatically. App Shield attaches `X-CN1-Attest` on the network thread and checks the certificate chain against the current SPKI pin set. An unregistered host is untouched.
+When App Shield owns the application's network guard, `ConnectionRequest`, `Rest`, `RequestBuilder`, and other code built on `NetworkManager` pass through it automatically. App Shield attaches `X-CN1-Attest` on the network thread and checks the certificate chain against the current SPKI pin set. An unregistered host is untouched.
 
 The two policies encode different outage choices:
 
@@ -103,6 +97,48 @@ The two policies encode different outage choices:
 | --- | --- |
 | `HostPolicy.PROTECTED` | Send the request without a token. The backend can degrade or reject it. |
 | `HostPolicy.ENFORCED` | Fail before the request leaves the device. Use this for the few endpoints where an unverified request is never acceptable. |
+
+### If your application already has a network guard
+
+`NetworkManager` accepts one `NetworkGuard` and seals that slot after the first call to `setNetworkGuard()`. In the usual setup, call `AppShield.init()` immediately after `Display.init()` and before any library or application code installs a guard.
+
+If another guard is installed first, App Shield cannot replace it. Initialization continues, but ordinary requests receive neither the attestation token nor App Shield's certificate-pin check. This includes hosts marked `ENFORCED`: without the shield guard, nothing sees that policy before the request leaves the device.
+
+An application that needs its own guard must install one composite guard and forward every callback to App Shield's guard:
+
+```java
+final NetworkGuard shield = AppShield.getNetworkGuard();
+
+NetworkManager.setNetworkGuard(new NetworkGuard() {
+    public void beforeRequest(ConnectionRequest request) throws IOException {
+        request.addRequestHeader("X-My-Trace", newTraceId());
+        shield.beforeRequest(request);
+    }
+
+    public boolean isCertificateCheckRequired(String url) {
+        return shield.isCertificateCheckRequired(url);
+    }
+
+    public void checkCertificates(ConnectionRequest request,
+            ConnectionRequest.SSLCertificate[] certificates) throws IOException {
+        shield.checkCertificates(request, certificates);
+    }
+
+    public String[] interestingResponseHeaders() {
+        return shield.interestingResponseHeaders();
+    }
+
+    public void afterResponse(ConnectionRequest request, int responseCode,
+            String[] headers) {
+        shield.afterResponse(request, responseCode, headers);
+    }
+});
+
+AppShield.init(new ShieldConfig()
+        .protect("api.mybank.example", HostPolicy.ENFORCED));
+```
+
+`AppShield.getNetworkGuard()` is safe to call before `init()` because the guard reads the configuration when it handles a request. Forwarding only `beforeRequest()` is not enough. The certificate callbacks enforce the pin set, while the response callbacks let App Shield discard a rejected token. If your guard also captures response headers, return the union of both guards' header names and preserve that order when passing App Shield its values.
 
 The simulator now has **Simulate > App Shield** controls for rejected attestations, expired tokens, compromised-device signals, and forced certificate-pin mismatches. That makes the failure path testable without misconfiguring a live server.
 
