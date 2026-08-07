@@ -1214,13 +1214,22 @@ public final class WearableConnection {
             // available, since the item is gone and no port can enumerate an absence.
             if (removals != null) {
                 for (String removed : removals) {
+                    // Isolated too: deliverDataRemoved only queues, but it runs the same
+                    // park/evict path as any delivery, and an eviction hands a payload back to the
+                    // port -- which is foreign code that can throw.
                     // Only if it is still pending. A publication for this path parking during the
                     // recovery supersedes the removal, and announcing anyway put a stale removal
                     // BEHIND the newer value in the same queue -- the listener ended up removed
                     // while getData returned the replacement, which is the failure this recovery
                     // exists to prevent, produced by the recovery itself.
-                    if (takeDroppedRemoval(removed)) {
-                        deliverDataRemoved(removed);
+                    try {
+                        if (takeDroppedRemoval(removed)) {
+                            deliverDataRemoved(removed);
+                        }
+                    } catch (Throwable portFailed) {
+                        com.codename1.io.Log.p("Wearable: re-announcing the removal of " + removed
+                                + " failed; continuing the drain");
+                        com.codename1.io.Log.e(portFailed);
                     }
                 }
             }
@@ -1229,7 +1238,20 @@ public final class WearableConnection {
                 DroppedDeliveryHandler handler = droppedHandler();
                 if (handler != null) {
                     for (String path : dropped) {
-                        handler.deliveryDropped(path);
+                        // Each hand-back isolated. This is PORT code reaching into a native
+                        // bridge, and one of them throwing used to escape the drain entirely:
+                        // the finally released the guard, but the parked deliveries stayed
+                        // parked, and because the queue was then non-empty every later
+                        // publication parked behind them too. An app with a registered listener
+                        // stopped receiving data until some other listener happened to register.
+                        // One failing path must cost that path, not the queue.
+                        try {
+                            handler.deliveryDropped(path);
+                        } catch (Throwable portFailed) {
+                            com.codename1.io.Log.p("Wearable: recovery for " + path
+                                    + " failed; continuing the drain");
+                            com.codename1.io.Log.e(portFailed);
+                        }
                     }
                 }
             }
@@ -1237,7 +1259,14 @@ public final class WearableConnection {
             // landing straight back in a full queue.
             if (replays != null) {
                 for (Runnable replay : replays) {
-                    replay.run();
+                    // Isolated for the same reason: a replay is the port re-offering what it
+                    // holds, and one that fails must not strand the queue.
+                    try {
+                        replay.run();
+                    } catch (Throwable portFailed) {
+                        com.codename1.io.Log.p("Wearable: a port replay failed; continuing the drain");
+                        com.codename1.io.Log.e(portFailed);
+                    }
                 }
             }
         } finally {
