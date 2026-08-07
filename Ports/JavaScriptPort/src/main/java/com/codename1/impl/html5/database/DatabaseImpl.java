@@ -373,7 +373,7 @@ public class DatabaseImpl extends Database {
 
         @Override
         protected void rewind() throws IOException {
-            SQLiteNative.reset(stmt);
+            checkNative(SQLiteNative.reset(stmt));
         }
 
         @Override

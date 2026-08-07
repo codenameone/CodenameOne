@@ -121,8 +121,14 @@ public class SQLiteNative {
      */
     public static native int step(long stmtPeer);
 
-    /** Resets a statement to before its first row, keeping its bindings. */
-    public static native void reset(long stmtPeer);
+    /**
+     * Resets a statement to before its first row, keeping its bindings.
+     *
+     * @return false on failure, with the reason in {@link #lastError()}. Not inert: the reset
+     * reports the error from the statement's last step, so resetting after a failed step is
+     * where that error surfaces.
+     */
+    public static native boolean reset(long stmtPeer);
 
     public static native void finish(long stmtPeer);
 

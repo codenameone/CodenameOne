@@ -11181,6 +11181,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void deleteDB(String databaseName) throws IOException {
+        // The working files first. They survive deleting the live file, and the next open runs
+        // recovery and puts the backup back - so a database the caller was told had been deleted
+        // reappears, and after an interrupted encryption what reappears is the plaintext copy.
+        discardDatabaseMigrationArtifacts(resolveNativeDatabasePath(databaseName));
         if (databaseName.startsWith("file://")) {
             deleteFile(databaseName);
             return;
@@ -11188,13 +11192,58 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         getContext().deleteDatabase(databaseName);
     }
 
+    /// Removes any migration working files for a database, without restoring anything.
+    ///
+    /// Used by delete, where the caller's intent is that the data goes away: recovering the
+    /// backup first and deleting afterwards would be the same outcome by a longer route, and
+    /// leaving it is how deleted data comes back.
+    static void discardDatabaseMigrationArtifacts(String path) {
+        if (path == null) {
+            return;
+        }
+        File dir = databaseMigrationDir(path);
+        if (dir == null || !dir.isDirectory()) {
+            return;
+        }
+        String name = new File(path).getName();
+        new File(dir, name + MIGRATION_MARKER).delete();
+        new File(dir, name + MIGRATION_BACKUP).delete();
+        new File(dir, name + MIGRATION_TARGET).delete();
+    }
+
     @Override
     public boolean existsDB(String databaseName) {
+        // Recover first. A conversion interrupted between its two renames leaves the live name
+        // missing while the database itself sits complete in the migration directory, and
+        // reporting "does not exist" there would refuse a retry of encrypt or decrypt - the one
+        // operation that could put it right.
+        String path = resolveNativeDatabasePath(databaseName);
+        try {
+            recoverInterruptedDatabaseMigration(path);
+        } catch (IOException cannotRecover) {
+            // The data is still in the migration directory, so the database does exist even
+            // though it could not be moved back. Say so; the open will report the real problem.
+            return hasRecoverableDatabaseBackup(path);
+        }
         if (databaseName.startsWith("file://")) {
             return exists(databaseName);
         }
         File db = new File(getContext().getApplicationInfo().dataDir + "/databases/" + databaseName);
         return db.exists();
+    }
+
+    /// Whether a marked migration backup is holding a database's contents.
+    static boolean hasRecoverableDatabaseBackup(String path) {
+        if (path == null) {
+            return false;
+        }
+        File dir = databaseMigrationDir(path);
+        if (dir == null || !dir.isDirectory()) {
+            return false;
+        }
+        String name = new File(path).getName();
+        return new File(dir, name + MIGRATION_MARKER).isFile()
+                && new File(dir, name + MIGRATION_BACKUP).isFile();
     }
 
     public String getDatabasePath(String databaseName) {

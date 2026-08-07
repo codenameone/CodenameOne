@@ -6632,6 +6632,12 @@ let cn1SqliteLastError = "";
  * every thread blocked on a call that never returns, so an ordinary SQL error - a syntax mistake,
  * a constraint violation - would hang the application instead of reporting itself. Each binding
  * therefore records the message here and answers with a sentinel the Java side checks.
+ *
+ * The rule for anything added below: every binding that touches the engine goes through this.
+ * The only ones that do not are init and open, which catch for themselves because they have
+ * their own sentinels, and the four that just read a variable. "This one cannot throw" has been
+ * wrong four times in this file already -- reset looked inert and reports the previous step's
+ * error, close and finalize report the last error of what they are closing.
  */
 function cn1SqliteGuard(fn, failureValue) {
   try {
@@ -6833,14 +6839,19 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastError_R_java
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_close_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_close___long", "cn1_com_codename1_impl_html5_database_SQLiteNative_close_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_close___long_R_void"],
   function(dbId) {
-    const db = cn1SqliteHandles.get(Number(dbId));
-    if (db) {
-      // Always close: this is a connection of its own, never the anchor, and the anchor is what
-      // keeps a memdb-backed database readable after its last application connection goes away.
-      db.close();
-      cn1SqliteHandles.delete(Number(dbId));
-    }
-    return null;
+    // Guarded and swallowed. close() is best effort by contract and reports nothing, but an
+    // escaping exception would unwind the worker and hang the caller, which is far worse than a
+    // close that did not fully succeed. The reason is left in lastError for diagnosis.
+    return cn1SqliteGuard(function() {
+      const db = cn1SqliteHandles.get(Number(dbId));
+      if (db) {
+        // Always close: this is a connection of its own, never the anchor, and the anchor is what
+        // keeps a memdb-backed database readable after its last application connection goes away.
+        db.close();
+        cn1SqliteHandles.delete(Number(dbId));
+      }
+      return null;
+    }, null);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_rekey_long_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_rekey___long_java_lang_String_R_boolean"],
@@ -6935,21 +6946,32 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_step_long_R_int"
     }, -1);
   });
 
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_reset_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_reset___long", "cn1_com_codename1_impl_html5_database_SQLiteNative_reset_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_reset___long_R_void"],
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_reset_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_reset___long_R_boolean"],
   function(stmtId) {
-    // Keep the bindings: re-stepping a parameterised query is how a backward seek works.
-    cn1SqliteLookup(Number(stmtId)).reset(false);
-    return null;
+    return cn1SqliteGuard(function() {
+      // Keep the bindings: re-stepping a parameterised query is how a backward seek works.
+      //
+      // Guarded because reset is not the inert call it looks like: the wrapper checks
+      // sqlite3_reset, which reports the error from the statement's last step, so resetting
+      // after a failed step raises that error here rather than at the step.
+      cn1SqliteLookup(Number(stmtId)).reset(false);
+      return true;
+    }, false);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_finish_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_finish___long", "cn1_com_codename1_impl_html5_database_SQLiteNative_finish_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_finish___long_R_void"],
   function(stmtId) {
-    const stmt = cn1SqliteHandles.get(Number(stmtId));
-    if (stmt) {
-      stmt.finalize();
-      cn1SqliteHandles.delete(Number(stmtId));
-    }
-    return null;
+    // Same reasoning as close: finalize reports the statement's last error, and this is a
+    // cleanup path that cannot usefully raise. Handle dropped either way so it cannot be
+    // finalized twice.
+    return cn1SqliteGuard(function() {
+      const stmt = cn1SqliteHandles.get(Number(stmtId));
+      if (stmt) {
+        cn1SqliteHandles.delete(Number(stmtId));
+        stmt.finalize();
+      }
+      return null;
+    }, null);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish___long_R_boolean"],
@@ -6977,8 +6999,10 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnCount_long
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnName_long_int_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnName___long_int_R_java_lang_String"],
   function(stmtId, col) {
-    const name = cn1SqliteLookup(Number(stmtId)).getColumnName(col | 0);
-    return name === null || name === undefined ? null : jvm.createStringLiteral(String(name));
+    return cn1SqliteGuard(function() {
+      const name = cn1SqliteLookup(Number(stmtId)).getColumnName(col | 0);
+      return name === null || name === undefined ? null : jvm.createStringLiteral(String(name));
+    }, null);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull_long_int_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull___long_int_R_boolean"],
@@ -6990,35 +7014,43 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull_lon
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnString_long_int_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnString___long_int_R_java_lang_String"],
   function(stmtId, col) {
-    const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
-    return v === null || v === undefined ? null : jvm.createStringLiteral(String(v));
+    return cn1SqliteGuard(function() {
+      const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
+      return v === null || v === undefined ? null : jvm.createStringLiteral(String(v));
+    }, null);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnBlob_long_int_R_byte_1ARRAY", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnBlob___long_int_R_byte_1ARRAY"],
   function(stmtId, col) {
-    const v = cn1SqliteLookup(Number(stmtId)).get(col | 0, new Uint8Array(0).constructor);
-    if (v === null || v === undefined) {
-      return null;
-    }
-    const out = jvm.newArray(v.length, "JAVA_BYTE", 1);
-    for (let i = 0; i < v.length; i++) {
-      // Back to signed Java bytes.
-      out[i] = v[i] > 127 ? v[i] - 256 : v[i];
-    }
-    return out;
+    return cn1SqliteGuard(function() {
+      const v = cn1SqliteLookup(Number(stmtId)).get(col | 0, new Uint8Array(0).constructor);
+      if (v === null || v === undefined) {
+        return null;
+      }
+      const out = jvm.newArray(v.length, "JAVA_BYTE", 1);
+      for (let i = 0; i < v.length; i++) {
+        // Back to signed Java bytes.
+        out[i] = v[i] > 127 ? v[i] - 256 : v[i];
+      }
+      return out;
+    }, null);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnDouble_long_int_R_double", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnDouble___long_int_R_double"],
   function(stmtId, col) {
-    // A REAL column is a Number. Routing it through the exact-long conversion would truncate the
-    // fractional part and hand back the wrong bridge type.
-    const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
-    return v === null || v === undefined ? 0 : Number(v);
+    return cn1SqliteGuard(function() {
+      // A REAL column is a Number. Routing it through the exact-long conversion would truncate the
+      // fractional part and hand back the wrong bridge type.
+      const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
+      return v === null || v === undefined ? 0 : Number(v);
+    }, 0);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong_long_int_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong___long_int_R_long"],
   function(stmtId, col) {
-    // Exact: Number() would round an INTEGER past 2^53 on the way back to a Java long.
-    const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
-    return v === null || v === undefined ? cn1SqliteFromBigInt(0n) : cn1SqliteFromBigInt(v);
+    return cn1SqliteGuard(function() {
+      // Exact: Number() would round an INTEGER past 2^53 on the way back to a Java long.
+      const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
+      return v === null || v === undefined ? cn1SqliteFromBigInt(0n) : cn1SqliteFromBigInt(v);
+    }, 0);
   });
