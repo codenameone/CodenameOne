@@ -2711,6 +2711,14 @@ public abstract class Executor {
      * and platform as a SHA-256 hex string, matching the engine mapping id's format, so a hardened
      * crash report can be tied to the R8 mapping.txt uploaded for this build+platform.
      */
+    // The id is necessarily fixed BEFORE R8 runs -- the app carries it as a compile-time constant,
+    // and R8's own mapping.txt does not exist until after the app is compiled, so the id cannot be a
+    // hash of that mapping. It is therefore a build-INPUT identifier (build key + platform + hardened
+    // jar bytes): unique per build content, deterministic for a byte-identical rebuild. Correctness
+    // against R8 non-determinism does not come from the id's inputs but from the upload: the daemon
+    // uploads the produced R8 mapping.txt keyed by THIS same id, so a crash report's id selects the
+    // exact mapping that build shipped even if a reused build key or a different R8 result produced a
+    // different mapping.
     private String downstreamMappingId(BuildRequest request, File hardenedJar) {
         String seed = resolveBuildKey(request) + ":" + hardeningPlatform(request);
         try {

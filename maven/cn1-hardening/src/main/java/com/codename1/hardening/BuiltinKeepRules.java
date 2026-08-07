@@ -106,6 +106,12 @@ public final class BuiltinKeepRules {
         // Class files are written to a directory and builds run on a case-insensitive
         // filesystem, so mixed-case names would collide.
         r.add("-dontusemixedcaseclassnames");
+        // Keep package names. Resources are copied verbatim by JarDemuxer and never pass through
+        // ProGuard, so a package-relative lookup such as Screen.class.getResource("icon.png") -- which
+        // resolves under the class's (renamed) package -- would return null if the package were renamed
+        // while com/foo/icon.png stayed put. Class simple names, methods, fields and strings are still
+        // obfuscated; only the package path, which resource loading depends on, is preserved.
+        r.add("-keeppackagenames");
         r.add("-dontnote");
         r.add("-dontwarn");
         // Keep SourceFile + LineNumberTable: ParparVM translates the line table into its

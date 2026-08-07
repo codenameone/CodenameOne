@@ -53,6 +53,15 @@ public class BuiltinKeepRulesTest {
     }
 
     @Test
+    public void packageNamesAreKeptSoResourcesResolve() {
+        // Resources are copied verbatim and never renamed, so a package-relative getResource would
+        // break if the package were renamed; -keeppackagenames must always be present.
+        for (String p : new String[] {"ios", "javase", "javascript", "win"}) {
+            assertTrue("package names kept for " + p, BuiltinKeepRules.flags(p).contains("-keeppackagenames"));
+        }
+    }
+
+    @Test
     public void lineTablesAreAlwaysKept() {
         // Retracing depends on SourceFile + LineNumberTable regardless of platform.
         for (String p : new String[] {"ios", "javase", "and"}) {
