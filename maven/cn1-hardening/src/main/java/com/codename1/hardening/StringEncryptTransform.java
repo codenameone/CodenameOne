@@ -60,6 +60,7 @@ public final class StringEncryptTransform {
 
     /** Synthesized per-class decoder; the {@code $} keeps it clear of any real app member. */
     static final String DECODER_NAME = "zqdec$";
+    private static final String HOISTED_FIELD_PREFIX = "zqL$";
     static final String DECODER_DESC = "(Ljava/lang/String;)Ljava/lang/String;";
 
     private final boolean encryptAllStrings;
@@ -143,15 +144,22 @@ public final class StringEncryptTransform {
         // encrypted; in "constants" mode only literals whose value was declared as a
         // static-final String constant somewhere in the jar -- which is exactly the set javac
         // inlined at these read sites -- so ordinary incidental literals are left alone.
+        //
+        // For a normal class each distinct literal is hoisted to a synthetic static field decoded
+        // ONCE in <clinit>, and its LDC sites become a GETSTATIC of that field, so a literal in a hot
+        // loop is not re-decoded (and re-interned -- an O(n) scan on ParparVM) on every iteration. An
+        // interface can't host that (its fields are public), so there the literal is decoded per
+        // access; interface method bodies are rare and not hot loops.
         if (cn.methods != null) {
-            for (MethodNode mn : cn.methods) {
-                if (mn.instructions == null) {
-                    continue;
+            if (isInterface) {
+                for (MethodNode mn : cn.methods) {
+                    if (mn.instructions == null || decoderName.equals(mn.name)) {
+                        continue;
+                    }
+                    changed |= encryptMethodLiterals(cn, mn, base, isInterface, decoderName);
                 }
-                if (decoderName.equals(mn.name)) {
-                    continue;
-                }
-                changed |= encryptMethodLiterals(cn, mn, base, isInterface, decoderName);
+            } else {
+                changed |= hoistMethodLiterals(cn, base, decoderName);
             }
         }
 
@@ -182,26 +190,83 @@ public final class StringEncryptTransform {
                 LdcInsnNode ldc = (LdcInsnNode) insn;
                 if (ldc.cst instanceof String && shouldEncryptLiteral((String) ldc.cst)) {
                     String plain = (String) ldc.cst;
-                    String cipher = encode(plain, base);
-                    // The XOR key spans 0..0xFFFF, so an ASCII literal can encrypt into mostly
-                    // 3-byte (modified) UTF-8 characters; a large-but-valid literal could then exceed
-                    // the 65535-byte constant-pool limit and make ASM throw while writing the class.
-                    // Leave such a literal in plaintext rather than fail the whole build.
-                    if (fitsConstantPool(cipher)) {
-                        ldc.cst = cipher;
-                        // The itf flag must be true when the decoder lives in an interface, or the JVM
-                        // writes a Methodref instead of an InterfaceMethodref and throws
-                        // IncompatibleClassChangeError at run time.
-                        mn.instructions.insert(ldc, new MethodInsnNode(
-                                Opcodes.INVOKESTATIC, cn.name, decoderName, DECODER_DESC, isInterface));
-                        encryptedCount++;
-                        changed = true;
-                    }
+                    // shouldEncrypt already rejected any value whose ciphertext could overflow the
+                    // constant pool, using a class-independent bound, so the encode result fits.
+                    ldc.cst = encode(plain, base);
+                    // The itf flag must be true when the decoder lives in an interface, or the JVM
+                    // writes a Methodref instead of an InterfaceMethodref and throws
+                    // IncompatibleClassChangeError at run time.
+                    mn.instructions.insert(ldc, new MethodInsnNode(
+                            Opcodes.INVOKESTATIC, cn.name, decoderName, DECODER_DESC, isInterface));
+                    encryptedCount++;
+                    changed = true;
                 }
             }
             insn = next;
         }
         return changed;
+    }
+
+    /**
+     * Hoists each distinct encryptable method-body literal in {@code cn} to a synthetic static field
+     * decoded once in {@code <clinit>}, and rewrites its LDC sites to a GETSTATIC of that field. So a
+     * literal read in a loop pays the decode + intern cost once at class load instead of on every
+     * access. Fields are private and synthetic; the decoded value is interned, so all sites of one
+     * value -- and equal values in other classes -- stay reference-equal.
+     */
+    private boolean hoistMethodLiterals(ClassNode cn, int base, String decoderName) {
+        // 1. Collect the distinct values, in first-seen order for a stable field naming.
+        java.util.LinkedHashMap<String, String> valueToField = new java.util.LinkedHashMap<String, String>();
+        for (MethodNode mn : cn.methods) {
+            if (mn.instructions == null || decoderName.equals(mn.name)) {
+                continue;
+            }
+            for (AbstractInsnNode insn = mn.instructions.getFirst(); insn != null; insn = insn.getNext()) {
+                if (insn instanceof LdcInsnNode && ((LdcInsnNode) insn).cst instanceof String) {
+                    String v = (String) ((LdcInsnNode) insn).cst;
+                    if (shouldEncryptLiteral(v) && !valueToField.containsKey(v)) {
+                        valueToField.put(v, HOISTED_FIELD_PREFIX + valueToField.size());
+                    }
+                }
+            }
+        }
+        if (valueToField.isEmpty()) {
+            return false;
+        }
+        // 2. Add a field per value and decode it once in <clinit> (before the original body, so a
+        //    literal used within <clinit> itself reads the already-initialized field).
+        if (cn.fields == null) {
+            cn.fields = new java.util.ArrayList<FieldNode>();
+        }
+        InsnList init = new InsnList();
+        for (java.util.Map.Entry<String, String> e : valueToField.entrySet()) {
+            cn.fields.add(new FieldNode(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
+                    e.getValue(), "Ljava/lang/String;", null, null));
+            init.add(new LdcInsnNode(encode(e.getKey(), base)));
+            init.add(new MethodInsnNode(Opcodes.INVOKESTATIC, cn.name, decoderName, DECODER_DESC, false));
+            init.add(new FieldInsnNode(Opcodes.PUTSTATIC, cn.name, e.getValue(), "Ljava/lang/String;"));
+            encryptedCount++;
+        }
+        prependToClinit(cn, init);
+        // 3. Replace each LDC of a hoisted value with a GETSTATIC of its field.
+        for (MethodNode mn : cn.methods) {
+            if (mn.instructions == null || decoderName.equals(mn.name)) {
+                continue;
+            }
+            AbstractInsnNode insn = mn.instructions.getFirst();
+            while (insn != null) {
+                AbstractInsnNode next = insn.getNext();
+                if (insn instanceof LdcInsnNode && ((LdcInsnNode) insn).cst instanceof String) {
+                    String field = valueToField.get((String) ((LdcInsnNode) insn).cst);
+                    if (field != null) {
+                        mn.instructions.set(insn, new FieldInsnNode(Opcodes.GETSTATIC, cn.name, field,
+                                "Ljava/lang/String;"));
+                    }
+                }
+                insn = next;
+            }
+        }
+        return true;
     }
 
     private boolean encryptStaticFinalStrings(ClassNode cn, int base, boolean isInterface,
@@ -215,16 +280,12 @@ public final class StringEncryptTransform {
             boolean isStatic = (fn.access & Opcodes.ACC_STATIC) != 0;
             if (isStatic && fn.value instanceof String && shouldEncrypt((String) fn.value)) {
                 String plain = (String) fn.value;
-                String cipher = encode(plain, base);
-                // Skip a literal whose ciphertext would overflow the 65535-byte constant-pool limit
-                // (the XOR key can widen ASCII into 3-byte UTF-8); leaving it as-is beats failing.
-                if (!fitsConstantPool(cipher)) {
-                    continue;
-                }
+                // shouldEncrypt already rejected any value whose ciphertext could overflow the
+                // constant pool (class-independent bound), so the encode result fits.
                 // Strip the ConstantValue so the plaintext leaves the class file entirely
                 // (this is the slot ParparVM would otherwise dump into the C constant pool).
                 fn.value = null;
-                init.add(new LdcInsnNode(cipher));
+                init.add(new LdcInsnNode(encode(plain, base)));
                 // itf=true when the decoder lives in an interface, else the JVM emits a Methodref
                 // instead of an InterfaceMethodref and throws IncompatibleClassChangeError.
                 init.add(new MethodInsnNode(Opcodes.INVOKESTATIC, cn.name, decoderName, DECODER_DESC, isInterface));
@@ -381,6 +442,14 @@ public final class StringEncryptTransform {
     /** Strings too short to be worth the decoder overhead, or trivially empty, are left alone. */
     private boolean shouldEncrypt(String s) {
         if (s == null || s.length() <= 2) {
+            return false;
+        }
+        // Skip a literal whose ciphertext could overflow the 65535-byte constant-pool limit and make
+        // ASM throw. The XOR key varies per class, so decide from the plaintext's WORST case -- every
+        // character widening to a 3-byte modified-UTF-8 character. That bound is class-INDEPENDENT, so
+        // the same value is skipped in every class rather than encrypted in one and left plaintext in
+        // another, which would break a valid cross-class literal == on ParparVM's deduplicated pool.
+        if ((long) s.length() * 3 > 65535) {
             return false;
         }
         return true;

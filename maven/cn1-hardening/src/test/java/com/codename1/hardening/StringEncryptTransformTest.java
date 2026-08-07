@@ -160,6 +160,38 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void repeatedLiteralIsHoistedAndDecodedOnce() throws Exception {
+        // The same value is used by two methods. It must be hoisted to ONE synthetic field decoded
+        // once (encryptedCount == 1, not 2), and both reads must return that one interned object.
+        String shared = "a shared hoisted secret literal";
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/Hoist", null, "java/lang/Object", null);
+        for (String name : new String[] {"a", "b"}) {
+            org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                    | org.objectweb.asm.Opcodes.ACC_STATIC, name, "()Ljava/lang/String;", null, null);
+            m.visitCode();
+            m.visitLdcInsn(shared);
+            m.visitInsn(org.objectweb.asm.Opcodes.ARETURN);
+            m.visitMaxs(1, 0);
+            m.visitEnd();
+        }
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 21);
+        byte[] out = t.transform(w.toByteArray());
+        assertEquals("a repeated literal must be hoisted to a single decoded field", 1, t.getEncryptedCount());
+        assertFalse(StringEncryptTransform.containsStringLiteral(out, shared));
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        Class<?> c = new ByteLoader().define("app.Hoist", out);
+        Object a = c.getMethod("a").invoke(null);
+        Object b = c.getMethod("b").invoke(null);
+        assertEquals(shared, a);
+        org.junit.Assert.assertSame("both reads share one interned object", a, b);
+    }
+
+    @Test
     public void encryptsEvenWhenDecoderNameCollides() throws Exception {
         // A class that already declares a member named "zqdec$" must NOT be skipped: skipping would
         // leave its literal in plaintext while an equal literal elsewhere was encrypted, breaking a

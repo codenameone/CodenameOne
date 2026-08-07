@@ -86,9 +86,8 @@ final class BuildHintSchemaDefaults {
         set("{{#hardening#harden.level}}.values", "off,standard,aggressive,paranoid,");
         set("{{#hardening#harden.level}}.description",
                 "off = no hardening. standard = renaming + constant-string encryption. "
-                + "aggressive = + all-string encryption + control flow. paranoid = + opaque "
-                + "predicates + reflective-name hiding. Higher levels cost build time, size and "
-                + "startup; measure before choosing paranoid.");
+                + "aggressive = + all-string encryption + control flow. paranoid = + stronger "
+                + "control-flow obfuscation.");
 
         set("{{#hardening#harden.strings}}.label", "String encryption");
         set("{{#hardening#harden.strings}}.type", "Select");

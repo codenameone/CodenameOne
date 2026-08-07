@@ -212,7 +212,14 @@ public final class MappingFile {
         }
         int observed = obfuscated.getLineNumber();
         String originalClass = cm.originalName;
-        String file = simpleSourceFile(originalClass);
+        // For the enclosing class, keep the filename the frame actually reported when it is a real
+        // source name that renaming can't reconstruct -- a Kotlin frame carries Screen.kt, and a
+        // package-private class carries the file it was declared in (Main.java). But when the reported
+        // name is just the obfuscated class name with an extension (SourceFile renamed to match the
+        // obfuscated class, or a ParparVM synthesized <obfClass>.java), it carries no information, so
+        // synthesize <OriginalClass>.java from the retraced class instead.
+        String file = preferredSourceFile(obfuscated.getFileName(), obfuscated.getClassName(),
+                originalClass);
         List<MethodMapping> candidates = cm.methods.get(obfuscated.getMethodName());
         List<Frame> out = new ArrayList<Frame>();
         if (candidates != null && !candidates.isEmpty()) {
@@ -235,6 +242,33 @@ public final class MappingFile {
         String cls = m.declaringClass != null ? m.declaringClass : enclosingClass;
         String file = m.declaringClass != null ? simpleSourceFile(m.declaringClass) : enclosingFile;
         return new Frame(cls, m.originalName, file, m.mapLine(observed));
+    }
+
+    /**
+     * The source file to report for the enclosing class. Keeps a real reported name (Screen.kt,
+     * Main.java) but synthesizes {@code <OriginalClass>.java} when the reported name is empty or is
+     * just the obfuscated class name with an extension (a renamed/synthesized placeholder that would
+     * otherwise leak an obfuscated name into the retraced stack).
+     */
+    private static String preferredSourceFile(String reported, String obfClassName, String originalClass) {
+        if (reported == null || reported.length() == 0) {
+            return simpleSourceFile(originalClass);
+        }
+        int dot = reported.lastIndexOf('.');
+        String reportedBase = dot > 0 ? reported.substring(0, dot) : reported;
+        String obfSimple = obfClassName;
+        int sep = Math.max(obfSimple.lastIndexOf('.'), obfSimple.lastIndexOf('/'));
+        if (sep >= 0) {
+            obfSimple = obfSimple.substring(sep + 1);
+        }
+        int dollar = obfSimple.indexOf('$');
+        if (dollar > 0) {
+            obfSimple = obfSimple.substring(0, dollar);
+        }
+        if (reportedBase.equals(obfSimple)) {
+            return simpleSourceFile(originalClass);
+        }
+        return reported;
     }
 
     private static String simpleSourceFile(String fqcn) {

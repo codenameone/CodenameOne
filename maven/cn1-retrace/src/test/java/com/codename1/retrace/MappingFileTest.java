@@ -117,6 +117,22 @@ public class MappingFileTest {
     }
 
     @Test
+    public void keepsRealReportedSourceFileButNotObfuscatedPlaceholder() throws Exception {
+        MappingFile mf = MappingFile.parse(
+                "com.example.Screen -> a:\n"
+                + "    void onClick() -> b\n");
+        // A real Kotlin source name the class name can't reconstruct is kept.
+        assertEquals("Screen.kt",
+                mf.retrace(new Frame("a", "b", "Screen.kt", 5)).getFileName());
+        // A placeholder equal to the obfuscated class name is replaced by the retraced class's file.
+        assertEquals("Screen.java",
+                mf.retrace(new Frame("a", "b", "a.java", 5)).getFileName());
+        // No reported name -> synthesized from the retraced class.
+        assertEquals("Screen.java",
+                mf.retrace(new Frame("a", "b", "", 5)).getFileName());
+    }
+
+    @Test
     public void unknownClassPassesThroughUnchanged() throws Exception {
         MappingFile mf = MappingFile.parse(MAPPING);
         Frame in = new Frame("some.Other", "x", "Other.java", 9);

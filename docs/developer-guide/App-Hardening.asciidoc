@@ -23,7 +23,9 @@ The transform runs on the merged application jar, at the bytecode level, before 
 
 |String constant encryption
 |iOS, Android, Windows, Linux, desktop
-|Both channels are handled: the `LDC` string literals in method bodies *and* the `ConstantValue` attribute of `static final String` fields, which would otherwise leak into the ParparVM C constant pool even after the readers were encrypted. The decoder is synthesized into each class with a per-class key, so there is no single framework method to hook. Not applied on the JavaScript port, where a string literal can be a live reference into the native bridge.
+|Both channels are handled: the `LDC` string literals in method bodies *and* the `ConstantValue` attribute of `static final String` fields, which would otherwise leak into the ParparVM C constant pool even after the readers were encrypted. Each distinct literal is decoded once (per class) and interned, so equal encrypted literals stay reference-equal to each other. The decoder is synthesized into each class with a per-class key, so there is no single framework method to hook. Not applied on the JavaScript port, where a string literal can be a live reference into the native bridge.
+
+One caveat: an encrypted app literal is a different object from an equal *un-encrypted* literal elsewhere -- for example a literal of the same value returned by the framework, which isn't hardened. Reference (`==`) comparison of string literals across that boundary can therefore change. Compare strings with `.equals()`, which is unaffected; `==` on distinct string values was never a guarantee to rely on.
 
 |Control-flow obfuscation
 |Android, desktop
