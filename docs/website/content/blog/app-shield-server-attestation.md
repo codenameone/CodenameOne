@@ -13,9 +13,7 @@ series: ["release-2026-08-07"]
 
 Any security check that runs only on a phone can be patched out on that phone. [App Shield](https://github.com/codenameone/CodenameOne/pull/5486) moves the final decision to your server by attaching a short-lived, server-verified attestation token to protected requests.
 
-This is the only release post this week. The main story needs more room than a bullet in a changelog, while the smaller changes fit naturally at the end.
-
-> Greetings from Thailand, where I have been dragged by my family on a forced vacation. It is a lovely country. I am just not the type of person who enjoys beaches, sunshine, or the sea. That, plus the GitHub Actions downtime, is my excuse for the relatively slow progress this week. We have some interesting PRs in progress, but we decided not to rush them.
+Greetings from Thailand. My family dragged me here for a forced vacation. It is a lovely country, but beaches, sunshine, and the sea aren't really my thing. The GitHub Actions downtime didn't help either, so progress was slower than usual this week. Several interesting PRs are still in progress, and we chose not to rush them.
 
 ## This week in one page
 
