@@ -96,6 +96,36 @@ class IOSWidgetExtensionWatchFamilyTest {
                         .setIosFamilies(Arrays.asList("small"))));
     }
 
+    /// The WidgetKit spellings are documented as accepted, and three of them were not: the
+    /// classification tested startsWith("watch"), so accessoryCircular looked like an iOS surface
+    /// and fell through to the systemSmall/Medium/Large default -- a complication became three
+    /// home-screen widgets instead of being withheld.
+    @Test
+    void widgetKitSpellingsAreTheSameFamilies() throws IOException {
+        assertTrue(IOSWidgetExtensionBuilder.isWatchOnly(
+                new IOSWidgetExtensionBuilder.Kind("steps")
+                        .setIosFamilies(Arrays.asList("accessoryCircular", "accessoryCorner"))),
+                "the WidgetKit spellings are complication families like their portable names");
+        assertTrue(IOSWidgetExtensionBuilder.hasWatchFamily(
+                new IOSWidgetExtensionBuilder.Kind("steps")
+                        .setIosFamilies(Arrays.asList("small", "accessoryInline"))));
+
+        IOSWidgetExtensionBuilder b = builderFor("accessoryCircular", "accessoryInline");
+        assertFalse(b.hasIosSurface(),
+                "declared only in the WidgetKit spelling, these are still complications");
+
+        // accessoryRectangular stays a LOCK-SCREEN family: it is the spelling of the portable
+        // "lockscreen", which the iOS target does host.
+        IOSWidgetExtensionBuilder lock = builderFor("accessoryRectangular");
+        assertTrue(lock.hasIosSurface(),
+                "accessoryRectangular is the lock-screen family and must keep its iOS surface");
+
+        String bundle = bundleFor("small", "accessoryCircular");
+        assertFalse(bundle.contains(".accessoryCircular"),
+                "a complication family must not reach the iOS target: " + bundle);
+        assertTrue(bundle.contains(".systemSmall"), bundle);
+    }
+
     @Test
     void phoneOnlyKindIsUnaffected() throws IOException {
         String bundle = bundleFor("small", "medium", "large");

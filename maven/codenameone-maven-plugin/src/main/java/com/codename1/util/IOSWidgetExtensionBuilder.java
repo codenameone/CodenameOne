@@ -495,16 +495,47 @@ public class IOSWidgetExtensionBuilder {
             return "";
         }
         List<String> families = kind.getIosFamilies();
-        if (families != null && families.contains("watchCorner")) {
-            return ".accessoryCorner";
+        if (families != null) {
+            for (String family : families) {
+                if ("watchCorner".equals(normalizeFamily(family))) {
+                    return ".accessoryCorner";
+                }
+            }
         }
         return "";
     }
 
-    private static String mapFamily(String family, boolean watchTarget) {
+    /// The portable family name for a declaration, resolving the WidgetKit spellings.
+    ///
+    /// Normalised in ONE place because four decisions read these names -- the Swift family list,
+    /// the watch-only classification, whether a kind has any watch family at all, and the corner
+    /// complication's platform guard -- and three of them tested `startsWith("watch")`. So
+    /// `accessoryCircular` was accepted by none of them: the kind looked like an iOS surface and
+    /// fell through to the systemSmall/Medium/Large default, turning a complication into three
+    /// home-screen widgets rather than withholding it.
+    ///
+    /// accessoryRectangular is deliberately NOT folded into watchRectangular. It is the spelling of
+    /// the portable `lockscreen` family, which the iOS target does host, and watchRectangular
+    /// already emits the same Swift family -- the renderer picks the more specific published layout
+    /// when both exist.
+    static String normalizeFamily(String family) {
+        if ("accessoryCircular".equals(family)) {
+            return "watchCircular";
+        }
+        if ("accessoryInline".equals(family)) {
+            return "watchInline";
+        }
+        if ("accessoryCorner".equals(family)) {
+            return "watchCorner";
+        }
+        return family;
+    }
+
+    private static String mapFamily(String rawFamily, boolean watchTarget) {
         // Both the portable names (matching the core WidgetSize wire names) and the
         // WidgetKit-style spellings are accepted, so manifests written against either
         // naming in the docs resolve to the same families.
+        String family = normalizeFamily(rawFamily);
         if ("small".equals(family) || "systemSmall".equals(family)) {
             return ".systemSmall";
         }
@@ -580,7 +611,7 @@ public class IOSWidgetExtensionBuilder {
             return false;
         }
         for (String family : families) {
-            if (family != null && !family.startsWith("watch")) {
+            if (family != null && !normalizeFamily(family).startsWith("watch")) {
                 return false;
             }
         }
@@ -593,7 +624,7 @@ public class IOSWidgetExtensionBuilder {
             return false;
         }
         for (String family : families) {
-            if (family != null && family.startsWith("watch")) {
+            if (family != null && normalizeFamily(family).startsWith("watch")) {
                 return true;
             }
         }
