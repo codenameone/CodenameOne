@@ -24,6 +24,9 @@ package com.codename1.hardening.fixture;
 
 /** A Java 8 interface with an executable default/static method carrying string literals. */
 public interface Iface {
+    /** An implicitly-constant String field whose plaintext lives in a ConstantValue attribute. */
+    String TOKEN = "interface constant secret";
+
     default String secret() {
         return "interface default secret";
     }

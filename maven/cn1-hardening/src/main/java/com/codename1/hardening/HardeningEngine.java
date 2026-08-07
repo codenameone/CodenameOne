@@ -218,6 +218,19 @@ public final class HardeningEngine {
             }
         }
 
+        // Even when the config asked for a transform, the input may contain nothing eligible (e.g.
+        // rename off, and no static-final string longer than two characters to encrypt): every
+        // counter stays zero and no transform actually ran. Stamping cn1.hardened=true for a
+        // byte-unchanged app would be dishonest, so report SKIPPED and let the caller keep the input.
+        // Android still counts as hardened here because R8 renames downstream (isRenameRequested).
+        boolean anyApplied = cfg.isRenameEnabled()
+                || cfg.isRenameRequested()
+                || (stringsApplied && encryptedStrings > 0)
+                || (controlFlowApplied && guardedMethods > 0);
+        if (!anyApplied) {
+            return HardeningResult.skipped(HardeningResult.Outcome.SKIPPED_NOT_REQUESTED, req.getInputJar());
+        }
+
         // The a.b_c / a.b.c -> a_b_c collision only exists in the ParparVM C symbol mangle. On
         // Android (R8/DEX -- and the engine does not even rename there) and JavaSE (plain JVM),
         // '.' vs '_' stay distinct, so two legal classes must not abort the build.

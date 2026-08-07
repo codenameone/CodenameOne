@@ -143,11 +143,11 @@ public final class StringEncryptTransform {
             }
         }
 
-        // Channel 2: static final String ConstantValue attributes (both modes). Skipped on
-        // interfaces, whose fields are implicitly constant and have no rewritable init slot.
-        if (!isInterface) {
-            changed |= encryptStaticFinalStrings(cn, base);
-        }
+        // Channel 2: static final String ConstantValue attributes (both modes), including
+        // interfaces. A Java 8 interface may carry a <clinit> for non-constant field initialization,
+        // so an interface constant's plaintext can be moved to a decoder call there just as a class
+        // field's is -- otherwise "String TOKEN = \"secret\"" would still leak the plaintext.
+        changed |= encryptStaticFinalStrings(cn, base, isInterface);
 
         if (!changed) {
             return classBytes;
@@ -169,14 +169,21 @@ public final class StringEncryptTransform {
                 LdcInsnNode ldc = (LdcInsnNode) insn;
                 if (ldc.cst instanceof String && shouldEncryptLiteral((String) ldc.cst)) {
                     String plain = (String) ldc.cst;
-                    ldc.cst = encode(plain, base);
-                    // The itf flag must be true when the decoder lives in an interface, or the JVM
-                    // writes a Methodref instead of an InterfaceMethodref and throws
-                    // IncompatibleClassChangeError at run time.
-                    mn.instructions.insert(ldc, new MethodInsnNode(
-                            Opcodes.INVOKESTATIC, cn.name, DECODER_NAME, DECODER_DESC, isInterface));
-                    encryptedCount++;
-                    changed = true;
+                    String cipher = encode(plain, base);
+                    // The XOR key spans 0..0xFFFF, so an ASCII literal can encrypt into mostly
+                    // 3-byte (modified) UTF-8 characters; a large-but-valid literal could then exceed
+                    // the 65535-byte constant-pool limit and make ASM throw while writing the class.
+                    // Leave such a literal in plaintext rather than fail the whole build.
+                    if (fitsConstantPool(cipher)) {
+                        ldc.cst = cipher;
+                        // The itf flag must be true when the decoder lives in an interface, or the JVM
+                        // writes a Methodref instead of an InterfaceMethodref and throws
+                        // IncompatibleClassChangeError at run time.
+                        mn.instructions.insert(ldc, new MethodInsnNode(
+                                Opcodes.INVOKESTATIC, cn.name, DECODER_NAME, DECODER_DESC, isInterface));
+                        encryptedCount++;
+                        changed = true;
+                    }
                 }
             }
             insn = next;
@@ -184,7 +191,7 @@ public final class StringEncryptTransform {
         return changed;
     }
 
-    private boolean encryptStaticFinalStrings(ClassNode cn, int base) {
+    private boolean encryptStaticFinalStrings(ClassNode cn, int base, boolean isInterface) {
         if (cn.fields == null) {
             return false;
         }
@@ -194,11 +201,19 @@ public final class StringEncryptTransform {
             boolean isStatic = (fn.access & Opcodes.ACC_STATIC) != 0;
             if (isStatic && fn.value instanceof String && shouldEncrypt((String) fn.value)) {
                 String plain = (String) fn.value;
+                String cipher = encode(plain, base);
+                // Skip a literal whose ciphertext would overflow the 65535-byte constant-pool limit
+                // (the XOR key can widen ASCII into 3-byte UTF-8); leaving it as-is beats failing.
+                if (!fitsConstantPool(cipher)) {
+                    continue;
+                }
                 // Strip the ConstantValue so the plaintext leaves the class file entirely
                 // (this is the slot ParparVM would otherwise dump into the C constant pool).
                 fn.value = null;
-                init.add(new LdcInsnNode(encode(plain, base)));
-                init.add(new MethodInsnNode(Opcodes.INVOKESTATIC, cn.name, DECODER_NAME, DECODER_DESC, false));
+                init.add(new LdcInsnNode(cipher));
+                // itf=true when the decoder lives in an interface, else the JVM emits a Methodref
+                // instead of an InterfaceMethodref and throws IncompatibleClassChangeError.
+                init.add(new MethodInsnNode(Opcodes.INVOKESTATIC, cn.name, DECODER_NAME, DECODER_DESC, isInterface));
                 init.add(new FieldInsnNode(Opcodes.PUTSTATIC, cn.name, fn.name, fn.desc));
                 encryptedCount++;
                 changed = true;
@@ -208,6 +223,32 @@ public final class StringEncryptTransform {
             prependToClinit(cn, init);
         }
         return changed;
+    }
+
+    /**
+     * Whether {@code s} fits a single constant-pool entry: the class-file format stores a String
+     * constant as modified UTF-8 with a 16-bit (65535-byte) length prefix. The XOR cipher can turn
+     * an ASCII character into a value up to {@code 0xFFFF} (three modified-UTF-8 bytes), so an
+     * originally-valid literal can encrypt into an over-long one; such literals are left in plaintext.
+     */
+    static boolean fitsConstantPool(String s) {
+        long bytes = 0;
+        for (int i = 0; i < s.length(); i++) {
+            int c = s.charAt(i) & 0xFFFF;
+            // Modified UTF-8: 0x0001..0x007F -> 1 byte; 0x0000 and 0x0080..0x07FF -> 2 bytes;
+            // 0x0800..0xFFFF -> 3 bytes.
+            if (c >= 0x0001 && c <= 0x007F) {
+                bytes += 1;
+            } else if (c == 0x0000 || c <= 0x07FF) {
+                bytes += 2;
+            } else {
+                bytes += 3;
+            }
+            if (bytes > 65535) {
+                return false;
+            }
+        }
+        return bytes <= 65535;
     }
 
     private void prependToClinit(ClassNode cn, InsnList init) {

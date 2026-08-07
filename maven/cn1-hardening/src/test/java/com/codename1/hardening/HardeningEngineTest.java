@@ -244,6 +244,48 @@ public class HardeningEngineTest {
     }
 
     @Test
+    public void requestedTransformWithNoEligibleTargetsIsSkipped() throws Exception {
+        // rename off + strings requested (constants), but the only class has no encryptable string:
+        // nothing actually runs, so the build must report SKIPPED rather than stamp cn1.hardened=true
+        // on a byte-unchanged app.
+        File jar = tmp.newFile("noop2.jar");
+        FileOutputStream fo = new FileOutputStream(jar);
+        ZipOutputStream zos = new ZipOutputStream(fo);
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
+        cw.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/NoStrings", null, "java/lang/Object", null);
+        org.objectweb.asm.MethodVisitor m = cw.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "add", "(II)I", null, null);
+        m.visitCode();
+        m.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 0);
+        m.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 1);
+        m.visitInsn(org.objectweb.asm.Opcodes.IADD);
+        m.visitInsn(org.objectweb.asm.Opcodes.IRETURN);
+        m.visitMaxs(2, 2);
+        m.visitEnd();
+        cw.visitEnd();
+        zos.putNextEntry(new ZipEntry("app/NoStrings.class"));
+        zos.write(cw.toByteArray());
+        zos.closeEntry();
+        zos.finish();
+        fo.close();
+
+        File out = tmp.newFile("noop2-hardened.jar");
+        Map<String, String> hints = new HashMap<String, String>();
+        hints.put("harden.level", "standard");
+        hints.put("harden.rename", "false");
+        hints.put("harden.strings", "constants");
+        HardeningRequest req = new HardeningRequest()
+                .inputJar(jar).outputJar(out).mappingFile(tmp.newFile("noop2-map.txt"))
+                .workDir(tmp.newFolder("noop2-work"))
+                .config(HardeningConfig.from(hints, "ios", true))
+                .mainClass("app.NoStrings");
+        HardeningResult r = HardeningEngine.harden(req);
+        assertFalse("no eligible target ran, so the build must not be marked hardened", r.isHardened());
+        assertEquals(HardeningResult.Outcome.SKIPPED_NOT_REQUESTED, r.getOutcome());
+    }
+
+    @Test
     public void nonOffLevelWithAllTransformsDisabledIsSkipped() throws Exception {
         // standard, but rename off and strings off -> nothing to do -> not stamped hardened.
         File in = buildInputJar();

@@ -2511,6 +2511,16 @@ public abstract class Executor {
                 lastHardeningMapping = mapping.isFile() ? mapping : null;
                 lastHardeningMappingId = readMappingId(mapping);
                 lastHardeningR8Keep = r8Keep.isFile() ? readFileToString(r8Keep) : "";
+                // On Android the engine does not rename (R8 is the sole renamer), so its mapping --
+                // and thus its mapping id -- is empty. R8 still produces a real mapping.txt later,
+                // uploaded for this build+platform. Give the crash report a stable, build-scoped id
+                // derived from the build key so a report can be tied to that R8 mapping; an empty id
+                // would leave hardened Android crashes unretraceable.
+                if ((lastHardeningMappingId == null || lastHardeningMappingId.length() == 0)
+                        && !hardeningRenameSupported()
+                        && hardenBoolArg(request, "harden.rename", true)) {
+                    lastHardeningMappingId = downstreamMappingId(request);
+                }
                 // Propagate the mapping id / hardened flag / level into the request BEFORE the
                 // builder generates its stubs, so the stubs stamp them as runtime properties
                 // (Hardening.isHardened(), the crash report's mappingId/hardenLevel).
@@ -2685,6 +2695,29 @@ public abstract class Executor {
      */
     public String resolveMappingId(BuildRequest request) {
         return request.getArg("cn1.mappingId", "");
+    }
+
+    /**
+     * A stable mapping id for a build whose rename is produced by a downstream tool (R8 on Android)
+     * rather than the engine, so the engine's own mapping id is empty. Derived from the build key
+     * and platform as a SHA-256 hex string, matching the engine mapping id's format, so a hardened
+     * crash report can be tied to the R8 mapping.txt uploaded for this build+platform.
+     */
+    private String downstreamMappingId(BuildRequest request) {
+        String seed = resolveBuildKey(request) + ":" + hardeningPlatform(request);
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(seed.getBytes("UTF-8"));
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(Character.forDigit((b >> 4) & 0xF, 16));
+                sb.append(Character.forDigit(b & 0xF, 16));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            // No SHA-256 (impossible on a supported JDK) -- fall back to a non-empty encoded key.
+            return buildKeyEncoded(request);
+        }
     }
 
     /**

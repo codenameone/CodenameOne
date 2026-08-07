@@ -422,13 +422,17 @@ public class JavaScriptBuilder extends Executor {
                             + ifaceName + ".class, " + ifaceName + "Impl.class);");
                 }
             }
-            pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "());");
-            // bootstrap() runs Display.init followed by the app's init/start synchronously, so
-            // Display is live once it returns; stamp the hardening metadata now so
-            // Hardening.isHardened() and crash reports carry the mapping id / level on this port
-            // too (parity with iOS and Android). hardeningRuntimeProperties emits 8-space-indented
+            // Stamp the hardening metadata after Display.init but BEFORE the lifecycle's init/start,
+            // so Hardening.isHardened() and any crash raised during startup already carry the mapping
+            // id / level (parity with iOS and Android). bootstrap(lifecycle, afterInit) invokes the
+            // runnable at exactly that point; a post-bootstrap stamp would miss startup because
+            // bootstrap runs init/start inline. hardeningRuntimeProperties emits
             // Display.getInstance().setProperty(...) lines.
+            pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "(), new Runnable() {");
+            pw.println("            public void run() {");
             pw.print(hardeningRuntimeProperties(request));
+            pw.println("            }");
+            pw.println("        });");
             pw.println("    }");
             pw.println("}");
         } finally {

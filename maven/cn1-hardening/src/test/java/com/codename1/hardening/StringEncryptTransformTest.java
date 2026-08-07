@@ -136,6 +136,70 @@ public class StringEncryptTransformTest {
         assertEquals("interface static secret", c.getMethod("staticSecret").invoke(null));
     }
 
+    @Test
+    public void encryptsInterfaceConstantValueField() throws Exception {
+        InputStream in = getClass().getResourceAsStream(
+                "/com/codename1/hardening/fixture/Iface.class");
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        int r;
+        while ((r = in.read(buf)) >= 0) {
+            b.write(buf, 0, r);
+        }
+        in.close();
+        StringEncryptTransform t = new StringEncryptTransform(true, 5);
+        byte[] out = t.transform(b.toByteArray());
+        // The interface's String TOKEN constant must no longer be present as plaintext.
+        assertFalse("interface field ConstantValue plaintext survived",
+                StringEncryptTransform.containsStringLiteral(out, "interface constant secret"));
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        // Loading the interface runs its <clinit> decoder; the field reads back its true value.
+        Class<?> c = new ByteLoader().define("com.codename1.hardening.fixture.Iface", out);
+        assertEquals("interface constant secret", c.getField("TOKEN").get(null));
+    }
+
+    @Test
+    public void oversizedLiteralIsLeftPlaintextNotCrashing() throws Exception {
+        // A large-but-valid ASCII literal (40000 chars = 40000 UTF-8 bytes, under the 65535 limit)
+        // would encrypt into mostly 3-byte characters and overflow the constant pool. The transform
+        // must skip it and still write a valid class rather than throw UTF8 string too large.
+        StringBuilder big = new StringBuilder();
+        for (int i = 0; i < 40000; i++) {
+            big.append('a');
+        }
+        String huge = big.toString();
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/Huge", null, "java/lang/Object", null);
+        org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "big", "()Ljava/lang/String;", null, null);
+        m.visitCode();
+        m.visitLdcInsn(huge);
+        m.visitInsn(org.objectweb.asm.Opcodes.ARETURN);
+        m.visitMaxs(1, 0);
+        m.visitEnd();
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 3);
+        byte[] out = t.transform(w.toByteArray()); // must not throw
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        Class<?> c = new ByteLoader().define("app.Huge", out);
+        assertEquals(huge, c.getMethod("big").invoke(null));
+        // A helper-level check that the guard is doing the classifying.
+        assertFalse("oversized ciphertext must be rejected by the fit check",
+                StringEncryptTransform.fitsConstantPool(mostlyThreeByte()));
+    }
+
+    private static String mostlyThreeByte() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 30000; i++) {
+            sb.append('\u0800'); // smallest 3-byte modified-UTF-8 char; 30000 * 3 = 90000 > 65535
+        }
+        return sb.toString();
+    }
+
     /** Defines transformed bytes as a fresh class distinct from the already-loaded fixture. */
     private static final class ByteLoader extends ClassLoader {
         Class<?> define(String name, byte[] b) {
