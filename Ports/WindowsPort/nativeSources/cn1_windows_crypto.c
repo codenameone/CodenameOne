@@ -1107,6 +1107,22 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_verifyData___java_lang_Str
                 toVerifyLength = (ULONG) (half * 2);
             }
         }
+        /* An RSA signature that is not exactly the modulus width cannot be a
+         * signature for this key at all. CNG answers STATUS_INVALID_PARAMETER
+         * for it, which the classification below would report as a
+         * configuration fault -- but a caller-supplied signature of the wrong
+         * size is bad input to verify(), not a broken runtime, and every other
+         * port answers false for it. */
+        if (usable && !isEc) {
+            DWORD expected = 0;
+            ULONG copied = 0;
+            if (BCryptGetProperty(key, BCRYPT_SIGNATURE_LENGTH, (PUCHAR) &expected,
+                                  sizeof(expected), &copied, 0) == STATUS_SUCCESS
+                    && expected != 0 && toVerifyLength != expected) {
+                BCryptDestroyKey(key);
+                return JAVA_FALSE;
+            }
+        }
         if (!usable) {
             cn1CryptoFail("could not read the signature for verification", 0);
         } else {
@@ -1116,13 +1132,28 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_verifyData___java_lang_Str
                                                           isEc ? 0 : BCRYPT_PAD_PKCS1);
             if (verifyStatus == STATUS_SUCCESS) {
                 result = JAVA_TRUE;
-            } else if (verifyStatus != STATUS_INVALID_SIGNATURE) {
-                /* Only STATUS_INVALID_SIGNATURE means "this signature is bad".
-                 * An invalid handle, parameter or unsupported algorithm means
-                 * verification never ran, and answering a bare false for those
-                 * reported tampering where the real fault was configuration --
-                 * the same conflation the Linux port had. Recording the status
-                 * is what makes cryptoVerify raise a CryptoException instead. */
+            } else if (verifyStatus != STATUS_INVALID_SIGNATURE
+                       && verifyStatus != STATUS_INVALID_PARAMETER) {
+                /* STATUS_INVALID_SIGNATURE means "this signature is bad". An
+                 * invalid handle or unsupported algorithm means verification
+                 * never ran, and answering a bare false for those reported
+                 * tampering where the real fault was configuration -- the same
+                 * conflation the Linux port had. Recording the status is what
+                 * makes cryptoVerify raise a CryptoException instead.
+                 *
+                 * STATUS_INVALID_PARAMETER is deliberately on the "bad
+                 * signature" side. By this point the key imported, the digest
+                 * algorithm is supported, the key family matches the algorithm,
+                 * the digest computed and (for RSA) the signature is exactly
+                 * the modulus width -- every configuration input has been
+                 * checked, so the only thing left that CNG can object to is the
+                 * signature's CONTENT. Verifying with the wrong key decrypts to
+                 * essentially random bytes, and whether the PKCS#1 v1.5 parse of
+                 * that garbage comes back INVALID_SIGNATURE or INVALID_PARAMETER
+                 * depends on the garbage: CryptoApiTest's "rejects signature
+                 * from wrong key" case passed nine runs and then raised
+                 * "verification failed to run (status 0xc000000d)" on the tenth.
+                 * Rejecting the signature is the correct answer for both. */
                 cn1CryptoFail("signature verification failed to run", verifyStatus);
             }
         }
