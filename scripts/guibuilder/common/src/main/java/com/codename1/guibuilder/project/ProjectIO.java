@@ -114,8 +114,15 @@ public final class ProjectIO {
         if (fs.exists(url)) {
             fs.delete(url);
         }
+        if (fs.exists(url)) {
+            // delete() and rename() both fail silently, and the target that survives a failed
+            // replacement still satisfies an exists() check, so a caller would be told the save
+            // succeeded while the new content sat in the temporary file.
+            fs.delete(temporary);
+            throw new IOException("Could not replace " + path + "; it may be open in another program");
+        }
         fs.rename(temporary, fileName(url));
-        if (!fs.exists(url)) {
+        if (!fs.exists(url) || fs.exists(temporary)) {
             throw new IOException("Failed to replace " + path + " with the file just written");
         }
     }
