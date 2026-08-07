@@ -43,14 +43,16 @@ public final class MappingFile {
 
     private static final class MethodMapping {
         final String originalName;
+        final String declaringClass; // FQ class an inlined method came from, or null for this class
         final int startLine;         // obfuscated range start (0 if none)
         final int endLine;           // obfuscated range end
         final int originalStartLine; // original range start (0 if none / same)
         final int originalEndLine;   // original range end (== start for a single line)
 
-        MethodMapping(String originalName, int startLine, int endLine,
+        MethodMapping(String originalName, String declaringClass, int startLine, int endLine,
                       int originalStartLine, int originalEndLine) {
             this.originalName = originalName;
+            this.declaringClass = declaringClass;
             this.startLine = startLine;
             this.endLine = endLine;
             this.originalStartLine = originalStartLine;
@@ -166,13 +168,23 @@ public final class MappingFile {
         int paren = left.indexOf('(');
         String beforeParen = left.substring(0, paren).trim();
         int sp = beforeParen.lastIndexOf(' ');
-        String originalMethod = sp < 0 ? beforeParen : beforeParen.substring(sp + 1);
+        String qualifiedMethod = sp < 0 ? beforeParen : beforeParen.substring(sp + 1);
+        // An R8 inline record can name a method from ANOTHER class, fully qualified
+        // ("com.example.Callee.run"). Split the declaring class off so the retraced frame reports
+        // Callee.run / Callee.java rather than gluing the callee's FQ name onto the enclosing class.
+        String declaringClass = null;
+        String originalMethod = qualifiedMethod;
+        int lastDot = qualifiedMethod.lastIndexOf('.');
+        if (lastDot > 0) {
+            declaringClass = qualifiedMethod.substring(0, lastDot);
+            originalMethod = qualifiedMethod.substring(lastDot + 1);
+        }
         List<MethodMapping> list = cm.methods.get(obfName);
         if (list == null) {
             list = new ArrayList<MethodMapping>();
             cm.methods.put(obfName, list);
         }
-        list.add(new MethodMapping(originalMethod, startLine, endLine, originalStartLine, originalEndLine));
+        list.add(new MethodMapping(originalMethod, declaringClass, startLine, endLine, originalStartLine, originalEndLine));
     }
 
     /**
@@ -206,17 +218,23 @@ public final class MappingFile {
         if (candidates != null && !candidates.isEmpty()) {
             for (MethodMapping m : candidates) {
                 if (m.startLine != 0 && observed >= m.startLine && observed <= m.endLine) {
-                    out.add(new Frame(originalClass, m.originalName, file, m.mapLine(observed)));
+                    out.add(frameFor(m, originalClass, file, observed));
                 }
             }
             if (out.isEmpty()) {
-                MethodMapping m = candidates.get(0);
-                out.add(new Frame(originalClass, m.originalName, file, m.mapLine(observed)));
+                out.add(frameFor(candidates.get(0), originalClass, file, observed));
             }
         } else {
             out.add(new Frame(originalClass, obfuscated.getMethodName(), file, observed));
         }
         return out;
+    }
+
+    /** Builds a frame for one method record, honoring an inlinee's own declaring class/source file. */
+    private Frame frameFor(MethodMapping m, String enclosingClass, String enclosingFile, int observed) {
+        String cls = m.declaringClass != null ? m.declaringClass : enclosingClass;
+        String file = m.declaringClass != null ? simpleSourceFile(m.declaringClass) : enclosingFile;
+        return new Frame(cls, m.originalName, file, m.mapLine(observed));
     }
 
     private static String simpleSourceFile(String fqcn) {

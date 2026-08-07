@@ -201,8 +201,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         if (hardenPlatform == null) {
             hardenPlatform = normalizeHardenPlatform(platform);
         }
-        if (hardenPlatform != null && "false".equalsIgnoreCase(
-                settings.getProperty("codename1.arg.harden." + hardenPlatform + ".enabled", "true").trim())) {
+        if (hardenPlatform != null && isHardenFalse(
+                settings.getProperty("codename1.arg.harden." + hardenPlatform + ".enabled", "true"))) {
             level = "off";
         }
         boolean allowLocal = "true".equalsIgnoreCase(
@@ -259,6 +259,20 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             return "mac";
         }
         return null;
+    }
+
+    /**
+     * True when a {@code harden.*} boolean setting reads as disabled, using the same tri-state rules
+     * as the engine's {@code HardeningConfig.boolTri}: {@code false}, {@code 0} and {@code off} all
+     * mean off. Recognizing only the literal {@code false} here would preflight-reject a
+     * local/source build that {@code harden.<platform>.enabled=off} had actually turned off.
+     */
+    private static boolean isHardenFalse(String value) {
+        if (value == null) {
+            return false;
+        }
+        String t = value.trim().toLowerCase();
+        return "false".equals(t) || "0".equals(t) || "off".equals(t);
     }
 
     /** Maps {@code codename1.platform} to the {@code harden.<platform>.enabled} opt-out key. */

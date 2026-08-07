@@ -100,6 +100,23 @@ public class MappingFileTest {
     }
 
     @Test
+    public void inlinedMethodFromAnotherClassKeepsItsOwnClass() throws Exception {
+        // The inlinee 'a' at obf line 1 is Callee.run from a DIFFERENT class; the retraced frame must
+        // report Callee/Callee.java, not the enclosing Outer with Callee.run glued on as the method.
+        MappingFile mf = MappingFile.parse(
+                "com.example.Outer -> x:\n"
+                + "    1:1:void com.example.Callee.run():12:12 -> a\n"
+                + "    1:1:void outerMethod():30:30 -> a\n");
+        java.util.List<Frame> frames = mf.retraceAll(new Frame("x", "a", "x.java", 1));
+        assertEquals(2, frames.size());
+        assertEquals("com.example.Callee", frames.get(0).getClassName());
+        assertEquals("run", frames.get(0).getMethodName());
+        assertEquals("Callee.java", frames.get(0).getFileName());
+        assertEquals("com.example.Outer", frames.get(1).getClassName());
+        assertEquals("outerMethod", frames.get(1).getMethodName());
+    }
+
+    @Test
     public void unknownClassPassesThroughUnchanged() throws Exception {
         MappingFile mf = MappingFile.parse(MAPPING);
         Frame in = new Frame("some.Other", "x", "Other.java", 9);

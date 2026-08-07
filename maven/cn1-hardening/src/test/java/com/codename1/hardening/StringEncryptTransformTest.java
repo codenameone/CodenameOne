@@ -160,6 +160,37 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void encryptsEvenWhenDecoderNameCollides() throws Exception {
+        // A class that already declares a member named "zqdec$" must NOT be skipped: skipping would
+        // leave its literal in plaintext while an equal literal elsewhere was encrypted, breaking a
+        // valid literal == on ParparVM. The transform picks a non-colliding decoder name instead.
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/Clash", null, "java/lang/Object", null);
+        // A pre-existing member named exactly like the decoder.
+        w.visitField(org.objectweb.asm.Opcodes.ACC_PRIVATE | org.objectweb.asm.Opcodes.ACC_STATIC,
+                "zqdec$", "I", null, null).visitEnd();
+        org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "secret", "()Ljava/lang/String;", null, null);
+        m.visitCode();
+        m.visitLdcInsn("this is a clash secret value");
+        m.visitInsn(org.objectweb.asm.Opcodes.ARETURN);
+        m.visitMaxs(1, 0);
+        m.visitEnd();
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 11);
+        byte[] out = t.transform(w.toByteArray());
+        assertTrue("the clashing class must still be encrypted, not skipped", t.getEncryptedCount() >= 1);
+        assertFalse("plaintext must be gone despite the name clash",
+                StringEncryptTransform.containsStringLiteral(out, "this is a clash secret value"));
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        Class<?> c = new ByteLoader().define("app.Clash", out);
+        assertEquals("this is a clash secret value", c.getMethod("secret").invoke(null));
+    }
+
+    @Test
     public void oversizedLiteralIsLeftPlaintextNotCrashing() throws Exception {
         // A large-but-valid ASCII literal (40000 chars = 40000 UTF-8 bytes, under the 65535 limit)
         // would encrypt into mostly 3-byte characters and overflow the constant pool. The transform

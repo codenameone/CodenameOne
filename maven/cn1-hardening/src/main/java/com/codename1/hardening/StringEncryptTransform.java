@@ -118,10 +118,6 @@ public final class StringEncryptTransform {
         ClassNode cn = new ClassNode();
         new ClassReader(classBytes).accept(cn, ClassReader.SKIP_FRAMES);
 
-        // If the class already defines a member colliding with the decoder, leave it alone.
-        if (hasDecoderCollision(cn)) {
-            return classBytes;
-        }
         boolean isInterface = (cn.access & Opcodes.ACC_INTERFACE) != 0;
         // The decoder is a concrete static method, and (for interface constants) it is invoked from
         // <clinit>. Static/private methods and <clinit> in an interface are only valid from class-file
@@ -131,6 +127,14 @@ public final class StringEncryptTransform {
         if (isInterface && (cn.version & 0xFFFF) < Opcodes.V1_8) {
             return classBytes;
         }
+
+        // Pick a decoder name that does not collide with an existing member, so a class is NEVER
+        // skipped for a name clash. Skipping would leave that class's literals in plaintext while an
+        // equal literal in another class was encrypted+interned; on ParparVM, whose intern pool does
+        // not contain the compile-time literals, the two would then fail a valid literal '==' compare.
+        // Never skipping keeps encryption applied by-value across the whole jar, so all occurrences of
+        // a value are decoded through the shared intern pool and stay reference-equal.
+        String decoderName = resolveDecoderName(cn);
 
         int base = keyBase(cn.name);
         boolean changed = false;
@@ -144,10 +148,10 @@ public final class StringEncryptTransform {
                 if (mn.instructions == null) {
                     continue;
                 }
-                if (DECODER_NAME.equals(mn.name)) {
+                if (decoderName.equals(mn.name)) {
                     continue;
                 }
-                changed |= encryptMethodLiterals(cn, mn, base, isInterface);
+                changed |= encryptMethodLiterals(cn, mn, base, isInterface, decoderName);
             }
         }
 
@@ -155,20 +159,21 @@ public final class StringEncryptTransform {
         // interfaces. A Java 8 interface may carry a <clinit> for non-constant field initialization,
         // so an interface constant's plaintext can be moved to a decoder call there just as a class
         // field's is -- otherwise "String TOKEN = \"secret\"" would still leak the plaintext.
-        changed |= encryptStaticFinalStrings(cn, base, isInterface);
+        changed |= encryptStaticFinalStrings(cn, base, isInterface, decoderName);
 
         if (!changed) {
             return classBytes;
         }
 
-        addDecoder(cn, base, isInterface);
+        addDecoder(cn, base, isInterface, decoderName);
 
         ClassWriter cw = new FrameClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, hierarchy);
         cn.accept(cw);
         return cw.toByteArray();
     }
 
-    private boolean encryptMethodLiterals(ClassNode cn, MethodNode mn, int base, boolean isInterface) {
+    private boolean encryptMethodLiterals(ClassNode cn, MethodNode mn, int base, boolean isInterface,
+                                          String decoderName) {
         boolean changed = false;
         AbstractInsnNode insn = mn.instructions.getFirst();
         while (insn != null) {
@@ -188,7 +193,7 @@ public final class StringEncryptTransform {
                         // writes a Methodref instead of an InterfaceMethodref and throws
                         // IncompatibleClassChangeError at run time.
                         mn.instructions.insert(ldc, new MethodInsnNode(
-                                Opcodes.INVOKESTATIC, cn.name, DECODER_NAME, DECODER_DESC, isInterface));
+                                Opcodes.INVOKESTATIC, cn.name, decoderName, DECODER_DESC, isInterface));
                         encryptedCount++;
                         changed = true;
                     }
@@ -199,7 +204,8 @@ public final class StringEncryptTransform {
         return changed;
     }
 
-    private boolean encryptStaticFinalStrings(ClassNode cn, int base, boolean isInterface) {
+    private boolean encryptStaticFinalStrings(ClassNode cn, int base, boolean isInterface,
+                                              String decoderName) {
         if (cn.fields == null) {
             return false;
         }
@@ -221,7 +227,7 @@ public final class StringEncryptTransform {
                 init.add(new LdcInsnNode(cipher));
                 // itf=true when the decoder lives in an interface, else the JVM emits a Methodref
                 // instead of an InterfaceMethodref and throws IncompatibleClassChangeError.
-                init.add(new MethodInsnNode(Opcodes.INVOKESTATIC, cn.name, DECODER_NAME, DECODER_DESC, isInterface));
+                init.add(new MethodInsnNode(Opcodes.INVOKESTATIC, cn.name, decoderName, DECODER_DESC, isInterface));
                 init.add(new FieldInsnNode(Opcodes.PUTSTATIC, cn.name, fn.name, fn.desc));
                 encryptedCount++;
                 changed = true;
@@ -281,12 +287,12 @@ public final class StringEncryptTransform {
         }
     }
 
-    private void addDecoder(ClassNode cn, int base, boolean isInterface) {
+    private void addDecoder(ClassNode cn, int base, boolean isInterface, String decoderName) {
         // A Java 8 interface may only have public static methods (private statics are 9+), so the
         // decoder is public there; in a class it stays private.
         int access = (isInterface ? Opcodes.ACC_PUBLIC : Opcodes.ACC_PRIVATE)
                 | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC;
-        MethodNode m = new MethodNode(Opcodes.ASM9, access, DECODER_NAME, DECODER_DESC, null, null);
+        MethodNode m = new MethodNode(Opcodes.ASM9, access, decoderName, DECODER_DESC, null, null);
         InsnList in = m.instructions;
         // char[] c = s.toCharArray();  (local 1)
         in.add(new VarInsnNode(Opcodes.ALOAD, 0));
@@ -338,13 +344,35 @@ public final class StringEncryptTransform {
         cn.methods.add(m);
     }
 
-    private boolean hasDecoderCollision(ClassNode cn) {
-        if (cn.methods == null) {
-            return false;
+    /**
+     * A decoder method name for {@code cn} that collides with no existing member. Starts from the
+     * base name and lengthens the {@code $} suffix until unused, so a class is never skipped for a
+     * clash (which would leave its literals in plaintext and break cross-class literal {@code ==}).
+     */
+    private String resolveDecoderName(ClassNode cn) {
+        String name = DECODER_NAME;
+        while (memberExists(cn, name)) {
+            name = name + "$";
         }
-        for (MethodNode mn : cn.methods) {
-            if (DECODER_NAME.equals(mn.name) && DECODER_DESC.equals(mn.desc)) {
-                return true;
+        return name;
+    }
+
+    private boolean memberExists(ClassNode cn, String name) {
+        if (cn.methods != null) {
+            for (MethodNode mn : cn.methods) {
+                // Same descriptor would be an outright clash; a differently-typed method of the same
+                // name is legal, but the decoder is also referenced by name from <clinit>, so keep it
+                // simple and avoid the name entirely.
+                if (name.equals(mn.name)) {
+                    return true;
+                }
+            }
+        }
+        if (cn.fields != null) {
+            for (FieldNode fn : cn.fields) {
+                if (name.equals(fn.name)) {
+                    return true;
+                }
             }
         }
         return false;

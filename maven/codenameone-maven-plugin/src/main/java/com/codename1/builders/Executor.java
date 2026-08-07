@@ -2527,7 +2527,7 @@ public abstract class Executor {
                 if ((lastHardeningMappingId == null || lastHardeningMappingId.length() == 0)
                         && !hardeningRenameSupported()
                         && hardenBoolArg(request, "harden.rename", true)) {
-                    lastHardeningMappingId = downstreamMappingId(request);
+                    lastHardeningMappingId = downstreamMappingId(request, hardened);
                 }
                 // Propagate the mapping id / hardened flag / level into the request BEFORE the
                 // builder generates its stubs, so the stubs stamp them as runtime properties
@@ -2711,11 +2711,28 @@ public abstract class Executor {
      * and platform as a SHA-256 hex string, matching the engine mapping id's format, so a hardened
      * crash report can be tied to the R8 mapping.txt uploaded for this build+platform.
      */
-    private String downstreamMappingId(BuildRequest request) {
+    private String downstreamMappingId(BuildRequest request, File hardenedJar) {
         String seed = resolveBuildKey(request) + ":" + hardeningPlatform(request);
         try {
             java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] digest = md.digest(seed.getBytes("UTF-8"));
+            md.update(seed.getBytes("UTF-8"));
+            // Fold in the hardened application jar's bytes so two builds that reuse a build key but
+            // differ in code get distinct ids -- resolveMappingId promises to distinguish a rebuilt
+            // app that reused a build key. A byte-identical rebuild keeps the same id, matching its
+            // identical R8 mapping.
+            if (hardenedJar != null && hardenedJar.isFile()) {
+                java.io.InputStream in = new java.io.FileInputStream(hardenedJar);
+                try {
+                    byte[] buf = new byte[65536];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        md.update(buf, 0, n);
+                    }
+                } finally {
+                    in.close();
+                }
+            }
+            byte[] digest = md.digest();
             StringBuilder sb = new StringBuilder(digest.length * 2);
             for (byte b : digest) {
                 sb.append(Character.forDigit((b >> 4) & 0xF, 16));
