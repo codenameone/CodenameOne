@@ -2094,12 +2094,31 @@ public class CN1WearableBridge implements WearableBridge {
                             }
                             ackers.add(acker);
                         }
+                        boolean retainedAck = false;
                         for (Uri ownAck : ownAcks) {
                             if (!livePaths.contains(ackedTransferKey(ownAck.getPath()))) {
                                 // The item's OWN uri, not one rebuilt from parts: it already
                                 // carries the authority the Data Layer expects.
                                 Tasks.await(dataClient.deleteDataItems(ownAck),
                                         TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                            } else {
+                                retainedAck = true;
+                            }
+                        }
+                        if (retainedAck) {
+                            // An acknowledgement we are KEEPING, because the transfer it vouches
+                            // for is still published. Only its author can delete it, and nothing
+                            // else will schedule that: the sender's eventual deletion of the
+                            // transfer raises a callback the listener's deletion branch does not
+                            // sweep on, so a receive-only process that stays alive would keep it
+                            // for good.
+                            //
+                            // A slow poll rather than a precise deadline, because the receiver
+                            // cannot know when the sender will retire its item -- the sender may be
+                            // offline for days. One sweep a day over a handful of small items.
+                            long recheck = System.currentTimeMillis() + TRANSFER_RETENTION_MILLIS;
+                            if (recheck < nextDue[0]) {
+                                nextDue[0] = recheck;
                             }
                         }
                         for (DataItem item : items) {
