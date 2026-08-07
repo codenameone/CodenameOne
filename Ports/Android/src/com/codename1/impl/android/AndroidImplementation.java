@@ -11064,6 +11064,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// create an empty database on top of the real one.
     public static final String DATABASE_BACKUP_SUFFIX = ".cn1backup";
 
+    /// Written while a conversion is in progress, and removed once it completes.
+    ///
+    /// Without it the backup would be identified by name alone, and nothing reserves that name:
+    /// an application may have its own database called `<name>.cn1backup`, which an ordinary open
+    /// of `<name>` would then delete.
+    public static final String DATABASE_MIGRATION_MARKER_SUFFIX = ".cn1migrating";
+
     /// Restores a database whose conversion was interrupted between the two renames.
     ///
     /// Called before every open, encrypted or not. Encrypt and decrypt move the original aside
@@ -11076,7 +11083,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         File live = new File(path);
         File backup = new File(path + DATABASE_BACKUP_SUFFIX);
+        File marker = new File(path + DATABASE_MIGRATION_MARKER_SUFFIX);
+        // The marker is what identifies these as migration artifacts. Nothing reserves the backup
+        // suffix, so an application may legitimately have databases named "foo" and
+        // "foo.cn1backup"; acting on the name alone would delete the second one the first time
+        // the first is opened. Only a migration writes the marker, and it is removed once the
+        // conversion is complete, so its presence means one was interrupted.
+        if (!marker.isFile()) {
+            return;
+        }
         if (!backup.isFile()) {
+            // The marker outlived its backup, so there is nothing to put back or clean up.
+            marker.delete();
             return;
         }
         if (!live.exists()) {
@@ -11089,6 +11107,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         + "data is intact in that file; the database was not opened rather than "
                         + "replacing it with an empty one.");
             }
+            marker.delete();
             return;
         }
         // Both exist, so the swap completed and only the cleanup was lost. The backup is the
@@ -11099,6 +11118,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     + "previous form at " + backup + " could not be removed. Delete it before "
                     + "relying on this database being encrypted.");
         }
+        marker.delete();
     }
 
     private String resolveNativeDatabasePath(String databaseName) {

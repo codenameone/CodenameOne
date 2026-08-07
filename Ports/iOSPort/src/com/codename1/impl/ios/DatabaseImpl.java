@@ -269,7 +269,14 @@ class DatabaseImpl extends Database {
         // argument array: a statement with placeholders would run with every slot left as NULL
         // instead of reporting the parameters the caller did not supply.
         long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
-        checkParameterCount(stmt, 0);
+        // Finalized here because this path does not go through the bind helpers, which are what
+        // own the statement everywhere else.
+        try {
+            checkParameterCount(stmt, 0);
+        } catch (IOException err) {
+            IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
+            throw err;
+        }
         return register(new CursorImpl(stmt));
     }
 
@@ -313,7 +320,10 @@ class DatabaseImpl extends Database {
         }
         int declared = IOSImplementation.nativeInstance.sqlStmtParameterCount(stmt);
         if (declared != supplied) {
-            IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
+            // Deliberately does NOT finalize. The bind helpers that call this own the statement
+            // and finalize it when anything in them throws, so doing it here too would finalize
+            // the same pointer twice -- undefined behaviour, and a crash rather than the
+            // parameter-count error this is supposed to report.
             throw new IOException("The statement has " + declared + " parameters but "
                     + supplied + " were supplied");
         }

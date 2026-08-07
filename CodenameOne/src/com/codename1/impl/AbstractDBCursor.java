@@ -166,6 +166,11 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
         lastReadWasNull = false;
     }
 
+    /// True once the result set has been walked to the end and not rewound since.
+    private boolean isExhausted() {
+        return !onRow && knownCount >= 0 && position >= knownCount;
+    }
+
     /// Records that the result set is exhausted, which also establishes the row count.
     private void markExhausted() {
         onRow = false;
@@ -178,6 +183,13 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
     @Override
     public boolean next() throws IOException {
         checkOpen();
+        if (isExhausted()) {
+            // Do not step again. sqlite3_step after SQLITE_DONE resets the statement and
+            // re-executes it, so on the iOS, Linux, Windows and JavaScript engines a second
+            // next() past the end returns the first row again while this wrapper counts a
+            // position beyond the row count. Only an explicit rewind clears this.
+            return false;
+        }
         if (stepForward()) {
             position++;
             onRow = true;

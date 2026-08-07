@@ -38,6 +38,7 @@ import net.zetetic.database.sqlcipher.SQLiteQuery;
 import net.zetetic.database.sqlcipher.SQLiteStatement;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -257,6 +258,9 @@ class AndroidCipherDB extends Database {
     static final String BACKUP_SUFFIX =
             com.codename1.impl.android.AndroidImplementation.DATABASE_BACKUP_SUFFIX;
 
+    static final String MIGRATION_MARKER_SUFFIX =
+            com.codename1.impl.android.AndroidImplementation.DATABASE_MIGRATION_MARKER_SUFFIX;
+
     /** Reads one integer header pragma, which sqlcipher_export does not carry across. */
     private int readHeaderPragma(String pragma) {
         android.database.Cursor c = db.rawQuery(pragma, null);
@@ -317,7 +321,17 @@ class AndroidCipherDB extends Database {
         closing.close();
         File original = new File(path);
         File backup = new File(path + BACKUP_SUFFIX);
+        File marker = new File(path + MIGRATION_MARKER_SUFFIX);
         backup.delete();
+        // Written before the first rename and removed after the last, so recovery can tell these
+        // two files apart from application databases that happen to share the names.
+        try {
+            new FileOutputStream(marker).close();
+        } catch (IOException err) {
+            db = openAt(path, currentKey);
+            throw new IOException("The conversion could not be marked as in progress at " + marker
+                    + ", so it was not started: " + err.getMessage(), err);
+        }
         // Move the original aside rather than deleting it. Deleting first leaves a window where
         // the only copy of the data is the converted file under a name nothing looks for: a
         // process kill there strands it, the next open creates an empty database in its place,
@@ -325,12 +339,14 @@ class AndroidCipherDB extends Database {
         // means there is a complete database under one of the two names at every instant.
         if (!original.renameTo(backup)) {
             target.delete();
+            marker.delete();
             db = openAt(path, currentKey);
             throw new IOException("The database " + path + " could not be moved aside, so it was "
                     + "left as it was and not converted");
         }
         if (!target.renameTo(original)) {
             if (!backup.renameTo(original)) {
+                // The marker stays: the backup still holds the data and recovery has to find it.
                 // Do not reopen. openAt creates what it cannot find, so it would put an empty
                 // database at the live name, and the next recovery would then see both files,
                 // read that as a completed conversion, and delete the backup holding the data.
@@ -340,6 +356,7 @@ class AndroidCipherDB extends Database {
                         + "an empty one over it.");
             }
             target.delete();
+            marker.delete();
             db = openAt(path, currentKey);
             throw new IOException("The converted database could not replace " + path
                     + ", so the original was restored and nothing was converted");
@@ -350,10 +367,12 @@ class AndroidCipherDB extends Database {
         // plaintext copy of what is now an encrypted database, sitting at a predictable name --
         // which defeats the encryption entirely, so its removal is checked rather than assumed.
         if (!backup.delete() && backup.exists()) {
+            // Marker left in place on purpose: recovery has to come back and finish this.
             throw new IOException("The database was converted, but the copy of its previous form "
                     + "at " + backup + " could not be removed. Delete it before relying on this "
                     + "database being encrypted.");
         }
+        marker.delete();
     }
 
     private SQLiteDatabase openAt(String path, String key) throws IOException {

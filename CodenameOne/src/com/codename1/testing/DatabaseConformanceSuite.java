@@ -611,9 +611,21 @@ public final class DatabaseConformanceSuite {
             }
             r.check(walked == 5, "walking the whole result set sees every row, saw " + walked);
             int countAfterFirstExhaustion = Database.count(cur);
-            cur.next();
-            cur.next();
-            cur.next();
+            // Every one of these must stay false. SQLite resets and re-executes a statement when
+            // stepped after it is done, so a port that steps again hands back the first row while
+            // reporting a position past the end - the same query silently answering differently
+            // depending on how many times it was walked.
+            boolean steppedPastEnd = cur.next() || cur.next() || cur.next();
+            r.check(!steppedPastEnd, "next() past the end keeps returning false rather than "
+                    + "re-running the query");
+            boolean offRowAfterEnd = true;
+            try {
+                cur.getRow().getString(0);
+                offRowAfterEnd = false;
+            } catch (IOException expected) {
+                // Off a row is what this should be.
+            }
+            r.check(offRowAfterEnd, "the cursor stays off a row after being stepped past the end");
             if (countAfterFirstExhaustion >= 0) {
                 r.check(Database.count(cur) == countAfterFirstExhaustion,
                         "calling next() past the end repeatedly does not inflate the row count, was "

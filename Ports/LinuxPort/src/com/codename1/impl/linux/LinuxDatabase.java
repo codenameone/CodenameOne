@@ -212,7 +212,14 @@ class LinuxDatabase extends Database {
         // A statement with placeholders and no arguments would otherwise run with every slot left
         // as NULL rather than reporting the missing parameters. The check is a no-op in legacy
         // mode, where running it unbound is the behaviour applications were written against.
-        checkParameterCount(stmt, 0);
+        // Finalized here because this path does not go through the bind helpers, which are what
+        // own the statement everywhere else.
+        try {
+            checkParameterCount(stmt, 0);
+        } catch (IOException err) {
+            LinuxNative.sqlStmtFinalize(stmt);
+            throw err;
+        }
         return register(new CursorImpl(stmt));
     }
 
@@ -256,7 +263,10 @@ class LinuxDatabase extends Database {
         }
         int declared = LinuxNative.sqlStmtParameterCount(stmt);
         if (declared != supplied) {
-            LinuxNative.sqlStmtFinalize(stmt);
+            // Deliberately does NOT finalize. The bind helpers that call this own the statement
+            // and finalize it when anything in them throws, so doing it here too would finalize
+            // the same pointer twice -- undefined behaviour, and a crash rather than the
+            // parameter-count error this is supposed to report.
             throw new IOException("The statement has " + declared + " parameters but "
                     + supplied + " were supplied");
         }
