@@ -347,6 +347,15 @@ jobs:
       - name: Run SpotBugs for ByteCodeTranslator
         if: ${{ matrix.java-version == 8 }}
         run: mvn -B -DskipTests=true -f vm/ByteCodeTranslator/pom.xml verify
+      # ParparVM's CHECKCAST is unchecked, so a failed cast does not throw
+      # ClassCastException on iOS -- code written to catch it silently uses the
+      # wrong object instead (issue #5531). core/android/ios are already compiled
+      # by the SpotBugs steps above; JavaAPI is not, so build it here.
+      - name: Check cast semantics
+        if: ${{ matrix.java-version == 8 }}
+        run: |
+          mvn -B -q -f vm/pom.xml -pl JavaAPI -am package -DskipTests
+          scripts/check-cast-semantics.sh
       - name: Run JavaScript Port smoke integration
         if: ${{ matrix.java-version == 8 }}
         working-directory: vm
