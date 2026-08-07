@@ -2471,9 +2471,17 @@ public abstract class Executor {
      * the plugin and the cloud daemon and never shares a classloader with the caller.
      */
     public File hardenSourceJar(File sourceZip, BuildRequest request) throws BuildException {
+        // Idempotence FIRST, via a non-forgeable per-instance flag (not an input-jar marker: a
+        // spurious META-INF/CN1-HARDENED resource must not skip the transform). On a second call in
+        // this build -- a nested/delegated invocation -- the verified cn1.hardened / cn1.hardenLevel /
+        // cn1.mappingId from the first run are already in the request, so return WITHOUT touching them.
+        if (hardeningRanThisBuild) {
+            log("cn1-hardening: already hardened in this build; skipping");
+            return sourceZip;
+        }
         // cn1.hardened / cn1.hardenLevel / cn1.mappingId are engine OUTPUTS, never inputs. Clear any
-        // supplied values up front so the stubs never stamp a hardened state the engine didn't
-        // actually produce; they are set again below only from a verified hardening run.
+        // supplied values so the stubs never stamp a hardened state the engine didn't actually
+        // produce; they are set again below only from a verified hardening run.
         request.putArgument("cn1.hardened", "false");
         request.putArgument("cn1.hardenLevel", "off");
         request.putArgument("cn1.mappingId", "");
@@ -2485,13 +2493,6 @@ public abstract class Executor {
         // an unhardened build via harden.allowUnhardenedLocalBuild; honor it as a single point.
         if ("true".equals(System.getProperty("cn1.harden.forceOff"))) {
             log("cn1-hardening: forced off for this local build; building unhardened");
-            return sourceZip;
-        }
-        // Idempotence via a non-forgeable per-instance flag, not an input-jar marker (a spurious
-        // META-INF/CN1-HARDENED resource must not skip the transform) and not the cn1.hardened arg
-        // (just cleared above so a client can't forge it). Suppresses only a second call in this build.
-        if (hardeningRanThisBuild) {
-            log("cn1-hardening: already hardened in this build; skipping");
             return sourceZip;
         }
         try {
