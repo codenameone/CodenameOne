@@ -65,6 +65,31 @@ describe_accept_status() {
   esac
 }
 
+# Every downloaded report in $1 that names one of the whitespace-separated port
+# ids in $2. Used to tell a run that produced nothing for this workflow apart
+# from the browser-evidence sidecar from one whose producer really failed.
+owned_reports_in() {
+  local run_dir="$1"
+  local owned_ids="$2"
+  local report found
+  while IFS= read -r report; do
+    [ -n "${report}" ] || continue
+    found="$(jq -r '.port // empty' "${report}" 2>/dev/null || true)"
+    [ -n "${found}" ] || continue
+    case " $(printf '%s ' ${owned_ids}) " in
+      *" ${found} "*) printf '%s\n' "${found}" ;;
+    esac
+  done < <(port_reports_in "${run_dir}")
+}
+
+# The per-port reports a run uploaded. port-status-environment.json is the
+# browser-evidence sidecar rather than a port report -- it describes the
+# browsers the evidence was captured in and names no port -- so scanning it as
+# one recorded the newest run as having uploaded an unreadable report.
+port_reports_in() {
+  find "$1" -type f -name 'port-status-*.json' ! -name 'port-status-environment.json' | sort
+}
+
 for tool in gh jq python3; do
   if ! command -v "${tool}" >/dev/null 2>&1; then
     echo "backfill-port-status: ${tool} is required." >&2
@@ -156,23 +181,28 @@ while IFS= read -r workflow; do
     | jq -r --arg horizon "${horizon}" '[.[] | select((.event == "push" or .event == "schedule" or .event == "workflow_dispatch") and
           (.conclusion != null and .conclusion != "cancelled" and .conclusion != "skipped") and
           (.updatedAt >= $horizon))]
-          | sort_by(.updatedAt) | reverse | .[].databaseId')"
+          | sort_by(.updatedAt) | reverse | .[] | "\(.databaseId):\(.conclusion)"')"
   if [ -z "${candidates}" ]; then
     echo "No completed master run for ${workflow}; nothing to publish." >&2
     continue
   fi
 
   run_id=""
-  # The newest candidate gets stricter treatment than the ones behind it.
-  first_candidate=1
-  newest_candidate="$(printf '%s\n' ${candidates} | head -1)"
+  # The newest producer candidate gets stricter treatment than the ones behind
+  # it. Which run that is cannot be read off the top of the list, because a run
+  # can be a dispatch that deliberately produced no port report at all -- see
+  # the evidence-only check below -- so it is assigned to the first candidate
+  # that actually attempted to produce one.
+  newest_candidate=""
   download_dir="${tmp_dir}/${workflow}"
   mkdir -p "${download_dir}"
   # Merge across candidate runs rather than stopping at the first with any
   # artifact: a failed matrix run can upload the report for one leg only, and
   # the other ports that workflow owns would then never be considered.
   owned="$(jq -r --arg workflow "${workflow}" '.ports[] | select(.workflow == $workflow) | .id' "${MANIFEST}")"
-  for candidate in ${candidates}; do
+  for candidate_entry in ${candidates}; do
+    candidate="${candidate_entry%%:*}"
+    candidate_conclusion="${candidate_entry##*:}"
     missing=0
     for port in ${owned}; do
       if [ ! -f "${download_dir}/covered-${port}" ]; then
@@ -189,13 +219,31 @@ while IFS= read -r workflow; do
       # freshness check passes, and the sweep goes green while the current run
       # produced no evidence. Only the newest is reported: older candidates
       # without artifacts are just how the merge walks back.
-      if [ "${first_candidate}" = "1" ]; then
+      if [ -z "${newest_candidate}" ]; then
+        newest_candidate="${candidate}"
         unusable+=("${workflow}: newest run ${candidate} uploaded no port-status artifact")
       fi
-      first_candidate=0
       continue
     fi
-    first_candidate=0
+    # A run that succeeded, uploaded the browser-evidence environment sidecar
+    # and named none of the ports this workflow owns never tried to produce a
+    # port report: scripts-javascript.yml dispatched with
+    # port_status_browser_evidence skips its screenshot job by design and only
+    # calls the reusable evidence workflow. Treating it as the newest producer
+    # made the sweep fail every time -- the environment artifact names no port,
+    # and the JavaScript port then looked omitted -- for a run in which no
+    # producer was asked to run. A producer that genuinely died before
+    # normalization is not caught by this: its job failure fails the run, so the
+    # conclusion is not success and the strict checks still apply.
+    if [ "${candidate_conclusion}" = "success" ] \
+        && [ -f "${download_dir}/run-${candidate}/port-status-environment/port-status-environment.json" ] \
+        && [ -z "$(owned_reports_in "${download_dir}/run-${candidate}" "${owned}")" ]; then
+      echo "Skipping run ${candidate}: a browser-evidence dispatch that produces no ${workflow} port report." >&2
+      continue
+    fi
+    if [ -z "${newest_candidate}" ]; then
+      newest_candidate="${candidate}"
+    fi
     run_id="${candidate}"
     while IFS= read -r downloaded; do
       found="$(jq -r '.port // empty' "${downloaded}" 2>/dev/null || true)"
@@ -275,7 +323,7 @@ while IFS= read -r workflow; do
       # every port to whichever candidate happened to be examined last --
       # misleading exactly when someone is chasing down a bad report.
       printf '%s' "${candidate}" > "${download_dir}/source-run-${found}"
-    done < <(find "${download_dir}/run-${candidate}" -type f -name 'port-status-*.json' | sort)
+    done < <(port_reports_in "${download_dir}/run-${candidate}")
   done
   if [ -z "${run_id}" ]; then
     echo "No recent ${workflow} run has a port status artifact." >&2

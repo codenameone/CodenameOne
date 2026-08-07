@@ -104,7 +104,24 @@ struct CN1VideoWriter {
     int height;
     float frameRate;
     bool hasAudio;
+    /* The rate the AAC encoder was configured at. Media Foundation's AAC encoder
+     * accepts 44100 or 48000 Hz only, so a caller asking for anything else (the
+     * conformance suite records an 8 kHz tone) gets its PCM resampled on the way
+     * in rather than losing the audio stream. */
+    int audioEncRate;
+    int audioChannels;
+    HRESULT audioSetupHr;
 };
+
+/* The sample rates Media Foundation's AAC encoder will accept. */
+static int cn1AacEncoderRate(int requested) {
+    if (requested == 44100 || requested == 48000) {
+        return requested;
+    }
+    /* 44100 is the closer target for anything derived from CD-family rates
+     * (11025/22050); everything else lands on 48000. */
+    return (requested % 11025) == 0 ? 44100 : 48000;
+}
 
 // --------------------------------------------------------------------------
 // Reader
@@ -407,6 +424,9 @@ static JAVA_LONG cn1WriterOpen(const wchar_t* url, bool hevc, int width, int hei
     st->frameRate = fps;
     st->hasAudio = hasAudio;
     st->audioStream = 0;
+    st->audioEncRate = 0;
+    st->audioChannels = channels > 0 ? channels : 1;
+    st->audioSetupHr = S_OK;
 
     // ---- video output (H.264 / HEVC) ----
     ComPtr<IMFMediaType> videoOut;
@@ -439,24 +459,53 @@ static JAVA_LONG cn1WriterOpen(const wchar_t* url, bool hevc, int width, int hei
 
     // ---- audio output (AAC) ----
     if (hasAudio) {
+        /* Media Foundation's AAC encoder publishes input types at 44100 and
+         * 48000 Hz only. Asking it for the caller's rate made AddStream fail for
+         * an 8 kHz tone, and the failure was swallowed by clearing hasAudio: the
+         * file then carried a video stream alone while the writer reported
+         * success, so VideoIORoundTripTest saw a clip whose audio never arrived.
+         * Configure the encoder at a rate it accepts and convert on the way in.
+         * Byte rate is likewise constrained (the encoder publishes 12000, 16000,
+         * 20000 and 24000 bytes/sec), so an unlisted bit rate is rounded to the
+         * nearest supported one instead of failing the stream. */
+        static const UINT32 aacByteRates[] = { 12000, 16000, 20000, 24000 };
+        UINT32 wanted = (UINT32) (audioBitRate / 8);
+        UINT32 byteRate = aacByteRates[0];
+        for (size_t i = 1; i < sizeof(aacByteRates) / sizeof(aacByteRates[0]); i++) {
+            UINT32 best = byteRate > wanted ? byteRate - wanted : wanted - byteRate;
+            UINT32 here = aacByteRates[i] > wanted ? aacByteRates[i] - wanted : wanted - aacByteRates[i];
+            if (here < best) {
+                byteRate = aacByteRates[i];
+            }
+        }
+        st->audioEncRate = cn1AacEncoderRate(sampleRate);
+        st->audioChannels = channels > 0 ? channels : 1;
+
         ComPtr<IMFMediaType> audioOut;
         MFCreateMediaType(&audioOut);
         audioOut->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
         audioOut->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_AAC);
         audioOut->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
-        audioOut->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, (UINT32) sampleRate);
-        audioOut->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, (UINT32) channels);
-        audioOut->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, (UINT32) (audioBitRate / 8));
-        if (SUCCEEDED(writer->AddStream(audioOut.Get(), &st->audioStream))) {
+        audioOut->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, (UINT32) st->audioEncRate);
+        audioOut->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, (UINT32) st->audioChannels);
+        audioOut->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, byteRate);
+        st->audioSetupHr = writer->AddStream(audioOut.Get(), &st->audioStream);
+        if (SUCCEEDED(st->audioSetupHr)) {
             ComPtr<IMFMediaType> audioIn;
             MFCreateMediaType(&audioIn);
             audioIn->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
             audioIn->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
             audioIn->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
-            audioIn->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, (UINT32) sampleRate);
-            audioIn->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, (UINT32) channels);
-            writer->SetInputMediaType(st->audioStream, audioIn.Get(), NULL);
-        } else {
+            audioIn->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, (UINT32) st->audioEncRate);
+            audioIn->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, (UINT32) st->audioChannels);
+            /* The PCM input type is under-specified without these two: the
+             * encoder needs the frame size and byte rate to accept the type. */
+            audioIn->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, (UINT32) (2 * st->audioChannels));
+            audioIn->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND,
+                    (UINT32) (st->audioEncRate * 2 * st->audioChannels));
+            st->audioSetupHr = writer->SetInputMediaType(st->audioStream, audioIn.Get(), NULL);
+        }
+        if (FAILED(st->audioSetupHr)) {
             st->hasAudio = false;
         }
     }
@@ -609,7 +658,43 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_videoWriterAudio___long_byte_
     }
     BYTE* pcm = (BYTE*) (*(JAVA_ARRAY) pcmObj).data;
     DWORD len = (DWORD) (*(JAVA_ARRAY) pcmObj).length;
-    DWORD frames = len / (DWORD) (2 * (channels > 0 ? channels : 1));
+    int ch = channels > 0 ? channels : 1;
+    DWORD frames = len / (DWORD) (2 * ch);
+    BYTE* resampled = NULL;
+
+    /* The encoder runs at a rate it will accept (see cn1WriterOpen), so PCM
+     * recorded at any other rate is converted here. Linear interpolation between
+     * neighbouring frames: enough for the tone the conformance suite records,
+     * and it keeps the signal level -- and therefore the RMS the test measures --
+     * where the caller put it. */
+    if (sampleRate > 0 && st->audioEncRate > 0 && sampleRate != st->audioEncRate && frames > 0) {
+        double ratio = (double) st->audioEncRate / (double) sampleRate;
+        DWORD outFrames = (DWORD) (frames * ratio);
+        if (outFrames > 0) {
+            DWORD outLen = outFrames * (DWORD) (2 * ch);
+            resampled = (BYTE*) malloc(outLen);
+            if (resampled != NULL) {
+                const short* in = (const short*) pcm;
+                short* out = (short*) resampled;
+                for (DWORD f = 0; f < outFrames; f++) {
+                    double srcPos = (double) f / ratio;
+                    DWORD i0 = (DWORD) srcPos;
+                    DWORD i1 = i0 + 1 < frames ? i0 + 1 : frames - 1;
+                    double frac = srcPos - (double) i0;
+                    for (int c = 0; c < ch; c++) {
+                        double a = (double) in[i0 * ch + c];
+                        double b = (double) in[i1 * ch + c];
+                        out[f * ch + c] = (short) (a + (b - a) * frac);
+                    }
+                }
+                pcm = resampled;
+                len = outLen;
+                frames = outFrames;
+                sampleRate = st->audioEncRate;
+            }
+        }
+    }
+
     LONGLONG dur = sampleRate > 0 ? (LONGLONG) ((LONGLONG) frames * CN1_HNS_PER_SEC / sampleRate) : 0;
     cn1WriterWriteSample(st, st->audioStream, pcm, len, (LONGLONG) ptsMs * CN1_HNS_PER_MS, dur);
     /* A freshly opened reader cannot be positioned at EOF, yet it still reports
@@ -618,6 +703,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_videoWriterAudio___long_byte_
      * reader. Count what actually goes in. */
     st->audioSamplesWritten++;
     st->audioBytesWritten += (unsigned long long) len;
+    free(resampled);
 }
 
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_videoWriterClose___long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {
@@ -626,9 +712,10 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_videoWriterClose___long_R_
         return JAVA_FALSE;
     }
     HRESULT hr = st->writer->Finalize();
-    printf("CN1SS:INFO:winWriter audioSamples=%lu audioBytes=%llu hasAudio=%d finalizeHr=0x%08lx\n",
+    printf("CN1SS:INFO:winWriter audioSamples=%lu audioBytes=%llu hasAudio=%d encRate=%d "
+           "audioSetupHr=0x%08lx finalizeHr=0x%08lx\n",
            st->audioSamplesWritten, st->audioBytesWritten, st->hasAudio ? 1 : 0,
-           (unsigned long) hr);
+           st->audioEncRate, (unsigned long) st->audioSetupHr, (unsigned long) hr);
     fflush(stdout);
     delete st;
     return SUCCEEDED(hr) ? JAVA_TRUE : JAVA_FALSE;

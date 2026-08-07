@@ -1064,7 +1064,18 @@ public class WindowsImplementation extends CodenameOneImplementation {
             int b = Math.min(255, (p & 0xff) * 255 / a);
             px[i] = (a << 24) | (r << 16) | (g << 8) | b;
         }
-        return Image.createImage(px, w, h);
+        // Callers composite ON TOP of the blur result -- Switch blurs its thumb's
+        // drop shadow and then draws the knob onto the blurred image -- so the
+        // result has to be drawable. Image.createImage(int[], w, h) builds an
+        // ARGB-backed CN1Image with no Direct2D render target, and
+        // getImageGraphics then answers 0: Graphics wraps a null peer, and every
+        // subsequent draw either vanishes or dereferences it. Blit the pixels
+        // into a mutable image so the port matches JavaSE, where the blur result
+        // is a BufferedImage and getGraphics has always worked.
+        Image blurred = Image.createImage(px, w, h);
+        Image drawable = Image.createImage(w, h, 0);
+        drawable.getGraphics().drawImage(blurred, 0, 0);
+        return drawable;
     }
 
     /** One separable box-blur pass over premultiplied ARGB; edges clamp. */
@@ -2819,7 +2830,11 @@ public class WindowsImplementation extends CodenameOneImplementation {
             // mattered -- and JavaSE and Android reject the same call, because
             // they hand a non-null iv to JCE as an IvParameterSpec and ECB
             // refuses it. Refusing here keeps the ports answering alike.
-            if (iv != null && iv.length > 0) {
+            // Any non-null array, including a zero-length one: JavaSE branches
+            // on iv != null rather than on its length, so new byte[0] builds an
+            // IvParameterSpec there and ECB throws. Accepting it here would have
+            // made the same call succeed on the desktop ports alone.
+            if (iv != null) {
                 throw new RuntimeException("AES-ECB cannot use an initialization vector");
             }
         } else if (iv == null || iv.length != 16) {

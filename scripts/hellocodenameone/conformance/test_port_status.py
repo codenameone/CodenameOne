@@ -495,6 +495,50 @@ class PortStatusTest(unittest.TestCase):
                 self.assertTrue(
                     any("missing list" in item for item in malformed), malformed)
 
+    def test_publishable_rejects_a_complete_label_on_partial_benchmark_data(self):
+        # normalize writes "partial" whenever a workload went unrun, but nothing
+        # downstream re-derives it: port-status.html renders the timings of any
+        # benchmark whose status is "complete". A crashed suite that mislabelled
+        # itself would present the handful of workloads it managed to measure as
+        # a finished measurement run, and measured | missing still covers the
+        # contract so the accounting check above stays quiet.
+        report = self.publishable_report("linux-x64")
+        report["suite_finished"] = False
+        report["performance"]["status"] = "complete"
+        report["performance"]["missing"] = ["quicksort"]
+        del report["performance"]["benchmarks"]["quicksort"]
+
+        _, malformed = port_status.publishable_report_problems(
+            self.manifest, "linux-x64", report
+        )
+        self.assertTrue(
+            any("declares missing workloads" in item for item in malformed), malformed
+        )
+
+    def test_publishable_rejects_a_malformed_reason_list(self):
+        # The reason list is optional, but the feature template calls len, range
+        # and hasPrefix on whatever is there. A wrongly typed one has to be
+        # caught as a single unusable report rather than reaching the data
+        # branch and failing the Hugo build for the whole site.
+        for bad in (True, 7, "flaky", {"why": "flaky"}, ["ok", 3]):
+            with self.subTest(bad=bad):
+                report = self.publishable_report("linux-x64")
+                report["tests"]["ClipboardRoundTripTest"]["reasons"] = bad
+                _, malformed = port_status.publishable_report_problems(
+                    self.manifest, "linux-x64", report
+                )
+                self.assertTrue(
+                    any("reasons is not an array of strings" in item
+                        for item in malformed), malformed)
+
+    def test_publishable_accepts_a_well_formed_reason_list(self):
+        report = self.publishable_report("linux-x64")
+        report["tests"]["ClipboardRoundTripTest"]["reasons"] = ["documented skip"]
+
+        self.assertEqual(([], []), port_status.publishable_report_problems(
+            self.manifest, "linux-x64", report
+        ))
+
     def test_publishable_matches_every_report_the_site_serves(self):
         for port in self.manifest["ports"]:
             report_path = port_status.REPO_ROOT / self.manifest["report_directory"] / (

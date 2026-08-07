@@ -2811,7 +2811,11 @@ public class LinuxImplementation extends CodenameOneImplementation {
             // mattered -- and JavaSE and Android reject the same call, because
             // they hand a non-null iv to JCE as an IvParameterSpec and ECB
             // refuses it. Refusing here keeps the ports answering alike.
-            if (iv != null && iv.length > 0) {
+            // Any non-null array, including a zero-length one: JavaSE branches
+            // on iv != null rather than on its length, so new byte[0] builds an
+            // IvParameterSpec there and ECB throws. Accepting it here would have
+            // made the same call succeed on the desktop ports alone.
+            if (iv != null) {
                 throw new RuntimeException("AES-ECB cannot use an initialization vector");
             }
         } else if (iv == null || iv.length != 16) {

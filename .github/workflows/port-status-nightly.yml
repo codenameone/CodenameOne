@@ -132,9 +132,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: scripts/hellocodenameone/conformance/publish_port_status_environment.sh artifacts/port-status-environment.json
       - name: Rebuild the static website snapshot
-        # Deliberately not gated on the JavaScript build: the reports published
-        # tonight reach the public table only through this dispatch.
-        if: github.ref == 'refs/heads/master'
+        # Deliberately not gated on the JavaScript build, nor on the evidence
+        # steps above it: the reports published tonight reach the public table
+        # only through this dispatch. Without always() the step inherits the
+        # implicit success() requirement, so a failure while downloading,
+        # assembling, uploading or publishing the browser evidence left the
+        # sweep's freshly published reports off the public snapshot until some
+        # later deployment happened to rebuild it.
+        if: always() && github.ref == 'refs/heads/master'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run website-docs.yml --ref master -f deploy_production=true

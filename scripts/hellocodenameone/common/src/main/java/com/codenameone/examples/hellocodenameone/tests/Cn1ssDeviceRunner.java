@@ -852,6 +852,20 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         }
         if (frames == null || frames.length == 0) {
             log("CN1SS:ERR:throwable context=" + context + " frames=none");
+            // ParparVM's Throwable.getStackTrace() is a stub that always answers
+            // an empty array, but the VM does record frames: the native
+            // fillInStack walks threadStateData->callStack when the throwable is
+            // constructed and stores the rendered text, which printStackTrace is
+            // the only accessor for. Asking getStackTrace and stopping there is
+            // why a NullPointerException on Windows arrived with no location at
+            // all and took several CI rounds to place. Costs nothing on the JVM
+            // ports, where the frames above are non-empty and this never runs.
+            log("CN1SS:ERR:throwable context=" + context + " printing the VM's own stack:");
+            try {
+                t.printStackTrace();
+            } catch (Throwable unsupported) {
+                log("CN1SS:ERR:throwable context=" + context + " printStackTrace=unsupported");
+            }
             return;
         }
         for (int i = 0; i < frames.length && i < 24; i++) {

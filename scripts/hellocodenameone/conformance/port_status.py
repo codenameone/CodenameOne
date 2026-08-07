@@ -674,6 +674,18 @@ def publishable_report_problems(
         }:
             malformed.append(f"invalid result for {test}")
             continue
+        # The reason list is optional, but when present the feature template
+        # calls len, range and hasPrefix on it. A producer emitting "reasons":
+        # true or an object would pass the status check here, reach the data
+        # branch, and then fail the Hugo build -- taking the whole site down
+        # rather than being classified as one unusable report.
+        reasons = result.get("reasons")
+        if reasons is not None and (
+            not isinstance(reasons, list)
+            or not all(isinstance(item, str) for item in reasons)
+        ):
+            malformed.append(f"{test} reasons is not an array of strings")
+            continue
         statuses[result["status"]] += 1
     expected_summary = {
         key: statuses.get(key, 0) for key in ("pass", "fail", "skip", "not-run")
@@ -764,6 +776,19 @@ def publishable_report_problems(
             malformed.append(
                 "performance workloads unaccounted for: "
                 + describe_workload_gap(covered, expected_benchmarks)
+            )
+        # A report that names workloads it never ran cannot also call the run
+        # complete. normalize never writes that pair, but nothing downstream
+        # re-derives the status: port-status.html renders the timings of any
+        # benchmark whose status is "complete", so the partial set that a
+        # crashed suite did manage to measure would be presented as a finished
+        # measurement run. accounted | missing can still cover the contract, so
+        # the check above does not catch it.
+        if declared_missing and performance.get("status") != "partial":
+            malformed.append(
+                "performance run is "
+                f"{performance.get('status')!r} but declares missing workloads: "
+                + ", ".join(declared_missing)
             )
     for name, measurement in benchmarks.items():
         duration = measurement.get("duration_ns") if isinstance(measurement, dict) else None
