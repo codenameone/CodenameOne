@@ -105,6 +105,20 @@ public final class GuiDocument {
         modified = true;
     }
 
+    /**
+     * Sets an attribute on a specific element rather than the selection.
+     *
+     * @param element the element to change
+     * @param name the attribute name
+     * @param value the new value, or null to remove it
+     */
+    public void setAttribute(Element element, String name, String value) {
+        if (element == null) return;
+        beforeMutation();
+        setNormalizedAttribute(element, name, value);
+        modified = true;
+    }
+
     public String effectiveUiid(Element element) {
         String explicit = element == null ? null : element.getAttribute("uiid");
         if (explicit != null && explicit.length() > 0) return explicit;
@@ -216,7 +230,30 @@ public final class GuiDocument {
         modified = true;
     }
 
+    /**
+     * True when the parent is a BorderLayout whose five regions are all taken. Core
+     * {@code BorderLayout.addLayoutComponent()} removes whatever already occupies a region, so a
+     * sixth child does not stack up -- it silently evicts an existing one from the preview and the
+     * generated container while remaining in the .gui hierarchy.
+     *
+     * @param parent the container an addition is aimed at
+     * @return true when there is no free region left
+     */
+    public static boolean borderLayoutIsFull(Element parent) {
+        if (parent == null || !"BorderLayout".equals(parent.getAttribute("layout"))) return false;
+        return componentsIn(parent).size() >= BORDER_LAYOUT_REGIONS;
+    }
+
+    /** North, South, East, West and Center: everything a BorderLayout can hold. */
+    private static final int BORDER_LAYOUT_REGIONS = 5;
+
+    /**
+     * @param type the component type to add
+     * @return the new element, or null when the selected parent cannot take another child
+     */
     public Element addComponent(String type) {
+        Element target = acceptsChildren(selected) ? selected : findParent(root, selected);
+        if (borderLayoutIsFull(target == null ? root : target)) return null;
         beforeMutation();
         Element parent = selected;
         if (!acceptsChildren(parent)) parent = findParent(root, selected);
