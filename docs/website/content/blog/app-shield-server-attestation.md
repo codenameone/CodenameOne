@@ -100,7 +100,7 @@ The two policies encode different outage choices:
 
 ### If your application already has a network guard
 
-`NetworkManager` accepts one `NetworkGuard` and seals that slot after the first call to `setNetworkGuard()`. In the usual setup, call `AppShield.init()` immediately after `Display.init()` and before any library or application code installs a guard.
+`NetworkManager` accepts one `NetworkGuard` and seals that slot after the first call to `setNetworkGuard()`. In the usual setup, call `AppShield.init()` at the top of your application's `init(Object)` method, before any library or application code installs a guard.
 
 If another guard is installed first, App Shield cannot replace it. Initialization continues, but ordinary requests receive neither the attestation token nor App Shield's certificate-pin check. This includes hosts marked `ENFORCED`: without the shield guard, nothing sees that policy before the request leaves the device.
 
