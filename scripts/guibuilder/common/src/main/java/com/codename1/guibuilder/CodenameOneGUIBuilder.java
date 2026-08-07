@@ -539,6 +539,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void switchForm(String path) {
         cancelDesignerDrag();
+        // Opening another form tears the editor pane down, and its buffer is the only copy of an
+        // unsaved edit. The document itself can be perfectly clean while the source, CSS or model
+        // pane is not, so this has to be asked separately.
+        if (editorBufferIsDirty()
+                && !com.codename1.ui.Dialog.show("Unsaved changes",
+                        "The open editor has changes you have not saved. Opening another form"
+                        + " discards them.", "Discard", "Keep editing")) {
+            setStatus("Kept your unsaved editor changes");
+            return;
+        }
         if (document != null && document.isModified()) {
             if (com.codename1.ui.Dialog.show("Unsaved changes", "Save changes before switching forms?", "Save", "Discard")) {
                 // Staying on a form whose save failed is the only way to keep the work: opening the
@@ -1345,8 +1355,22 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private void addComponentAt(String type, int x, int y) {
         Element previous = document.selected();
         Element added = null;
+        // A rejected drop has to leave the document exactly as it was. The candidate is inserted
+        // under the current selection before the plan is known, and for a TableLayout parent that
+        // insertion assigns a cell and can grow tableLayoutRows -- undoing only the child left the
+        // table enlarged and the document dirty for a drop that never happened.
+        String tableRowsBefore = null;
+        Element candidateParent = GuiDocument.acceptsChildren(previous) ? previous : document.parentOf(previous);
+        if (candidateParent != null && "TableLayout".equals(candidateParent.getAttribute("layout"))) {
+            tableRowsBefore = candidateParent.getAttribute("tableLayoutRows");
+        }
         try {
             added = document.addComponent(type);
+            if (added == null) {
+                ToastBar.showErrorMessage("That container is a BorderLayout and all five regions are taken");
+                setStatus("Nothing added: the drop target is a full BorderLayout");
+                return;
+            }
             Element target = activePreviewElementAt(x, y);
             Component palettePreview = ComponentPreviewFactory.create(added, null, new ComponentPreviewFactory.SelectionHandler() {
                 @Override public void selected(Element element) { }
@@ -1358,6 +1382,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (plan == null || !plan.valid) {
                 document.select(added);
                 document.deleteSelected();
+                restoreTableRows(candidateParent, tableRowsBefore);
                 document.select(previous);
                 setStatus(plan == null ? "Drop inside the form to add " + type : plan.message);
                 return;
@@ -1371,6 +1396,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (added != null && document.parentOf(added) != null) {
                 document.select(added);
                 document.deleteSelected();
+                restoreTableRows(candidateParent, tableRowsBefore);
                 document.select(previous);
             }
             setStatus("Drop failed safely — " + (ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage()));
@@ -1378,6 +1404,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             hideDropGuide();
             if (workspace != null) workspace.revalidate();
         }
+    }
+
+    /**
+     * Puts a table's declared row count back after a rejected drop.
+     *
+     * @param parent the table the candidate was inserted into, or null when it was not a table
+     * @param rows the value the attribute held before, possibly null
+     */
+    private void restoreTableRows(Element parent, String rows) {
+        if (parent == null || !"TableLayout".equals(parent.getAttribute("layout"))) return;
+        document.setAttribute(parent, "tableLayoutRows", rows);
     }
 
     private boolean dropAfter(Element target, String layout, int x, int y) {
@@ -3814,7 +3851,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void addComponent(String type) {
         if (document == null) return;
-        document.addComponent(type);
+        if (document.addComponent(type) == null) {
+            // Core BorderLayout evicts whatever holds the region it is handed, so a sixth child
+            // would remove one of the five already placed rather than joining them.
+            ToastBar.showErrorMessage("That container is a BorderLayout and all five regions are taken");
+            setStatus("Nothing added: the selected BorderLayout is full");
+            return;
+        }
         refreshEditor();
         setStatus("Added " + type);
     }
@@ -3963,7 +4006,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (document == null) return true;
         try {
             ProjectIO.write(document.path(), document.toXml());
-            document.markSaved();
             // The .gui file alone changes nothing at runtime. Without regenerating the companion
             // here, a component added in the designer and saved was simply absent from the running
             // application until the user happened to open the Code pane and save that too, and a
@@ -3971,6 +4013,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             String sourcePath = companionSourcePath();
             String existing = ProjectIO.exists(sourcePath) ? ProjectIO.read(sourcePath) : null;
             if (!writeCompanionSource(sourcePath, existing)) return false;
+            // Only now: marking the document clean after the .gui write but before the companion
+            // one meant a failed companion write left isModified() false, so the next form switch
+            // went ahead without retrying and the runtime source stayed stale.
+            document.markSaved();
             recordAction("saved", "form", relativeFormName(document.path()));
             setStatus("Saved " + relativeFormName(document.path()) + " and its companion source");
             ToastBar.showMessage("GUI form saved", FontImage.MATERIAL_CHECK);
@@ -4869,12 +4915,40 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (legacyStart < 0 || legacyEnd < legacyStart) return null;
         String carried = legacyUserMembers(existing, legacyStart, legacyEnd);
         String marker = "// <gui-builder-user-code>";
-        if (carried.length() == 0) return generated;
-        String merged = dropStubsAlreadyWritten(generated, carried);
+        if (carried.length() == 0) return carriedImports(existing, generated);
+        String merged = carriedImports(existing, dropStubsAlreadyWritten(generated, carried));
         int insert = merged.indexOf(marker);
         if (insert < 0) return merged;
         insert += marker.length();
         return merged.substring(0, insert) + "\n" + carried + "\n" + merged.substring(insert);
+    }
+
+    /**
+     * Adds the legacy file's own imports to the generated header. Migration carries the class body
+     * across but the header is regenerated, so a user method that depended on a custom import
+     * compiled before the migration and not after it -- an existing project would stop building on
+     * the first save in this editor.
+     *
+     * @param existing the legacy companion source
+     * @param generated the freshly generated source to add the imports to
+     * @return the generated source with any imports it was missing
+     */
+    private String carriedImports(String existing, String generated) {
+        int classAt = classDeclaration(existing);
+        String header = classAt < 0 ? existing : existing.substring(0, classAt);
+        StringBuilder missing = new StringBuilder();
+        for (String line : header.split("\n")) {
+            String statement = line.trim();
+            if (!statement.startsWith("import ") || !statement.endsWith(";")) continue;
+            if (generated.indexOf(statement) >= 0) continue;
+            missing.append(statement).append('\n');
+        }
+        if (missing.length() == 0) return generated;
+        int anchor = generated.lastIndexOf("\nimport ");
+        if (anchor < 0) return generated;
+        int endOfImports = generated.indexOf('\n', anchor + 1);
+        if (endOfImports < 0) return generated;
+        return generated.substring(0, endOfImports + 1) + missing + generated.substring(endOfImports + 1);
     }
 
     /**

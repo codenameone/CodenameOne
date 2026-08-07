@@ -120,7 +120,7 @@ class LiveTypingTest {
         // from a keystroke to a repainted canvas -- the path that was actually broken.
         Display.getInstance().callSeriallyAndWait(() -> view.selectAll());
         type(view, "Label { color: #00ff00; }\n");
-        settleForLiveCss();
+        awaitForeground(builder, "nestedDescription", 0x00ff00);
 
         Component after = previewOf(builder, "nestedDescription");
         assertNotNull(after, "the label vanished after the CSS edit");
@@ -147,12 +147,26 @@ class LiveTypingTest {
     }
 
     /** The live CSS path debounces twice, so it needs longer than an ordinary EDT flush. */
-    private static void settleForLiveCss() {
-        for (int i = 0; i < 8; i++) {
-            try { Thread.sleep(300); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    /**
+     * Waits for the live recompile to reach the canvas, rather than sleeping a fixed span and
+     * hoping. Every keystroke reschedules a 120ms debounce and a 250ms poll drives the recompile,
+     * so on a loaded machine -- the whole suite running ahead of this test -- a fixed wait expired
+     * before the colour arrived and the assertion failed for timing rather than behaviour. Giving
+     * up after the timeout still fails the test, so a colour that never applies is still caught.
+     *
+     * @param builder the workspace under test
+     * @param name the element whose preview is watched
+     * @param expected the foreground colour the stylesheet should produce
+     */
+    private static void awaitForeground(CodenameOneGUIBuilder builder, String name, int expected) {
+        for (int attempt = 0; attempt < 100; attempt++) {
             Display.getInstance().callSeriallyAndWait(() -> { });
+            Component preview = previewOf(builder, name);
+            if (preview != null && preview.getUnselectedStyle().getFgColor() == expected) return;
+            try { Thread.sleep(300); } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
         }
     }
+
 
     // ---- harness ----------------------------------------------------------------------------
 

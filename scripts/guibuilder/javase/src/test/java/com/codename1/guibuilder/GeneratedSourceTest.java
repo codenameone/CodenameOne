@@ -256,6 +256,36 @@ class GeneratedSourceTest {
         compile(merged, null);
     }
 
+    /**
+     * Migration regenerates the header, so an import the developer added for their own method has
+     * to be carried across or the project stops compiling on the first save in this editor.
+     */
+    @Test
+    void migratingALegacyCompanionKeepsTheImportsItsUserCodeNeeds() throws Exception {
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import java.util.ArrayList;\n"
+                + "import java.util.List;\n"
+                + "public class LoginForm extends com.codename1.ui.Form {\n"
+                + "    private final List<String> attempts = new ArrayList<String>();\n"
+                + "    public LoginForm() {\n"
+                + "        initGuiBuilderComponents(null);\n"
+                + "    }\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    private void initGuiBuilderComponents(com.codename1.ui.util.Resources r) {\n"
+                + "    }\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "}\n";
+        String generated = invoke(builder, "defaultCompanionSource");
+        String merged = merge(builder, legacy, generated);
+
+        assertTrue(merged.contains("import java.util.ArrayList;"),
+                "the import the carried field needs was dropped:\n" + merged);
+        assertTrue(merged.contains("import java.util.List;"), merged);
+        assertTrue(merged.contains("attempts"), "the developer's field was lost:\n" + merged);
+        compile(merged, null);
+    }
+
     @Test
     void aHandWrittenCompanionIsLeftAlone() throws Exception {
         CodenameOneGUIBuilder builder = builder("none");
