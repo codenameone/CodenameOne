@@ -2282,8 +2282,41 @@ public class CN1WearableBridge implements WearableBridge {
      * back to the Data Layer for the item, so a transfer that was still streaming lands as soon as
      * it is complete; after the last attempt the transfer is genuinely dropped.
      */
+    /// Starts a retry chain for a transfer whose Asset would not read, unless one is already
+    /// running for it.
+    ///
+    /// ONE chain per URI. The startup replay and onDataChanged both inspect the same item on a cold
+    /// start -- that race is expected, not exceptional -- and each inspection used to start its own
+    /// chain. Every chain then reopens the same asset on the shared transfer timer for up to the
+    /// hard cap, and each further callback added another, so the cost grew with the number of
+    /// times the item was looked at while it happened to be unreadable. It also delays the replay
+    /// and cleanup work queued behind it on that timer.
+    ///
+    /// The claim is the retryStarts entry, which every exit from the chain already clears -- decode
+    /// success, our own echo, the item having disappeared, and the hard-cap give-up -- so a chain
+    /// that ends releases the URI for a later one without any new bookkeeping.
     private static void scheduleTransferRetry(final Context context, final Uri uri) {
+        if (uri == null) {
+            return;
+        }
+        if (!claimRetryChain(uri)) {
+            return;
+        }
         scheduleTransferRetry(context, uri, 1);
+    }
+
+    /// Records that a retry chain now owns this URI, or reports that one already did.
+    private static boolean claimRetryChain(Uri uri) {
+        String key = uri.toString();
+        synchronized (retryStarts) {
+            if (retryStarts.containsKey(key)) {
+                return false;
+            }
+            // Stamped from the FIRST attempt rather than from the first hard-cap check, so the
+            // window the chain is bounded by is the one the caller actually experienced.
+            retryStarts.put(key, Long.valueOf(System.currentTimeMillis()));
+            return true;
+        }
     }
 
     /**
