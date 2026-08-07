@@ -211,7 +211,7 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
                     throw new AssertionError("Physical typing did not mutate the actual theme.css editor: " + editorState[0]);
                 }
                 int typedLength = text[0].length();
-                int shortcutKey = (Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()
+                int shortcutKey = (menuShortcutMask()
                         & java.awt.event.InputEvent.META_DOWN_MASK) != 0 ? KeyEvent.VK_META : KeyEvent.VK_CONTROL;
                 robot.keyPress(shortcutKey);
                 robot.keyPress(KeyEvent.VK_Z);
@@ -490,7 +490,7 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
         edit.add(item("Undo", KeyEvent.VK_Z, true, CodenameOneGUIBuilderStub::undoFocusedEditorOrForm));
         JMenuItem redo = item("Redo", 0, false, CodenameOneGUIBuilderStub::redoFocusedEditorOrForm);
         redo.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Z,
-                Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx() | KeyEvent.SHIFT_DOWN_MASK));
+                menuShortcutMask() | KeyEvent.SHIFT_DOWN_MASK));
         edit.add(redo);
         edit.addSeparator();
         edit.add(item("Cut", KeyEvent.VK_X, true, () -> editFocusedTextOrForm("cut")));
@@ -504,7 +504,7 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
 
         JMenu view = new JMenu("View");
         JCheckBoxMenuItem dark = new JCheckBoxMenuItem("Dark Mode", CodenameOneGUIBuilder.isActiveDarkMode());
-        dark.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
+        dark.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, menuShortcutMask()));
         dark.addActionListener(e -> CodenameOneGUIBuilder.toggleActiveDarkMode());
         view.add(dark);
         view.addSeparator();
@@ -532,13 +532,56 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
         bar.add(forms);
         bar.add(code);
         frame.setJMenuBar(bar);
+        installAboutHandler(frame);
+    }
+
+    /**
+     * The menu shortcut modifier. {@code getMenuShortcutKeyMaskEx} arrived in Java 10 and this
+     * editor is a Java 8 artifact, so the older accessor is used; it reports the legacy mask
+     * constants, which {@code KeyStroke} and {@code InputEvent} still understand.
+     */
+    @SuppressWarnings("deprecation")
+    private static int menuShortcutMask() {
+        // Converted to the extended constants the call sites use. Java 8 only offers the legacy
+        // accessor, and mixing a legacy mask into an accelerator built from *_DOWN_MASK values
+        // yields a modifier combination that never matches.
+        int legacy = Toolkit.getDefaultToolkit().getMenuShortcutKeyMask();
+        if ((legacy & java.awt.event.InputEvent.META_MASK) != 0) return java.awt.event.InputEvent.META_DOWN_MASK;
+        if ((legacy & java.awt.event.InputEvent.ALT_MASK) != 0) return java.awt.event.InputEvent.ALT_DOWN_MASK;
+        if ((legacy & java.awt.event.InputEvent.SHIFT_MASK) != 0) return java.awt.event.InputEvent.SHIFT_DOWN_MASK;
+        return java.awt.event.InputEvent.CTRL_DOWN_MASK;
+    }
+
+    /**
+     * Installs the About entry in the application menu. {@code Desktop.Action.APP_ABOUT} and
+     * {@code setAboutHandler} are Java 9 additions, so they are invoked reflectively: on 8 the menu
+     * simply has no About entry rather than the whole editor failing to build.
+     *
+     * @param frame the window the dialog is shown over
+     */
+    private static void installAboutHandler(final JFrame frame) {
         try {
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.APP_ABOUT)) {
-                Desktop.getDesktop().setAboutHandler(e -> javax.swing.JOptionPane.showMessageDialog(frame,
-                        "Modern Maven-first visual editor for Codename One GUI forms.", APP_DISPLAY_NAME,
-                        javax.swing.JOptionPane.INFORMATION_MESSAGE));
-            }
-        } catch (Throwable ignored) { }
+            Class<?> actionClass = Class.forName("java.awt.Desktop$Action");
+            Object appAbout = actionClass.getField("APP_ABOUT").get(null);
+            if (!Desktop.isDesktopSupported()) return;
+            Desktop desktop = Desktop.getDesktop();
+            java.lang.reflect.Method supported = Desktop.class.getMethod("isSupported", actionClass);
+            if (!Boolean.TRUE.equals(supported.invoke(desktop, appAbout))) return;
+            Class<?> handlerClass = Class.forName("java.awt.desktop.AboutHandler");
+            Object handler = java.lang.reflect.Proxy.newProxyInstance(
+                    CodenameOneGUIBuilderStub.class.getClassLoader(), new Class<?>[]{handlerClass},
+                    (proxy, method, args) -> {
+                        if ("handleAbout".equals(method.getName())) {
+                            javax.swing.JOptionPane.showMessageDialog(frame,
+                                    "Modern Maven-first visual editor for Codename One GUI forms.",
+                                    APP_DISPLAY_NAME, javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                        }
+                        return null;
+                    });
+            Desktop.class.getMethod("setAboutHandler", handlerClass).invoke(desktop, handler);
+        } catch (Throwable olderJdkOrHeadless) {
+            // Java 8, or a desktop that does not offer an application menu.
+        }
     }
 
     private static UndoManager focusedEditorUndoManager() {
@@ -607,7 +650,7 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
     private static JMenuItem item(String label, int key, boolean menuShortcut, Runnable action) {
         JMenuItem item = new JMenuItem(label);
         if (key > 0) {
-            int mask = menuShortcut ? Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx() : 0;
+            int mask = menuShortcut ? menuShortcutMask() : 0;
             item.setAccelerator(KeyStroke.getKeyStroke(key, mask));
         }
         item.addActionListener(e -> action.run());

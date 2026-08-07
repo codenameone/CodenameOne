@@ -130,6 +130,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     /** Reopens whichever editor was on screen after the canvas is rebuilt; null when none is. */
     private Runnable activeEditorReopen;
     private boolean reopeningEditor;
+    /**
+     * Live mirror of the open editor's text, and the text it last agreed with on disk. A canvas
+     * rebuild destroys the editor component, so without a mirror the reopen re-read the file and
+     * every unsaved keystroke vanished the moment the user dropped, deleted or undid anything.
+     * The pair also answers whether the buffer is dirty, which is what Close has to know.
+     */
+    private String editorBuffer;
+    private String editorBufferOnDisk;
     private String lastObservedCss;
     private com.codename1.ui.util.UITimer cssLiveTimer;
     private int cssEditRevision;
@@ -648,9 +656,41 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
     }
 
-    /** Closes an open editor pane for good, rather than letting the next refresh restore it. */
+    /**
+     * Starts mirroring an editor's text so a canvas rebuild can put the buffer back and Close can
+     * tell whether there is anything to lose.
+     *
+     * @param editor the editor being shown
+     * @param content the text it was opened with
+     */
+    private void trackEditorBuffer(final CodeEditor editor, String content) {
+        editorBuffer = content;
+        // Only the reopen path carries a buffer forward; a fresh open agrees with disk by
+        // definition, and after a save the caller resets this to the text it wrote.
+        if (!reopeningEditor) editorBufferOnDisk = content;
+        editor.addChangeListener(e -> editor.getText(text -> editorBuffer = text));
+    }
+
+    /** True when the open editor holds text that is not on disk. */
+    private boolean editorBufferIsDirty() {
+        return editorBuffer != null && !editorBuffer.equals(editorBufferOnDisk);
+    }
+
+    /**
+     * Closes an open editor pane for good, rather than letting the next refresh restore it. The
+     * buffer is the only copy of an unsaved edit -- reopening reads the file -- so closing without
+     * asking discarded the user's work outright.
+     */
     private void closeEditorPane() {
+        if (editorBufferIsDirty()
+                && !com.codename1.ui.Dialog.show("Unsaved changes",
+                        "Closing this editor discards the changes you have not saved.",
+                        "Discard", "Keep editing")) {
+            return;
+        }
         activeEditorReopen = null;
+        editorBuffer = null;
+        editorBufferOnDisk = null;
         refreshEditor();
     }
 
@@ -676,7 +716,19 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         for (Element command : document.commands()) {
             Button button = new Button(value(command, "name", "Command"));
             button.setUIID("TitleCommand");
-            if ("left".equals(value(command, "placement", "right"))) left.add(button); else right.add(button);
+            // The command editor offers overflow and side placements and the generated source
+            // honours them. Falling through to the right bar here showed a toolbar the running
+            // application would never produce, so placement could not be checked before saving.
+            String placement = value(command, "placement", "right");
+            if ("side".equals(placement)) {
+                // A side command reaches the user through the side menu and an overflow command
+                // through the overflow menu; neither sits on the bar as its own button. Showing
+                // where it actually lives beats showing it in the wrong corner.
+                button.setText("[side] " + button.getText());
+            } else if ("overflow".equals(placement)) {
+                button.setText("[overflow] " + button.getText());
+            }
+            if ("left".equals(placement) || "side".equals(placement)) left.add(button); else right.add(button);
         }
         if (left.getComponentCount() > 0) bar.add(BorderLayout.WEST, left);
         if (right.getComponentCount() > 0) bar.add(BorderLayout.EAST, right);
@@ -2945,7 +2997,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String type = document.attribute("type", "Component");
         fields.add(new Label(type, "BuilderInspectorComponent"));
         fields.add(nameField());
-        if ("Form".equals(type)) {
+        if (isFormLike(type)) {
             fields.add(propertyField("Title", "title"));
             fields.add(bindingStrategyPicker());
         }
@@ -2987,13 +3039,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             fields.add(booleanProperty("Scroll horizontally", "scrollableX", false));
             fields.add(booleanProperty("Scroll vertically", "scrollableY", false));
         }
-        if (hasText(type) || "Form".equals(type)) {
+        if (hasText(type) || isFormLike(type)) {
             Button inline = new Button("Edit content in place", material(FontImage.MATERIAL_EDIT, "BuilderInlineIcon"));
             inline.setUIID("BuilderSecondaryAction");
             inline.addActionListener(e -> editSelectedContent());
             fields.add(inline);
         }
-        if ("Form".equals(type)) {
+        if (isFormLike(type)) {
             fields.add(fieldLabel("Toolbar commands"));
             fields.add(toolbarCommandsEditor());
         }
@@ -3772,7 +3824,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         finishInlineEditor();
         Element target = document.selected();
         String type = value(target, "type", "Component");
-        String attribute = "Form".equals(type) ? "title" : "text";
+        String attribute = isFormLike(type) ? "title" : "text";
         Component source = target == document.root() ? formTitlePreview : componentForElement(canvasHost, target);
         if (source == null || workspace == null) return;
         Container parent = source.getParent();
@@ -3912,8 +3964,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         try {
             ProjectIO.write(document.path(), document.toXml());
             document.markSaved();
+            // The .gui file alone changes nothing at runtime. Without regenerating the companion
+            // here, a component added in the designer and saved was simply absent from the running
+            // application until the user happened to open the Code pane and save that too, and a
+            // freshly scaffolded form stayed an empty screen despite a successful save.
+            String sourcePath = companionSourcePath();
+            String existing = ProjectIO.exists(sourcePath) ? ProjectIO.read(sourcePath) : null;
+            if (!writeCompanionSource(sourcePath, existing)) return false;
             recordAction("saved", "form", relativeFormName(document.path()));
-            setStatus("Saved " + relativeFormName(document.path()));
+            setStatus("Saved " + relativeFormName(document.path()) + " and its companion source");
             ToastBar.showMessage("GUI form saved", FontImage.MATERIAL_CHECK);
             return true;
         } catch (IOException ex) {
@@ -3955,9 +4014,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         try {
             refreshEditor();
             String css = ProjectIO.read(binding.cssFile());
+            if (reopeningEditor && editorBuffer != null) css = editorBuffer;
             CodeEditor editor = new CodeEditor("css", css);
             activeCodeEditor = editor;
             lastObservedCss = css;
+            // The CSS editor already observes its own text to recompile live, so it mirrors the
+            // buffer from that path instead of registering a second change listener here.
+            editorBuffer = css;
+            if (!reopeningEditor) editorBufferOnDisk = css;
             editor.setTheme(darkMode ? "dark" : "light");
             editor.setEditable(true);
             editor.setShowLineNumbers(true);
@@ -3998,7 +4062,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         com.codename1.ui.util.UITimer.timer(120, false, workspace, () -> {
             if (revision != cssEditRevision || activeCodeEditor != editor) return;
             editor.getText(value -> {
-                if (value == null || value.equals(lastObservedCss)) return;
+                if (value == null) return;
+                editorBuffer = value;
+                if (value.equals(lastObservedCss)) return;
                 lastObservedCss = value;
                 applyProjectCss(value, editor);
             });
@@ -4018,8 +4084,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // split panes and push the design surface out of reach.
             refreshEditor();
             String source = ProjectIO.exists(modelPath) ? ProjectIO.read(modelPath) : generatedModelSource();
+            if (reopeningEditor && editorBuffer != null) source = editorBuffer;
             CodeEditor editor = new CodeEditor("java", source);
             activeCodeEditor = editor;
+            trackEditorBuffer(editor, source);
             editor.setTheme(darkMode ? "dark" : "light");
             editor.setEditable(true);
             editor.onReady(editor::focusEditor);
@@ -4056,10 +4124,18 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             refreshEditor();
             String generated = defaultCompanionSource();
             String source = ProjectIO.exists(sourcePath) ? mergeGeneratedSource(ProjectIO.read(sourcePath), generated) : generated;
+            // A rebuild must not cost the user their unsaved text; the mirror is what they were
+            // actually looking at, the file is merely what was last written.
+            if (reopeningEditor && editorBuffer != null) source = editorBuffer;
             for (String generatedHandler : generatedHandlers()) source = ensureHandler(source, generatedHandler);
-            if (handler != null) source = ensureHandler(source, handler);
+            // Normalized, because the stub and the listener are both generated from the normalized
+            // name. Passing the raw Events value here appended a second, invalid declaration for
+            // anything that is not already an identifier, so "on-click" opened source that could
+            // not compile and could then be saved in that state.
+            if (handler != null) source = ensureHandler(source, javaIdentifier(handler));
             CodeEditor editor = new CodeEditor("java", source);
             activeCodeEditor = editor;
+            trackEditorBuffer(editor, source);
             editor.setTheme(darkMode ? "dark" : "light");
             editor.setEditable(true);
             // No protected regions here. Marking the generated blocks read-only meant the caret
@@ -4115,6 +4191,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (!applyProjectCss(css, editor)) return;
         try {
             ProjectIO.write(binding.cssFile(), css);
+            editorBufferOnDisk = css;
             setStatus("Saved theme.css • preview updated");
         } catch (IOException ex) {
             ToastBar.showErrorMessage("CSS save failed: " + ex.getMessage());
@@ -4192,12 +4269,38 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
     }
 
-    private void saveSource(String path, String source) {
+    /**
+     * Writes the companion Java source for the current document, regenerating everything outside
+     * the user-code markers from the .gui model and keeping only what the developer wrote between
+     * them.
+     *
+     * <p>The editor deliberately leaves the generated regions editable, because marking them read
+     * only refused every keystroke wherever the caret happened to land. That makes regenerating
+     * here the thing that keeps the promise the editor makes: edits to imports, buildUI or the
+     * class braces cannot survive to diverge from the document or stop the file compiling.
+     *
+     * @param path the companion source path
+     * @param userSource the text to carry the user-code region from -- the editor buffer when the
+     *     code pane is saving, the file on disk when the designer is saving
+     * @return true when the file reached disk
+     */
+    private boolean writeCompanionSource(String path, String userSource) {
         try {
-            ProjectIO.write(path, source);
-            setStatus("Saved companion Java source");
+            String generated = defaultCompanionSource();
+            ProjectIO.write(path, userSource == null ? generated : mergeGeneratedSource(userSource, generated));
+            return true;
         } catch (IOException ex) {
             ToastBar.showErrorMessage("Source save failed: " + ex.getMessage());
+            return false;
+        }
+    }
+
+    private void saveSource(String path, String source) {
+        if (writeCompanionSource(path, source)) {
+            // The file now matches what was written, not the raw buffer: the generated regions were
+            // regenerated on the way out, so Close must compare against that.
+            editorBufferOnDisk = editorBuffer;
+            setStatus("Saved companion Java source");
         }
     }
 
@@ -4322,6 +4425,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                     .append("        ").append(superCall).append("        buildUI();\n    }\n\n");
         }
         out.append("    private void buildUI() {\n");
+        // The root's own inspector properties belong here. Emitting only the descendants meant a
+        // reusable Container root could have its UIID, RTL, visibility or scrolling set in the
+        // designer and shown in the preview while the runtime instance kept the defaults.
+        if (document.root().getAttribute("uiid") != null) {
+            out.append("        setUIID(\"").append(javaEscape(document.root().getAttribute("uiid"))).append("\");\n");
+        }
+        appendGeneratedProperties(out, document.root(), "this", rootType, "        ");
         appendGeneratedChildren(out, document.root(), "this", "        ");
         for (Element command : document.commands()) {
             String placement = value(command, "placement", "right");
@@ -4354,7 +4464,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                     .append(javaEscape(((Element) value).getAttribute("uiid"))).append("\");\n");
             appendGeneratedProperties(out, ((Element) value), name, type, indent);
             String handler = ((Element) value).getAttribute("actionEvent");
-            if (handler != null && handler.length() > 0 && ("Button".equals(type) || "CheckBox".equals(type) || "RadioButton".equals(type))) {
+            if (handler != null && handler.length() > 0 && firesActionEvents(type)) {
                 out.append(indent).append(name).append(".addActionListener(this::").append(javaIdentifier(handler)).append(");\n");
             }
             if ("Tabs".equals(value(parent, "type", ""))) {
@@ -4578,9 +4688,35 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return out.append(");\n    @Override public PropertyIndex getPropertyIndex() { return index; }\n}\n").toString();
     }
 
+    /**
+     * True for the root types that carry a title and a toolbar. {@code cn1:create-gui-form
+     * -DguiType=Dialog} is explicitly supported and the generator already keeps Dialog as the
+     * superclass, so a Form-only test left those forms unable to edit the very attributes the
+     * generated source consumes.
+     *
+     * @param type the {@code type} attribute of the element
+     * @return true when the element behaves like a form
+     */
+    /**
+     * True for the component types that expose {@code addActionListener}. The Events tab offers a
+     * handler for all of them and a stub is generated either way, so leaving text inputs and
+     * sliders out here produced a form that compiled while the handler was never invoked.
+     *
+     * @param type the {@code type} attribute of the element
+     * @return true when a listener can be registered on this type
+     */
+    private static boolean firesActionEvents(String type) {
+        return "Button".equals(type) || "CheckBox".equals(type) || "RadioButton".equals(type)
+                || "TextField".equals(type) || "TextArea".equals(type) || "Slider".equals(type);
+    }
+
+    private static boolean isFormLike(String type) {
+        return "Form".equals(type) || "Dialog".equals(type);
+    }
+
     private String javaType(Element element) {
         String type = value(element, "type", "Container");
-        return "Form".equals(type) ? "Container" : type;
+        return isFormLike(type) ? "Container" : type;
     }
 
     private String componentSource(Element element) {

@@ -261,10 +261,22 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
                 .setLocalRepository(localRepository)
                 .setRemoteRepositories(new ArrayList<ArtifactRepository>(remoteRepositories))
                 .setResolveTransitively(true)
+                // Maven documents -o as "work offline"; the legacy resolver does not read the
+                // session flag by itself, so without this mvn -o cn1:guibuilder still reaches the
+                // network and can refresh a snapshot over the jar this build just produced.
+                .setOffline(offline)
                 .setArtifact(artifact));
         addArtifact(files, artifact);
         if (result != null && result.getArtifacts() != null) {
             for (Artifact resolved : result.getArtifacts()) addArtifact(files, resolved);
+        }
+        // A cached main jar with a missing transitive dependency leaves this list nonempty, and in
+        // detached mode the goal would report a successful launch while the process died in
+        // guibuilder.log with a NoClassDefFoundError nobody goes looking for.
+        String incomplete = resolutionFailure(result);
+        if (incomplete != null) {
+            throw new MojoFailureException("The GUI Builder could not be fully resolved: " + incomplete
+                    + "\nRun mvn -U cn1:guibuilder to refresh it, or drop -o if you are building offline.");
         }
         if (files.isEmpty()) {
             throw new MojoFailureException("Could not resolve the GUI Builder (com.codenameone:codenameone-guibuilder:"
@@ -273,6 +285,24 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
                     + "    cd scripts/guibuilder && mvn -Pexecutable-jar -pl javase -am package -Dcodename1.platform=javase");
         }
         return new ToolClasspath(files);
+    }
+
+    /**
+     * Describes what the resolver could not produce, or null when the result is complete.
+     *
+     * @param result the resolution result to inspect
+     * @return a human readable description of the first problem found
+     */
+    static String resolutionFailure(ArtifactResolutionResult result) {
+        if (result == null) return null;
+        if (result.hasMissingArtifacts()) {
+            return "missing " + result.getMissingArtifacts();
+        }
+        if (result.hasExceptions()) {
+            Exception first = (Exception) result.getExceptions().get(0);
+            return first.getMessage();
+        }
+        return null;
     }
 
     private static void addArtifact(List<File> files, Artifact artifact) {
