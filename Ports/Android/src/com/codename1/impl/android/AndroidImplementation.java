@@ -11052,46 +11052,55 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * callers that hand it to FileSystemStorage but wrong for anything constructing a java.io.File
      * from it.
      */
-    /// Suffix used by the encrypted-database migration for the copy it moves aside.
+    /// Directory holding the encrypted-database migration's working files.
     ///
-    /// Public because the SQLCipher-backed database is in a sub-package, which is compiled
-    /// separately inside the generated application rather than into the port jar, so
-    /// package-private members of this class are not reachable from it.
+    /// A directory beside the database rather than suffixed file names. Every suffix is a valid
+    /// database name -- an application may legitimately have a database called
+    /// `mydata.cn1backup` -- so naming artifacts that way meant an ordinary open could delete or
+    /// truncate one. Databases are files, so a directory of this name cannot also be one, and if
+    /// a file is already sitting there the conversion refuses rather than touching it.
     ///
-    /// Declared here rather than only in the cipher package because that package is deleted from
-    /// builds that never encrypt, while recovery has to happen on every open: the migration
-    /// leaves the live name missing for an instant, and a plaintext open in that window would
-    /// create an empty database on top of the real one.
-    public static final String DATABASE_BACKUP_SUFFIX = ".cn1backup";
+    /// It stays beside the database so the rename that installs the converted file is within one
+    /// filesystem and therefore atomic.
+    public static final String DATABASE_MIGRATION_DIR = ".cn1migration";
 
-    /// Written while a conversion is in progress, and removed once it completes.
-    ///
-    /// Without it the backup would be identified by name alone, and nothing reserves that name:
-    /// an application may have its own database called `<name>.cn1backup`, which an ordinary open
-    /// of `<name>` would then delete.
-    public static final String DATABASE_MIGRATION_MARKER_SUFFIX = ".cn1migrating";
+    /// Names of the three working files inside that directory, all derived from the database.
+    public static final String MIGRATION_BACKUP = ".backup";
+
+    public static final String MIGRATION_TARGET = ".target";
+
+    public static final String MIGRATION_MARKER = ".marker";
+
+    /// The migration directory for a database, or null if the path has no parent.
+    public static File databaseMigrationDir(String path) {
+        File parent = new File(path).getParentFile();
+        return parent == null ? null : new File(parent, DATABASE_MIGRATION_DIR);
+    }
 
     /// Restores a database whose conversion was interrupted between the two renames.
     ///
     /// Called before every open, encrypted or not. Encrypt and decrypt move the original aside
     /// and install the converted file in its place, so a process death in that gap leaves a
-    /// complete database under the backup name and nothing under the live one. Putting it back
-    /// first is what makes the window recoverable rather than a silent empty database.
+    /// complete database in the migration directory and nothing under the live name. Putting it
+    /// back is what makes that window recoverable rather than a silent empty database.
+    ///
+    /// The marker is what says a conversion was in progress. Nothing else writes into this
+    /// directory, so its contents cannot be confused with application databases.
     public static void recoverInterruptedDatabaseMigration(String path) throws IOException {
         if (path == null) {
             return;
         }
-        File live = new File(path);
-        File backup = new File(path + DATABASE_BACKUP_SUFFIX);
-        File marker = new File(path + DATABASE_MIGRATION_MARKER_SUFFIX);
-        // The marker is what identifies these as migration artifacts. Nothing reserves the backup
-        // suffix, so an application may legitimately have databases named "foo" and
-        // "foo.cn1backup"; acting on the name alone would delete the second one the first time
-        // the first is opened. Only a migration writes the marker, and it is removed once the
-        // conversion is complete, so its presence means one was interrupted.
+        File dir = databaseMigrationDir(path);
+        if (dir == null || !dir.isDirectory()) {
+            return;
+        }
+        String name = new File(path).getName();
+        File marker = new File(dir, name + MIGRATION_MARKER);
+        File backup = new File(dir, name + MIGRATION_BACKUP);
         if (!marker.isFile()) {
             return;
         }
+        File live = new File(path);
         if (!backup.isFile()) {
             // The marker outlived its backup, so there is nothing to put back or clean up.
             marker.delete();
@@ -11111,8 +11120,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return;
         }
         // Both exist, so the swap completed and only the cleanup was lost. The backup is the
-        // database in its previous form, which after an encrypt is a plaintext copy sitting at a
-        // predictable name, so leaving it is the encryption-at-rest hole in slow motion.
+        // database in its previous form, which after an encrypt is a plaintext copy of an
+        // encrypted database - the encryption-at-rest hole in slow motion.
         if (!backup.delete() && backup.exists()) {
             throw new IOException("The database " + path + " was converted, but the copy of its "
                     + "previous form at " + backup + " could not be removed. Delete it before "

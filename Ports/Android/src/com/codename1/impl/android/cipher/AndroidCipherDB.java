@@ -28,6 +28,7 @@ import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.DatabaseConfig;
 import com.codename1.impl.android.AndroidCursor;
+import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.SQLStatementSplitter;
 
 import net.zetetic.database.sqlcipher.SQLiteCursor;
@@ -255,12 +256,6 @@ class AndroidCipherDB extends Database {
      * the two names at every instant; AndroidCipherFactory recovers from the backup if the
      * process dies in the gap.
      */
-    static final String BACKUP_SUFFIX =
-            com.codename1.impl.android.AndroidImplementation.DATABASE_BACKUP_SUFFIX;
-
-    static final String MIGRATION_MARKER_SUFFIX =
-            com.codename1.impl.android.AndroidImplementation.DATABASE_MIGRATION_MARKER_SUFFIX;
-
     /** Reads one integer header pragma, which sqlcipher_export does not carry across. */
     private int readHeaderPragma(String pragma) {
         android.database.Cursor c = db.rawQuery(pragma, null);
@@ -273,7 +268,18 @@ class AndroidCipherDB extends Database {
 
     private void migrateThroughExport(String targetKey) throws IOException {
         String path = db.getPath();
-        File target = new File(path + ".cn1migrate");
+        String name = new File(path).getName();
+        File dir = AndroidImplementation.databaseMigrationDir(path);
+        if (dir == null) {
+            throw new IOException("The database " + path + " has no directory to convert it in");
+        }
+        if (!dir.isDirectory() && !dir.mkdirs()) {
+            // A file already sitting at that name is the one collision left, and refusing is the
+            // only safe answer: it may be an application database and this must not touch it.
+            throw new IOException("The conversion needs a working directory at " + dir
+                    + " and could not create one. If a file exists there, move it aside.");
+        }
+        File target = new File(dir, name + AndroidImplementation.MIGRATION_TARGET);
         if (target.exists() && !target.delete()) {
             throw new IOException("A previous migration left " + target + " behind and it could "
                     + "not be removed");
@@ -320,11 +326,11 @@ class AndroidCipherDB extends Database {
         }
         closing.close();
         File original = new File(path);
-        File backup = new File(path + BACKUP_SUFFIX);
-        File marker = new File(path + MIGRATION_MARKER_SUFFIX);
+        File backup = new File(dir, name + AndroidImplementation.MIGRATION_BACKUP);
+        File marker = new File(dir, name + AndroidImplementation.MIGRATION_MARKER);
         backup.delete();
-        // Written before the first rename and removed after the last, so recovery can tell these
-        // two files apart from application databases that happen to share the names.
+        // Written before the first rename and removed after the last, so recovery knows a
+        // conversion was in progress rather than inferring it from file names.
         try {
             new FileOutputStream(marker).close();
         } catch (IOException err) {
