@@ -194,6 +194,55 @@ class SQLStatementSplitterTest {
     }
 
     @Test
+    void readsTheWholeNameTheEngineWouldRead() {
+        // A name is more than its run of identifier characters, and stopping early splits one
+        // parameter into two -- which rejects a valid single-argument call. Every expectation here
+        // was taken from sqlite3_bind_parameter_count on a real engine, not from reading the
+        // grammar.
+        //
+        // "::" continues a name rather than ending it.
+        assertEquals(1, SQLStatementSplitter.countParameters("SELECT $foo::bar"));
+        assertEquals(1, SQLStatementSplitter.countParameters("SELECT :foo::bar"));
+        assertEquals(1, SQLStatementSplitter.countParameters("SELECT @foo::bar"));
+        assertEquals(1, SQLStatementSplitter.countParameters("SELECT $foo::bar::baz"));
+        assertEquals(1, SQLStatementSplitter.countParameters("SELECT $foo::"));
+        assertEquals(1, SQLStatementSplitter.countParameters("SELECT $foo::bar, $foo::bar"));
+        assertEquals(2, SQLStatementSplitter.countParameters("SELECT $foo::bar, $foo"));
+        assertEquals(2, SQLStatementSplitter.countParameters("SELECT $foo::bar, :foo::bar"));
+
+        // A parenthesized suffix is part of the name, so it tells two parameters apart.
+        assertEquals(1, SQLStatementSplitter.countParameters("SELECT $foo(suffix)"));
+        assertEquals(1, SQLStatementSplitter.countParameters("SELECT $foo()"));
+        assertEquals(1, SQLStatementSplitter.countParameters("SELECT $foo(a::b)"));
+        assertEquals(1, SQLStatementSplitter.countParameters("SELECT :foo::bar(baz)"));
+        assertEquals(2, SQLStatementSplitter.countParameters("SELECT $foo(a), $foo(b)"));
+        assertEquals(1, SQLStatementSplitter.countParameters("SELECT $foo(a), $foo(a)"));
+        assertEquals(2, SQLStatementSplitter.countParameters(
+                "INSERT INTO t VALUES ($foo(x), $foo(y), $foo(x))"));
+
+        // "#" is a parameter sigil too, and "$" is an identifier character.
+        assertEquals(1, SQLStatementSplitter.countParameters("SELECT #foo"));
+        assertEquals(1, SQLStatementSplitter.countParameters("SELECT $a$b"));
+        assertEquals(4, SQLStatementSplitter.countParameters("SELECT ? , :n , @m , $k"));
+
+        // And none of it applies inside a literal.
+        assertEquals(1, SQLStatementSplitter.countParameters(
+                "SELECT $foo::bar FROM t WHERE a = '$foo::baz'"));
+        assertEquals(0, SQLStatementSplitter.countParameters("SELECT \"$foo::bar\" FROM t"));
+    }
+
+    @Test
+    void reportsNoCountForANameTheEngineWouldNotTokenize() {
+        // Whitespace inside the suffix, or no closing parenthesis, makes the token unparseable.
+        // Reporting a count there would replace the engine's syntax error with a parameter count
+        // error that says nothing about the real problem.
+        assertEquals(SQLStatementSplitter.PARAMETER_COUNT_UNKNOWN,
+                SQLStatementSplitter.countParameters("SELECT $foo(a b)"));
+        assertEquals(SQLStatementSplitter.PARAMETER_COUNT_UNKNOWN,
+                SQLStatementSplitter.countParameters("SELECT $foo(unterminated"));
+    }
+
+    @Test
     void refusesToGuessAtAnIndexTheEngineWouldReject() {
         // ?0 is not a parameter SQLite accepts, so there is no count to report and the caller
         // skips the check rather than rejecting a statement it cannot judge.

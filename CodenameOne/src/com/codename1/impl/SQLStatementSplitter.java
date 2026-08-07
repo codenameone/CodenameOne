@@ -206,8 +206,9 @@ public final class SQLStatementSplitter {
     /// - `?` takes the next index, one past the largest assigned so far.
     /// - `?NNN` takes index NNN, and raises the largest if NNN is above it. That is what makes
     ///   `SELECT ?3` a three parameter statement with two unbound slots.
-    /// - `:name`, `@name` and `$name` take the next index the first time the name appears and
-    ///   reuse that index every time after, so `WHERE a = :x OR b = :x` declares one parameter.
+    /// - `:name`, `@name`, `$name` and `#name` take the next index the first time the name appears
+    ///   and reuse that index every time after, so `WHERE a = :x OR b = :x` declares one
+    ///   parameter. A name runs further than it looks: see `#endOfParameterName(String,int)`.
     ///
     /// Reading these as one-per-marker is what would let a caller supply one argument to a two
     /// parameter statement and have the second silently stay SQL NULL, which is the outcome this
@@ -254,14 +255,16 @@ public final class SQLStatementSplitter {
                 iter = skipBlockComment(sql, iter + 2);
                 continue;
             }
-            if (c == ':' || c == '@' || c == '$') {
-                // Only a parameter when a name actually follows: "::" is not one, nor a bare "@",
-                // nor the ":" of an assignment.
-                int nameEnd = iter + 1;
-                while (nameEnd < length && isParameterNamePart(sql.charAt(nameEnd))) {
-                    nameEnd++;
+            if (c == ':' || c == '@' || c == '$' || c == '#') {
+                int nameEnd = endOfParameterName(sql, iter);
+                if (nameEnd == NAME_IS_MALFORMED) {
+                    // A name the engine will not tokenize. There is no count for a statement it
+                    // will not parse, and reporting one would replace its syntax error with a
+                    // parameter count error that says nothing about the real problem.
+                    return PARAMETER_COUNT_UNKNOWN;
                 }
-                if (nameEnd == iter + 1) {
+                if (nameEnd < 0) {
+                    // Not a parameter: a lone ":" or "@" with no name after it.
                     iter++;
                     continue;
                 }
@@ -329,6 +332,54 @@ public final class SQLStatementSplitter {
     /// SQLite's own default ceiling on a parameter index. Above it the engine rejects the
     /// statement, so there is no count to report.
     private static final int MAX_PARAMETER_INDEX = 32766;
+
+    /// Returned by `#endOfParameterName(String,int)` for a name the engine would reject.
+    private static final int NAME_IS_MALFORMED = -2;
+
+    /// Returns the index one past a named parameter, -1 if there is no name, or
+    /// `#NAME_IS_MALFORMED`.
+    ///
+    /// This follows SQLite's own tokenizer, because a name is more than the run of identifier
+    /// characters it looks like:
+    ///
+    /// - `::` continues the name rather than ending it, so `$foo::bar` is **one** parameter named
+    ///   `$foo::bar` and not two. A single `:` inside a name is not accepted at all.
+    /// - A parenthesized suffix is part of the name, so `$foo(a)` and `$foo(b)` are two different
+    ///   parameters while `$foo(a)` twice is one. The suffix ends at its `)` and the name ends
+    ///   with it; whitespace inside it, or no closing parenthesis, makes the whole token
+    ///   unparseable.
+    /// - At least one identifier character has to come first, so `$(x)` is not a parameter.
+    ///
+    /// Both extensions are compiled out of an engine built without TCL variable syntax, but a
+    /// statement using them would not parse there at all, so reading them this way is right in
+    /// either build.
+    private static int endOfParameterName(String sql, int sigil) {
+        int length = sql.length();
+        int identifierChars = 0;
+        int iter = sigil + 1;
+        while (iter < length) {
+            char c = sql.charAt(iter);
+            if (isParameterNamePart(c)) {
+                identifierChars++;
+                iter++;
+            } else if (c == '(' && identifierChars > 0) {
+                // Everything up to the closing parenthesis, which the name includes and ends at.
+                iter++;
+                while (iter < length && sql.charAt(iter) != ')' && sql.charAt(iter) > ' ') {
+                    iter++;
+                }
+                if (iter >= length || sql.charAt(iter) != ')') {
+                    return NAME_IS_MALFORMED;
+                }
+                return iter + 1;
+            } else if (c == ':' && iter + 1 < length && sql.charAt(iter + 1) == ':') {
+                iter += 2;
+            } else {
+                break;
+            }
+        }
+        return identifierChars == 0 ? -1 : iter;
+    }
 
     /// Whether a character continues a named parameter, matching SQLite's own rule.
     private static boolean isParameterNamePart(char c) {
