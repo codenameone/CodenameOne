@@ -995,7 +995,12 @@ public final class WearableConnection {
             replayRequests.clear();
             rescanRequested = false;
             drainingData = 0;
-            droppedDeliveries = null;
+            // droppedDeliveries is deliberately KEPT. It belongs to the port, not to the app
+            // instance being replaced: the bridge registers it once from its constructor, and the
+            // simulator caches that bridge across reloads -- so clearing it here removed the
+            // recovery path for good. After a reload with more than MAX_PENDING updates and no
+            // listener, evicted paths would stay marked delivered by the port and could never be
+            // re-offered.
         }
         synchronized (pendingMessages) {
             messageListeners.clear();

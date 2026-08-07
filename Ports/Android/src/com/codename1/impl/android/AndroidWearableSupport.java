@@ -65,8 +65,18 @@ public final class AndroidWearableSupport {
             lookedUp = true;
             try {
                 Class<?> c = Class.forName("com.codename1.impl.android.CN1WearableBridge");
-                bridge = (WearableBridge) c.getConstructor(android.content.Context.class)
+                Object created = c.getConstructor(android.content.Context.class)
                         .newInstance(context);
+                // instanceof, not a cast inside the catch below. ParparVM does not throw
+                // ClassCastException for a failed cast, so on iOS the handler would never run and
+                // the bad value would simply be used -- the cast-semantics gate exists to catch
+                // exactly this shape. Branching says the same thing in a way both VMs honour.
+                if (created instanceof WearableBridge) {
+                    bridge = (WearableBridge) created;
+                } else {
+                    com.codename1.io.Log.p("Wearable: the injected bridge does not implement "
+                            + "WearableBridge; the API stays inert");
+                }
             } catch (ClassNotFoundException notInjected) {
                 // The app never references com.codename1.wearable; the API stays inert.
             } catch (Throwable err) {

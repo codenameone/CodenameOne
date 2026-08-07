@@ -299,16 +299,19 @@ image::img/wearables/apple-watch-simulator.png[Codename One running on the Apple
 ==== What the Watch App Runs Today
 [[watch-entry-point]]
 
-Two properties of the watchOS build are worth knowing before you plan around it,
-because neither is obvious from the setting you wrote.
+`codename1.watchMain` is the watch app's entry point on both platforms. The
+watchOS build writes a stub of its own for that class and runs a second
+translation rooted there, so the watch binary starts your watch lifecycle class
+and carries what that class reaches rather than everything the phone reaches. On
+Wear OS the declared class is the watch launcher. Put the watch UI in the class
+you declared.
 
-The watch target compiles the same translated application sources as the phone
-and starts the phone lifecycle class. On watchOS `codename1.watchMain` therefore
-selects and enables the watch build, but it doesn't yet root the watch app at a
-different entry point. Branch on `CN.isWatch()` to decide what the watch shows.
-On Wear OS the declared class *is* the watch launcher, so a project that keeps
-its watch screens behind that check behaves the same on both platforms -- which is
-the pattern to write today regardless.
+One case differs by design: naming the phone's own main class as
+`codename1.watchMain` keeps a single translation, because both entry points
+reach the same code and translating twice would produce the same binary twice.
+There the watch starts the phone lifecycle, and `CN.isWatch()` is how you decide
+what the watch shows. That check is still worth keeping in shared code, but it's
+no longer what selects the watch UI when the two entry points differ.
 
 Distribution has rough edges too, and they surface at archive time rather than in
 the build itself. Submitting the companion pair to the App Store needs an app icon
@@ -428,7 +431,7 @@ Layer APIs directly.
 
 |Distribution
 |Companion (embedded in the phone app) or standalone
-|Standalone only -- companion does not yet produce a Wear artifact
+|Standalone only -- companion doesn't yet produce a Wear artifact
 
 |Runtime detection
 |`CN.isWatch()`
