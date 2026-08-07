@@ -15191,11 +15191,14 @@ void com_codename1_impl_ios_IOSNative_wearableReplayInbox__(CN1_THREAD_STATE_MUL
 }
 
 void com_codename1_impl_ios_IOSNative_wearableForgetReceived___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
-    if (path == JAVA_NULL) {
-        return;
-    }
     POOL_BEGIN();
-    cn1_wearable_forgetReceived([toNSString(CN1_THREAD_GET_STATE_PASS_ARG path) UTF8String]);
+    // NULL is PASSED THROUGH, not filtered. It is the rescan request: the pending-delivery cap
+    // discarded more paths than it could name, and cn1_wearable_forgetReceived reads a null path as
+    // "forget every received marker and re-offer the whole held context". Returning early here --
+    // the reflex for a null argument -- silently dropped the one signal that recovers an overflow,
+    // so those values stayed marked delivered and never reached the listener that finally arrived.
+    cn1_wearable_forgetReceived(path == JAVA_NULL
+            ? NULL : [toNSString(CN1_THREAD_GET_STATE_PASS_ARG path) UTF8String]);
     POOL_END();
 }
 
