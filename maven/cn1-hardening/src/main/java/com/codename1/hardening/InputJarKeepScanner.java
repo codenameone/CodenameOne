@@ -29,89 +29,88 @@ import java.util.Map;
 import java.util.Set;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
 /**
- * Tier 2 keep rules, derived from the input classes with ASM. This covers what
- * ProGuard cannot infer declaratively: a class named by a string constant that is
- * then resolved by reflection ({@code Class.forName}, {@code UIBuilder}, the
- * annotation-generated mappers). Over-keeping here is safe -- it costs a little
- * obfuscation coverage; under-keeping would break the app at runtime -- so any app
- * class whose name appears verbatim as a string constant anywhere in the jar is
- * kept.
+ * Tier 2 keep rules, derived from the input classes with ASM. Codename One has no reflection --
+ * {@code Class.forName} never resolved an obfuscated app class -- so there is nothing to keep for a
+ * class named only by a string. What ProGuard cannot infer declaratively is the <em>naming
+ * convention</em> that binds a native interface to its generated peer: for a native interface
+ * {@code com.foo.Bar} the build produces {@code com.foo.BarImpl} / {@code com.foo.BarStub} and
+ * resolves them by name. This scanner finds the native interfaces (phase 1) and keeps exactly those
+ * peers (phase 2), which is far narrower than the previous {@code **Impl} / {@code **Stub}.
  */
 public final class InputJarKeepScanner {
 
-    private final Set<String> classBinaryNames = new LinkedHashSet<String>();
-    private final Set<String> stringConstants = new LinkedHashSet<String>();
+    private static final String NATIVE_INTERFACE = "com/codename1/system/NativeInterface";
+
+    /** internal name -> its direct super-interfaces (from the class's interfaces[]). */
+    private final java.util.Map<String, String[]> interfacesOf =
+            new java.util.HashMap<String, String[]>();
+    private final Set<String> nativeInterfaceTypes = new LinkedHashSet<String>();
 
     /** Scans every class in {@code classesByInternalName} (keyed {@code a/b/C}). */
     public void scan(Map<String, byte[]> classesByInternalName) {
-        for (Map.Entry<String, byte[]> e : classesByInternalName.entrySet()) {
-            classBinaryNames.add(e.getKey().replace('/', '.'));
-        }
         for (byte[] classBytes : classesByInternalName.values()) {
             ClassReader cr = new ClassReader(classBytes);
-            cr.accept(new ConstantCollector(), ClassReader.SKIP_FRAMES);
+            cr.accept(new HierarchyCollector(), ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG
+                    | ClassReader.SKIP_FRAMES);
+        }
+        // A type is a native interface if NativeInterface is in its transitive super-interface
+        // closure. Resolve transitively across the classes we saw (an interface may extend another
+        // native interface rather than NativeInterface directly).
+        for (String type : interfacesOf.keySet()) {
+            if (extendsNativeInterface(type, new LinkedHashSet<String>())) {
+                nativeInterfaceTypes.add(type);
+            }
         }
     }
 
-    /** The derived keep rules. */
+    private boolean extendsNativeInterface(String type, Set<String> visiting) {
+        if (!visiting.add(type)) {
+            return false;
+        }
+        String[] ifaces = interfacesOf.get(type);
+        if (ifaces == null) {
+            return false;
+        }
+        for (String i : ifaces) {
+            if (NATIVE_INTERFACE.equals(i) || extendsNativeInterface(i, visiting)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The derived keep rules: the generated {@code Impl}/{@code Stub} peer of each native interface. */
     public List<String> keepRules() {
         List<String> rules = new ArrayList<String>();
-        Set<String> kept = new LinkedHashSet<String>();
-        for (String s : stringConstants) {
-            String candidate = s.trim();
-            // Accept both dotted and slash forms of a reference.
-            String dotted = candidate.replace('/', '.');
-            if (classBinaryNames.contains(dotted) && kept.add(dotted)) {
-                rules.add("-keep class " + dotted + " { *; }");
-            }
+        for (String type : nativeInterfaceTypes) {
+            String dotted = type.replace('/', '.');
+            rules.add("-keep class " + dotted + "Impl { *; }");
+            rules.add("-keep class " + dotted + "Stub { *; }");
         }
         return rules;
     }
 
-    /** Visible for testing: the class names that were kept for reflection safety. */
-    List<String> reflectivelyReferencedClasses() {
+    /** Visible for testing: the native interface types found in the input (dotted names). */
+    List<String> nativeInterfaces() {
         List<String> out = new ArrayList<String>();
-        Set<String> seen = new LinkedHashSet<String>();
-        for (String s : stringConstants) {
-            String dotted = s.trim().replace('/', '.');
-            if (classBinaryNames.contains(dotted) && seen.add(dotted)) {
-                out.add(dotted);
-            }
+        for (String type : nativeInterfaceTypes) {
+            out.add(type.replace('/', '.'));
         }
         return out;
     }
 
-    private final class ConstantCollector extends ClassVisitor {
-        ConstantCollector() {
+    private final class HierarchyCollector extends ClassVisitor {
+        HierarchyCollector() {
             super(Opcodes.ASM9);
         }
 
         @Override
-        public MethodVisitor visitMethod(int access, String name, String descriptor,
-                                         String signature, String[] exceptions) {
-            return new MethodVisitor(Opcodes.ASM9) {
-                @Override
-                public void visitLdcInsn(Object value) {
-                    if (value instanceof String) {
-                        stringConstants.add((String) value);
-                    }
-                }
-            };
-        }
-
-        @Override
-        public org.objectweb.asm.FieldVisitor visitField(int access, String name, String descriptor,
-                                                         String signature, Object value) {
-            // A reflective class name may live only in a static-final String field's ConstantValue
-            // attribute, never as an LDC (e.g. read by an external framework). Collect those too.
-            if (value instanceof String) {
-                stringConstants.add((String) value);
-            }
-            return null;
+        public void visit(int version, int access, String name, String signature,
+                          String superName, String[] interfaces) {
+            interfacesOf.put(name, interfaces == null ? new String[0] : interfaces);
         }
     }
 }

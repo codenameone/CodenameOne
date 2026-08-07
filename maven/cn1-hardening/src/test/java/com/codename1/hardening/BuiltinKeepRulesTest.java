@@ -53,25 +53,30 @@ public class BuiltinKeepRulesTest {
     }
 
     @Test
-    public void packageNamesAreKeptSoResourcesResolve() {
-        // Resources are copied verbatim and never renamed, so a package-relative getResource would
-        // break if the package were renamed; -keeppackagenames must always be present.
+    public void packageNamesAreNotKept() {
+        // Codename One has no getResource for nested packages, so package names are obfuscated too;
+        // -keeppackagenames must NOT be present.
         for (String p : new String[] {"ios", "javase", "javascript", "win"}) {
-            assertTrue("package names kept for " + p, BuiltinKeepRules.flags(p).contains("-keeppackagenames"));
+            assertFalse("packages must be obfuscated for " + p,
+                    BuiltinKeepRules.flags(p).contains("-keeppackagenames"));
         }
     }
 
     @Test
-    public void lineTablesAreAlwaysKept() {
-        // Retracing depends on SourceFile + LineNumberTable regardless of platform.
+    public void lineNumbersKeptButSourceFileStripped() {
+        // Retracing needs LineNumberTable; SourceFile is stripped (the retrace synthesizes the file
+        // name from the class), matching DexGuard.
         for (String p : new String[] {"ios", "javase", "and"}) {
-            boolean kept = false;
+            boolean lineKept = false;
+            boolean sourceKept = false;
             for (String f : BuiltinKeepRules.flags(p)) {
-                if (f.contains("SourceFile") && f.contains("LineNumberTable")) {
-                    kept = true;
+                if (f.startsWith("-keepattributes")) {
+                    lineKept = f.contains("LineNumberTable");
+                    sourceKept = f.contains("SourceFile");
                 }
             }
-            assertTrue("line tables kept for " + p, kept);
+            assertTrue("LineNumberTable kept for " + p, lineKept);
+            assertFalse("SourceFile stripped for " + p, sourceKept);
         }
     }
 }

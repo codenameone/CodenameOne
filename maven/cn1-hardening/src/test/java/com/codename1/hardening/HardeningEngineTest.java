@@ -89,18 +89,13 @@ public class HardeningEngineTest {
         return b.toByteArray();
     }
 
-    /**
-     * A synthetic class whose only reference to {@code targetBinaryName} is a static-final String
-     * field carrying it as a {@code ConstantValue} attribute -- never an LDC. Models a class name a
-     * framework reads reflectively from a constant field.
-     */
-    private static byte[] classWithConstantNamingField(String internalName, String targetBinaryName) {
+    /** A synthetic native interface: {@code interface <internalName> extends NativeInterface}. */
+    private static byte[] nativeInterface(String internalName) {
         org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
-        cw.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
-                internalName, null, "java/lang/Object", null);
-        cw.visitField(org.objectweb.asm.Opcodes.ACC_PUBLIC | org.objectweb.asm.Opcodes.ACC_STATIC
-                | org.objectweb.asm.Opcodes.ACC_FINAL, "TARGET", "Ljava/lang/String;",
-                null, targetBinaryName).visitEnd();
+        cw.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_ABSTRACT | org.objectweb.asm.Opcodes.ACC_INTERFACE,
+                internalName, null, "java/lang/Object",
+                new String[]{"com/codename1/system/NativeInterface"});
         cw.visitEnd();
         return cw.toByteArray();
     }
@@ -335,34 +330,36 @@ public class HardeningEngineTest {
     }
 
     @Test
-    public void scannerKeepsClassNamedOnlyByAFieldConstant() throws Exception {
-        // The class name lives solely in a static-final String field's ConstantValue attribute,
-        // never as an LDC, so a method-instruction-only scan would miss it.
-        byte[] ref = classWithConstantNamingField(
-                "com/codename1/hardening/fixture/Ref", "com.codename1.hardening.fixture.Helper");
+    public void scannerKeepsNativeInterfacePeers() throws Exception {
+        // Phase 1: find the native interface. Phase 2: keep ITS generated Impl/Stub peer -- narrow,
+        // not the old blanket **Impl / **Stub.
         Map<String, byte[]> classes = new HashMap<String, byte[]>();
-        classes.put("com/codename1/hardening/fixture/Ref", ref);
+        classes.put("app/MyNative", nativeInterface("app/MyNative"));
         classes.put(HELPER, resourceBytes(HELPER));
         InputJarKeepScanner scanner = new InputJarKeepScanner();
         scanner.scan(classes);
-        assertTrue("class named by a field ConstantValue must be kept",
-                scanner.keepRules().contains(
-                        "-keep class com.codename1.hardening.fixture.Helper { *; }"));
+        java.util.List<String> rules = scanner.keepRules();
+        assertTrue("the native interface's Impl peer must be kept",
+                rules.contains("-keep class app.MyNativeImpl { *; }"));
+        assertTrue("the native interface's Stub peer must be kept",
+                rules.contains("-keep class app.MyNativeStub { *; }"));
+        // A plain class is NOT kept -- there is no reflection to keep it for.
+        for (String rule : rules) {
+            assertFalse("a non-native class must not be kept: " + rule,
+                    rule.contains("hardening.fixture.Helper"));
+        }
     }
 
     @Test
-    public void androidExportsReflectionKeepsToR8() throws Exception {
-        // On Android the engine does not rename (R8 does), so the classes the scanner found
-        // reflectively must be written to the R8 keep file or R8 renames them out from under the
-        // reflective lookup. Ref names Helper only via a field constant.
+    public void androidExportsNativeInterfaceKeepsToR8() throws Exception {
+        // On Android the engine does not rename (R8 does), so the native-interface peer keeps plus
+        // the user's harden.keep must reach the R8 keep file.
         File jar = tmp.newFile("r8.jar");
         FileOutputStream fo = new FileOutputStream(jar);
         ZipOutputStream zos = new ZipOutputStream(fo);
         putClass(zos, SECRETS);
-        putClass(zos, HELPER);
-        zos.putNextEntry(new ZipEntry("com/codename1/hardening/fixture/Ref.class"));
-        zos.write(classWithConstantNamingField(
-                "com/codename1/hardening/fixture/Ref", "com.codename1.hardening.fixture.Helper"));
+        zos.putNextEntry(new ZipEntry("app/MyNative.class"));
+        zos.write(nativeInterface("app/MyNative"));
         zos.closeEntry();
         zos.finish();
         fo.close();
@@ -382,8 +379,8 @@ public class HardeningEngineTest {
         assertTrue(r.isHardened());
         assertTrue("engine must emit the R8 keep file", r8Keep.isFile());
         String keep = new String(Files.readAllBytes(r8Keep.toPath()), Charset.forName("UTF-8"));
-        assertTrue("reflectively referenced class must reach R8",
-                keep.contains("-keep class com.codename1.hardening.fixture.Helper { *; }"));
+        assertTrue("native interface peer must reach R8",
+                keep.contains("-keep class app.MyNativeImpl { *; }"));
         assertTrue("the main class must reach R8",
                 keep.contains("com.codename1.hardening.fixture.Secrets"));
         assertTrue("the user's harden.keep must reach R8",

@@ -30,8 +30,10 @@ import java.util.List;
  * what the input jar contains. These exist because the builders generate stub
  * source <em>after</em> hardening that names classes literally and then compiles
  * it against the hardened classes -- the main class and its {@code Stub}, the
- * generated router and annotation bootstraps, native-interface peers, and the
- * usual reflective seams (enums, serialization, {@code native} members).
+ * generated router and annotation bootstraps, native-interface types, {@code native}
+ * members, and {@code enum} {@code values()}/{@code valueOf()}. Codename One has no
+ * reflection and does not support serialization, so no {@code Class.forName},
+ * {@code Serializable}/{@code Externalizable} or property-name keeps are needed.
  */
 public final class BuiltinKeepRules {
 
@@ -59,25 +61,15 @@ public final class BuiltinKeepRules {
         for (String b : BOOTSTRAPS) {
             r.add("-keep class cn1app." + b + " { *; }");
         }
-        // Native interfaces are matched to their implementation by name.
+        // Native interfaces are bound to their platform implementation by name. Keep the interface
+        // itself here; the specific <Interface>Impl / <Interface>Stub are found by scanning the input
+        // (InputJarKeepScanner) and kept individually, rather than the over-broad **Impl / **Stub.
         r.add("-keep class * implements com.codename1.system.NativeInterface { *; }");
-        r.add("-keep class **Impl { *; }");
-        r.add("-keep class **Stub { *; }");
         // JNI/native method names must not move.
         r.add("-keepclasseswithmembernames,includedescriptorclasses class * { native <methods>; }");
-        // Reflective seams the JDK itself relies on.
+        // enum values()/valueOf(String) resolve constants by name, so they are kept -- this is
+        // ordinary language behaviour, not reflection.
         r.add("-keepclassmembers enum * { public static **[] values(); public static ** valueOf(java.lang.String); }");
-        r.add("-keepclassmembers class * implements java.io.Serializable { "
-                + "static final long serialVersionUID; "
-                + "private void writeObject(java.io.ObjectOutputStream); "
-                + "private void readObject(java.io.ObjectInputStream); "
-                + "java.lang.Object writeReplace(); java.lang.Object readResolve(); }");
-        r.add("-keep class * implements java.io.Externalizable { *; }");
-        // PropertyBusinessObject property/field names ARE the JSON/ORM column names;
-        // renaming them silently changes the on-disk schema and the wire format, which
-        // corrupts data on the next app upgrade rather than throwing. Keep the member
-        // names (the class itself may still be renamed).
-        r.add("-keepclassmembernames class * implements com.codename1.properties.PropertyBusinessObject { *; }");
         return r;
     }
 
@@ -106,20 +98,14 @@ public final class BuiltinKeepRules {
         // Class files are written to a directory and builds run on a case-insensitive
         // filesystem, so mixed-case names would collide.
         r.add("-dontusemixedcaseclassnames");
-        // Keep package names. Resources are copied verbatim by JarDemuxer and never pass through
-        // ProGuard, so a package-relative lookup such as Screen.class.getResource("icon.png") -- which
-        // resolves under the class's (renamed) package -- would return null if the package were renamed
-        // while com/foo/icon.png stayed put. Class simple names, methods, fields and strings are still
-        // obfuscated; only the package path, which resource loading depends on, is preserved.
-        r.add("-keeppackagenames");
         r.add("-dontnote");
         r.add("-dontwarn");
-        // Keep SourceFile + LineNumberTable: ParparVM translates the line table into its
-        // on-device debug-line info, and the crash retrace passes device line numbers through
-        // rather than reconstructing them, so stripping the tables would make every hardened
-        // trace report unknown/-1 lines. The renamed names still hide the code; line tables don't.
+        // Keep LineNumberTable so a hardened crash still reports its true line (the crash retrace
+        // passes device line numbers through, and ParparVM turns the table into on-device debug-line
+        // info). SourceFile is NOT kept -- the retrace synthesizes the file name from the class name,
+        // so the original .java name is stripped, matching DexGuard.
         r.add("-keepattributes Exceptions,InnerClasses,Signature,EnclosingMethod,*Annotation*,"
-                + "SourceFile,LineNumberTable");
+                + "LineNumberTable");
         return r;
     }
 

@@ -1,13 +1,13 @@
 [[app-hardening]]
 == App Hardening
 
-Every shipped app is a program someone else can read. The class and method names survive into the binary, the string constants sit in plain sight, and the control flow is exactly what you wrote. On Android a release build is run through R8, which renames the Java names -- but on the other ports even that much isn't true: the iOS and native builds translate your code to C through ParparVM and the class names, method names and every string literal end up in the binary as readable text.
+Every Codename One app is already obfuscated by default. On Android the release build runs through R8, which renames the Java names. On iOS and the other native ports your code is compiled to native machine code through ParparVM, which is hard to reverse engineer on its own -- but the class names, method names and string literals still travel into the binary as readable text, so a reader who can't follow the machine code can still read the labels and the constants.
 
-App Hardening closes that gap across *all* the ports from one place. It renames classes, methods and fields; encrypts string constants so they're not present as plaintext in the binary; and obfuscates control flow -- and it does this to the merged application before each platform build, so Android, iOS, JavaScript and the native desktop targets are all covered by one transform and one mapping.
+App Hardening is the Enterprise layer that closes that remaining gap across *all* the ports from one place. It renames classes, methods and fields; encrypts string constants so they're not present as plaintext in the binary; and obfuscates control flow -- and it does this to the merged application before each platform build, so Android, iOS, JavaScript and the native desktop targets are all covered by one transform and one mapping.
 
-WARNING: App Hardening doesn't make an app impossible to reverse engineer, and no product does. What it changes is the cost: turning a class named `LoginController` with a string `"invalid password"` into a class named `zqab` with an encrypted constant moves the first afternoon of a reverse-engineering effort from "read it" to "reconstruct it." Be careful not to promise more than that, internally or in marketing. It's one layer; pair it with <<app-shield>> so the statement your backend trusts is made by hardware the attacker doesn't control.
+This is a tool for apps that face serious security scrutiny -- banking, payments, government and other high-risk targets. It raises the cost of static analysis and tampering; it's one layer, so pair it with <<app-shield>> so the statement your backend trusts is made by hardware the attacker doesn't control.
 
-This is an *Enterprise* feature. A build that asks for it without an Enterprise subscription *fails with an explanation* rather than producing an unhardened binary -- a binary that looks protected but isn't is worse than one that never claimed to be.
+App Hardening is an *Enterprise* feature. A build that asks for it without an Enterprise subscription *fails with an explanation* rather than producing an unhardened binary that would look protected without being so.
 
 === What it changes, per port
 
@@ -89,26 +89,21 @@ The level is the one decision most projects need to make. The individual switche
 | |`off` |`standard` |`aggressive` |`paranoid`
 
 |Class/method/field renaming |-- |yes |yes |yes
-|String encryption |-- |constants |all |all + reflective names
+|String encryption |-- |constants |all |all
 |Control-flow obfuscation |-- |-- |yes |yes + opaque predicates
 |Local-variable debug stripping |-- |yes |yes |yes
 |Symbol/mapping upload |-- |required |required |required
 |===
 
-Line numbers are *kept*, not stripped: the transform preserves the `SourceFile` and `LineNumberTable` attributes (and Android's generated R8 configuration keeps the same) so a crash from a hardened build still retraces to a file and line against the retained mapping. What renaming removes is the local-variable and parameter *names*; the method and class names are replaced by the mapping, not deleted. If you need a build with no line information at all, that's a separate choice you make in your own ProGuard/R8 configuration, and it makes crash reports unretraceable.
-
-Higher levels cost build time, a little binary size and a little startup time. Measure the trade-off for your own app before committing to `paranoid`; the honest number for your codebase is the one that matters, not a headline figure.
+The source file name (`SourceFile`) is stripped, matching DexGuard. `LineNumberTable` is kept so a hardened crash still retraces to a line number against the mapping; the retrace reconstructs the file name from the (retraced) class name. Renaming also removes the local-variable and parameter names.
 
 === Keeping what must not be renamed
 
-Renaming is safe for code the compiler and runtime resolve by symbol, and unsafe for code resolved by *name*. The engine keeps the obvious cases automatically -- the main class and its generated stub, native-interface implementations and their peers, `enum` `values()`/`valueOf()`, serialization members, and any class named by a string constant that appears in the jar (a `Class.forName` target, a GUI-builder reference).
+Renaming is safe for code the compiler and runtime resolve by symbol. Codename One has no runtime reflection -- `Class.forName` never resolved an obfuscated application class -- so there is no reflective seam to protect, and there is no serialization to keep members for. What must survive is the small set the build resolves by *name*: the main class and its generated stub, the generated router and annotation bootstraps, and each native interface with its generated `Impl`/`Stub` peer. The engine finds the native interfaces in the input and keeps exactly those peers, and keeps the rest of that set automatically.
 
-Two categories deserve special attention:
+`PropertyBusinessObject` properties are safe without any special handling: a property's JSON key and database column come from the *string* passed to its `Property`, not from the field name, so renaming the field doesn't change the on-disk schema or the wire format. String encryption decodes those strings back to the same value at runtime.
 
-* *Name-bound persistence.* A `PropertyBusinessObject`'s property names *are* the JSON keys and the database column names. Renaming them would change the on-disk schema and the wire format, which corrupts data on the next app upgrade rather than throwing. The engine keeps these member names automatically.
-* *Runtime reflection you construct dynamically.* If you build a class name at runtime from pieces the analysis can't follow, add a `harden.keep` rule for it.
-
-When you enable a hardening level, review your app for these name-bound patterns before the first hardened cloud build: reflective `Class.forName` targets built from dynamic strings, GUI-builder resources that reference components by class name, and any framework registration that resolves an implementation by name. The automatic keep analysis catches the common cases; a `harden.keep` rule covers anything it can't see.
+If you have a class the build resolves by a name the automatic analysis can't see, add a `harden.keep` rule for it.
 
 === Crash reports from a hardened build
 
@@ -116,7 +111,9 @@ Hardening and Crash Protection are designed together. The build server retains t
 
 === Local and source builds aren't hardened
 
-Hardening runs on the Codename One build server. A local or source-project target (`*-source`, `local-*`) never reaches the server, so its output isn't hardened; the build fails the pre-flight rather than mislead you, unless you set `harden.allowUnhardenedLocalBuild=true`. The simulator is never obfuscated either -- it runs your `target/classes` directly. App code can read `com.codename1.security.hardening.Hardening.isHardened()` to tell a hardened build apart from one of these.
+Hardening runs on the Codename One build server, and only there. Running it server-side keeps the hardening implementation itself off the client: the exact transforms, the decoder shapes and the dictionary stay on infrastructure the attacker doesn't have, which is part of what makes a hardened binary harder to reverse engineer -- an attacker can't study the tool that produced it.
+
+A local or source-project target (`*-source`, `local-*`) never reaches the server, so its output isn't hardened; the build fails the pre-flight rather than mislead you, unless you set `harden.allowUnhardenedLocalBuild=true`. The simulator is never obfuscated either -- it runs your `target/classes` directly. App code can read `com.codename1.security.hardening.Hardening.isHardened()` to tell a hardened build apart from one of these.
 
 === Hardening and App Shield
 

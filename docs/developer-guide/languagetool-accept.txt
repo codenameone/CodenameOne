@@ -49,6 +49,7 @@ iapdemo
 ParparVM
 RoboVM
 TeaVM
+DexGuard
 teavm
 teavmdbg
 LWUIT
