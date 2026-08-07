@@ -3574,6 +3574,18 @@ public class CN1WearableBridge implements WearableBridge {
             ack.getDataMap().putLong(PUBLISHED_AT_KEY, System.currentTimeMillis());
             Wearable.getDataClient(context.getApplicationContext())
                     .putDataItem(ack.asPutDataRequest());
+            // A sweep is what deletes these again, once the transfer they vouch for is gone -- and
+            // on a RECEIVE-ONLY device nothing else ever arms one. The constructor sweeps at
+            // startup and publishing a transfer sweeps after; a device that only takes files does
+            // neither, so its acknowledgements accumulated for the life of the process. The
+            // sender's deletion of the transfer does not help: the listener's deletion branch does
+            // not run a sweep.
+            //
+            // Coalesced like every other caller, so a burst of deliveries adds no timer entries.
+            CN1WearableBridge live = current;
+            if (live != null) {
+                live.expireOwnTransfers();
+            }
         } catch (Throwable unavailable) {
             // The transfer has been delivered either way. Losing the acknowledgement only means the
             // sender holds its copy until the hard cap.
