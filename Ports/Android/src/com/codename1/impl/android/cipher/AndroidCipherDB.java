@@ -270,28 +270,15 @@ class AndroidCipherDB extends Database {
      * Disposes of an export that is not going to be used.
      *
      * The export is a complete second copy of the data, and when the conversion was a decryption
-     * it is a plaintext copy, so leaving it behind is a disclosure rather than litter. If the file
-     * cannot be unlinked it is truncated instead, which removes the contents even where the
-     * directory entry survives, and anything still left is named in the failure the caller sees --
-     * that caller goes on using the live database and would otherwise never learn of it.
+     * it is a plaintext copy, so leaving it behind is a disclosure rather than litter. The rule
+     * lives in AndroidImplementation because recovery has to apply the same one, and this package
+     * is deleted from applications that never encrypt.
      *
      * @param target the export to remove
      * @return a sentence to append to the failure message, empty when nothing survived
      */
     private static String discardExport(File target) {
-        if (!target.exists() || target.delete()) {
-            return "";
-        }
-        try {
-            new java.io.FileOutputStream(target).close();
-        } catch (IOException cannotEmptyIt) {
-            return " A complete copy of the data was left at " + target.getPath()
-                    + " and could not be removed; delete it.";
-        }
-        if (!target.exists() || target.delete()) {
-            return "";
-        }
-        return " An emptied file was left at " + target.getPath() + ".";
+        return AndroidImplementation.discardDatabaseMigrationExport(target);
     }
 
     private void migrateThroughExport(String targetKey) throws IOException {
@@ -312,6 +299,13 @@ class AndroidCipherDB extends Database {
         // and deleting whatever is sitting there is how the previous three attempts at this went
         // wrong. A file this call creates is ours by construction and collides with nothing.
         File target = File.createTempFile(name + ".", ".target", dir);
+        // Recorded while it is still empty, and before a single row goes into it. Between creating
+        // this file and finishing the conversion the process can be killed at any point, and from
+        // then on the file is a complete second copy of the data -- in the clear when this is a
+        // decryption. Writing the record afterwards would leave that copy on disk under a random
+        // name with nothing that knows to look for it; writing it first costs a file that recovery
+        // finds and removes.
+        AndroidImplementation.writeDatabaseMigrationMarker(path, null, target);
         int userVersion = 0;
         int applicationId = 0;
         try {
@@ -338,8 +332,13 @@ class AndroidCipherDB extends Database {
             } catch (RuntimeException notAttached) {
                 // It may never have been attached; the conversion failure is what matters.
             }
+            String surviving = discardExport(target);
+            File unusedMarker = AndroidImplementation.databaseMigrationMarker(path);
+            if (unusedMarker != null) {
+                unusedMarker.delete();
+            }
             throw new IOException("The database could not be converted: " + err.getMessage()
-                    + discardExport(target), err);
+                    + surviving, err);
         }
         SQLiteDatabase closing = db;
         db = null;
@@ -358,11 +357,15 @@ class AndroidCipherDB extends Database {
         File backup;
         try {
             backup = File.createTempFile(name + ".", ".backup", dir);
-            // The marker records which file holds the original, and carries a magic line so that
-            // recovery and delete act only on files this port wrote.
-            AndroidImplementation.writeDatabaseMigrationMarker(path, backup);
+            // Rewritten, now naming both files: the original is about to move aside, and the
+            // export still has to be cleaned up if the swap does not complete.
+            AndroidImplementation.writeDatabaseMigrationMarker(path, backup, target);
         } catch (IOException err) {
             String surviving = discardExport(target);
+            File unusedMarker = AndroidImplementation.databaseMigrationMarker(path);
+            if (unusedMarker != null) {
+                unusedMarker.delete();
+            }
             db = openAt(path, currentKey);
             throw new IOException("The conversion could not be marked as in progress, so it was "
                     + "not started: " + err.getMessage() + surviving, err);

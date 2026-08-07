@@ -451,6 +451,14 @@ class DatabaseImpl extends Database {
         }
 
         @Override
+        protected boolean legacyWasNullBeforeAnyRead() {
+            // iOS answered wasNull() by asking the statement about the last column index it was
+            // given, which starts at zero, so before any read it reported on column zero of the
+            // current row rather than saying nothing had been read.
+            return true;
+        }
+
+        @Override
         protected String readString(int index) throws IOException {
             return SQLText.fromUTF8(
                     IOSImplementation.nativeInstance.sqlCursorValueAtColumnText(stmt, index));

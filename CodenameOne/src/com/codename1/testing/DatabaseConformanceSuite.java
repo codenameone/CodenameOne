@@ -363,19 +363,31 @@ public final class DatabaseConformanceSuite {
         }
 
         if (typedRowInserted) {
-            Cursor cur = db.executeQuery("SELECT typeof(t), typeof(i), typeof(d), typeof(b) "
-                    + "FROM conf_stmt WHERE id = 1");
+            // typeof() over the parameter itself rather than over a stored column. A column
+            // carries an affinity, and SQLite converts an inserted value to it -- text "42" lands
+            // in an INTEGER column as an integer -- so reading the type back from the table says
+            // what the column is, not what was bound. This is the only form that distinguishes
+            // typed binding from stringified binding at all.
+            Cursor cur = stringifiesParameters
+                    ? db.executeQuery("SELECT typeof(?), typeof(?), typeof(?)",
+                            new Object[] {"text", Long.valueOf(42), Double.valueOf(1.5)})
+                    : db.executeQuery("SELECT typeof(?), typeof(?), typeof(?), typeof(?)",
+                            new Object[] {"text", Long.valueOf(42), Double.valueOf(1.5),
+                                new byte[] {1, 2, 3}});
             try {
-                r.check(cur.next(), "the typed row was inserted");
+                r.check(cur.next(), "typeof() over the bound parameters returns a row");
                 Row row = cur.getRow();
                 String tType = row.getString(0);
                 String iType = row.getString(1);
                 String dType = row.getString(2);
-                String bType = row.getString(3);
-                if (mode == MODE_LEGACY && portKind() == PORT_IOS) {
+                if (stringifiesParameters) {
                     r.check("text".equals(iType),
-                            "legacy: parameters are bound as text, typeof(i) was " + iType);
+                            "legacy: parameters are bound as text, typeof of a Long was " + iType);
+                    r.check("text".equals(dType),
+                            "legacy: parameters are bound as text, typeof of a Double was "
+                            + dType);
                 } else {
+                    String bType = row.getString(3);
                     r.check("text".equals(tType), "a String binds as TEXT, got " + tType);
                     r.check("integer".equals(iType), "a Long binds as INTEGER, got " + iType);
                     r.check("real".equals(dType), "a Double binds as REAL, got " + dType);

@@ -69,6 +69,10 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
     /// Latches whether the most recent value read through this row was SQL NULL.
     private boolean lastReadWasNull;
 
+    /// Whether any value has been read through this cursor yet, which only the compatibility hint
+    /// cares about.
+    private boolean anythingRead;
+
     /// Row count once known, or -1. Filled in by anything that walks to the end.
     private int knownCount = -1;
 
@@ -348,7 +352,24 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
         // close of its cursor or its database kept answering from a stale latch instead of
         // reporting that it is gone.
         checkOpen();
+        if (!anythingRead && Database.isLegacyBehavior() && legacyWasNullBeforeAnyRead()) {
+            return true;
+        }
         return lastReadWasNull;
+    }
+
+    /// Whether this port used to answer `wasNull()` with true before anything had been read.
+    ///
+    /// It is a per-port question, which is why it is asked here rather than decided here: the
+    /// answer is what that port actually did, and only a port that did it restores it under the
+    /// compatibility hint. The default is the contract, which says a value nobody has read is not
+    /// a null value.
+    ///
+    /// #### Returns
+    ///
+    /// true if the compatibility hint should make `wasNull()` true before the first read
+    protected boolean legacyWasNullBeforeAnyRead() {
+        return false;
     }
 
     /// Guards a value read and updates the null latch.
@@ -358,6 +379,7 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
             throw new IOException("The cursor is not on a row");
         }
         checkColumn(index);
+        anythingRead = true;
         lastReadWasNull = isNullAt(index);
     }
 

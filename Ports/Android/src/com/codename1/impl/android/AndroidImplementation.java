@@ -11097,11 +11097,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return dir == null ? null : new File(dir, new File(path).getName() + MIGRATION_MARKER);
     }
 
-    /// Reads the backup a marker claims, or null when the file is not one of ours.
+    /// Reads a marker written by this port, or null when the file is not one of ours.
     ///
     /// A marker is trusted only if it opens with the magic line. Anything else - including an
     /// application database that happens to live at this path - is left alone.
-    public static File readDatabaseMigrationBackup(String path) {
+    ///
+    /// The two entries after it are the file holding the original and the export being built,
+    /// either of which may be absent: the marker is written before the export is filled in and
+    /// rewritten once the original has been moved aside, so which files exist depends on how far
+    /// the conversion got.
+    ///
+    /// @return the two names, either element null, or null if this is not our marker
+    private static String[] readDatabaseMigrationMarker(String path) {
         File marker = databaseMigrationMarker(path);
         if (marker == null || !marker.isFile()) {
             return null;
@@ -11114,10 +11121,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return null;
             }
             String backup = reader.readLine();
-            if (backup == null || backup.length() == 0) {
-                return null;
-            }
-            return new File(marker.getParentFile(), backup);
+            String target = reader.readLine();
+            return new String[] {
+                backup == null || backup.length() == 0 ? null : backup,
+                target == null || target.length() == 0 ? null : target,
+            };
         } catch (IOException unreadable) {
             return null;
         } finally {
@@ -11131,6 +11139,59 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    /// Whether the marker for this database was written by this port.
+    ///
+    /// Distinct from having a backup: a marker written before the export was filled in names no
+    /// backup yet, and is still ours to rewrite.
+    private static boolean ownsDatabaseMigrationMarker(String path) {
+        return readDatabaseMigrationMarker(path) != null;
+    }
+
+    /// Reads the backup a marker claims, or null when there is none.
+    public static File readDatabaseMigrationBackup(String path) {
+        String[] entry = readDatabaseMigrationMarker(path);
+        if (entry == null || entry[0] == null) {
+            return null;
+        }
+        return new File(databaseMigrationMarker(path).getParentFile(), entry[0]);
+    }
+
+    /// Reads the export a marker claims, or null when there is none.
+    ///
+    /// The export is a second complete copy of the data, and a plaintext one when the conversion
+    /// was a decryption, so it is recorded before anything is written into it. Otherwise a process
+    /// death between creating it and finishing the conversion would leave readable data behind
+    /// under a name nothing knows to look for.
+    public static File readDatabaseMigrationTarget(String path) {
+        String[] entry = readDatabaseMigrationMarker(path);
+        if (entry == null || entry[1] == null) {
+            return null;
+        }
+        return new File(databaseMigrationMarker(path).getParentFile(), entry[1]);
+    }
+
+    /// Disposes of an export, and reports anything that survived.
+    ///
+    /// If the file cannot be unlinked it is truncated instead, which removes the contents even
+    /// where the directory entry survives.
+    ///
+    /// @return a sentence to append to a failure message, empty when nothing survived
+    public static String discardDatabaseMigrationExport(File target) {
+        if (target == null || !target.exists() || target.delete()) {
+            return "";
+        }
+        try {
+            new FileOutputStream(target).close();
+        } catch (IOException cannotEmptyIt) {
+            return " A complete copy of the data was left at " + target.getPath()
+                    + " and could not be removed; delete it.";
+        }
+        if (!target.exists() || target.delete()) {
+            return "";
+        }
+        return " An emptied file was left at " + target.getPath() + ".";
+    }
+
     /// Records that a conversion is under way and which file holds the original.
     ///
     /// The marker is the one file here whose name has to be predictable, because recovery has to
@@ -11138,12 +11199,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// an application may point a database at this exact path - and writing over it would
     /// destroy that database. Anything already there that this port did not write means the
     /// conversion does not start.
-    public static void writeDatabaseMigrationMarker(String path, File backup) throws IOException {
+    public static void writeDatabaseMigrationMarker(String path, File backup, File target)
+            throws IOException {
         File marker = databaseMigrationMarker(path);
         if (marker == null) {
             throw new IOException("The database " + path + " has no directory to convert it in");
         }
-        if (marker.exists() && readDatabaseMigrationBackup(path) == null) {
+        if (marker.exists() && !ownsDatabaseMigrationMarker(path)) {
             throw new IOException("There is already a file at " + marker + " that this port did "
                     + "not write, so the conversion was not started rather than overwriting it. "
                     + "Move it aside if it is not a database you need.");
@@ -11152,7 +11214,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         try {
             writer.write(MIGRATION_MARKER_MAGIC);
             writer.write("\n");
-            writer.write(backup.getName());
+            writer.write(backup == null ? "" : backup.getName());
+            writer.write("\n");
+            writer.write(target == null ? "" : target.getName());
             writer.write("\n");
         } finally {
             writer.close();
@@ -11171,11 +11235,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (path == null) {
             return;
         }
+        File marker = databaseMigrationMarker(path);
+        // The export first, whatever else is true. It is a second complete copy of the data, and
+        // a plaintext one when the conversion was a decryption, so an interrupted conversion must
+        // not leave it lying in the migration directory. It is only ever installed by being
+        // renamed over the live database, so anything still under its own name is an orphan.
+        File orphanedExport = readDatabaseMigrationTarget(path);
+        if (orphanedExport != null && orphanedExport.exists()) {
+            String surviving = discardDatabaseMigrationExport(orphanedExport);
+            if (surviving.length() > 0) {
+                throw new IOException("The database " + path + " has an interrupted conversion "
+                        + "whose working copy could not be cleaned up." + surviving);
+            }
+        }
         File backup = readDatabaseMigrationBackup(path);
         if (backup == null) {
+            // No original was moved aside, so the conversion never reached the swap. Only the
+            // export existed, and it is gone.
+            marker.delete();
             return;
         }
-        File marker = databaseMigrationMarker(path);
         File live = new File(path);
         if (!backup.isFile()) {
             // The marker outlived its backup, so there is nothing to put back or clean up.
@@ -11215,8 +11294,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (path == null) {
             return;
         }
+        File export = readDatabaseMigrationTarget(path);
+        if (export != null && export.exists()) {
+            String surviving = discardDatabaseMigrationExport(export);
+            if (surviving.length() > 0) {
+                throw new IOException("The database " + path + " was not deleted, because the "
+                        + "working copy of its interrupted conversion could not be removed."
+                        + surviving);
+            }
+        }
         File backup = readDatabaseMigrationBackup(path);
         if (backup == null) {
+            File onlyMarker = databaseMigrationMarker(path);
+            if (onlyMarker != null && onlyMarker.isFile() && ownsDatabaseMigrationMarker(path)
+                    && !onlyMarker.delete() && onlyMarker.exists()) {
+                throw new IOException("The database " + path + " was not deleted, because the "
+                        + "record of its interrupted conversion at " + onlyMarker + " could not "
+                        + "be removed.");
+            }
             return;
         }
         if (backup.exists() && !backup.delete() && backup.exists()) {

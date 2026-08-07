@@ -117,7 +117,8 @@ public final class DatabaseConfig {
     ///
     /// #### Parameters
     ///
-    /// - `passphrase`: the secret, which must not be null or empty
+    /// - `passphrase`: the secret, which must not be null or empty, and must not contain the
+    ///   character with code point zero
     ///
     /// #### Returns
     ///
@@ -125,10 +126,23 @@ public final class DatabaseConfig {
     ///
     /// #### Throws
     ///
-    /// - `IllegalArgumentException`: if the passphrase is null or empty
+    /// - `IllegalArgumentException`: if the passphrase is null, empty, or contains the character
+    ///   with code point zero
     public static DatabaseConfig passphrase(String passphrase) {
         if (passphrase == null || passphrase.length() == 0) {
             throw new IllegalArgumentException("The database passphrase must not be null or empty");
+        }
+        // Rejected rather than truncated. The cipher takes a key as bytes and a length, and the
+        // engines behind this API disagree about where that length comes from: some measure to the
+        // first zero byte, which would silently reduce two passphrases differing only after such a
+        // character to the same key, and make one passphrase open a database on one platform and
+        // not on another.
+        // Refusing is the one answer that is the same everywhere, and it is loud.
+        if (passphrase.indexOf(0) >= 0) {
+            throw new IllegalArgumentException("The database passphrase must not contain the "
+                    + "character with code point zero. It cannot be carried to every platform's "
+                    + "cipher without being silently cut short there, so it is refused rather "
+                    + "than quietly weakening the key.");
         }
         return new DatabaseConfig(KEY_PASSPHRASE, null, passphrase.toCharArray(), null);
     }
