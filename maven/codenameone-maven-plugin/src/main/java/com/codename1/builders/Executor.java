@@ -2404,6 +2404,7 @@ public abstract class Executor {
         return jars;
     }
 
+    private boolean hardeningRanThisBuild;
     private File lastHardeningMapping;
     private String lastHardeningMappingId = "";
     private String lastHardeningR8Keep = "";
@@ -2470,6 +2471,12 @@ public abstract class Executor {
      * the plugin and the cloud daemon and never shares a classloader with the caller.
      */
     public File hardenSourceJar(File sourceZip, BuildRequest request) throws BuildException {
+        // cn1.hardened / cn1.hardenLevel / cn1.mappingId are engine OUTPUTS, never inputs. Clear any
+        // supplied values up front so the stubs never stamp a hardened state the engine didn't
+        // actually produce; they are set again below only from a verified hardening run.
+        request.putArgument("cn1.hardened", "false");
+        request.putArgument("cn1.hardenLevel", "off");
+        request.putArgument("cn1.mappingId", "");
         String level = request.getArg("harden.level", "off");
         if (level == null || level.trim().length() == 0 || "off".equalsIgnoreCase(level.trim())) {
             return sourceZip;
@@ -2480,12 +2487,10 @@ public abstract class Executor {
             log("cn1-hardening: forced off for this local build; building unhardened");
             return sourceZip;
         }
-        // Idempotence via trusted build state, not an input-jar marker: a META-INF/CN1-HARDENED
-        // resource could be added under src/main/resources or inherited from a dependency without the
-        // classes actually being hardened, which would silently skip the transform. cn1.hardened is
-        // set by this method only after it really hardens, so this suppresses only a second call in
-        // the same build.
-        if ("true".equals(request.getArg("cn1.hardened", "false"))) {
+        // Idempotence via a non-forgeable per-instance flag, not an input-jar marker (a spurious
+        // META-INF/CN1-HARDENED resource must not skip the transform) and not the cn1.hardened arg
+        // (just cleared above so a client can't forge it). Suppresses only a second call in this build.
+        if (hardeningRanThisBuild) {
             log("cn1-hardening: already hardened in this build; skipping");
             return sourceZip;
         }
@@ -2540,6 +2545,7 @@ public abstract class Executor {
                 request.putArgument("cn1.mappingId", lastHardeningMappingId);
                 request.putArgument("cn1.hardened", "true");
                 request.putArgument("cn1.hardenLevel", level.trim().toLowerCase());
+                hardeningRanThisBuild = true;
                 log("cn1-hardening: applied, mappingId=" + lastHardeningMappingId);
                 return hardened;
             }
