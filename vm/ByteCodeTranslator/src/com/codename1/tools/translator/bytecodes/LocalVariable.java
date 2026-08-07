@@ -35,15 +35,41 @@ public class LocalVariable extends Instruction {
     private String name;
     private String desc;
     private int index;
+    /**
+     * The bounds of the declaring scope, as ASM labels, or null for a local
+     * the translator synthesised from a store opcode rather than reading out
+     * of the class file's LocalVariableTable.
+     *
+     * Retained so the on-device debugger can resolve them to source lines and
+     * hide a local outside its scope. Two locals sharing a slot in disjoint
+     * scopes are otherwise indistinguishable at a breakpoint, and the debugger
+     * shows whichever one it happens to list — reporting the contents of a
+     * variable the code has not reached yet.
+     */
+    private final Label scopeStart;
+    private final Label scopeEnd;
+
     public LocalVariable(String name, String desc, String signature, Label start, Label end, int index) {
         super(Opcodes.ALOAD);
         this.name = name;
         this.desc = desc;
         this.index = index;
+        this.scopeStart = start;
+        this.scopeEnd = end;
     }
-    
+
     public int getIndex() {
         return index;
+    }
+
+    /** The label where this local's scope opens, or null if unknown. */
+    public Label getScopeStart() {
+        return scopeStart;
+    }
+
+    /** The label where this local's scope closes, or null if unknown. */
+    public Label getScopeEnd() {
+        return scopeEnd;
     }
     
     public boolean isRightVariable(int index, char type) {

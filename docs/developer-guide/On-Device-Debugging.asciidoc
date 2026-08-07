@@ -33,9 +33,10 @@ If your bug is reproducible in the simulator, stay in the simulator
 === Quick start (IntelliJ IDEA)
 
 Codename One projects generated from the `cn1app-archetype` ship with
-two ready-made IntelliJ run configurations under the *On-Device Debug*
-folder in the run-config dropdown: *CN1 Debug Proxy* and *CN1 Attach
-iOS*. The rest of this section assumes you're using them. Skip to
+three ready-made IntelliJ run configurations under the *On-Device
+Debug* folder in the run-config dropdown: *CN1 iOS On-Device Debug
+Build*, *CN1 Debug Proxy* and *CN1 Attach iOS*. The rest of this
+section assumes you're using them. Skip to
 <<on-device-debug-jdb,Using jdb instead>> if you prefer the
 command-line debugger.
 
@@ -116,18 +117,34 @@ normal remote attach. Device output from
 `System.out.println` / `Log.p` / `printf` / `NSLog` lands in the
 *CN1 Debug Proxy* Run window prefixed with `[device]`.
 
-=== Attach from NetBeans
+=== Quick start (NetBeans)
 
-NetBeans uses the same proxy and connection order. Start the proxy,
-launch the app, and wait for the device handshake and symbol-loading
-lines shown above. Then choose *Debug > Attach Debugger* in NetBeans.
-Select *Java Debugger (JPDA)* and the *SocketAttach* connector, set
-the host to `localhost` and the port to `8000`, then attach. Keep the
-Codename One project open so NetBeans can resolve your source files
-and breakpoints.
+NetBeans uses the same proxy and connection order as IntelliJ. Generated
+projects ship two custom actions for it, on the project's right-click
+menu:
+
+* *Build for iOS On-Device Debug* runs `cn1:buildIosOnDeviceDebug`,
+  which forces `codename1.arg.ios.onDeviceDebug=true` for that one
+  build. You do not need to edit
+  `common/codenameone_settings.properties` first — the goal sets the
+  hint itself, so a release build stays a release build.
+* *Start iOS Debug Proxy* runs `cn1:ios-on-device-debugging`, which
+  listens on `55333` for the device and `8000` for the IDE.
+
+Install the app the first action produced, start the proxy with the
+second, launch the app, and wait for the device handshake and
+symbol-loading lines shown above. Then choose *Debug > Attach
+Debugger*, select *Java Debugger (JPDA)* and the *SocketAttach*
+connector, set the host to `localhost` and the port to `8000`, and
+attach. Keep the Codename One project open so NetBeans can resolve
+your source files and breakpoints.
 
 Don't point NetBeans at port `55333`. The iPhone uses `55333` to
 reach the proxy. The IDE uses the proxy's JDWP port, `8000`.
+
+If the actions are missing from an older project, they live in
+`tools/netbeans/nbactions.xml`; copying that file from a freshly
+generated project adds them.
 
 === Quick start (Maven from the command line)
 
@@ -194,6 +211,19 @@ prefer plain files, extract it once and point at the directory.
   `printf` / `NSLog` from native code are surfaced in the proxy's
   console (the IntelliJ *CN1 Debug Proxy* Run window when launched
   via the run config) prefixed with `[device]`.
+* Thread list — every live Java thread appears in the IDE's Threads
+  panel, whether or not it has stopped anywhere, named after the
+  `java.lang.Thread` it belongs to (`EDT`, `main`, ...). Suspension
+  is reported per thread, so with several parked at once the panel
+  shows which is which.
+* Scoped locals — a local is listed only on the source lines it is
+  actually in scope for. That matters where two variables share a JVM
+  slot in disjoint blocks: only the one the code has reached is
+  shown, rather than both, one of them displaying the other's
+  storage.
+* Deferred breakpoints — a breakpoint set in a class the IDE has not
+  seen yet (an anonymous listener, say) resolves via the ClassPrepare
+  events the proxy raises for every matching class.
 * Pause and resume from the IDE.
 
 === Pointing the IDE at the Codename One sources
@@ -248,7 +278,14 @@ in the IDE editor when stepping into framework code.
   sources were compiled with `-g`. Codename One's archetypes do
   compile with debug info by default; if a variable shows up as
   `v1`, `v2`, ... that's because that particular class was
-  compiled without debug info.
+  compiled without debug info. Such a local also has no declaring
+  scope, so it is listed for the whole method rather than only
+  where it is live.
+* *Two locals of the same type sharing a slot* are reported as one.
+  Where disjoint blocks reuse a JVM slot for, say, two different
+  `int` variables, the debugger keeps the later declaration's name
+  and scope for both. Reuse across *different* types — the common
+  case, and the one that used to matter — is fully distinguished.
 * *Static field reads* are unsupported. Instance field reads are
   fully wired; static-field support requires an additional per-class
   static table that hasn't been emitted yet.

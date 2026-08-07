@@ -29,6 +29,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -85,6 +86,14 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     private static final int TYPE_TAG_INTERFACE = 2;
     private static final int TYPE_TAG_ARRAY = 3;
 
+    /**
+     * Zero-based position of canRequestVMDeathEvent in the CapabilitiesNew
+     * reply: the seven original capabilities, then canRedefineClasses,
+     * canAddMethod, canUnrestrictedlyRedefineClasses, canPopFrames,
+     * canUseInstanceFilters, canGetSourceDebugExtension, and then this one.
+     */
+    private static final int CAP_NEW_REQUEST_VM_DEATH_EVENT = 13;
+
     // SuspendPolicy
     private static final int SP_NONE         = 0;
     private static final int SP_EVENT_THREAD = 1;
@@ -111,6 +120,68 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     // event can find the JDWP request ID that triggered it.
     private final Map<Long, Integer> stepRequests = new ConcurrentHashMap<>();
     private final List<Long> knownThreads = new ArrayList<>();
+    // Last thread list pulled off the device, keyed by thread id. Threads that
+    // have never raised an event still appear here, which is the whole point:
+    // before CMD_GET_THREADS was implemented the IDE could only ever see
+    // threads that had already hit a breakpoint.
+    private final Map<Long, ThreadInfo> deviceThreads = new ConcurrentHashMap<>();
+    // Resolved java.lang.Thread names, cached because naming a thread costs a
+    // field read plus a string read on the device.
+    private final Map<Long, String> threadNames = new ConcurrentHashMap<>();
+    // ClassPrepare requests the IDE has registered, by request id. IntelliJ and
+    // NetBeans defer any breakpoint they could not resolve to one of these, so
+    // a proxy that accepts the request and never fires leaves those breakpoints
+    // permanently unarmed.
+    private final Map<Integer, ClassPrepareRequest> classPrepareRequests = new ConcurrentHashMap<>();
+
+    /** What the device reports about one thread. Keyed by id in deviceThreads. */
+    private static final class ThreadInfo {
+        final boolean suspended;
+        /** The java.lang.Thread instance, or 0 if the thread has none yet. */
+        final long threadObject;
+        ThreadInfo(boolean suspended, long threadObject) {
+            this.suspended = suspended;
+            this.threadObject = threadObject;
+        }
+    }
+
+    private static final class ClassPrepareRequest {
+        final int requestId;
+        final int suspendPolicy;
+        /** ClassMatch patterns; empty means "every class". */
+        final List<String> includes;
+        /** ClassExclude patterns. */
+        final List<String> excludes;
+        ClassPrepareRequest(int requestId, int suspendPolicy,
+                            List<String> includes, List<String> excludes) {
+            this.requestId = requestId;
+            this.suspendPolicy = suspendPolicy;
+            this.includes = includes;
+            this.excludes = excludes;
+        }
+
+        /**
+         * JDWP class patterns are an exact name or a single leading/trailing
+         * wildcard — "com.example.Main", "com.example.*", "*Main".
+         */
+        private static boolean matches(String pattern, String className) {
+            if (pattern.equals("*")) return true;
+            if (pattern.startsWith("*")) return className.endsWith(pattern.substring(1));
+            if (pattern.endsWith("*")) return className.startsWith(pattern.substring(0, pattern.length() - 1));
+            return pattern.equals(className);
+        }
+
+        boolean accepts(String className) {
+            for (String ex : excludes) {
+                if (matches(ex, className)) return false;
+            }
+            if (includes.isEmpty()) return true;
+            for (String in : includes) {
+                if (matches(in, className)) return true;
+            }
+            return false;
+        }
+    }
     // Synthetic thread group ID. jdb wants a non-null group on every thread.
     private static final long FAKE_GROUP_ID = 0xCAFEL;
     private static final long FAKE_CLASSLOADER_ID = 0;
@@ -275,6 +346,9 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         // Clear any pending step requests so a stale one from the previous
         // attach can't fire against the new debugger.
         stepRequests.clear();
+        // Same for class-prepare registrations: the next IDE re-registers its
+        // own, and replaying against a closed socket would only log failures.
+        classPrepareRequests.clear();
         // Re-arm VM_START for the next attach.
         vmStartSent = false;
         // Breakpoints stay in bpRequests so the device keeps them set; the
@@ -468,9 +542,10 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 return;
             }
             case 4: { // AllThreads
+                List<Long> ids = currentThreadIds();
                 Buf b = new Buf();
-                b.writeInt(knownThreads.size());
-                for (long tid : knownThreads) b.writeLong(tid);
+                b.writeInt(ids.size());
+                for (long tid : ids) b.writeLong(tid);
                 writeReply(id, 0, b.bytes());
                 return;
             }
@@ -508,10 +583,21 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 writeReply(id, 0, empty());
                 return;
             }
-            case 12: case 17: { // Capabilities / CapabilitiesNew — return all false
+            case 12: case 17: { // Capabilities / CapabilitiesNew
+                // The seven original capabilities are all field watchpoints,
+                // bytecode access and monitor introspection — none of which
+                // ParparVM exposes, so those stay false.
+                //
+                // CapabilitiesNew adds fourteen more. The only one that is
+                // true of this proxy is canRequestVMDeathEvent: the device's
+                // disconnect is turned into a VM_DEATH event. Claiming any of
+                // the others would have the IDE offer redefinition, frame
+                // popping or forced returns and then fail when used.
                 Buf b = new Buf();
                 int n = (cmd == 12) ? 7 : 32;
-                for (int i = 0; i < n; i++) b.writeByte(0);
+                for (int i = 0; i < n; i++) {
+                    b.writeByte(i == CAP_NEW_REQUEST_VM_DEATH_EVENT && cmd == 17 ? 1 : 0);
+                }
                 writeReply(id, 0, b.bytes());
                 return;
             }
@@ -668,11 +754,16 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     b.writeInt(m.argSlots(false));
                     b.writeInt(m.locals.size());
                     for (SymbolTable.LocalVarInfo v : m.locals) {
-                        // codeIndex=0, length=large => "always live"
-                        b.writeLong(0L);
+                        // ParparVM's "code index" is the source line, so a
+                        // local's scope travels as its declaration line plus
+                        // the number of lines it stays live for. Reporting
+                        // every local as always-live made the IDE ask for
+                        // slots the frame had not reached, which is how a
+                        // variable came to display the previous scope's value.
+                        b.writeLong(v.jdwpCodeIndex());
                         b.writeString(v.name);
                         b.writeString(v.descriptor);
-                        b.writeInt(Integer.MAX_VALUE);
+                        b.writeInt(v.jdwpLength());
                         b.writeInt(v.slot);
                     }
                 }
@@ -687,11 +778,11 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     b.writeInt(m.argSlots(false));
                     b.writeInt(m.locals.size());
                     for (SymbolTable.LocalVarInfo v : m.locals) {
-                        b.writeLong(0L);
+                        b.writeLong(v.jdwpCodeIndex());
                         b.writeString(v.name);
                         b.writeString(v.descriptor);
                         b.writeString(""); // generic signature
-                        b.writeInt(Integer.MAX_VALUE);
+                        b.writeInt(v.jdwpLength());
                         b.writeInt(v.slot);
                     }
                 }
@@ -804,11 +895,23 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
 
     // -------- Thread / ThreadGroup -----------------------------------------
 
+    /**
+     * Whether the IDE should see this thread as suspended. The device's own
+     * view wins when we have one — the last suspending event only ever knew
+     * about a single thread, so with several parked at once the others used to
+     * be reported as running.
+     */
+    private boolean isSuspended(long tid) {
+        ThreadInfo info = deviceThreads.get(tid);
+        if (info != null) return info.suspended;
+        return tid == lastSuspendedThread;
+    }
+
     private void handleThread(int id, int cmd, byte[] p) throws IOException {
         long tid = readLong(p, 0);
         switch (cmd) {
             case 1: { // Name
-                Buf b = new Buf(); b.writeString("Thread-" + tid); writeReply(id, 0, b.bytes()); return;
+                Buf b = new Buf(); b.writeString(threadName(tid)); writeReply(id, 0, b.bytes()); return;
             }
             case 2: { // Suspend
                 writeReply(id, 0, empty()); return;
@@ -824,7 +927,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 // 1 = SLEEPING, 4 = RUNNING; suspendStatus bit 1 = SUSPENDED
                 Buf b = new Buf();
                 b.writeInt(4); // RUNNING
-                b.writeInt(tid == lastSuspendedThread ? 1 : 0);
+                b.writeInt(isSuspended(tid) ? 1 : 0);
                 writeReply(id, 0, b.bytes()); return;
             }
             case 5: { // ThreadGroup
@@ -863,7 +966,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             }
             case 12: { // SuspendCount
                 Buf b = new Buf();
-                b.writeInt(tid == lastSuspendedThread ? 1 : 0);
+                b.writeInt(isSuspended(tid) ? 1 : 0);
                 writeReply(id, 0, b.bytes()); return;
             }
             default:
@@ -875,10 +978,11 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         switch (cmd) {
             case 1: { Buf b = new Buf(); b.writeString("main"); writeReply(id, 0, b.bytes()); return; }
             case 2: { Buf b = new Buf(); b.writeLong(0); writeReply(id, 0, b.bytes()); return; }
-            case 3: {
+            case 3: { // Children — threads then child groups (we have none)
+                List<Long> ids = currentThreadIds();
                 Buf b = new Buf();
-                b.writeInt(knownThreads.size());
-                for (long t : knownThreads) b.writeLong(t);
+                b.writeInt(ids.size());
+                for (long t : ids) b.writeLong(t);
                 b.writeInt(0);
                 writeReply(id, 0, b.bytes()); return;
             }
@@ -1001,6 +1105,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 long stepThread = 0;
                 int stepDepth = 0;
                 boolean badModifier = false;
+                List<String> classIncludes = new ArrayList<>();
+                List<String> classExcludes = new ArrayList<>();
                 for (int i = 0; i < modCount && !badModifier; i++) {
                     if (off >= p.length) { badModifier = true; break; }
                     int modKind = p[off] & 0xff; off += 1;
@@ -1035,6 +1141,15 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                             if (off + 4 > p.length) { badModifier = true; break; }
                             int slen = readInt(p, off);
                             if (slen < 0 || off + 4 + slen > p.length) { badModifier = true; break; }
+                            // Retained rather than skipped: a ClassPrepare
+                            // request is nothing but its patterns, and firing
+                            // for every class would flood the IDE.
+                            String pattern = readString(p, off);
+                            if (modKind == 5) {
+                                classIncludes.add(pattern);
+                            } else {
+                                classExcludes.add(pattern);
+                            }
                             off += 4 + slen;
                             break;
                         }
@@ -1088,13 +1203,44 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     int methodIdInt = fromJdwpRef(methodID);
                     BpRequest br = new BpRequest(rid, classIdInt, methodIdInt, codeIndex, suspendPolicy);
                     bpRequests.put(rid, br);
+                    // Say what was armed and where. A breakpoint the proxy
+                    // cannot resolve to a method used to be accepted in
+                    // silence, so a developer whose breakpoints never fired
+                    // had nothing in the log to go on.
+                    SymbolTable.MethodInfo m = symbols == null ? null : symbols.methodById(methodIdInt);
+                    if (m == null) {
+                        System.err.println("[jdwp] breakpoint rid=" + rid
+                                + " does not resolve to a known method (methodId=" + methodIdInt
+                                + ", line=" + codeIndex + "); it will never fire");
+                    } else {
+                        System.out.println("[jdwp] breakpoint rid=" + rid + " armed at "
+                                + describeMethod(m) + ":" + codeIndex);
+                        if (!m.lines.isEmpty() && !m.lines.contains((int) codeIndex)) {
+                            System.err.println("[jdwp] line " + codeIndex + " is not in "
+                                    + describeMethod(m) + "'s line table "
+                                    + m.lines.first() + ".." + m.lines.last()
+                                    + "; the breakpoint will not fire");
+                        }
+                    }
                     // If the device isn't connected yet, the breakpoint will
                     // be replayed when onHello fires. Either way bpRequests
                     // is the source of truth so the event handler can match
                     // device-emitted BP_HIT events back to a JDWP request id.
                     if (device != null && deviceHelloReceived) try {
                         device.setBreakpoint(methodIdInt, (int) codeIndex);
-                    } catch (IOException io) { /* ignore */ }
+                    } catch (IOException io) {
+                        System.err.println("[jdwp] failed to arm breakpoint rid=" + rid
+                                + " on the device: " + io.getMessage());
+                    }
+                } else if (eventKind == EK_CLASS_PREPARE) {
+                    ClassPrepareRequest cpr = new ClassPrepareRequest(
+                            rid, suspendPolicy, classIncludes, classExcludes);
+                    classPrepareRequests.put(rid, cpr);
+                    // The reply has to reach the IDE before the events do, so
+                    // the already-loaded classes are replayed after it below.
+                    Buf reply = new Buf(); reply.writeInt(rid); writeReply(id, 0, reply.bytes());
+                    replayClassPrepare(cpr);
+                    return;
                 } else if (eventKind == EK_SINGLE_STEP && stepThread != 0) {
                     // depth: 0=INTO, 1=OVER, 2=OUT — same numeric values as
                     // the wire protocol's STEP_INTO/OVER/OUT, so no mapping.
@@ -1119,6 +1265,9 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 if (eventKind == EK_SINGLE_STEP) {
                     stepRequests.entrySet().removeIf(e -> e.getValue() == rid);
                 }
+                if (eventKind == EK_CLASS_PREPARE) {
+                    classPrepareRequests.remove(rid);
+                }
                 writeReply(id, 0, empty());
                 return;
             }
@@ -1135,6 +1284,57 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             default:
                 writeReply(id, 100, empty());
         }
+    }
+
+    /** "com.example.Main.actionPerformed(Lcom/codename1/ui/events/ActionEvent;)V" */
+    private String describeMethod(SymbolTable.MethodInfo m) {
+        SymbolTable.ClassInfo c = symbols == null ? null : symbols.classById(m.classId);
+        String cls = c != null ? c.jvmName.replace('/', '.') : "?";
+        return cls + "." + m.name + m.descriptor;
+    }
+
+    /**
+     * Fires a ClassPrepare event for every class already in the symbol table
+     * that the request matches.
+     *
+     * ParparVM links its whole class set into the binary, so by the time a
+     * debugger can talk to us every class is "prepared" — there is no later
+     * moment at which to fire. Replaying on registration is therefore the
+     * complete implementation, not an approximation, and it is what makes the
+     * IDE resolve a breakpoint it deferred because the class was not loaded
+     * when the file was first opened.
+     *
+     * Suspend policy is deliberately downgraded to NONE: the app is running
+     * normally at this point, and honouring SUSPEND_ALL here would freeze it
+     * on attach with no event thread to resume.
+     */
+    private void replayClassPrepare(ClassPrepareRequest cpr) {
+        if (symbols == null) return;
+        int fired = 0;
+        for (SymbolTable.ClassInfo c : symbols.allClasses()) {
+            String dotted = c.jvmName.replace('/', '.');
+            if (!cpr.accepts(dotted)) continue;
+            try {
+                Buf b = new Buf();
+                b.writeByte(SP_NONE);
+                b.writeInt(1);
+                b.writeByte(EK_CLASS_PREPARE);
+                b.writeInt(cpr.requestId);
+                b.writeLong(lastSuspendedThread != 0 ? lastSuspendedThread : 1L);
+                b.writeByte(TYPE_TAG_CLASS);
+                b.writeLong(toJdwpRef(c.classId));
+                b.writeString(c.jvmSignature());
+                b.writeInt(7); // VERIFIED|PREPARED|INITIALIZED
+                writeEventCommand(b.bytes());
+                fired++;
+            } catch (IOException e) {
+                System.err.println("[jdwp] failed to send CLASS_PREPARE: " + e.getMessage());
+                return;
+            }
+        }
+        System.out.println("[jdwp] CLASS_PREPARE rid=" + cpr.requestId
+                + " matched " + fired + " class(es)"
+                + (cpr.includes.isEmpty() ? "" : " for " + cpr.includes));
     }
 
     private void handleObject(int id, int cmd, byte[] p) throws IOException {
@@ -1422,6 +1622,87 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         }
     }
 
+    private final Object threadsLock = new Object();
+    private boolean pendingThreads = false;
+
+    /**
+     * Refreshes {@link #deviceThreads} from the device, blocking briefly for
+     * the reply. Falls back to whatever the last refresh produced (plus the
+     * threads we have seen raise events) so an unresponsive or older device
+     * degrades to the previous behaviour instead of an empty thread list.
+     */
+    private List<Long> currentThreadIds() {
+        if (device != null && deviceHelloReceived) {
+            synchronized (threadsLock) {
+                pendingThreads = true;
+                try {
+                    device.getThreads();
+                    long deadline = System.currentTimeMillis() + 2000;
+                    while (pendingThreads && System.currentTimeMillis() < deadline) {
+                        try { threadsLock.wait(deadline - System.currentTimeMillis()); }
+                        catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+                    }
+                } catch (IOException io) {
+                    pendingThreads = false;
+                }
+            }
+        }
+        List<Long> ids = new ArrayList<>(deviceThreads.keySet());
+        // Union with event-derived ids: a thread that hit a breakpoint must
+        // stay listed even if the device list came back empty.
+        synchronized (knownThreads) {
+            for (Long t : knownThreads) {
+                if (!ids.contains(t)) ids.add(t);
+            }
+        }
+        Collections.sort(ids);
+        return ids;
+    }
+
+    /**
+     * The name the IDE should show for a thread.
+     *
+     * Read off the {@code java.lang.Thread} instance the device reported for
+     * it — its {@code name} field, then that String's contents — so the panel
+     * shows "EDT" and "main" rather than an opaque id. Anything that does not
+     * resolve (no Thread object yet, a device that predates the thread list)
+     * falls back to the synthetic name.
+     */
+    private String threadName(long tid) {
+        String cached = threadNames.get(tid);
+        if (cached != null) return cached;
+        String name = resolveThreadName(tid);
+        if (name == null) return "Thread-" + tid;
+        threadNames.put(tid, name);
+        return name;
+    }
+
+    private String resolveThreadName(long tid) {
+        ThreadInfo info = deviceThreads.get(tid);
+        if (info == null || info.threadObject == 0 || symbols == null) return null;
+        int classId = blockingGetObjectClass(info.threadObject);
+        if (classId < 0) return null;
+        SymbolTable.FieldInfo nameField = null;
+        for (SymbolTable.ClassInfo c = symbols.classById(classId);
+                c != null && nameField == null;
+                c = c.superId >= 0 ? symbols.classById(c.superId) : null) {
+            for (SymbolTable.FieldInfo f : c.instanceFields) {
+                if ("name".equals(f.name) && "Ljava/lang/String;".equals(f.descriptor)) {
+                    nameField = f;
+                    break;
+                }
+            }
+        }
+        if (nameField == null) return null;
+        if (!blockingGetObjectFields(info.threadObject, new int[] { nameField.fieldId })) {
+            return null;
+        }
+        long[] values = lastObjectFieldsValues;
+        if (values == null || values.length < 1 || values[0] == 0) return null;
+        String s = blockingGetString(values[0]);
+        return s == null || s.isEmpty() ? null : s;
+    }
+
     private final Object stringLock = new Object();
     private boolean pendingString = false;
     private String lastString = null;
@@ -1494,7 +1775,9 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
 
     @Override public void onBreakpointHit(long threadId, int methodId, int line) {
         System.out.println("[jdwp] BP_HIT tid=" + threadId + " methodId=" + methodId + " line=" + line);
-        if (!knownThreads.contains(threadId)) knownThreads.add(threadId);
+        synchronized (knownThreads) {
+            if (!knownThreads.contains(threadId)) knownThreads.add(threadId);
+        }
         lastSuspendedThread = threadId;
         // The thread just paused at a new location — drop any stale cache
         // from a previous suspension and re-fetch.
@@ -1554,6 +1837,20 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             writeEventCommand(b.bytes());
         } catch (IOException e) {
             System.err.println("[jdwp] failed to send step event: " + e.getMessage());
+        }
+    }
+
+    @Override public void onThreads(long[] threadIds, boolean[] suspended, long[] threadObjects) {
+        // Rebuild rather than merge: a thread absent from the device's list has
+        // died, and keeping it would leave a phantom row in the IDE.
+        deviceThreads.clear();
+        for (int i = 0; i < threadIds.length; i++) {
+            deviceThreads.put(threadIds[i], new ThreadInfo(suspended[i], threadObjects[i]));
+        }
+        threadNames.keySet().retainAll(deviceThreads.keySet());
+        synchronized (threadsLock) {
+            pendingThreads = false;
+            threadsLock.notifyAll();
         }
     }
 

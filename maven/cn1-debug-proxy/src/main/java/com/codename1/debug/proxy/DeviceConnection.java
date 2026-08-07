@@ -58,6 +58,14 @@ public final class DeviceConnection implements AutoCloseable {
         void onHello(int version);
         void onBreakpointHit(long threadId, int methodId, int line);
         void onStepComplete(long threadId, int methodId, int line);
+        /**
+         * The device's live thread list, in reply to {@link #getThreads()}.
+         * {@code suspended} marks threads the debugger has parked, and
+         * {@code threadObjects} carries each {@code java.lang.Thread} instance
+         * (0 when the thread has not published one) so the proxy can read its
+         * name through the ordinary object/field commands.
+         */
+        void onThreads(long[] threadIds, boolean[] suspended, long[] threadObjects);
         void onStack(long threadId, int[] methodIds, int[] lines);
         void onLocals(int[] slots, byte[] typeCodes, long[] values);
         void onVmDeath();
@@ -169,6 +177,23 @@ public final class DeviceConnection implements AutoCloseable {
                 int mid = readInt(p, 8);
                 int line = readInt(p, 12);
                 listener.onStepComplete(tid, mid, line);
+                return;
+            }
+            case WireProtocol.EVT_THREAD_LIST: {
+                // count(4) then per thread: threadId(8) flags(1) threadObject(8).
+                if (p.length < 4) { listener.onUnknownEvent(code, p); return; }
+                int n = readInt(p, 0);
+                if (n < 0 || 4 + n * 17 > p.length) { listener.onUnknownEvent(code, p); return; }
+                long[] ids = new long[n];
+                boolean[] suspended = new boolean[n];
+                long[] objects = new long[n];
+                int off = 4;
+                for (int i = 0; i < n; i++) {
+                    ids[i] = readLong(p, off); off += 8;
+                    suspended[i] = (p[off] & 0x01) != 0; off += 1;
+                    objects[i] = readLong(p, off); off += 8;
+                }
+                listener.onThreads(ids, suspended, objects);
                 return;
             }
             case WireProtocol.EVT_STACK: {
@@ -364,6 +389,11 @@ public final class DeviceConnection implements AutoCloseable {
         writeLong(p, 0, threadId);
         p[8] = (byte) stepKind;
         sendCommand(WireProtocol.CMD_STEP, p);
+    }
+
+    /** Asks the device to enumerate its live Java threads. */
+    public void getThreads() throws IOException {
+        sendCommand(WireProtocol.CMD_GET_THREADS, null);
     }
 
     public void getStack(long threadId) throws IOException {

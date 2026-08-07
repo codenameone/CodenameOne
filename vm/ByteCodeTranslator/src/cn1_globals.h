@@ -1172,11 +1172,26 @@ struct ThreadLocalData {
 
 #ifdef CN1_ON_DEVICE_DEBUG
 // One row of the variable side-table: a single (line, slot, typeCode) tuple.
-// typeCode is the JVM type descriptor first char (I/J/F/D/Z/B/S/C/L/[) so the
-// debugger thread knows how to dereference the void* held in
-// callStackLocalsAddresses[offset][slot].
+// typeCode is the JVM type descriptor first char (I/J/F/D/Z/B/S/C/L/[).
+//
+// The void* that backs row i is callStackLocalsAddresses[offset][i] -- indexed
+// by ROW, not by slot. A JVM slot is reused across disjoint scopes and the two
+// occupants need not share a type, so ParparVM emits separate storage for each
+// (slot, qualifier) pair it sees ("ilocals_3_" and "locals[3].data.o" can both
+// exist). A per-slot address table can only name one of them, which made the
+// debugger read an 8-byte object reference out of a 4-byte JAVA_INT and then
+// dereference the result -- a wild pointer, and the SIGSEGV behind issue #5333.
+// One address per row keeps typeCode and storage in lockstep by construction.
+// startLine/endLine bound the source lines this local is in scope for, with
+// endLine exclusive. {0, 0} means "always live" — the class file carried no
+// scope, or the translator synthesised the local from a store opcode; {n, 0}
+// means "live from line n onwards". The debugger uses them to hide a local the
+// frame has not reached, which matters most for the reused-slot case: without
+// a scope, both occupants show at every breakpoint and one of them displays
+// storage belonging to the other's scope.
 struct cn1_var_entry {
-    int line;
+    int startLine;
+    int endLine;
     int slot;
     char typeCode;
 };
@@ -1192,6 +1207,20 @@ struct cn1_frame_info {
     int varTableCount;
     const struct cn1_var_entry* varTable;
 };
+
+// Clears the debug side-channel for the frame about to be pushed.
+//
+// Only methods that carry a locals side-table publish these two pointers, and
+// they publish them AFTER the frame is pushed. Native, eliminated and barebone
+// methods never do -- so without this clear such a frame silently inherits
+// whatever the previous occupant of that call depth left behind, including a
+// callStackLocalsAddresses entry pointing into a C frame that has already
+// returned. handleGetStack then reports a bogus method for the frame and
+// handleGetLocals reads freed stack memory as object references. Must run
+// before callStackOffset is incremented.
+#define CN1_DEBUG_FRAME_ENTER(threadStateData) \
+    threadStateData->callStackFrameInfo[threadStateData->callStackOffset] = 0; \
+    threadStateData->callStackLocalsAddresses[threadStateData->callStackOffset] = 0;
 
 // Set to non-zero by the debugger proxy listener once a proxy has connected
 // and is ready to receive events. Read on the hot path of __CN1_DEBUG_INFO,
@@ -1221,6 +1250,8 @@ extern void cn1_debugger_check(struct ThreadLocalData* threadStateData, int line
 #else
 #define __CN1_DEBUG_INFO(line) threadStateData->callStackLine[threadStateData->callStackOffset - 1] = line;
 #define __CN1_DEBUG_INFO_NT(line) do {} while(0)
+// Release builds carry no debug side-channel, so pushing a frame costs nothing.
+#define CN1_DEBUG_FRAME_ENTER(threadStateData)
 #endif
 
 // we need to throw stack overflow error but its unavailable here...
@@ -2247,6 +2278,7 @@ static inline void cn1_init_method_stack_fast(CODENAME_ONE_THREAD_STATE, JAVA_OB
                 sizeof(struct elementStruct) * (localsStackSize + stackSize));
     }
     threadStateData->threadObjectStackOffset += localsStackSize + stackSize;
+    CN1_DEBUG_FRAME_ENTER(threadStateData)
     threadStateData->callStackOffset++;
 }
 
@@ -2271,6 +2303,7 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     threadStateData->threadObjectStackOffset += localsStackSize + stackSize;
     threadStateData->callStackClass[threadStateData->callStackOffset] = classNameId;
     threadStateData->callStackMethod[threadStateData->callStackOffset] = methodNameId;
+    CN1_DEBUG_FRAME_ENTER(threadStateData)
     threadStateData->callStackOffset++;
 }
 

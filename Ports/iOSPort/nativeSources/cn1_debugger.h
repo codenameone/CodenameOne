@@ -58,6 +58,45 @@ extern void cn1_debugger_register_fields(int classId,
                                          const cn1_field_entry* table,
                                          int count);
 
+/**
+ * Publishes a class's {@code clazz} address under its classId, from the same
+ * translator-generated constructor that registers the field table.
+ *
+ * Everything the debugger is handed as an object reference is untrusted: the
+ * IDE echoes back ids it was given earlier, and a local slot can hold a value
+ * the frame never initialised on the branch it stopped in. With this registry
+ * the runtime can decide whether a candidate pointer really is a Java object
+ * by checking that its class word is the registered clazz for the classId it
+ * claims — an exact identity test, not a range guess. Before it existed, a
+ * bogus reference was dereferenced directly and took the app down mid-session
+ * (issue #5333).
+ */
+extern void cn1_debugger_register_class(int classId, struct clazz* cls);
+
+/**
+ * Copies {@code len} bytes from a possibly-invalid address, returning 0
+ * instead of faulting when the address is not mapped.
+ */
+extern int cn1_debugger_safe_read(const void* addr, void* dst, size_t len);
+
+/**
+ * Resolves an untrusted reference to its class, or NULL when it cannot be
+ * shown to be a live Java object. Every debugger path that is about to
+ * dereference a reference — a local slot's contents, an objectID from the
+ * IDE, an element of an object array — goes through this first.
+ */
+extern struct clazz* cn1_debugger_class_of(JAVA_OBJECT obj);
+
+/** Whether obj can safely be dereferenced as a Java object. */
+extern int cn1_debugger_is_valid_object(JAVA_OBJECT obj);
+
+/**
+ * Whether a local described by one side-table row is in scope at a source
+ * line. Locals out of scope are left out of the reply rather than reported
+ * with the contents of storage that belongs to another scope.
+ */
+extern int cn1_debugger_var_in_scope(const struct cn1_var_entry* v, int line);
+
 /* --- Method invocation -------------------------------------------------- */
 
 /**

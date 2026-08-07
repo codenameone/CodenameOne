@@ -93,6 +93,12 @@ extern int cn1_debug_symbols_length(void) __attribute__((weak));
 // of falling through to a (currently unsupported) toString() InvokeMethod.
 extern struct clazz class__java_lang_String;
 
+// ParparVM's registry of live threads. Owned by nativeMethods.m and guarded by
+// the critical section already declared in cn1_globals.h; CMD_GET_THREADS walks
+// it so the IDE can list every thread instead of only the ones that happened to
+// hit a breakpoint.
+extern struct ThreadLocalData** allThreads;
+
 // Step kinds
 #define STEP_INTO 0
 #define STEP_OVER 1
@@ -720,6 +726,63 @@ static void handleGetStack(int64_t threadId) {
     free(buf);
 }
 
+/**
+ * Enumerates every live Java thread for the proxy.
+ *
+ * The IDE's thread list used to show only threads that had already produced
+ * a breakpoint or step event, because that was the proxy's sole source of
+ * thread ids and this command was a stub that replied empty. ParparVM already
+ * keeps every ThreadLocalData in allThreads, so the list is simply that array
+ * minus its empty slots.
+ *
+ * Reply payload: count(4) then per thread threadId(8), flags(1),
+ * threadObject(8). Bit 0 of flags is "suspended by the debugger", bit 1 is
+ * "running Java code". threadObject is the java.lang.Thread instance (0 when
+ * the thread has not published one yet) so the proxy can read its name field
+ * through the ordinary object/field commands rather than needing a second
+ * naming protocol.
+ */
+static void handleGetThreads(void) {
+    lockCriticalSection();
+    int count = 0;
+    if (allThreads != NULL) {
+        for (int i = 0; i < NUMBER_OF_SUPPORTED_THREADS; i++) {
+            if (allThreads[i] != NULL && !allThreads[i]->threadKilled) count++;
+        }
+    }
+    size_t sz = 4 + (size_t)count * 17;
+    uint8_t* buf = (uint8_t*)malloc(sz);
+    if (!buf) {
+        unlockCriticalSection();
+        uint8_t empty[4] = {0,0,0,0};
+        sendEvent(EVT_THREAD_LIST, empty, 4);
+        return;
+    }
+    writeBE32(buf, (uint32_t)count);
+    uint8_t* p = buf + 4;
+    int emitted = 0;
+    if (allThreads != NULL) {
+        for (int i = 0; i < NUMBER_OF_SUPPORTED_THREADS && emitted < count; i++) {
+            struct ThreadLocalData* t = allThreads[i];
+            if (t == NULL || t->threadKilled) continue;
+            int64_t tid = (int64_t)t->threadId;
+            struct sus_state* s = susForThread(tid);
+            uint8_t flags = 0;
+            if (s->suspended) flags |= 0x01;
+            if (t->threadActive) flags |= 0x02;
+            JAVA_OBJECT threadObj = t->currentThreadObject;
+            if (!cn1_debugger_is_valid_object(threadObj)) threadObj = JAVA_NULL;
+            writeBE64(p, (uint64_t)tid); p += 8;
+            *p++ = flags;
+            writeBE64(p, (uint64_t)(uintptr_t)threadObj); p += 8;
+            emitted++;
+        }
+    }
+    unlockCriticalSection();
+    sendEvent(EVT_THREAD_LIST, buf, (uint32_t)sz);
+    free(buf);
+}
+
 static void handleGetLocals(int64_t threadId, int frameOffsetFromTop) {
     struct sus_state* s = susForThread(threadId);
     pthread_mutex_lock(&s->mu);
@@ -741,44 +804,69 @@ static void handleGetLocals(int64_t threadId, int frameOffsetFromTop) {
         sendEvent(EVT_LOCALS, &zero, 4);
         return;
     }
-    int count = fi->varTableCount;
+    // Only locals in scope at the line the frame is stopped on are reported.
+    // A slot reused by two disjoint scopes has a row for each, and reporting
+    // both means one of them shows storage that belongs to the other scope —
+    // a variable the code has not reached yet, displaying whatever the earlier
+    // occupant left there.
+    int currentLine = tsd->callStackLine[frameIdx];
+    int rows = fi->varTableCount;
+    int count = 0;
+    for (int i = 0; i < rows; i++) {
+        if (cn1_debugger_var_in_scope(&fi->varTable[i], currentLine)) count++;
+    }
     size_t sz = 4 + (size_t)count * (4 + 1 + 8);
     uint8_t* buf = (uint8_t*)malloc(sz);
     writeBE32(buf, (uint32_t)count);
     uint8_t* p = buf + 4;
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < rows; i++) {
         const struct cn1_var_entry* v = &fi->varTable[i];
+        if (!cn1_debugger_var_in_scope(v, currentLine)) continue;
         writeBE32(p, (uint32_t)v->slot); p += 4;
         uint8_t tag = (uint8_t)v->typeCode;
         uint64_t value = 0;
-        if (v->slot >= 0 && v->slot < fi->numLocals && addrs[v->slot] != NULL) {
+        // Row-indexed, NOT slot-indexed: disjoint scopes reuse a slot with
+        // different types and ParparVM gives each its own storage, so only the
+        // row's own address is guaranteed to hold the row's own type. Indexing
+        // by slot read an 8-byte reference out of a 4-byte JAVA_INT and then
+        // dereferenced it (issue #5333).
+        void* addr = addrs[i];
+        if (addr != NULL) {
             switch (v->typeCode) {
                 case 'I': case 'B': case 'S': case 'C': case 'Z':
-                    value = (uint64_t)(*(int32_t*)addrs[v->slot]);
+                    value = (uint64_t)(*(int32_t*)addr);
                     break;
                 case 'J':
-                    value = (uint64_t)(*(int64_t*)addrs[v->slot]);
+                    value = (uint64_t)(*(int64_t*)addr);
                     break;
                 case 'F': {
-                    float f = *(float*)addrs[v->slot];
+                    float f = *(float*)addr;
                     uint32_t u; memcpy(&u, &f, 4);
                     value = u;
                     break;
                 }
                 case 'D': {
-                    double d = *(double*)addrs[v->slot];
+                    double d = *(double*)addr;
                     uint64_t u; memcpy(&u, &d, 8);
                     value = u;
                     break;
                 }
                 case 'L': case '[': {
-                    JAVA_OBJECT obj = *(JAVA_OBJECT*)addrs[v->slot];
+                    JAVA_OBJECT obj = *(JAVA_OBJECT*)addr;
+                    // Report only references we can prove are live objects.
+                    // A slot the frame has not reached yet holds whatever the
+                    // branch left behind, and handing that to the IDE just
+                    // means it asks us to dereference it a moment later.
+                    struct clazz* cls = cn1_debugger_class_of(obj);
+                    if (cls == NULL) {
+                        value = 0;
+                        break;
+                    }
                     value = (uint64_t)(uintptr_t)obj;
                     // Tag java.lang.String references with JDWP type 's'
                     // so the IDE can read their contents via
                     // StringReference.Value instead of invoking toString().
-                    if (v->typeCode == 'L' && obj != JAVA_NULL
-                            && obj->__codenameOneParentClsReference == &class__java_lang_String) {
+                    if (v->typeCode == 'L' && cls == &class__java_lang_String) {
                         tag = 's';
                     }
                     break;
@@ -879,8 +967,8 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             int classId = -1;
             uint8_t isArray = 0;
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
-            if (obj != JAVA_NULL && obj->__codenameOneParentClsReference != NULL) {
-                struct clazz* cls = obj->__codenameOneParentClsReference;
+            struct clazz* cls = cn1_debugger_class_of(obj);
+            if (cls != NULL) {
                 classId = cls->classId;
                 isArray = cls->isArray ? 1 : 0;
             }
@@ -905,7 +993,9 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
             NSString* ns = nil;
             @try {
-                if (obj != JAVA_NULL) {
+                // toNSString walks the String's char[]; a reference that is
+                // not really a String would send it off into arbitrary memory.
+                if (cn1_debugger_class_of(obj) == &class__java_lang_String) {
                     ns = toNSString(getThreadLocalData(), obj);
                 }
             } @catch (NSException* e) {
@@ -937,10 +1027,11 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                 return 0;
             }
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
-            int classId = -1;
-            if (obj != JAVA_NULL && obj->__codenameOneParentClsReference != NULL) {
-                classId = obj->__codenameOneParentClsReference->classId;
-            }
+            struct clazz* objCls = cn1_debugger_class_of(obj);
+            int classId = objCls != NULL ? objCls->classId : -1;
+            // An unverifiable reference yields no fields rather than a read
+            // at obj+offset, which is where a bogus objectID used to fault.
+            if (objCls == NULL) obj = JAVA_NULL;
             // Reply payload: count(4) then per-field { type(1), value(8) }.
             uint32_t sz = 4 + (uint32_t)count * 9;
             uint8_t* buf = (uint8_t*)malloc(sz);
@@ -961,6 +1052,11 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                 const cn1_field_entry* fe = field_lookup_by_class_and_id(classId, fid, NULL);
                 if (fe && obj != JAVA_NULL) {
                     field_read_into(obj, fe, &tc, &val);
+                    // A reference field can legitimately hold a value the GC
+                    // has since reclaimed; don't pass one on as an objectID.
+                    if (tc == 'L' && !cn1_debugger_is_valid_object((JAVA_OBJECT)(uintptr_t)val)) {
+                        val = 0;
+                    }
                 } else {
                     tc = 'L'; val = 0;
                 }
@@ -991,6 +1087,14 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             memcpy(&thisHi, payload + 12, 4); memcpy(&thisLo, payload + 16, 4);
             uint64_t thisRaw = ((uint64_t)ntohl(thisHi) << 32) | (uint32_t)ntohl(thisLo);
             JAVA_OBJECT thisObj = (JAVA_OBJECT)(uintptr_t)thisRaw;
+            // The thunk dispatches through this receiver's vtable, so an
+            // unverifiable one would jump through a fabricated function
+            // pointer. Refuse the call instead.
+            if (thisObj != JAVA_NULL && !cn1_debugger_is_valid_object(thisObj)) {
+                uint8_t badThis[9] = {'V',0,0,0,0,0,0,0,0};
+                sendEvent(EVT_INVOKE_RESULT, badThis, 9);
+                return 0;
+            }
             uint32_t cntBE;
             memcpy(&cntBE, payload + 20, 4);
             int argCount = (int)ntohl(cntBE);
@@ -1019,8 +1123,14 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                     }
                     case 'D':
                         memcpy(&argv[i].d, &v, 8); break;
-                    case 'L': case '[': default:
-                        argv[i].o = (JAVA_OBJECT)(uintptr_t)v; break;
+                    case 'L': case '[': default: {
+                        // Same reasoning as the receiver: the callee will
+                        // dereference this. An unverifiable argument becomes
+                        // null, which the callee can at least handle.
+                        JAVA_OBJECT arg = (JAVA_OBJECT)(uintptr_t)v;
+                        argv[i].o = cn1_debugger_is_valid_object(arg) ? arg : JAVA_NULL;
+                        break;
+                    }
                 }
             }
             cn1_invoke_thunk_t thunk = invoke_thunk_for(mid);
@@ -1090,7 +1200,8 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             uint64_t ptr = ((uint64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
             int length = 0;
-            if (obj != JAVA_NULL) {
+            struct clazz* arrCls = cn1_debugger_class_of(obj);
+            if (arrCls != NULL && arrCls->isArray) {
                 length = ((JAVA_ARRAY)obj)->length;
             }
             uint8_t reply[4];
@@ -1115,7 +1226,10 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             int firstIdx = (int)ntohl(fstBE);
             int reqCount = (int)ntohl(cntBE);
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
-            if (obj == JAVA_NULL) {
+            // Everything below indexes arr->data, so the reference has to be
+            // a verified array before any of it runs.
+            struct clazz* objArrCls = cn1_debugger_class_of(obj);
+            if (objArrCls == NULL || !objArrCls->isArray) {
                 uint8_t err[5] = {'L', 0,0,0,0};
                 sendEvent(EVT_ARRAY_VALUES, err, 5);
                 return 0;
@@ -1133,8 +1247,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             // vs float, ...).
             char tag = 'L';
             int elemSize = arr->primitiveSize;
-            struct clazz* arrCls = obj->__codenameOneParentClsReference;
-            struct clazz* elemCls = arrCls ? arrCls->arrayType : NULL;
+            struct clazz* elemCls = objArrCls->arrayType;
             if (elemSize == 0) {
                 tag = 'L';
             } else if (elemCls && elemCls->clsName) {
@@ -1208,7 +1321,11 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                                 writeBE64(p, db); }
                               p += 8; break;
                     case 'L': case '[': default: {
+                        // Only hand back element references we can verify;
+                        // anything else would come straight back to us as an
+                        // objectID the IDE expects us to dereference.
                         JAVA_OBJECT v = ((JAVA_OBJECT*)arr->data)[idx];
+                        if (!cn1_debugger_is_valid_object(v)) v = JAVA_NULL;
                         writeBE64(p, (uint64_t)(uintptr_t)v);
                         p += 8; break;
                     }
@@ -1252,6 +1369,8 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             return 0;
         }
         case CMD_GET_THREADS:
+            handleGetThreads();
+            return 0;
         case CMD_SUSPEND:
             // Minimal viable: reply empty so the proxy doesn't hang.
             sendEvent(EVT_REPLY_STATUS, NULL, 0);

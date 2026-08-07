@@ -48,9 +48,12 @@ import com.codename1.tools.translator.bytecodes.TryCatch;
 import com.codename1.tools.translator.bytecodes.TypeInstruction;
 import com.codename1.tools.translator.bytecodes.VarOp;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1355,77 +1358,171 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     /**
-     * Emits a stack-allocated {@code void*} array containing the address of
-     * each JVM-local slot in the current frame, then stores the array pointer
-     * into the per-frame slot {@code callStackLocalsAddresses[offset-1]} that
-     * the debugger thread consults to read locals.
+     * The locals the on-device-debug side-table describes, in a stable order
+     * shared by {@link #appendFrameInfoStruct} (which emits each row's slot and
+     * type) and {@link #appendLocalsAddressTable} (which emits the matching
+     * storage address). Row <em>i</em> of one is row <em>i</em> of the other.
      *
-     * Slot type is resolved from {@link #localVariables} first (the declared
-     * source-level locals) and falls back to method arguments for slots that
-     * have no debug info. Slots with no known type are emitted as NULL — the
-     * debugger will report them as unavailable.
+     * Sorted rather than taken in {@link #localVariables} iteration order: that
+     * is a {@code HashSet}, so the order varies between builds of the same
+     * input, which used to make the emitted table non-deterministic.
+     *
+     * Locals whose slot lies outside the frame are dropped — there is no
+     * storage to point at, and keeping them would only hand the debugger an
+     * address that indexes past {@code locals[]}.
+     */
+    public List<LocalVariable> debugVarEntries() {
+        List<LocalVariable> rows = new ArrayList<LocalVariable>();
+        for (LocalVariable lv : localVariables) {
+            int idx = lv.getIndex();
+            if (idx >= 0 && idx < maxLocals) {
+                rows.add(lv);
+            }
+        }
+        Collections.sort(rows, DEBUG_VAR_ORDER);
+        return rows;
+    }
+
+    /** Slot first, then storage qualifier, so a reused slot's rows stay adjacent. */
+    private static final Comparator<LocalVariable> DEBUG_VAR_ORDER = new Comparator<LocalVariable>() {
+        @Override
+        public int compare(LocalVariable a, LocalVariable b) {
+            if (a.getIndex() != b.getIndex()) {
+                return a.getIndex() - b.getIndex();
+            }
+            return a.getQualifier() - b.getQualifier();
+        }
+    };
+
+    /**
+     * Maps each label in this method to the source line in effect there.
+     *
+     * javac emits a label and then the line number attached to it, so a label
+     * takes the line of the next {@code LineNumber} that follows it — several
+     * labels can share one line. Labels that no line follows (a trailing scope
+     * close, typically) keep the last line seen, which is the right answer for
+     * a scope that runs to the end of the method.
+     */
+    private Map<Label, Integer> lineByLabel() {
+        Map<Label, Integer> lines = new HashMap<Label, Integer>();
+        List<Label> pending = new ArrayList<Label>();
+        int currentLine = 0;
+        for (Instruction i : instructions) {
+            if (i instanceof LabelInstruction) {
+                pending.add(((LabelInstruction) i).getLabel());
+            } else if (i instanceof LineNumber) {
+                currentLine = ((LineNumber) i).getLine();
+                for (Label pendingLabel : pending) {
+                    lines.put(pendingLabel, currentLine);
+                }
+                pending.clear();
+            }
+        }
+        for (Label trailing : pending) {
+            lines.put(trailing, currentLine);
+        }
+        return lines;
+    }
+
+    /**
+     * The source-line range a local is in scope for, as {@code {start, end}}.
+     *
+     * {@code {0, 0}} means "always live": either the class file carried no
+     * scope for it, or the translator synthesised the local from a store
+     * opcode. The end is exclusive — a local declared at line 10 in a block
+     * closing at line 14 is live for lines 10 through 13.
+     */
+    private static final int[] ALWAYS_LIVE = { 0, 0 };
+
+    /**
+     * Resolves every local's scope in one pass, keyed the same way
+     * {@link #debugVarEntries()} orders them, so a caller emitting a whole
+     * method's locals walks the instruction list once rather than per local.
+     */
+    public List<int[]> debugVarScopes(List<LocalVariable> rows) {
+        Map<Label, Integer> lineByLabel = lineByLabel();
+        List<int[]> scopes = new ArrayList<int[]>(rows.size());
+        for (LocalVariable lv : rows) {
+            scopes.add(debugVarScope(lv, lineByLabel));
+        }
+        return scopes;
+    }
+
+    private int[] debugVarScope(LocalVariable lv, Map<Label, Integer> lineByLabel) {
+        Label start = lv.getScopeStart();
+        Label end = lv.getScopeEnd();
+        if (start == null || end == null) {
+            return ALWAYS_LIVE;
+        }
+        Integer startLine = lineByLabel.get(start);
+        Integer endLine = lineByLabel.get(end);
+        if (startLine == null || endLine == null || startLine <= 0) {
+            return ALWAYS_LIVE;
+        }
+        // A scope whose end resolves at or before its start tells us nothing
+        // usable (it happens when the whole scope sits on one line); treat it
+        // as open-ended rather than as an empty range that hides the local
+        // everywhere.
+        if (endLine <= startLine) {
+            return new int[] { startLine, 0 };
+        }
+        return new int[] { startLine, endLine };
+    }
+
+    /**
+     * The C expression naming the storage ParparVM emitted for one local.
+     *
+     * Object locals live in the frame's {@code locals[]} array (the GC scans
+     * it); primitives are plain C autos named by qualifier and slot. Both
+     * spellings can exist for the same slot when disjoint scopes reuse it with
+     * different types, which is exactly why this resolves per local rather than
+     * per slot.
+     */
+    private static String debugVarAddress(LocalVariable lv) {
+        char q = lv.getQualifier();
+        if (q == 'o') {
+            return "&locals[" + lv.getIndex() + "].data.o";
+        }
+        return "&" + q + "locals_" + lv.getIndex() + "_";
+    }
+
+    /**
+     * Emits a stack-allocated {@code void*} array holding the address backing
+     * each row of this method's variable side-table, then publishes it (and the
+     * static frame info) into the per-frame slots the debugger thread reads.
+     *
+     * Indexed by side-table row, so a row's {@code typeCode} always describes
+     * the storage its address points at. The previous per-slot form could not:
+     * a slot reused by an {@code int} and a reference has one address but two
+     * rows, so the reference row read eight bytes out of a four-byte
+     * {@code JAVA_INT} and the debugger then dereferenced the result.
+     *
+     * The frame-info pointer is published even when there are no rows, so the
+     * frame never inherits the previous occupant's metadata.
      *
      * Only called from the non-barebone path; barebone methods carry no
      * locals and bypass this entirely.
      */
     private void appendLocalsAddressTable(StringBuilder b) {
-        if (maxLocals <= 0) {
-            return;
-        }
-        char[] slotQual = new char[maxLocals];
-        java.util.Arrays.fill(slotQual, ' ');
-        for (LocalVariable lv : localVariables) {
-            int idx = lv.getIndex();
-            if (idx >= 0 && idx < maxLocals) {
-                slotQual[idx] = lv.getQualifier();
-            }
-        }
-        int slot = 0;
-        if (!staticMethod) {
-            if (slotQual[0] == ' ') {
-                slotQual[0] = 'o';
-            }
-            slot = 1;
-        }
-        for (int i = 0; i < arguments.size() && slot < maxLocals; i++) {
-            ByteCodeMethodArg arg = arguments.get(i);
-            if (slotQual[slot] == ' ') {
-                slotQual[slot] = arg.getQualifier();
-            }
-            slot++;
-            if (arg.isDoubleOrLong() && slot < maxLocals) {
-                slot++;
-            }
-        }
-
+        List<LocalVariable> rows = debugVarEntries();
         // Leading newline: callers may have left the cursor mid-line after
         // the "this" assignment when there are no other arguments, and the
         // preprocessor requires #ifdef to be the first non-whitespace token
         // on its line.
         b.append("\n#ifdef CN1_ON_DEVICE_DEBUG\n");
-        b.append("    void* __cn1_local_addrs[").append(maxLocals).append("] = { ");
-        for (int s = 0; s < maxLocals; s++) {
-            if (s > 0) {
-                b.append(", ");
+        if (rows.isEmpty()) {
+            b.append("    threadStateData->callStackLocalsAddresses[threadStateData->callStackOffset - 1] = 0;\n");
+        } else {
+            b.append("    void* __cn1_local_addrs[").append(rows.size()).append("] = { ");
+            for (int i = 0; i < rows.size(); i++) {
+                if (i > 0) {
+                    b.append(", ");
+                }
+                b.append(debugVarAddress(rows.get(i)));
             }
-            char q = slotQual[s];
-            switch (q) {
-                case 'o':
-                    b.append("&locals[").append(s).append("].data.o");
-                    break;
-                case 'i':
-                case 'l':
-                case 'f':
-                case 'd':
-                    b.append("&").append(q).append("locals_").append(s).append("_");
-                    break;
-                default:
-                    b.append("0");
-                    break;
-            }
+            b.append(" };\n");
+            b.append("    threadStateData->callStackLocalsAddresses[threadStateData->callStackOffset - 1] = __cn1_local_addrs;\n");
         }
-        b.append(" };\n");
-        b.append("    threadStateData->callStackLocalsAddresses[threadStateData->callStackOffset - 1] = __cn1_local_addrs;\n");
         b.append("    threadStateData->callStackFrameInfo[threadStateData->callStackOffset - 1] = &__cn1_finfo_").append(getMethodIdentifier()).append(";\n");
         b.append("#endif\n");
     }
@@ -1436,27 +1533,34 @@ public class BytecodeMethod implements SignatureSet {
      * per-frame pointer set up in {@link #appendLocalsAddressTable} stays
      * valid for the program's lifetime.
      *
-     * The side-table currently lists every declared local with line=0
-     * meaning "always live"; refining live-range per source line is left
-     * for a follow-up so the proxy can hide locals before their declaration.
+     * Each row carries the source-line range its local is in scope for, so the
+     * debugger can hide a local the code has not reached. Without it, two
+     * locals sharing a slot in disjoint scopes both appear at every
+     * breakpoint, one of them showing the contents of storage that belongs to
+     * the other scope.
      */
     private void appendFrameInfoStruct(StringBuilder b) {
         String id = getMethodIdentifier();
         int classId = Parser.getClassOffset(clsName);
         int methodId = methodOffset;
+        List<LocalVariable> rows = debugVarEntries();
         b.append("#ifdef CN1_ON_DEVICE_DEBUG\n");
-        if (localVariables.isEmpty()) {
+        if (rows.isEmpty()) {
             b.append("static const struct cn1_frame_info __cn1_finfo_").append(id).append(" = {\n");
             b.append("    ").append(classId).append(", ").append(methodId).append(", ").append(maxLocals).append(", 0, 0\n");
             b.append("};\n");
         } else {
+            Map<Label, Integer> lineByLabel = lineByLabel();
             b.append("static const struct cn1_var_entry __cn1_vars_").append(id).append("[] = {\n");
-            for (LocalVariable lv : localVariables) {
-                b.append("    { 0, ").append(lv.getIndex()).append(", '").append(lv.getTypeCode()).append("' },\n");
+            for (LocalVariable lv : rows) {
+                int[] scope = debugVarScope(lv, lineByLabel);
+                b.append("    { ").append(scope[0]).append(", ").append(scope[1])
+                 .append(", ").append(lv.getIndex())
+                 .append(", '").append(lv.getTypeCode()).append("' },\n");
             }
             b.append("};\n");
             b.append("static const struct cn1_frame_info __cn1_finfo_").append(id).append(" = {\n");
-            b.append("    ").append(classId).append(", ").append(methodId).append(", ").append(maxLocals).append(", ").append(localVariables.size()).append(", __cn1_vars_").append(id).append("\n");
+            b.append("    ").append(classId).append(", ").append(methodId).append(", ").append(maxLocals).append(", ").append(rows.size()).append(", __cn1_vars_").append(id).append("\n");
             b.append("};\n");
         }
         b.append("#endif\n");
@@ -2185,7 +2289,27 @@ public class BytecodeMethod implements SignatureSet {
             return;
         }
         //addInstruction(0, new LocalVariable(name, desc, signature, start, end, index));
-        localVariables.add(new LocalVariable(name, desc, signature, start, end, index));
+        LocalVariable lv = new LocalVariable(name, desc, signature, start, end, index);
+        // A store opcode visited earlier already synthesised a placeholder for
+        // this (slot, qualifier) — named "vN", with no scope. localVariables is
+        // a Set keyed on exactly that pair, so the placeholder would otherwise
+        // keep the class file's own entry out and the debugger would show "v2"
+        // for a local named "count" and treat it as live for the whole method.
+        if (lv.getScopeStart() != null) {
+            replaceSyntheticLocalVariable(lv);
+        }
+        localVariables.add(lv);
+    }
+
+    /** Drops the store-synthesised placeholder a real declaration supersedes. */
+    private void replaceSyntheticLocalVariable(LocalVariable replacement) {
+        for (Iterator<LocalVariable> it = localVariables.iterator(); it.hasNext();) {
+            LocalVariable existing = it.next();
+            if (existing.getScopeStart() == null && existing.equals(replacement)) {
+                it.remove();
+                return;
+            }
+        }
     }
     
     public void setSourceFile(String sourceFile) {

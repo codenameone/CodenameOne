@@ -64,6 +64,31 @@ class Cn1AppArchetypeCertificateWizardTest {
         assertContains(".vscode/settings.json", "-Dcodename1.buildTarget=local-javascript");
     }
 
+    /**
+     * A generated project must offer both halves of iOS on-device debugging
+     * from the IDE: the build that turns the debug listener on, and the proxy
+     * the IDE attaches through.
+     *
+     * NetBeans had neither, so the two goals had to be typed by hand and the
+     * build one silently did nothing unless the developer had already edited
+     * codenameone_settings.properties (issue #5333). IntelliJ shipped the
+     * proxy and the attach config but not the build.
+     */
+    @Test
+    void iosOnDeviceDebugBindingsAreIncludedInPackagedProjectTemplates() throws Exception {
+        // The build goal forces the onDeviceDebug hint on for one build.
+        assertContains("tools/netbeans/nbactions.xml", "CUSTOM-Build for iOS On-Device Debug");
+        assertContains("tools/netbeans/nbactions.xml", "<goal>cn1:buildIosOnDeviceDebug</goal>");
+        assertContains(".idea/runConfigurations/CN1_iOS_OnDeviceDebug.xml",
+                "codenameone:buildIosOnDeviceDebug");
+
+        // The proxy bridges the device's wire protocol to JDWP.
+        assertContains("tools/netbeans/nbactions.xml", "CUSTOM-Start iOS Debug Proxy");
+        assertContains("tools/netbeans/nbactions.xml", "<goal>cn1:ios-on-device-debugging</goal>");
+        assertContains(".idea/runConfigurations/CN1_Debug_Proxy.xml",
+                "codenameone:ios-on-device-debugging");
+    }
+
     private static void assertContains(String path, String expected) throws Exception {
         String content = archetypeResource("archetype-resources/" + path);
         assertTrue(content.contains(expected), path + " should contain " + expected);
