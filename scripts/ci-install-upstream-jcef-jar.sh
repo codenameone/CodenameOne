@@ -51,8 +51,13 @@ install_artifact() {
 
 install_artifact me/friwi jcef-api "$jcef_ver" jcef.jar
 install_artifact me/friwi jcefmaven "$jcefmaven_ver" jcefmaven.jar
-install_artifact org/apache/commons commons-compress 1.27.1 commons-compress.jar
+# These helper jars mirror JCEF Maven's transitive dependencies for the Ant
+# build. Keep them aligned with the versions jcefmaven.version actually resolves
+# (JCEF Maven 146 -> commons-compress 1.28.0, which in turn requires commons-io
+# 2.20.0; a stale commons-io throws IllegalAccessError while extracting the
+# native bundle). commons-codec/commons-lang3 track commons-compress 1.28.0.
+install_artifact org/apache/commons commons-compress 1.28.0 commons-compress.jar
 install_artifact com/google/code/gson gson 2.11.0 gson.jar
-install_artifact commons-codec commons-codec 1.17.1 commons-codec.jar
-install_artifact commons-io commons-io 2.16.1 commons-io.jar
-install_artifact org/apache/commons commons-lang3 3.16.0 commons-lang3.jar
+install_artifact commons-codec commons-codec 1.19.0 commons-codec.jar
+install_artifact commons-io commons-io 2.20.0 commons-io.jar
+install_artifact org/apache/commons commons-lang3 3.18.0 commons-lang3.jar
