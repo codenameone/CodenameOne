@@ -273,7 +273,11 @@ class JavaSEWearableBridge implements WearableBridge {
             // neither the new value nor the removal and keep its pre-removal value for good. Put
             // the tombstone back: the removal is still the last thing that actually happened.
             writeValue(tomb, new byte[0], path);
+            return;
         }
+        // The peer may have written a tombstone between our delete of theirs and this write, which
+        // leaves both records durable. Same reconciliation removeData does, from the other side.
+        resolveValueAgainstTombstone(path);
     }
 
     /// @return true when the value was published; false when it could not be written, so a caller
@@ -405,6 +409,52 @@ class JavaSEWearableBridge implements WearableBridge {
         // The other two platforms both keep a tombstone for exactly this; the simulator was the
         // odd one out.
         writeValue(new File(dataDir, encodePath(path) + TOMB_SUFFIX), new byte[0], path);
+        // The other JVM may have published a replacement between the delete above and this write,
+        // in which case BOTH records now exist durably. writeLock cannot prevent that -- it is
+        // process-local and the peer is a separate process -- so the records are reconciled instead
+        // of pretended away.
+        resolveValueAgainstTombstone(path);
+    }
+
+    /// Keeps at most one of the two records for a path, the newer by embedded stamp.
+    ///
+    /// A value and a tombstone for the same path can both end up on disk: two simulator processes
+    /// share this directory, and a publish landing between the value delete and the tombstone write
+    /// -- or the reverse -- leaves one of each. Nothing later is guaranteed to touch that path
+    /// again, so without reconciliation the peer's scan can settle in the removed state while
+    /// getData keeps returning the value, permanently.
+    ///
+    /// The stamps are a Lamport clock with a wall-clock floor and disjoint residues per side, so
+    /// "newer" is meaningful across processes and never a tie. Either side may resolve: unlike the
+    /// Data Layer there is no replication here, just one directory, so deleting the loser cannot
+    /// propagate and rob anyone.
+    private void resolveValueAgainstTombstone(String path) {
+        File value = dataFile(path);
+        File tomb = new File(dataDir, encodePath(path) + TOMB_SUFFIX);
+        if (!value.isFile() || !tomb.isFile()) {
+            return;
+        }
+        long valueStamp = versionOf(value);
+        long tombStamp = versionOf(tomb);
+        File loser = valueStamp > tombStamp ? tomb : value;
+        if (loser.delete()) {
+            synchronized (seenData) {
+                seenData.remove(loser.getName());
+            }
+            if (loser == tomb) {
+                // The tombstone lost, so its acknowledgement describes nothing.
+                new File(dataDir, tomb.getName() + ACK_SUFFIX).delete();
+            }
+        }
+    }
+
+    /// A record's version: the stamp inside it, falling back to its mtime when it carries no frame.
+    private static long versionOf(File f) {
+        try {
+            return tombstoneVersion(readFully(f), f);
+        } catch (IOException vanished) {
+            return Long.MIN_VALUE;
+        }
     }
 
     /// The acknowledgement payload for a tombstone: the stamp of the tombstone being
@@ -1111,6 +1161,17 @@ class JavaSEWearableBridge implements WearableBridge {
                     // Bookkeeping between the two simulators. Delivering it would announce a path
                     // ending in ".tomb.ack" that no app ever published.
                     continue;
+                }
+                if (isTombstone(f.getName())
+                        && dataFile(tombstonePath(f.getName())).isFile()) {
+                    // BOTH records exist for this path -- the two processes interleaved a publish
+                    // and a removal. Reconcile before delivering either, or the listener settles on
+                    // whichever the enumeration happened to reach first while getData answers from
+                    // the other, and nothing is guaranteed to touch that path again.
+                    resolveValueAgainstTombstone(tombstonePath(f.getName()));
+                    if (!f.isFile()) {
+                        continue;
+                    }
                 }
                 if (isTombstone(f.getName())) {
                     // A peer's removal. Delivered once -- the seen-marker above has already been

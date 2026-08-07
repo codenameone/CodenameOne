@@ -378,10 +378,18 @@ public final class WearableConnection {
     ///
     /// - `l`: the listener to add
     public static void addMessageListener(WearableMessageListener l) {
-        if (l != null && !messageListeners.contains(l)) {
-            synchronized (pendingMessages) {
+        if (l == null) {
+            return;
+        }
+        boolean added;
+        // One step, for the reason given on addDataListener.
+        synchronized (pendingMessages) {
+            added = !messageListeners.contains(l);
+            if (added) {
                 messageListeners.add(l);
             }
+        }
+        if (added) {
             activate();
             drainPending(pendingMessages, false);
         }
@@ -403,10 +411,21 @@ public final class WearableConnection {
     ///
     /// - `l`: the listener to add
     public static void addDataListener(WearableDataListener l) {
-        if (l != null && !dataListeners.contains(l)) {
-            synchronized (pendingData) {
+        if (l == null) {
+            return;
+        }
+        boolean added;
+        // The membership test and the add are ONE step. Split, two threads registering the same
+        // instance both passed the test before either appended, and every later change was then
+        // reported to that listener twice. Concurrent registration is not hypothetical here -- the
+        // drain guard is a count precisely because two of them can run at once.
+        synchronized (pendingData) {
+            added = !dataListeners.contains(l);
+            if (added) {
                 dataListeners.add(l);
             }
+        }
+        if (added) {
             activate();
             drainPending(pendingData, true);
         }

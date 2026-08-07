@@ -221,6 +221,56 @@ static BOOL cn1WearableMarkInFlight(NSString *name) {
     return fresh;
 }
 
+/// Inbox entries this process has consumed but could not delete.
+///
+/// The in-flight set is memory only, which is right for "a delivery is in progress" and wrong for
+/// "this file has already been handed over". A delete can be refused -- data protection while the
+/// device is locked -- and after a restart the set is empty, so the drain saw a consumed one-shot
+/// transfer as new and delivered it again. Recorded durably instead, and dropped the moment the
+/// file finally goes.
+static NSString *const kCN1ConsumedInboxKey = @"cn1.wearable.consumedInbox";
+
+/// Marks an inbox entry as consumed across process restarts.
+static void cn1WearableNoteConsumed(NSString *name) {
+    if (name.length == 0) {
+        return;
+    }
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    NSMutableArray *consumed = [[d arrayForKey:kCN1ConsumedInboxKey] mutableCopy];
+    if (consumed == nil) {
+        consumed = [[NSMutableArray alloc] init];
+    }
+    if (![consumed containsObject:name]) {
+        [consumed addObject:name];
+        // Bounded like every other cache here. Past the bound the OLDEST goes, and the worst that
+        // costs is one redelivery of a file whose delete has been failing for 256 transfers.
+        while (consumed.count > 256) {
+            [consumed removeObjectAtIndex:0];
+        }
+        [d setObject:consumed forKey:kCN1ConsumedInboxKey];
+    }
+    [consumed release];
+}
+
+/// Whether this entry was already consumed by some earlier run.
+static BOOL cn1WearableWasConsumed(NSString *name) {
+    NSArray *consumed = [[NSUserDefaults standardUserDefaults] arrayForKey:kCN1ConsumedInboxKey];
+    return consumed != nil && [consumed containsObject:name];
+}
+
+/// Forgets the consumed record once the file it protects is gone.
+static void cn1WearableForgetConsumed(NSString *name) {
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    NSArray *consumed = [d arrayForKey:kCN1ConsumedInboxKey];
+    if (consumed == nil || ![consumed containsObject:name]) {
+        return;
+    }
+    NSMutableArray *rest = [consumed mutableCopy];
+    [rest removeObject:name];
+    [d setObject:rest forKey:kCN1ConsumedInboxKey];
+    [rest release];
+}
+
 static void cn1WearableClearInFlight(NSString *name) {
     if (name == nil) {
         return;
@@ -246,6 +296,18 @@ static void cn1WearableDrainInbox(void) {
             // consumed them, so nothing writes these any more. An app updated across that change
             // can still find one parked here, and it was already delivered.
             [[NSFileManager defaultManager] removeItemAtPath:full error:NULL];
+            continue;
+        }
+        if (cn1WearableWasConsumed(name)) {
+            // Consumed by an EARLIER RUN whose delete was refused. The in-flight set does not
+            // survive a restart, so without this durable record the file looked new again and the
+            // one-shot transfer was delivered a second time. Retry the delete instead; the record
+            // goes with it.
+            if ([[NSFileManager defaultManager] removeItemAtPath:full error:NULL]
+                    || ![[NSFileManager defaultManager] fileExistsAtPath:full]) {
+                cn1WearableForgetConsumed(name);
+                cn1WearableClearInFlight(name);
+            }
             continue;
         }
         if (!cn1WearableMarkInFlight(name)) {
@@ -357,6 +419,12 @@ void cn1_wearable_confirmInbox(const char *inboxToken) {
     // the next confirm for this token retries the delete.
     if (![files fileExistsAtPath:full]) {
         cn1WearableClearInFlight(name);
+        cn1WearableForgetConsumed(name);
+    } else {
+        // The file survived the delete. The in-memory claim keeps this process from re-offering it,
+        // but that set dies with the process -- so record it durably as well, or the next launch
+        // treats a file the app has already received as a new transfer.
+        cn1WearableNoteConsumed(name);
     }
 }
 
