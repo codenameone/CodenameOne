@@ -192,6 +192,69 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void hoistedFieldNameDoesNotCollideWithExistingField() throws Exception {
+        // The class already declares a field named exactly like the first generated hoisted name.
+        // The transform must pick a different name, not add a duplicate field.
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/FieldClash", null, "java/lang/Object", null);
+        w.visitField(org.objectweb.asm.Opcodes.ACC_PRIVATE | org.objectweb.asm.Opcodes.ACC_STATIC,
+                "zqL$0", "Ljava/lang/String;", null, null).visitEnd();
+        org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "get", "()Ljava/lang/String;", null, null);
+        m.visitCode();
+        m.visitLdcInsn("a clashing hoist secret value");
+        m.visitInsn(org.objectweb.asm.Opcodes.ARETURN);
+        m.visitMaxs(1, 0);
+        m.visitEnd();
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 31);
+        byte[] out = t.transform(w.toByteArray());
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        Class<?> c = new ByteLoader().define("app.FieldClash", out);
+        assertEquals("a clashing hoist secret value", c.getMethod("get").invoke(null));
+    }
+
+    @Test
+    public void injectedInitializerCiphertextIsNotRewritten() throws Exception {
+        // Construct two literals A and B where B is exactly the ciphertext of A for this class's key.
+        // The hoisted initializer's LDC of A's ciphertext (== B) must NOT be rewritten into a read of
+        // B's field, or <clinit> reads an unassigned field and throws ExceptionInInitializerError.
+        String owner = "app/Involutive";
+        StringEncryptTransform probe = new StringEncryptTransform(true, 99);
+        int base = probe.keyBase(owner);
+        String a = "an involutive secret literal";
+        String b = StringEncryptTransform.encode(a, base); // ciphertext of A == plaintext B
+
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                owner, null, "java/lang/Object", null);
+        addStringGetter(w, "a", a);
+        addStringGetter(w, "b", b);
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 99);
+        byte[] out = t.transform(w.toByteArray());
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        Class<?> c = new ByteLoader().define("app.Involutive", out); // must not throw on <clinit>
+        assertEquals(a, c.getMethod("a").invoke(null));
+        assertEquals(b, c.getMethod("b").invoke(null));
+    }
+
+    private static void addStringGetter(org.objectweb.asm.ClassWriter w, String name, String value) {
+        org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, name, "()Ljava/lang/String;", null, null);
+        m.visitCode();
+        m.visitLdcInsn(value);
+        m.visitInsn(org.objectweb.asm.Opcodes.ARETURN);
+        m.visitMaxs(1, 0);
+        m.visitEnd();
+    }
+
+    @Test
     public void encryptsEvenWhenDecoderNameCollides() throws Exception {
         // A class that already declares a member named "zqdec$" must NOT be skipped: skipping would
         // leave its literal in plaintext while an equal literal elsewhere was encrypted, breaking a

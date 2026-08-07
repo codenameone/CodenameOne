@@ -215,8 +215,18 @@ public final class StringEncryptTransform {
      * value -- and equal values in other classes -- stay reference-equal.
      */
     private boolean hoistMethodLiterals(ClassNode cn, int base, String decoderName) {
-        // 1. Collect the distinct values, in first-seen order for a stable field naming.
+        // 1. Collect the distinct values, in first-seen order, each mapped to a field name that does
+        //    NOT collide with an existing member (an input class may already declare a zqL$N field;
+        //    on Android the engine doesn't rename first, so this is reachable and a duplicate field
+        //    would make the class fail to load).
+        java.util.Set<String> taken = new java.util.HashSet<String>();
+        if (cn.fields != null) {
+            for (FieldNode f : cn.fields) {
+                taken.add(f.name);
+            }
+        }
         java.util.LinkedHashMap<String, String> valueToField = new java.util.LinkedHashMap<String, String>();
+        int counter = 0;
         for (MethodNode mn : cn.methods) {
             if (mn.instructions == null || decoderName.equals(mn.name)) {
                 continue;
@@ -225,7 +235,13 @@ public final class StringEncryptTransform {
                 if (insn instanceof LdcInsnNode && ((LdcInsnNode) insn).cst instanceof String) {
                     String v = (String) ((LdcInsnNode) insn).cst;
                     if (shouldEncryptLiteral(v) && !valueToField.containsKey(v)) {
-                        valueToField.put(v, HOISTED_FIELD_PREFIX + valueToField.size());
+                        String fname;
+                        do {
+                            fname = HOISTED_FIELD_PREFIX + counter;
+                            counter++;
+                        } while (taken.contains(fname));
+                        taken.add(fname);
+                        valueToField.put(v, fname);
                     }
                 }
             }
@@ -233,22 +249,11 @@ public final class StringEncryptTransform {
         if (valueToField.isEmpty()) {
             return false;
         }
-        // 2. Add a field per value and decode it once in <clinit> (before the original body, so a
-        //    literal used within <clinit> itself reads the already-initialized field).
-        if (cn.fields == null) {
-            cn.fields = new java.util.ArrayList<FieldNode>();
-        }
-        InsnList init = new InsnList();
-        for (java.util.Map.Entry<String, String> e : valueToField.entrySet()) {
-            cn.fields.add(new FieldNode(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
-                    e.getValue(), "Ljava/lang/String;", null, null));
-            init.add(new LdcInsnNode(encode(e.getKey(), base)));
-            init.add(new MethodInsnNode(Opcodes.INVOKESTATIC, cn.name, decoderName, DECODER_DESC, false));
-            init.add(new FieldInsnNode(Opcodes.PUTSTATIC, cn.name, e.getValue(), "Ljava/lang/String;"));
-            encryptedCount++;
-        }
-        prependToClinit(cn, init);
-        // 3. Replace each LDC of a hoisted value with a GETSTATIC of its field.
+        // 2. Replace each LDC of a hoisted value with a GETSTATIC of its field, in the ORIGINAL method
+        //    bodies. This happens BEFORE the initializer is inserted, so the initializer's own
+        //    ciphertext LDCs are never rescanned -- otherwise a ciphertext that happens to equal
+        //    another hoisted plaintext (the XOR encoding is involutive) would be rewritten into a read
+        //    of a not-yet-assigned field and pass null to the decoder.
         for (MethodNode mn : cn.methods) {
             if (mn.instructions == null || decoderName.equals(mn.name)) {
                 continue;
@@ -266,6 +271,21 @@ public final class StringEncryptTransform {
                 insn = next;
             }
         }
+        // 3. Add a field per value and decode it once in <clinit>, prepended so it runs before the
+        //    original body (a hoisted value used within <clinit> reads the already-initialized field).
+        if (cn.fields == null) {
+            cn.fields = new java.util.ArrayList<FieldNode>();
+        }
+        InsnList init = new InsnList();
+        for (java.util.Map.Entry<String, String> e : valueToField.entrySet()) {
+            cn.fields.add(new FieldNode(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
+                    e.getValue(), "Ljava/lang/String;", null, null));
+            init.add(new LdcInsnNode(encode(e.getKey(), base)));
+            init.add(new MethodInsnNode(Opcodes.INVOKESTATIC, cn.name, decoderName, DECODER_DESC, false));
+            init.add(new FieldInsnNode(Opcodes.PUTSTATIC, cn.name, e.getValue(), "Ljava/lang/String;"));
+            encryptedCount++;
+        }
+        prependToClinit(cn, init);
         return true;
     }
 
@@ -484,7 +504,8 @@ public final class StringEncryptTransform {
         return encode(enc, base);
     }
 
-    private int keyBase(String internalName) {
+    /** Package-visible so a test can construct a value whose ciphertext equals another value. */
+    int keyBase(String internalName) {
         int h = seed;
         for (int i = 0; i < internalName.length(); i++) {
             h = h * 31 + internalName.charAt(i);
