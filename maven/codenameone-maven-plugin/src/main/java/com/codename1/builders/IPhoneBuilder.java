@@ -2164,7 +2164,7 @@ public class IPhoneBuilder extends Executor {
                         registerNativeImplementationsAndCreateStubs(
                                 new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}),
                                 stubSource, classesDir),
-                        iosMode);
+                        iosMode, svgRegistryInstall);
             }
         } catch (IOException ex) {
             throw new BuildException("Failed to write stub source", ex);

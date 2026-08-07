@@ -296,7 +296,8 @@ class WatchNativeBuilder {
     /// providers and the ad padding are all phone concerns; pulling them in here would defeat the
     /// point of rooting the translation somewhere else.
     void writeWatchStubSource(BuildRequest request, File stubSource, String buildVersion,
-            String nativeRegistration, String iosMode) throws IOException {
+            String nativeRegistration, String iosMode, String svgRegistryInstall)
+            throws IOException {
         String stubClass = translationRoot(request.getMainClass()) + "Stub";
         String body = "package " + request.getPackageName() + ";\n\n"
                 + "import com.codename1.ui.*;\n"
@@ -321,6 +322,14 @@ class WatchNativeBuilder {
                 + "        Display.getInstance().setProperty(\"AppName\", APPLICATION_NAME);\n"
                 + "        if(!initialized) {\n"
                 + "            initialized = true;\n"
+                // The SAME registry install the phone stub emits.
+                //
+                // It is a static reference, and that is the whole point: the generated SVG classes
+                // are reached only reflectively, so this call is what keeps them in the reachable
+                // graph. Leaving it out of the watch stub let the watch translation shake out all
+                // of them -- correct tree-shaking, wrong result -- and SVG and Lottie fell back to
+                // a placeholder render on the watch while working on the phone.
+                + svgRegistryInstall
                 + "            i.init(this);\n"
                 + "        }\n"
                 + "        i.start();\n"
