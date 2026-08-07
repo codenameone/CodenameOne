@@ -1742,15 +1742,27 @@ public class CN1WearableBridge implements WearableBridge {
     /// published. Transfers escape that only because they are excluded by name a line earlier.
     private static final String TRANSFER_ACK_PREFIX = "/cnxk";
 
-    /// The acknowledgement path for a transfer item path.
-    static String transferAckPath(String transferPath) {
-        return TRANSFER_ACK_PREFIX + transferPath;
+    /// The acknowledgement path for a transfer, scoped to the node that PUBLISHED it.
+    ///
+    /// The transfer path alone is not an identity. Two senders -- two watches reacting to the same
+    /// event -- can produce the same logical path, file name and per-device sequence, and their
+    /// item URIs then differ only in authority. An acknowledgement keyed on the path alone would
+    /// answer for both, and the sender that had not been delivered to would delete a transfer
+    /// nobody had taken.
+    static String transferAckPath(String publisherNode, String transferPath) {
+        return TRANSFER_ACK_PREFIX + "/" + publisherNode + transferPath;
     }
 
-    /// The transfer path an acknowledgement refers to, or null when this is not one.
-    static String ackedTransferPath(String ackPath) {
-        return ackPath != null && ackPath.startsWith(TRANSFER_ACK_PREFIX)
-                ? ackPath.substring(TRANSFER_ACK_PREFIX.length()) : null;
+    /// The publisher-scoped transfer key an acknowledgement refers to, or null when this path is
+    /// not an acknowledgement. Compared against {@link #transferKey}.
+    static String ackedTransferKey(String ackPath) {
+        return ackPath != null && ackPath.startsWith(TRANSFER_ACK_PREFIX + "/")
+                ? ackPath.substring(TRANSFER_ACK_PREFIX.length() + 1) : null;
+    }
+
+    /// The identity of a transfer item: who published it, and at what path.
+    static String transferKey(String publisherNode, String transferPath) {
+        return publisherNode + transferPath;
     }
     /** Floor between sweeps; retention is a day, so sweeping more often than this buys nothing. */
     private static final long SWEEP_MIN_INTERVAL_MILLIS = 5 * 60 * 1000L;
@@ -2059,10 +2071,10 @@ public class CN1WearableBridge implements WearableBridge {
                                 continue;
                             }
                             if (isTransferPath(ackPath)) {
-                                livePaths.add(ackPath);
+                                livePaths.add(transferKey(item.getUri().getHost(), ackPath));
                                 continue;
                             }
-                            String forPath = ackedTransferPath(ackPath);
+                            String forPath = ackedTransferKey(ackPath);
                             if (forPath == null) {
                                 continue;
                             }
@@ -2083,7 +2095,7 @@ public class CN1WearableBridge implements WearableBridge {
                             ackers.add(acker);
                         }
                         for (Uri ownAck : ownAcks) {
-                            if (!livePaths.contains(ackedTransferPath(ownAck.getPath()))) {
+                            if (!livePaths.contains(ackedTransferKey(ownAck.getPath()))) {
                                 // The item's OWN uri, not one rebuilt from parts: it already
                                 // carries the authority the Data Layer expects.
                                 Tasks.await(dataClient.deleteDataItems(ownAck),
@@ -2113,7 +2125,7 @@ public class CN1WearableBridge implements WearableBridge {
                             // hard cap has passed. A transfer with no known peers waits for the cap
                             // too: nobody can acknowledge it, and deleting on age alone is what
                             // lost files to an offline watch.
-                            java.util.Set<String> ackers = acked.get(p);
+                            java.util.Set<String> ackers = acked.get(transferKey(sweepNode, p));
                             boolean allTook = !expected.isEmpty() && ackers != null
                                     && ackers.containsAll(expected);
                             boolean retire = publishedAt != Long.MIN_VALUE
@@ -3570,7 +3582,12 @@ public class CN1WearableBridge implements WearableBridge {
             return;
         }
         try {
-            PutDataMapRequest ack = PutDataMapRequest.create(transferAckPath(path));
+            String publisher = uri.getHost();
+            if (publisher == null) {
+                return;
+            }
+            PutDataMapRequest ack =
+                    PutDataMapRequest.create(transferAckPath(publisher, path));
             ack.getDataMap().putLong(PUBLISHED_AT_KEY, System.currentTimeMillis());
             Wearable.getDataClient(context.getApplicationContext())
                     .putDataItem(ack.asPutDataRequest());
