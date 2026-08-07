@@ -1,0 +1,187 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.builders;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * The bundled SQLite engine, and its cipher, ship only for applications that use the database.
+ *
+ * <p>That promise is what pays for the whole arrangement: the iOS amalgamation replaces the system
+ * libsqlite3, the Android AAR carries minSdk 23, and the browser bundle is about 1.5MB. An
+ * application that never opens a database must carry none of it.
+ *
+ * <p>The gate is easy to get wrong in the direction that costs nothing to notice and everything to
+ * ship: the tree a builder scans is the application merged with the framework, and
+ * {@code Display} alone declares {@code openOrCreate(String, DatabaseConfig)}. A scan that cannot
+ * say which class made a reference therefore answers yes for every application ever built, and the
+ * gate silently stops gating -- every build still succeeds, just fatter, and on Android with a
+ * higher minimum SDK. Only a test that asserts the negative direction catches it.
+ */
+class DatabaseUsageScanTest {
+
+    /** Executor is abstract; none of these hooks are exercised here. */
+    private static final class TestExecutor extends Executor {
+        @Override
+        protected String getDeviceIdCode() {
+            return "";
+        }
+
+        @Override
+        protected String generatePeerComponentCreationCode(String methodCallString) {
+            return "";
+        }
+
+        @Override
+        protected String convertPeerComponentToNative(String param) {
+            return "";
+        }
+
+        @Override
+        public boolean build(File sourceZip, BuildRequest request) {
+            return false;
+        }
+    }
+
+    private final TestExecutor executor = new TestExecutor();
+
+    private File root;
+
+    @BeforeEach
+    void setUp() throws IOException {
+        root = File.createTempFile("cn1-db-scan", "");
+        assertTrue(root.delete());
+        assertTrue(root.mkdirs());
+    }
+
+    @AfterEach
+    void tearDown() {
+        delete(root);
+    }
+
+    private static void delete(File f) {
+        if (f == null) {
+            return;
+        }
+        File[] children = f.listFiles();
+        if (children != null) {
+            for (int iter = 0; iter < children.length; iter++) {
+                delete(children[iter]);
+            }
+        }
+        f.delete();
+    }
+
+    /**
+     * Writes a stand-in for a compiled class carrying the given constant-pool strings.
+     *
+     * The scan is a byte search over the class file, so a file containing the internal names is
+     * indistinguishable from a real class that references them, which is the whole of what is
+     * under test here.
+     */
+    private void writeClass(String path, String... references) throws IOException {
+        File f = new File(root, path.replace('/', File.separatorChar));
+        assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());
+        OutputStream out = new FileOutputStream(f);
+        try {
+            out.write(new byte[] {(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE});
+            for (int iter = 0; iter < references.length; iter++) {
+                out.write(references[iter].getBytes("UTF-8"));
+            }
+        } finally {
+            out.close();
+        }
+    }
+
+    /** Display declares openOrCreate(String, DatabaseConfig), so it names both. */
+    private void writeFramework() throws IOException {
+        writeClass("com/codename1/ui/Display.class",
+                "com/codename1/db/Database", "com/codename1/db/DatabaseConfig");
+        writeClass("com/codename1/db/Database.class", "com/codename1/db/DatabaseConfig");
+        writeClass("com/codename1/impl/CodenameOneImplementation.class",
+                "com/codename1/db/DatabaseConfig");
+        writeClass("com/codename1/orm/EntityManager.class", "com/codename1/db/Database");
+        writeClass("com/codename1/properties/SQLMap.class", "com/codename1/db/Database");
+        writeClass("com/codename1/testing/DatabaseConformanceSuite.class",
+                "com/codename1/db/DatabaseConfig");
+    }
+
+    @Test
+    void anApplicationThatNeverTouchesTheDatabaseGetsNoEngine() throws IOException {
+        writeFramework();
+        writeClass("com/example/MyApp.class", "com/codename1/ui/Form");
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertFalse(usage.usesDatabase(),
+                "the framework's own reference is not the application's");
+        assertFalse(usage.usesDatabaseCipher(),
+                "nor is the framework's reference to DatabaseConfig");
+    }
+
+    @Test
+    void anApplicationThatOpensADatabaseGetsTheEngineButNotTheCipher() throws IOException {
+        writeFramework();
+        // Calling Display.openOrCreate(String) puts the return type's descriptor in the caller's
+        // constant pool, so an application never naming the package still counts as using it.
+        writeClass("com/example/MyApp.class", "com/codename1/db/Database");
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase());
+        assertFalse(usage.usesDatabaseCipher(), "encryption was never configured");
+    }
+
+    @Test
+    void anApplicationThatConfiguresEncryptionGetsBoth() throws IOException {
+        writeFramework();
+        writeClass("com/example/MyApp.class", "com/codename1/db/DatabaseConfig");
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(), "DatabaseConfig is in the database package");
+        assertTrue(usage.usesDatabaseCipher());
+    }
+
+    @Test
+    void aClassInADeeperApplicationPackageStillCounts() throws IOException {
+        writeFramework();
+        writeClass("com/example/deep/nested/Dao.class", "com/codename1/db/Database");
+
+        assertTrue(executor.scanForDatabaseUsage(root).usesDatabase());
+    }
+
+    @Test
+    void anEmptyOrMissingTreeIsNotADatabaseUser() throws IOException {
+        assertFalse(executor.scanForDatabaseUsage(root).usesDatabase());
+        assertFalse(executor.scanForDatabaseUsage(new File(root, "nope")).usesDatabase());
+        assertFalse(executor.scanForDatabaseUsage(null).usesDatabase());
+    }
+}

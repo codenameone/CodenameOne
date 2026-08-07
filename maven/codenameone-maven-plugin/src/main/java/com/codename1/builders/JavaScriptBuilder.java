@@ -221,95 +221,22 @@ public class JavaScriptBuilder extends Executor {
      */
     /**
      * True when the application references com.codename1.db, so the SQLite engine has to ship.
-     * Set by {@link #scanForDatabaseUsage(File)} before the assets are pruned.
+     * Set by {@link #recordDatabaseUsage(File)} before the assets are pruned.
      */
     private boolean usesDatabase;
 
     /**
-     * Framework packages that reference the database themselves.
-     *
-     * The staging directory holds the core and the port merged with the application's classes, so
-     * "does anything here reference the database" is always yes. The question is whether anything
-     * outside the framework does.
-     */
-    private static final String[] FRAMEWORK_DATABASE_PACKAGES = {
-        "com/codename1/db",
-        "com/codename1/impl",
-        "com/codename1/properties",
-        "com/codename1/testing"
-    };
-
-    /** The internal name every class that touches the database API has in its constant pool. */
-    private static final byte[] DATABASE_PACKAGE_MARKER =
-            "com/codename1/db/".getBytes(StandardCharsets.UTF_8);
-
-    /**
      * Records whether the application, as opposed to the framework, touches the database.
      *
-     * Reads each class file directly rather than going through scanClassesForPermissions, which
-     * reports the class being scanned only from visitEnd -- after its references have already
-     * been delivered - so a reference cannot be attributed to the class that made it. Filtering
-     * by path, one file at a time, is what makes the distinction possible.
-     *
-     * The test is a constant-pool search for the package name, which is how every reference to a
-     * class in it is stored. A class mentioning the string for another reason would count, which
-     * errs towards treating the application as a database user - the safe direction here.
+     * The attribution lives in {@link Executor}: the staging tree is the application merged with
+     * the framework, and Display alone references both Database and DatabaseConfig, so a scan that
+     * cannot say which class made the reference reports every application as a database user and
+     * ships the ~1.5MB engine to all of them.
      */
-    private void scanForDatabaseUsage(File dir, String relativePath) throws IOException {
-        File[] children = dir.listFiles();
-        if (children == null) {
-            return;
-        }
-        for (int iter = 0; iter < children.length; iter++) {
-            File child = children[iter];
-            String childPath = relativePath.length() == 0
-                    ? child.getName() : relativePath + "/" + child.getName();
-            if (child.isDirectory()) {
-                if (!isFrameworkPackage(childPath)) {
-                    scanForDatabaseUsage(child, childPath);
-                }
-            } else if (!usesDatabase && child.getName().endsWith(".class")
-                    && referencesDatabasePackage(child)) {
-                usesDatabase = true;
-            }
-        }
+    private void recordDatabaseUsage(File stageClasses) throws IOException {
+        usesDatabase = scanForDatabaseUsage(stageClasses).usesDatabase();
     }
 
-    private static boolean isFrameworkPackage(String path) {
-        for (int iter = 0; iter < FRAMEWORK_DATABASE_PACKAGES.length; iter++) {
-            if (path.equals(FRAMEWORK_DATABASE_PACKAGES[iter])) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean referencesDatabasePackage(File classFile) throws IOException {
-        byte[] bytes = new byte[(int) classFile.length()];
-        InputStream in = new FileInputStream(classFile);
-        try {
-            int read = 0;
-            while (read < bytes.length) {
-                int step = in.read(bytes, read, bytes.length - read);
-                if (step < 0) {
-                    break;
-                }
-                read += step;
-            }
-        } finally {
-            in.close();
-        }
-        outer:
-        for (int iter = 0; iter + DATABASE_PACKAGE_MARKER.length <= bytes.length; iter++) {
-            for (int j = 0; j < DATABASE_PACKAGE_MARKER.length; j++) {
-                if (bytes[iter + j] != DATABASE_PACKAGE_MARKER[j]) {
-                    continue outer;
-                }
-            }
-            return true;
-        }
-        return false;
-    }
 
     private void pruneOptionalPortAssets(File webApp, BuildRequest request) {
         File js = new File(webApp, "js");
@@ -417,7 +344,7 @@ public class JavaScriptBuilder extends Executor {
                         delTree(stagedWebApp, true);
                     }
                     jsPortWebApp = dest;
-                    scanForDatabaseUsage(stageClasses, "");
+                    recordDatabaseUsage(stageClasses);
                     pruneOptionalPortAssets(dest, request);
                 }
                 return stageClasses;
@@ -467,7 +394,7 @@ public class JavaScriptBuilder extends Executor {
         // The bundled-jar path above does this too. Without it here, a build from a source
         // checkout never sets the flag, so the compatibility default never applies and the
         // optional assets are never pruned.
-        scanForDatabaseUsage(stageClasses, "");
+        recordDatabaseUsage(stageClasses);
         return stageClasses;
     }
 

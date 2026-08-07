@@ -141,16 +141,90 @@ static JAVA_OBJECT cn1DbBlobToByteArray(CODENAME_ONE_THREAD_STATE, const void* b
  * the _R_<returntype> wrapper the VM calls; omitting either is a link error.
  */
 #ifdef CN1_DB_ENGINE_PRESENT
+
+#ifdef _WIN32
+#include <windows.h>
+#include <wchar.h>
+
+/*
+ * Windows takes a narrow path in the active ANSI code page, and this port's paths are UTF-8.
+ *
+ * sqlite3_open_v2 reads UTF-8 and gets it right, so a database under a profile directory with a
+ * non-ASCII name -- the default storage location is under Local AppData, which carries the user's
+ * name -- opens and works. The CRT's fopen and remove take the same bytes and read them as ANSI,
+ * so they look somewhere else: exists() answers false for a database that is there, and delete()
+ * sees ENOENT and reports success while leaving the file behind. The wide-character calls take
+ * UTF-16 and are the only ones that agree with the engine.
+ */
+static wchar_t* cn1DbWidePath(const char* utf8) {
+    int chars;
+    wchar_t* wide;
+    if (utf8 == NULL) {
+        return NULL;
+    }
+    chars = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0);
+    if (chars <= 0) {
+        return NULL;
+    }
+    wide = (wchar_t*)malloc((size_t)chars * sizeof(wchar_t));
+    if (wide == NULL) {
+        return NULL;
+    }
+    if (MultiByteToWideChar(CP_UTF8, 0, utf8, -1, wide, chars) <= 0) {
+        free(wide);
+        return NULL;
+    }
+    return wide;
+}
+
+/** Whether a file exists, by a path the engine and the filesystem agree on. */
+static int cn1DbFileExists(const char* utf8) {
+    wchar_t* wide = cn1DbWidePath(utf8);
+    DWORD attributes;
+    if (wide == NULL) {
+        return 0;
+    }
+    attributes = GetFileAttributesW(wide);
+    free(wide);
+    return attributes != INVALID_FILE_ATTRIBUTES
+            && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+
+/** Removes a file, returning 0 on success and setting errno as remove() would. */
+static int cn1DbFileRemove(const char* utf8) {
+    wchar_t* wide = cn1DbWidePath(utf8);
+    int result;
+    if (wide == NULL) {
+        errno = ENOMEM;
+        return -1;
+    }
+    result = _wremove(wide);
+    free(wide);
+    return result;
+}
+
+#else
+
+/** Whether a file exists. Everywhere but Windows the narrow path is already the right bytes. */
+static int cn1DbFileExists(const char* utf8) {
+    FILE* f = fopen(utf8, "rb");
+    if (f == NULL) {
+        return 0;
+    }
+    fclose(f);
+    return 1;
+}
+
+/** Removes a file, returning 0 on success and setting errno. */
+static int cn1DbFileRemove(const char* utf8) {
+    return remove(utf8);
+}
+
+#endif /* _WIN32 */
 #define CN1_DB_DEFINE_NATIVES(PREFIX)                                                              \
                                                                                                    \
 JAVA_BOOLEAN PREFIX##_sqlDbExists___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) { \
-    const char* p = stringToUTF8(threadStateData, path);                                            \
-    FILE* f = fopen(p, "rb");                                                                       \
-    if (f == NULL) {                                                                                \
-        return JAVA_FALSE;                                                                          \
-    }                                                                                               \
-    fclose(f);                                                                                      \
-    return JAVA_TRUE;                                                                               \
+    return cn1DbFileExists(stringToUTF8(threadStateData, path)) ? JAVA_TRUE : JAVA_FALSE;           \
 }                                                                                                   \
 JAVA_BOOLEAN PREFIX##_sqlDbExists___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) { \
     return PREFIX##_sqlDbExists___java_lang_String(threadStateData, path);                          \
@@ -161,7 +235,7 @@ JAVA_VOID PREFIX##_sqlDbDelete___java_lang_String(CODENAME_ONE_THREAD_STATE, JAV
     /* Deleting what is not there is the documented no-op. Any other failure -- a read-only file, \
      * or a Windows handle still open on it -- has to be reported, or delete() returns and the    \
      * database is still sitting there. */                                                         \
-    if (remove(target) != 0 && errno != ENOENT) {                                                   \
+    if (cn1DbFileRemove(target) != 0 && errno != ENOENT) {                                          \
         char cn1DbDeleteMessage[512];                                                               \
         snprintf(cn1DbDeleteMessage, sizeof(cn1DbDeleteMessage),                                    \
                 "The database %s could not be deleted: %s", target, strerror(errno));               \

@@ -385,6 +385,7 @@ public class SEDatabase extends Database {
     @Override
     public void changeKey(DatabaseConfig config) throws IOException {
         checkOpen();
+        checkNoTransactionForKeyChange();
         Statement s = null;
         try {
             s = conn.createStatement();

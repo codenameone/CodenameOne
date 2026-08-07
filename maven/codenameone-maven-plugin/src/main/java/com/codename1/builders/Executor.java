@@ -699,6 +699,161 @@ public abstract class Executor {
                 && new File(stageClasses, "com/codename1/db/DatabaseConfig.class").exists();
     }
 
+    /// What an application's own classes say about its use of the database API.
+    ///
+    /// Two independent answers, because two different payloads hang off them: any reference to
+    /// `com.codename1.db` means the SQLite engine has to ship, and a reference to `DatabaseConfig`
+    /// additionally means the cipher does.
+    public static final class DatabaseUsage {
+
+        private final boolean database;
+
+        private final boolean cipher;
+
+        DatabaseUsage(boolean database, boolean cipher) {
+            this.database = database;
+            this.cipher = cipher;
+        }
+
+        /// Whether anything outside the framework references `com.codename1.db`.
+        public boolean usesDatabase() {
+            return database;
+        }
+
+        /// Whether anything outside the framework references `com.codename1.db.DatabaseConfig`.
+        public boolean usesDatabaseCipher() {
+            return cipher;
+        }
+    }
+
+    /// Framework packages whose references to the database say nothing about the application.
+    ///
+    /// The tree handed to a builder is the application merged with the framework, so "does
+    /// anything in here reference the database" is always yes -- `Display` alone carries
+    /// `openOrCreate(String, DatabaseConfig)`, which is every gate answered before it is asked.
+    /// The question these payloads actually turn on is whether anything **outside** the framework
+    /// references it.
+    private static final String[] FRAMEWORK_DATABASE_PACKAGES = {
+        "com/codename1/db",
+        "com/codename1/impl",
+        "com/codename1/orm",
+        "com/codename1/properties",
+        "com/codename1/testing",
+        "com/codename1/ui"
+    };
+
+    /// The internal name of the database package, as every reference to a class in it is stored.
+    private static final byte[] DATABASE_MARKER = toAscii("com/codename1/db/");
+
+    /// The internal name of the class that turns encryption on.
+    private static final byte[] DATABASE_CIPHER_MARKER = toAscii("com/codename1/db/DatabaseConfig");
+
+    private static byte[] toAscii(String s) {
+        byte[] out = new byte[s.length()];
+        for (int iter = 0; iter < s.length(); iter++) {
+            out[iter] = (byte) s.charAt(iter);
+        }
+        return out;
+    }
+
+    /// Reports whether the application, as opposed to the framework, uses the database.
+    ///
+    /// Reads each class file directly rather than going through
+    /// `#scanClassesForPermissions(File,ClassScanner)`, which reports the class being scanned only
+    /// from `visitEnd` -- after its references have already been delivered -- so a reference cannot
+    /// be attributed to the class that made it. Walking one file at a time, and skipping the
+    /// framework by path, is what makes the distinction possible.
+    ///
+    /// The test is a constant-pool search for the package name, which is how every reference to a
+    /// class in it is stored, including the descriptor of a framework method that merely returns
+    /// one. A class mentioning the string for some other reason counts too, which errs towards
+    /// treating the application as a database user -- the safe direction, since the cost is bytes
+    /// rather than a missing engine.
+    ///
+    /// #### Parameters
+    ///
+    /// - `classesDir`: the staged class tree, application and framework together
+    ///
+    /// #### Returns
+    ///
+    /// what the application's own classes reference, never null
+    protected DatabaseUsage scanForDatabaseUsage(File classesDir) throws IOException {
+        boolean[] found = {false, false};
+        if (classesDir != null && classesDir.isDirectory()) {
+            scanForDatabaseUsage(classesDir, "", found);
+        }
+        return new DatabaseUsage(found[0], found[1]);
+    }
+
+    private void scanForDatabaseUsage(File dir, String relativePath, boolean[] found)
+            throws IOException {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (int iter = 0; iter < children.length; iter++) {
+            if (found[0] && found[1]) {
+                return;
+            }
+            File child = children[iter];
+            String childPath = relativePath.length() == 0
+                    ? child.getName() : relativePath + "/" + child.getName();
+            if (child.isDirectory()) {
+                if (!isFrameworkDatabasePackage(childPath)) {
+                    scanForDatabaseUsage(child, childPath, found);
+                }
+            } else if (child.getName().endsWith(".class")) {
+                byte[] bytes = readAllBytes(child);
+                if (!found[0] && containsBytes(bytes, DATABASE_MARKER)) {
+                    found[0] = true;
+                }
+                if (!found[1] && containsBytes(bytes, DATABASE_CIPHER_MARKER)) {
+                    found[1] = true;
+                }
+            }
+        }
+    }
+
+    private static boolean isFrameworkDatabasePackage(String path) {
+        for (int iter = 0; iter < FRAMEWORK_DATABASE_PACKAGES.length; iter++) {
+            if (path.equals(FRAMEWORK_DATABASE_PACKAGES[iter])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static byte[] readAllBytes(File f) throws IOException {
+        byte[] bytes = new byte[(int) f.length()];
+        InputStream in = new FileInputStream(f);
+        try {
+            int read = 0;
+            while (read < bytes.length) {
+                int step = in.read(bytes, read, bytes.length - read);
+                if (step < 0) {
+                    break;
+                }
+                read += step;
+            }
+        } finally {
+            in.close();
+        }
+        return bytes;
+    }
+
+    private static boolean containsBytes(byte[] haystack, byte[] needle) {
+        outer:
+        for (int iter = 0; iter + needle.length <= haystack.length; iter++) {
+            for (int j = 0; j < needle.length; j++) {
+                if (haystack[iter + j] != needle[j]) {
+                    continue outer;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
     protected void scanClassesForPermissions(File directory, final ClassScanner scanner) throws IOException {
         File[] list = directory.listFiles();
         for (final File current : list) {

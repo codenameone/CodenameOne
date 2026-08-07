@@ -209,6 +209,7 @@ class AndroidCipherDB extends Database {
     @Override
     public void changeKey(DatabaseConfig config) throws IOException {
         checkOpen();
+        checkNoTransactionForKeyChange();
         String targetKey = config == null || !config.isEncrypted()
                 ? "" : config.resolveKeyMaterial(databaseName);
         if (currentKey.length() == 0 || targetKey.length() == 0) {
@@ -281,6 +282,26 @@ class AndroidCipherDB extends Database {
         return AndroidImplementation.discardDatabaseMigrationExport(target);
     }
 
+    /**
+     * Builds a createTempFile prefix from a database name.
+     *
+     * createTempFile rejects a prefix under three characters with an IllegalArgumentException, and
+     * "a" is a perfectly good database name, so the conversion of one would have died before it
+     * exported anything -- with an unchecked exception, out of a method that promises IOException.
+     * The name is kept in the prefix because these files are read by a human when something goes
+     * wrong; the padding only makes up the length.
+     *
+     * @param name the database's file name
+     * @return a prefix createTempFile will accept
+     */
+    private static String tempPrefix(String name) {
+        StringBuilder prefix = new StringBuilder(name);
+        while (prefix.length() < 3) {
+            prefix.append('_');
+        }
+        return prefix.append('.').toString();
+    }
+
     private void migrateThroughExport(String targetKey) throws IOException {
         String path = db.getPath();
         String name = new File(path).getName();
@@ -298,7 +319,7 @@ class AndroidCipherDB extends Database {
         // database paths mean an application can put a database anywhere, including in here -
         // and deleting whatever is sitting there is how the previous three attempts at this went
         // wrong. A file this call creates is ours by construction and collides with nothing.
-        File target = File.createTempFile(name + ".", ".target", dir);
+        File target = File.createTempFile(tempPrefix(name), ".target", dir);
         // Recorded while it is still empty, and before a single row goes into it. Between creating
         // this file and finishing the conversion the process can be killed at any point, and from
         // then on the file is a complete second copy of the data -- in the clear when this is a
@@ -356,7 +377,7 @@ class AndroidCipherDB extends Database {
         // Same reasoning as the target: created, not named, so nothing pre-existing is disturbed.
         File backup;
         try {
-            backup = File.createTempFile(name + ".", ".backup", dir);
+            backup = File.createTempFile(tempPrefix(name), ".backup", dir);
             // Rewritten, now naming both files: the original is about to move aside, and the
             // export still has to be cleaned up if the swap does not complete.
             AndroidImplementation.writeDatabaseMigrationMarker(path, backup, target);
@@ -400,8 +421,37 @@ class AndroidCipherDB extends Database {
             throw new IOException("The converted database could not replace " + path
                     + ", so the original was restored and nothing was converted." + surviving);
         }
+        // Opened before the backup is dropped, and the backup put back if it will not open. The
+        // converted file is installed at the live path by now, so a failure here would otherwise
+        // leave both files in place with the marker still naming the backup -- and the next open
+        // reads that state as a completed conversion, deletes the backup, and retries the live
+        // database that just refused to open. The last readable copy of the data would go with it.
+        try {
+            db = openAt(path, targetKey);
+        } catch (IOException cannotOpenConverted) {
+            File converted = new File(path);
+            if (converted.delete() && backup.renameTo(converted)) {
+                marker.delete();
+                try {
+                    db = openAt(path, currentKey);
+                } catch (IOException cannotReopenOriginal) {
+                    throw new IOException("The converted database could not be opened, and "
+                            + "neither could the original after it was put back: "
+                            + cannotReopenOriginal.getMessage(), cannotReopenOriginal);
+                }
+                throw new IOException("The converted database could not be opened, so the "
+                        + "original was put back and nothing was converted: "
+                        + cannotOpenConverted.getMessage(), cannotOpenConverted);
+            }
+            // The marker stays: the backup still holds the data and recovery has to find it. Do
+            // not reopen, for the reason given where the two renames fail.
+            throw new IOException("The converted database at " + path + " could not be opened and "
+                    + "the original could not be put back either. The original is intact at "
+                    + backup + " and the database was left closed rather than opening the one "
+                    + "that will not open: " + cannotOpenConverted.getMessage(),
+                    cannotOpenConverted);
+        }
         currentKey = targetKey;
-        db = openAt(path, targetKey);
         // The backup is the database in its previous form. After an encrypt that means a
         // plaintext copy of what is now an encrypted database, sitting at a predictable name --
         // which defeats the encryption entirely, so its removal is checked rather than assumed.

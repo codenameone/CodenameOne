@@ -253,8 +253,16 @@ public class WindowsNativeBuilder extends Executor {
         final boolean[] usesBluetoothHolder = {false};
         // The bundled SQLite engine is emitted only for applications that use com.codename1.db,
         // and its cipher only for those that configure encryption, so nobody else pays for either.
-        final boolean[] usesDatabaseHolder = {false};
-        final boolean[] usesDatabaseCipherHolder = {false};
+        // Attributed to the class that makes the reference: the tree scanned below is the
+        // application merged with the framework, and Display alone carries
+        // openOrCreate(String, DatabaseConfig), so a callback that cannot say who referenced what
+        // answers yes for every application ever built.
+        DatabaseUsage databaseUsage;
+        try {
+            databaseUsage = scanForDatabaseUsage(classesDir);
+        } catch (IOException ex) {
+            throw new BuildException("Failed to scan for database usage", ex);
+        }
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
                 @Override
@@ -266,12 +274,6 @@ public class WindowsNativeBuilder extends Executor {
                     if (cls != null && cls.startsWith("com/codename1/bluetooth/")) {
                         usesBluetoothHolder[0] = true;
                     }
-                    if (cls != null && cls.startsWith("com/codename1/db/")) {
-                        usesDatabaseHolder[0] = true;
-                        if (cls.equals("com/codename1/db/DatabaseConfig")) {
-                            usesDatabaseCipherHolder[0] = true;
-                        }
-                    }
                 }
 
                 @Override
@@ -282,8 +284,8 @@ public class WindowsNativeBuilder extends Executor {
             throw new BuildException("Failed to scan for Bluetooth usage", ex);
         }
         boolean usesBluetooth = usesBluetoothHolder[0];
-        usesDatabase = usesDatabaseHolder[0];
-        boolean usesDatabaseCipher = usesDatabaseCipherHolder[0];
+        usesDatabase = databaseUsage.usesDatabase();
+        boolean usesDatabaseCipher = databaseUsage.usesDatabaseCipher();
 
         List<String> parparCmd = new ArrayList<String>();
         parparCmd.add("java");

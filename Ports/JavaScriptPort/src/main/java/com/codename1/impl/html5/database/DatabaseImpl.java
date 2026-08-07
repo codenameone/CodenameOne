@@ -178,6 +178,7 @@ public class DatabaseImpl extends Database {
     @Override
     public void changeKey(DatabaseConfig config) throws IOException {
         checkOpen();
+        checkNoTransactionForKeyChange();
         String key = null;
         if (config != null && config.isEncrypted()) {
             key = config.resolveKeyMaterial(databaseName);

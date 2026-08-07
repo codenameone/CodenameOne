@@ -11210,7 +11210,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     + "not write, so the conversion was not started rather than overwriting it. "
                     + "Move it aside if it is not a database you need.");
         }
-        Writer writer = new OutputStreamWriter(new FileOutputStream(marker), "UTF-8");
+        // Written beside the marker and renamed over it, never written into it. The second call
+        // updates a marker that is already valid and already naming a file holding data, and
+        // opening it for writing truncates it first: a process death in that window leaves a
+        // marker that recovery cannot recognise, so it acts on nothing and the export it named is
+        // orphaned. A rename is atomic, so the marker is only ever the old contents or the new.
+        // The marker's own name already carries the ".marker" suffix, so it is never short
+        // enough for createTempFile to reject the prefix.
+        File pending = File.createTempFile(marker.getName() + ".", ".pending",
+                marker.getParentFile());
+        Writer writer = new OutputStreamWriter(new FileOutputStream(pending), "UTF-8");
         try {
             writer.write(MIGRATION_MARKER_MAGIC);
             writer.write("\n");
@@ -11220,6 +11229,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             writer.write("\n");
         } finally {
             writer.close();
+        }
+        // renameTo replaces an existing destination on the filesystems Android puts databases on.
+        // Deleting first would reopen exactly the window this is here to close.
+        if (!pending.renameTo(marker)) {
+            pending.delete();
+            throw new IOException("The record of the conversion at " + marker + " could not be "
+                    + "written, so the conversion was not started.");
         }
     }
 

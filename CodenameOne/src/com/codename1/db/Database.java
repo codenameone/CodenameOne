@@ -637,6 +637,27 @@ public abstract class Database {
         return b.toString();
     }
 
+    /// Rejects a key change while a transaction is open.
+    ///
+    /// Ports call this at the top of `#changeKey(DatabaseConfig)`. Re-keying is not a statement
+    /// inside the transaction: depending on the engine it either rewrites the file in place or
+    /// exports into a new one and swaps it under the connection. Either way the open transaction
+    /// has nowhere to land -- an export copies the uncommitted rows into the file that becomes the
+    /// database, and a following commit or rollback addresses a connection that has no transaction
+    /// to end. Refusing is the only outcome that keeps `commit` and `rollback` meaning what they
+    /// say, and the caller loses nothing: it can end the transaction and change the key after.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if a transaction is open
+    protected void checkNoTransactionForKeyChange() throws IOException {
+        if (inTransaction) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    "The database key cannot be changed while a transaction is open, because the "
+                    + "conversion replaces the database under it. Commit or roll back first.");
+        }
+    }
+
     /// Rejects a nested `#beginTransaction()`, then records that one is open.
     ///
     /// Transactions are flat: only that model is expressible on all of the engines behind this

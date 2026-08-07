@@ -935,6 +935,18 @@ public class IPhoneBuilder extends Executor {
         final PlatformFeatureCatalog.Accumulator aiAcc = new PlatformFeatureCatalog.Accumulator();
         boolean excludeArm64Simulator = false;
 
+        // Attributed to the class that makes the reference, so the framework's own use of the
+        // database does not answer for the application's. Both payloads this gates are large --
+        // the cipher amalgamation replaces the system libsqlite3 -- so an application that never
+        // touches com.codename1.db must not carry either.
+        try {
+            DatabaseUsage databaseUsage = scanForDatabaseUsage(classesDir);
+            usesDatabase = databaseUsage.usesDatabase();
+            usesDatabaseCipher = databaseUsage.usesDatabaseCipher();
+        } catch (IOException ex) {
+            throw new BuildException("Failed to scan for database usage", ex);
+        }
+
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
                 // iOS has no OS-relaunch delivery, but it does have cold
@@ -1012,14 +1024,11 @@ public class IPhoneBuilder extends Executor {
                             usesCryptoAPI = true;
                         }
                     }
-                    // The bundled cipher-capable SQLite replaces the system libsqlite3, so it
-                    // is only linked for applications that actually encrypt a database.
-                    if (cls.equals("com/codename1/db/DatabaseConfig")) {
-                        usesDatabaseCipher = true;
-                    }
-                    if (cls.indexOf("com/codename1/db/") == 0) {
-                        usesDatabase = true;
-                    }
+                    // Deliberately not scanned here. This callback cannot say which class made
+                    // the reference, and the tree it walks is the application merged with the
+                    // framework, where Display alone carries openOrCreate(String, DatabaseConfig)
+                    // -- so both database gates would answer yes for every application ever built.
+                    // scanForDatabaseUsage below attributes the reference instead.
                     if (!usesNfc && cls.indexOf("com/codename1/nfc/") == 0) {
                         usesNfc = true;
                         if (cls.equals("com/codename1/nfc/HostCardEmulationService")) {

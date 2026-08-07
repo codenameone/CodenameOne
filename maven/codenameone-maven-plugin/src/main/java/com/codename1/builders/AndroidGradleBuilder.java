@@ -1508,6 +1508,12 @@ public class AndroidGradleBuilder extends Executor {
         // thread. The mutable feature flags and source set are intentionally
         // unsynchronized; parallelizing the scanner requires revisiting them.
         try {
+            DatabaseUsage databaseUsage = scanForDatabaseUsage(dummyClassesDir);
+            usesDatabase = databaseUsage.usesDatabase();
+            // Keeps the SQLCipher-backed impl package, which is deleted below for apps that never
+            // encrypt, and pulls in the AAR through the catalog. The AAR carries minSdk 23, so a
+            // false positive here raises the floor of every application that never encrypts.
+            dbCipherSupport = databaseUsage.usesDatabaseCipher();
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
                 @Override
                 public void implementsInterface(String cls, String iface) {
@@ -1550,14 +1556,11 @@ public class AndroidGradleBuilder extends Executor {
                             && cls.indexOf("com/codename1/ai/language/") == 0) {
                         languageSupport = true;
                     }
-                    if (cls.equals("com/codename1/db/DatabaseConfig")) {
-                        // Keeps the SQLCipher-backed impl package, which is deleted below for
-                        // apps that never encrypt, and pulls in the AAR through the catalog.
-                        dbCipherSupport = true;
-                    }
-                    if (cls.indexOf("com/codename1/db/") == 0) {
-                        usesDatabase = true;
-                    }
+                    // Deliberately not scanned here. This callback cannot say which class made
+                    // the reference, and the tree it walks is the application merged with the
+                    // framework, where Display alone carries openOrCreate(String, DatabaseConfig)
+                    // -- so the cipher gate would answer yes for every application ever built and
+                    // raise its minimum SDK to 23 for nothing. Attributed below instead.
                     if (cls.indexOf("com/codename1/ar/") == 0) {
                         // Keeps the ARCore-backed impl sources (deleted for
                         // non-AR apps below) and bumps minSdk to the ARCore
