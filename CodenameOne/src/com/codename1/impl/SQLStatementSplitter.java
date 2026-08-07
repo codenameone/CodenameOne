@@ -105,11 +105,11 @@ public final class SQLStatementSplitter {
                         inTrigger = true;
                     }
                 } else if ("BEGIN".equalsIgnoreCase(word) || "CASE".equalsIgnoreCase(word)) {
-                    if (inTrigger) {
+                    if (inTrigger && isDelimiterUse(sql, wordEnd)) {
                         beginDepth++;
                     }
                 } else if ("END".equalsIgnoreCase(word)) {
-                    if (inTrigger && beginDepth > 0) {
+                    if (inTrigger && beginDepth > 0 && isDelimiterUse(sql, wordEnd)) {
                         beginDepth--;
                     }
                 } else if (!"TEMP".equalsIgnoreCase(word) && !"TEMPORARY".equalsIgnoreCase(word)
@@ -234,6 +234,42 @@ public final class SQLStatementSplitter {
             iter++;
         }
         return count;
+    }
+
+    /// Distinguishes a structural `BEGIN`, `CASE` or `END` from a column that happens to be
+    /// called one of those.
+    ///
+    /// None of them are reserved words in SQLite, so `UPDATE t SET end = 1` is valid and used to
+    /// decrement the trigger depth, splitting the trigger at the next semicolon and handing the
+    /// engine two malformed fragments. What separates the two uses is what follows: a delimiter
+    /// is followed by more statement, an identifier by an operator, a separator or a closing
+    /// bracket.
+    ///
+    /// This does not catch every case -- `SELECT end FROM t` still reads as a delimiter, because
+    /// telling those apart needs a real parser rather than a splitter. It covers the assignment
+    /// and reference forms, which is where a column called `end` actually turns up.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: the script
+    /// - `wordEnd`: index just past the word
+    ///
+    /// #### Returns
+    ///
+    /// true if the word reads as a structural delimiter
+    private static boolean isDelimiterUse(String sql, int wordEnd) {
+        int iter = wordEnd;
+        int length = sql.length();
+        while (iter < length && sql.charAt(iter) <= ' ') {
+            iter++;
+        }
+        if (iter >= length) {
+            return true;
+        }
+        // What follows an identifier is an operator, a separator or a closing bracket; what
+        // follows a delimiter is more statement. "<" and ">" are included because "end <> 1" and
+        // "end < 1" are both comparisons.
+        return "=,).<>!+-*/|".indexOf(sql.charAt(iter)) < 0;
     }
 
     private static void addIfNotBlank(List statements, String candidate) {

@@ -80,7 +80,8 @@ public class SQLiteNative {
     /** The message from the last failed call, for the exception the caller raises. */
     public static native String lastError();
 
-    public static native void close(long dbPeer);
+    /** Closes the database, returning false and recording {@link #lastError()} on failure. */
+    public static native boolean close(long dbPeer);
 
     /** Re-keys the database, returning false and recording {@link #lastError()} on failure. */
     public static native boolean rekey(long dbPeer, String key);

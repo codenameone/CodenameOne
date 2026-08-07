@@ -84,6 +84,27 @@ class SQLStatementSplitterTest {
     }
 
     @Test
+    void doesNotTreatColumnsNamedLikeDelimitersAsDelimiters() {
+        // None of BEGIN, END or CASE is reserved in SQLite, so these are valid column names and
+        // counting them as structure splits the trigger at the next semicolon.
+        String trigger = "CREATE TRIGGER t AFTER INSERT ON a BEGIN "
+                + "UPDATE b SET end=1; "
+                + "UPDATE c SET begin = 2; "
+                + "END;";
+        assertEquals(1, SQLStatementSplitter.countStatements(trigger));
+        assertEquals(2, SQLStatementSplitter.countStatements(trigger + " SELECT 1;"));
+    }
+
+    @Test
+    void stillTracksRealTriggerStructure() {
+        String withCase = "CREATE TRIGGER t AFTER INSERT ON a BEGIN "
+                + "UPDATE b SET n = CASE WHEN n > 0 THEN 1 ELSE 2 END; "
+                + "END;";
+        assertEquals(1, SQLStatementSplitter.countStatements(withCase));
+        assertEquals(2, SQLStatementSplitter.countStatements(withCase + " SELECT 1;"));
+    }
+
+    @Test
     void countsPositionalPlaceholders() {
         assertEquals(0, SQLStatementSplitter.countPositionalParameters("SELECT 1"));
         assertEquals(1, SQLStatementSplitter.countPositionalParameters("SELECT * FROM t WHERE a=?"));

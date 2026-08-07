@@ -279,11 +279,11 @@ class AndroidCipherDB extends Database {
             throw new IOException("The conversion needs a working directory at " + dir
                     + " and could not create one. If a file exists there, move it aside.");
         }
-        File target = new File(dir, name + AndroidImplementation.MIGRATION_TARGET);
-        if (target.exists() && !target.delete()) {
-            throw new IOException("A previous migration left " + target + " behind and it could "
-                    + "not be removed");
-        }
+        // Created rather than named. A path chosen up front can already be occupied - custom
+        // database paths mean an application can put a database anywhere, including in here -
+        // and deleting whatever is sitting there is how the previous three attempts at this went
+        // wrong. A file this call creates is ours by construction and collides with nothing.
+        File target = File.createTempFile(name + ".", ".target", dir);
         int userVersion = 0;
         int applicationId = 0;
         try {
@@ -326,18 +326,20 @@ class AndroidCipherDB extends Database {
         }
         closing.close();
         File original = new File(path);
-        File backup = new File(dir, name + AndroidImplementation.MIGRATION_BACKUP);
-        File marker = new File(dir, name + AndroidImplementation.MIGRATION_MARKER);
-        backup.delete();
-        // Written before the first rename and removed after the last, so recovery knows a
-        // conversion was in progress rather than inferring it from file names.
+        // Same reasoning as the target: created, not named, so nothing pre-existing is disturbed.
+        File backup;
         try {
-            new FileOutputStream(marker).close();
+            backup = File.createTempFile(name + ".", ".backup", dir);
+            // The marker records which file holds the original, and carries a magic line so that
+            // recovery and delete act only on files this port wrote.
+            AndroidImplementation.writeDatabaseMigrationMarker(path, backup);
         } catch (IOException err) {
+            target.delete();
             db = openAt(path, currentKey);
-            throw new IOException("The conversion could not be marked as in progress at " + marker
-                    + ", so it was not started: " + err.getMessage(), err);
+            throw new IOException("The conversion could not be marked as in progress, so it was "
+                    + "not started: " + err.getMessage(), err);
         }
+        File marker = AndroidImplementation.databaseMigrationMarker(path);
         // Move the original aside rather than deleting it. Deleting first leaves a window where
         // the only copy of the data is the converted file under a name nothing looks for: a
         // process kill there strands it, the next open creates an empty database in its place,

@@ -181,12 +181,15 @@ import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.Callback;
 import java.io.File;
+import java.io.BufferedReader;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.io.Writer;
@@ -11054,27 +11057,93 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     /// Directory holding the encrypted-database migration's working files.
     ///
-    /// A directory beside the database rather than suffixed file names. Every suffix is a valid
-    /// database name -- an application may legitimately have a database called
-    /// `mydata.cn1backup` -- so naming artifacts that way meant an ordinary open could delete or
-    /// truncate one. Databases are files, so a directory of this name cannot also be one, and if
-    /// a file is already sitting there the conversion refuses rather than touching it.
+    /// A directory beside the database, so the rename that installs the converted file stays
+    /// within one filesystem and is therefore atomic.
     ///
-    /// It stays beside the database so the rename that installs the converted file is within one
-    /// filesystem and therefore atomic.
+    /// The location alone does not make these files ours. Custom paths mean an application can
+    /// point a database anywhere, including inside here, so ownership is established by the
+    /// marker's contents rather than by where a file sits or what it is called. Nothing is
+    /// deleted, renamed over or truncated without that proof.
     public static final String DATABASE_MIGRATION_DIR = ".cn1migration";
 
-    /// Names of the three working files inside that directory, all derived from the database.
-    public static final String MIGRATION_BACKUP = ".backup";
-
-    public static final String MIGRATION_TARGET = ".target";
-
+    /// Marker name for a database. Deterministic so recovery can find it; its contents, not its
+    /// name, are what establish that a conversion wrote it.
     public static final String MIGRATION_MARKER = ".marker";
+
+    /// First line of a marker written by this port.
+    private static final String MIGRATION_MARKER_MAGIC = "codename1-database-migration-1";
 
     /// The migration directory for a database, or null if the path has no parent.
     public static File databaseMigrationDir(String path) {
         File parent = new File(path).getParentFile();
         return parent == null ? null : new File(parent, DATABASE_MIGRATION_DIR);
+    }
+
+    public static File databaseMigrationMarker(String path) {
+        File dir = databaseMigrationDir(path);
+        return dir == null ? null : new File(dir, new File(path).getName() + MIGRATION_MARKER);
+    }
+
+    /// Reads the backup a marker claims, or null when the file is not one of ours.
+    ///
+    /// A marker is trusted only if it opens with the magic line. Anything else - including an
+    /// application database that happens to live at this path - is left alone.
+    public static File readDatabaseMigrationBackup(String path) {
+        File marker = databaseMigrationMarker(path);
+        if (marker == null || !marker.isFile()) {
+            return null;
+        }
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader(new InputStreamReader(new FileInputStream(marker),
+                    "UTF-8"));
+            if (!MIGRATION_MARKER_MAGIC.equals(reader.readLine())) {
+                return null;
+            }
+            String backup = reader.readLine();
+            if (backup == null || backup.length() == 0) {
+                return null;
+            }
+            return new File(marker.getParentFile(), backup);
+        } catch (IOException unreadable) {
+            return null;
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException ignored) {
+                    // Nothing useful to do.
+                }
+            }
+        }
+    }
+
+    /// Records that a conversion is under way and which file holds the original.
+    ///
+    /// The marker is the one file here whose name has to be predictable, because recovery has to
+    /// find it without being told. So it is the one place something could already be sitting -
+    /// an application may point a database at this exact path - and writing over it would
+    /// destroy that database. Anything already there that this port did not write means the
+    /// conversion does not start.
+    public static void writeDatabaseMigrationMarker(String path, File backup) throws IOException {
+        File marker = databaseMigrationMarker(path);
+        if (marker == null) {
+            throw new IOException("The database " + path + " has no directory to convert it in");
+        }
+        if (marker.exists() && readDatabaseMigrationBackup(path) == null) {
+            throw new IOException("There is already a file at " + marker + " that this port did "
+                    + "not write, so the conversion was not started rather than overwriting it. "
+                    + "Move it aside if it is not a database you need.");
+        }
+        Writer writer = new OutputStreamWriter(new FileOutputStream(marker), "UTF-8");
+        try {
+            writer.write(MIGRATION_MARKER_MAGIC);
+            writer.write("\n");
+            writer.write(backup.getName());
+            writer.write("\n");
+        } finally {
+            writer.close();
+        }
     }
 
     /// Restores a database whose conversion was interrupted between the two renames.
@@ -11084,22 +11153,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// complete database in the migration directory and nothing under the live name. Putting it
     /// back is what makes that window recoverable rather than a silent empty database.
     ///
-    /// The marker is what says a conversion was in progress. Nothing else writes into this
-    /// directory, so its contents cannot be confused with application databases.
+    /// Acts only on a marker this port wrote, and only on the backup that marker names.
     public static void recoverInterruptedDatabaseMigration(String path) throws IOException {
         if (path == null) {
             return;
         }
-        File dir = databaseMigrationDir(path);
-        if (dir == null || !dir.isDirectory()) {
+        File backup = readDatabaseMigrationBackup(path);
+        if (backup == null) {
             return;
         }
-        String name = new File(path).getName();
-        File marker = new File(dir, name + MIGRATION_MARKER);
-        File backup = new File(dir, name + MIGRATION_BACKUP);
-        if (!marker.isFile()) {
-            return;
-        }
+        File marker = databaseMigrationMarker(path);
         File live = new File(path);
         if (!backup.isFile()) {
             // The marker outlived its backup, so there is nothing to put back or clean up.
@@ -11128,6 +11191,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     + "relying on this database being encrypted.");
         }
         marker.delete();
+    }
+
+    /// Removes the working files for a database, reporting anything it could not remove.
+    ///
+    /// Used by delete, where the caller's intent is that the data goes away. A failure here has
+    /// to stop the deletion: continuing would report success while a complete copy of the
+    /// database survives, and a later open would restore it.
+    static void discardDatabaseMigrationArtifacts(String path) throws IOException {
+        if (path == null) {
+            return;
+        }
+        File backup = readDatabaseMigrationBackup(path);
+        if (backup == null) {
+            return;
+        }
+        if (backup.exists() && !backup.delete() && backup.exists()) {
+            throw new IOException("The database " + path + " was not deleted, because the copy of "
+                    + "it at " + backup + " could not be removed and a later open would restore "
+                    + "it.");
+        }
+        File marker = databaseMigrationMarker(path);
+        if (marker.exists() && !marker.delete() && marker.exists()) {
+            throw new IOException("The database " + path + " was not deleted, because the record "
+                    + "of its interrupted conversion at " + marker + " could not be removed.");
+        }
+    }
+
+    /// Whether a marked migration backup is holding a database's contents.
+    static boolean hasRecoverableDatabaseBackup(String path) {
+        File backup = readDatabaseMigrationBackup(path);
+        return backup != null && backup.isFile();
     }
 
     private String resolveNativeDatabasePath(String databaseName) {
@@ -11192,25 +11286,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         getContext().deleteDatabase(databaseName);
     }
 
-    /// Removes any migration working files for a database, without restoring anything.
-    ///
-    /// Used by delete, where the caller's intent is that the data goes away: recovering the
-    /// backup first and deleting afterwards would be the same outcome by a longer route, and
-    /// leaving it is how deleted data comes back.
-    static void discardDatabaseMigrationArtifacts(String path) {
-        if (path == null) {
-            return;
-        }
-        File dir = databaseMigrationDir(path);
-        if (dir == null || !dir.isDirectory()) {
-            return;
-        }
-        String name = new File(path).getName();
-        new File(dir, name + MIGRATION_MARKER).delete();
-        new File(dir, name + MIGRATION_BACKUP).delete();
-        new File(dir, name + MIGRATION_TARGET).delete();
-    }
-
     @Override
     public boolean existsDB(String databaseName) {
         // Recover first. A conversion interrupted between its two renames leaves the live name
@@ -11230,20 +11305,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         File db = new File(getContext().getApplicationInfo().dataDir + "/databases/" + databaseName);
         return db.exists();
-    }
-
-    /// Whether a marked migration backup is holding a database's contents.
-    static boolean hasRecoverableDatabaseBackup(String path) {
-        if (path == null) {
-            return false;
-        }
-        File dir = databaseMigrationDir(path);
-        if (dir == null || !dir.isDirectory()) {
-            return false;
-        }
-        String name = new File(path).getName();
-        return new File(dir, name + MIGRATION_MARKER).isFile()
-                && new File(dir, name + MIGRATION_BACKUP).isFile();
     }
 
     public String getDatabasePath(String databaseName) {

@@ -6837,21 +6837,22 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenWasWrong
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastError_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_lastError___R_java_lang_String"],
   function() { return jvm.createStringLiteral(String(cn1SqliteLastError)); });
 
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_close_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_close___long", "cn1_com_codename1_impl_html5_database_SQLiteNative_close_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_close___long_R_void"],
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_close_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_close___long_R_boolean"],
   function(dbId) {
-    // Guarded and swallowed. close() is best effort by contract and reports nothing, but an
-    // escaping exception would unwind the worker and hang the caller, which is far worse than a
-    // close that did not fully succeed. The reason is left in lastError for diagnosis.
+    // Reports failure rather than swallowing it. A close that fails on an OPFS flush has not
+    // written the data, and the caller's peer is already cleared, so returning normally would be
+    // the last chance to say so passing silently. The handle is dropped before the close so a
+    // failure cannot leave it stranded in the map either.
     return cn1SqliteGuard(function() {
       const db = cn1SqliteHandles.get(Number(dbId));
       if (db) {
         // Always close: this is a connection of its own, never the anchor, and the anchor is what
         // keeps a memdb-backed database readable after its last application connection goes away.
-        db.close();
         cn1SqliteHandles.delete(Number(dbId));
+        db.close();
       }
-      return null;
-    }, null);
+      return true;
+    }, false);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_rekey_long_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_rekey___long_java_lang_String_R_boolean"],
