@@ -346,8 +346,18 @@ void cn1_wearable_confirmInbox(const char *inboxToken) {
         return;
     }
     NSString *full = [cn1WearableInboxDir() stringByAppendingPathComponent:name];
-    [[NSFileManager defaultManager] removeItemAtPath:full error:NULL];
-    cn1WearableClearInFlight(name);
+    NSFileManager *files = [NSFileManager defaultManager];
+    [files removeItemAtPath:full error:NULL];
+    // The claim is released only once the file is actually GONE. A delete can be refused -- data
+    // protection while the device is locked, a transient filesystem error -- and clearing the
+    // in-flight marker anyway left a consumed one-shot transfer looking new to the next inbox
+    // replay, so it was delivered again on every activation for as long as the file survived.
+    //
+    // Keeping the claim is the safe direction: the marker is what says "already handed over", and
+    // the next confirm for this token retries the delete.
+    if (![files fileExistsAtPath:full]) {
+        cn1WearableClearInFlight(name);
+    }
 }
 
 /// Serializes the whole applicationContext read-modify-write.

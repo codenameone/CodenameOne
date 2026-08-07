@@ -383,7 +383,7 @@ public final class WearableConnection {
                 messageListeners.add(l);
             }
             activate();
-            drainPending(pendingMessages);
+            drainPending(pendingMessages, false);
         }
     }
 
@@ -408,7 +408,7 @@ public final class WearableConnection {
                 dataListeners.add(l);
             }
             activate();
-            drainPending(pendingData);
+            drainPending(pendingData, true);
         }
     }
 
@@ -526,9 +526,19 @@ public final class WearableConnection {
         deliverTagged(path, new Runnable() {
             @Override
             public void run() {
-                WearableMessage m = WearableMessage.fromByteArray(path, payload);
                 WearableDataListener[] copy =
                         dataListeners.toArray(new WearableDataListener[dataListeners.size()]);
+                if (copy.length == 0) {
+                    // The last listener went away between the park check and this EDT turn -- an
+                    // app pausing while a native callback was in flight. Dispatching to nobody
+                    // would DISCARD the change: the port has already recorded the path as
+                    // delivered, so registering a listener again replays nothing, and a replicated
+                    // value raises no second callback while it stays unchanged. Park it instead,
+                    // which is what would have happened had the list been empty a moment earlier.
+                    deliverTagged(path, this);
+                    return;
+                }
+                WearableMessage m = WearableMessage.fromByteArray(path, payload);
                 for (WearableDataListener l : copy) {
                     l.dataChanged(m);
                 }
@@ -548,6 +558,12 @@ public final class WearableConnection {
             public void run() {
                 WearableDataListener[] copy =
                         dataListeners.toArray(new WearableDataListener[dataListeners.size()]);
+                if (copy.length == 0) {
+                    // Same gap as deliverDataChanged, and worse for a removal: the item is gone, so
+                    // there is nothing left for any later enumeration to find. Park it.
+                    deliverTagged(path, this, true);
+                    return;
+                }
                 for (WearableDataListener l : copy) {
                     l.dataRemoved(path);
                 }
@@ -629,8 +645,8 @@ public final class WearableConnection {
         // Run outside the monitor: this calls back into the port, and holding the queue's lock
         // across foreign code invites a deadlock with whatever the port synchronises on.
         if (release != null) {
-            for (int i = 0; i < release.size(); i++) {
-                release.get(i).run();
+            for (Runnable r : release) {
+                r.run();
             }
         }
         if (parked) {
@@ -689,8 +705,7 @@ public final class WearableConnection {
                 return null;
             }
         }
-        OneShot dropped = (OneShot) queue.remove(0);
-        return dropped.onDropped;
+        return ((OneShot) queue.remove(0)).onDropped;
     }
 
     /// A parked replicated delivery, tagged with its path so the cap can drop one the incoming
@@ -825,7 +840,22 @@ public final class WearableConnection {
 
     /// What a port does about a replicated delivery the cap had to discard, or null when it has
     /// registered nothing. See [#setDroppedDeliveryHandler].
-    private static volatile DroppedDeliveryHandler droppedDeliveries;
+    /// Guarded by the pendingData monitor rather than declared volatile.
+    ///
+    /// Every read already happens under that lock -- the drain holds it while deciding whether to
+    /// hand paths back -- so volatile bought nothing beyond the write, and a lock that covers the
+    /// decision is stronger than a field that only covers the load.
+    private static DroppedDeliveryHandler droppedDeliveries;
+
+    /// The registered handler, read under the monitor that guards it.
+    ///
+    /// Callers already hold that monitor in the drain, so this is reentrant there; it exists so no
+    /// read of the field is left depending on the caller remembering to take the lock.
+    private static DroppedDeliveryHandler droppedHandler() {
+        synchronized (pendingData) {
+            return droppedDeliveries;
+        }
+    }
 
     /// How a port recovers a parked delivery the cap discarded.
     ///
@@ -851,7 +881,9 @@ public final class WearableConnection {
     ///
     /// - `handler`: the port's recovery action, or null to remove it
     public static void setDroppedDeliveryHandler(DroppedDeliveryHandler handler) {
-        droppedDeliveries = handler;
+        synchronized (pendingData) {
+            droppedDeliveries = handler;
+        }
     }
 
     /// Paths whose parked delivery was discarded and not superseded, awaiting the drain.
@@ -863,7 +895,8 @@ public final class WearableConnection {
     /// anything that falls off, which is the same guarantee as before this list existed.
     private static final java.util.Set<String> droppedPaths =
             java.util.Collections.newSetFromMap(new java.util.LinkedHashMap<String, Boolean>() {
-                protected boolean removeEldestEntry(java.util.Map.Entry<String, Boolean> eldest) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
                     if (size() > MAX_PENDING) {
                         // Overflowing loses a specific path, so instead of forgetting quietly, ask
                         // the port to re-offer everything it can. One flag, however many paths
@@ -887,7 +920,8 @@ public final class WearableConnection {
     /// And keeping them in their own set means a burst of ordinary changes cannot evict them.
     private static final java.util.Set<String> droppedRemovals =
             java.util.Collections.newSetFromMap(new java.util.LinkedHashMap<String, Boolean>() {
-                protected boolean removeEldestEntry(java.util.Map.Entry<String, Boolean> eldest) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
                     if (size() <= MAX_REMEMBERED_REMOVALS) {
                         return false;
                     }
@@ -966,7 +1000,9 @@ public final class WearableConnection {
     }
 
     /// Replays what was queued for one listener type, once a listener of that type exists.
-    private static void drainPending(List<Runnable> queue) {
+    /// @param dataQueue whether this is the replicated-data queue, which carries the recovery
+    ///                  bookkeeping the message queue has none of
+    private static void drainPending(List<Runnable> queue, boolean dataQueue) {
         List<Runnable> drained;
         List<Runnable> replays = null;
         List<String> dropped = null;
@@ -975,12 +1011,12 @@ public final class WearableConnection {
             // Only taken when a port can actually act on them. Clearing the set with no handler
             // registered would discard the one record that a path needs re-offering -- and iOS,
             // which registers late in its bridge's construction, would lose whatever arrived first.
-            if (queue == pendingData && !droppedRemovals.isEmpty()) {
+            if (dataQueue && !droppedRemovals.isEmpty()) {
                 // Taken whether or not a port registered a handler: these are re-announced here.
                 removals = new ArrayList<String>(droppedRemovals);
                 droppedRemovals.clear();
             }
-            if (queue == pendingData && droppedDeliveries != null && !droppedPaths.isEmpty()) {
+            if (dataQueue && droppedHandler() != null && !droppedPaths.isEmpty()) {
                 dropped = new ArrayList<String>(droppedPaths);
                 droppedPaths.clear();
                 if (takeRescanRequest()) {
@@ -988,7 +1024,7 @@ public final class WearableConnection {
                     dropped.add(null);
                 }
             }
-            if (queue == pendingData && !replayRequests.isEmpty()) {
+            if (dataQueue && !replayRequests.isEmpty()) {
                 replays = new ArrayList<Runnable>(replayRequests.values());
                 replayRequests.clear();
             }
@@ -1008,24 +1044,24 @@ public final class WearableConnection {
         // is a complete recovery rather than a request for one -- and it is the only recovery
         // available, since the item is gone and no port can enumerate an absence.
         if (removals != null) {
-            for (int i = 0; i < removals.size(); i++) {
-                deliverDataRemoved(removals.get(i));
+            for (String removed : removals) {
+                deliverDataRemoved(removed);
             }
         }
         // Paths the cap discarded, handed back now that a listener exists and there is room.
         if (dropped != null) {
-            DroppedDeliveryHandler handler = droppedDeliveries;
+            DroppedDeliveryHandler handler = droppedHandler();
             if (handler != null) {
-                for (int i = 0; i < dropped.size(); i++) {
-                    handler.deliveryDropped(dropped.get(i));
+                for (String path : dropped) {
+                    handler.deliveryDropped(path);
                 }
             }
         }
         // After the drain, so a re-offered payload finds room and a registered listener rather than
         // landing straight back in a full queue.
         if (replays != null) {
-            for (int i = 0; i < replays.size(); i++) {
-                replays.get(i).run();
+            for (Runnable replay : replays) {
+                replay.run();
             }
         }
     }
