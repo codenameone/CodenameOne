@@ -229,6 +229,61 @@ class WatchNativeBuilder {
         return new File(tmpFile, "watchvm");
     }
 
+    /// Moves each entry-point Stub into a directory of its own, so a translation pass can be given
+    /// exactly one of them.
+    ///
+    /// The translator parses everything on its classpath and REFUSES a classpath carrying two mains
+    /// ("Multiple main classes"). Both stubs compile into the same classes directory, so leaving
+    /// them there breaks both passes -- not just the watch one. Relocating them means the phone
+    /// pass sees the phone stub, the watch pass sees the watch stub, and the application classes
+    /// are shared by both without being copied.
+    ///
+    /// Inner classes travel with their outer class: a Stub with an anonymous Runnable in it emits
+    /// Stub$1.class, and leaving that behind would fail to resolve.
+    ///
+    /// Only called when the watch has its own translation, so a project without one keeps the exact
+    /// classpath it had before.
+    ///
+    /// @return the directory holding the requested stub
+    File isolateStub(BuildRequest request, File classesDir, File tmpFile, boolean watch)
+            throws IOException {
+        String stubClass = watch
+                ? translationRoot(request.getMainClass()) + "Stub"
+                : request.getMainClass() + "Stub";
+        File dest = new File(tmpFile, watch ? "watchstub" : "phonestub");
+        String pkgPath = request.getPackageName() == null || request.getPackageName().isEmpty()
+                ? "" : request.getPackageName().replace('.', File.separatorChar);
+        File fromDir = pkgPath.isEmpty() ? classesDir : new File(classesDir, pkgPath);
+        File toDir = pkgPath.isEmpty() ? dest : new File(dest, pkgPath);
+        toDir.mkdirs();
+        File[] candidates = fromDir.listFiles();
+        if (candidates == null) {
+            throw new IOException("no compiled classes at " + fromDir);
+        }
+        int moved = 0;
+        for (File f : candidates) {
+            String name = f.getName();
+            if (!f.isFile() || !name.endsWith(".class")) {
+                continue;
+            }
+            // The stub itself and its inner classes, and nothing whose name merely starts the same
+            // way -- MyAppStub must not carry off MyAppStubHelper.
+            if (!name.equals(stubClass + ".class") && !name.startsWith(stubClass + "$")) {
+                continue;
+            }
+            IPhoneBuilder.copy(f, new File(toDir, name));
+            if (!f.delete()) {
+                throw new IOException("could not move " + f + " out of the shared classes tree; "
+                        + "leaving it there would give the translator two main classes");
+            }
+            moved++;
+        }
+        if (moved == 0) {
+            throw new IOException("expected " + stubClass + ".class in " + fromDir);
+        }
+        return dest;
+    }
+
     /// Writes the watch app's own Stub -- the root the watch translation is tree-shaken from.
     ///
     /// The phone Stub cannot serve: it instantiates the PHONE lifecycle class, so a watch binary
@@ -244,7 +299,12 @@ class WatchNativeBuilder {
             String nativeRegistration, String iosMode) throws IOException {
         String stubClass = translationRoot(request.getMainClass()) + "Stub";
         String body = "package " + request.getPackageName() + ";\n\n"
-                + "import com.codename1.ui.*;\n\n"
+                + "import com.codename1.ui.*;\n"
+                // The native registration block below calls NativeLookup, exactly as the phone
+                // stub's does. Importing only the UI package left the generated stub referring to
+                // a class it had never imported -- which javac only reports once a project
+                // actually HAS a native interface, so a sample without one would have hidden it.
+                + "import com.codename1.system.*;\n\n"
                 + "/** Generated watch entry point. Rooted at codename1.watchMain (" + watchMain
                 + "). */\n"
                 + "public class " + stubClass
@@ -331,6 +391,18 @@ class WatchNativeBuilder {
                 compiled.add(name);
             }
         }
+        // A prefix header of the watch tree's OWN, so its quoted includes resolve there.
+        //
+        // The phone's pch does #include "cn1_class_method_index.h", and a quoted include resolves
+        // against the directory of the file doing the including -- before any HEADER_SEARCH_PATHS.
+        // Compiled with the phone's pch, every watch source therefore saw the PHONE's class index,
+        // which does not declare the watch stub's class id: the watch translation's own files
+        // failed on an identifier they had just been generated to use. Copying the same pch into
+        // the watch tree changes nothing but where those includes land.
+        File phonePch = new File(appSrcDir, request.getMainClass() + "-Prefix.pch");
+        if (phonePch.isFile()) {
+            IPhoneBuilder.copy(phonePch, new File(to, watchPrefixHeader(request.getMainClass())));
+        }
         owner.log("[watchNative] Staged " + compiled.size()
                 + " translated watch sources from " + watchMain);
         return compiled;
@@ -338,6 +410,11 @@ class WatchNativeBuilder {
 
     /// Where the staged watch translation lives, relative to the app's -src directory.
     static final String WATCH_SRC_DIR = "watch-src";
+
+    /// The watch slice's prefix header, which must sit INSIDE the staged tree.
+    static String watchPrefixHeader(String mainClass) {
+        return translationRoot(mainClass) + "-Prefix.pch";
+    }
 
     void writeWatchEntry(BuildRequest request, File appSrcDir) throws IOException {
         appSrcDir.mkdirs();
@@ -1181,10 +1258,38 @@ class WatchNativeBuilder {
                 }
                 names.append(name);
             }
+            // The app target's file SET, with the watch translation's CONTENTS.
+            //
+            // Adding every .m the watch translation emitted was wrong: its dist carries native
+            // sources the app target never compiles -- UIWebViewEventDelegate.m among them, which
+            // calls UIApplication and does not exist on watchOS. The shared-translation path has
+            // always taken its file list from the app target, and that list is what belongs on the
+            // watch too; only the translated bodies differ. So walk the app target exactly as the
+            // shared path does, and swap each file for its watch-src counterpart where one exists.
             s.append("watch_sources = %w[").append(names).append("]\n")
-                    .append("watch_group_path = '").append(WATCH_SRC_DIR).append("'\n")
+                    // Relative to the PROJECT, not to the app's -src folder. Naming only
+                    // "watch-src" pointed every reference at a directory that does not exist --
+                    // and because most translated files share a basename with the phone's, Xcode
+                    // resolved them against the phone tree instead and quietly compiled those.
+                    // Only the handful of watch-only names failed outright, which is how a broken
+                    // path looked like 16 missing files rather than the wrong sources entirely.
+                    .append("watch_group_path = '")
+                    .append(IPhoneBuilder.escapeRubyStr(mainClass + "-src/" + WATCH_SRC_DIR))
+                    .append("'\n")
+                    // EVERY file the watch translation emitted, and only those.
+                    //
+                    // Not the app target's list: the phone's translation shakes out whatever the
+                    // phone never reaches, and that includes the watch lifecycle class itself --
+                    // taking the phone's set left the watch binary without its own entry class and
+                    // the link failed on ___NEW_..Watch. The watch tree IS the watch program.
+                    //
+                    // Files that must not build for watchOS are excluded in the SOURCE, by
+                    // TARGET_OS_WATCH guards in the port, rather than by a list here -- so a
+                    // translated native like UIWebViewEventDelegate.m compiles to nothing on this
+                    // target instead of having to be enumerated.
                     .append("watch_existing = watch_target.source_build_phase.files.to_a.map { |bf| bf.file_ref && bf.file_ref.path ? File.basename(bf.file_ref.path) : nil }\n")
                     .append("watch_sources.each do |name|\n")
+                    .append("  next if excluded.include?(name)\n")
                     .append("  next if watch_existing.include?(name)\n")
                     .append("  ref = xcproj.main_group.new_reference(watch_group_path + '/' + name)\n")
                     .append("  watch_target.source_build_phase.add_file_reference(ref)\n")
@@ -1221,8 +1326,8 @@ class WatchNativeBuilder {
                 // Build settings for the watch slice.
                 .append("watch_target.build_configurations.each do |config|\n")
                 .append("  bs = config.build_settings\n")
-                .append("  bs['SDKROOT'] = 'watchos'\n")
-                // arm64_32 is the watchOS *device* ABI; the watch *simulator*
+                .append("  bs['SDKROOT'] = 'watchos'\n");
+        s                // arm64_32 is the watchOS *device* ABI; the watch *simulator*
                 // on Apple Silicon is arm64 (and x86_64 on Intel). Set the arch
                 // per-SDK so the simulator build doesn't try arm64_32 (whose
                 // Swift stdlib slice doesn't exist -> 'Unable to find module Swift').
@@ -1248,8 +1353,22 @@ class WatchNativeBuilder {
                 .append("  bs['CURRENT_PROJECT_VERSION'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(buildVersion == null ? "1" : buildVersion)).append("'\n")
                 .append("  bs['CLANG_ENABLE_MODULES'] = 'YES'\n")
+                // The prefix header of whichever translation this target compiles.
+                //
+                // A pch's quoted includes resolve against ITS OWN directory before any search
+                // path, and both trees carry a cn1_class_method_index.h describing different
+                // programs. Compiled with the phone's pch, the watch sources saw a class index
+                // that never declares the watch stub -- "use of undeclared identifier
+                // cn1_class_id_..WatchStub" from a file the watch translation had just emitted.
+                //
+                // Set HERE rather than earlier in this loop: this assignment is the last one to
+                // run, so anything set above it is silently overwritten.
                 .append("  bs['GCC_PREFIX_HEADER'] = '")
-                .append(IPhoneBuilder.escapeRubyStr(mainClass + "-src/" + mainClass + "-Prefix.pch")).append("'\n")
+                .append(IPhoneBuilder.escapeRubyStr(watchSources.isEmpty()
+                        ? mainClass + "-src/" + mainClass + "-Prefix.pch"
+                        : mainClass + "-src/" + WATCH_SRC_DIR + "/"
+                                + watchPrefixHeader(mainClass)))
+                .append("'\n")
                 .append("  bs['EXCLUDED_SOURCE_FILE_NAMES'] = '").append(excluded).append("'\n")
                 // The CN1 sources (and CN1WatchBootstrap.m) compile without ARC,
                 // matching the iOS port; the Swift shell is ARC regardless.
@@ -1264,9 +1383,19 @@ class WatchNativeBuilder {
                 // an iOS Simulator build, these stubs must not shadow Apple's
                 // real OpenGLES headers.
                 .append("  bs.delete('HEADER_SEARCH_PATHS')\n")
-                .append("  bs['HEADER_SEARCH_PATHS[sdk=watchos*]'] = '$(inherited) $(SRCROOT)/")
+                // The staged watch tree comes FIRST when it exists, so a header shared by name
+                // with the phone's resolves to the watch translation's copy. These are the
+                // SDK-conditional keys, which is what the plain HEADER_SEARCH_PATHS deleted just
+                // above is replaced by -- setting the plain key has no effect on this target.
+                .append("  bs['HEADER_SEARCH_PATHS[sdk=watchos*]'] = '$(inherited) ")
+                .append(watchSources.isEmpty() ? "" : "$(SRCROOT)/"
+                        + IPhoneBuilder.escapeRubyStr(mainClass + "-src/" + WATCH_SRC_DIR) + " ")
+                .append("$(SRCROOT)/")
                 .append(IPhoneBuilder.escapeRubyStr(mainClass)).append("-src/watchOSStubs'\n")
-                .append("  bs['HEADER_SEARCH_PATHS[sdk=watchsimulator*]'] = '$(inherited) $(SRCROOT)/")
+                .append("  bs['HEADER_SEARCH_PATHS[sdk=watchsimulator*]'] = '$(inherited) ")
+                .append(watchSources.isEmpty() ? "" : "$(SRCROOT)/"
+                        + IPhoneBuilder.escapeRubyStr(mainClass + "-src/" + WATCH_SRC_DIR) + " ")
+                .append("$(SRCROOT)/")
                 .append(IPhoneBuilder.escapeRubyStr(mainClass)).append("-src/watchOSStubs'\n")
                 // A standalone watch app IS the product, so it must be installable; an embedded
                 // companion is carried inside the phone app and must not be.
@@ -1291,13 +1420,22 @@ class WatchNativeBuilder {
         String stubFqn = (request.getPackageName() == null || request.getPackageName().isEmpty())
                 ? mainClass : (request.getPackageName() + "." + mainClass);
         String phoneStubName = mangle(stubFqn) + "Stub";
-        if (watchSources.isEmpty()) {
-            // ONLY when the watch shares the phone's translation. Two entry points would otherwise
-            // define main twice in one binary, so the phone's is defined away.
+        {
+            // The stub's C main is defined away in BOTH modes, on whichever stub this target
+            // compiles.
             //
-            // With a translation of its own the watch has a real main -- its own stub's -- and
-            // defining it away here would leave the watch binary with no entry point at all.
-            s.append("stub_name = '").append(phoneStubName).append(".m'\n")
+            // The watch app is SwiftUI-rooted: CN1WatchApp.swift carries @main, and the generated
+            // bootstrap calls the stub's Java main METHOD from there. The translator also emits a C
+            // main for any class with a Java main, so leaving it produced "duplicate symbol _main"
+            // against Swift's. I had assumed an own translation needed its main kept -- it does
+            // not; what it needs is its Java entry reachable, which the bootstrap already does.
+            String neutralised = watchSources.isEmpty()
+                    ? phoneStubName
+                    : mangle(request.getPackageName() == null
+                            || request.getPackageName().isEmpty()
+                            ? translationRoot(mainClass)
+                            : request.getPackageName() + "." + translationRoot(mainClass)) + "Stub";
+            s.append("stub_name = '").append(neutralised).append(".m'\n")
                     .append("watch_target.source_build_phase.files.to_a.each do |bf|\n")
                     .append("  ref = bf.file_ref\n")
                     .append("  next unless ref && ref.path && File.basename(ref.path) == stub_name\n")

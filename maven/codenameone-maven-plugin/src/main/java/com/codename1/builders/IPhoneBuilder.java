@@ -66,6 +66,12 @@ public class IPhoneBuilder extends Executor {
     // declares a codename1.watchMain, keeping the iOS build unchanged.
     private final WatchNativeBuilder watchNativeBuilder = new WatchNativeBuilder(this);
 
+    /// Where each entry-point stub lives once they have been separated, or null when there is one
+    /// translation and the classpath is untouched. See WatchNativeBuilder.isolateStub.
+    private File phoneStubDir;
+
+    private File watchStubDir;
+
     // tvNative.* delegate: adds an Apple TV (tvOS) target. tvOS is handled like
     // the Mac Catalyst slice (Metal + GL stub headers + GL-only sources excluded)
     // but as a separate appletvos target. Inert unless tvNative.enabled (or
@@ -2433,6 +2439,17 @@ public class IPhoneBuilder extends Executor {
         } catch (Exception ex) {
             throw new BuildException("Failure occurred while compiling native interface stubs", ex);
         }
+        // Two entry points cannot share one classpath: the translator parses everything it is
+        // given and refuses two mains. Each stub moves into a directory of its own so each pass
+        // can be handed exactly one; the application classes stay shared.
+        if (watchNativeBuilder.needsOwnTranslation()) {
+            try {
+                phoneStubDir = watchNativeBuilder.isolateStub(request, classesDir, tmpFile, false);
+                watchStubDir = watchNativeBuilder.isolateStub(request, classesDir, tmpFile, true);
+            } catch (IOException ex) {
+                throw new BuildException("Failed to separate the phone and watch entry points", ex);
+            }
+        }
         stopwatch.split("Compile Stubs");
 
         
@@ -3637,7 +3654,11 @@ public class IPhoneBuilder extends Executor {
                 parparCmd.add("-jar");
                 parparCmd.add(parparVMCompilerJar);
                 parparCmd.add("ios");
-                parparCmd.add(classesDir.getAbsolutePath() + ";" + resDir.getAbsolutePath() + ";"
+                // The phone stub's directory joins the classpath only when the stubs were
+                // separated; without a watch translation the classpath is exactly what it was.
+                parparCmd.add(classesDir.getAbsolutePath()
+                        + (phoneStubDir != null ? ";" + phoneStubDir.getAbsolutePath() : "")
+                        + ";" + resDir.getAbsolutePath() + ";"
                         + buildinRes.getAbsolutePath());
                 parparCmd.add(tmpFile.getAbsolutePath());
                 parparCmd.add(request.getMainClass());
@@ -3679,6 +3700,11 @@ public class IPhoneBuilder extends Executor {
                     // main class; everything before them -- the JVM flags, the jar, the "ios" mode
                     // and the classpath -- is shared with the phone pass by construction.
                     int outIndex = watchCmd.size() - 7;
+                    // Same application classes, but the WATCH stub in place of the phone's -- the
+                    // only difference that makes this a different program.
+                    watchCmd.set(outIndex - 1, classesDir.getAbsolutePath() + ";"
+                            + watchStubDir.getAbsolutePath() + ";" + resDir.getAbsolutePath() + ";"
+                            + buildinRes.getAbsolutePath());
                     watchCmd.set(outIndex, watchOut.getAbsolutePath());
                     watchCmd.set(outIndex + 1,
                             WatchNativeBuilder.translationRoot(request.getMainClass()));

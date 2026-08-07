@@ -593,11 +593,34 @@ class WatchNativeBuilderTest {
         String ruby = b.buildXcodeScript(req, tmp.toFile(), "1.0",
                 java.util.Arrays.asList("MyAppWatchStub.m", "java_lang_String.m"));
         assertTrue(ruby.contains("MyAppWatchStub.m"), ruby);
-        assertTrue(ruby.contains("watch-src"), ruby);
-        assertFalse(ruby.contains("-Dmain=cn1_watch_phone_main_unused"),
-                "the watch has a real main of its own now: " + ruby);
-        assertFalse(ruby.contains("app_target.source_build_phase.files.to_a.each"),
-                "the phone's sources must not be added to the watch target: " + ruby);
+        // The FULL path, relative to the project. Asserting only "watch-src" passed while the
+        // reference pointed at a directory that does not exist -- and since most translated files
+        // share a basename with the phone's, Xcode resolved those against the phone tree and
+        // compiled the wrong sources, with only the watch-only names failing.
+        assertTrue(ruby.contains("MyApp-src/watch-src"),
+                "the staged tree is addressed from the project root: " + ruby);
+        // The watch slice must compile against ITS OWN prefix header. The phone's pch includes
+        // "cn1_class_method_index.h" relative to its own directory, so using it made every watch
+        // source see the phone's class index -- which does not declare the watch stub's id.
+        assertTrue(ruby.contains("GCC_PREFIX_HEADER"),
+                "the watch target needs its own prefix header: " + ruby);
+        assertTrue(ruby.contains("watch-src/MyAppWatch-Prefix.pch"), ruby);
+        // The stub's C main is defined away in BOTH modes -- the watch app is SwiftUI-rooted, so
+        // Swift's @main is the entry and a second C main is a duplicate symbol. What differs is
+        // WHICH stub gets the flag: here, the watch's own.
+        assertTrue(ruby.contains("-Dmain=cn1_watch_phone_main_unused"), ruby);
+        assertTrue(ruby.contains("MyAppWatchStub.m"),
+                "the neutraliser targets the stub this target compiles: " + ruby);
+        // The app target IS walked -- for its file LIST. The watch translation's dist also holds
+        // native sources the app target never compiles (UIWebViewEventDelegate.m calls
+        // UIApplication, absent on watchOS), so taking every emitted .m compiled files the phone
+        // build itself excludes. What must not happen is compiling the phone's translated BODIES:
+        // each name present in the staged tree is swapped for its watch-src counterpart.
+        // The watch target compiles the watch translation's OWN file set. The phone's list would
+        // omit the watch lifecycle class, which the phone never reaches and its translation
+        // therefore shakes out -- the link then fails on that class's symbols.
+        assertTrue(ruby.contains("watch_sources.each"), ruby);
+        assertTrue(ruby.contains("watch_group_path + '/' + name"), ruby);
     }
 
     /// The same class on both slices is ONE app, so it keeps one translation -- and there the
