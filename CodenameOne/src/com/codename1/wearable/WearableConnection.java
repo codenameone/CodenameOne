@@ -640,6 +640,19 @@ public final class WearableConnection {
                 }
                 queue.add(oneShot ? new OneShot(delivery, onDropped)
                         : (path != null ? new Replicated(delivery, path, removal) : delivery));
+                if (path != null) {
+                    // Any recovery record for THIS path is now obsolete: the delivery just parked
+                    // is a newer statement about it than the one that was discarded.
+                    //
+                    // Leaving them cost more than a redundant re-offer. droppedRemovals is
+                    // re-announced by the drain itself, AFTER the parked deliveries are handed to
+                    // the EDT -- so a path whose removal was evicted and which was then
+                    // republished ended with the listener told "removed" on top of the newer
+                    // value, while getData returned the value. Nothing later corrects that: the
+                    // republication has already been consumed.
+                    droppedRemovals.remove(path);
+                    droppedPaths.remove(path);
+                }
             }
         }
         // Run outside the monitor: this calls back into the port, and holding the queue's lock
