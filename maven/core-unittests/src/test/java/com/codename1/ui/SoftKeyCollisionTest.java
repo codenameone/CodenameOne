@@ -92,6 +92,28 @@ class SoftKeyCollisionTest extends UITestBase {
         }
     }
 
+    /**
+     * A port is free to use a negative code for Back. That code cannot stand for a character, so a
+     * focused text editor must not divert it: the form's back command, pop guard and
+     * minimize-on-back all hang off the menu bar seeing it, and the editor would discard it anyway.
+     */
+    @Test
+    void aNegativeSoftKeyReachesTheMenuBarEvenWhileTextIsBeingEdited() {
+        int previous = MenuBar.leftSK;
+        MenuBar.leftSK = -11;
+        try {
+            RecordingInput input = showFocusedInput();
+            assertTrue(input.editsText, "this test is about a component that does edit text");
+
+            input.getComponentForm().keyReleased(-11);
+
+            assertEquals("", input.typed.toString(),
+                    "a code that cannot be typed must stay with the menu bar even while editing");
+        } finally {
+            MenuBar.leftSK = previous;
+        }
+    }
+
     @Test
     void softKeysStillReachTheMenuBarWhenNothingIsEditing() {
         int previous = MenuBar.leftSK;

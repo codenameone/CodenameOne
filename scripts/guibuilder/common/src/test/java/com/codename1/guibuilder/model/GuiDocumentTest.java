@@ -388,6 +388,25 @@ class GuiDocumentTest {
         assertEquals("Center", document.selected().getAttribute("layoutConstraint"));
     }
 
+    @Test
+    void undoingAcrossASaveLeavesTheDocumentDirty() {
+        GuiDocument document = GuiDocument.parse("path.gui",
+                "<component type=\"Form\" name=\"Form\" layout=\"LayeredLayout\"></component>");
+        document.addComponent("Button");
+        document.markSaved();
+        assertFalse(document.isModified(), "a document that was just written matches the file");
+
+        // Undo takes the form back to a state that predates the save, so it no longer matches what
+        // is on disk even though the snapshot it came from was captured while the form was clean.
+        assertTrue(document.undo());
+        assertTrue(document.isModified(),
+                "undoing past the save point must leave the document dirty, or the next form switch"
+                        + " discards the undone state without a prompt");
+
+        assertTrue(document.redo());
+        assertFalse(document.isModified(), "redoing back to the saved content is clean again");
+    }
+
     private static Element named(GuiDocument document, String name) {
         for (Element element : document.components()) {
             if (name.equals(element.getAttribute("name"))) return element;

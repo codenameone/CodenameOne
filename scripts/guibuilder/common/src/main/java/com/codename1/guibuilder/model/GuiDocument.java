@@ -45,6 +45,8 @@ public final class GuiDocument {
     private Element root;
     private Element selected;
     private boolean modified;
+    /** The XML as last written to disk; null until this document has been saved. */
+    private String savedXml;
     private final List<State> undo = new ArrayList<>();
     private final List<State> redo = new ArrayList<>();
     private int transactionDepth;
@@ -67,8 +69,21 @@ public final class GuiDocument {
     public String path() { return path; }
     public Element root() { return root; }
     public Element selected() { return selected; }
-    public boolean isModified() { return modified; }
-    public void markSaved() { modified = false; }
+    /**
+     * True when the document differs from what is on disk. This is derived from the saved XML
+     * rather than reported by a flag the undo stack restores: a snapshot taken before a save
+     * carries "not modified", so undoing across a save used to report a document that no longer
+     * matched the file as clean, and the next form switch then discarded it without a prompt.
+     */
+    public boolean isModified() {
+        if (savedXml == null) return modified;
+        return !savedXml.equals(xmlOnly());
+    }
+
+    public void markSaved() {
+        modified = false;
+        savedXml = xmlOnly();
+    }
 
     public void select(Element element) {
         if (element != null && containsElement(element)) selected = element;

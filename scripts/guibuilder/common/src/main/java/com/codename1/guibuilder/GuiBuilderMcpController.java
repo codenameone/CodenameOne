@@ -173,14 +173,20 @@ final class GuiBuilderMcpController {
         synchronized (this) {
             if (sequence <= after && timeout > 0) wait(timeout);
             List<Object> outEvents = new ArrayList<Object>();
+            // The cursor has to be the last event actually handed over, not the global sequence:
+            // clients are told to feed latestSequence back as afterSequence, so reporting the
+            // global one would silently skip every event this page could not fit.
+            long delivered = after;
             for (int i = 0; i < events.size() && outEvents.size() < limit; i++) {
                 Map<String, Object> event = events.get(i);
                 if (longValue(event.get("sequence"), 0) > after) {
                     outEvents.add(new LinkedHashMap<String, Object>(event));
+                    delivered = longValue(event.get("sequence"), delivered);
                 }
             }
             Map<String, Object> out = new LinkedHashMap<String, Object>();
-            out.put("latestSequence", Long.valueOf(sequence));
+            out.put("latestSequence", Long.valueOf(outEvents.isEmpty() ? sequence : delivered));
+            out.put("pendingEvents", Boolean.valueOf(delivered < sequence));
             out.put("events", outEvents);
             return out;
         }
