@@ -1827,6 +1827,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         boolean sameGuidedParent = "LayeredLayout".equals(plan.layout) && oldParent == plan.parent;
         boolean moved = plan.occupied != null || sameGuidedParent || document.moveSelectedTo(plan.target, plan.after);
         if (!moved && document.parentOf(dragged) != plan.parent) return false;
+        // Guided references only resolve among a parent's own children, so a sibling left pointing
+        // at a component that moved to another container resolves to null on the next refresh and
+        // jumps or resizes. Drop those relationships as part of the same move.
+        if (oldParent != null && oldParent != plan.parent) {
+            document.detachReferencesWithin(oldParent, dragged);
+        }
         document.select(dragged);
         if ("BorderLayout".equals(plan.layout)) {
             document.setAttribute("layoutConstraint", plan.constraint);
@@ -3177,7 +3183,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
         if (GuiDocument.acceptsChildren(element)) {
             Picker layout = stringPicker(new String[]{"BoxLayout", "BorderLayout", "FlowLayout", "GridLayout", "TableLayout", "LayeredLayout"}, document.attribute("layout", "BoxLayout"));
-            layout.addActionListener(e -> update("layout", String.valueOf(layout.getSelectedString())));
+            layout.addActionListener(e -> changeLayout(element, layout));
             fields.add(fieldLabel("Container layout"));
             fields.add(layout);
             if ("BoxLayout".equals(document.attribute("layout", "BoxLayout"))) {
@@ -3236,8 +3242,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             fields.add(actions);
             fields.add(propertyField("Advanced insets (top right bottom left)", "layeredInsets", "auto auto auto auto"));
         } else if ("TableLayout".equals(document.parentLayout(element))) {
-            fields.add(numericPropertyField("Table row", "tableRow", "0", 0, 99));
-            fields.add(numericPropertyField("Table column", "tableColumn", "0", 0, 99));
+            fields.add(numericPropertyField("Table row", "tableRow", "0", 0,
+                    Math.max(0, tableRowLimit(document.parentOf(element)))));
+            fields.add(numericPropertyField("Table column", "tableColumn", "0", 0,
+                    Math.max(0, tableColumnLimit(document.parentOf(element)))));
             fields.add(numericPropertyField("Horizontal span", "tableHorizontalSpan", "1", 1, 100));
             fields.add(numericPropertyField("Vertical span", "tableVerticalSpan", "1", 1, 100));
             fields.add(numericPropertyField("Column width %", "tableWidth", "-1", -1, 100));
@@ -3676,6 +3684,55 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return BoxLayout.encloseY(fieldLabel(label), field);
     }
 
+    /**
+     * Switches a container's layout, refusing a BorderLayout that cannot hold the children already
+     * there. Core BorderLayout removes whatever occupies the region it is handed, so the sixth and
+     * later children would drop out of the preview and the generated container while remaining in
+     * the .gui.
+     *
+     * @param element the container being changed
+     * @param layout the picker holding the requested layout
+     */
+    private void changeLayout(Element element, Picker layout) {
+        String requested = String.valueOf(layout.getSelectedString());
+        int children = GuiDocument.componentsIn(element).size();
+        if ("BorderLayout".equals(requested) && children > BORDER_LAYOUT_REGION_COUNT) {
+            layout.setSelectedString(document.attribute("layout", "BoxLayout"));
+            ToastBar.showErrorMessage("A BorderLayout holds five components; this container has " + children);
+            setStatus("Layout unchanged: BorderLayout cannot hold " + children + " components");
+            return;
+        }
+        update("layout", requested);
+    }
+
+    /** North, South, East, West and Center. */
+    private static final int BORDER_LAYOUT_REGION_COUNT = 5;
+
+    /**
+     * The highest row a child of this table may occupy. TableLayout grows by a single row when it
+     * is handed an out-of-range constraint and then indexes a positions array that is still too
+     * small, so the refresh threw and left a value the document could not render.
+     *
+     * @param parent the table the child belongs to
+     * @return the greatest valid row index
+     */
+    private int tableRowLimit(Element parent) {
+        if (parent == null) return 99;
+        return Math.max(0, integer(parent.getAttribute("tableLayoutRows"), 2) - 1);
+    }
+
+    /**
+     * The highest column a child of this table may occupy, for the same reason as
+     * {@link #tableRowLimit(Element)}.
+     *
+     * @param parent the table the child belongs to
+     * @return the greatest valid column index
+     */
+    private int tableColumnLimit(Element parent) {
+        if (parent == null) return 99;
+        return Math.max(0, integer(parent.getAttribute("tableLayoutColumns"), 2) - 1);
+    }
+
     private Component numericPropertyField(String label, String attribute, String fallback, int minimum, int maximum) {
         Element target = document.selected();
         TextField field = new TextField(document.attribute(attribute, fallback));
@@ -3962,6 +4019,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     void commitInlineValue(Element target, String attribute, String value) {
         if (document == null || target == null || attribute == null) return;
+        // stopEditing() completes asynchronously, so the document can have been replaced by a form
+        // switch or a refresh in the meantime. document.select() leaves the selection alone for an
+        // element it does not contain, and the value would then be written into whatever the new
+        // form happens to have selected.
+        if (!document.containsElement(target)) return;
         document.select(target);
         document.setAttribute(attribute, value);
         updatePreviewAttribute(target, attribute, value);

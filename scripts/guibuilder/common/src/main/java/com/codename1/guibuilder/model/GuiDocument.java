@@ -503,6 +503,27 @@ public final class GuiDocument {
         }
     }
 
+    /**
+     * Clears the guided-layout relationships a container's remaining children hold to a component
+     * that has just left it. {@code GuidedLayoutSupport.namedChild()} resolves a reference only
+     * among the current parent's children, so a reference to a moved-away sibling silently becomes
+     * null on the next refresh and the dependent component jumps or resizes.
+     *
+     * @param parent the container the component was moved out of
+     * @param movedAway the component that left
+     */
+    public void detachReferencesWithin(Element parent, Element movedAway) {
+        if (parent == null || movedAway == null) return;
+        String name = movedAway.getAttribute("name");
+        if (name == null || name.length() == 0) return;
+        Set<String> gone = new LinkedHashSet<>();
+        gone.add(name);
+        for (Element sibling : componentsIn(parent)) {
+            if (sibling == movedAway) continue;
+            clearReferencesTo(sibling, gone);
+        }
+    }
+
     private static void clearReferencesTo(Element element, Set<String> removedNames) {
         String[] references = splitReferences(element);
         if (references != null) {
