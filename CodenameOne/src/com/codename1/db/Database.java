@@ -23,6 +23,7 @@
 package com.codename1.db;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.impl.SQLStatementSplitter;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.Display;
 
@@ -635,6 +636,70 @@ public abstract class Database {
         }
         b.append('\'');
         return b.toString();
+    }
+
+    /// Records a transaction that a script opened or closed.
+    ///
+    /// `#execute(java.lang.String)` hands SQL straight to the engine, so `execute("BEGIN")` opens a
+    /// real transaction that `#beginTransaction()` never saw. Left untracked, the two ways of
+    /// saying the same thing disagree: a key change would be allowed inside a transaction opened
+    /// this way, and `beginTransaction(); execute("COMMIT")` would leave the flag set over a
+    /// transaction that has already ended, so the next `commitTransaction()` addresses one that is
+    /// not there.
+    ///
+    /// Ports call this after a successful `#execute(java.lang.String)`, with the script they ran.
+    /// Only statements the engine itself would treat as transaction control count, and a `BEGIN`
+    /// opening a trigger body is not one of them -- the splitter keeps a trigger together, so its
+    /// body is never a statement here.
+    ///
+    /// SAVEPOINT is deliberately not tracked. It nests, this API's transactions do not, and a
+    /// savepoint inside a transaction is the caller's business.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: the script that was just run
+    protected void noteScriptTransactionControl(String sql) {
+        if (sql == null) {
+            return;
+        }
+        for (String statement : SQLStatementSplitter.split(sql)) {
+            String keyword = leadingKeyword(statement);
+            if ("BEGIN".equals(keyword)) {
+                inTransaction = true;
+            } else if ("COMMIT".equals(keyword) || "END".equals(keyword)
+                    || "ROLLBACK".equals(keyword)) {
+                // ROLLBACK TO <savepoint> does not end the transaction, and neither does
+                // RELEASE; only a bare ROLLBACK does.
+                if (!"ROLLBACK".equals(keyword) || !hasToSavepoint(statement)) {
+                    inTransaction = false;
+                }
+            }
+        }
+    }
+
+    /// The first word of a statement, upper cased, or an empty string.
+    private static String leadingKeyword(String statement) {
+        int start = 0;
+        int length = statement.length();
+        while (start < length && statement.charAt(start) <= ' ') {
+            start++;
+        }
+        int end = start;
+        while (end < length && isKeywordChar(statement.charAt(end))) {
+            end++;
+        }
+        return statement.substring(start, end).toUpperCase();
+    }
+
+    private static boolean isKeywordChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    }
+
+    /// Whether a ROLLBACK names a savepoint, which unwinds to it rather than ending anything.
+    private static boolean hasToSavepoint(String statement) {
+        String rest = statement.toUpperCase();
+        int to = rest.indexOf(" TO");
+        return to >= 0;
     }
 
     /// Rejects a key change while a transaction is open.

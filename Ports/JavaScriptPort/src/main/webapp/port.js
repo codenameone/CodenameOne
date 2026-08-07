@@ -6618,6 +6618,29 @@ function cn1SqliteStartInit() {
  */
 const cn1SqliteMemoryAnchors = new Map();
 
+/**
+ * Live application connections to each memdb-backed database, by name.
+ *
+ * The store behind a memdb URI is released only once every connection to it closes, so deleting
+ * one while a connection is still open removes the name without removing the data: exists() then
+ * says no, and reopening before that connection closes lands back on the original database with
+ * everything still in it. Counting is what lets delete refuse instead.
+ */
+const cn1SqliteMemoryOpenCounts = new Map();
+
+function cn1SqliteMemoryOpened(name) {
+  cn1SqliteMemoryOpenCounts.set(name, (cn1SqliteMemoryOpenCounts.get(name) || 0) + 1);
+}
+
+function cn1SqliteMemoryClosed(name) {
+  const count = cn1SqliteMemoryOpenCounts.get(name) || 0;
+  if (count <= 1) {
+    cn1SqliteMemoryOpenCounts.delete(name);
+  } else {
+    cn1SqliteMemoryOpenCounts.set(name, count - 1);
+  }
+}
+
 /** Whether the last failed open failed because of the key, rather than storage or corruption. */
 let cn1SqliteLastOpenWrongKey = false;
 
@@ -6736,6 +6759,10 @@ function cn1SqliteOpen(name, key) {
     cn1SqliteApplyKey(anchor, key);
     cn1SqliteMemoryAnchors.set(name, anchor);
   }
+  // Tagged so closing this connection can decrement the count without another lookup, and so the
+  // close binding can tell a memdb connection from a pooled one.
+  db.cn1MemoryName = name;
+  cn1SqliteMemoryOpened(name);
   return db;
 }
 
@@ -6803,6 +6830,14 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang
       if (cn1SqlitePool) {
         cn1SqlitePool.unlink(cn1SqliteDbPath(n));
       } else {
+        if ((cn1SqliteMemoryOpenCounts.get(n) || 0) > 0) {
+          // Refused rather than half done. Dropping the anchor here would take the name away
+          // while the store lives on behind the connection that is still open -- exists() would
+          // answer no, and reopening before that connection closed would find the original
+          // database with all of its rows. Saying so is the only honest answer.
+          cn1SqliteLastError = "the database " + n + " is still open; close it before deleting it";
+          return false;
+        }
         const anchor = cn1SqliteMemoryAnchors.get(n);
         if (anchor) {
           // Dropping the anchor releases the store once every other connection to it has closed.
@@ -6849,6 +6884,9 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_close_long_R_boo
         // Always close: this is a connection of its own, never the anchor, and the anchor is what
         // keeps a memdb-backed database readable after its last application connection goes away.
         cn1SqliteHandles.delete(Number(dbId));
+        if (db.cn1MemoryName) {
+          cn1SqliteMemoryClosed(db.cn1MemoryName);
+        }
         db.close();
       }
       return true;
@@ -6980,13 +7018,18 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_executeAndFinish
     return cn1SqliteGuard(function() {
       const stmt = cn1SqliteHandles.get(Number(stmtId));
       if (stmt) {
+        // Dropped before anything that can throw. finalize() reports the result of the statement
+        // it is finalizing, so a failed write -- a constraint violation, say -- throws from step()
+        // and then throws again from the cleanup, and a delete placed after it never runs. The
+        // entry would stay in the map forever with nothing left able to reach it, one per failed
+        // write. The same reasoning the close binding already follows.
+        cn1SqliteHandles.delete(Number(stmtId));
         try {
           while (stmt.step()) {
             // A statement that returns rows still has to run to completion.
           }
         } finally {
           stmt.finalize();
-          cn1SqliteHandles.delete(Number(stmtId));
         }
       }
       return true;

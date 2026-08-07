@@ -27,6 +27,7 @@ import android.database.sqlite.SQLiteException;
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.DatabaseConfig;
+import com.codename1.db.DatabaseEncryptionException;
 import com.codename1.impl.android.AndroidCursor;
 import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.SQLStatementSplitter;
@@ -73,10 +74,50 @@ class AndroidCipherDB extends Database {
      */
     private String currentKey;
 
+    /**
+     * Every connection this port has open, by the file it is open on.
+     *
+     * Only a conversion needs this. A conversion is not a statement: it renames a new file over
+     * the database while the process is running, and on Android that rename succeeds even while
+     * another connection holds the old file open. That connection keeps writing to the file that
+     * has just been replaced -- its writes are accepted, and then the backup they landed in is
+     * deleted -- so the caller is told its data was saved and it is not there. Counting the
+     * connections is what lets a conversion refuse rather than do that.
+     */
+    private static final java.util.Map<String, Integer> OPEN_CONNECTIONS =
+            new java.util.HashMap<String, Integer>();
+
+    private static synchronized void connectionOpened(String path) {
+        Integer count = OPEN_CONNECTIONS.get(path);
+        OPEN_CONNECTIONS.put(path, Integer.valueOf(count == null ? 1 : count.intValue() + 1));
+    }
+
+    private static synchronized void connectionClosed(String path) {
+        Integer count = OPEN_CONNECTIONS.get(path);
+        if (count == null) {
+            return;
+        }
+        if (count.intValue() <= 1) {
+            OPEN_CONNECTIONS.remove(path);
+        } else {
+            OPEN_CONNECTIONS.put(path, Integer.valueOf(count.intValue() - 1));
+        }
+    }
+
+    private static synchronized int openConnections(String path) {
+        Integer count = OPEN_CONNECTIONS.get(path);
+        return count == null ? 0 : count.intValue();
+    }
+
+    /** The path this connection is open on, for the registry above. */
+    private final String openPath;
+
     AndroidCipherDB(SQLiteDatabase db, String databaseName, String key) {
         this.db = db;
         this.databaseName = databaseName;
         this.currentKey = key == null ? "" : key;
+        this.openPath = db.getPath();
+        connectionOpened(this.openPath);
     }
 
     private void checkOpen() throws IOException {
@@ -204,6 +245,7 @@ class AndroidCipherDB extends Database {
             cursors[iter].invalidate();
         }
         closing.close();
+        connectionClosed(openPath);
     }
 
     @Override
@@ -312,6 +354,18 @@ class AndroidCipherDB extends Database {
 
     private void migrateThroughExport(String targetKey) throws IOException {
         String path = db.getPath();
+        if (openConnections(path) > 1) {
+            // Refused rather than raced. The swap renames a new file over this one, and Android
+            // lets that succeed while another connection still holds the old file open -- that
+            // connection keeps writing to a file that is no longer the database, is told each
+            // write succeeded, and then loses the lot when the backup is deleted. Its WAL is the
+            // same story. There is no way to migrate underneath it, so the caller is told.
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    "The database " + path + " is open more than once, and converting it replaces "
+                    + "the file underneath every connection to it. Close the other connections "
+                    + "first; writes made through them during the conversion would be accepted "
+                    + "and then lost.");
+        }
         String name = new File(path).getName();
         File dir = AndroidImplementation.databaseMigrationDir(path);
         if (dir == null) {
@@ -496,6 +550,7 @@ class AndroidCipherDB extends Database {
         } catch (Exception e) {
             throw new IOException(e.getMessage(), e);
         }
+        noteScriptTransactionControl(sql);
     }
 
     @Override

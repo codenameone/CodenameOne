@@ -194,6 +194,7 @@ public class AndroidDB extends Database {
         } catch (Exception e) {
             throw new IOException(e.getMessage(), e);
         }
+        noteScriptTransactionControl(sql);
     }
 
     @Override

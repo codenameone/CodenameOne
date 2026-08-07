@@ -131,7 +131,10 @@ class DatabaseUsageScanTest {
         writeClass("com/codename1/impl/CodenameOneImplementation.class",
                 "com/codename1/db/DatabaseConfig");
         writeClass("com/codename1/orm/EntityManager.class", "com/codename1/db/Database");
+        writeClass("com/codename1/orm/Dao.class", "com/codename1/db/Database");
         writeClass("com/codename1/properties/SQLMap.class", "com/codename1/db/Database");
+        writeClass("com/codename1/properties/SQLMap$SqlType$8.class", "com/codename1/db/Database");
+        writeClass("com/codename1/impl/AbstractDBCursor.class", "com/codename1/db/Row");
         writeClass("com/codename1/testing/DatabaseConformanceSuite.class",
                 "com/codename1/db/DatabaseConfig");
     }
@@ -176,6 +179,48 @@ class DatabaseUsageScanTest {
         writeClass("com/example/deep/nested/Dao.class", "com/codename1/db/Database");
 
         assertTrue(executor.scanForDatabaseUsage(root).usesDatabase());
+    }
+
+    @Test
+    void anApplicationClassUnderAFrameworkNamespaceIsStillScanned() throws IOException {
+        // The framework is named class by class rather than package by package. A package says
+        // nothing reliable about who wrote a class, and skipping com/codename1/ui wholesale would
+        // skip an application or library class living under it -- leaving the engine out of a
+        // build that needs it, which fails at runtime rather than here.
+        writeFramework();
+        writeClass("com/codename1/ui/extensions/Dao.class", "com/codename1/db/DatabaseConfig");
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase());
+        assertTrue(usage.usesDatabaseCipher());
+    }
+
+    @Test
+    void reachingTheDatabaseThroughAFacadeCounts() throws IOException {
+        // EntityManager and SQLMap exist so an application does not have to name
+        // com.codename1.db, so its constant pool holds neither Database nor DatabaseConfig. The
+        // engine still has to ship: this is the direction that fails at runtime.
+        writeFramework();
+        writeClass("com/example/MyApp.class", "com/codename1/orm/EntityManager");
+        assertTrue(executor.scanForDatabaseUsage(root).usesDatabase(),
+                "an application using the ORM facade is a database user");
+
+        delete(new File(root, "com/example"));
+        writeClass("com/example/Other.class", "com/codename1/properties/SQLMap");
+        assertTrue(executor.scanForDatabaseUsage(root).usesDatabase(),
+                "an application using SQLMap is a database user");
+        assertFalse(executor.scanForDatabaseUsage(root).usesDatabaseCipher(),
+                "using a facade is not configuring encryption");
+    }
+
+    @Test
+    void theFacadesOwnReferenceIsStillNotTheApplications() throws IOException {
+        // SQLMap and EntityManager reference Database themselves; that alone is the framework
+        // talking, exactly as Display is.
+        writeFramework();
+        writeClass("com/example/MyApp.class", "com/codename1/ui/Form");
+
+        assertFalse(executor.scanForDatabaseUsage(root).usesDatabase());
     }
 
     @Test

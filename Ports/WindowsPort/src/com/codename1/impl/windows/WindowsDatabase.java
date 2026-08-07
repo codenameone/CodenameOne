@@ -178,6 +178,7 @@ class WindowsDatabase extends Database {
     public void execute(String sql) throws IOException {
         checkOpen();
         WindowsNative.sqlDbExecScript(peer, sql);
+        noteScriptTransactionControl(sql);
     }
 
     @Override

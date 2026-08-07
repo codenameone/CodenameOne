@@ -726,20 +726,25 @@ public abstract class Executor {
         }
     }
 
-    /// Framework packages whose references to the database say nothing about the application.
+    /// The database API itself. Every class in it names the package, so none of them says
+    /// anything about whether the application does.
+    private static final String DATABASE_PACKAGE = "com/codename1/db";
+
+    /// Framework classes whose reference to the database package is their own.
     ///
-    /// The tree handed to a builder is the application merged with the framework, so "does
-    /// anything in here reference the database" is always yes -- `Display` alone carries
-    /// `openOrCreate(String, DatabaseConfig)`, which is every gate answered before it is asked.
-    /// The question these payloads actually turn on is whether anything **outside** the framework
-    /// references it.
-    private static final String[] FRAMEWORK_DATABASE_PACKAGES = {
-        "com/codename1/db",
-        "com/codename1/impl",
-        "com/codename1/orm",
-        "com/codename1/properties",
-        "com/codename1/testing",
-        "com/codename1/ui"
+    /// Named one by one rather than by package, because a package is not a reliable statement
+    /// about who wrote a class: skipping `com/codename1/ui` wholesale would also skip an
+    /// application class under it, and a direct `DatabaseConfig` reference there would then go
+    /// unseen and the engine would be left out of a build that needs it. There are sixteen of
+    /// these in the framework and they are enumerated.
+    private static final String[] FRAMEWORK_DATABASE_CLASSES = {
+        "com/codename1/impl/AbstractDBCursor",
+        "com/codename1/impl/CodenameOneImplementation",
+        "com/codename1/orm/Dao",
+        "com/codename1/orm/EntityManager",
+        "com/codename1/properties/SQLMap",
+        "com/codename1/testing/DatabaseConformanceSuite",
+        "com/codename1/ui/Display"
     };
 
     /// The internal name of the database package, as every reference to a class in it is stored.
@@ -748,6 +753,19 @@ public abstract class Executor {
     /// The internal name of the class that turns encryption on.
     private static final byte[] DATABASE_CIPHER_MARKER = toAscii("com/codename1/db/DatabaseConfig");
 
+    /// Framework classes that are a database by another name.
+    ///
+    /// An application can use one of these and never mention `com.codename1.db` itself --
+    /// `EntityManager` and `SQLMap` exist so that it does not have to -- so a reference to one is
+    /// a reference to the database. Without this the engine would be left out of exactly the
+    /// applications that took the framework's advice, and they would fail at runtime rather than
+    /// at build time.
+    private static final byte[][] DATABASE_FACADE_MARKERS = {
+        toAscii("com/codename1/orm/"),
+        toAscii("com/codename1/properties/SQLMap")
+    };
+
+    /// An internal class name as the bytes a constant pool holds, which are always ASCII here.
     private static byte[] toAscii(String s) {
         byte[] out = new byte[s.length()];
         for (int iter = 0; iter < s.length(); iter++) {
@@ -799,12 +817,14 @@ public abstract class Executor {
             String childPath = relativePath.length() == 0
                     ? child.getName() : relativePath + "/" + child.getName();
             if (child.isDirectory()) {
-                if (!isFrameworkDatabasePackage(childPath)) {
+                if (!DATABASE_PACKAGE.equals(childPath)) {
                     scanForDatabaseUsage(child, childPath, found);
                 }
-            } else if (child.getName().endsWith(".class")) {
+            } else if (child.getName().endsWith(".class")
+                    && !isFrameworkDatabaseClass(childPath)) {
                 byte[] bytes = readAllBytes(child);
-                if (!found[0] && containsBytes(bytes, DATABASE_MARKER)) {
+                if (!found[0] && (containsBytes(bytes, DATABASE_MARKER)
+                        || referencesDatabaseFacade(bytes))) {
                     found[0] = true;
                 }
                 if (!found[1] && containsBytes(bytes, DATABASE_CIPHER_MARKER)) {
@@ -814,9 +834,25 @@ public abstract class Executor {
         }
     }
 
-    private static boolean isFrameworkDatabasePackage(String path) {
-        for (int iter = 0; iter < FRAMEWORK_DATABASE_PACKAGES.length; iter++) {
-            if (path.equals(FRAMEWORK_DATABASE_PACKAGES[iter])) {
+    /// Whether this class file is one of the framework's own, by exact name.
+    ///
+    /// The `$` test catches a nested class, which belongs to the class that declares it --
+    /// `SQLMap$SqlType$8` is `SQLMap`.
+    private static boolean isFrameworkDatabaseClass(String path) {
+        String name = path.substring(0, path.length() - ".class".length());
+        for (int iter = 0; iter < FRAMEWORK_DATABASE_CLASSES.length; iter++) {
+            String framework = FRAMEWORK_DATABASE_CLASSES[iter];
+            if (name.equals(framework) || name.startsWith(framework + "$")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether these bytes reach the database through one of the framework's facades.
+    private static boolean referencesDatabaseFacade(byte[] bytes) {
+        for (int iter = 0; iter < DATABASE_FACADE_MARKERS.length; iter++) {
+            if (containsBytes(bytes, DATABASE_FACADE_MARKERS[iter])) {
                 return true;
             }
         }

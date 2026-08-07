@@ -196,6 +196,7 @@ class DatabaseImpl extends Database {
         checkOpen();
         // sqlite3_exec runs a whole script, which is the portable contract.
         executeScript(sql);
+        noteScriptTransactionControl(sql);
     }
 
     @Override

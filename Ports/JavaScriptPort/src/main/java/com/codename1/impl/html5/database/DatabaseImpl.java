@@ -190,6 +190,7 @@ public class DatabaseImpl extends Database {
     public void execute(String sql) throws IOException {
         checkOpen();
         checkNative(SQLiteNative.execScript(peer, sql));
+        noteScriptTransactionControl(sql);
     }
 
     @Override

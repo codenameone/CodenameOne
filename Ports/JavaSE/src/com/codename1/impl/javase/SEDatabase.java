@@ -232,6 +232,7 @@ public class SEDatabase extends Database {
         } finally {
             cleanup(s);
         }
+        noteScriptTransactionControl(sql);
     }
 
     /// Rejects a call that supplies the wrong number of bind arguments.
