@@ -1043,6 +1043,17 @@ public final class WearableConnection {
 
     /// Set when the dropped-path set overflowed, so the port is asked for a full rescan instead of
     /// a list of paths it can no longer be given. Read and cleared with [#droppedPaths]'s monitor.
+    /// Claims a pending dropped-removal announcement, or reports that it has been superseded.
+    ///
+    /// False when a publication for the path parked while the drain was announcing, which removed
+    /// the record: that newer value is the truth about the path, and the removal must not be queued
+    /// behind it.
+    private static boolean takeDroppedRemoval(String path) {
+        synchronized (pendingData) {
+            return droppedRemovals.remove(path);
+        }
+    }
+
     /// Takes the overflow flag and clears it.
     ///
     /// Synchronized on {@link #pendingData} by NAME even though the caller already holds that
@@ -1165,8 +1176,11 @@ public final class WearableConnection {
             // which registers late in its bridge's construction, would lose whatever arrived first.
             if (dataQueue && !droppedRemovals.isEmpty()) {
                 // Taken whether or not a port registered a handler: these are re-announced here.
+                // COPIED, not taken. The entries stay in the set until each is actually
+                // announced, so a publication parking in the meantime can still cancel one --
+                // deliver() already removes an incoming path from this set, and clearing here put
+                // the record out of its reach. The announcement re-checks membership.
                 removals = new ArrayList<String>(droppedRemovals);
-                droppedRemovals.clear();
             }
             if (dataQueue && droppedHandler() != null && !droppedPaths.isEmpty()) {
                 dropped = new ArrayList<String>(droppedPaths);
@@ -1200,7 +1214,14 @@ public final class WearableConnection {
             // available, since the item is gone and no port can enumerate an absence.
             if (removals != null) {
                 for (String removed : removals) {
-                    deliverDataRemoved(removed);
+                    // Only if it is still pending. A publication for this path parking during the
+                    // recovery supersedes the removal, and announcing anyway put a stale removal
+                    // BEHIND the newer value in the same queue -- the listener ended up removed
+                    // while getData returned the replacement, which is the failure this recovery
+                    // exists to prevent, produced by the recovery itself.
+                    if (takeDroppedRemoval(removed)) {
+                        deliverDataRemoved(removed);
+                    }
                 }
             }
             // Paths the cap discarded, handed back now that a listener exists and there is room.
