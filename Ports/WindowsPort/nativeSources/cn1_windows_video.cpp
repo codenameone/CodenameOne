@@ -36,6 +36,7 @@
 #include <mfreadwrite.h>
 #include <mferror.h>
 #include <wrl/client.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
@@ -95,6 +96,8 @@ struct CN1VideoReader {
 
 struct CN1VideoWriter {
     ComPtr<IMFSinkWriter> writer;
+    unsigned long audioSamplesWritten;
+    unsigned long long audioBytesWritten;
     DWORD videoStream;
     DWORD audioStream;
     int width;
@@ -397,6 +400,8 @@ static JAVA_LONG cn1WriterOpen(const wchar_t* url, bool hevc, int width, int hei
 
     CN1VideoWriter* st = new CN1VideoWriter();
     st->writer = writer;
+    st->audioSamplesWritten = 0;
+    st->audioBytesWritten = 0;
     st->width = width;
     st->height = height;
     st->frameRate = fps;
@@ -607,6 +612,12 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_videoWriterAudio___long_byte_
     DWORD frames = len / (DWORD) (2 * (channels > 0 ? channels : 1));
     LONGLONG dur = sampleRate > 0 ? (LONGLONG) ((LONGLONG) frames * CN1_HNS_PER_SEC / sampleRate) : 0;
     cn1WriterWriteSample(st, st->audioStream, pcm, len, (LONGLONG) ptsMs * CN1_HNS_PER_MS, dur);
+    /* A freshly opened reader cannot be positioned at EOF, yet it still reports
+     * ENDOFSTREAM on its first audio read -- so the file carries an audio stream
+     * header with no samples behind it, which points here rather than at the
+     * reader. Count what actually goes in. */
+    st->audioSamplesWritten++;
+    st->audioBytesWritten += (unsigned long long) len;
 }
 
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_videoWriterClose___long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {
@@ -615,6 +626,10 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_videoWriterClose___long_R_
         return JAVA_FALSE;
     }
     HRESULT hr = st->writer->Finalize();
+    printf("CN1SS:INFO:winWriter audioSamples=%lu audioBytes=%llu hasAudio=%d finalizeHr=0x%08lx\n",
+           st->audioSamplesWritten, st->audioBytesWritten, st->hasAudio ? 1 : 0,
+           (unsigned long) hr);
+    fflush(stdout);
     delete st;
     return SUCCEEDED(hr) ? JAVA_TRUE : JAVA_FALSE;
 }

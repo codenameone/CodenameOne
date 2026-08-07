@@ -300,7 +300,15 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         int imgW = baseW + 2 * (shadowSpread + thumbInset);
         int imgH = pxDim + 2 * shadowSpread;
         Image img = ImageFactory.createImage(context, imgW, imgH, 0x0);
+        if (img == null) {
+            throw new IllegalStateException("Switch thumb: ImageFactory returned null for "
+                    + imgW + "x" + imgH);
+        }
         Graphics g = img.getGraphics();
+        if (g == null) {
+            throw new IllegalStateException("Switch thumb: no graphics for a " + imgW + "x"
+                    + imgH + " image");
+        }
         g.setAntiAliased(true);
 
         int shadowOpacity = 200;
@@ -322,9 +330,21 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
                 g.translate(-iter, -iter);
             }
             if (Display.getInstance().isGaussianBlurSupported()) {
+                // A port whose blur answers null, or answers an image it cannot then
+                // draw on, used to surface as a NullPointerException two frames up in
+                // calcPreferredSize -- with no stack at all on ParparVM, which is how
+                // this cost days on Windows. Name it where it happens.
                 Image blured = Display.getInstance().gaussianBlurImage(img, shadowBlur / 2);
+                if (blured == null) {
+                    throw new IllegalStateException("Switch thumb: gaussianBlurImage returned null for "
+                            + imgW + "x" + imgH);
+                }
                 img = blured;
                 g = img.getGraphics();
+                if (g == null) {
+                    throw new IllegalStateException("Switch thumb: no graphics on the blurred "
+                            + img.getWidth() + "x" + img.getHeight() + " image");
+                }
                 g.setAntiAliased(true);
             }
         }
@@ -675,10 +695,24 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /// {@inheritDoc}
     @Override
     protected Dimension calcPreferredSize() {
+        // Each of these can be null if the platform failed to make an image, and
+        // the resulting NullPointerException names none of them.
+        requireImage(getCurrentThumbImage(), "thumb");
+        requireImage(getCurrentTrackOnImage(), "trackOn");
+        requireImage(getCurrentTrackOffImage(), "trackOff");
         return new Dimension(
                 getStyle().getHorizontalPadding() + Math.max(getCurrentThumbImage().getWidth(), Math.max(getCurrentTrackOnImage().getWidth(), getCurrentTrackOffImage().getWidth())),
                 getStyle().getVerticalPadding() + Math.max(getCurrentThumbImage().getHeight(), Math.max(getCurrentTrackOnImage().getHeight(), getCurrentTrackOffImage().getHeight())));
 
+    }
+
+    /// Fails with the name of the image that could not be built, rather than a
+    /// bare NullPointerException from the arithmetic below it.
+    private void requireImage(Image img, String which) {
+        if (img == null) {
+            throw new IllegalStateException("Switch " + which + " image is null (uiid=" + getUIID()
+                    + " on=" + value + " enabled=" + isEnabled() + ")");
+        }
     }
 
     /// {@inheritDoc}
