@@ -782,7 +782,7 @@ To open the form in the GUI builder:
 include::../demos/common/src/main/snippets/developer-guide/basics.sh[tag=basics-bash-002,indent=0]
 ----
 
-Projects generated from the archetype also carry a ready-made shortcut for this: a *CN1 GUI Builder* run configuration in IntelliJ IDEA, an *Open in GUI Builder* action in NetBeans, a *GUI Builder* launch configuration in Eclipse, and a *Tools > GUI Builder* entry in the Visual Studio Code Maven favourites. They all run the same goal.
+Projects generated from the archetype also carry a ready-made shortcut for this: a *CN1 GUI Builder* run configuration in IntelliJ IDEA, an *Open in GUI Builder* action in NetBeans, a *GUI Builder* launch configuration in Eclipse, and a *Tools > GUI Builder* entry in the Visual Studio Code Maven favorites. They all run the same goal.
 
 The full goal reference, including every parameter, lives in <<create-gui-form>> and <<guibuilder>> in the Maven goals appendix.
 
@@ -809,7 +809,7 @@ The two dividers between the columns can be dragged, so you can give the canvas 
 
 Drag a component from the palette onto the canvas to add it. As you drag, the builder highlights where the component would land: the container that would receive it, and, in auto layout mode, guides showing the edges it would line up with. Dropping outside a valid target leaves the form unchanged.
 
-Select a component by clicking it on the canvas or by picking it in the *Hierarchy* tab. A selected component shows resize handles; drag its body to move it, or a handle to resize it. Hold Shift while clicking to select several components at once, which is what the alignment actions in the top-left corner of the canvas operate on: they align edges, centres or baselines, match widths or heights, or disconnect a component from the relationships it has picked up.
+Select a component by clicking it on the canvas or by picking it in the *Hierarchy* tab. A selected component shows resize handles; drag its body to move it, or a handle to resize it. Hold Shift while clicking to select several components at once, which is what the alignment actions in the top-left corner of the canvas operate on: they align edges, centers or baselines, match widths or heights, or disconnect a component from the relationships it has picked up.
 
 Double-click a component that displays text -- or long-press it -- to edit that text in place, without going to the inspector.
 
@@ -823,7 +823,7 @@ New forms use auto layout mode. In this mode you place components where you want
 .All forms designed in auto layout mode use `LayeredLayout`
 NOTE: Auto layout mode is built on the inset support in `LayeredLayout`. Component positioning uses <<insets-and-reference-components,insets and reference components>>, not absolute coordinates.
 
-An inset can be fixed (stated in millimetres, pixels or a percentage) or flexible, and it can be measured from the parent or from a sibling component. That's what makes a form designed on one canvas size still work on another: a component pinned to the bottom of the form stays there on a taller screen, and a component pinned below its neighbour follows that neighbour when it moves.
+An inset can be fixed (stated in millimetres, pixels or a percentage) or flexible, and it can be measured from the parent or from a sibling component. That's what makes a form designed on one canvas size still work on another: a component pinned to the bottom of the form stays there on a taller screen, and a component pinned below its neighbor follows that neighbor when it moves.
 
 The builder chooses insets for you as you drag, and it prefers a relationship with a nearby component over a distance from the edge of the form. The *Layout* tab shows the choice it made and lets you change it:
 
@@ -836,7 +836,7 @@ Resize the canvas with the device buttons above it after every few changes. A fo
 
 A form doesn't have to be one flat surface. Drag a *Container* from the palette to group components together, then use the *Container layout* picker in the *Layout* tab to give it whichever layout manager suits that part of the form: box, border, flow, grid, table, or layered again. Components dragged into that container are then arranged by it, and the drop guides change to match -- a box layout shows where in the sequence the component would go, a border layout shows which region would receive it, and a table layout shows the cell.
 
-Containers can be nested as deeply as you need, and a component can be dragged out of one container and into another; the builder rewrites its constraints for the layout it lands in.
+Containers can be nested as far as you need, and a component can be dragged out of one container and into another; the builder rewrites its constraints for the layout it lands in.
 
 ==== The theme and the companion source
 
@@ -872,4 +872,4 @@ The `.gui` file is plain XML and readable enough to review in a diff:
 include::../demos/common/src/main/snippets/developer-guide/basics.xml[tag=basics-xml-001,indent=0]
 ----
 
-You can edit it by hand, but reopen the form afterwards: the builder doesn't watch the file while it's running.
+You can edit it by hand, but reopen the form afterward: the builder doesn't watch the file while it's running.
