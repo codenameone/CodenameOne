@@ -1987,12 +1987,17 @@ public class CN1WearableBridge implements WearableBridge {
                     pruneClaims(context);
                 }
                 if (replayFailed
-                        && System.currentTimeMillis() - startedAt < TRANSFER_RETENTION_MILLIS) {
+                        && System.currentTimeMillis() - startedAt < TRANSFER_HARD_CAP_MILLIS) {
                     // Retried for as long as the sender may still be holding the item. This pass is
                     // the ONLY cover for a transfer whose cold-start delivery died with the service
                     // process: the DataItem is unchanged, so no normal callback is guaranteed, and
                     // an app that stays open through an outage would otherwise lose the file when
                     // the sender eventually sweeps it.
+                    //
+                    // Against the HARD CAP, like the unreadable-asset retry. An unclaimed transfer
+                    // is by definition unacknowledged, and the sender now keeps those for the cap
+                    // rather than the retention window -- so giving up at 24 hours abandoned an
+                    // item that will still be there on day six.
                     replayOutstandingTransfers(attempt + 1, startedAt);
                 }
             }

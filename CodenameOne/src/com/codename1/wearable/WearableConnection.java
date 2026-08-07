@@ -456,8 +456,20 @@ public final class WearableConnection {
     ///
     /// - `l`: the listener to add
     public static void addStateListener(WearableStateListener l) {
-        if (l != null && !stateListeners.contains(l)) {
-            stateListeners.add(l);
+        if (l == null) {
+            return;
+        }
+        boolean added;
+        // The state list has no pending queue of its own, so it guards itself. Test and add in one
+        // step, as the other two registrations do -- and it is the same monitor the snapshot takes,
+        // so locking the snapshot alone would have guarded nothing.
+        synchronized (stateListeners) {
+            added = !stateListeners.contains(l);
+            if (added) {
+                stateListeners.add(l);
+            }
+        }
+        if (added) {
             activate();
         }
     }
@@ -468,7 +480,9 @@ public final class WearableConnection {
     ///
     /// - `l`: the listener to remove
     public static void removeStateListener(WearableStateListener l) {
-        stateListeners.remove(l);
+        synchronized (stateListeners) {
+            stateListeners.remove(l);
+        }
     }
 
     // --- platform port entry points -----------------------------------------
@@ -489,7 +503,7 @@ public final class WearableConnection {
                 WearableMessage m = WearableMessage.fromByteArray(path, payload);
                 WearableMessage reply = null;
                 WearableMessageListener[] copy =
-                        messageListeners.toArray(new WearableMessageListener[messageListeners.size()]);
+                        messageListenerSnapshot();
                 for (WearableMessageListener l : copy) {
                     WearableMessage r = l.messageReceived(m, replyToken != 0);
                     if (r != null && reply == null) {
@@ -543,6 +557,35 @@ public final class WearableConnection {
         });
     }
 
+    /// A snapshot of the data listeners, taken under the monitor registration and removal use.
+    ///
+    /// size() and toArray() as two steps is not a snapshot. Codename One's ArrayList.toArray(T[])
+    /// fills a caller-sized array, so a listener removed between the two leaves the last slot null
+    /// -- and a null-terminated array is not empty, so the "no listeners" recovery does not run and
+    /// the loop dereferences null. For a tracked transfer that throws before either callback, so
+    /// the port keeps its claim and the payload cannot be recovered in this process.
+    private static WearableDataListener[] dataListenerSnapshot() {
+        synchronized (pendingData) {
+            return dataListeners.toArray(new WearableDataListener[dataListeners.size()]);
+        }
+    }
+
+    /// A snapshot of the state listeners. Same reasoning as dataListenerSnapshot -- state
+    /// notifications carry no payload, so a null here is a crash rather than a lost file, but the
+    /// two-step read is wrong for the same reason.
+    private static WearableStateListener[] stateListenerSnapshot() {
+        synchronized (stateListeners) {
+            return stateListeners.toArray(new WearableStateListener[stateListeners.size()]);
+        }
+    }
+
+    /// A snapshot of the message listeners. Same reasoning as dataListenerSnapshot.
+    private static WearableMessageListener[] messageListenerSnapshot() {
+        synchronized (pendingMessages) {
+            return messageListeners.toArray(new WearableMessageListener[messageListeners.size()]);
+        }
+    }
+
     /// Framework/port entry point: reports that the peer published or updated a replicated value.
     /// Called by the platform port; queued across a cold start like a message.
     ///
@@ -554,8 +597,7 @@ public final class WearableConnection {
         deliverTagged(path, new Runnable() {
             @Override
             public void run() {
-                WearableDataListener[] copy =
-                        dataListeners.toArray(new WearableDataListener[dataListeners.size()]);
+                WearableDataListener[] copy = dataListenerSnapshot();
                 if (copy.length == 0) {
                     // The last listener went away between the park check and this EDT turn -- an
                     // app pausing while a native callback was in flight. Dispatching to nobody
@@ -584,8 +626,7 @@ public final class WearableConnection {
         deliverTagged(path, new Runnable() {
             @Override
             public void run() {
-                WearableDataListener[] copy =
-                        dataListeners.toArray(new WearableDataListener[dataListeners.size()]);
+                WearableDataListener[] copy = dataListenerSnapshot();
                 if (copy.length == 0) {
                     // Same gap as deliverDataChanged, and worse for a removal: the item is gone, so
                     // there is nothing left for any later enumeration to find. Park it.
@@ -607,7 +648,7 @@ public final class WearableConnection {
             @Override
             public void run() {
                 WearableStateListener[] copy =
-                        stateListeners.toArray(new WearableStateListener[stateListeners.size()]);
+                        stateListenerSnapshot();
                 for (WearableStateListener l : copy) {
                     l.connectionStateChanged();
                 }
@@ -872,8 +913,7 @@ public final class WearableConnection {
             @Override
             public void run() {
                 WearableMessage m = WearableMessage.fromByteArray(path, payload);
-                WearableDataListener[] copy =
-                        dataListeners.toArray(new WearableDataListener[dataListeners.size()]);
+                WearableDataListener[] copy = dataListenerSnapshot();
                 if (copy.length == 0) {
                     // Every listener went away between the dispatch and this runnable -- an app
                     // shutting down, or one that deregisters on pause. Confirming here would be a
