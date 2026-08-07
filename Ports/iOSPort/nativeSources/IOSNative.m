@@ -9196,15 +9196,19 @@ void com_codename1_impl_ios_IOSNative_sqlStmtBindNull___long_int(CN1_THREAD_STAT
             sqlite3_bind_null((sqlite3_stmt*)statementPeer, index), index);
 }
 
-void com_codename1_impl_ios_IOSNative_sqlStmtBindString___long_int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index, JAVA_OBJECT value) {
+void com_codename1_impl_ios_IOSNative_sqlStmtBindText___long_int_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index, JAVA_OBJECT value) {
     if (value == JAVA_NULL) {
         cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
                 sqlite3_bind_null((sqlite3_stmt*)statementPeer, index), index);
         return;
     }
-    const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG value);
+    // The caller encodes, and the length is the array's rather than "up to the first zero byte":
+    // a Java string may hold a zero character and SQLite stores it, so a C string would drop that
+    // character and everything after it.
+    JAVA_ARRAY arr = (JAVA_ARRAY)value;
     cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
-            sqlite3_bind_text((sqlite3_stmt*)statementPeer, index, chrs, -1, SQLITE_TRANSIENT), index);
+            sqlite3_bind_text((sqlite3_stmt*)statementPeer, index, (const char*)arr->data,
+                    arr->length, SQLITE_TRANSIENT), index);
 }
 
 void com_codename1_impl_ios_IOSNative_sqlStmtBindBlob___long_int_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index, JAVA_OBJECT value) {
@@ -9355,11 +9359,17 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNext___long(CN1_THREAD_ST
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlGetColName___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index) {
+    // UTF-8 bytes for the caller to decode, for the reason given on sqlCursorValueAtColumnText:
+    // an identifier is as free to be non-ASCII as a value is.
     const char* name = sqlite3_column_name((sqlite3_stmt*)statementPeer, index);
     if (name == NULL) {
         return JAVA_NULL;
     }
-    return newStringFromCString(CN1_THREAD_STATE_PASS_ARG name);
+    POOL_BEGIN();
+    NSData* data = [NSData dataWithBytes:name length:strlen(name)];
+    JAVA_OBJECT result = nsDataToByteArr(data);
+    POOL_END();
+    return result;
 }
 
 void com_codename1_impl_ios_IOSNative_sqlCursorCloseStatement___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement) {
@@ -9407,12 +9417,26 @@ JAVA_SHORT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnShort___long_i
     return (JAVA_SHORT)sqlite3_column_int64((sqlite3_stmt*)statement, col);
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
-    const char* text = (const char*)sqlite3_column_text((sqlite3_stmt*)statement, col);
-    if (text == NULL) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnText___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
+    // Handed back as the engine's own UTF-8 bytes, for the caller to decode. Converting here would
+    // mean a C string, which ends at an embedded zero byte -- a character SQLite stores and every
+    // other port round-trips.
+    sqlite3_stmt* stmt = (sqlite3_stmt*)statement;
+    if (sqlite3_column_type(stmt, col) == SQLITE_NULL) {
         return JAVA_NULL;
     }
-    return newStringFromCString(CN1_THREAD_STATE_PASS_ARG text);
+    // sqlite3_column_bytes must follow the _text call: it reports the length of the value as that
+    // call converted it.
+    const void* text = sqlite3_column_text(stmt, col);
+    int length = sqlite3_column_bytes(stmt, col);
+    if (text == NULL || length < 0) {
+        length = 0;
+    }
+    POOL_BEGIN();
+    NSData* data = [NSData dataWithBytes:(text == NULL ? "" : text) length:length];
+    JAVA_OBJECT result = nsDataToByteArr(data);
+    POOL_END();
+    return result;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNullValueAtColumn___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
@@ -12647,7 +12671,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNext___long_R_boolean(CN1
     return com_codename1_impl_ios_IOSNative_sqlCursorNext___long(CN1_THREAD_STATE_PASS_ARG instanceObject, statementPeer);
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlGetColName___long_int_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index) {
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlGetColName___long_int_R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index) {
     return com_codename1_impl_ios_IOSNative_sqlGetColName___long_int(CN1_THREAD_STATE_PASS_ARG instanceObject, statementPeer, index);
 }
 
@@ -12703,8 +12727,8 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlStmtStep___long_R_boolean(CN1_T
     return com_codename1_impl_ios_IOSNative_sqlStmtStep___long(CN1_THREAD_STATE_PASS_ARG instanceObject, statementPeer);
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long_int_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
-    return com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnString___long_int(CN1_THREAD_STATE_PASS_ARG instanceObject, statement, col);
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnText___long_int_R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
+    return com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnText___long_int(CN1_THREAD_STATE_PASS_ARG instanceObject, statement, col);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNullValueAtColumn___long_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {

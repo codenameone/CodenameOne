@@ -28,6 +28,7 @@ import com.codename1.db.DatabaseConfig;
 import com.codename1.db.DatabaseEncryptionException;
 import com.codename1.impl.AbstractDBCursor;
 import com.codename1.impl.SQLStatementSplitter;
+import com.codename1.impl.SQLText;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -283,7 +284,7 @@ class LinuxDatabase extends Database {
                 if (params[iter] == null) {
                     LinuxNative.sqlStmtBindNull(stmt, iter + 1);
                 } else {
-                    LinuxNative.sqlStmtBindString(stmt, iter + 1, params[iter]);
+                    LinuxNative.sqlStmtBindText(stmt, iter + 1, SQLText.toUTF8(params[iter]));
                 }
             }
         } catch (IOException err) {
@@ -299,34 +300,42 @@ class LinuxDatabase extends Database {
         // Finalized if anything in here throws. The statement is not registered as a cursor
         // until after binding, so a rejected parameter would otherwise strand its peer -- and
         // an unfinalized statement keeps the connection alive after close().
+        // The binding loop itself is a separate method because a failed cast is not an exception
+        // on every runtime this framework targets, so a cast must not sit inside a block that
+        // catches RuntimeException -- there would be nothing for that handler to catch.
         try {
             checkParameterCount(stmt, params.length);
-            for (int iter = 0; iter < params.length; iter++) {
-                Object p = params[iter];
-                int index = iter + 1;
-                if (p == null) {
-                    LinuxNative.sqlStmtBindNull(stmt, index);
-                } else if (p instanceof byte[]) {
-                    LinuxNative.sqlStmtBindBlob(stmt, index, (byte[]) p);
-                } else if (p instanceof String) {
-                    LinuxNative.sqlStmtBindString(stmt, index, (String) p);
-                } else if (p instanceof Double || p instanceof Float) {
-                    LinuxNative.sqlStmtBindDouble(stmt, index, ((Number) p).doubleValue());
-                } else if (p instanceof Long || p instanceof Integer || p instanceof Short
-                        || p instanceof Byte) {
-                    LinuxNative.sqlStmtBindLong(stmt, index, ((Number) p).longValue());
-                } else if (p instanceof Boolean) {
-                    LinuxNative.sqlStmtBindLong(stmt, index, ((Boolean) p).booleanValue() ? 1 : 0);
-                } else {
-                    LinuxNative.sqlStmtBindString(stmt, index, p.toString());
-                }
-            }
+            bindEach(stmt, params);
         } catch (IOException err) {
             LinuxNative.sqlStmtFinalize(stmt);
             throw err;
         } catch (RuntimeException err) {
             LinuxNative.sqlStmtFinalize(stmt);
             throw err;
+        }
+    }
+
+    /** The typed binds themselves, outside any catch region. See bind(long, Object[]). */
+    private void bindEach(long stmt, Object[] params) throws IOException {
+        for (int iter = 0; iter < params.length; iter++) {
+            Object p = params[iter];
+            int index = iter + 1;
+            if (p == null) {
+                LinuxNative.sqlStmtBindNull(stmt, index);
+            } else if (p instanceof byte[]) {
+                LinuxNative.sqlStmtBindBlob(stmt, index, (byte[]) p);
+            } else if (p instanceof String) {
+                LinuxNative.sqlStmtBindText(stmt, index, SQLText.toUTF8((String) p));
+            } else if (p instanceof Double || p instanceof Float) {
+                LinuxNative.sqlStmtBindDouble(stmt, index, ((Number) p).doubleValue());
+            } else if (p instanceof Long || p instanceof Integer || p instanceof Short
+                    || p instanceof Byte) {
+                LinuxNative.sqlStmtBindLong(stmt, index, ((Number) p).longValue());
+            } else if (p instanceof Boolean) {
+                LinuxNative.sqlStmtBindLong(stmt, index, ((Boolean) p).booleanValue() ? 1 : 0);
+            } else {
+                LinuxNative.sqlStmtBindText(stmt, index, SQLText.toUTF8(p.toString()));
+            }
         }
     }
 
@@ -384,7 +393,7 @@ class LinuxDatabase extends Database {
 
         @Override
         protected String columnLabel(int columnIndex) throws IOException {
-            return LinuxNative.sqlColName(stmt, columnIndex);
+            return SQLText.fromUTF8(LinuxNative.sqlColName(stmt, columnIndex));
         }
 
         @Override
@@ -394,7 +403,7 @@ class LinuxDatabase extends Database {
 
         @Override
         protected String readString(int index) throws IOException {
-            return LinuxNative.sqlColString(stmt, index);
+            return SQLText.fromUTF8(LinuxNative.sqlColText(stmt, index));
         }
 
         @Override

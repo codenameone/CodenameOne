@@ -878,7 +878,7 @@ public final class WindowsNative {
     public static native long sqlStmtPrepare(long dbPeer, String sql) throws java.io.IOException;
     public static native int sqlStmtParameterCount(long stmtPeer) throws java.io.IOException;
     public static native void sqlStmtBindNull(long stmtPeer, int index) throws java.io.IOException;
-    public static native void sqlStmtBindString(long stmtPeer, int index, String value) throws java.io.IOException;
+    public static native void sqlStmtBindText(long stmtPeer, int index, byte[] utf8) throws java.io.IOException;
     public static native void sqlStmtBindBlob(long stmtPeer, int index, byte[] value) throws java.io.IOException;
     public static native void sqlStmtBindLong(long stmtPeer, int index, long value) throws java.io.IOException;
     public static native void sqlStmtBindDouble(long stmtPeer, int index, double value) throws java.io.IOException;
@@ -891,9 +891,9 @@ public final class WindowsNative {
     public static native void sqlStmtExecuteAndFinalize(long stmtPeer) throws java.io.IOException;
 
     public static native int sqlColCount(long stmtPeer) throws java.io.IOException;
-    public static native String sqlColName(long stmtPeer, int col) throws java.io.IOException;
+    public static native byte[] sqlColName(long stmtPeer, int col) throws java.io.IOException;
     public static native boolean sqlColIsNull(long stmtPeer, int col) throws java.io.IOException;
-    public static native String sqlColString(long stmtPeer, int col) throws java.io.IOException;
+    public static native byte[] sqlColText(long stmtPeer, int col) throws java.io.IOException;
     public static native byte[] sqlColBlob(long stmtPeer, int col) throws java.io.IOException;
     public static native double sqlColDouble(long stmtPeer, int col) throws java.io.IOException;
     public static native long sqlColLong(long stmtPeer, int col) throws java.io.IOException;

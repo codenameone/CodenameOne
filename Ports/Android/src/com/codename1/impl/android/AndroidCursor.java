@@ -155,6 +155,7 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     @Override
     public String getColumnName(int columnIndex) throws IOException {
         checkOpen();
+        checkColumn(columnIndex);
         return c.getColumnName(columnIndex);
     }
 
@@ -200,56 +201,69 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
 
     @Override
     public byte[] getBlob(int index) throws IOException {
-        checkOpen();
-        last_read_column_index = index;
+        beginRead(index);
         return c.getBlob(index);
     }
 
     @Override
     public double getDouble(int index) throws IOException {
-        checkOpen();
-        last_read_column_index = index;
+        beginRead(index);
         return c.getDouble(index);
     }
 
     @Override
     public float getFloat(int index) throws IOException {
-        checkOpen();
-        last_read_column_index = index;
+        beginRead(index);
         return c.getFloat(index);
     }
 
     @Override
     public int getInteger(int index) throws IOException {
-        checkOpen();
-        last_read_column_index = index;
+        beginRead(index);
         return c.getInt(index);
     }
 
     @Override
     public long getLong(int index) throws IOException {
-        checkOpen();
-        last_read_column_index = index;
+        beginRead(index);
         return c.getLong(index);
     }
 
     @Override
     public short getShort(int index) throws IOException {
-        checkOpen();
-        last_read_column_index = index;
+        beginRead(index);
         return c.getShort(index);
     }
 
     @Override
     public String getString(int index) throws IOException {
-        checkOpen();
-        last_read_column_index = index;
+        beginRead(index);
         return c.getString(index);
     }
 
     public boolean isNull(int index) throws IOException {
         checkOpen();
+        checkColumn(index);
         return c.isNull(index);
+    }
+
+    /// Guards a value read and records which column it was, for wasNull().
+    private void beginRead(int index) throws IOException {
+        checkOpen();
+        checkColumn(index);
+        last_read_column_index = index;
+    }
+
+    /// Rejects a column index the result set does not have.
+    ///
+    /// The underlying cursor answers this with an unchecked CursorIndexOutOfBoundsException, which
+    /// is not what the portable contract promises and not what the other ports raise.
+    private void checkColumn(int index) throws IOException {
+        int count = c.getColumnCount();
+        if (index < 0 || index >= count) {
+            throw new IOException("Column index " + index + " is out of range. This result set has "
+                    + count + (count == 1 ? " column" : " columns"));
+        }
     }
 
     @Override

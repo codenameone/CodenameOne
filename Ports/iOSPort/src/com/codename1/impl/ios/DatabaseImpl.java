@@ -28,6 +28,7 @@ import com.codename1.db.DatabaseConfig;
 import com.codename1.db.DatabaseEncryptionException;
 import com.codename1.impl.AbstractDBCursor;
 import com.codename1.impl.SQLStatementSplitter;
+import com.codename1.impl.SQLText;
 
 import java.io.IOException;
 import java.util.Vector;
@@ -302,7 +303,8 @@ class DatabaseImpl extends Database {
                 if (params[iter] == null) {
                     IOSImplementation.nativeInstance.sqlStmtBindNull(stmt, iter + 1);
                 } else {
-                    IOSImplementation.nativeInstance.sqlStmtBindString(stmt, iter + 1, params[iter]);
+                    IOSImplementation.nativeInstance.sqlStmtBindText(stmt, iter + 1,
+                            SQLText.toUTF8(params[iter]));
                 }
             }
         } catch (IOException err) {
@@ -334,37 +336,47 @@ class DatabaseImpl extends Database {
         // Finalized if anything in here throws. The statement is not registered as a cursor
         // until after binding, so a rejected parameter would otherwise strand its peer -- and
         // an unfinalized statement keeps the connection alive after close().
+        // The binding loop itself is a separate method because a failed cast is not an exception
+        // on every runtime this framework targets, so a cast must not sit inside a block that
+        // catches RuntimeException -- there would be nothing for that handler to catch.
         try {
             checkParameterCount(stmt, params.length);
-            for (int iter = 0; iter < params.length; iter++) {
-                Object p = params[iter];
-                int index = iter + 1;
-                if (p == null) {
-                    IOSImplementation.nativeInstance.sqlStmtBindNull(stmt, index);
-                } else if (p instanceof byte[]) {
-                    IOSImplementation.nativeInstance.sqlStmtBindBlob(stmt, index, (byte[])p);
-                } else if (p instanceof String) {
-                    IOSImplementation.nativeInstance.sqlStmtBindString(stmt, index, (String)p);
-                } else if (p instanceof Double || p instanceof Float) {
-                    IOSImplementation.nativeInstance.sqlStmtBindDouble(stmt, index,
-                            ((Number)p).doubleValue());
-                } else if (p instanceof Long || p instanceof Integer || p instanceof Short
-                        || p instanceof Byte) {
-                    IOSImplementation.nativeInstance.sqlStmtBindLong(stmt, index,
-                            ((Number)p).longValue());
-                } else if (p instanceof Boolean) {
-                    IOSImplementation.nativeInstance.sqlStmtBindLong(stmt, index,
-                            ((Boolean)p).booleanValue() ? 1 : 0);
-                } else {
-                    IOSImplementation.nativeInstance.sqlStmtBindString(stmt, index, p.toString());
-                }
-            }
+            bindEach(stmt, params);
         } catch (IOException err) {
             IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
             throw err;
         } catch (RuntimeException err) {
             IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
             throw err;
+        }
+    }
+
+    /** The typed binds themselves, outside any catch region. See bind(long, Object[]). */
+    private void bindEach(long stmt, Object[] params) throws IOException {
+        for (int iter = 0; iter < params.length; iter++) {
+            Object p = params[iter];
+            int index = iter + 1;
+            if (p == null) {
+                IOSImplementation.nativeInstance.sqlStmtBindNull(stmt, index);
+            } else if (p instanceof byte[]) {
+                IOSImplementation.nativeInstance.sqlStmtBindBlob(stmt, index, (byte[])p);
+            } else if (p instanceof String) {
+                IOSImplementation.nativeInstance.sqlStmtBindText(stmt, index,
+                        SQLText.toUTF8((String)p));
+            } else if (p instanceof Double || p instanceof Float) {
+                IOSImplementation.nativeInstance.sqlStmtBindDouble(stmt, index,
+                        ((Number)p).doubleValue());
+            } else if (p instanceof Long || p instanceof Integer || p instanceof Short
+                    || p instanceof Byte) {
+                IOSImplementation.nativeInstance.sqlStmtBindLong(stmt, index,
+                        ((Number)p).longValue());
+            } else if (p instanceof Boolean) {
+                IOSImplementation.nativeInstance.sqlStmtBindLong(stmt, index,
+                        ((Boolean)p).booleanValue() ? 1 : 0);
+            } else {
+                IOSImplementation.nativeInstance.sqlStmtBindText(stmt, index,
+                        SQLText.toUTF8(p.toString()));
+            }
         }
     }
 
@@ -430,7 +442,7 @@ class DatabaseImpl extends Database {
 
         @Override
         protected String columnLabel(int columnIndex) throws IOException {
-            return IOSImplementation.nativeInstance.sqlGetColName(stmt, columnIndex);
+            return SQLText.fromUTF8(IOSImplementation.nativeInstance.sqlGetColName(stmt, columnIndex));
         }
 
         @Override
@@ -440,7 +452,8 @@ class DatabaseImpl extends Database {
 
         @Override
         protected String readString(int index) throws IOException {
-            return IOSImplementation.nativeInstance.sqlCursorValueAtColumnString(stmt, index);
+            return SQLText.fromUTF8(
+                    IOSImplementation.nativeInstance.sqlCursorValueAtColumnText(stmt, index));
         }
 
         @Override

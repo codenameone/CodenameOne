@@ -298,14 +298,19 @@ JAVA_VOID PREFIX##_sqlStmtBindNull___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LO
             sqlite3_bind_null((sqlite3_stmt*)(intptr_t)stmtPeer, index), index);                    \
 }                                                                                                   \
                                                                                                    \
-JAVA_VOID PREFIX##_sqlStmtBindString___long_int_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT index, JAVA_OBJECT value) { \
+JAVA_VOID PREFIX##_sqlStmtBindText___long_int_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT index, JAVA_OBJECT value) { \
     sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtPeer;                                         \
+    JAVA_ARRAY arr;                                                                                 \
     if (value == JAVA_NULL) {                                                                       \
         cn1DbCheckBind(threadStateData, stmt, sqlite3_bind_null(stmt, index), index);                \
         return;                                                                                     \
     }                                                                                               \
+    /* The caller encodes, and the length is the array's rather than "up to the first zero byte": \
+     * a Java string may hold a zero character and SQLite stores it, so measuring with strlen       \
+     * would drop that character and everything after it. */                                        \
+    arr = (JAVA_ARRAY)value;                                                                        \
     cn1DbCheckBind(threadStateData, stmt,                                                           \
-            sqlite3_bind_text(stmt, index, stringToUTF8(threadStateData, value), -1,                \
+            sqlite3_bind_text(stmt, index, (const char*)arr->data, arr->length,                     \
                     SQLITE_TRANSIENT), index);                                                      \
 }                                                                                                   \
                                                                                                    \
@@ -376,13 +381,15 @@ JAVA_INT PREFIX##_sqlColCount___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG 
 }                                                                                                   \
                                                                                                    \
 JAVA_OBJECT PREFIX##_sqlColName___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT col) { \
+    /* UTF-8 bytes, decoded by the caller, for the reason given on sqlColText: an identifier is as  \
+     * free to be non-ASCII as a value is. */                                                       \
     const char* name = sqlite3_column_name((sqlite3_stmt*)(intptr_t)stmtPeer, col);                 \
     if (name == NULL) {                                                                             \
         return JAVA_NULL;                                                                           \
     }                                                                                               \
-    return newStringFromCString(threadStateData, name);                                             \
+    return cn1DbBlobToByteArray(threadStateData, name, (int)strlen(name));                          \
 }                                                                                                   \
-JAVA_OBJECT PREFIX##_sqlColName___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT col) { \
+JAVA_OBJECT PREFIX##_sqlColName___long_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT col) { \
     return PREFIX##_sqlColName___long_int(threadStateData, stmtPeer, col);                          \
 }                                                                                                   \
                                                                                                    \
@@ -394,15 +401,23 @@ JAVA_BOOLEAN PREFIX##_sqlColIsNull___long_int_R_boolean(CODENAME_ONE_THREAD_STAT
     return PREFIX##_sqlColIsNull___long_int(threadStateData, stmtPeer, col);                        \
 }                                                                                                   \
                                                                                                    \
-JAVA_OBJECT PREFIX##_sqlColString___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT col) { \
-    const char* text = (const char*)sqlite3_column_text((sqlite3_stmt*)(intptr_t)stmtPeer, col);    \
-    if (text == NULL) {                                                                             \
+JAVA_OBJECT PREFIX##_sqlColText___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT col) { \
+    sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtPeer;                                         \
+    const void* text;                                                                               \
+    int length;                                                                                     \
+    if (sqlite3_column_type(stmt, col) == SQLITE_NULL) {                                            \
         return JAVA_NULL;                                                                           \
     }                                                                                               \
-    return newStringFromCString(threadStateData, text);                                             \
+    /* Handed back as the engine's own UTF-8 bytes, for the caller to decode. The conversions the   \
+     * VM offers here widen one byte to one character, which is not UTF-8, and a C string would     \
+     * also end at an embedded zero byte. sqlite3_column_bytes must follow the _text call: it       \
+     * reports the length of the value as that call converted it. */                                \
+    text = sqlite3_column_text(stmt, col);                                                          \
+    length = sqlite3_column_bytes(stmt, col);                                                       \
+    return cn1DbBlobToByteArray(threadStateData, text, length);                                     \
 }                                                                                                   \
-JAVA_OBJECT PREFIX##_sqlColString___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT col) { \
-    return PREFIX##_sqlColString___long_int(threadStateData, stmtPeer, col);                        \
+JAVA_OBJECT PREFIX##_sqlColText___long_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT col) { \
+    return PREFIX##_sqlColText___long_int(threadStateData, stmtPeer, col);                          \
 }                                                                                                   \
                                                                                                    \
 JAVA_OBJECT PREFIX##_sqlColBlob___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT col) { \
@@ -467,7 +482,7 @@ JAVA_LONG PREFIX##_sqlStmtPrepare___long_java_lang_String_R_long(CODENAME_ONE_TH
 JAVA_INT PREFIX##_sqlStmtParameterCount___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG s) { return 0; } \
 JAVA_INT PREFIX##_sqlStmtParameterCount___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG s) { return 0; } \
 JAVA_VOID PREFIX##_sqlStmtBindNull___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT i) { } \
-JAVA_VOID PREFIX##_sqlStmtBindString___long_int_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT i, JAVA_OBJECT v) { } \
+JAVA_VOID PREFIX##_sqlStmtBindText___long_int_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT i, JAVA_OBJECT v) { } \
 JAVA_VOID PREFIX##_sqlStmtBindBlob___long_int_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT i, JAVA_OBJECT v) { } \
 JAVA_VOID PREFIX##_sqlStmtBindLong___long_int_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT i, JAVA_LONG v) { } \
 JAVA_VOID PREFIX##_sqlStmtBindDouble___long_int_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT i, JAVA_DOUBLE v) { } \
@@ -479,11 +494,11 @@ JAVA_VOID PREFIX##_sqlStmtExecuteAndFinalize___long(CODENAME_ONE_THREAD_STATE, J
 JAVA_INT PREFIX##_sqlColCount___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG s) { return 0; }          \
 JAVA_INT PREFIX##_sqlColCount___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG s) { return 0; }    \
 JAVA_OBJECT PREFIX##_sqlColName___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT c) { return JAVA_NULL; } \
-JAVA_OBJECT PREFIX##_sqlColName___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT c) { return JAVA_NULL; } \
+JAVA_OBJECT PREFIX##_sqlColName___long_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT c) { return JAVA_NULL; } \
 JAVA_BOOLEAN PREFIX##_sqlColIsNull___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT c) { return JAVA_TRUE; } \
 JAVA_BOOLEAN PREFIX##_sqlColIsNull___long_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT c) { return JAVA_TRUE; } \
-JAVA_OBJECT PREFIX##_sqlColString___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT c) { return JAVA_NULL; } \
-JAVA_OBJECT PREFIX##_sqlColString___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT c) { return JAVA_NULL; } \
+JAVA_OBJECT PREFIX##_sqlColText___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT c) { return JAVA_NULL; } \
+JAVA_OBJECT PREFIX##_sqlColText___long_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT c) { return JAVA_NULL; } \
 JAVA_OBJECT PREFIX##_sqlColBlob___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT c) { return JAVA_NULL; } \
 JAVA_OBJECT PREFIX##_sqlColBlob___long_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT c) { return JAVA_NULL; } \
 JAVA_DOUBLE PREFIX##_sqlColDouble___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG s, JAVA_INT c) { return 0; } \

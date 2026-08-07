@@ -266,6 +266,34 @@ class AndroidCipherDB extends Database {
         }
     }
 
+    /**
+     * Disposes of an export that is not going to be used.
+     *
+     * The export is a complete second copy of the data, and when the conversion was a decryption
+     * it is a plaintext copy, so leaving it behind is a disclosure rather than litter. If the file
+     * cannot be unlinked it is truncated instead, which removes the contents even where the
+     * directory entry survives, and anything still left is named in the failure the caller sees --
+     * that caller goes on using the live database and would otherwise never learn of it.
+     *
+     * @param target the export to remove
+     * @return a sentence to append to the failure message, empty when nothing survived
+     */
+    private static String discardExport(File target) {
+        if (!target.exists() || target.delete()) {
+            return "";
+        }
+        try {
+            new java.io.FileOutputStream(target).close();
+        } catch (IOException cannotEmptyIt) {
+            return " A complete copy of the data was left at " + target.getPath()
+                    + " and could not be removed; delete it.";
+        }
+        if (!target.exists() || target.delete()) {
+            return "";
+        }
+        return " An emptied file was left at " + target.getPath() + ".";
+    }
+
     private void migrateThroughExport(String targetKey) throws IOException {
         String path = db.getPath();
         String name = new File(path).getName();
@@ -310,8 +338,8 @@ class AndroidCipherDB extends Database {
             } catch (RuntimeException notAttached) {
                 // It may never have been attached; the conversion failure is what matters.
             }
-            target.delete();
-            throw new IOException("The database could not be converted: " + err.getMessage(), err);
+            throw new IOException("The database could not be converted: " + err.getMessage()
+                    + discardExport(target), err);
         }
         SQLiteDatabase closing = db;
         db = null;
@@ -334,10 +362,10 @@ class AndroidCipherDB extends Database {
             // recovery and delete act only on files this port wrote.
             AndroidImplementation.writeDatabaseMigrationMarker(path, backup);
         } catch (IOException err) {
-            target.delete();
+            String surviving = discardExport(target);
             db = openAt(path, currentKey);
             throw new IOException("The conversion could not be marked as in progress, so it was "
-                    + "not started: " + err.getMessage(), err);
+                    + "not started: " + err.getMessage() + surviving, err);
         }
         File marker = AndroidImplementation.databaseMigrationMarker(path);
         // Move the original aside rather than deleting it. Deleting first leaves a window where
@@ -346,11 +374,11 @@ class AndroidCipherDB extends Database {
         // and the migration after that removes the stranded copy as stale leftovers. Renaming
         // means there is a complete database under one of the two names at every instant.
         if (!original.renameTo(backup)) {
-            target.delete();
+            String surviving = discardExport(target);
             marker.delete();
             db = openAt(path, currentKey);
             throw new IOException("The database " + path + " could not be moved aside, so it was "
-                    + "left as it was and not converted");
+                    + "left as it was and not converted." + surviving);
         }
         if (!target.renameTo(original)) {
             if (!backup.renameTo(original)) {
@@ -363,11 +391,11 @@ class AndroidCipherDB extends Database {
                         + "at " + backup + " and the database was left closed rather than opening "
                         + "an empty one over it.");
             }
-            target.delete();
+            String surviving = discardExport(target);
             marker.delete();
             db = openAt(path, currentKey);
             throw new IOException("The converted database could not replace " + path
-                    + ", so the original was restored and nothing was converted");
+                    + ", so the original was restored and nothing was converted." + surviving);
         }
         currentKey = targetKey;
         db = openAt(path, targetKey);

@@ -67,12 +67,22 @@
 ///   as the query returns, before the first `next()`.
 /// - `getColumnIndex` is case-insensitive, returns -1 for an unknown name, and matches the
 ///   **result set label**, so a column selected as `SELECT a AS b` is found under `b`.
+/// - A column index the result set does not have raises `java.io.IOException`. It is never
+///   reported as a null value: SQLite's own C API answers an out-of-range index with SQL NULL, and
+///   passing that on would make a mistyped index indistinguishable from stored data.
 ///
 /// Forward iteration with `next()` costs the same everywhere. Seeking backwards or to an absolute
 /// row is cheap on Android and costs O(distance from the start) elsewhere, because SQLite
 /// statements only step forward and a backward seek is a rewind and re-step. A consequence worth
 /// knowing: a cursor is a repeatable read only inside a transaction, since a concurrent write
 /// between the two passes can change what the second one sees.
+///
+/// ## Text
+///
+/// Text is stored and returned exactly as given, for every character a Java `String` can hold. That
+/// includes characters outside ASCII, characters outside the Basic Multilingual Plane, and the
+/// character with code point zero, which SQLite stores in a TEXT value like any other. A string
+/// written on one platform reads back identical on every other.
 ///
 /// ## Statements
 ///

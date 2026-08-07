@@ -314,6 +314,18 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 The wrapper costs a thread handoff per call, so a connection per thread is faster when the threads
 don't genuinely need to share one.
 
+==== Text and column indexes
+
+Text is stored and read back exactly as written, for every character a Java `String` can hold:
+accented characters, scripts outside ASCII, emoji, and even the character with code point zero,
+which SQLite stores in a `TEXT` value like any other. A string written on one platform reads back
+identical on every other.
+
+Reading a column the result set doesn't have -- a negative index, or one past the last column --
+raises an `IOException`. It's never reported as a null value, because SQLite's own C interface
+answers an out-of-range index with SQL NULL, and passing that on would make a mistyped index
+impossible to tell apart from stored data.
+
 ==== Cursor performance
 
 Iterating forward with `next()` costs the same everywhere. Seeking backwards or to an absolute row

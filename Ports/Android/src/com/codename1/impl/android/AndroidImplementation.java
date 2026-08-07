@@ -10993,11 +10993,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // The SQLCipher-backed package is deleted at build time for apps that never touch
         // DatabaseConfig, so it has to be reached reflectively - the same arrangement the
         // ARCore-backed AR implementation uses.
+        Object opened;
         try {
             Class c = Class.forName("com.codename1.impl.android.cipher.AndroidCipherFactory");
             java.lang.reflect.Method open = c.getMethod("open", String.class, String.class,
                     String.class);
-            return (Database) open.invoke(null,
+            // Cast outside the try, below. ParparVM does not throw on a failed cast, so a cast
+            // inside a block that catches Throwable is a cast whose failure nothing can handle.
+            opened = open.invoke(null,
                     resolveNativeDatabasePath(databaseName), databaseName,
                     config.resolveKeyMaterial(databaseName));
         } catch (java.lang.reflect.InvocationTargetException err) {
@@ -11028,16 +11031,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     com.codename1.db.DatabaseEncryptionException.NOT_SUPPORTED,
                     "This build does not include encrypted database support", err);
         }
+        if (!(opened instanceof Database)) {
+            throw new IOException("The encrypted database implementation returned "
+                    + (opened == null ? "nothing" : opened.getClass().getName())
+                    + " rather than a Database. This build is inconsistent.");
+        }
+        return (Database) opened;
     }
 
     @Override
     public boolean isDatabaseEncryptionSupported() {
+        Object available;
         try {
             Class c = Class.forName("com.codename1.impl.android.cipher.AndroidCipherFactory");
-            return ((Boolean) c.getMethod("isAvailable").invoke(null)).booleanValue();
+            available = c.getMethod("isAvailable").invoke(null);
         } catch (Throwable notPresent) {
             return false;
         }
+        // Tested rather than cast inside the try: ParparVM does not throw on a failed cast, so
+        // the handler above could never see one.
+        return available instanceof Boolean && ((Boolean) available).booleanValue();
     }
 
     @Override
@@ -11239,10 +11252,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (!isDatabaseEncryptionSupported()) {
             return openOrCreateDB(databaseName);
         }
+        Object opened;
         try {
             Class c = Class.forName("com.codename1.impl.android.cipher.AndroidCipherFactory");
             java.lang.reflect.Method open = c.getMethod("open", String.class, String.class, String.class);
-            return (Database) open.invoke(null,
+            // Cast below, outside the try, for the reason given in openOrCreateDB.
+            opened = open.invoke(null,
                     resolveNativeDatabasePath(databaseName), databaseName, "");
         } catch (java.lang.reflect.InvocationTargetException err) {
             Throwable cause = err.getCause();
@@ -11259,6 +11274,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch (Throwable err) {
             return openOrCreateDB(databaseName);
         }
+        if (!(opened instanceof Database)) {
+            throw new IOException("The encrypted database implementation returned "
+                    + (opened == null ? "nothing" : opened.getClass().getName())
+                    + " rather than a Database. This build is inconsistent.");
+        }
+        return (Database) opened;
     }
 
     @Override

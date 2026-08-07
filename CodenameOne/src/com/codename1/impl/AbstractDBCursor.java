@@ -310,6 +310,7 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
     @Override
     public String getColumnName(int columnIndex) throws IOException {
         checkOpen();
+        checkColumn(columnIndex);
         return columnLabel(columnIndex);
     }
 
@@ -351,7 +352,23 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
         if (!onRow) {
             throw new IOException("The cursor is not on a row");
         }
+        checkColumn(index);
         lastReadWasNull = isNullAt(index);
+    }
+
+    /// Rejects a column index the result set does not have.
+    ///
+    /// The SQLite C API answers an out-of-range index with SQL NULL and a status code the callers
+    /// of a `sqlite3_column_*` function have no way to see, so without this a mistyped index reads
+    /// as a real null and the caller gets null or zero back. That is indistinguishable from data,
+    /// which is the worst of the three possible outcomes; the other engines behind this API report
+    /// it, so it is reported here for all of them.
+    private void checkColumn(int index) throws IOException {
+        int count = columnCount();
+        if (index < 0 || index >= count) {
+            throw new IOException("Column index " + index + " is out of range. This result set has "
+                    + count + (count == 1 ? " column" : " columns"));
+        }
     }
 
     @Override

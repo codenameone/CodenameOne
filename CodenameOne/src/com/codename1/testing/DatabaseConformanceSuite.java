@@ -405,8 +405,12 @@ public final class DatabaseConformanceSuite {
 
         // ---- a null parameter array is the same as no parameters
         boolean nullArrayOk = true;
+        // The null array is a local rather than a cast at the call site: a cast inside a block
+        // that catches Throwable is a cast whose failure nothing could catch, since a failed cast
+        // is not an exception on every runtime this framework targets.
+        Object[] noParameterArray = null;
         try {
-            db.execute("DELETE FROM conf_stmt", (Object[]) null);
+            db.execute("DELETE FROM conf_stmt", noParameterArray);
         } catch (Throwable err) {
             nullArrayOk = false;
         }
@@ -425,6 +429,42 @@ public final class DatabaseConformanceSuite {
             }
             r.check(threwAtQuery, "executeQuery reports malformed SQL rather than deferring to next()");
         }
+
+        // ---- text survives a round trip byte for byte
+        // SQLite stores TEXT as UTF-8 and measures it in bytes, so a port that hands its engine a
+        // C string agrees with it on neither: anything outside ASCII comes back one character per
+        // byte, and a string holding a zero character is cut there. Both are invisible until
+        // someone stores a name or a pasted document, and both differ per port, which is exactly
+        // what this API is supposed to stop happening.
+        db.execute("DELETE FROM conf_stmt");
+        String[] texts = new String[] {
+            "plain ascii",
+            "caf\u00e9 na\u00efve",          // Latin-1 range, two UTF-8 bytes each
+            "\u4e2d\u6587\u30c6\u30b9\u30c8",     // three UTF-8 bytes each
+            "\ud83d\ude00 emoji",           // a surrogate pair, four UTF-8 bytes
+            "before\u0000after",            // a zero character, which SQLite stores
+        };
+        for (int iter = 0; iter < texts.length; iter++) {
+            db.execute("INSERT INTO conf_stmt (id, t) VALUES (?, ?)",
+                    new Object[] {Integer.valueOf(100 + iter), texts[iter]});
+        }
+        for (int iter = 0; iter < texts.length; iter++) {
+            Cursor cur = null;
+            String back = null;
+            try {
+                cur = db.executeQuery("SELECT t FROM conf_stmt WHERE id = ?",
+                        new Object[] {Integer.valueOf(100 + iter)});
+                if (cur.next()) {
+                    back = cur.getRow().getString(0);
+                }
+            } finally {
+                closeQuietly(cur);
+            }
+            r.check(texts[iter].equals(back),
+                    "text round trips unchanged: " + describeText(texts[iter])
+                    + " read back as " + describeText(back));
+        }
+        db.execute("DELETE FROM conf_stmt");
 
         // ---- errors are IOException with a message
         boolean properError = false;
@@ -719,8 +759,65 @@ public final class DatabaseConformanceSuite {
         }
         r.check(useThrew, "using a closed cursor throws");
 
+        // ---- a column index the result set does not have is a programming error, not a null
+        cur = db.executeQuery("SELECT id, name FROM conf_cur ORDER BY id");
+        try {
+            cur.next();
+            Row row = cur.getRow();
+            r.check(readRejectsColumn(row, 2),
+                    "reading past the last column raises IOException rather than answering null");
+            r.check(readRejectsColumn(row, -1),
+                    "reading a negative column raises IOException rather than answering null");
+            boolean nameRejected = false;
+            try {
+                cur.getColumnName(99);
+            } catch (IOException expected) {
+                nameRejected = true;
+            } catch (RuntimeException unchecked) {
+                r.check(false, "getColumnName out of range raises IOException, not "
+                        + unchecked.getClass().getName());
+            }
+            r.check(nameRejected, "getColumnName rejects an index the result set does not have");
+        } finally {
+            closeQuietly(cur);
+        }
+
         db.execute("DROP TABLE IF EXISTS conf_null");
         db.execute("DROP TABLE IF EXISTS conf_cur");
+    }
+
+    /// Renders a string as code points, so a failure names what actually came back rather than
+    /// printing characters a device log may not be able to show.
+    private static String describeText(String value) {
+        if (value == null) {
+            return "null";
+        }
+        StringBuilder out = new StringBuilder();
+        out.append('[');
+        for (int iter = 0; iter < value.length(); iter++) {
+            if (iter > 0) {
+                out.append(' ');
+            }
+            out.append(Integer.toHexString(value.charAt(iter)));
+        }
+        out.append(']');
+        return out.toString();
+    }
+
+    /// Reports whether reading `index` off `row` fails the way the contract says it should.
+    ///
+    /// A port whose engine substitutes SQL NULL for an out-of-range column - the SQLite C API does
+    /// exactly that - would otherwise return null or zero here, which the caller cannot tell from
+    /// stored data.
+    private static boolean readRejectsColumn(Row row, int index) {
+        try {
+            row.getString(index);
+            return false;
+        } catch (IOException expected) {
+            return true;
+        } catch (RuntimeException unchecked) {
+            return false;
+        }
     }
 
     // ------------------------------------------------------------------ transactions

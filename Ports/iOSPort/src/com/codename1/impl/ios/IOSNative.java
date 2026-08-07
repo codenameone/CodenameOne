@@ -731,7 +731,8 @@ public final class IOSNative {
     native long sqlStmtPrepare(long dbPeer, String sql);
     native int sqlStmtParameterCount(long statementPeer);
     native void sqlStmtBindNull(long statementPeer, int index);
-    native void sqlStmtBindString(long statementPeer, int index, String value);
+    /** Binds SQL text as UTF-8 bytes; see com.codename1.impl.SQLText for why not a String. */
+    native void sqlStmtBindText(long statementPeer, int index, byte[] utf8);
     native void sqlStmtBindBlob(long statementPeer, int index, byte[] value);
     native void sqlStmtBindLong(long statementPeer, int index, long value);
     native void sqlStmtBindDouble(long statementPeer, int index, double value);
@@ -745,7 +746,7 @@ public final class IOSNative {
 
     native boolean sqlCursorFirst(long statementPeer);
     native boolean sqlCursorNext(long statementPeer);
-    native String sqlGetColName(long statementPeer, int index);
+    native byte[] sqlGetColName(long statementPeer, int index);
     native void sqlCursorCloseStatement(long statement);
 
     native byte[] sqlCursorValueAtColumnBlob(long statement, int col);
@@ -754,7 +755,7 @@ public final class IOSNative {
     native int sqlCursorValueAtColumnInteger(long statement, int col);
     native long sqlCursorValueAtColumnLong(long statement, int col);
     native short sqlCursorValueAtColumnShort(long statement, int col);
-    native String sqlCursorValueAtColumnString(long statement, int col);
+    native byte[] sqlCursorValueAtColumnText(long statement, int col);
     native boolean sqlCursorNullValueAtColumn(long statement, int col); //Warning. This function only works if no automatic type conversions have occurred for the value in question. So it must be called before any of the sqlCursorValueAtColumn* methods. After a type conversion, the result of calling this method is undefined, though harmless
     
     native int sqlCursorGetColumnCount(long statementPeer);
