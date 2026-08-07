@@ -285,17 +285,25 @@ class AndroidCipherDB extends Database {
     /**
      * Builds a createTempFile prefix from a database name.
      *
-     * createTempFile rejects a prefix under three characters with an IllegalArgumentException, and
-     * "a" is a perfectly good database name, so the conversion of one would have died before it
-     * exported anything -- with an unchecked exception, out of a method that promises IOException.
-     * The name is kept in the prefix because these files are read by a human when something goes
-     * wrong; the padding only makes up the length.
+     * Two things the name itself cannot be trusted about. createTempFile rejects a prefix under
+     * three characters with an IllegalArgumentException, and "a" is a perfectly good database
+     * name, so converting one would have died before it exported anything -- with an unchecked
+     * exception, out of a method that promises IOException. And a name may legally contain a line
+     * break, which the generated file name would inherit and the marker, which is a line per
+     * entry, would then record as two: recovery would look for a file whose name is the first
+     * line and never find the export or the backup. Control characters are replaced rather than
+     * escaped, because the name here is a hint for whoever reads these files when something has
+     * gone wrong and not something anything parses back out.
      *
      * @param name the database's file name
-     * @return a prefix createTempFile will accept
+     * @return a prefix createTempFile will accept and the marker can record on one line
      */
     private static String tempPrefix(String name) {
-        StringBuilder prefix = new StringBuilder(name);
+        StringBuilder prefix = new StringBuilder();
+        for (int iter = 0; iter < name.length(); iter++) {
+            char c = name.charAt(iter);
+            prefix.append(c < ' ' || c == 127 ? '_' : c);
+        }
         while (prefix.length() < 3) {
             prefix.append('_');
         }

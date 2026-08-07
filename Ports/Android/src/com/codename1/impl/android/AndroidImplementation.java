@@ -11252,6 +11252,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return;
         }
         File marker = databaseMigrationMarker(path);
+        if (marker == null || !marker.isFile() || !ownsDatabaseMigrationMarker(path)) {
+            // Nothing of ours is here, and nothing of anybody else's gets touched. A file at this
+            // name that this port did not write belongs to someone -- a custom database path can
+            // legitimately put another database here -- and this runs before every open, so acting
+            // on it would mean that opening one database destroys an unrelated one.
+            return;
+        }
         // The export first, whatever else is true. It is a second complete copy of the data, and
         // a plaintext one when the conversion was a decryption, so an interrupted conversion must
         // not leave it lying in the migration directory. It is only ever installed by being

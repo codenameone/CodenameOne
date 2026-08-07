@@ -385,16 +385,25 @@ public class JavaScriptBuilder extends Executor {
             throw new BuildException("Failed to compile JavaScript port sources");
         }
         copyTree(portClasses, stageClasses);
-        // Source-checkout build: the webapp sits next to the sources at
-        // src/main/webapp (portSources is src/main/java).
+        // The bundled-jar path above does this too. Without it here, a build from a source
+        // checkout never sets the flag and the compatibility default never applies.
+        recordDatabaseUsage(stageClasses);
+        // Source-checkout build: the webapp sits next to the sources at src/main/webapp
+        // (portSources is src/main/java). Copied into this build's work directory before it is
+        // used, rather than pointed at in place: pruning is a delete, and the directory here
+        // belongs to somebody's checkout of this repository -- a build that never opens a
+        // database would otherwise remove sqlite3.wasm from their working tree. The bundled path
+        // moves its webapp out of the jar for the same reason and prunes the copy.
         File srcWebApp = new File(portSources.getParentFile(), "webapp");
         if (srcWebApp.isDirectory()) {
-            jsPortWebApp = srcWebApp;
+            File dest = new File(tmpDir, "port-webapp");
+            if (dest.exists()) {
+                delTree(dest, true);
+            }
+            copyTree(srcWebApp, dest);
+            jsPortWebApp = dest;
+            pruneOptionalPortAssets(dest, request);
         }
-        // The bundled-jar path above does this too. Without it here, a build from a source
-        // checkout never sets the flag, so the compatibility default never applies and the
-        // optional assets are never pruned.
-        recordDatabaseUsage(stageClasses);
         return stageClasses;
     }
 

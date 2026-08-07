@@ -614,6 +614,9 @@ public class AndroidGradleBuilder extends Executor {
     private boolean migrateToAndroidX;
     private boolean shouldIncludeGoogleImpl;
     private boolean arSupport;
+    /** The catalog entry that carries the SQLCipher dependencies and their minimum SDK. */
+    private static final String DATABASE_CIPHER_CATALOG_CLASS = "com/codename1/db/DatabaseConfig";
+
     boolean dbCipherSupport;
 
     /// Whether the application touches com.codename1.db at all, which is what the database
@@ -1514,6 +1517,11 @@ public class AndroidGradleBuilder extends Executor {
             // encrypt, and pulls in the AAR through the catalog. The AAR carries minSdk 23, so a
             // false positive here raises the floor of every application that never encrypts.
             dbCipherSupport = databaseUsage.usesDatabaseCipher();
+            if (dbCipherSupport) {
+                // Fed by name rather than by the scan, so the catalog applies its dependencies and
+                // its minimum SDK only when the application itself configures encryption.
+                aiAcc.consume(DATABASE_CIPHER_CATALOG_CLASS);
+            }
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
                 @Override
                 public void implementsInterface(String cls, String iface) {
@@ -1540,7 +1548,15 @@ public class AndroidGradleBuilder extends Executor {
 
                 @Override
                 public void usesClass(String cls) {
-                    aiAcc.consume(cls);
+                    // The catalog matches on a class reference and this callback cannot say which
+                    // class made one, so the SQLCipher entry is withheld here and fed from the
+                    // attributed scan below instead. Display references DatabaseConfig, so letting
+                    // it through adds both SQLCipher dependencies and takes minSdk to 23 for every
+                    // application -- which the later deletion of the cipher source package does
+                    // not undo, since the dependency and the floor are already in the gradle file.
+                    if (!DATABASE_CIPHER_CATALOG_CLASS.equals(cls)) {
+                        aiAcc.consume(cls);
+                    }
                     String aiAdapter = androidAiAdapterSource(cls);
                     if (aiAdapter != null) {
                         includedAiAdapterSources.add(aiAdapter);
