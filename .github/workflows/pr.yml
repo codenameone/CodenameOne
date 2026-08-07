@@ -598,14 +598,14 @@ jobs:
         if: matrix.java-version == 8
         run: zip -j result.zip CodenameOne/javadocs.zip CodenameOne/dist/CodenameOne.jar CodenameOne/updatedLibs.zip Ports/JavaSE/dist/JavaSE.jar build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip
 
-      - name: Copying Files to Server
+      # Handed to a separate job rather than deployed here. See deploy-dist.
+      - name: Upload the distribution bundle
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && matrix.java-version == 8 }}
-        uses: marcodallasanta/ssh-scp-deploy@v1.0.5
+        uses: actions/upload-artifact@v7
         with:
-          host: ${{ secrets.WP_HOST }}
-          user: ${{ secrets.WP_USER }}
-          password: ${{ secrets.WP_PASSWORD }}
-          local: result.zip
+          name: result.zip
+          path: result.zip
+          retention-days: 1
 
       - name: Upload a Build Artifact
         if: matrix.java-version == 8
@@ -614,3 +614,31 @@ jobs:
           name: JavaSE.jar
           path: Ports/JavaSE/dist/JavaSE.jar
   
+
+  deploy-dist:
+    # Gated at the JOB level, deliberately, and this is not a style preference.
+    # A Docker-based action is BUILT during job setup, before any step's `if` is
+    # evaluated -- so while this deploy step was inside build-test it made every
+    # matrix leg, including the Java 17 and 21 legs that could never satisfy its
+    # condition, pull alpine:latest from Docker Hub to build an action they were
+    # never going to run. A Docker Hub timeout then failed a pull-request job for
+    # a deploy that was not happening: exactly what killed build-test (17) with
+    # "failed to resolve source metadata for docker.io/library/alpine:latest"
+    # after three retries. A job-level condition skips setup entirely, so on a
+    # pull request the image is never fetched.
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the distribution bundle
+        uses: actions/download-artifact@v7
+        with:
+          name: result.zip
+
+      - name: Copying Files to Server
+        uses: marcodallasanta/ssh-scp-deploy@v1.0.5
+        with:
+          host: ${{ secrets.WP_HOST }}
+          user: ${{ secrets.WP_USER }}
+          password: ${{ secrets.WP_PASSWORD }}
+          local: result.zip
