@@ -2563,13 +2563,29 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /** The child occupying {@code row}/{@code column}, or null. */
+    /**
+     * The child occupying a cell, counting the rectangle a span covers rather than only the cell a
+     * child starts in. Testing the anchor alone treated a covered cell as empty, so a drop there
+     * was assigned a cell the span already owned and the rebuild overlapped or failed.
+     *
+     * @param parent the table
+     * @param row the row being dropped on
+     * @param column the column being dropped on
+     * @param ignored a child to skip, typically the one being dragged
+     * @return the child covering that cell, or null when it is genuinely free
+     */
     private Element childAtTableCell(Element parent, int row, int column, Element ignored) {
         for (Element child : componentChildren(parent)) {
             if (child == ignored) continue;
             Integer childRow = parseInteger(child.getAttribute("tableRow"));
             Integer childColumn = parseInteger(child.getAttribute("tableColumn"));
-            if (childRow != null && childColumn != null
-                    && childRow.intValue() == row && childColumn.intValue() == column) return child;
+            if (childRow == null || childColumn == null) continue;
+            int rowSpan = Math.max(1, integer(child.getAttribute("tableVerticalSpan"), 1));
+            int columnSpan = Math.max(1, integer(child.getAttribute("tableHorizontalSpan"), 1));
+            if (row >= childRow.intValue() && row < childRow.intValue() + rowSpan
+                    && column >= childColumn.intValue() && column < childColumn.intValue() + columnSpan) {
+                return child;
+            }
         }
         return null;
     }
@@ -4013,6 +4029,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             String sourcePath = companionSourcePath();
             String existing = ProjectIO.exists(sourcePath) ? ProjectIO.read(sourcePath) : null;
             if (!writeCompanionSource(sourcePath, existing)) return false;
+            // The generated companion references <Form>Model whenever a binding strategy is set,
+            // and cn1:create-gui-form does not write bindingStrategy, so a scaffolded form defaults
+            // to "properties". Creating the model only when the Code pane is saved left an ordinary
+            // Save producing source that referenced a class which did not exist.
+            ensureBindingModel(sourcePath);
             // Only now: marking the document clean after the .gui write but before the companion
             // one meant a failed companion write left isModified() false, so the next form switch
             // went ahead without retrying and the runtime source stayed stale.
@@ -4352,16 +4373,28 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void saveSourceAndModel(String path, String source) {
         saveSource(path, source);
+        setStatus(ensureBindingModel(path)
+                ? "Saved form source and created its binding model"
+                : "Saved form source • existing model left unchanged");
+    }
+
+    /**
+     * Writes the binding model the generated companion refers to, when the form uses a binding
+     * strategy and the model is not already there.
+     *
+     * @param sourcePath the companion source path
+     * @return true when a model was created by this call
+     */
+    private boolean ensureBindingModel(String sourcePath) {
+        if ("none".equals(value(document.root(), "bindingStrategy", "properties"))) return false;
+        String modelPath = sourcePath.substring(0, sourcePath.length() - 5) + "Model.java";
+        if (ProjectIO.exists(modelPath)) return false;
         try {
-            String modelPath = path.substring(0, path.length() - 5) + "Model.java";
-            if (!ProjectIO.exists(modelPath) && !"none".equals(value(document.root(), "bindingStrategy", "properties"))) {
-                ProjectIO.write(modelPath, generatedModelSource());
-                setStatus("Saved form source and created its binding model");
-            } else {
-                setStatus("Saved form source • existing model left unchanged");
-            }
+            ProjectIO.write(modelPath, generatedModelSource());
+            return true;
         } catch (IOException ex) {
             ToastBar.showErrorMessage("Model save failed: " + ex.getMessage());
+            return false;
         }
     }
 
@@ -4508,6 +4541,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                     .append(indent).append(name).append(".setName(\"").append(javaEscape(value(((Element) value), "name", name))).append("\");\n");
             if (((Element) value).getAttribute("uiid") != null) out.append(indent).append(name).append(".setUIID(\"")
                     .append(javaEscape(((Element) value).getAttribute("uiid"))).append("\");\n");
+            appendHint(out, ((Element) value), name, type, indent);
             appendGeneratedProperties(out, ((Element) value), name, type, indent);
             String handler = ((Element) value).getAttribute("actionEvent");
             if (handler != null && handler.length() > 0 && firesActionEvents(type)) {
@@ -4765,6 +4799,24 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return isFormLike(type) ? "Container" : type;
     }
 
+    /**
+     * Appends the hint for a text component. The inspector offers Hint for TextArea and applies it
+     * live, so omitting it from the generated source made it vanish on the next canvas rebuild and
+     * never reach the compiled form.
+     *
+     * @param out the source being built
+     * @param element the component element
+     * @param name the generated field name
+     * @param type the component type
+     * @param indent the current indent
+     */
+    private void appendHint(StringBuilder out, Element element, String name, String type, String indent) {
+        if (!"TextArea".equals(type)) return;
+        String hint = element.getAttribute("hint");
+        if (hint == null || hint.length() == 0) return;
+        out.append(indent).append(name).append(".setHint(\"").append(javaEscape(hint)).append("\");\n");
+    }
+
     private String componentSource(Element element) {
         String type = value(element, "type", "Container");
         String text = "\"" + javaEscape(value(element, "text", "")) + "\"";
@@ -4830,6 +4882,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         used.add("model");
         used.add("binding");
         used.add("buildUI");
+        // The PropertyBusinessObject model declares its own PropertyIndex called index, so a
+        // bindable control named "index" produced a model with two fields of that name.
+        used.add("index");
         for (Element element : document.components()) {
             if (element == document.root()) continue;
             String base = javaIdentifier(value(element, "name", value(element, "type", "component")));
