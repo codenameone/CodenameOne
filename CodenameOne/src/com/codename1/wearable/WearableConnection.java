@@ -972,6 +972,43 @@ public final class WearableConnection {
         void deliveryDropped(String path);
     }
 
+    /// Framework entry point: forgets every listener and everything parked for them.
+    ///
+    /// The simulator's hot reload builds a NEW app instance while this class -- static, and loaded
+    /// by a class loader the reload does not replace -- keeps the old one's listeners. Every later
+    /// wearable event was then delivered to both instances, so side effects ran twice and callbacks
+    /// reached UI objects belonging to a screen that no longer exists. The old instance also stayed
+    /// strongly reachable through these lists, so it could never be collected.
+    ///
+    /// The parked deliveries and recovery records go with them. They describe work owed to the
+    /// listeners being dropped; handing them to the replacement would deliver, as brand new, state
+    /// the previous instance had already been told about.
+    ///
+    /// Only the simulator calls this. On a device the process dies instead, which is why nothing
+    /// needed it before.
+    public static void resetForReload() {
+        synchronized (pendingData) {
+            dataListeners.clear();
+            pendingData.clear();
+            droppedPaths.clear();
+            droppedRemovals.clear();
+            replayRequests.clear();
+            rescanRequested = false;
+            drainingData = 0;
+            droppedDeliveries = null;
+        }
+        synchronized (pendingMessages) {
+            messageListeners.clear();
+            pendingMessages.clear();
+        }
+        synchronized (stateListeners) {
+            stateListeners.clear();
+        }
+        synchronized (pendingReplies) {
+            pendingReplies.clear();
+        }
+    }
+
     /// Framework/port entry point: registers what to do about a discarded delivery.
     ///
     /// #### Parameters

@@ -466,6 +466,21 @@ public class Executor {
             sourceWatcher.stop();
             sourceWatcher = null;
         }
+        // The wearable listeners belong to the app instance being replaced. They live in a static
+        // list this reload does not touch, so without clearing them every later event reached the
+        // OLD instance as well as the new one -- side effects twice over, callbacks into a screen
+        // that no longer exists, and the dead instance kept reachable so it never collected.
+        //
+        // Reflective because the JavaSE port must not hard-depend on the wearable API: a build that
+        // strips it, or an older core on the classpath, would otherwise fail to reload at all.
+        try {
+            Class<?> wearable = Class.forName("com.codename1.wearable.WearableConnection");
+            wearable.getMethod("resetForReload").invoke(null);
+        } catch (ClassNotFoundException noWearableApi) {
+            // Nothing registered wearable listeners in this build.
+        } catch (Throwable ex) {
+            com.codename1.io.Log.p("Wearable listeners could not be reset on reload: " + ex);
+        }
     }
 
     public static void destroyApp(){
