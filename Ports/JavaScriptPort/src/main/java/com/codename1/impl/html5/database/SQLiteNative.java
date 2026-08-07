@@ -144,7 +144,14 @@ public class SQLiteNative {
 
     public static native String columnName(long stmtPeer, int col);
 
-    public static native boolean columnIsNull(long stmtPeer, int col);
+    /**
+     * Reports whether a column holds SQL NULL.
+     *
+     * @return 1 for null, 0 for a value, -1 on failure with the reason in {@link #lastError()}.
+     * An int rather than a boolean because "true" would be indistinguishable from a real NULL,
+     * so a bad column index would read as a null value rather than raising.
+     */
+    public static native int columnIsNull(long stmtPeer, int col);
 
     public static native String columnString(long stmtPeer, int col);
 

@@ -36,12 +36,14 @@ import java.util.List;
 /// Semicolons inside string literals, quoted identifiers and comments do not split, and neither do
 /// those inside a `CREATE TRIGGER` body.
 ///
-/// #### Known limitation
+/// #### Trigger bodies
 ///
-/// Trigger bodies are recognised by tracking `BEGIN`/`END` nesting after `CREATE TRIGGER`, which
-/// also counts the `END` that closes a `CASE` expression. A trigger body whose `BEGIN`/`END`
-/// structure is unbalanced by construction cannot be split correctly -- but such a script would not
-/// parse in SQLite either.
+/// None of `BEGIN`, `CASE` or `END` is reserved in SQLite, so a column may be called any of them
+/// and counting the words alone splits a valid trigger into fragments. The body is tracked by
+/// position instead: it opens at the first `BEGIN` after `CREATE TRIGGER`, and closes at an `END`
+/// that follows a completed statement -- one that comes straight after that statement's semicolon.
+/// A column called `end` never appears there. It follows a keyword in `SELECT end FROM t`, an
+/// operator in `SET x = end`, and the `END` of a `CASE` follows the expression it returns.
 public final class SQLStatementSplitter {
 
     private SQLStatementSplitter() {
@@ -67,9 +69,12 @@ public final class SQLStatementSplitter {
         }
         int length = sql.length();
         int statementStart = 0;
-        int beginDepth = 0;
         boolean sawCreate = false;
         boolean inTrigger = false;
+        boolean bodyOpen = false;
+        // The last character that was neither whitespace nor part of a comment, outside quotes.
+        // This is what tells a structural END from a column called "end".
+        char lastSignificant = 0;
 
         int iter = 0;
         while (iter < length) {
@@ -77,10 +82,12 @@ public final class SQLStatementSplitter {
 
             if (c == '\'' || c == '"' || c == '`') {
                 iter = skipQuoted(sql, iter, c);
+                lastSignificant = 'x';
                 continue;
             }
             if (c == '[') {
                 iter = skipUntil(sql, iter + 1, ']');
+                lastSignificant = 'x';
                 continue;
             }
             if (c == '-' && iter + 1 < length && sql.charAt(iter + 1) == '-') {
@@ -104,13 +111,21 @@ public final class SQLStatementSplitter {
                     if (sawCreate) {
                         inTrigger = true;
                     }
-                } else if ("BEGIN".equalsIgnoreCase(word) || "CASE".equalsIgnoreCase(word)) {
-                    if (inTrigger && isDelimiterUse(sql, wordEnd)) {
-                        beginDepth++;
+                } else if ("BEGIN".equalsIgnoreCase(word)) {
+                    // The body opens at the first BEGIN after CREATE TRIGGER and only there, so a
+                    // later column called "begin" cannot reopen it.
+                    if (inTrigger && !bodyOpen) {
+                        bodyOpen = true;
                     }
                 } else if ("END".equalsIgnoreCase(word)) {
-                    if (inTrigger && beginDepth > 0 && isDelimiterUse(sql, wordEnd)) {
-                        beginDepth--;
+                    // The END that closes the body is the one that follows a completed statement,
+                    // so it comes straight after that statement's semicolon - or after the BEGIN
+                    // itself. Anything else called "end" is a column: "SELECT end FROM t" follows
+                    // a keyword, "SET x = end" follows an operator, and the END of a CASE follows
+                    // the expression it returns. That is what separates them, rather than what
+                    // happens to come next.
+                    if (bodyOpen && (lastSignificant == ';' || lastSignificant == 0)) {
+                        bodyOpen = false;
                     }
                 } else if (!"TEMP".equalsIgnoreCase(word) && !"TEMPORARY".equalsIgnoreCase(word)
                         && !"IF".equalsIgnoreCase(word) && !"NOT".equalsIgnoreCase(word)
@@ -118,16 +133,22 @@ public final class SQLStatementSplitter {
                     // Any other keyword means this CREATE was not a CREATE TRIGGER.
                     sawCreate = false;
                 }
+                lastSignificant = 'x';
                 iter = wordEnd;
                 continue;
             }
 
-            if (c == ';' && (!inTrigger || beginDepth == 0)) {
+            if (c == ';' && !bodyOpen) {
                 addIfNotBlank(statements, sql.substring(statementStart, iter));
                 statementStart = iter + 1;
                 sawCreate = false;
                 inTrigger = false;
-                beginDepth = 0;
+                lastSignificant = 0;
+                iter++;
+                continue;
+            }
+            if (c > ' ') {
+                lastSignificant = c;
             }
             iter++;
         }
@@ -234,42 +255,6 @@ public final class SQLStatementSplitter {
             iter++;
         }
         return count;
-    }
-
-    /// Distinguishes a structural `BEGIN`, `CASE` or `END` from a column that happens to be
-    /// called one of those.
-    ///
-    /// None of them are reserved words in SQLite, so `UPDATE t SET end = 1` is valid and used to
-    /// decrement the trigger depth, splitting the trigger at the next semicolon and handing the
-    /// engine two malformed fragments. What separates the two uses is what follows: a delimiter
-    /// is followed by more statement, an identifier by an operator, a separator or a closing
-    /// bracket.
-    ///
-    /// This does not catch every case -- `SELECT end FROM t` still reads as a delimiter, because
-    /// telling those apart needs a real parser rather than a splitter. It covers the assignment
-    /// and reference forms, which is where a column called `end` actually turns up.
-    ///
-    /// #### Parameters
-    ///
-    /// - `sql`: the script
-    /// - `wordEnd`: index just past the word
-    ///
-    /// #### Returns
-    ///
-    /// true if the word reads as a structural delimiter
-    private static boolean isDelimiterUse(String sql, int wordEnd) {
-        int iter = wordEnd;
-        int length = sql.length();
-        while (iter < length && sql.charAt(iter) <= ' ') {
-            iter++;
-        }
-        if (iter >= length) {
-            return true;
-        }
-        // What follows an identifier is an operator, a separator or a closing bracket; what
-        // follows a delimiter is more statement. "<" and ">" are included because "end <> 1" and
-        // "end < 1" are both comparisons.
-        return "=,).<>!+-*/|".indexOf(sql.charAt(iter)) < 0;
     }
 
     private static void addIfNotBlank(List statements, String candidate) {

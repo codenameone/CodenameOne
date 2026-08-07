@@ -7006,11 +7006,19 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnName_long_
     }, null);
   });
 
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull_long_int_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull___long_int_R_boolean"],
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull_long_int_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull___long_int_R_int"],
   function(stmtId, col) {
+    // -1 rather than a boolean, because "true" here is indistinguishable from a real SQL NULL:
+    // an out-of-range column index would be reported as a null value and the getter would hand
+    // back null or zero instead of raising. 1 is null, 0 is not, -1 is a failed lookup.
     return cn1SqliteGuard(function() {
-      return cn1SqliteLookup(Number(stmtId)).get(col | 0) === null;
-    }, true);
+      const stmt = cn1SqliteLookup(Number(stmtId));
+      const index = col | 0;
+      if (index < 0 || index >= stmt.columnCount) {
+        throw new Error("Column " + index + " is out of range");
+      }
+      return stmt.get(index) === null ? 1 : 0;
+    }, -1);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnString_long_int_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnString___long_int_R_java_lang_String"],

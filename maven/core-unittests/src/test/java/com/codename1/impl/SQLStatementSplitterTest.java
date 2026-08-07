@@ -96,6 +96,32 @@ class SQLStatementSplitterTest {
     }
 
     @Test
+    void doesNotTreatColumnReferencesNamedEndAsDelimiters() {
+        // The forms a next-character rule could not tell apart: one is followed by a keyword, the
+        // other by the statement's own semicolon.
+        String selecting = "CREATE TRIGGER t AFTER INSERT ON a BEGIN "
+                + "SELECT end FROM t; "
+                + "END;";
+        assertEquals(1, SQLStatementSplitter.countStatements(selecting));
+        assertEquals(2, SQLStatementSplitter.countStatements(selecting + " SELECT 1;"));
+
+        String assigning = "CREATE TRIGGER t AFTER INSERT ON a BEGIN "
+                + "UPDATE t SET x = end; "
+                + "END;";
+        assertEquals(1, SQLStatementSplitter.countStatements(assigning));
+        assertEquals(2, SQLStatementSplitter.countStatements(assigning + " SELECT 1;"));
+    }
+
+    @Test
+    void doesNotLetAColumnNamedBeginReopenTheBody() {
+        String trigger = "CREATE TRIGGER t AFTER INSERT ON a BEGIN "
+                + "UPDATE t SET begin = 1; "
+                + "END;";
+        assertEquals(1, SQLStatementSplitter.countStatements(trigger));
+        assertEquals(2, SQLStatementSplitter.countStatements(trigger + " SELECT 1;"));
+    }
+
+    @Test
     void stillTracksRealTriggerStructure() {
         String withCase = "CREATE TRIGGER t AFTER INSERT ON a BEGIN "
                 + "UPDATE b SET n = CASE WHEN n > 0 THEN 1 ELSE 2 END; "

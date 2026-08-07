@@ -411,7 +411,14 @@ public class DatabaseImpl extends Database {
 
         @Override
         protected boolean isNullAt(int index) throws IOException {
-            return SQLiteNative.columnIsNull(stmt, index);
+            int nullness = SQLiteNative.columnIsNull(stmt, index);
+            if (nullness < 0) {
+                // Reported rather than answered. A bad column index would otherwise come back as
+                // a null value, and the getter would hand out null or zero - data the caller
+                // cannot tell from a real NULL.
+                throw new IOException(SQLiteNative.lastError());
+            }
+            return nullness == 1;
         }
 
         @Override
