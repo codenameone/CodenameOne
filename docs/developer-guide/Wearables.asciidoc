@@ -428,7 +428,7 @@ Layer APIs directly.
 
 |Distribution
 |Companion (embedded in the phone app) or standalone
-|Companion or standalone
+|Standalone only -- companion does not yet produce a Wear artifact
 
 |Runtime detection
 |`CN.isWatch()`
