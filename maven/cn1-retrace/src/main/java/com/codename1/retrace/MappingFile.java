@@ -181,34 +181,42 @@ public final class MappingFile {
      * source lines on real frames.
      */
     public Frame retrace(Frame obfuscated) {
-        ClassMapping cm = byObfuscated.get(obfuscated.getClassName());
-        if (cm == null) {
-            return obfuscated;
-        }
-        int observed = obfuscated.getLineNumber();
-        String originalMethod = obfuscated.getMethodName();
-        int mappedLine = observed;
-        List<MethodMapping> candidates = cm.methods.get(obfuscated.getMethodName());
-        if (candidates != null && !candidates.isEmpty()) {
-            MethodMapping m = pickByLine(candidates, observed);
-            originalMethod = m.originalName;
-            // Translate the observed obfuscated line back to the original source line when the
-            // mapping carries a distinct original range (R8 / optimized ProGuard).
-            mappedLine = m.mapLine(observed);
-        }
-        String originalClass = cm.originalName;
-        String file = simpleSourceFile(originalClass);
-        return new Frame(originalClass, originalMethod, file, mappedLine);
+        // The first (innermost) frame; retraceAll is the full expansion including inlined callers.
+        return retraceAll(obfuscated).get(0);
     }
 
-    private MethodMapping pickByLine(List<MethodMapping> candidates, int line) {
-        // Prefer a candidate whose obfuscated line range contains the frame's line.
-        for (MethodMapping m : candidates) {
-            if (m.startLine != 0 && line >= m.startLine && line <= m.endLine) {
-                return m;
-            }
+    /**
+     * Inverts one obfuscated frame into one or more original frames. An optimized R8 mapping records
+     * several methods for the same obfuscated name and line range -- the inlined callee(s) and the
+     * caller they were inlined into -- and all of them describe that single physical frame. Returning
+     * only the first would silently drop the inlined callers and mis-identify the call path, so this
+     * emits every record whose range covers the line, in R8's order (innermost first). Always returns
+     * at least one frame (the input unchanged when the class is unknown).
+     */
+    public List<Frame> retraceAll(Frame obfuscated) {
+        ClassMapping cm = byObfuscated.get(obfuscated.getClassName());
+        if (cm == null) {
+            return java.util.Collections.singletonList(obfuscated);
         }
-        return candidates.get(0);
+        int observed = obfuscated.getLineNumber();
+        String originalClass = cm.originalName;
+        String file = simpleSourceFile(originalClass);
+        List<MethodMapping> candidates = cm.methods.get(obfuscated.getMethodName());
+        List<Frame> out = new ArrayList<Frame>();
+        if (candidates != null && !candidates.isEmpty()) {
+            for (MethodMapping m : candidates) {
+                if (m.startLine != 0 && observed >= m.startLine && observed <= m.endLine) {
+                    out.add(new Frame(originalClass, m.originalName, file, m.mapLine(observed)));
+                }
+            }
+            if (out.isEmpty()) {
+                MethodMapping m = candidates.get(0);
+                out.add(new Frame(originalClass, m.originalName, file, m.mapLine(observed)));
+            }
+        } else {
+            out.add(new Frame(originalClass, obfuscated.getMethodName(), file, observed));
+        }
+        return out;
     }
 
     private static String simpleSourceFile(String fqcn) {

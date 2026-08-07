@@ -83,12 +83,26 @@ public final class BuiltinKeepRules {
 
     /** The global ProGuard flags the engine always sets. Kept here so the Android R8 export can share them. */
     public static List<String> flags() {
+        return flags(null);
+    }
+
+    /**
+     * The global ProGuard flags, tuned for {@code platform}. On the real-JVM targets (JavaSE /
+     * desktop) {@code -dontpreverify} is omitted so ProGuard regenerates {@code StackMapTable}
+     * frames: without them a class ProGuard emitted unchanged (not rewritten by the string or
+     * control-flow transforms) throws {@code VerifyError} on a Java 7+ JVM. The ParparVM ports
+     * translate to C and the JavaScript port to JS, so their frames are never JVM-verified and the
+     * flag stays (preverification there only costs time).
+     */
+    public static List<String> flags(String platform) {
         List<String> r = new ArrayList<String>();
         // ParparVM culls and R8 shrinks; shrinking/optimizing here only risks
         // "works in debug, NPEs in release". Rename and encrypt, nothing else.
         r.add("-dontshrink");
         r.add("-dontoptimize");
-        r.add("-dontpreverify");
+        if (!isRealJvmTarget(platform)) {
+            r.add("-dontpreverify");
+        }
         // Class files are written to a directory and builds run on a case-insensitive
         // filesystem, so mixed-case names would collide.
         r.add("-dontusemixedcaseclassnames");
@@ -101,6 +115,11 @@ public final class BuiltinKeepRules {
         r.add("-keepattributes Exceptions,InnerClasses,Signature,EnclosingMethod,*Annotation*,"
                 + "SourceFile,LineNumberTable");
         return r;
+    }
+
+    /** True for the ports whose hardened classes are executed on a real JVM (so frames are verified). */
+    static boolean isRealJvmTarget(String platform) {
+        return "javase".equals(platform) || "desktop".equals(platform);
     }
 
     /**

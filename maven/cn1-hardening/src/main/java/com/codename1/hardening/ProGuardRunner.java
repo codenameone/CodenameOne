@@ -56,10 +56,10 @@ public final class ProGuardRunner {
      */
     public static void rename(File classesJar, File outJar, File mappingFile,
                               List<File> libraryJars, List<String> keepRules, File dictionary,
-                              File workDir) throws HardeningException {
+                              File workDir, String platform) throws HardeningException {
         File config = new File(workDir, "cn1-hardening.pro");
         try {
-            writeConfig(config, classesJar, outJar, mappingFile, libraryJars, keepRules, dictionary);
+            writeConfig(config, classesJar, outJar, mappingFile, libraryJars, keepRules, dictionary, platform);
         } catch (IOException e) {
             throw new HardeningException("Could not write ProGuard configuration", e);
         }
@@ -87,7 +87,8 @@ public final class ProGuardRunner {
     }
 
     private static void writeConfig(File config, File classesJar, File outJar, File mappingFile,
-                                    List<File> libraryJars, List<String> keepRules, File dictionary)
+                                    List<File> libraryJars, List<String> keepRules, File dictionary,
+                                    String platform)
             throws IOException {
         FileOutputStream fo = new FileOutputStream(config);
         try {
@@ -108,7 +109,7 @@ public final class ProGuardRunner {
             w.write("-classobfuscationdictionary " + quote(dictionary) + "\n");
             w.write("-obfuscationdictionary " + quote(dictionary) + "\n");
             w.write("-packageobfuscationdictionary " + quote(dictionary) + "\n");
-            for (String flag : BuiltinKeepRules.flags()) {
+            for (String flag : BuiltinKeepRules.flags(platform)) {
                 w.write(flag + "\n");
             }
             if (keepRules != null) {

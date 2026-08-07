@@ -58,6 +58,24 @@ public final class MappingChain {
         return f;
     }
 
+    /**
+     * Retraces one frame through every mapping, expanding inlined frames: each mapping can turn a
+     * single frame into several (an inlined callee plus its caller), and the next mapping is applied
+     * to each resulting frame in turn. Returns at least one frame.
+     */
+    public List<Frame> retraceAll(Frame frame) {
+        List<Frame> current = new ArrayList<Frame>();
+        current.add(frame);
+        for (MappingFile m : mappings) {
+            List<Frame> next = new ArrayList<Frame>();
+            for (Frame f : current) {
+                next.addAll(m.retraceAll(f));
+            }
+            current = next;
+        }
+        return current;
+    }
+
     public boolean isEmpty() {
         return mappings.isEmpty();
     }

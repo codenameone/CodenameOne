@@ -2377,6 +2377,14 @@ public abstract class Executor {
      */
     protected java.util.List<File> hardeningLibraryJars(BuildRequest request) {
         java.util.List<File> jars = new java.util.ArrayList<File>();
+        // Always include the Codename One framework jar: every builder receives it, and it carries
+        // the framework superclasses ProGuard must see so it never renames an application override
+        // (e.g. a custom Component.paint) apart from the fixed framework method -- which would break
+        // virtual dispatch. cn1.hardening.libraryJars (below) is only set on the CN1BuildMojo entry
+        // and is absent when hardening runs through buildNoException, so it can't be relied on alone.
+        if (codenameOneJar != null && codenameOneJar.exists()) {
+            jars.add(codenameOneJar);
+        }
         String raw = request.getArg("cn1.hardening.libraryJars", "");
         if (raw == null || raw.length() == 0) {
             // Fallback: the maven plugin publishes the compile classpath here (a single injection
@@ -2387,7 +2395,7 @@ public abstract class Executor {
             for (String p : raw.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
                 if (p != null && p.trim().length() > 0) {
                     File f = new File(p.trim());
-                    if (f.exists()) {
+                    if (f.exists() && !jars.contains(f)) {
                         jars.add(f);
                     }
                 }

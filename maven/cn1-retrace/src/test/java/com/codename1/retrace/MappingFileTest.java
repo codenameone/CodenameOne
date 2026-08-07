@@ -81,6 +81,25 @@ public class MappingFileTest {
     }
 
     @Test
+    public void inlinedFramesAreAllEmittedInOrder() throws Exception {
+        // R8 inlining: two method records share the obfuscated name 'a' and obfuscated line 1 --
+        // the inlined callee and the caller it was inlined into. retraceAll must emit BOTH, innermost
+        // first, or the reconstructed stack loses the inlined call path.
+        MappingFile mf = MappingFile.parse(
+                "com.example.Outer -> x:\n"
+                + "    1:1:void inlinedCallee():10:10 -> a\n"
+                + "    1:1:void caller():20:20 -> a\n");
+        java.util.List<Frame> frames = mf.retraceAll(new Frame("x", "a", "x.java", 1));
+        assertEquals(2, frames.size());
+        assertEquals("inlinedCallee", frames.get(0).getMethodName());
+        assertEquals(10, frames.get(0).getLineNumber());
+        assertEquals("caller", frames.get(1).getMethodName());
+        assertEquals(20, frames.get(1).getLineNumber());
+        // The single-frame retrace() stays backward compatible: it returns the innermost frame.
+        assertEquals("inlinedCallee", mf.retrace(new Frame("x", "a", "x.java", 1)).getMethodName());
+    }
+
+    @Test
     public void unknownClassPassesThroughUnchanged() throws Exception {
         MappingFile mf = MappingFile.parse(MAPPING);
         Frame in = new Frame("some.Other", "x", "Other.java", 9);

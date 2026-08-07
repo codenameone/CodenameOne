@@ -163,7 +163,7 @@ public final class HardeningEngine {
                     deriveSeed(cfg, req.getBuildKey()));
             File renamedJar = new File(workDir, "renamed.jar");
             ProGuardRunner.rename(classesJar, renamedJar, mappingFile,
-                    req.getLibraryJars(), keepRules, dict, workDir);
+                    req.getLibraryJars(), keepRules, dict, workDir, cfg.getPlatform());
             renamed = JarDemuxer.readClasses(renamedJar);
             renamedCount = countRenamed(inClasses.keySet(), renamed.keySet());
             hierarchyJar = renamedJar;

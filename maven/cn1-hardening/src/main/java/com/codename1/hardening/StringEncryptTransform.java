@@ -123,6 +123,14 @@ public final class StringEncryptTransform {
             return classBytes;
         }
         boolean isInterface = (cn.access & Opcodes.ACC_INTERFACE) != 0;
+        // The decoder is a concrete static method, and (for interface constants) it is invoked from
+        // <clinit>. Static/private methods and <clinit> in an interface are only valid from class-file
+        // version 52 (Java 8). A pre-Java-8 interface therefore cannot host the decoder, and such an
+        // interface has no default/static method bodies to hold LDC literals anyway, so skip it whole
+        // rather than emit a class that fails verification.
+        if (isInterface && (cn.version & 0xFFFF) < Opcodes.V1_8) {
+            return classBytes;
+        }
 
         int base = keyBase(cn.name);
         boolean changed = false;

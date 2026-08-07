@@ -63,8 +63,15 @@ public final class RetraceMain {
             return;
         }
         for (Frame f : frames) {
-            Frame out = chain.isEmpty() ? f : chain.retrace(f);
-            System.out.println("    " + out);
+            if (chain.isEmpty()) {
+                System.out.println("    " + f);
+            } else {
+                // One obfuscated frame can expand into several original frames (R8 inlining);
+                // print them all, innermost first.
+                for (Frame out : chain.retraceAll(f)) {
+                    System.out.println("    " + out);
+                }
+            }
         }
     }
 
