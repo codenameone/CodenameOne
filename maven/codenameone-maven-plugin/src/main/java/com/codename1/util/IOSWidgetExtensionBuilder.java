@@ -514,17 +514,19 @@ public class IOSWidgetExtensionBuilder {
     /// fell through to the systemSmall/Medium/Large default, turning a complication into three
     /// home-screen widgets rather than withholding it.
     ///
-    /// accessoryRectangular is deliberately NOT folded into watchRectangular. It is the spelling of
-    /// the portable `lockscreen` family, which the iOS target does host, and watchRectangular
-    /// already emits the same Swift family -- the renderer picks the more specific published layout
-    /// when both exist.
+    /// ONLY accessoryCorner. The other accessory spellings are not watch families:
+    /// `.accessoryCircular`, `.accessoryInline` and `.accessoryRectangular` are the iPhone
+    /// LOCK-SCREEN families as well as watch ones, and CN1DescriptorWidget.swift already renders
+    /// all three on iOS -- they sit under `if #available(iOS 16.0, watchOS 9.0)`, while only
+    /// `.accessoryCorner` is inside `#if os(watchOS)`. Folding them into the watch names withheld a
+    /// lock-screen widget the manifest had asked for, which is the mirror of the bug this method
+    /// was added to fix.
+    ///
+    /// So the two namings are NOT interchangeable for these three, and accessoryRectangular already
+    /// said so: it maps to the portable `lockscreen`, not to watchRectangular. The portable
+    /// `watch*` names mean "complication only"; the WidgetKit spellings mean the WidgetKit family,
+    /// which on iOS is the lock screen.
     static String normalizeFamily(String family) {
-        if ("accessoryCircular".equals(family)) {
-            return "watchCircular";
-        }
-        if ("accessoryInline".equals(family)) {
-            return "watchInline";
-        }
         if ("accessoryCorner".equals(family)) {
             return "watchCorner";
         }
@@ -547,6 +549,16 @@ public class IOSWidgetExtensionBuilder {
         }
         if ("lockscreen".equals(family) || "accessoryRectangular".equals(family)) {
             return ".accessoryRectangular";
+        }
+        // The other two shared families, in their WidgetKit spelling. Available on the iPhone lock
+        // screen from iOS 16 and on the watch from watchOS 9, and the Swift renderer handles both
+        // on either platform -- so unlike the portable watch* names these are NOT confined to the
+        // watch target.
+        if ("accessoryCircular".equals(family)) {
+            return ".accessoryCircular";
+        }
+        if ("accessoryInline".equals(family)) {
+            return ".accessoryInline";
         }
         // Watch complications. On Apple a complication is a WidgetKit widget in an accessory
         // family, which is why they map here rather than through an API of their own.

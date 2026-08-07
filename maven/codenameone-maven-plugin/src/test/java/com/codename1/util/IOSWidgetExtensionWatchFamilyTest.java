@@ -96,34 +96,38 @@ class IOSWidgetExtensionWatchFamilyTest {
                         .setIosFamilies(Arrays.asList("small"))));
     }
 
-    /// The WidgetKit spellings are documented as accepted, and three of them were not: the
-    /// classification tested startsWith("watch"), so accessoryCircular looked like an iOS surface
-    /// and fell through to the systemSmall/Medium/Large default -- a complication became three
-    /// home-screen widgets instead of being withheld.
+    /// The accessory spellings are NOT synonyms for the portable watch names.
+    ///
+    /// `.accessoryCircular`, `.accessoryInline` and `.accessoryRectangular` are iPhone lock-screen
+    /// families as well as watch ones -- CN1DescriptorWidget.swift renders all three under
+    /// `if #available(iOS 16.0, watchOS 9.0)`, and only `.accessoryCorner` sits inside
+    /// `#if os(watchOS)`. Treating them as watch-only withholds a lock-screen widget the manifest
+    /// asked for; treating accessoryCorner as an iOS family emits one iOS cannot show.
     @Test
-    void widgetKitSpellingsAreTheSameFamilies() throws IOException {
+    void accessorySpellingsKeepTheirIosSurface() throws IOException {
+        assertFalse(IOSWidgetExtensionBuilder.isWatchOnly(
+                new IOSWidgetExtensionBuilder.Kind("steps")
+                        .setIosFamilies(Arrays.asList("accessoryCircular", "accessoryInline"))),
+                "the lock-screen accessory families are an iOS surface");
+        assertTrue(builderFor("accessoryCircular", "accessoryInline").hasIosSurface(),
+                "a kind declared only in accessory spellings still has an iOS extension to live in");
+        assertTrue(builderFor("accessoryRectangular").hasIosSurface(),
+                "accessoryRectangular is the lock-screen family");
+
+        String bundle = bundleFor("accessoryCircular", "accessoryInline");
+        assertTrue(bundle.contains(".accessoryCircular"), bundle);
+        assertTrue(bundle.contains(".accessoryInline"), bundle);
+        assertFalse(bundle.contains(".systemSmall"),
+                "declared families must not fall through to the home-screen default: " + bundle);
+
+        // accessoryCorner IS watchOS-only, so it behaves exactly like watchCorner.
         assertTrue(IOSWidgetExtensionBuilder.isWatchOnly(
                 new IOSWidgetExtensionBuilder.Kind("steps")
-                        .setIosFamilies(Arrays.asList("accessoryCircular", "accessoryCorner"))),
-                "the WidgetKit spellings are complication families like their portable names");
+                        .setIosFamilies(Arrays.asList("accessoryCorner"))),
+                "the corner complication has no iOS surface");
         assertTrue(IOSWidgetExtensionBuilder.hasWatchFamily(
                 new IOSWidgetExtensionBuilder.Kind("steps")
-                        .setIosFamilies(Arrays.asList("small", "accessoryInline"))));
-
-        IOSWidgetExtensionBuilder b = builderFor("accessoryCircular", "accessoryInline");
-        assertFalse(b.hasIosSurface(),
-                "declared only in the WidgetKit spelling, these are still complications");
-
-        // accessoryRectangular stays a LOCK-SCREEN family: it is the spelling of the portable
-        // "lockscreen", which the iOS target does host.
-        IOSWidgetExtensionBuilder lock = builderFor("accessoryRectangular");
-        assertTrue(lock.hasIosSurface(),
-                "accessoryRectangular is the lock-screen family and must keep its iOS surface");
-
-        String bundle = bundleFor("small", "accessoryCircular");
-        assertFalse(bundle.contains(".accessoryCircular"),
-                "a complication family must not reach the iOS target: " + bundle);
-        assertTrue(bundle.contains(".systemSmall"), bundle);
+                        .setIosFamilies(Arrays.asList("small", "accessoryCorner"))));
     }
 
     @Test
