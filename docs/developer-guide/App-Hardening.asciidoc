@@ -95,7 +95,7 @@ The level is the one decision most projects need to make. The individual switche
 |Symbol/mapping upload |-- |required |required |required
 |===
 
-Line numbers are deliberately *kept*, not stripped: the transform preserves the `SourceFile` and `LineNumberTable` attributes (and Android's generated R8 configuration keeps the same) so a crash from a hardened build still retraces to a file and line against the retained mapping. What renaming removes is the local-variable and parameter *names*; the method and class names are replaced by the mapping, not deleted. If you need a build with no line information at all, that is a separate choice you make in your own ProGuard/R8 configuration, and it makes crash reports unretraceable.
+Line numbers are *kept*, not stripped: the transform preserves the `SourceFile` and `LineNumberTable` attributes (and Android's generated R8 configuration keeps the same) so a crash from a hardened build still retraces to a file and line against the retained mapping. What renaming removes is the local-variable and parameter *names*; the method and class names are replaced by the mapping, not deleted. If you need a build with no line information at all, that's a separate choice you make in your own ProGuard/R8 configuration, and it makes crash reports unretraceable.
 
 Higher levels cost build time, a little binary size and a little startup time. Measure the trade-off for your own app before committing to `paranoid`; the honest number for your codebase is the one that matters, not a headline figure.
 
