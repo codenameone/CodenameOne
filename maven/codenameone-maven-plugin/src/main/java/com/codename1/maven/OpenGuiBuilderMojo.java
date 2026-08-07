@@ -57,7 +57,10 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
     private static final String LAUNCHED_PROPERTY = "com.codename1.maven.OpenGuiBuilderMojo.launched";
 
     /** The editor is compiled for this Java release, so an older forked JVM cannot load it. */
-    private static final int REQUIRED_JAVA_VERSION = 17;
+    private static final int REQUIRED_JAVA_VERSION = 8;
+
+    /** {@code --add-exports} is a Java 9 option; passing it to an 8 JVM stops it from starting. */
+    private static final int MODULE_OPTIONS_VERSION = 9;
 
     /** Optional fully-qualified form to select initially. */
     @Parameter(property = "className", required = false)
@@ -111,7 +114,7 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
     }
 
     /**
-     * The GUI Builder is a Java 17 artifact. The spawned process writes only to its log file, so
+     * The GUI Builder is a Java 8 artifact. The spawned process writes only to its log file, so
      * without this check an older Maven JVM fails with an UnsupportedClassVersionError that never
      * reaches the console.
      */
@@ -174,8 +177,12 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
         args.add("-Dcom.apple.mrj.application.apple.menu.about.name=Codename One GUI Builder");
         args.add("-Dsun.awt.application.name=Codename One GUI Builder");
         args.add("-Dsun.awt.X11.XWMClass=CodenameOneGUIBuilder");
-        args.add("--add-exports=java.desktop/com.apple.eawt.event=ALL-UNNAMED");
-        args.add("--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED");
+        if (javaFeatureVersion() >= MODULE_OPTIONS_VERSION) {
+            // On 8 these packages are already reachable and the option itself is unrecognized,
+            // which stops the forked JVM before it prints anything the user would see.
+            args.add("--add-exports=java.desktop/com.apple.eawt.event=ALL-UNNAMED");
+            args.add("--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED");
+        }
         if (isMacOs()) {
             args.add("-Xdock:name=Codename One GUI Builder");
         }

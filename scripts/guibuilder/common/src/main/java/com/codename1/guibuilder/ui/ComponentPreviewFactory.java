@@ -73,59 +73,79 @@ public final class ComponentPreviewFactory {
         int guidedHeight = integer(element, "guidedPreferredHeight", -1);
         Component component;
         switch (type) {
-            case "Button" -> component = new Button(value(element, "text", "Button")) {
+            case "Button":
+                component = new Button(value(element, "text", "Button")) {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
             };
-            case "Label" -> component = new Label(value(element, "text", "Label")) {
+                break;
+            case "Label":
+                component = new Label(value(element, "text", "Label")) {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
             };
-            case "SpanLabel" -> component = new SpanLabel(value(element, "text", "Wrapped label text")) {
+                break;
+            case "SpanLabel":
+                component = new SpanLabel(value(element, "text", "Wrapped label text")) {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
             };
-            case "TextField" -> component = new TextField(value(element, "text", ""), value(element, "hint", "Text field")) {
+                break;
+            case "TextField":
+                component = new TextField(value(element, "text", ""), value(element, "hint", "Text field")) {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
             };
-            case "TextArea" -> component = new TextArea(value(element, "text", "Text area")) {
+                break;
+            case "TextArea":
+                component = new TextArea(value(element, "text", "Text area")) {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
             };
-            case "CheckBox" -> component = new CheckBox(value(element, "text", "Check box")) {
+                break;
+            case "CheckBox":
+                component = new CheckBox(value(element, "text", "Check box")) {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
             };
-            case "RadioButton" -> component = new RadioButton(value(element, "text", "Radio button")) {
+                break;
+            case "RadioButton":
+                component = new RadioButton(value(element, "text", "Radio button")) {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
             };
-            case "Slider" -> component = new Slider() {
+                break;
+            case "Slider":
+                component = new Slider() {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
             };
-            case "Tabs" -> component = sizedTabs(element, selected, handler, guidedWidth, guidedHeight);
-            default -> component = sizedContainer(element, selected, handler, guidedWidth, guidedHeight);
+                break;
+            case "Tabs":
+                component = sizedTabs(element, selected, handler, guidedWidth, guidedHeight);
+                break;
+            default:
+                component = sizedContainer(element, selected, handler, guidedWidth, guidedHeight);
+                break;
         }
         component.setUIID(value(element, "uiid", type));
         applyAttributes(component, element);
-        if (component instanceof CheckBox check) {
-            check.setIcon(FontImage.createMaterial(check.isSelected()
+        if (component instanceof CheckBox) {
+            ((CheckBox) component).setIcon(FontImage.createMaterial(((CheckBox) component).isSelected()
                     ? FontImage.MATERIAL_CHECK_BOX : FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK,
-                    check.getUnselectedStyle()));
-        } else if (component instanceof RadioButton radio) {
-            radio.setIcon(FontImage.createMaterial(radio.isSelected()
+                    ((CheckBox) component).getUnselectedStyle()));
+        } else if (component instanceof RadioButton) {
+            ((RadioButton) component).setIcon(FontImage.createMaterial(((RadioButton) component).isSelected()
                     ? FontImage.MATERIAL_RADIO_BUTTON_CHECKED : FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED,
-                    radio.getUnselectedStyle()));
+                    ((RadioButton) component).getUnselectedStyle()));
         }
         component.putClientProperty("gui.originalBorder", component.getUnselectedStyle().getBorder());
         component.putClientProperty("gui.element", element);
@@ -151,7 +171,7 @@ public final class ComponentPreviewFactory {
             long now = System.currentTimeMillis();
             Object previous = component.getClientProperty("gui.lastClick");
             component.putClientProperty("gui.lastClick", Long.valueOf(now));
-            if (previous instanceof Long time && now - time.longValue() < 450) handler.editContent(element);
+            if (previous instanceof Long && now - ((Long) previous).longValue() < 450) handler.editContent(element);
         });
         return component;
     }
@@ -162,8 +182,8 @@ public final class ComponentPreviewFactory {
         component.setRippleEffect(false);
         component.setPressedStyle(new Style(component.getUnselectedStyle()));
         component.setSelectedStyle(new Style(component.getUnselectedStyle()));
-        if (component instanceof Container container) {
-            for (int i = 0; i < container.getComponentCount(); i++) stabilizeDesignStyles(container.getComponentAt(i));
+        if (component instanceof Container) {
+            for (int i = 0; i < ((Container) component).getComponentCount(); i++) stabilizeDesignStyles(((Container) component).getComponentAt(i));
         }
     }
 
@@ -178,20 +198,20 @@ public final class ComponentPreviewFactory {
         // styled by the project CSS exactly as the generated form will be at runtime.
         for (int i = 0; i < element.getNumChildren(); i++) {
             Object child = element.getChildAt(i);
-            if (child instanceof Element childElement && "component".equals(childElement.getTagName())) {
-                Component rendered = create(childElement, selected, handler);
+            if (child instanceof Element && "component".equals(((Element) child).getTagName())) {
+                Component rendered = create(((Element) child), selected, handler);
                 if (out.getLayout() instanceof BorderLayout) {
-                    out.add(GuiDocument.effectiveBorderConstraint(element, childElement), rendered);
-                } else if (out.getLayout() instanceof TableLayout table) {
+                    out.add(GuiDocument.effectiveBorderConstraint(element, ((Element) child)), rendered);
+                } else if (out.getLayout() instanceof TableLayout) {
                     // GuiDocument owns the cell rule so the preview and the generated source cannot
                     // disagree about where a component with no explicit cell belongs.
-                    int row = GuiDocument.effectiveTableRow(element, childElement);
-                    int column = GuiDocument.effectiveTableColumn(element, childElement);
-                    TableLayout.Constraint constraint = table.createConstraint(row, column)
-                            .horizontalSpan(integer(childElement, "tableHorizontalSpan", 1))
-                            .verticalSpan(integer(childElement, "tableVerticalSpan", 1));
-                    int width = integer(childElement, "tableWidth", -1);
-                    int height = integer(childElement, "tableHeight", -1);
+                    int row = GuiDocument.effectiveTableRow(element, ((Element) child));
+                    int column = GuiDocument.effectiveTableColumn(element, ((Element) child));
+                    TableLayout.Constraint constraint = ((TableLayout) out.getLayout()).createConstraint(row, column)
+                            .horizontalSpan(integer(((Element) child), "tableHorizontalSpan", 1))
+                            .verticalSpan(integer(((Element) child), "tableVerticalSpan", 1));
+                    int width = integer(((Element) child), "tableWidth", -1);
+                    int height = integer(((Element) child), "tableHeight", -1);
                     if (width != -1) constraint.widthPercentage(width);
                     if (height != -1) constraint.heightPercentage(height);
                     out.add(constraint, rendered);
@@ -241,8 +261,8 @@ public final class ComponentPreviewFactory {
         };
         for (int i = 0; i < element.getNumChildren(); i++) {
             Object child = element.getChildAt(i);
-            if (child instanceof Element e && "component".equals(e.getTagName())) {
-                tabs.addTab(value(e, "name", "Tab " + (i + 1)), create(e, selected, handler));
+            if (child instanceof Element && "component".equals(((Element) child).getTagName())) {
+                tabs.addTab(value(((Element) child), "name", "Tab " + (i + 1)), create(((Element) child), selected, handler));
             }
         }
         if (tabs.getTabCount() == 0) tabs.addTab("Tab", new Label("Drop content here"));
@@ -251,14 +271,20 @@ public final class ComponentPreviewFactory {
 
     private static Layout layout(Element element) {
         String layout = value(element, "layout", "BoxLayout");
-        return switch (layout) {
-            case "BorderLayout" -> new DesignerBorderLayout();
-            case "FlowLayout" -> new FlowLayout();
-            case "GridLayout" -> new GridLayout(integer(element, "gridLayoutRows", 1), integer(element, "gridLayoutColumns", 2));
-            case "TableLayout" -> new TableLayout(integer(element, "tableLayoutRows", 2), integer(element, "tableLayoutColumns", 2));
-            case "LayeredLayout" -> new LayeredLayout();
-            default -> "X".equals(element.getAttribute("boxLayoutAxis")) ? BoxLayout.x() : BoxLayout.y();
-        };
+        switch (layout) {
+            case "BorderLayout":
+                return new DesignerBorderLayout();
+            case "FlowLayout":
+                return new FlowLayout();
+            case "GridLayout":
+                return new GridLayout(integer(element, "gridLayoutRows", 1), integer(element, "gridLayoutColumns", 2));
+            case "TableLayout":
+                return new TableLayout(integer(element, "tableLayoutRows", 2), integer(element, "tableLayoutColumns", 2));
+            case "LayeredLayout":
+                return new LayeredLayout();
+            default:
+                return "X".equals(element.getAttribute("boxLayoutAxis")) ? BoxLayout.x() : BoxLayout.y();
+        }
     }
 
     /** Keeps a newly displaced edge component from consuming the entire designer surface. */
@@ -296,8 +322,8 @@ public final class ComponentPreviewFactory {
         if (guidedHeight > 0) natural.setHeight(guidedHeight);
         Object maximumWidth = component.getClientProperty(MAX_DESIGN_WIDTH);
         Object maximumHeight = component.getClientProperty(MAX_DESIGN_HEIGHT);
-        if (maximumWidth instanceof Integer value) natural.setWidth(Math.min(natural.getWidth(), value.intValue()));
-        if (maximumHeight instanceof Integer value) natural.setHeight(Math.min(natural.getHeight(), value.intValue()));
+        if (maximumWidth instanceof Integer) natural.setWidth(Math.min(natural.getWidth(), ((Integer) maximumWidth).intValue()));
+        if (maximumHeight instanceof Integer) natural.setHeight(Math.min(natural.getHeight(), ((Integer) maximumHeight).intValue()));
         return natural;
     }
 
@@ -317,51 +343,51 @@ public final class ComponentPreviewFactory {
         component.setEnabled(!"false".equals(value(element, "enabled", "true")));
         component.setVisible(!"false".equals(value(element, "visible", "true")));
         component.setRTL("true".equals(value(element, "rtl", "false")));
-        if (component instanceof Label label) {
-            label.setGap(integer(element, "gap", label.getGap()));
-            label.setTickerEnabled("true".equals(value(element, "tickerEnabled", "false")));
-        } else if (component instanceof SpanLabel span) {
+        if (component instanceof Label) {
+            ((Label) component).setGap(integer(element, "gap", ((Label) component).getGap()));
+            ((Label) component).setTickerEnabled("true".equals(value(element, "tickerEnabled", "false")));
+        } else if (component instanceof SpanLabel) {
             // SpanLabel is a Container rather than a Label, so the inspector's gap silently did
             // nothing here while the generated source was free to set it.
-            span.setGap(integer(element, "gap", span.getGap()));
+            ((SpanLabel) component).setGap(integer(element, "gap", ((SpanLabel) component).getGap()));
         }
         // Applied only when the document carries it: the generated source emits nothing for an
         // absent attribute, and forcing LEFT here would make the preview disagree with a themed
         // alignment. Labels and text inputs are the components that own the setter.
         if (element.getAttribute("alignment") != null) {
-            if (component instanceof Label label) label.setAlignment(alignment(element.getAttribute("alignment")));
-            else if (component instanceof TextArea area) area.setAlignment(alignment(element.getAttribute("alignment")));
+            if (component instanceof Label) ((Label) component).setAlignment(alignment(element.getAttribute("alignment")));
+            else if (component instanceof TextArea) ((TextArea) component).setAlignment(alignment(element.getAttribute("alignment")));
         }
-        if (component instanceof Button button) button.setToggle("true".equals(value(element, "toggle", "false")));
-        if (component instanceof CheckBox check) check.setSelected("true".equals(value(element, "selected", "false")));
-        else if (component instanceof RadioButton radio) radio.setSelected("true".equals(value(element, "selected", "false")));
-        if (component instanceof TextArea area) {
-            area.setColumns(integer(element, "columns", area.getColumns()));
-            area.setRows(integer(element, "rows", area.getRows()));
-            area.setMaxSize(integer(element, "maxSize", area.getMaxSize()));
-            area.setEditable(!"false".equals(value(element, "editable", "true")));
-            area.setGrowByContent(!"false".equals(value(element, "growByContent", "true")));
-            area.setConstraint(constraint(value(element, "constraint", "ANY")));
+        if (component instanceof Button) ((Button) component).setToggle("true".equals(value(element, "toggle", "false")));
+        if (component instanceof CheckBox) ((CheckBox) component).setSelected("true".equals(value(element, "selected", "false")));
+        else if (component instanceof RadioButton) ((RadioButton) component).setSelected("true".equals(value(element, "selected", "false")));
+        if (component instanceof TextArea) {
+            ((TextArea) component).setColumns(integer(element, "columns", ((TextArea) component).getColumns()));
+            ((TextArea) component).setRows(integer(element, "rows", ((TextArea) component).getRows()));
+            ((TextArea) component).setMaxSize(integer(element, "maxSize", ((TextArea) component).getMaxSize()));
+            ((TextArea) component).setEditable(!"false".equals(value(element, "editable", "true")));
+            ((TextArea) component).setGrowByContent(!"false".equals(value(element, "growByContent", "true")));
+            ((TextArea) component).setConstraint(constraint(value(element, "constraint", "ANY")));
         }
-        if (component instanceof Container container) {
-            container.setScrollableX("true".equals(value(element, "scrollableX", "false")));
-            container.setScrollableY("true".equals(value(element, "scrollableY", "false")));
-            container.setTensileDragEnabled(false);
-            container.setAlwaysTensile(false);
-            container.setSmoothScrolling(false);
-            container.setScrollVisible(true);
+        if (component instanceof Container) {
+            ((Container) component).setScrollableX("true".equals(value(element, "scrollableX", "false")));
+            ((Container) component).setScrollableY("true".equals(value(element, "scrollableY", "false")));
+            ((Container) component).setTensileDragEnabled(false);
+            ((Container) component).setAlwaysTensile(false);
+            ((Container) component).setSmoothScrolling(false);
+            ((Container) component).setScrollVisible(true);
         }
-        if (component instanceof Slider slider) {
-            slider.setMinValue(integer(element, "minValue", slider.getMinValue()));
-            slider.setMaxValue(integer(element, "maxValue", slider.getMaxValue()));
-            slider.setProgress(integer(element, "progress", slider.getProgress()));
-            slider.setEditable("true".equals(value(element, "editable", "false")));
-            slider.setInfinite("true".equals(value(element, "infinite", "false")));
+        if (component instanceof Slider) {
+            ((Slider) component).setMinValue(integer(element, "minValue", ((Slider) component).getMinValue()));
+            ((Slider) component).setMaxValue(integer(element, "maxValue", ((Slider) component).getMaxValue()));
+            ((Slider) component).setProgress(integer(element, "progress", ((Slider) component).getProgress()));
+            ((Slider) component).setEditable("true".equals(value(element, "editable", "false")));
+            ((Slider) component).setInfinite("true".equals(value(element, "infinite", "false")));
         }
-        if (component instanceof Tabs tabs && tabs.getTabCount() > 0) {
-            int selected = Math.max(0, Math.min(tabs.getTabCount() - 1, integer(element, "selectedIndex", 0)));
-            tabs.setSelectedIndex(selected, false);
-            tabs.setTabPlacement(tabPlacement(value(element, "tabPlacement", "top")));
+        if (component instanceof Tabs && ((Tabs) component).getTabCount() > 0) {
+            int selected = Math.max(0, Math.min(((Tabs) component).getTabCount() - 1, integer(element, "selectedIndex", 0)));
+            ((Tabs) component).setSelectedIndex(selected, false);
+            ((Tabs) component).setTabPlacement(tabPlacement(value(element, "tabPlacement", "top")));
         }
     }
 

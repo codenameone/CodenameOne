@@ -84,18 +84,20 @@ jobs:
             -Darchetype.test.skip=true -Dmaven.javadoc.skip=true \
             -Dcn1.binaries="${GITHUB_WORKSPACE}/maven/target/cn1-binaries"
 
-      - name: Run standalone GUI Builder tests (JDK 17)
+      # Built and tested on JDK 8 so that the editor stays loadable on every JDK a Codename One
+      # project may be built with. A newer JDK here would let a post-8 API through unnoticed.
+      - name: Run standalone GUI Builder tests (JDK 8)
         run: |
           set -euo pipefail
-          export JAVA_HOME="${JAVA_HOME_17}"
+          export JAVA_HOME="${JAVA_HOME_8}"
           export PATH="${JAVA_HOME}/bin:${PATH}"
           cd scripts/guibuilder
           xvfb-run -a mvn -B -pl javase -am clean test -Dcodename1.platform=javase
 
-      - name: Package the executable GUI Builder (JDK 17)
+      - name: Package the executable GUI Builder (JDK 8)
         run: |
           set -euo pipefail
-          export JAVA_HOME="${JAVA_HOME_17}"
+          export JAVA_HOME="${JAVA_HOME_8}"
           export PATH="${JAVA_HOME}/bin:${PATH}"
           cd scripts/guibuilder
           xvfb-run -a mvn -B -pl javase -am -Pexecutable-jar package \

@@ -45,7 +45,8 @@ public final class GuidedLayoutSupport {
     private GuidedLayoutSupport() { }
 
     public static void apply(Element parentElement, Container parent) {
-        if (!(parent.getLayout() instanceof LayeredLayout layered)) return;
+        if (!(parent.getLayout() instanceof LayeredLayout)) return;
+        LayeredLayout layered = (LayeredLayout) parent.getLayout();
         List<Element> elements = componentChildren(parentElement);
         for (int i = 0; i < elements.size() && i < parent.getComponentCount(); i++) {
             Element element = elements.get(i);
@@ -112,7 +113,7 @@ public final class GuidedLayoutSupport {
         for (int i = 0; i < parent.getComponentCount(); i++) {
             Component child = parent.getComponentAt(i);
             Object value = child.getClientProperty("gui.element");
-            if (value instanceof Element element && name.equals(element.getAttribute("name"))) return child;
+            if (value instanceof Element && name.equals(((Element) value).getAttribute("name"))) return child;
         }
         return null;
     }
@@ -121,7 +122,7 @@ public final class GuidedLayoutSupport {
         List<Element> out = new ArrayList<>();
         for (int i = 0; i < parent.getNumChildren(); i++) {
             Object child = parent.getChildAt(i);
-            if (child instanceof Element element && "component".equals(element.getTagName())) out.add(element);
+            if (child instanceof Element && "component".equals(((Element) child).getTagName())) out.add(((Element) child));
         }
         return out;
     }

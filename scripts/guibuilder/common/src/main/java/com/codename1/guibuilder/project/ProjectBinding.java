@@ -48,12 +48,23 @@ public final class ProjectBinding {
             String key = value.substring(0, split).trim();
             String field = value.substring(split + 1).trim();
             switch (key) {
-                case "projectDir" -> binding.projectDir = field;
-                case "guiDir" -> binding.guiDir = field;
-                case "sourceDir" -> binding.sourceDir = field;
-                case "cssFile" -> binding.cssFile = field;
-                case "initialForm" -> binding.initialForm = field;
-                default -> { }
+                case "projectDir":
+                    binding.projectDir = field;
+                    break;
+                case "guiDir":
+                    binding.guiDir = field;
+                    break;
+                case "sourceDir":
+                    binding.sourceDir = field;
+                    break;
+                case "cssFile":
+                    binding.cssFile = field;
+                    break;
+                case "initialForm":
+                    binding.initialForm = field;
+                    break;
+                default:
+                    break;
             }
         }
         return binding;
