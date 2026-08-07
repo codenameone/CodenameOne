@@ -99,7 +99,9 @@ The level is the one decision most projects need to make. The individual switche
 |Symbol/mapping upload |-- |required |required |required
 |===
 
-The source file name (`SourceFile`) is stripped, matching DexGuard. `LineNumberTable` is kept so a hardened crash still retraces to a line number against the mapping; the retrace reconstructs the file name from the (retraced) class name. Renaming also removes the local-variable and parameter names.
+On a renamed build the source file name (`SourceFile`) is stripped, matching DexGuard: the engine-renamed ports drop it, and on a minified Android release R8 drops it too. `LineNumberTable` is kept so a hardened crash still retraces to a line number against the mapping; the retrace reconstructs the file name from the (retraced) class name. Renaming also removes the local-variable and parameter names.
+
+An explicitly *unminified* Android build (`android.enableProguard=false`, which `android.onDeviceDebug` also forces) doesn't rename at all -- only string encryption and control-flow obfuscation apply -- so its class names, and `SourceFile` along with them, remain. That's a debug configuration, not the release artifact hardening targets.
 
 === Keeping what must not be renamed
 
