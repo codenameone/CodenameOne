@@ -1719,6 +1719,39 @@ public class CN1WearableBridge implements WearableBridge {
 
     /** How long one of our own published transfer items is kept before it is swept. */
     private static final long TRANSFER_RETENTION_MILLIS = 24 * 60 * 60 * 1000L;
+
+    /// The outer bound on a transfer nobody has acknowledged.
+    ///
+    /// Retention alone was age-only, and age is not evidence of delivery: a watch offline for more
+    /// than a day, or one of several watches that had not synced yet, came back to nothing. The
+    /// receiver never deletes a transfer and the sender kept no record of who had taken it, so the
+    /// file was simply gone.
+    ///
+    /// Retirement now needs an acknowledgement from every peer this device knows about. This cap is
+    /// the backstop for the peer that never returns -- an uninstalled watch app, a watch unpaired
+    /// and forgotten -- because without one such a device would pin every file the phone has ever
+    /// sent, forever. A week is far past any sync window and still bounded.
+    private static final long TRANSFER_HARD_CAP_MILLIS = 7 * 24 * 60 * 60 * 1000L;
+
+    /// Namespace for delivery acknowledgements. A receiver publishes one per transfer it has
+    /// actually handed to a listener; the sender reads them to decide what it may retire.
+    ///
+    /// Deliberately OUTSIDE the "/cn1" namespace rather than a suffix of it. PATH_PREFIX has no
+    /// trailing slash, so anything beginning "/cn1" -- "/cn1xk/..." included -- passes the value
+    /// filter and would have been handed to the app as a replicated change at a path it never
+    /// published. Transfers escape that only because they are excluded by name a line earlier.
+    private static final String TRANSFER_ACK_PREFIX = "/cnxk";
+
+    /// The acknowledgement path for a transfer item path.
+    static String transferAckPath(String transferPath) {
+        return TRANSFER_ACK_PREFIX + transferPath;
+    }
+
+    /// The transfer path an acknowledgement refers to, or null when this is not one.
+    static String ackedTransferPath(String ackPath) {
+        return ackPath != null && ackPath.startsWith(TRANSFER_ACK_PREFIX)
+                ? ackPath.substring(TRANSFER_ACK_PREFIX.length()) : null;
+    }
     /** Floor between sweeps; retention is a day, so sweeping more often than this buys nothing. */
     private static final long SWEEP_MIN_INTERVAL_MILLIS = 5 * 60 * 1000L;
     private final Object sweepLock = new Object();
@@ -1979,8 +2012,22 @@ public class CN1WearableBridge implements WearableBridge {
             lastSweepAt = now;
         }
         final long cutoff = System.currentTimeMillis() - TRANSFER_RETENTION_MILLIS;
-        // A one-element array because the anonymous task below needs to write it.
-        final long[] oldestKept = {Long.MAX_VALUE};
+        final long hardCutoff = System.currentTimeMillis() - TRANSFER_HARD_CAP_MILLIS;
+        // The earliest ABSOLUTE time a decision could change for something this sweep keeps.
+        // Tracking the oldest publish time instead assumed every kept item was waiting on the
+        // retention window, but an unacknowledged one waits on the hard cap -- so the deadline
+        // fired at once, found nothing to do and rearmed on the same instant.
+        final long[] nextDue = {Long.MAX_VALUE};
+        // Every peer this device knows of, connected or merely paired. A transfer is retired once
+        // ALL of them have taken it: one watch of several having synced is not enough, which is
+        // exactly the case a single acknowledgement would get wrong. Never ourselves -- our own
+        // items are echoed back, and waiting for an acknowledgement this device will never write
+        // would pin every transfer to the cap.
+        final java.util.Set<String> expected = new java.util.HashSet<String>(bondedNodeIds());
+        for (Node connected : connectedNodes()) {
+            expected.add(connected.getId());
+        }
+        expected.remove(localNodeId(context));
         transferTimer.schedule(new java.util.TimerTask() {
             public void run() {
                 boolean failed = false;
@@ -1999,6 +2046,50 @@ public class CN1WearableBridge implements WearableBridge {
                     DataItemBuffer items = Tasks.await(dataClient.getDataItems(),
                             TIMEOUT_SECONDS, TimeUnit.SECONDS);
                     try {
+                        // Acknowledgements first, in a pass of their own: the enumeration has no
+                        // useful order, so a transfer can be seen before the acknowledgement that
+                        // retires it.
+                        java.util.Map<String, java.util.Set<String>> acked =
+                                new java.util.HashMap<String, java.util.Set<String>>();
+                        java.util.List<Uri> ownAcks = new java.util.ArrayList<Uri>();
+                        java.util.Set<String> livePaths = new java.util.HashSet<String>();
+                        for (DataItem item : items) {
+                            String ackPath = item.getUri().getPath();
+                            if (ackPath == null) {
+                                continue;
+                            }
+                            if (isTransferPath(ackPath)) {
+                                livePaths.add(ackPath);
+                                continue;
+                            }
+                            String forPath = ackedTransferPath(ackPath);
+                            if (forPath == null) {
+                                continue;
+                            }
+                            String acker = item.getUri().getHost();
+                            if (sweepNode.equals(acker)) {
+                                // OUR acknowledgement, for something a peer sent us. Only its
+                                // author may delete it -- deleting another node's item propagates
+                                // and would rob a second watch -- so ours are cleaned up here,
+                                // once the transfer they vouch for is gone.
+                                ownAcks.add(item.getUri());
+                                continue;
+                            }
+                            java.util.Set<String> ackers = acked.get(forPath);
+                            if (ackers == null) {
+                                ackers = new java.util.HashSet<String>();
+                                acked.put(forPath, ackers);
+                            }
+                            ackers.add(acker);
+                        }
+                        for (Uri ownAck : ownAcks) {
+                            if (!livePaths.contains(ackedTransferPath(ownAck.getPath()))) {
+                                // The item's OWN uri, not one rebuilt from parts: it already
+                                // carries the authority the Data Layer expects.
+                                Tasks.await(dataClient.deleteDataItems(ownAck),
+                                        TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                            }
+                        }
                         for (DataItem item : items) {
                             String p = item.getUri().getPath();
                             if (p == null || !isTransferPath(p)) {
@@ -2017,15 +2108,26 @@ public class CN1WearableBridge implements WearableBridge {
                             // this item was published.
                             long publishedAt = map == null
                                     ? Long.MIN_VALUE : map.getLong(PUBLISHED_AT_KEY, Long.MIN_VALUE);
-                            if (publishedAt != Long.MIN_VALUE && publishedAt >= cutoff
-                                    && publishedAt < oldestKept[0]) {
-                                // The oldest item this sweep is LEAVING behind. Its deadline is
-                                // when the single shared task must next fire; without it the task
-                                // that just ran would be the last one and the remaining items would
-                                // outlive their retention.
-                                oldestKept[0] = publishedAt;
+                            // Age is not delivery. Retired once every known peer has said it
+                            // took the file, or -- for the peer that never comes back -- once the
+                            // hard cap has passed. A transfer with no known peers waits for the cap
+                            // too: nobody can acknowledge it, and deleting on age alone is what
+                            // lost files to an offline watch.
+                            java.util.Set<String> ackers = acked.get(p);
+                            boolean allTook = !expected.isEmpty() && ackers != null
+                                    && ackers.containsAll(expected);
+                            boolean retire = publishedAt != Long.MIN_VALUE
+                                    && ((allTook && publishedAt < cutoff)
+                                            || publishedAt < hardCutoff);
+                            if (!retire && publishedAt != Long.MIN_VALUE) {
+                                // The deadline that actually applies to THIS item.
+                                long due = publishedAt + (allTook
+                                        ? TRANSFER_RETENTION_MILLIS : TRANSFER_HARD_CAP_MILLIS);
+                                if (due < nextDue[0]) {
+                                    nextDue[0] = due;
+                                }
                             }
-                            if (publishedAt != Long.MIN_VALUE && publishedAt < cutoff) {
+                            if (retire) {
                                 // Awaited, so a deletion that fails is not counted as a sweep that
                                 // succeeded. Firing and forgetting left `failed` false while the
                                 // item stayed published, and for the LAST transfer there may be no
@@ -2043,11 +2145,11 @@ public class CN1WearableBridge implements WearableBridge {
                 } finally {
                     synchronized (sweepLock) {
                         sweepScheduled = false;
-                        if (!failed && oldestKept[0] != Long.MAX_VALUE) {
+                        if (!failed && nextDue[0] != Long.MAX_VALUE) {
                             // Rearmed for what is still published. Outside the failure branch: a
                             // sweep that threw enumerated nothing reliable, and its retry below
                             // rearms this when it succeeds.
-                            armSweepDeadline(oldestKept[0] + TRANSFER_RETENTION_MILLIS + 1000L);
+                            armSweepDeadline(nextDue[0] + 1000L);
                         }
                         if (failed) {
                             // Retried, not abandoned. "The next transfer sweeps again" assumes
@@ -3448,6 +3550,33 @@ public class CN1WearableBridge implements WearableBridge {
             persistClaim(context, key, sequence + "|"
                     + (uri.getHost() == null ? "" : uri.getHost())
                     + "|" + System.currentTimeMillis());
+        }
+        publishTransferAck(context, uri);
+    }
+
+    /// Tells the SENDER that this device has handed the transfer to a listener.
+    ///
+    /// The claim above is local, so it answers "have I already taken this?" and nothing else. The
+    /// sender needs the same fact, and the Data Layer only replicates items, so the acknowledgement
+    /// has to be an item of our own. Published from the same place the claim is persisted -- after
+    /// the payload actually reached the listener -- so it never vouches for a delivery that did not
+    /// happen.
+    ///
+    /// Fire and forget: a lost acknowledgement costs the sender an item kept until the hard cap,
+    /// while blocking here would stall the delivery path on a network round trip.
+    private static void publishTransferAck(Context context, Uri uri) {
+        String path = uri.getPath();
+        if (path == null || !isTransferPath(path)) {
+            return;
+        }
+        try {
+            PutDataMapRequest ack = PutDataMapRequest.create(transferAckPath(path));
+            ack.getDataMap().putLong(PUBLISHED_AT_KEY, System.currentTimeMillis());
+            Wearable.getDataClient(context.getApplicationContext())
+                    .putDataItem(ack.asPutDataRequest());
+        } catch (Throwable unavailable) {
+            // The transfer has been delivered either way. Losing the acknowledgement only means the
+            // sender holds its copy until the hard cap.
         }
     }
 

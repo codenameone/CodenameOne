@@ -643,7 +643,7 @@ public final class WearableConnection {
             // getData returned the value. Queueing behind an existing backlog makes that ordering
             // structural instead of a matter of timing, and it also routes the update through the
             // park path, which is where a superseded recovery record is cancelled.
-            parked = listeners.isEmpty() || !queue.isEmpty() || (dataQueue && drainingData);
+            parked = listeners.isEmpty() || !queue.isEmpty() || (dataQueue && drainingData > 0);
             if (parked) {
                 while (queue.size() >= MAX_PENDING) {
                     Runnable evicted = evictOne(queue, path);
@@ -1000,7 +1000,11 @@ public final class WearableConnection {
     /// order behind the recovery work.
     ///
     /// Guarded by the pendingData monitor.
-    private static boolean drainingData;
+    ///
+    /// A COUNT, not a flag. addDataListener does not serialise, so two threads registering
+    /// listeners can drain at once -- and with a boolean the one that finished first cleared it
+    /// while the other was still announcing, reopening the window for whatever arrived next.
+    private static int drainingData;
 
     /// Sets the draining flag under the monitor that guards it, named rather than aliased.
     ///
@@ -1010,7 +1014,13 @@ public final class WearableConnection {
     /// takeRescanRequest.
     private static void setDrainingData(boolean draining) {
         synchronized (pendingData) {
-            drainingData = draining;
+            drainingData += draining ? 1 : -1;
+            if (drainingData < 0) {
+                // Cannot happen from the paired calls in drainPendingOnce, but a count that goes
+                // negative would silently disable the guard for every later drain, so it is pinned
+                // rather than trusted.
+                drainingData = 0;
+            }
         }
     }
 
