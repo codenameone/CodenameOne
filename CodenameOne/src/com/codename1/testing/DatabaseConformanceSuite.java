@@ -218,6 +218,7 @@ public final class DatabaseConformanceSuite {
         if (db == null) {
             return;
         }
+        noteDatabase(db);
         db.execute("CREATE TABLE IF NOT EXISTS lifecycle (id INTEGER PRIMARY KEY)");
         db.close();
 
@@ -298,6 +299,7 @@ public final class DatabaseConformanceSuite {
     ///
     /// - `IOException`: if the scratch table cannot be created
     public static void runStatements(Database db, int mode, Reporter r) throws IOException {
+        noteDatabase(db);
         db.execute("DROP TABLE IF EXISTS conf_stmt");
         db.execute("CREATE TABLE conf_stmt (id INTEGER PRIMARY KEY, t TEXT, i INTEGER, "
                 + "d REAL, b BLOB)");
@@ -338,17 +340,29 @@ public final class DatabaseConformanceSuite {
 
         // ---- typed binding
         db.execute("DELETE FROM conf_stmt");
-        boolean blobWriteSupported = true;
+        // Under the legacy hint iOS stringifies every parameter, and a byte[] has no text form, so
+        // the blob column is left out of the insert there. That is the behaviour the hint restores,
+        // not a shortcoming: the check below still confirms the stringification itself.
+        boolean stringifiesParameters = mode == MODE_LEGACY && portKind() == PORT_IOS;
+        boolean blobWriteSupported = !stringifiesParameters;
+        boolean typedRowInserted = true;
         try {
-            db.execute("INSERT INTO conf_stmt (id, t, i, d, b) VALUES (?, ?, ?, ?, ?)",
-                    new Object[] {Integer.valueOf(1), "text", Long.valueOf(42), Double.valueOf(1.5),
-                        new byte[] {1, 2, 3}});
+            if (stringifiesParameters) {
+                db.execute("INSERT INTO conf_stmt (id, t, i, d) VALUES (?, ?, ?, ?)",
+                        new Object[] {Integer.valueOf(1), "text", Long.valueOf(42),
+                            Double.valueOf(1.5)});
+            } else {
+                db.execute("INSERT INTO conf_stmt (id, t, i, d, b) VALUES (?, ?, ?, ?, ?)",
+                        new Object[] {Integer.valueOf(1), "text", Long.valueOf(42),
+                            Double.valueOf(1.5), new byte[] {1, 2, 3}});
+            }
         } catch (IOException err) {
             blobWriteSupported = false;
-            r.check(false, "execute() binds a byte[] parameter: " + err.getMessage());
+            typedRowInserted = false;
+            r.check(false, "execute() binds a parameter of each type: " + err.getMessage());
         }
 
-        if (blobWriteSupported) {
+        if (typedRowInserted) {
             Cursor cur = db.executeQuery("SELECT typeof(t), typeof(i), typeof(d), typeof(b) "
                     + "FROM conf_stmt WHERE id = 1");
             try {
@@ -371,16 +385,20 @@ public final class DatabaseConformanceSuite {
                 closeQuietly(cur);
             }
 
-            // ---- blob round trip
-            Cursor blobCur = db.executeQuery("SELECT b FROM conf_stmt WHERE id = 1");
-            try {
-                blobCur.next();
-                byte[] read = blobCur.getRow().getBlob(0);
-                boolean same = read != null && read.length == 3
-                        && read[0] == 1 && read[1] == 2 && read[2] == 3;
-                r.check(same, "a blob round trips through getBlob");
-            } finally {
-                closeQuietly(blobCur);
+            // ---- blob round trip, where one was written
+            if (blobWriteSupported) {
+                Cursor blobCur = db.executeQuery("SELECT b FROM conf_stmt WHERE id = 1");
+                try {
+                    blobCur.next();
+                    byte[] read = blobCur.getRow().getBlob(0);
+                    boolean same = read != null && read.length == 3
+                            && read[0] == 1 && read[1] == 2 && read[2] == 3;
+                    r.check(same, "a blob round trips through getBlob");
+                } finally {
+                    closeQuietly(blobCur);
+                }
+            } else {
+                r.info("legacy: no blob was written, since every parameter is stringified here");
             }
         }
 
@@ -405,12 +423,8 @@ public final class DatabaseConformanceSuite {
 
         // ---- a null parameter array is the same as no parameters
         boolean nullArrayOk = true;
-        // The null array is a local rather than a cast at the call site: a cast inside a block
-        // that catches Throwable is a cast whose failure nothing could catch, since a failed cast
-        // is not an exception on every runtime this framework targets.
-        Object[] noParameterArray = null;
         try {
-            db.execute("DELETE FROM conf_stmt", noParameterArray);
+            db.execute("DELETE FROM conf_stmt", noParameterArray());
         } catch (Throwable err) {
             nullArrayOk = false;
         }
@@ -587,6 +601,7 @@ public final class DatabaseConformanceSuite {
     ///
     /// - `IOException`: if the scratch table cannot be created
     public static void runCursor(Database db, int mode, Reporter r) throws IOException {
+        noteDatabase(db);
         db.execute("DROP TABLE IF EXISTS conf_cur");
         db.execute("CREATE TABLE conf_cur (id INTEGER PRIMARY KEY, name TEXT)");
         for (int iter = 0; iter < 5; iter++) {
@@ -786,6 +801,15 @@ public final class DatabaseConformanceSuite {
         db.execute("DROP TABLE IF EXISTS conf_cur");
     }
 
+    /// The null array `execute(String, Object[])` has to accept as "no parameters at all".
+    ///
+    /// A method rather than `(Object[]) null` at the call site, which sits inside a block that
+    /// catches Throwable: a failed cast is not an exception on every runtime this framework
+    /// targets, so a cast there is one whose failure nothing could catch.
+    private static Object[] noParameterArray() {
+        return null;
+    }
+
     /// Renders a string as code points, so a failure names what actually came back rather than
     /// printing characters a device log may not be able to show.
     private static String describeText(String value) {
@@ -836,6 +860,7 @@ public final class DatabaseConformanceSuite {
     ///
     /// - `IOException`: if the scratch table cannot be created
     public static void runTransactions(Database db, int mode, Reporter r) throws IOException {
+        noteDatabase(db);
         db.execute("DROP TABLE IF EXISTS conf_tx");
         db.execute("CREATE TABLE conf_tx (id INTEGER PRIMARY KEY)");
 
@@ -1142,10 +1167,10 @@ public final class DatabaseConformanceSuite {
         if (portKindOverride != PORT_AUTODETECT) {
             return portKindOverride;
         }
+        if (portKindFromDatabase != PORT_AUTODETECT) {
+            return portKindFromDatabase;
+        }
         try {
-            if (Display.getInstance().isSimulator()) {
-                return PORT_SIMULATOR;
-            }
             String platform = Display.getInstance().getPlatformName();
             if ("ios".equals(platform)) {
                 return PORT_IOS;
@@ -1153,10 +1178,40 @@ public final class DatabaseConformanceSuite {
             if ("and".equals(platform)) {
                 return PORT_ANDROID;
             }
+            if (Display.getInstance().isSimulator()) {
+                return PORT_SIMULATOR;
+            }
         } catch (Throwable displayNotUp) {
             return PORT_OTHER;
         }
         return PORT_OTHER;
+    }
+
+    /// Autodetected from a database implementation, or `#PORT_AUTODETECT` before one is seen.
+    private static int portKindFromDatabase = PORT_AUTODETECT;
+
+    /// Records which port a database came from, which is the only unambiguous signal available.
+    ///
+    /// `Display` cannot answer this. The desktop simulator reports the platform name of the skin it
+    /// is wearing and answers `isSimulator()` with true -- and so does a real iOS build running on
+    /// the iOS Simulator, which is where this suite runs in CI. Asking `isSimulator()` first read
+    /// every iOS Simulator run as a desktop one and applied the wrong port's legacy expectations to
+    /// it; asking the platform name first would still confuse the desktop simulator wearing an iOS
+    /// skin for iOS. The implementation class behind the `Database` is neither.
+    private static void noteDatabase(Database db) {
+        if (db == null || portKindFromDatabase != PORT_AUTODETECT) {
+            return;
+        }
+        String impl = db.getClass().getName();
+        if (impl.startsWith("com.codename1.impl.javase.")) {
+            portKindFromDatabase = PORT_SIMULATOR;
+        } else if (impl.startsWith("com.codename1.impl.ios.")) {
+            portKindFromDatabase = PORT_IOS;
+        } else if (impl.startsWith("com.codename1.impl.android.")) {
+            portKindFromDatabase = PORT_ANDROID;
+        } else {
+            portKindFromDatabase = PORT_OTHER;
+        }
     }
 
     /// The blob-query capability could not be determined.

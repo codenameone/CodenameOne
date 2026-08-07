@@ -72,6 +72,11 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
     /// Row count once known, or -1. Filled in by anything that walks to the end.
     private int knownCount = -1;
 
+    /// Column count once asked for, or -1. A statement's column count does not change, and every
+    /// value read checks its index against it, so asking the engine once keeps that check off the
+    /// per-read path.
+    private int knownColumnCount = -1;
+
     /// Repositions the underlying statement before its first row.
     ///
     /// #### Throws
@@ -364,7 +369,10 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
     /// which is the worst of the three possible outcomes; the other engines behind this API report
     /// it, so it is reported here for all of them.
     private void checkColumn(int index) throws IOException {
-        int count = columnCount();
+        if (knownColumnCount < 0) {
+            knownColumnCount = columnCount();
+        }
+        int count = knownColumnCount;
         if (index < 0 || index >= count) {
             throw new IOException("Column index " + index + " is out of range. This result set has "
                     + count + (count == 1 ? " column" : " columns"));
