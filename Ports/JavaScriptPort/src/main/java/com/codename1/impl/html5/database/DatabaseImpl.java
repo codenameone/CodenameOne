@@ -279,38 +279,60 @@ public class DatabaseImpl extends Database {
     }
 
     private void bindText(long stmt, String[] params) throws IOException {
-        int len = params == null ? 0 : params.length;
-        checkParameterCount(stmt, len);
-        for (int iter = 0; iter < len; iter++) {
-            if (params[iter] == null) {
-                SQLiteNative.bindNull(stmt, iter + 1);
-            } else {
-                SQLiteNative.bindString(stmt, iter + 1, params[iter]);
+        // Finalized if anything in here throws. The statement is not registered as a cursor
+        // until after binding, so a rejected parameter would otherwise strand its peer -- and
+        // an unfinalized statement keeps the connection alive after close().
+        try {
+            int len = params == null ? 0 : params.length;
+            checkParameterCount(stmt, len);
+            for (int iter = 0; iter < len; iter++) {
+                if (params[iter] == null) {
+                    checkNative(SQLiteNative.bindNull(stmt, iter + 1));
+                } else {
+                    checkNative(SQLiteNative.bindString(stmt, iter + 1, params[iter]));
+                }
             }
+        } catch (IOException err) {
+            SQLiteNative.finish(stmt);
+            throw err;
+        } catch (RuntimeException err) {
+            SQLiteNative.finish(stmt);
+            throw err;
         }
     }
 
     private void bind(long stmt, Object[] params) throws IOException {
-        checkParameterCount(stmt, params.length);
-        for (int iter = 0; iter < params.length; iter++) {
-            Object p = params[iter];
-            int index = iter + 1;
-            if (p == null) {
-                SQLiteNative.bindNull(stmt, index);
-            } else if (p instanceof byte[]) {
-                SQLiteNative.bindBlob(stmt, index, (byte[]) p);
-            } else if (p instanceof String) {
-                SQLiteNative.bindString(stmt, index, (String) p);
-            } else if (p instanceof Double || p instanceof Float) {
-                SQLiteNative.bindDouble(stmt, index, ((Number) p).doubleValue());
-            } else if (p instanceof Long || p instanceof Integer || p instanceof Short
-                    || p instanceof Byte) {
-                SQLiteNative.bindLong(stmt, index, ((Number) p).longValue());
-            } else if (p instanceof Boolean) {
-                SQLiteNative.bindLong(stmt, index, ((Boolean) p).booleanValue() ? 1 : 0);
-            } else {
-                SQLiteNative.bindString(stmt, index, p.toString());
+        // Finalized if anything in here throws. The statement is not registered as a cursor
+        // until after binding, so a rejected parameter would otherwise strand its peer -- and
+        // an unfinalized statement keeps the connection alive after close().
+        try {
+            checkParameterCount(stmt, params.length);
+            for (int iter = 0; iter < params.length; iter++) {
+                Object p = params[iter];
+                int index = iter + 1;
+                if (p == null) {
+                    checkNative(SQLiteNative.bindNull(stmt, index));
+                } else if (p instanceof byte[]) {
+                    checkNative(SQLiteNative.bindBlob(stmt, index, (byte[]) p));
+                } else if (p instanceof String) {
+                    checkNative(SQLiteNative.bindString(stmt, index, (String) p));
+                } else if (p instanceof Double || p instanceof Float) {
+                    checkNative(SQLiteNative.bindDouble(stmt, index, ((Number) p).doubleValue()));
+                } else if (p instanceof Long || p instanceof Integer || p instanceof Short
+                        || p instanceof Byte) {
+                    checkNative(SQLiteNative.bindLong(stmt, index, ((Number) p).longValue()));
+                } else if (p instanceof Boolean) {
+                    checkNative(SQLiteNative.bindLong(stmt, index, ((Boolean) p).booleanValue() ? 1 : 0));
+                } else {
+                    checkNative(SQLiteNative.bindString(stmt, index, p.toString()));
+                }
             }
+        } catch (IOException err) {
+            SQLiteNative.finish(stmt);
+            throw err;
+        } catch (RuntimeException err) {
+            SQLiteNative.finish(stmt);
+            throw err;
         }
     }
 

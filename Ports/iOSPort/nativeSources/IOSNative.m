@@ -9176,39 +9176,58 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlStmtPrepare___long_java_lang_Strin
     return (JAVA_LONG)stmt;
 }
 
+/** Raises when a bind fails. SQLite unbinds the old value before copying, so ignoring this leaves
+ * the parameter as SQL NULL and the statement runs with something the caller never supplied. */
+static void cn1CheckSqlBind(CODENAME_ONE_THREAD_STATE, int rc, int index) {
+    if (rc == SQLITE_OK) {
+        return;
+    }
+    NSString* message = [NSString stringWithFormat:@"Parameter %d could not be bound: %s", index,
+            sqlite3_errstr(rc)];
+    cn1ThrowSqlMessage(CN1_THREAD_STATE_PASS_ARG [message UTF8String]);
+}
+
 JAVA_INT com_codename1_impl_ios_IOSNative_sqlStmtParameterCount___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
     return sqlite3_bind_parameter_count((sqlite3_stmt*)statementPeer);
 }
 
 void com_codename1_impl_ios_IOSNative_sqlStmtBindNull___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index) {
-    sqlite3_bind_null((sqlite3_stmt*)statementPeer, index);
+    cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
+            sqlite3_bind_null((sqlite3_stmt*)statementPeer, index), index);
 }
 
 void com_codename1_impl_ios_IOSNative_sqlStmtBindString___long_int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index, JAVA_OBJECT value) {
     if (value == JAVA_NULL) {
-        sqlite3_bind_null((sqlite3_stmt*)statementPeer, index);
+        cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
+                sqlite3_bind_null((sqlite3_stmt*)statementPeer, index), index);
         return;
     }
     const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG value);
-    sqlite3_bind_text((sqlite3_stmt*)statementPeer, index, chrs, -1, SQLITE_TRANSIENT);
+    cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
+            sqlite3_bind_text((sqlite3_stmt*)statementPeer, index, chrs, -1, SQLITE_TRANSIENT), index);
 }
 
 void com_codename1_impl_ios_IOSNative_sqlStmtBindBlob___long_int_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index, JAVA_OBJECT value) {
     if (value == JAVA_NULL) {
-        sqlite3_bind_null((sqlite3_stmt*)statementPeer, index);
+        cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
+                sqlite3_bind_null((sqlite3_stmt*)statementPeer, index), index);
         return;
     }
     JAVA_ARRAY byteArray = (JAVA_ARRAY)value;
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->data;
-    sqlite3_bind_blob((sqlite3_stmt*)statementPeer, index, data, byteArray->length, SQLITE_TRANSIENT);
+    cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
+            sqlite3_bind_blob((sqlite3_stmt*)statementPeer, index, data, byteArray->length,
+                    SQLITE_TRANSIENT), index);
 }
 
 void com_codename1_impl_ios_IOSNative_sqlStmtBindLong___long_int_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index, JAVA_LONG value) {
-    sqlite3_bind_int64((sqlite3_stmt*)statementPeer, index, value);
+    cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
+            sqlite3_bind_int64((sqlite3_stmt*)statementPeer, index, value), index);
 }
 
 void com_codename1_impl_ios_IOSNative_sqlStmtBindDouble___long_int_double(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index, JAVA_DOUBLE value) {
-    sqlite3_bind_double((sqlite3_stmt*)statementPeer, index, value);
+    cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
+            sqlite3_bind_double((sqlite3_stmt*)statementPeer, index, value), index);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlStmtStep___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer) {
@@ -9354,7 +9373,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnBlob___long_i
     sqlite3_stmt* stmt = (sqlite3_stmt*)statement;
     const void* bytes = sqlite3_column_blob(stmt, col);
     int length = sqlite3_column_bytes(stmt, col);
-    if (bytes == NULL || length < 0) {
+    // A zero length blob is a blob, not SQL NULL: SQLite may return a null pointer for it, and
+    // reading that as null would disagree with the column type and with wasNull().
+    if (length < 0 || (bytes == NULL && length > 0)) {
         return JAVA_NULL;
     }
     POOL_BEGIN();

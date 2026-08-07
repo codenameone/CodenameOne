@@ -285,14 +285,25 @@ class DatabaseImpl extends Database {
 
     /** Binds every value as text, rejecting a count that does not match the statement. */
     private void bindText(long stmt, String[] params) throws IOException {
-        int len = params == null ? 0 : params.length;
-        checkParameterCount(stmt, len);
-        for (int iter = 0; iter < len; iter++) {
-            if (params[iter] == null) {
-                IOSImplementation.nativeInstance.sqlStmtBindNull(stmt, iter + 1);
-            } else {
-                IOSImplementation.nativeInstance.sqlStmtBindString(stmt, iter + 1, params[iter]);
+        // Finalized if anything in here throws. The statement is not registered as a cursor
+        // until after binding, so a rejected parameter would otherwise strand its peer -- and
+        // an unfinalized statement keeps the connection alive after close().
+        try {
+            int len = params == null ? 0 : params.length;
+            checkParameterCount(stmt, len);
+            for (int iter = 0; iter < len; iter++) {
+                if (params[iter] == null) {
+                    IOSImplementation.nativeInstance.sqlStmtBindNull(stmt, iter + 1);
+                } else {
+                    IOSImplementation.nativeInstance.sqlStmtBindString(stmt, iter + 1, params[iter]);
+                }
             }
+        } catch (IOException err) {
+            IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
+            throw err;
+        } catch (RuntimeException err) {
+            IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
+            throw err;
         }
     }
 
@@ -310,29 +321,40 @@ class DatabaseImpl extends Database {
 
     /** Binds by runtime type, so an Integer is stored as INTEGER rather than as its text form. */
     private void bind(long stmt, Object[] params) throws IOException {
-        checkParameterCount(stmt, params.length);
-        for (int iter = 0; iter < params.length; iter++) {
-            Object p = params[iter];
-            int index = iter + 1;
-            if (p == null) {
-                IOSImplementation.nativeInstance.sqlStmtBindNull(stmt, index);
-            } else if (p instanceof byte[]) {
-                IOSImplementation.nativeInstance.sqlStmtBindBlob(stmt, index, (byte[])p);
-            } else if (p instanceof String) {
-                IOSImplementation.nativeInstance.sqlStmtBindString(stmt, index, (String)p);
-            } else if (p instanceof Double || p instanceof Float) {
-                IOSImplementation.nativeInstance.sqlStmtBindDouble(stmt, index,
-                        ((Number)p).doubleValue());
-            } else if (p instanceof Long || p instanceof Integer || p instanceof Short
-                    || p instanceof Byte) {
-                IOSImplementation.nativeInstance.sqlStmtBindLong(stmt, index,
-                        ((Number)p).longValue());
-            } else if (p instanceof Boolean) {
-                IOSImplementation.nativeInstance.sqlStmtBindLong(stmt, index,
-                        ((Boolean)p).booleanValue() ? 1 : 0);
-            } else {
-                IOSImplementation.nativeInstance.sqlStmtBindString(stmt, index, p.toString());
+        // Finalized if anything in here throws. The statement is not registered as a cursor
+        // until after binding, so a rejected parameter would otherwise strand its peer -- and
+        // an unfinalized statement keeps the connection alive after close().
+        try {
+            checkParameterCount(stmt, params.length);
+            for (int iter = 0; iter < params.length; iter++) {
+                Object p = params[iter];
+                int index = iter + 1;
+                if (p == null) {
+                    IOSImplementation.nativeInstance.sqlStmtBindNull(stmt, index);
+                } else if (p instanceof byte[]) {
+                    IOSImplementation.nativeInstance.sqlStmtBindBlob(stmt, index, (byte[])p);
+                } else if (p instanceof String) {
+                    IOSImplementation.nativeInstance.sqlStmtBindString(stmt, index, (String)p);
+                } else if (p instanceof Double || p instanceof Float) {
+                    IOSImplementation.nativeInstance.sqlStmtBindDouble(stmt, index,
+                            ((Number)p).doubleValue());
+                } else if (p instanceof Long || p instanceof Integer || p instanceof Short
+                        || p instanceof Byte) {
+                    IOSImplementation.nativeInstance.sqlStmtBindLong(stmt, index,
+                            ((Number)p).longValue());
+                } else if (p instanceof Boolean) {
+                    IOSImplementation.nativeInstance.sqlStmtBindLong(stmt, index,
+                            ((Boolean)p).booleanValue() ? 1 : 0);
+                } else {
+                    IOSImplementation.nativeInstance.sqlStmtBindString(stmt, index, p.toString());
+                }
             }
+        } catch (IOException err) {
+            IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
+            throw err;
+        } catch (RuntimeException err) {
+            IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
+            throw err;
         }
     }
 

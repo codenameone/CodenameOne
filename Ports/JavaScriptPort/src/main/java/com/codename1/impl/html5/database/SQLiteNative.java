@@ -97,15 +97,20 @@ public class SQLiteNative {
 
     public static native int parameterCount(long stmtPeer);
 
-    public static native void bindNull(long stmtPeer, int index);
+    /** Binds SQL NULL, returning false and recording {@link #lastError()} on failure. */
+    public static native boolean bindNull(long stmtPeer, int index);
 
-    public static native void bindString(long stmtPeer, int index, String value);
+    /** Binds text, returning false and recording {@link #lastError()} on failure. */
+    public static native boolean bindString(long stmtPeer, int index, String value);
 
-    public static native void bindBlob(long stmtPeer, int index, byte[] value);
+    /** Binds a blob, returning false and recording {@link #lastError()} on failure. */
+    public static native boolean bindBlob(long stmtPeer, int index, byte[] value);
 
-    public static native void bindLong(long stmtPeer, int index, long value);
+    /** Binds an integer, returning false and recording {@link #lastError()} on failure. */
+    public static native boolean bindLong(long stmtPeer, int index, long value);
 
-    public static native void bindDouble(long stmtPeer, int index, double value);
+    /** Binds a real, returning false and recording {@link #lastError()} on failure. */
+    public static native boolean bindDouble(long stmtPeer, int index, double value);
 
     /**
      * Steps a statement.

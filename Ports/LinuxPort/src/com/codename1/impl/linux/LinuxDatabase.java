@@ -263,38 +263,60 @@ class LinuxDatabase extends Database {
     }
 
     private void bindText(long stmt, String[] params) throws IOException {
-        int len = params == null ? 0 : params.length;
-        checkParameterCount(stmt, len);
-        for (int iter = 0; iter < len; iter++) {
-            if (params[iter] == null) {
-                LinuxNative.sqlStmtBindNull(stmt, iter + 1);
-            } else {
-                LinuxNative.sqlStmtBindString(stmt, iter + 1, params[iter]);
+        // Finalized if anything in here throws. The statement is not registered as a cursor
+        // until after binding, so a rejected parameter would otherwise strand its peer -- and
+        // an unfinalized statement keeps the connection alive after close().
+        try {
+            int len = params == null ? 0 : params.length;
+            checkParameterCount(stmt, len);
+            for (int iter = 0; iter < len; iter++) {
+                if (params[iter] == null) {
+                    LinuxNative.sqlStmtBindNull(stmt, iter + 1);
+                } else {
+                    LinuxNative.sqlStmtBindString(stmt, iter + 1, params[iter]);
+                }
             }
+        } catch (IOException err) {
+            LinuxNative.sqlStmtFinalize(stmt);
+            throw err;
+        } catch (RuntimeException err) {
+            LinuxNative.sqlStmtFinalize(stmt);
+            throw err;
         }
     }
 
     private void bind(long stmt, Object[] params) throws IOException {
-        checkParameterCount(stmt, params.length);
-        for (int iter = 0; iter < params.length; iter++) {
-            Object p = params[iter];
-            int index = iter + 1;
-            if (p == null) {
-                LinuxNative.sqlStmtBindNull(stmt, index);
-            } else if (p instanceof byte[]) {
-                LinuxNative.sqlStmtBindBlob(stmt, index, (byte[]) p);
-            } else if (p instanceof String) {
-                LinuxNative.sqlStmtBindString(stmt, index, (String) p);
-            } else if (p instanceof Double || p instanceof Float) {
-                LinuxNative.sqlStmtBindDouble(stmt, index, ((Number) p).doubleValue());
-            } else if (p instanceof Long || p instanceof Integer || p instanceof Short
-                    || p instanceof Byte) {
-                LinuxNative.sqlStmtBindLong(stmt, index, ((Number) p).longValue());
-            } else if (p instanceof Boolean) {
-                LinuxNative.sqlStmtBindLong(stmt, index, ((Boolean) p).booleanValue() ? 1 : 0);
-            } else {
-                LinuxNative.sqlStmtBindString(stmt, index, p.toString());
+        // Finalized if anything in here throws. The statement is not registered as a cursor
+        // until after binding, so a rejected parameter would otherwise strand its peer -- and
+        // an unfinalized statement keeps the connection alive after close().
+        try {
+            checkParameterCount(stmt, params.length);
+            for (int iter = 0; iter < params.length; iter++) {
+                Object p = params[iter];
+                int index = iter + 1;
+                if (p == null) {
+                    LinuxNative.sqlStmtBindNull(stmt, index);
+                } else if (p instanceof byte[]) {
+                    LinuxNative.sqlStmtBindBlob(stmt, index, (byte[]) p);
+                } else if (p instanceof String) {
+                    LinuxNative.sqlStmtBindString(stmt, index, (String) p);
+                } else if (p instanceof Double || p instanceof Float) {
+                    LinuxNative.sqlStmtBindDouble(stmt, index, ((Number) p).doubleValue());
+                } else if (p instanceof Long || p instanceof Integer || p instanceof Short
+                        || p instanceof Byte) {
+                    LinuxNative.sqlStmtBindLong(stmt, index, ((Number) p).longValue());
+                } else if (p instanceof Boolean) {
+                    LinuxNative.sqlStmtBindLong(stmt, index, ((Boolean) p).booleanValue() ? 1 : 0);
+                } else {
+                    LinuxNative.sqlStmtBindString(stmt, index, p.toString());
+                }
             }
+        } catch (IOException err) {
+            LinuxNative.sqlStmtFinalize(stmt);
+            throw err;
+        } catch (RuntimeException err) {
+            LinuxNative.sqlStmtFinalize(stmt);
+            throw err;
         }
     }
 

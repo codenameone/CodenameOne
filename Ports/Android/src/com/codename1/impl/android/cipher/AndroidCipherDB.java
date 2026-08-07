@@ -283,12 +283,23 @@ class AndroidCipherDB extends Database {
                     + " AS cn1migrate KEY " + toPragmaLiteral(targetKey));
             android.database.Cursor exported = db.rawQuery("SELECT sqlcipher_export('cn1migrate')",
                     null);
-            exported.moveToFirst();
-            exported.close();
+            try {
+                exported.moveToFirst();
+            } finally {
+                exported.close();
+            }
             db.execSQL("PRAGMA cn1migrate.user_version = " + userVersion);
             db.execSQL("PRAGMA cn1migrate.application_id = " + applicationId);
             db.execSQL("DETACH DATABASE cn1migrate");
         } catch (RuntimeException err) {
+            // Detach before giving up. A caller that catches this and carries on with the same
+            // database would otherwise be left with cn1migrate still attached, and the next
+            // conversion would fail because that name is already in use.
+            try {
+                db.execSQL("DETACH DATABASE cn1migrate");
+            } catch (RuntimeException notAttached) {
+                // It may never have been attached; the conversion failure is what matters.
+            }
             target.delete();
             throw new IOException("The database could not be converted: " + err.getMessage(), err);
         }

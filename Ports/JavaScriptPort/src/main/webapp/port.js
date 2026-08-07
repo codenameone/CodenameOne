@@ -6876,40 +6876,54 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_parameterCount_l
     return cn1SqliteGuard(function() { return cn1SqliteLookup(Number(stmtId)).parameterCount; }, -1);
   });
 
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull_long_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull___long_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull_long_int_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull___long_int_R_void"],
-  function(stmtId, index) { cn1SqliteLookup(Number(stmtId)).bind(index | 0, null); return null; });
-
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindString_long_int_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindString___long_int_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindString_long_int_java_lang_String_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindString___long_int_java_lang_String_R_void"],
-  function(stmtId, index, value) {
-    cn1SqliteLookup(Number(stmtId)).bind(index | 0, value === null ? null : jvm.toNativeString(value));
-    return null;
-  });
-
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob_long_int_byte_1ARRAY", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob___long_int_byte_1ARRAY", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob_long_int_byte_1ARRAY_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob___long_int_byte_1ARRAY_R_void"],
-  function(stmtId, index, value) {
-    if (value === null) {
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindNulllong_int_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull___long_int_R_boolean"],
+  function(stmtId, index) {
+    return cn1SqliteGuard(function() {
       cn1SqliteLookup(Number(stmtId)).bind(index | 0, null);
-      return null;
-    }
-    // Java bytes are signed; the engine wants raw octets.
-    const bytes = new Uint8Array(value.length);
-    for (let i = 0; i < value.length; i++) {
-      bytes[i] = value[i] & 0xff;
-    }
-    cn1SqliteLookup(Number(stmtId)).bind(index | 0, bytes);
-    return null;
+      return true;
+    }, false);
   });
 
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong_long_int_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong___long_int_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong_long_int_long_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong___long_int_long_R_void"],
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindString_long_int_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindString___long_int_java_lang_String_R_boolean"],
   function(stmtId, index, value) {
-    cn1SqliteLookup(Number(stmtId)).bind(index | 0, cn1SqliteToBigInt(value));
-    return null;
+    return cn1SqliteGuard(function() {
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0,
+        value === null ? null : jvm.toNativeString(value));
+      return true;
+    }, false);
   });
 
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble_long_int_double", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble___long_int_double", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble_long_int_double_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble___long_int_double_R_void"],
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob_long_int_byte_1ARRAY_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindBlob___long_int_byte_1ARRAY_R_boolean"],
   function(stmtId, index, value) {
-    cn1SqliteLookup(Number(stmtId)).bind(index | 0, value);
-    return null;
+    return cn1SqliteGuard(function() {
+      if (value === null) {
+        cn1SqliteLookup(Number(stmtId)).bind(index | 0, null);
+        return true;
+      }
+      // Java bytes are signed; the engine wants raw octets.
+      const bytes = new Uint8Array(value.length);
+      for (let i = 0; i < value.length; i++) {
+        bytes[i] = value[i] & 0xff;
+      }
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0, bytes);
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong_long_int_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindLong___long_int_long_R_boolean"],
+  function(stmtId, index, value) {
+    return cn1SqliteGuard(function() {
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0, cn1SqliteToBigInt(value));
+      return true;
+    }, false);
+  });
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble_long_int_double_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindDouble___long_int_double_R_boolean"],
+  function(stmtId, index, value) {
+    return cn1SqliteGuard(function() {
+      cn1SqliteLookup(Number(stmtId)).bind(index | 0, value);
+      return true;
+    }, false);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_step_long_R_int", "cn1_com_codename1_impl_html5_database_SQLiteNative_step___long_R_int"],

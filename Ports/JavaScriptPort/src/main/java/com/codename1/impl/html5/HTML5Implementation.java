@@ -11511,8 +11511,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void deleteDB(String databaseName) throws IOException {
-        if (com.codename1.impl.html5.database.SQLiteNative.init()
-                && !com.codename1.impl.html5.database.SQLiteNative.delete(databaseName)) {
+        // A failed init is not "nothing to delete". The engine is unavailable - another tab
+        // holding the storage, most likely - and the database is still there, so returning
+        // normally would report a deletion that did not happen.
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()) {
+            throw new IOException("The database " + databaseName + " could not be deleted "
+                    + "because the SQLite engine is unavailable");
+        }
+        if (!com.codename1.impl.html5.database.SQLiteNative.delete(databaseName)) {
             throw new IOException("The database " + databaseName + " could not be deleted: "
                     + com.codename1.impl.html5.database.SQLiteNative.lastError());
         }

@@ -11188,8 +11188,13 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isDatabaseManagedKeyHardwareBacked() {
-        // SecureStorage keeps the key in the keychain, which is backed by the Secure Enclave.
-        return true;
+        // The managed key is a generic-password keychain item, so what backs it is the device's
+        // key hierarchy, which every iOS device since the A7 roots in the Secure Enclave. That is
+        // a real hardware guarantee on a device and none at all in the Simulator, where the
+        // keychain is an ordinary file on the host. Applications are told they may use this to
+        // refuse to store sensitive data, so answering true there would be a false assurance --
+        // and the security notes already say the simulator is the weaker case.
+        return !nativeInstance.isSimulator();
     }
 
     @Override

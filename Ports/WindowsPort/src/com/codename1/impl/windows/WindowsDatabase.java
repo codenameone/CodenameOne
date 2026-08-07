@@ -263,38 +263,60 @@ class WindowsDatabase extends Database {
     }
 
     private void bindText(long stmt, String[] params) throws IOException {
-        int len = params == null ? 0 : params.length;
-        checkParameterCount(stmt, len);
-        for (int iter = 0; iter < len; iter++) {
-            if (params[iter] == null) {
-                WindowsNative.sqlStmtBindNull(stmt, iter + 1);
-            } else {
-                WindowsNative.sqlStmtBindString(stmt, iter + 1, params[iter]);
+        // Finalized if anything in here throws. The statement is not registered as a cursor
+        // until after binding, so a rejected parameter would otherwise strand its peer -- and
+        // an unfinalized statement keeps the connection alive after close().
+        try {
+            int len = params == null ? 0 : params.length;
+            checkParameterCount(stmt, len);
+            for (int iter = 0; iter < len; iter++) {
+                if (params[iter] == null) {
+                    WindowsNative.sqlStmtBindNull(stmt, iter + 1);
+                } else {
+                    WindowsNative.sqlStmtBindString(stmt, iter + 1, params[iter]);
+                }
             }
+        } catch (IOException err) {
+            WindowsNative.sqlStmtFinalize(stmt);
+            throw err;
+        } catch (RuntimeException err) {
+            WindowsNative.sqlStmtFinalize(stmt);
+            throw err;
         }
     }
 
     private void bind(long stmt, Object[] params) throws IOException {
-        checkParameterCount(stmt, params.length);
-        for (int iter = 0; iter < params.length; iter++) {
-            Object p = params[iter];
-            int index = iter + 1;
-            if (p == null) {
-                WindowsNative.sqlStmtBindNull(stmt, index);
-            } else if (p instanceof byte[]) {
-                WindowsNative.sqlStmtBindBlob(stmt, index, (byte[]) p);
-            } else if (p instanceof String) {
-                WindowsNative.sqlStmtBindString(stmt, index, (String) p);
-            } else if (p instanceof Double || p instanceof Float) {
-                WindowsNative.sqlStmtBindDouble(stmt, index, ((Number) p).doubleValue());
-            } else if (p instanceof Long || p instanceof Integer || p instanceof Short
-                    || p instanceof Byte) {
-                WindowsNative.sqlStmtBindLong(stmt, index, ((Number) p).longValue());
-            } else if (p instanceof Boolean) {
-                WindowsNative.sqlStmtBindLong(stmt, index, ((Boolean) p).booleanValue() ? 1 : 0);
-            } else {
-                WindowsNative.sqlStmtBindString(stmt, index, p.toString());
+        // Finalized if anything in here throws. The statement is not registered as a cursor
+        // until after binding, so a rejected parameter would otherwise strand its peer -- and
+        // an unfinalized statement keeps the connection alive after close().
+        try {
+            checkParameterCount(stmt, params.length);
+            for (int iter = 0; iter < params.length; iter++) {
+                Object p = params[iter];
+                int index = iter + 1;
+                if (p == null) {
+                    WindowsNative.sqlStmtBindNull(stmt, index);
+                } else if (p instanceof byte[]) {
+                    WindowsNative.sqlStmtBindBlob(stmt, index, (byte[]) p);
+                } else if (p instanceof String) {
+                    WindowsNative.sqlStmtBindString(stmt, index, (String) p);
+                } else if (p instanceof Double || p instanceof Float) {
+                    WindowsNative.sqlStmtBindDouble(stmt, index, ((Number) p).doubleValue());
+                } else if (p instanceof Long || p instanceof Integer || p instanceof Short
+                        || p instanceof Byte) {
+                    WindowsNative.sqlStmtBindLong(stmt, index, ((Number) p).longValue());
+                } else if (p instanceof Boolean) {
+                    WindowsNative.sqlStmtBindLong(stmt, index, ((Boolean) p).booleanValue() ? 1 : 0);
+                } else {
+                    WindowsNative.sqlStmtBindString(stmt, index, p.toString());
+                }
             }
+        } catch (IOException err) {
+            WindowsNative.sqlStmtFinalize(stmt);
+            throw err;
+        } catch (RuntimeException err) {
+            WindowsNative.sqlStmtFinalize(stmt);
+            throw err;
         }
     }
 
