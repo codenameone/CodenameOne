@@ -728,6 +728,45 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// WearRound in particular is worth checking a layout against, because a round face is where a
     /// design that assumes a rectangle falls apart.
     private static final String WATCH_COMPANION_SKIN = "/AppleWatch45mm.skin";
+    /// Every watch skin shipped on the classpath, so the menu can offer the other form factors.
+    ///
+    /// The menu is built from the "skins" preference, and only the skin actually LOADED gets added
+    /// to it -- so launching the companion registered the 45mm face and the other three could never
+    /// be chosen, which made the round face in particular unreachable. That is the one worth
+    /// checking a layout against, since a round face is where a design that assumes a rectangle
+    /// falls apart.
+    private static final String[] BUNDLED_WATCH_SKINS = {
+        "/AppleWatch45mm.skin", "/AppleWatch41mm.skin", "/WearRound.skin", "/WearSquare.skin"
+    };
+
+    /// Adds the bundled watch skins that are actually on the classpath to the skin menu's list.
+    ///
+    /// Merged rather than assigned: the preference holds whatever the user has added, and a skin
+    /// already listed is left where it is.
+    private static void registerBundledWatchSkins(Preferences pref) {
+        String skinNames = pref.get("skins", DEFAULT_SKINS);
+        if (skinNames == null) {
+            skinNames = DEFAULT_SKINS;
+        }
+        StringBuilder merged = new StringBuilder(skinNames);
+        boolean added = false;
+        for (String skin : BUNDLED_WATCH_SKINS) {
+            if (JavaSEPort.class.getResource(skin) == null) {
+                continue;
+            }
+            if (skinNames.contains(skin + ";") || skinNames.endsWith(skin)) {
+                continue;
+            }
+            if (merged.length() > 0 && merged.charAt(merged.length() - 1) != ';') {
+                merged.append(';');
+            }
+            merged.append(skin).append(';');
+            added = true;
+        }
+        if (added) {
+            pref.put("skins", merged.toString());
+        }
+    }
     private static final String DEFAULT_SKINS = DEFAULT_SKIN+";";
     private static String appHomeDir = ".cn1";
     /// The app home both halves of a simulated pair resolve to, without the watch suffix below. The
@@ -7571,6 +7610,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         // OTA downloads from the legacy codenameone.com gallery move
         // into the submenu so the top level isn't cluttered with old
         // device skins most users never installed.
+        // Seeded here rather than at launch: the menu is what needs them, and a developer who
+        // never launches the companion can still open a watch skin to check a layout.
+        registerBundledWatchSkins(pref);
         String skinNames = pref.get("skins", DEFAULT_SKINS);
         if (skinNames == null || skinNames.length() < DEFAULT_SKINS.length()) {
             skinNames = DEFAULT_SKINS;
