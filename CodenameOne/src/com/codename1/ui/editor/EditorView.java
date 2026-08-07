@@ -53,8 +53,7 @@ public class EditorView extends Component implements TextInputClient {
 
     private int caret;
     private int anchor = -1;
-    private boolean multiKeyModeRestore;
-    private boolean multiKeyModeChanged;
+    private boolean multiKeyModeInstalled;
     private int composingStart = -1;
     private int composingEnd = -1;
     // pre-composition snapshot so the finalized composition forms a single undo unit
@@ -1379,14 +1378,13 @@ public class EditorView extends Component implements TextInputClient {
         // the most recent press. Anyone typing at speed presses the next key before releasing the
         // last one, so releases were being discarded and characters silently vanished -- always
         // the same ones, because it depends on which pairs overlap. Multi key mode delivers every
-        // release. It is restored on focus loss so the rest of the application is unaffected.
-        // Captured once: gaining focus twice without an intervening restore would otherwise
-        // record the mode this editor itself installed.
-        if (!multiKeyModeChanged) {
-            multiKeyModeRestore = Display.getInstance().isMultiKeyMode();
-            multiKeyModeChanged = true;
+        // release. Only an editor that found the mode off turns it on, and only that editor turns
+        // it back off on focus loss; an application that runs in multi key mode by choice is left
+        // alone rather than having the mode switched off underneath it.
+        if (!multiKeyModeInstalled && !Display.getInstance().isMultiKeyMode()) {
+            Display.getInstance().setMultiKeyMode(true);
+            multiKeyModeInstalled = true;
         }
-        Display.getInstance().setMultiKeyMode(true);
         startInput();
         if (!animRegistered && getComponentForm() != null) {
             getComponentForm().registerAnimated(this);
@@ -1396,16 +1394,16 @@ public class EditorView extends Component implements TextInputClient {
         repaint();
     }
 
-    /// Puts multi key mode back the way this editor found it, and only if this editor is the one
-    /// that changed it. An editor that was initialized but never focused must not restore anything:
-    /// removing it would otherwise switch the mode off underneath the editor currently being typed
-    /// in, bringing back the dropped keystrokes this exists to prevent.
+    /// Switches multi key mode back off, and only if this editor is the one that switched it on.
+    /// An editor that found the mode already on, or that was initialized but never focused, must
+    /// not touch it: doing so would switch the mode off underneath whoever does own it, bringing
+    /// back the dropped keystrokes this exists to prevent.
     private void restoreMultiKeyMode() {
-        if (!multiKeyModeChanged) {
+        if (!multiKeyModeInstalled) {
             return;
         }
-        multiKeyModeChanged = false;
-        Display.getInstance().setMultiKeyMode(multiKeyModeRestore);
+        multiKeyModeInstalled = false;
+        Display.getInstance().setMultiKeyMode(false);
     }
 
     @Override
