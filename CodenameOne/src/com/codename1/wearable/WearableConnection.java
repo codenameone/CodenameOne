@@ -401,7 +401,10 @@ public final class WearableConnection {
     ///
     /// - `l`: the listener to remove
     public static void removeMessageListener(WearableMessageListener l) {
-        messageListeners.remove(l);
+        // Same reasoning as removeDataListener.
+        synchronized (pendingMessages) {
+            messageListeners.remove(l);
+        }
     }
 
     /// Registers a listener for replicated data changes. Register from your app's `init()` for the
@@ -437,7 +440,13 @@ public final class WearableConnection {
     ///
     /// - `l`: the listener to remove
     public static void removeDataListener(WearableDataListener l) {
-        dataListeners.remove(l);
+        // The SAME monitor the registration holds. Unsynchronized, a removal could land between a
+        // concurrent registration's membership check and its append: the remove found nothing,
+        // returned successfully, and the append then put the listener back -- so a listener the
+        // app had removed went on receiving callbacks, and stayed reachable.
+        synchronized (pendingData) {
+            dataListeners.remove(l);
+        }
     }
 
     /// Registers a listener for changes to the link itself -- reachability, pairing, whether the
@@ -1145,35 +1154,41 @@ public final class WearableConnection {
                 }
             }
         }
-        // Discarded REMOVALS are simply re-announced. The path is the whole of a removal, so this
-        // is a complete recovery rather than a request for one -- and it is the only recovery
-        // available, since the item is gone and no port can enumerate an absence.
-        if (removals != null) {
-            for (String removed : removals) {
-                deliverDataRemoved(removed);
-            }
-        }
-        // Paths the cap discarded, handed back now that a listener exists and there is room.
-        if (dropped != null) {
-            DroppedDeliveryHandler handler = droppedHandler();
-            if (handler != null) {
-                for (String path : dropped) {
-                    handler.deliveryDropped(path);
+        try {
+            // Discarded REMOVALS are simply re-announced. The path is the whole of a removal, so this
+            // is a complete recovery rather than a request for one -- and it is the only recovery
+            // available, since the item is gone and no port can enumerate an absence.
+            if (removals != null) {
+                for (String removed : removals) {
+                    deliverDataRemoved(removed);
                 }
             }
-        }
-        // After the drain, so a re-offered payload finds room and a registered listener rather than
-        // landing straight back in a full queue.
-        if (replays != null) {
-            for (Runnable replay : replays) {
-                replay.run();
+            // Paths the cap discarded, handed back now that a listener exists and there is room.
+            if (dropped != null) {
+                DroppedDeliveryHandler handler = droppedHandler();
+                if (handler != null) {
+                    for (String path : dropped) {
+                        handler.deliveryDropped(path);
+                    }
+                }
             }
-        }
-        if (dataQueue) {
-            // Cleared only now that every recovery announcement has been made. The drain loop
-            // re-checks the queue immediately after, so anything that parked while this was held
-            // is drained in the next pass rather than waiting for a listener registration.
-            setDrainingData(false);
+            // After the drain, so a re-offered payload finds room and a registered listener rather than
+            // landing straight back in a full queue.
+            if (replays != null) {
+                for (Runnable replay : replays) {
+                    replay.run();
+                }
+            }
+        } finally {
+            if (dataQueue) {
+                // Cleared only now that every recovery announcement has been made, and cleared
+                // even if one of them THREW. A port callback that fails -- deliveryDropped
+                // reaching a native replay, say -- used to skip this, leaving the guard
+                // permanently positive: every later delivery parked behind a drain that had
+                // already aborted, and a process with a live listener silently stopped receiving
+                // data until it restarted.
+                setDrainingData(false);
+            }
         }
     }
 

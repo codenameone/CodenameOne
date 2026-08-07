@@ -2294,13 +2294,17 @@ public class CN1WearableBridge implements WearableBridge {
         if (uri == null) {
             return;
         }
-        // Bounded by the sender's RETENTION WINDOW, not by an attempt count. A fixed four tries
-        // abandoned a transfer whose Asset was merely slow -- a large file on a poor connection --
-        // while the sender keeps the DataItem for 24 hours and the item never changes, so the
-        // delivery model provides no later callback to pick it up again. The one-shot file was
-        // simply lost. Retrying until either the Asset reads or the item is gone matches the
-        // lifetime the sender actually promises.
-        if (attempt > TRANSFER_RETRIES && retryElapsed(uri) > TRANSFER_RETENTION_MILLIS) {
+        // Bounded by the longest the sender can still be holding the item, not by an attempt
+        // count. A fixed four tries abandoned a transfer whose Asset was merely slow -- a large
+        // file on a poor connection -- and the item never changes, so nothing provides a later
+        // callback to pick it up again and the one-shot file was simply lost.
+        //
+        // Against the HARD CAP rather than the retention window. Retention is now the acknowledged
+        // case only: an unacknowledged transfer -- which this is, since we have never managed to
+        // read it -- is kept for the hard cap, so stopping at 24 hours abandoned an item the
+        // sender would go on holding for another six days. The bound has to match the longer
+        // promise, or the retry gives up while the file is still there.
+        if (attempt > TRANSFER_RETRIES && retryElapsed(uri) > TRANSFER_HARD_CAP_MILLIS) {
             forgetRetryStart(uri);
             return;
         }
