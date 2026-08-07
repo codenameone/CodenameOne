@@ -114,10 +114,10 @@ public final class GuiDocument {
         List<String> used = new ArrayList<>();
         for (int i = 0; i < parent.getNumChildren(); i++) {
             Object value = parent.getChildAt(i);
-            if (!(value instanceof Element candidate) || !"component".equals(candidate.getTagName())) continue;
-            String constraint = normalizeBorderConstraint(candidate.getAttribute("layoutConstraint"));
+            if (!(value instanceof Element) || !"component".equals(((Element) value).getTagName())) continue;
+            String constraint = normalizeBorderConstraint(((Element) value).getAttribute("layoutConstraint"));
             if (constraint == null || used.contains(constraint)) constraint = firstFreeBorderConstraint(used);
-            if (candidate == child) return constraint;
+            if (((Element) value) == child) return constraint;
             used.add(constraint);
         }
         return "Center";
@@ -128,8 +128,8 @@ public final class GuiDocument {
         if (parent == null || wanted == null) return null;
         for (int i = 0; i < parent.getNumChildren(); i++) {
             Object value = parent.getChildAt(i);
-            if (value instanceof Element child && "component".equals(child.getTagName()) && child != excluding
-                    && wanted.equals(effectiveBorderConstraint(parent, child))) return child;
+            if (value instanceof Element && "component".equals(((Element) value).getTagName()) && ((Element) value) != excluding
+                    && wanted.equals(effectiveBorderConstraint(parent, ((Element) value)))) return ((Element) value);
         }
         return null;
     }
@@ -168,7 +168,7 @@ public final class GuiDocument {
         List<Element> result = new ArrayList<>();
         for (int i = 0; i < root.getNumChildren(); i++) {
             Object child = root.getChildAt(i);
-            if (child instanceof Element e && "command".equals(e.getTagName())) result.add(e);
+            if (child instanceof Element && "command".equals(((Element) child).getTagName())) result.add(((Element) child));
         }
         return result;
     }
@@ -447,7 +447,7 @@ public final class GuiDocument {
         }
         for (int i = 0; i < element.getNumChildren(); i++) {
             Object child = element.getChildAt(i);
-            if (child instanceof Element childElement) remapReferences(childElement, renames);
+            if (child instanceof Element) remapReferences(((Element) child), renames);
         }
     }
 
@@ -470,7 +470,7 @@ public final class GuiDocument {
         }
         for (int i = 0; i < element.getNumChildren(); i++) {
             Object child = element.getChildAt(i);
-            if (child instanceof Element childElement) clearReferencesTo(childElement, removedNames);
+            if (child instanceof Element) clearReferencesTo(((Element) child), removedNames);
         }
     }
 
@@ -505,8 +505,8 @@ public final class GuiDocument {
         if (name != null && name.length() > 0) out.add(name);
         for (int i = 0; i < element.getNumChildren(); i++) {
             Object child = element.getChildAt(i);
-            if (child instanceof Element childElement && "component".equals(childElement.getTagName())) {
-                namesIn(childElement, out);
+            if (child instanceof Element && "component".equals(((Element) child).getTagName())) {
+                namesIn(((Element) child), out);
             }
         }
         return out;
@@ -547,8 +547,8 @@ public final class GuiDocument {
         int componentIndex = 0;
         for (int i = 0; i < parent.getNumChildren(); i++) {
             Object value = parent.getChildAt(i);
-            if (!(value instanceof Element element) || !"component".equals(element.getTagName())) continue;
-            if (element == child) return componentIndex;
+            if (!(value instanceof Element) || !"component".equals(((Element) value).getTagName())) continue;
+            if (((Element) value) == child) return componentIndex;
             componentIndex++;
         }
         return -1;
@@ -565,7 +565,7 @@ public final class GuiDocument {
         int seen = 0;
         for (int i = 0; i < destination.getNumChildren(); i++) {
             Object child = destination.getChildAt(i);
-            if (child instanceof Element element && "component".equals(element.getTagName())) {
+            if (child instanceof Element && "component".equals(((Element) child).getTagName())) {
                 if (seen >= componentIndex) { xmlIndex = i; break; }
                 seen++;
             }
@@ -587,7 +587,7 @@ public final class GuiDocument {
         if (parent == null) return result;
         for (int i = 0; i < parent.getNumChildren(); i++) {
             Object child = parent.getChildAt(i);
-            if (child instanceof Element element && "component".equals(element.getTagName())) result.add(element);
+            if (child instanceof Element && "component".equals(((Element) child).getTagName())) result.add(((Element) child));
         }
         return result;
     }
@@ -650,7 +650,7 @@ public final class GuiDocument {
         }
         for (int i = 0; i < element.getNumChildren(); i++) {
             Object child = element.getChildAt(i);
-            if (child instanceof Element e && containsName(e, name, exclude)) return true;
+            if (child instanceof Element && containsName(((Element) child), name, exclude)) return true;
         }
         return false;
     }
@@ -659,8 +659,8 @@ public final class GuiDocument {
         for (int i = 0; i < parent.getNumChildren(); i++) {
             Object child = parent.getChildAt(i);
             if (child == target) return parent;
-            if (child instanceof Element e) {
-                Element found = findParent(e, target);
+            if (child instanceof Element) {
+                Element found = findParent(((Element) child), target);
                 if (found != null) return found;
             }
         }
@@ -687,7 +687,7 @@ public final class GuiDocument {
         if (ancestor == candidate) return true;
         for (int i = 0; i < ancestor.getNumChildren(); i++) {
             Object child = ancestor.getChildAt(i);
-            if (child instanceof Element e && isDescendant(e, candidate)) return true;
+            if (child instanceof Element && isDescendant(((Element) child), candidate)) return true;
         }
         return false;
     }
@@ -696,7 +696,7 @@ public final class GuiDocument {
         if (parent == target) return true;
         for (int i = 0; i < parent.getNumChildren(); i++) {
             Object child = parent.getChildAt(i);
-            if (child instanceof Element element && containsIdentity(element, target)) return true;
+            if (child instanceof Element && containsIdentity(((Element) child), target)) return true;
         }
         return false;
     }
@@ -705,7 +705,7 @@ public final class GuiDocument {
         result.add(element);
         for (int i = 0; i < element.getNumChildren(); i++) {
             Object child = element.getChildAt(i);
-            if (child instanceof Element e && "component".equals(e.getTagName())) collect(e, result);
+            if (child instanceof Element && "component".equals(((Element) child).getTagName())) collect(((Element) child), result);
         }
     }
 
@@ -772,7 +772,7 @@ public final class GuiDocument {
         List<Element> children = new ArrayList<>();
         for (int i = 0; i < element.getNumChildren(); i++) {
             Object child = element.getChildAt(i);
-            if (child instanceof Element e && e.getTagName() != null) children.add(e);
+            if (child instanceof Element && ((Element) child).getTagName() != null) children.add(((Element) child));
         }
         if (children.isEmpty()) {
             out.append(" />\n");
@@ -806,17 +806,33 @@ public final class GuiDocument {
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
             switch (c) {
-                case '&' -> out.append("&amp;");
-                case '<' -> out.append("&lt;");
-                case '>' -> out.append("&gt;");
-                case '"' -> out.append("&quot;");
+                case '&':
+                    out.append("&amp;");
+                    break;
+                case '<':
+                    out.append("&lt;");
+                    break;
+                case '>':
+                    out.append("&gt;");
+                    break;
+                case '"':
+                    out.append("&quot;");
+                    break;
                 // XML attribute normalization turns a literal newline, carriage return or tab into
                 // a space when the file is read back, so a multi line TextArea value quietly
                 // collapsed onto one line the first time the form was saved and reopened.
-                case '\n' -> out.append("&#10;");
-                case '\r' -> out.append("&#13;");
-                case '\t' -> out.append("&#9;");
-                default -> out.append(c);
+                case '\n':
+                    out.append("&#10;");
+                    break;
+                case '\r':
+                    out.append("&#13;");
+                    break;
+                case '\t':
+                    out.append("&#9;");
+                    break;
+                default:
+                    out.append(c);
+                    break;
             }
         }
         return out.toString();

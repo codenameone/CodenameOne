@@ -786,7 +786,7 @@ Projects generated from the archetype also carry a ready-made shortcut for this:
 
 The full goal reference, including every parameter, lives in <<create-gui-form>> and <<guibuilder>> in the Maven goals appendix.
 
-TIP: The GUI builder runs on JDK 17 or newer. If Maven itself runs on an older JDK the goal stops with a message telling you so, rather than failing inside the editor.
+TIP: The GUI builder is a Java 8 artifact, so it runs on whichever JDK already builds your project.
 
 ==== The workspace
 

@@ -32,6 +32,7 @@ import com.codename1.xml.Element;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import javax.swing.JPanel;
@@ -61,7 +62,7 @@ class NestedHierarchyTest {
         CodenameOneGUIBuilder builder = builder(document);
         Set<String> everything = names(document);
 
-        for (String child : List.of("nestedA", "nestedB", "nestedC", "nestedD")) {
+        for (String child : Arrays.asList("nestedA", "nestedB", "nestedC", "nestedD")) {
             Element moved = named(document, child);
             Element destination = named(document, "rightActions");
             assertTrue(builder.applyDropPlan(moved, plan(document, destination, destination, "BoxLayout", true), 0, 0),
@@ -84,7 +85,7 @@ class NestedHierarchyTest {
         Element grid = named(document, "leftGrid");
         Element rightActions = named(document, "rightActions");
 
-        for (String child : List.of("nestedA", "nestedB", "nestedC", "nestedD")) {
+        for (String child : Arrays.asList("nestedA", "nestedB", "nestedC", "nestedD")) {
             assertTrue(builder.applyDropPlan(named(document, child),
                     plan(document, rightActions, rightActions, "BoxLayout", true), 0, 0));
         }
@@ -92,13 +93,13 @@ class NestedHierarchyTest {
 
         // Dropping onto a container that renders only its empty-state hint must still target the
         // container, not fall through to whatever is behind it.
-        for (String child : List.of("nestedA", "nestedB")) {
+        for (String child : Arrays.asList("nestedA", "nestedB")) {
             assertTrue(builder.applyDropPlan(named(document, child),
                     plan(document, grid, grid, "GridLayout", true), 0, 0),
                     "the emptied container refused " + child);
             assertHierarchyIsSound(document, everything, "after returning " + child);
         }
-        assertEquals(List.of("nestedA", "nestedB"), childNames(grid), document.toXml());
+        assertEquals(Arrays.asList("nestedA", "nestedB"), childNames(grid), document.toXml());
     }
 
     @Test
@@ -108,7 +109,7 @@ class NestedHierarchyTest {
         Set<String> everything = names(document);
         Element root = document.root();
 
-        for (String child : List.of("nestedA", "nestedB", "nestedC", "nestedD")) {
+        for (String child : Arrays.asList("nestedA", "nestedB", "nestedC", "nestedD")) {
             assertTrue(builder.applyDropPlan(named(document, child),
                     plan(document, named(document, "rightActions"), named(document, "rightActions"), "BoxLayout", true), 0, 0));
             assertHierarchyIsSound(document, everything, "after draining " + child);
@@ -134,7 +135,7 @@ class NestedHierarchyTest {
 
         assertHierarchyIsSound(document, everything, "after moving a populated container");
         assertSame(rightActions, document.parentOf(grid), document.toXml());
-        assertEquals(List.of("nestedA", "nestedB", "nestedC", "nestedD"), childNames(grid),
+        assertEquals(Arrays.asList("nestedA", "nestedB", "nestedC", "nestedD"), childNames(grid),
                 "the subtree must travel intact: " + document.toXml());
     }
 
@@ -185,7 +186,7 @@ class NestedHierarchyTest {
 
     @Test
     void everyParentLayoutAcceptsAComponentFromAnotherContainer() throws Exception {
-        for (String layout : List.of("BoxLayout", "BorderLayout", "GridLayout", "FlowLayout", "TableLayout", "LayeredLayout")) {
+        for (String layout : Arrays.asList("BoxLayout", "BorderLayout", "GridLayout", "FlowLayout", "TableLayout", "LayeredLayout")) {
             GuiDocument document = documentWithDestinationLayout(layout);
             CodenameOneGUIBuilder builder = builder(document);
             Set<String> everything = names(document);
@@ -203,7 +204,7 @@ class NestedHierarchyTest {
 
     @Test
     void everySourceLayoutReleasesItsLastChild() throws Exception {
-        for (String layout : List.of("BoxLayout", "BorderLayout", "GridLayout", "FlowLayout", "TableLayout", "LayeredLayout")) {
+        for (String layout : Arrays.asList("BoxLayout", "BorderLayout", "GridLayout", "FlowLayout", "TableLayout", "LayeredLayout")) {
             GuiDocument document = documentWithSourceLayout(layout);
             CodenameOneGUIBuilder builder = builder(document);
             Set<String> everything = names(document);
@@ -236,7 +237,7 @@ class NestedHierarchyTest {
         Set<String> everything = names(document);
         Element destination = named(document, "destination");
 
-        for (String child : List.of("one", "two", "three")) {
+        for (String child : Arrays.asList("one", "two", "three")) {
             CodenameOneGUIBuilder.DropPlan plan = plan(document, destination, destination, "BorderLayout", true);
             plan.constraint = "Center";
             plan.occupied = GuiDocument.childAtBorderConstraint(destination, "Center", named(document, child));
@@ -348,7 +349,7 @@ class NestedHierarchyTest {
         Set<String> everything = names(document);
         List<String> snapshots = new ArrayList<>();
 
-        for (String child : List.of("nestedA", "nestedB", "nestedC", "nestedD")) {
+        for (String child : Arrays.asList("nestedA", "nestedB", "nestedC", "nestedD")) {
             snapshots.add(document.toXml());
             assertTrue(builder.applyDropPlan(named(document, child),
                     plan(document, named(document, "rightActions"), named(document, "rightActions"), "BoxLayout", true), 0, 0));
@@ -366,7 +367,7 @@ class NestedHierarchyTest {
         CodenameOneGUIBuilder builder = builder(document);
         Set<String> everything = names(document);
 
-        for (String child : List.of("nestedA", "nestedB")) {
+        for (String child : Arrays.asList("nestedA", "nestedB")) {
             assertTrue(builder.applyDropPlan(named(document, child),
                     plan(document, named(document, "rightActions"), named(document, "rightActions"), "BoxLayout", true), 0, 0));
         }
@@ -438,8 +439,8 @@ class NestedHierarchyTest {
         for (int i = 0; i < root.getComponentCount(); i++) {
             Component component = root.getComponentAt(i);
             if (component.getClientProperty("gui.element") == element) return component;
-            if (component instanceof Container container) {
-                Component nested = findPreview(container, element);
+            if (component instanceof Container) {
+                Component nested = findPreview(((Container) component), element);
                 if (nested != null) return nested;
             }
         }
@@ -551,7 +552,7 @@ class NestedHierarchyTest {
         for (int i = 0; i < root.getComponentCount(); i++) {
             Component component = root.getComponentAt(i);
             if (component.getClientProperty("gui.element") == element) found++;
-            if (component instanceof Container container) found = countPreviews(container, element, found);
+            if (component instanceof Container) found = countPreviews(((Container) component), element, found);
         }
         return found;
     }
@@ -573,7 +574,8 @@ class NestedHierarchyTest {
     private static void layoutNested(Container container) {
         container.layoutContainer();
         for (int i = 0; i < container.getComponentCount(); i++) {
-            if (container.getComponentAt(i) instanceof Container nested) layoutNested(nested);
+            Component child = container.getComponentAt(i);
+            if (child instanceof Container) layoutNested((Container) child);
         }
     }
 

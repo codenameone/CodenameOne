@@ -35,6 +35,7 @@ import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.xml.Element;
 import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.swing.JPanel;
@@ -269,9 +270,9 @@ class DesignerInteractionTest {
         assertEquals(originalXml, document.toXml(), "a group glass preview must not mutate the document");
         assertEquals(2, simulation.items.size(), "every selected component needs a moving glass rectangle");
         com.codename1.guibuilder.ui.DragGuideOverlay.GlassItem predictedFirst = simulation.items.stream()
-                .filter(item -> "first".equals(item.name)).findFirst().orElseThrow();
+                .filter(item -> "first".equals(item.name)).findFirst().get();
         com.codename1.guibuilder.ui.DragGuideOverlay.GlassItem predictedSecond = simulation.items.stream()
-                .filter(item -> "second".equals(item.name)).findFirst().orElseThrow();
+                .filter(item -> "second".equals(item.name)).findFirst().get();
         assertEquals(predictedFirst.newX - predictedFirst.oldX, predictedSecond.newX - predictedSecond.oldX);
         assertEquals(predictedFirst.newY - predictedFirst.oldY, predictedSecond.newY - predictedSecond.oldY);
         assertTrue(predictedFirst.active);
@@ -658,7 +659,7 @@ class DesignerInteractionTest {
         assertTrue(simulation.changedNames.contains("linked"), "the explicit width dependent must be shown changing");
         assertTrue(simulation.links.stream().anyMatch(link -> "primary".equals(link.from) && "linked".equals(link.to)));
         com.codename1.guibuilder.ui.DragGuideOverlay.GlassItem linked = simulation.items.stream()
-                .filter(item -> "linked".equals(item.name)).findFirst().orElseThrow();
+                .filter(item -> "linked".equals(item.name)).findFirst().get();
         assertEquals(240, linked.newW, 2);
     }
 
@@ -687,7 +688,7 @@ class DesignerInteractionTest {
         assertNotNull(simulation);
         assertEquals(originalXml, document.toXml());
         com.codename1.guibuilder.ui.DragGuideOverlay.GlassItem predicted = simulation.items.stream()
-                .filter(item -> "card".equals(item.name)).findFirst().orElseThrow();
+                .filter(item -> "card".equals(item.name)).findFirst().get();
 
         assertTrue(builder.applyDropPlan(card, plan, plan.snapX, plan.snapY));
         Container committed = (Container) render(document, 600, 320);
@@ -1275,7 +1276,7 @@ class DesignerInteractionTest {
 
         assertEquals(before, document.toXml(), "undo must restore the document byte for byte");
         List<Element> grid = GuiDocument.componentsIn(findByName(document, "leftGrid"));
-        assertEquals(List.of("nestedA", "nestedB", "nestedC", "nestedD"), namesOf(grid),
+        assertEquals(Arrays.asList("nestedA", "nestedB", "nestedC", "nestedD"), namesOf(grid),
                 "undo must restore sibling order, not just membership");
     }
 

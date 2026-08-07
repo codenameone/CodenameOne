@@ -466,7 +466,8 @@ public final class DragGuideOverlay extends Component {
         int bottom = parentY + parentH;
         int left = parentX;
         int right = parentX + parentW;
-        if (guideParent instanceof Container container && container.getLayout() instanceof BorderLayout border) {
+        if (guideParent instanceof Container && ((Container) guideParent).getLayout() instanceof BorderLayout) {
+                BorderLayout border = (BorderLayout) ((Container) guideParent).getLayout();
                 Component north = border.getNorth();
                 Component south = border.getSouth();
                 Component west = border.getWest();
@@ -484,12 +485,12 @@ public final class DragGuideOverlay extends Component {
     }
 
     private void paintLayeredRelationships(Graphics g, int x, int y, int w, int h) {
-        if (!(guideParent instanceof Container parent)) return;
+        if (!(guideParent instanceof Container)) return;
         int threshold = 2;
         g.setColor(0x4f8cff);
         g.setAlpha(125);
-        for (int i = 0; i < parent.getComponentCount(); i++) {
-            Component sibling = parent.getComponentAt(i);
+        for (int i = 0; i < ((Container) guideParent).getComponentCount(); i++) {
+            Component sibling = ((Container) guideParent).getComponentAt(i);
             if (sibling == guideSource || sibling.getClientProperty("gui.element") == null) continue;
             int sx = sibling.getAbsoluteX() - paintOriginX();
             int sy = sibling.getAbsoluteY() - paintOriginY();

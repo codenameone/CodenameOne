@@ -75,8 +75,17 @@ public class OpenGuiBuilderMojoTest {
     @Test
     public void desktopIdentityOpensThePackagesTheJavaseRuntimeNeeds() {
         List<String> args = new OpenGuiBuilderMojo().desktopIdentityArgs();
-        assertTrue(args.contains("--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED"));
         assertTrue(args.contains("-Dsun.awt.application.name=Codename One GUI Builder"));
+        // --add-exports is a Java 9 option. Passing it to an 8 JVM stops that JVM before it can
+        // print anything, and the editor is spawned detached, so the user would see nothing at all.
+        boolean modular = OpenGuiBuilderMojo.javaFeatureVersion() >= 9;
+        boolean exported = args.contains("--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED")
+                && args.contains("--add-exports=java.desktop/com.apple.eawt.event=ALL-UNNAMED");
+        if (modular) {
+            assertTrue("a Java 9+ fork needs the desktop packages opened", exported);
+        } else {
+            assertFalse("a Java 8 fork rejects --add-exports and never starts", exported);
+        }
     }
 
     @Test

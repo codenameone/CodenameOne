@@ -20,9 +20,12 @@
         <cn1.version>8.0-SNAPSHOT</cn1.version>
         <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <java.version>17</java.version>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <!-- The editor has to load on whatever JDK the project it edits already builds with, so it
+             is a Java 8 artifact like the rest of Codename One. Nothing here may use a language
+             feature or JDK API newer than 8. -->
+        <java.version>1.8</java.version>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
         <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
         <cn1app.name>cn1-guibuilder</cn1app.name>
     </properties>

@@ -625,7 +625,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // project CSS styles the preview and the builder's own theme never leaks into it.
         deviceSurface = device;
         device.setUIManager(previewUIManager);
-        if (preview instanceof Container previewContainer) previewContainer.setUIManager(previewUIManager);
+        if (preview instanceof Container) ((Container) preview).setUIManager(previewUIManager);
         refreshProjectThemeOnPreview();
         device.add(BorderLayout.CENTER, preview);
         if (desktop) stage.add(BorderLayout.CENTER, device); else stage.add(device);
@@ -665,7 +665,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             long now = System.currentTimeMillis();
             Object previous = formTitlePreview.getClientProperty("gui.lastClick");
             formTitlePreview.putClientProperty("gui.lastClick", Long.valueOf(now));
-            if (previous instanceof Long time && now - time.longValue() < 450) {
+            if (previous instanceof Long && now - ((Long) previous).longValue() < 450) {
                 document.select(document.root());
                 editSelectedContent();
             }
@@ -718,8 +718,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         hierarchyPanel.add(row);
         for (int i = 0; i < element.getNumChildren(); i++) {
             Object child = element.getChildAt(i);
-            if (child instanceof Element childElement && "component".equals(childElement.getTagName())) {
-                addHierarchyRow(childElement, depth + 1);
+            if (child instanceof Element && "component".equals(((Element) child).getTagName())) {
+                addHierarchyRow(((Element) child), depth + 1);
             }
         }
     }
@@ -1194,7 +1194,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (parentElement != plan.parent) return null;
         Component parentPreview = componentForElement(canvasHost, parentElement);
         Component draggedPreview = componentForElement(canvasHost, dragged);
-        if (!(parentPreview instanceof Container parent) || draggedPreview == null) return null;
+        if (!(parentPreview instanceof Container) || draggedPreview == null) return null;
         Map<Element, Component> previews = new LinkedHashMap<>();
         int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE;
         int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
@@ -1210,13 +1210,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
         int dx = plan.snapX - draggedPreview.getAbsoluteX();
         int dy = plan.snapY - draggedPreview.getAbsoluteY();
-        int contentLeft = contentX(parent);
-        int contentTop = contentY(parent);
-        int contentRight = contentLeft + contentWidth(parent);
-        int contentBottom = contentTop + contentHeight(parent);
+        int contentLeft = contentX(((Container) parentPreview));
+        int contentTop = contentY(((Container) parentPreview));
+        int contentRight = contentLeft + contentWidth(((Container) parentPreview));
+        int contentBottom = contentTop + contentHeight(((Container) parentPreview));
         dx = Math.max(contentLeft - minX, Math.min(dx, contentRight - maxX));
         dy = Math.max(contentTop - minY, Math.min(dy, contentBottom - maxY));
-        return new GroupMoveGeometry(parent, previews, dx, dy);
+        return new GroupMoveGeometry(((Container) parentPreview), previews, dx, dy);
     }
 
     GuidedSimulation simulateGroupedGuidedDrop(Element dragged, DropPlan plan) {
@@ -1378,8 +1378,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 dragGuideOverlay.clearSimulation();
             }
         }
-        if ("BoxLayout".equals(plan.layout) && plan.valid && parentPreview instanceof Container parentContainer) {
-            showBoxDropSpacer(parentContainer, targetPreview, plan.after,
+        if ("BoxLayout".equals(plan.layout) && plan.valid && parentPreview instanceof Container) {
+            showBoxDropSpacer(((Container) parentPreview), targetPreview, plan.after,
                     "X".equals(value(plan.parent, "boxLayoutAxis", "Y")));
         } else {
             clearBoxDropSpacer();
@@ -1564,11 +1564,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
         for (int i = 0; i < parent.getNumChildren(); i++) {
             Object childValue = parent.getChildAt(i);
-            if (!(childValue instanceof Element child) || child == dragged || !"component".equals(child.getTagName())) continue;
-            Component childPreview = componentForElement(canvasHost, child);
+            if (!(childValue instanceof Element) || ((Element) childValue) == dragged || !"component".equals(((Element) childValue).getTagName())) continue;
+            Component childPreview = componentForElement(canvasHost, ((Element) childValue));
             if (childPreview != null && x >= childPreview.getAbsoluteX() && x <= childPreview.getAbsoluteX() + childPreview.getWidth()
                     && y >= childPreview.getAbsoluteY() && y <= childPreview.getAbsoluteY() + childPreview.getHeight()) {
-                return GuiDocument.effectiveBorderConstraint(parent, child);
+                return GuiDocument.effectiveBorderConstraint(parent, ((Element) childValue));
             }
         }
         return "Center";
@@ -1596,17 +1596,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void resolveLayeredSnap(DropPlan plan, Component source, int x, int y) {
         Component parentComponent = componentForElement(canvasHost, plan.parent);
-        if (!(parentComponent instanceof Container parent)) return;
-        int contentW = contentWidth(parent);
-        int contentH = contentHeight(parent);
+        if (!(parentComponent instanceof Container)) return;
+        int contentW = contentWidth(((Container) parentComponent));
+        int contentH = contentHeight(((Container) parentComponent));
         int width = source == null ? Math.max(80, contentW / 6)
                 : source.getWidth() > 0 ? source.getWidth() : Math.max(1, source.getPreferredW());
         int height = source == null ? Math.max(36, contentH / 12)
                 : source.getHeight() > 0 ? source.getHeight() : Math.max(1, source.getPreferredH());
-        int desiredX = Math.max(contentX(parent), Math.min(x, contentX(parent) + contentW - width));
-        int desiredY = Math.max(contentY(parent), Math.min(y, contentY(parent) + contentH - height));
-        SnapResult horizontal = snapAxis(parent, source, desiredX, width, true);
-        SnapResult vertical = snapAxis(parent, source, desiredY, height, false);
+        int desiredX = Math.max(contentX(((Container) parentComponent)), Math.min(x, contentX(((Container) parentComponent)) + contentW - width));
+        int desiredY = Math.max(contentY(((Container) parentComponent)), Math.min(y, contentY(((Container) parentComponent)) + contentH - height));
+        SnapResult horizontal = snapAxis(((Container) parentComponent), source, desiredX, width, true);
+        SnapResult vertical = snapAxis(((Container) parentComponent), source, desiredY, height, false);
         plan.snapX = horizontal.position;
         plan.snapY = vertical.position;
         plan.snapW = width;
@@ -2388,7 +2388,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         container.layoutContainer();
         for (int i = 0; i < container.getComponentCount(); i++) {
             Component child = container.getComponentAt(i);
-            if (child instanceof Container nested) layoutSimulation(nested);
+            if (child instanceof Container) layoutSimulation(((Container) child));
         }
     }
 
@@ -2507,7 +2507,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (parent == null) return children;
         for (int i = 0; i < parent.getNumChildren(); i++) {
             Object child = parent.getChildAt(i);
-            if (child instanceof Element element && "component".equals(element.getTagName())) children.add(element);
+            if (child instanceof Element && "component".equals(((Element) child).getTagName())) children.add(((Element) child));
         }
         return children;
     }
@@ -2654,8 +2654,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         for (int i = 0; i < root.getComponentCount(); i++) {
             Component component = root.getComponentAt(i);
             if (component.getClientProperty("gui.element") == element) return component;
-            if (component instanceof Container container) {
-                Component nested = componentForElement(container, element);
+            if (component instanceof Container) {
+                Component nested = componentForElement(((Container) component), element);
                 if (nested != null) return nested;
             }
         }
@@ -2668,14 +2668,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             int ax = component.getAbsoluteX();
             int ay = component.getAbsoluteY();
             if (x < ax || x > ax + component.getWidth() || y < ay || y > ay + component.getHeight()) continue;
-            if (component instanceof Container container) {
-                Element nested = elementAt(container, x, y);
+            if (component instanceof Container) {
+                Element nested = elementAt(((Container) component), x, y);
                 if (nested != null) return nested;
             }
             Object element = component.getClientProperty("gui.element");
-            if (element instanceof Element e) return e;
+            if (element instanceof Element) return ((Element) element);
             Object dropTarget = component.getClientProperty("gui.dropTargetElement");
-            if (dropTarget instanceof Element e) return e;
+            if (dropTarget instanceof Element) return ((Element) dropTarget);
         }
         return null;
     }
@@ -2701,7 +2701,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         for (int i = 0; i < ancestor.getNumChildren(); i++) {
             Object child = ancestor.getChildAt(i);
             if (child == candidate) return true;
-            if (child instanceof Element element && containsElementIdentity(element, candidate)) return true;
+            if (child instanceof Element && containsElementIdentity(((Element) child), candidate)) return true;
         }
         return false;
     }
@@ -2916,8 +2916,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             Component component = root.getComponentAt(i);
             if (x < component.getAbsoluteX() || x > component.getAbsoluteX() + component.getWidth()
                     || y < component.getAbsoluteY() || y > component.getAbsoluteY() + component.getHeight()) continue;
-            if (component instanceof Container container) {
-                Component nested = deepestComponentAt(container, x, y);
+            if (component instanceof Container) {
+                Component nested = deepestComponentAt(((Container) component), x, y);
                 if (nested != null) return nested;
             }
             return component;
@@ -3238,8 +3238,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         Component component = componentForElement(canvasHost, element);
         Element parentElement = document.parentOf(element);
         Component parentComponent = componentForElement(canvasHost, parentElement);
-        if (component == null || !(parentComponent instanceof Container parent)) return;
-        freezeGuidedElement(element, parent, component, component.getAbsoluteX(), component.getAbsoluteY());
+        if (component == null || !(parentComponent instanceof Container)) return;
+        freezeGuidedElement(element, ((Container) parentComponent), component, component.getAbsoluteX(), component.getAbsoluteY());
     }
 
     private void freezeGuidedElement(Element element, Container parent, Component component, int absoluteX, int absoluteY) {
@@ -3311,12 +3311,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         Element parentElement = document.parentOf(element);
         Component component = componentForElement(canvasHost, element);
         Component parentComponent = componentForElement(canvasHost, parentElement);
-        if (component == null || !(parentComponent instanceof Container parent)) return;
-        int leftPx = component.getAbsoluteX() - parent.getAbsoluteX();
-        int topPx = component.getAbsoluteY() - parent.getAbsoluteY();
+        if (component == null || !(parentComponent instanceof Container)) return;
+        int leftPx = component.getAbsoluteX() - ((Container) parentComponent).getAbsoluteX();
+        int topPx = component.getAbsoluteY() - ((Container) parentComponent).getAbsoluteY();
         int width = component.getWidth();
         int height = component.getHeight();
-        Component reference = guidedReferenceComponent(element, parent, component);
+        Component reference = guidedReferenceComponent(element, ((Container) parentComponent), component);
         Element referenceElement = reference == null ? null : (Element) reference.getClientProperty("gui.element");
         if ((action.startsWith("align") || action.startsWith("match")) && referenceElement == null) {
             setStatus("Add another component before creating an alignment relationship");
@@ -3356,13 +3356,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 document.setAttribute("guidedMatchHeight", referenceName);
                 document.setAttribute("guidedVerticalSize", GuidedLayoutSupport.MATCH);
             } else if ("fillWidth".equals(action)) {
-                insets[3] = Math.max(0, component.getAbsoluteX() - contentX(parent)) + "px";
-                insets[1] = Math.max(0, contentX(parent) + contentWidth(parent) - component.getAbsoluteX() - component.getWidth()) + "px";
+                insets[3] = Math.max(0, component.getAbsoluteX() - contentX(((Container) parentComponent))) + "px";
+                insets[1] = Math.max(0, contentX(((Container) parentComponent)) + contentWidth(((Container) parentComponent)) - component.getAbsoluteX() - component.getWidth()) + "px";
                 refs[3] = refs[1] = "-";
                 document.setAttribute("guidedHorizontalSize", GuidedLayoutSupport.FILL);
             } else if ("fillHeight".equals(action)) {
-                insets[0] = Math.max(0, component.getAbsoluteY() - contentY(parent)) + "px";
-                insets[2] = Math.max(0, contentY(parent) + contentHeight(parent) - component.getAbsoluteY() - component.getHeight()) + "px";
+                insets[0] = Math.max(0, component.getAbsoluteY() - contentY(((Container) parentComponent))) + "px";
+                insets[2] = Math.max(0, contentY(((Container) parentComponent)) + contentHeight(((Container) parentComponent)) - component.getAbsoluteY() - component.getHeight()) + "px";
                 refs[0] = refs[2] = "-";
                 document.setAttribute("guidedVerticalSize", GuidedLayoutSupport.FILL);
             }
@@ -3381,8 +3381,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         Element parentElement = document.parentOf(element);
         Component component = componentForElement(canvasHost, element);
         Component parentComponent = componentForElement(canvasHost, parentElement);
-        if (component == null || !(parentComponent instanceof Container parent)) return;
-        Component reference = guidedReferenceComponent(element, parent, component);
+        if (component == null || !(parentComponent instanceof Container)) return;
+        Component reference = guidedReferenceComponent(element, ((Container) parentComponent), component);
         Element referenceElement = reference == null ? null : (Element) reference.getClientProperty("gui.element");
         if (GuidedLayoutSupport.MATCH.equals(policy) && referenceElement == null) {
             setStatus("Match size needs another component as its reference");
@@ -3395,13 +3395,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         try {
             if (horizontal) {
                 if (GuidedLayoutSupport.PREFERRED.equals(policy) || GuidedLayoutSupport.FIXED.equals(policy)) {
-                    insets[3] = Math.max(0, component.getAbsoluteX() - contentX(parent)) + "px";
+                    insets[3] = Math.max(0, component.getAbsoluteX() - contentX(((Container) parentComponent))) + "px";
                     insets[1] = "auto"; refs[3] = refs[1] = "-";
                     document.setAttribute("guidedPreferredWidth", GuidedLayoutSupport.FIXED.equals(policy)
                             ? String.valueOf(component.getWidth()) : null);
                 } else if (GuidedLayoutSupport.FILL.equals(policy)) {
-                    insets[3] = Math.max(0, component.getAbsoluteX() - contentX(parent)) + "px";
-                    insets[1] = Math.max(0, contentX(parent) + contentWidth(parent) - component.getAbsoluteX() - component.getWidth()) + "px";
+                    insets[3] = Math.max(0, component.getAbsoluteX() - contentX(((Container) parentComponent))) + "px";
+                    insets[1] = Math.max(0, contentX(((Container) parentComponent)) + contentWidth(((Container) parentComponent)) - component.getAbsoluteX() - component.getWidth()) + "px";
                     refs[3] = refs[1] = "-";
                 } else {
                     applyMatchedWidth(referenceElement, insets, refs, positions, component.getAbsoluteX(), component.getWidth());
@@ -3410,13 +3410,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 document.setAttribute("guidedHorizontalSize", policy);
             } else {
                 if (GuidedLayoutSupport.PREFERRED.equals(policy) || GuidedLayoutSupport.FIXED.equals(policy)) {
-                    insets[0] = Math.max(0, component.getAbsoluteY() - contentY(parent)) + "px";
+                    insets[0] = Math.max(0, component.getAbsoluteY() - contentY(((Container) parentComponent))) + "px";
                     insets[2] = "auto"; refs[0] = refs[2] = "-";
                     document.setAttribute("guidedPreferredHeight", GuidedLayoutSupport.FIXED.equals(policy)
                             ? String.valueOf(component.getHeight()) : null);
                 } else if (GuidedLayoutSupport.FILL.equals(policy)) {
-                    insets[0] = Math.max(0, component.getAbsoluteY() - contentY(parent)) + "px";
-                    insets[2] = Math.max(0, contentY(parent) + contentHeight(parent) - component.getAbsoluteY() - component.getHeight()) + "px";
+                    insets[0] = Math.max(0, component.getAbsoluteY() - contentY(((Container) parentComponent))) + "px";
+                    insets[2] = Math.max(0, contentY(((Container) parentComponent)) + contentHeight(((Container) parentComponent)) - component.getAbsoluteY() - component.getHeight()) + "px";
                     refs[0] = refs[2] = "-";
                 } else {
                     applyMatchedHeight(referenceElement, insets, refs, positions, component.getAbsoluteY(), component.getHeight());
@@ -3678,11 +3678,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         Component component = componentForElement(canvasHost, element);
         if (component == null) return;
         if ("text".equals(attribute)) {
-            if (component instanceof SpanLabel span) span.setText(value);
-            else if (component instanceof Label label) label.setText(value);
-            else if (component instanceof TextArea area) area.setText(value);
-        } else if ("hint".equals(attribute) && component instanceof TextArea area) {
-            area.setHint(value);
+            if (component instanceof SpanLabel) ((SpanLabel) component).setText(value);
+            else if (component instanceof Label) ((Label) component).setText(value);
+            else if (component instanceof TextArea) ((TextArea) component).setText(value);
+        } else if ("hint".equals(attribute) && component instanceof TextArea) {
+            ((TextArea) component).setHint(value);
         } else if ("enabled".equals(attribute)) {
             component.setEnabled(!"false".equals(value));
         } else if ("visible".equals(attribute)) {
@@ -3691,50 +3691,50 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             component.setRTL("true".equals(value));
         } else if ("name".equals(attribute)) {
             component.setName("preview." + value);
-        } else if ("gap".equals(attribute) && component instanceof Label label) {
-            label.setGap(integer(value, label.getGap()));
+        } else if ("gap".equals(attribute) && component instanceof Label) {
+            ((Label) component).setGap(integer(value, ((Label) component).getGap()));
         } else if ("alignment".equals(attribute)) {
             int alignment = "center".equals(value) ? Component.CENTER : "right".equals(value) ? Component.RIGHT : Component.LEFT;
-            if (component instanceof Label label) label.setAlignment(alignment);
-            else if (component instanceof TextArea area) area.setAlignment(alignment);
-        } else if ("tickerEnabled".equals(attribute) && component instanceof Label label) {
-            label.setTickerEnabled("true".equals(value));
-        } else if ("toggle".equals(attribute) && component instanceof Button button) {
-            button.setToggle("true".equals(value));
-        } else if ("selected".equals(attribute) && component instanceof CheckBox check) {
-            check.setSelected("true".equals(value));
-        } else if ("columns".equals(attribute) && component instanceof TextArea area) {
-            area.setColumns(integer(value, area.getColumns()));
-        } else if ("rows".equals(attribute) && component instanceof TextArea area) {
-            area.setRows(integer(value, area.getRows()));
-        } else if ("maxSize".equals(attribute) && component instanceof TextArea area) {
-            area.setMaxSize(integer(value, area.getMaxSize()));
-        } else if ("editable".equals(attribute) && component instanceof TextArea area) {
-            area.setEditable(!"false".equals(value));
-        } else if ("growByContent".equals(attribute) && component instanceof TextArea area) {
-            area.setGrowByContent(!"false".equals(value));
-        } else if ("scrollableX".equals(attribute) && component instanceof Container container) {
-            container.setScrollableX("true".equals(value));
-        } else if ("scrollableY".equals(attribute) && component instanceof Container container) {
-            container.setScrollableY("true".equals(value));
-        } else if ("minValue".equals(attribute) && component instanceof com.codename1.ui.Slider slider) {
-            slider.setMinValue(integer(value, slider.getMinValue()));
-        } else if ("maxValue".equals(attribute) && component instanceof com.codename1.ui.Slider slider) {
-            slider.setMaxValue(integer(value, slider.getMaxValue()));
-        } else if ("progress".equals(attribute) && component instanceof com.codename1.ui.Slider slider) {
-            slider.setProgress(integer(value, slider.getProgress()));
-        } else if ("editable".equals(attribute) && component instanceof com.codename1.ui.Slider slider) {
-            slider.setEditable("true".equals(value));
-        } else if ("infinite".equals(attribute) && component instanceof com.codename1.ui.Slider slider) {
-            slider.setInfinite("true".equals(value));
-        } else if ("selectedIndex".equals(attribute) && component instanceof Tabs tabs && tabs.getTabCount() > 0) {
-            tabs.setSelectedIndex(Math.max(0, Math.min(tabs.getTabCount() - 1, integer(value, 0))), false);
-        } else if ("tabPlacement".equals(attribute) && component instanceof Tabs tabs) {
-            tabs.setTabPlacement("bottom".equals(value) ? Component.BOTTOM : "left".equals(value) ? Component.LEFT
+            if (component instanceof Label) ((Label) component).setAlignment(alignment);
+            else if (component instanceof TextArea) ((TextArea) component).setAlignment(alignment);
+        } else if ("tickerEnabled".equals(attribute) && component instanceof Label) {
+            ((Label) component).setTickerEnabled("true".equals(value));
+        } else if ("toggle".equals(attribute) && component instanceof Button) {
+            ((Button) component).setToggle("true".equals(value));
+        } else if ("selected".equals(attribute) && component instanceof CheckBox) {
+            ((CheckBox) component).setSelected("true".equals(value));
+        } else if ("columns".equals(attribute) && component instanceof TextArea) {
+            ((TextArea) component).setColumns(integer(value, ((TextArea) component).getColumns()));
+        } else if ("rows".equals(attribute) && component instanceof TextArea) {
+            ((TextArea) component).setRows(integer(value, ((TextArea) component).getRows()));
+        } else if ("maxSize".equals(attribute) && component instanceof TextArea) {
+            ((TextArea) component).setMaxSize(integer(value, ((TextArea) component).getMaxSize()));
+        } else if ("editable".equals(attribute) && component instanceof TextArea) {
+            ((TextArea) component).setEditable(!"false".equals(value));
+        } else if ("growByContent".equals(attribute) && component instanceof TextArea) {
+            ((TextArea) component).setGrowByContent(!"false".equals(value));
+        } else if ("scrollableX".equals(attribute) && component instanceof Container) {
+            ((Container) component).setScrollableX("true".equals(value));
+        } else if ("scrollableY".equals(attribute) && component instanceof Container) {
+            ((Container) component).setScrollableY("true".equals(value));
+        } else if ("minValue".equals(attribute) && component instanceof com.codename1.ui.Slider) {
+            ((com.codename1.ui.Slider) component).setMinValue(integer(value, ((com.codename1.ui.Slider) component).getMinValue()));
+        } else if ("maxValue".equals(attribute) && component instanceof com.codename1.ui.Slider) {
+            ((com.codename1.ui.Slider) component).setMaxValue(integer(value, ((com.codename1.ui.Slider) component).getMaxValue()));
+        } else if ("progress".equals(attribute) && component instanceof com.codename1.ui.Slider) {
+            ((com.codename1.ui.Slider) component).setProgress(integer(value, ((com.codename1.ui.Slider) component).getProgress()));
+        } else if ("editable".equals(attribute) && component instanceof com.codename1.ui.Slider) {
+            ((com.codename1.ui.Slider) component).setEditable("true".equals(value));
+        } else if ("infinite".equals(attribute) && component instanceof com.codename1.ui.Slider) {
+            ((com.codename1.ui.Slider) component).setInfinite("true".equals(value));
+        } else if ("selectedIndex".equals(attribute) && component instanceof Tabs && ((Tabs) component).getTabCount() > 0) {
+            ((Tabs) component).setSelectedIndex(Math.max(0, Math.min(((Tabs) component).getTabCount() - 1, integer(value, 0))), false);
+        } else if ("tabPlacement".equals(attribute) && component instanceof Tabs) {
+            ((Tabs) component).setTabPlacement("bottom".equals(value) ? Component.BOTTOM : "left".equals(value) ? Component.LEFT
                     : "right".equals(value) ? Component.RIGHT : Component.TOP);
         } else if ("layeredInsets".equals(attribute) && component.getParent() != null
-                && component.getParent().getLayout() instanceof LayeredLayout layered) {
-            try { layered.setInsets(component, value); } catch (RuntimeException ignored) { }
+                && component.getParent().getLayout() instanceof LayeredLayout) {
+            try { ((LayeredLayout) component.getParent().getLayout()).setInsets(component, value); } catch (RuntimeException ignored) { }
         } else if ("uiid".equals(attribute)) {
             component.setUIID(value == null || value.length() == 0 ? document.effectiveUiid(element) : value);
             refreshSinglePreviewTheme(component);
@@ -4157,8 +4157,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         previewUIManager = UIManager.createInstance();
         previewUIManager.setThemeProps(projectTheme);
         if (deviceSurface != null) deviceSurface.setUIManager(previewUIManager);
-        if (previewRoot instanceof Container previewContainer) {
-            previewContainer.setUIManager(previewUIManager);
+        if (previewRoot instanceof Container) {
+            ((Container) previewRoot).setUIManager(previewUIManager);
         }
         if (previewRoot != null) {
             previewRoot.refreshTheme(false);
@@ -4223,7 +4223,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         for (Object keyObject : keys) {
             String key = String.valueOf(keyObject);
             Object raw = theme.get(keyObject);
-            if (key.endsWith("." + Style.FONT) && raw instanceof String font) {
+            if (key.endsWith("." + Style.FONT) && raw instanceof String) {
+                String font = (String) raw;
                 if (font.length() > 1 && font.charAt(0) == '"' && font.charAt(font.length() - 1) == '"') {
                     font = font.substring(1, font.length() - 1);
                 }
@@ -4238,8 +4239,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             }
             boolean padding = key.endsWith("." + Style.PADDING);
             boolean margin = key.endsWith("." + Style.MARGIN);
-            if ((!padding && !margin) || !(raw instanceof String box)) continue;
-            String[] values = box.split(",");
+            if ((!padding && !margin) || !(raw instanceof String)) continue;
+            String[] values = ((String) raw).split(",");
             if (values.length != 4) continue;
             byte[] units = new byte[4];
             StringBuilder normalized = new StringBuilder();
@@ -4344,42 +4345,42 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private void appendGeneratedChildren(StringBuilder out, Element parent, String parentName, String indent) {
         for (int i = 0; i < parent.getNumChildren(); i++) {
             Object value = parent.getChildAt(i);
-            if (!(value instanceof Element child) || !"component".equals(child.getTagName())) continue;
-            String name = javaName(child);
-            String type = value(child, "type", "Container");
-            out.append(indent).append(name).append(" = ").append(componentSource(child)).append(";\n")
-                    .append(indent).append(name).append(".setName(\"").append(javaEscape(value(child, "name", name))).append("\");\n");
-            if (child.getAttribute("uiid") != null) out.append(indent).append(name).append(".setUIID(\"")
-                    .append(javaEscape(child.getAttribute("uiid"))).append("\");\n");
-            appendGeneratedProperties(out, child, name, type, indent);
-            String handler = child.getAttribute("actionEvent");
+            if (!(value instanceof Element) || !"component".equals(((Element) value).getTagName())) continue;
+            String name = javaName(((Element) value));
+            String type = value(((Element) value), "type", "Container");
+            out.append(indent).append(name).append(" = ").append(componentSource(((Element) value))).append(";\n")
+                    .append(indent).append(name).append(".setName(\"").append(javaEscape(value(((Element) value), "name", name))).append("\");\n");
+            if (((Element) value).getAttribute("uiid") != null) out.append(indent).append(name).append(".setUIID(\"")
+                    .append(javaEscape(((Element) value).getAttribute("uiid"))).append("\");\n");
+            appendGeneratedProperties(out, ((Element) value), name, type, indent);
+            String handler = ((Element) value).getAttribute("actionEvent");
             if (handler != null && handler.length() > 0 && ("Button".equals(type) || "CheckBox".equals(type) || "RadioButton".equals(type))) {
                 out.append(indent).append(name).append(".addActionListener(this::").append(javaIdentifier(handler)).append(");\n");
             }
             if ("Tabs".equals(value(parent, "type", ""))) {
-                out.append(indent).append(parentName).append(".addTab(\"").append(javaEscape(value(child, "name", "Tab")))
+                out.append(indent).append(parentName).append(".addTab(\"").append(javaEscape(value(((Element) value), "name", "Tab")))
                         .append("\", ").append(name).append(");\n");
             } else if ("Accordion".equals(value(parent, "type", ""))) {
                 out.append(indent).append(parentName).append(".addContent(\"")
-                        .append(javaEscape(value(child, "name", "Section"))).append("\", ").append(name).append(");\n");
+                        .append(javaEscape(value(((Element) value), "name", "Section"))).append("\", ").append(name).append(");\n");
             } else if ("BorderLayout".equals(value(parent, "layout", "BoxLayout"))) {
                 out.append(indent).append(parentName).append(".add(BorderLayout.")
-                        .append(GuiDocument.effectiveBorderConstraint(parent, child).toUpperCase()).append(", ").append(name).append(");\n");
+                        .append(GuiDocument.effectiveBorderConstraint(parent, ((Element) value)).toUpperCase()).append(", ").append(name).append(");\n");
             } else if ("TableLayout".equals(value(parent, "layout", "BoxLayout"))) {
                 out.append(indent).append(parentName).append(".add(((TableLayout) ").append(parentName)
                         .append(".getLayout()).createConstraint(")
-                        .append(GuiDocument.effectiveTableRow(parent, child))
-                        .append(", ").append(GuiDocument.effectiveTableColumn(parent, child)).append(")")
-                        .append(".horizontalSpan(").append(value(child, "tableHorizontalSpan", "1")).append(")")
-                        .append(".verticalSpan(").append(value(child, "tableVerticalSpan", "1")).append(")")
+                        .append(GuiDocument.effectiveTableRow(parent, ((Element) value)))
+                        .append(", ").append(GuiDocument.effectiveTableColumn(parent, ((Element) value))).append(")")
+                        .append(".horizontalSpan(").append(value(((Element) value), "tableHorizontalSpan", "1")).append(")")
+                        .append(".verticalSpan(").append(value(((Element) value), "tableVerticalSpan", "1")).append(")")
                         // The preview honours these percentages, so a form designed against them
                         // collapses to preferred-size columns at runtime when they are dropped here.
-                        .append(percentageConstraint(child, "tableWidth", "widthPercentage"))
-                        .append(percentageConstraint(child, "tableHeight", "heightPercentage"))
+                        .append(percentageConstraint(((Element) value), "tableWidth", "widthPercentage"))
+                        .append(percentageConstraint(((Element) value), "tableHeight", "heightPercentage"))
                         .append(", ").append(name).append(");\n");
             } else out.append(indent).append(parentName).append(".add(").append(name).append(");\n");
-            if (GuiDocument.acceptsChildren(child)) appendGeneratedChildren(out, child, name, indent);
-            appendGeneratedTabState(out, child, name, type, indent);
+            if (GuiDocument.acceptsChildren(((Element) value))) appendGeneratedChildren(out, ((Element) value), name, indent);
+            appendGeneratedTabState(out, ((Element) value), name, type, indent);
         }
         if ("LayeredLayout".equals(value(parent, "layout", "BoxLayout"))) {
             for (Element child : componentChildren(parent)) {
@@ -5213,9 +5214,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
     private Component findNamedUiComponent(Component component, String componentName) {
         if (componentName.equals(component.getName())) return component;
-        if (component instanceof Container container) {
-            for (int i = 0; i < container.getComponentCount(); i++) {
-                Component found = findNamedUiComponent(container.getComponentAt(i), componentName);
+        if (component instanceof Container) {
+            for (int i = 0; i < ((Container) component).getComponentCount(); i++) {
+                Component found = findNamedUiComponent(((Container) component).getComponentAt(i), componentName);
                 if (found != null) return found;
             }
         }

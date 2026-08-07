@@ -119,7 +119,7 @@ broad commit that could pick up unrelated files.
 
 - `scripts/guibuilder/pom.xml`
   - Maven reactor root.
-  - Java 17 source/target.
+  - Java 8 source/target.
   - Modules for common and JavaSE code.
   - `guibuilder-central` release profile with sources, Javadocs, GPG signing,
     and Central publishing.
@@ -221,9 +221,10 @@ Current behavior:
   `java.desktop/com.apple.eawt*` packages the JavaSE port needs are exported,
   matching `cn1:settings` and `cn1:certificate-wizard`.
 - The goal fails with a friendly message when Maven runs on a JDK older than
-  17. The editor is a Java 17 artifact and the spawned process writes only to
+  8. The editor is a Java 8 artifact and the spawned process writes only to
   `guibuilder.log`, so without the check an old JDK produces a silent
-  `UnsupportedClassVersionError`.
+  `UnsupportedClassVersionError`. `--add-exports` is only passed to a JDK 9 or
+  newer fork; on 8 it is an unrecognized option that stops the JVM outright.
 - No Ant GUI Builder protocol, running marker file, resource-file handoff, or
   IDE source-jump callback remains.
 
@@ -717,7 +718,7 @@ different component margins and padding.
   not.
 - The desktop identity arguments export the JDK packages the JavaSE runtime
   needs.
-- The running Java feature version is detected (the input to the JDK 17 gate).
+- The running Java feature version is detected (the input to the JDK 8 gate).
 
 Latest result:
 
@@ -791,12 +792,13 @@ mvn -Dmaven.repo.local=/tmp/cn1-local-repo \
 
 ### Full GUI Builder suite
 
-Run with Java 21 because the standalone project targets Java 17 and the
-executable build was validated with the installed Azul 21 JDK:
+Run with Java 8: the standalone project targets Java 8 so that the editor loads
+on whichever JDK a Codename One project is already built with, and only a JDK 8
+compiler proves that no newer API crept in.
 
 ```bash
 cd scripts/guibuilder
-export JAVA_HOME="$(/usr/libexec/java_home -v 21)"    # JDK 17 or newer
+export JAVA_HOME="$(/usr/libexec/java_home -v 1.8)"   # JDK 8
 export PATH="$JAVA_HOME/bin:$PATH"
 mvn -nsu \
   -Dmaven.repo.local=/tmp/cn1-local-repo \
@@ -1015,7 +1017,7 @@ previous behavior.
 reviewed did not compile against the `8.0-SNAPSHOT` in the development
 repository, because the editor uses `CodeEditor` APIs added by this same change.
 `.github/workflows/guibuilder.yml` now builds Codename One on JDK 8, runs the
-standalone suite on JDK 17 under `xvfb`, and packages the executable JAR,
+standalone suite on JDK 8 under `xvfb`, and packages the executable JAR,
 triggered by `scripts/guibuilder/**`, the core editor/layout files it depends
 on, and the mojo. That workflow has not run on GitHub yet; the first PR that
 includes it will validate it.
@@ -1119,7 +1121,7 @@ things that are easier to judge once it is on a branch.
 9. Add `scripts/guibuilder/README.md`: how to run it from a project, how to run
    it from source, the `guibuilder.*` properties, and the MCP surface.
 10. Document `mvn cn1:guibuilder` in the developer guide next to `cn1:settings`,
-    including the JDK 17 requirement.
+    including the JDK requirement.
 11. Add first-class keyboard shortcuts and make the active undo domain explicit
     (items 3 and 16).
 

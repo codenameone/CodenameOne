@@ -106,9 +106,9 @@ class LiveCssTest {
         for (int i = 0; i < root.getComponentCount(); i++) {
             Component component = root.getComponentAt(i);
             Object element = component.getClientProperty("gui.element");
-            if (element instanceof Element e && name.equals(e.getAttribute("name"))) return component;
-            if (component instanceof Container container) {
-                Component nested = find(container, builder, name);
+            if (element instanceof Element && name.equals(((Element) element).getAttribute("name"))) return component;
+            if (component instanceof Container) {
+                Component nested = find(((Container) component), builder, name);
                 if (nested != null) return nested;
             }
         }

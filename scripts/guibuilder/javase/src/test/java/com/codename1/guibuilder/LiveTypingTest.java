@@ -137,9 +137,9 @@ class LiveTypingTest {
         for (int i = 0; i < root.getComponentCount(); i++) {
             Component component = root.getComponentAt(i);
             Object element = component.getClientProperty("gui.element");
-            if (element instanceof Element e && name.equals(e.getAttribute("name"))) return component;
-            if (component instanceof Container container) {
-                Component nested = findByElementName(container, name);
+            if (element instanceof Element && name.equals(((Element) element).getAttribute("name"))) return component;
+            if (component instanceof Container) {
+                Component nested = findByElementName(((Container) component), name);
                 if (nested != null) return nested;
             }
         }
@@ -224,9 +224,9 @@ class LiveTypingTest {
     private static EditorView findView(Container root) {
         for (int i = 0; i < root.getComponentCount(); i++) {
             Component component = root.getComponentAt(i);
-            if (component instanceof EditorView view) return view;
-            if (component instanceof Container container) {
-                EditorView nested = findView(container);
+            if (component instanceof EditorView) return ((EditorView) component);
+            if (component instanceof Container) {
+                EditorView nested = findView(((Container) component));
                 if (nested != null) return nested;
             }
         }

@@ -260,14 +260,14 @@ class LiveWorkspaceDragTest {
 
     private static Element elementOf(Component component) {
         Object element = component == null ? null : component.getClientProperty("gui.element");
-        return element instanceof Element e ? e : null;
+        return element instanceof Element ? ((Element) element) : null;
     }
 
     private static int countPreviews(Container root, Element element, int found) {
         for (int i = 0; i < root.getComponentCount(); i++) {
             Component component = root.getComponentAt(i);
             if (component.getClientProperty("gui.element") == element) found++;
-            if (component instanceof Container container) found = countPreviews(container, element, found);
+            if (component instanceof Container) found = countPreviews(((Container) component), element, found);
         }
         return found;
     }
@@ -276,8 +276,8 @@ class LiveWorkspaceDragTest {
         for (int i = 0; i < root.getComponentCount(); i++) {
             Component component = root.getComponentAt(i);
             if (component.getClientProperty("gui.element") == element) return component;
-            if (component instanceof Container container) {
-                Component nested = findPreview(container, element);
+            if (component instanceof Container) {
+                Component nested = findPreview(((Container) component), element);
                 if (nested != null) return nested;
             }
         }

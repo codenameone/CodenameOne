@@ -67,7 +67,7 @@ for module in core factory css-compiler; do
 done
 
 JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/editor/CodeView.class" "protectedStartMarker"
-JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/editor/EditorView.class" "multiKeyModeRestore"
+JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/editor/EditorView.class" "multiKeyModeInstalled"
 JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/CodeEditor.class" "setCursorPosition"
 JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/Form.class" "focusedHandlesInput"
 JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/editor/EditorView.class" "copySelection"
@@ -94,13 +94,15 @@ JAVA_HOME="$JDK8" verify_core_class "com/codename1/ui/Form.class" "focusedHandle
 
 cd "$REPO_ROOT/scripts/guibuilder"
 if [ "$run_tests" = "1" ]; then
-  echo "==> tests (JDK 21)"
-  JAVA_HOME="$JDK21" PATH="$JDK21/bin:$PATH" \
+  # Built and tested on JDK 8: the editor is a Java 8 artifact so that it loads on whatever
+  # JDK the project being edited already builds with, and only a JDK 8 compiler proves that.
+  echo "==> tests (JDK 8)"
+  JAVA_HOME="$JDK8" PATH="$JDK8/bin:$PATH" \
     mvn -nsu -o -Dmaven.repo.local="$LOCAL_REPO" -pl javase -am test -Dcodename1.platform=javase
 fi
 
-echo "==> package (JDK 21)"
-JAVA_HOME="$JDK21" PATH="$JDK21/bin:$PATH" \
+echo "==> package (JDK 8)"
+JAVA_HOME="$JDK8" PATH="$JDK8/bin:$PATH" \
   mvn -nsu -o -q -Dmaven.repo.local="$LOCAL_REPO" -pl javase -am -Pexecutable-jar package \
     -Dcodename1.platform=javase -Dmaven.test.skip=true
 

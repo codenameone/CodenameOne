@@ -134,7 +134,8 @@ class DemoFormsTest {
     private static void layoutNested(Container container) {
         container.layoutContainer();
         for (int i = 0; i < container.getComponentCount(); i++) {
-            if (container.getComponentAt(i) instanceof Container nested) layoutNested(nested);
+            Component child = container.getComponentAt(i);
+            if (child instanceof Container) layoutNested((Container) child);
         }
     }
 
@@ -142,8 +143,8 @@ class DemoFormsTest {
         for (int i = 0; i < root.getComponentCount(); i++) {
             Component component = root.getComponentAt(i);
             if (component.getClientProperty("gui.element") == element) return component;
-            if (component instanceof Container container) {
-                Component nested = findPreview(container, element);
+            if (component instanceof Container) {
+                Component nested = findPreview(((Container) component), element);
                 if (nested != null) return nested;
             }
         }
