@@ -722,6 +722,14 @@ static void handleGetStack(int64_t threadId) {
     if (depth > 256) depth = 256;
     size_t sz = 8 + 4 + (size_t)depth * 8;
     uint8_t* buf = (uint8_t*)malloc(sz);
+    if (!buf) {
+        pthread_mutex_unlock(&s->mu);
+        uint8_t empty[12];
+        writeBE64(empty,     (uint64_t)threadId);
+        writeBE32(empty + 8, 0);
+        sendEvent(EVT_STACK, empty, 12);
+        return;
+    }
     writeBE64(buf,     (uint64_t)threadId);
     writeBE32(buf + 8, (uint32_t)depth);
     // Frames emitted innermost-first.
@@ -830,6 +838,12 @@ static void handleGetLocals(int64_t threadId, int frameOffsetFromTop) {
     }
     size_t sz = 4 + (size_t)count * (4 + 1 + 8);
     uint8_t* buf = (uint8_t*)malloc(sz);
+    if (!buf) {
+        pthread_mutex_unlock(&s->mu);
+        uint32_t zero = 0;
+        sendEvent(EVT_LOCALS, &zero, 4);
+        return;
+    }
     writeBE32(buf, (uint32_t)count);
     uint8_t* p = buf + 4;
     for (int i = 0; i < rows; i++) {
