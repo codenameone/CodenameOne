@@ -170,6 +170,34 @@ public class SEDatabaseConformanceTest {
         r.assertClean("statements (legacy)");
     }
 
+    /**
+     * A port that shipped after this contract has no old behaviour, so the hint must not hold it
+     * to another port's.
+     *
+     * Windows, Linux and the browser are new here. The legacy group ran against them anyway, and
+     * one expectation was written as "every port except iOS", which quietly included them and
+     * asserted the simulator's silent truncation of a multi-statement script against ports that
+     * correctly run the whole thing. Both device jobs went red for behaving properly.
+     *
+     * What this pins is the suite's expectations, not the engine. On those ports the hint is
+     * readable but nothing reads it, so their behaviour is the portable contract whether it is set
+     * or not -- and the legacy group must therefore expect exactly what the strict group expects.
+     * Leaving the flag off reproduces that precisely: every expectation the legacy run makes here
+     * has to be the strict one, and any that is not is a legacy branch that forgot to name the
+     * port it belongs to. The device suites are the authority, but they cost forty minutes; this
+     * costs a second and fails on the same mistake.
+     */
+    @Test
+    public void aPortWithNoPriorBehaviourIsNotHeldToAnothersLegacy() throws Exception {
+        Database.setLegacyBehavior(false);
+        DatabaseConformanceSuite.setPortKind(DatabaseConformanceSuite.PORT_OTHER);
+        CollectingReporter r = new CollectingReporter();
+        DatabaseConformanceSuite.runStatements(db, DatabaseConformanceSuite.MODE_LEGACY, r);
+        DatabaseConformanceSuite.runCursor(db, DatabaseConformanceSuite.MODE_LEGACY, r);
+        DatabaseConformanceSuite.runTransactions(db, DatabaseConformanceSuite.MODE_LEGACY, r);
+        r.assertClean("a port with no prior behaviour (legacy)");
+    }
+
     @Test
     public void cursorsConformToTheLegacyContract() throws Exception {
         Database.setLegacyBehavior(true);

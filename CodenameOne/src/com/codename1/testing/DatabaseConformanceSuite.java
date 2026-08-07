@@ -314,12 +314,25 @@ public final class DatabaseConformanceSuite {
             multiThrew = true;
         }
         int created = countTables(db, "conf_m1", "conf_m2");
-        // In legacy mode only iOS ran a whole script: it used sqlite3_exec. Android's execSQL and
-        // the simulator's PreparedStatement each ran the first statement and dropped the rest.
-        if (mode == MODE_LEGACY && portKind() != PORT_IOS) {
+        // The compatibility hint restores what a port used to do, so it has something to restore
+        // only where the port shipped before this contract. Naming those ports rather than
+        // excluding iOS is the difference: Windows, Linux and the browser are new here, never ran
+        // a script any other way, and asserting the simulator's old truncation against them fails
+        // a port that is behaving correctly.
+        if (mode == MODE_LEGACY && portKind() == PORT_SIMULATOR) {
+            // The simulator ran the first statement through a PreparedStatement and dropped the
+            // rest, without saying so.
             r.check(!multiThrew && created == 1,
                     "legacy: execute(String) runs only the first statement of a script, got "
                     + created + " of 2");
+        } else if (mode == MODE_LEGACY && portKind() == PORT_ANDROID) {
+            // Android handed the whole script to execSQL, which takes a single statement. Whether
+            // it refuses the tail by throwing or by ignoring it is the engine's business and not
+            // something the hint can promise, so what is asserted is the promise itself: the
+            // script does not run whole.
+            r.check(multiThrew || created < 2,
+                    "legacy: execute(String) does not run a whole script on Android, threw="
+                    + multiThrew + " created=" + created + " of 2");
         } else {
             r.check(!multiThrew && created == 2,
                     "execute(String) runs every statement of a script, got " + created + " of 2");
