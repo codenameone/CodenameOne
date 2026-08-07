@@ -680,11 +680,22 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     /// screenshot test shrugs off failed them outright, on a different test each
     /// run. A test that is genuinely broken still fails -- it times out the second
     /// time too, and the retry is one-shot per index.
+    ///
+    /// It IS conditioned on isRetrySafe(). Dropping the screenshot gate without
+    /// putting anything in its place made the retry reachable for tests whose
+    /// runTest() starts a worker and returns: resetForRetry() clears the shared
+    /// completion state, so a late done() from the first attempt's thread would
+    /// complete the second attempt, advance the suite before it had finished and
+    /// let that worker's side effects bleed into later tests. Screenshot-taking
+    /// was never the property that made a retry safe -- having no work in flight
+    /// is -- and VideoIODecodedFramesScreenshotTest takes a screenshot AND starts
+    /// a thread, so the old gate did not establish it either.
     private boolean shouldRetryAfterSilentTimeout(int index, BaseTest testClass) {
         return retriedTestIndex != index
                 && !"HTML5".equals(Display.getInstance().getPlatformName())
                 && !testClass.isFailed()
-                && !testClass.isCaptureStarted();
+                && !testClass.isCaptureStarted()
+                && testClass.isRetrySafe();
     }
 
     private boolean shouldRetryAfterTransportFailure(int index, BaseTest testClass) {

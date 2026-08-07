@@ -2031,12 +2031,32 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
         struct timeval   tv;
         gettimeofday(&tv, NULL);
         struct timespec   ts;
-        ts.tv_sec = tv.tv_sec + (long)(timeout / 1000);
-        ts.tv_nsec = tv.tv_usec * 1000 + (timeout % 1000) * 1000000 + nanos;
-        if ( ts.tv_nsec > 1000000000 ){
-            ts.tv_nsec -= 1000000000;
-            ts.tv_sec++;
+        /* Built in 64-bit throughout. `timeout` is a JAVA_LONG and time_t is
+           64-bit everywhere we run, but `long` is only 32 bits on Windows
+           (LLP64) -- so casting the seconds through it truncated
+           Long.MAX_VALUE / 1000 (9223372036854775) to -1511828489, putting the
+           deadline about 48 years in the PAST. wait(Long.MAX_VALUE), the
+           ordinary park-until-notified idiom, therefore returned immediately
+           instead of blocking until notified. LP64 platforms were unaffected,
+           which is why this only ever showed up on Windows.
+
+           The addend is capped so the deadline cannot overflow time_t on any
+           platform; ~34,000 years is indistinguishable from never for a wait,
+           and the condition-variable wrapper chunks it down to timeouts the
+           host API can express. */
+        JAVA_LONG addSeconds = timeout / 1000;
+        if (addSeconds > ((JAVA_LONG)1 << 40)) {
+            addSeconds = ((JAVA_LONG)1 << 40);
         }
+        /* Normalized in 64-bit as well: tv_usec * 1000 plus the sub-second part
+           of the timeout plus nanos can exceed 2e9, which no longer fits a
+           32-bit tv_nsec, and a single subtract-one-second could not normalize
+           it anyway. */
+        JAVA_LONG nsec = (JAVA_LONG)tv.tv_usec * 1000
+                       + (timeout % 1000) * 1000000
+                       + (JAVA_LONG)nanos;
+        ts.tv_sec = (time_t)((JAVA_LONG)tv.tv_sec + addSeconds + nsec / 1000000000);
+        ts.tv_nsec = (long)(nsec % 1000000000);
         pthread_cond_timedwait(&data->__codenameOneCondition, &data->__codenameOneMutex, &ts);
     }
 

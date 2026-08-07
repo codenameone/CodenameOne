@@ -309,17 +309,20 @@ static EVP_PKEY* cn1PrivateKey(const unsigned char* der, int length) {
         PKCS8_PRIV_KEY_INFO_free(info);
     }
     if (key == 0) {
-        /* Tolerate a bare PKCS#1/SEC1 key as well; some callers keep those.
-         * The PKCS#8 attempt above queued its failure on this thread's OpenSSL
-         * error queue. For a valid PKCS#1/SEC1 key that failure is expected and
-         * the fallback succeeds, but the stale entry stays queued and the next
-         * unrelated operation to read the queue reports it -- so drop it before
-         * trying again. */
+        /* PKCS#8 only, deliberately. This used to fall back to
+         * d2i_AutoPrivateKey, which also accepts bare PKCS#1 RSA and SEC1 EC
+         * keys -- but the public entry point is PrivateKey.fromPkcs8(), JavaSE
+         * and Android feed it to PKCS8EncodedKeySpec and Windows imports it as
+         * NCRYPT_PKCS8_PRIVATE_KEY_BLOB, so all of those reject those
+         * encodings. Accepting them here meant the identical key loaded on
+         * Linux and nowhere else, which is a portability trap rather than a
+         * kindness: code written against this port would fail on every device
+         * it shipped to.
+         *
+         * The failed attempt above queued an entry on this thread's OpenSSL
+         * error queue; clear it so the next unrelated operation to read the
+         * queue does not report it. */
         ERR_clear_error();
-        cursor = der;
-        key = d2i_AutoPrivateKey(0, &cursor, (long) length);
-    }
-    if (key == 0) {
         cn1CryptoFail("private key is not PKCS#8 DER");
         return 0;
     }

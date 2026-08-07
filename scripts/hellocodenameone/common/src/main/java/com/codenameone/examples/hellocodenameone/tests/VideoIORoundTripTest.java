@@ -58,6 +58,15 @@ import java.util.List;
  * This is an assertion test, not a screenshot test, so it does not affect baselines.
  */
 public class VideoIORoundTripTest extends BaseTest {
+
+    /// Not safe for the runner's silent-timeout retry: it encodes and decodes on a worker thread,
+    /// and that worker outlives runTest(). A retry resets the shared
+    /// completion state, so a late done() from the first attempt's worker
+    /// would complete the second attempt and advance the suite early.
+    @Override
+    public boolean isRetrySafe() {
+        return false;
+    }
     private static final int W = 128;
     private static final int H = 96;
     private static final int FRAMES = 6;

@@ -2675,6 +2675,41 @@ public class LinuxImplementation extends CodenameOneImplementation {
      * directory joined to itself -- every write through that class landed on a
      * path that could not exist.
      */
+    /// A stable, filesystem-safe directory name for THIS application.
+    ///
+    /// storageDir() names the Codename One directory shared by every CN1 app
+    /// under this user account, so returning it as the app home gave two
+    /// applications the same getAppHomePath(): each could read and overwrite
+    /// the other's files. The base implementation appends
+    /// getProperty("AppName", packageName) for exactly this reason; the reason
+    /// this override exists at all is that the base builds it on an unwritable
+    /// filesystem root, not that the per-app component was wrong.
+    ///
+    /// Never returns the literal "null": an unset AppName and packageName is
+    /// what made the base implementation produce "/null/" in the first place.
+    private String appHomeDirName() {
+        String name = getProperty("AppName", null);
+        if (name == null || name.length() == 0) {
+            name = getPackageName();
+        }
+        if (name == null || name.length() == 0 || "null".equals(name)) {
+            return "CN1App";
+        }
+        StringBuilder safe = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            // Reserved on Windows and awkward everywhere else; NTFS and ext4
+            // both accept the rest of the printable range.
+            if (c < ' ' || c == '\\' || c == '/' || c == ':' || c == '*' || c == '?'
+                    || c == '"' || c == '<' || c == '>' || c == '|') {
+                safe.append('_');
+            } else {
+                safe.append(c);
+            }
+        }
+        return safe.toString();
+    }
+
     @Override
     public String getAppHomePath() {
         String dir = LinuxNative.storageDir();
@@ -2684,7 +2719,12 @@ public class LinuxImplementation extends CodenameOneImplementation {
         if (!dir.endsWith("/")) {
             dir += "/";
         }
-        return "file://" + dir;
+        dir += appHomeDirName() + "/";
+        String home = "file://" + dir;
+        if (!exists(home)) {
+            mkdir(home);
+        }
+        return home;
     }
 
     @Override
