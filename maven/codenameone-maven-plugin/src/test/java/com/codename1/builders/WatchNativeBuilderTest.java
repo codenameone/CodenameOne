@@ -576,6 +576,70 @@ class WatchNativeBuilderTest {
         return b;
     }
 
+    /// A watch that boots its OWN class must compile its OWN translation.
+    ///
+    /// Sharing the phone's tree is what made watchMain not really an entry point: the watch binary
+    /// carried everything the PHONE reaches, and the phone stub's main had to be defined away to
+    /// stop the two colliding. So the generated project must reference the staged watch sources,
+    /// must not copy the app target's, and must not carry the -Dmain neutraliser.
+    @Test
+    void aDistinctWatchMainCompilesItsOwnTranslation(@TempDir Path tmp) throws Exception {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        WatchNativeBuilder b = parse(req);
+        assertTrue(b.needsOwnTranslation(),
+                "a watch lifecycle class distinct from the phone's needs its own translation");
+
+        String ruby = b.buildXcodeScript(req, tmp.toFile(), "1.0",
+                java.util.Arrays.asList("MyAppWatchStub.m", "java_lang_String.m"));
+        assertTrue(ruby.contains("MyAppWatchStub.m"), ruby);
+        assertTrue(ruby.contains("watch-src"), ruby);
+        assertFalse(ruby.contains("-Dmain=cn1_watch_phone_main_unused"),
+                "the watch has a real main of its own now: " + ruby);
+        assertFalse(ruby.contains("app_target.source_build_phase.files.to_a.each"),
+                "the phone's sources must not be added to the watch target: " + ruby);
+    }
+
+    /// The same class on both slices is ONE app, so it keeps one translation -- and there the
+    /// phone stub's main still has to be defined away.
+    @Test
+    void asharedWatchMainKeepsTheSingleTranslation(@TempDir Path tmp) throws Exception {
+        BuildRequest req = request();
+        req.putArgument("watchMain", "com.mycompany.myapp.MyApp");
+        WatchNativeBuilder b = parse(req);
+        assertFalse(b.needsOwnTranslation(),
+                "the same entry point on both slices must not be translated twice");
+
+        String ruby = b.buildXcodeScript(req, tmp.toFile(), "1.0",
+                java.util.Collections.<String>emptyList());
+        assertTrue(ruby.contains("app_target.source_build_phase.files.to_a.each"),
+                "the shared translation is reused: " + ruby);
+        assertTrue(ruby.contains("-Dmain=cn1_watch_phone_main_unused"),
+                "one binary cannot define main twice: " + ruby);
+    }
+
+    /// The bootstrap has to call the stub that actually exists in the watch binary.
+    @Test
+    void theBootstrapEntersTheWatchStub(@TempDir Path tmp) throws Exception {
+        BuildRequest own = request();
+        own.putArgument("watchMain", WATCH_MAIN);
+        File dir = tmp.resolve("own").toFile();
+        dir.mkdirs();
+        parse(own).writeWatchEntry(own, dir);
+        String boot = read(new File(dir, "CN1WatchBootstrap.m"));
+        assertTrue(boot.contains("MyAppWatchStub_main___java_lang_String_1ARRAY"),
+                "the watch translation's own stub is the entry: " + boot);
+
+        BuildRequest shared = request();
+        shared.putArgument("watchMain", "com.mycompany.myapp.MyApp");
+        File dir2 = tmp.resolve("shared").toFile();
+        dir2.mkdirs();
+        parse(shared).writeWatchEntry(shared, dir2);
+        String boot2 = read(new File(dir2, "CN1WatchBootstrap.m"));
+        assertTrue(boot2.contains("MyAppStub_main___java_lang_String_1ARRAY"),
+                "the shared translation boots the phone stub: " + boot2);
+    }
+
     private static String writeInfoPlist(BuildRequest req, Path tmp) throws IOException {
         WatchNativeBuilder b = parse(req);
         File dir = tmp.toFile();

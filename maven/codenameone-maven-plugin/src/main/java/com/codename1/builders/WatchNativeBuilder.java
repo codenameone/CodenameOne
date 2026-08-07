@@ -25,6 +25,8 @@ package com.codename1.builders;
 import org.apache.tools.ant.BuildException;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
@@ -206,6 +208,137 @@ class WatchNativeBuilder {
      * (the phone entry) is excluded from the watch target in {@link
      * #applyXcodeSettings}.
      */
+    /// Whether the watch app needs a ParparVM translation of its own.
+    ///
+    /// Only when {@code watchMain} names a class the phone does not boot. A project whose watch and
+    /// phone entry points are the same class reaches the same code either way, so a second
+    /// translation would double the build for an identical binary.
+    boolean needsOwnTranslation() {
+        return enabled && distinctWatchMain;
+    }
+
+    /// The translator root for the watch: the class name the second pass is given, matching the
+    /// watch target's own name so the two are obviously the same thing.
+    static String translationRoot(String mainClass) {
+        return mainClass + "Watch";
+    }
+
+    /// Where the second translation is written, kept out of the phone's output root so neither pass
+    /// can see the other's dist tree.
+    static File translationDir(File tmpFile) {
+        return new File(tmpFile, "watchvm");
+    }
+
+    /// Writes the watch app's own Stub -- the root the watch translation is tree-shaken from.
+    ///
+    /// The phone Stub cannot serve: it instantiates the PHONE lifecycle class, so a watch binary
+    /// rooted there drags in the phone's entire reachable graph and then starts the phone UI. That
+    /// is precisely what the {@code -Dmain=cn1_watch_phone_main_unused} hack existed to hide -- the
+    /// watch target compiled the phone's translation and had its {@code main} defined away, so
+    /// {@code watchMain} was never really the entry point and nothing was shaken out for the watch.
+    ///
+    /// Deliberately smaller than the phone stub. Push callbacks, URL handling, maps, sign-in
+    /// providers and the ad padding are all phone concerns; pulling them in here would defeat the
+    /// point of rooting the translation somewhere else.
+    void writeWatchStubSource(BuildRequest request, File stubSource, String buildVersion,
+            String nativeRegistration, String iosMode) throws IOException {
+        String stubClass = translationRoot(request.getMainClass()) + "Stub";
+        String body = "package " + request.getPackageName() + ";\n\n"
+                + "import com.codename1.ui.*;\n\n"
+                + "/** Generated watch entry point. Rooted at codename1.watchMain (" + watchMain
+                + "). */\n"
+                + "public class " + stubClass
+                + " extends com.codename1.impl.ios.Lifecycle implements Runnable {\n"
+                + "    public static final String PACKAGE_NAME = \"" + request.getPackageName() + "\";\n"
+                + "    public static final String APPLICATION_VERSION = \"" + buildVersion + "\";\n"
+                + "    public static final String APPLICATION_NAME = \""
+                + request.getDisplayName() + "\";\n"
+                + "    private " + watchMain + " i = new " + watchMain + "();\n"
+                + "    private boolean initialized = false;\n\n"
+                + "    public void run() {\n"
+                + "        Display.getInstance().setProperty(\"package_name\", PACKAGE_NAME);\n"
+                + "        Display.getInstance().setProperty(\"AppVersion\", APPLICATION_VERSION);\n"
+                + "        Display.getInstance().setProperty(\"AppName\", APPLICATION_NAME);\n"
+                + "        if(!initialized) {\n"
+                + "            initialized = true;\n"
+                + "            i.init(this);\n"
+                + "        }\n"
+                + "        i.start();\n"
+                + "    }\n\n"
+                + "    public void applicationWillTerminate() {\n"
+                + "        i.stop();\n"
+                + "        i.destroy();\n"
+                + "    }\n\n"
+                + "    public static void main(String[] argv) {\n"
+                + "        if(!(argv != null && argv.length > 0 && argv[0].equals(\"ignoreNative\"))) {\n"
+                + nativeRegistration
+                + "        }\n"
+                + "        " + stubClass + " stub = new " + stubClass + "();\n"
+                + "        com.codename1.impl.ios.IOSImplementation.setMainClass(stub.i);\n"
+                + "        com.codename1.impl.ios.IOSImplementation.setIosMode(\"" + iosMode + "\");\n"
+                + "        Display.init(stub);\n"
+                + "    }\n"
+                + "}\n";
+        java.io.OutputStream out = new java.io.FileOutputStream(
+                new File(stubSource, stubClass + ".java"));
+        try {
+            out.write(body.getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+        owner.log("[watchNative] Wrote " + stubClass + ".java; the watch slice is translated from "
+                + watchMain + " rather than sharing the phone's translation");
+    }
+
+    /// Moves the watch translation next to the Xcode project and reports its source file names.
+    ///
+    /// The second pass writes into its own root so the two translations cannot see each other, but
+    /// the project has to reference the files with a path relative to itself -- so the tree is
+    /// copied into {@code <MainClass>-src/watch-src/} once, here.
+    ///
+    /// @return the base names the watch target must compile, empty when there is no own translation
+    List<String> stageWatchTranslation(BuildRequest request, File tmpFile, File appSrcDir)
+            throws IOException {
+        List<String> compiled = new ArrayList<String>();
+        if (!needsOwnTranslation()) {
+            return compiled;
+        }
+        File from = new File(translationDir(tmpFile),
+                "dist/" + translationRoot(request.getMainClass()) + "-src");
+        if (!from.isDirectory()) {
+            throw new IOException("the watch translation produced no sources at " + from);
+        }
+        File to = new File(appSrcDir, WATCH_SRC_DIR);
+        to.mkdirs();
+        File[] files = from.listFiles();
+        if (files == null) {
+            throw new IOException("could not read the watch translation at " + from);
+        }
+        for (File f : files) {
+            String name = f.getName();
+            if (!f.isFile()) {
+                continue;
+            }
+            boolean source = name.endsWith(".m") || name.endsWith(".c");
+            if (!source && !name.endsWith(".h")) {
+                // Only the code. The watch bundle's plist, resources and project file are written
+                // by this builder against the PHONE project -- taking the second translation's
+                // copies would overwrite them with ones describing a standalone app.
+                continue;
+            }
+            IPhoneBuilder.copy(f, new File(to, name));
+            if (source) {
+                compiled.add(name);
+            }
+        }
+        owner.log("[watchNative] Staged " + compiled.size()
+                + " translated watch sources from " + watchMain);
+        return compiled;
+    }
+
+    /// Where the staged watch translation lives, relative to the app's -src directory.
+    static final String WATCH_SRC_DIR = "watch-src";
+
     void writeWatchEntry(BuildRequest request, File appSrcDir) throws IOException {
         appSrcDir.mkdirs();
         String mainClass = request.getMainClass();
@@ -293,7 +426,17 @@ class WatchNativeBuilder {
         // C symbol is mangled from the fully-qualified <package>.<Main>Stub.
         String mainFqn = (request.getPackageName() == null || request.getPackageName().isEmpty())
                 ? mainClass : (request.getPackageName() + "." + mainClass);
-        String mainStub = mangle(mainFqn) + "Stub";
+        // The stub the watch actually boots. With a translation of its own that is the WATCH stub
+        // -- the phone's symbol is not in the watch binary at all, because the watch tree was
+        // shaken from a different root. Sharing the phone's translation is the only case where the
+        // phone stub is the right entry, and there its main is defined away so this call is what
+        // starts the app.
+        String stubFqn = needsOwnTranslation()
+                ? ((request.getPackageName() == null || request.getPackageName().isEmpty())
+                        ? translationRoot(mainClass)
+                        : request.getPackageName() + "." + translationRoot(mainClass))
+                : mainFqn;
+        String mainStub = mangle(stubFqn) + "Stub";
         StringBuilder bs = new StringBuilder();
         bs.append("#include \"TargetConditionals.h\"\n")
           .append("#if TARGET_OS_WATCH\n")
@@ -955,11 +1098,39 @@ class WatchNativeBuilder {
      * arm64_32}, points it at the watch Info.plist, and - for the companion
      * distribution - embeds it in the iOS app.
      */
-    void applyXcodeSettings(BuildRequest request, File tmpFile, String buildVersion)
+    void applyXcodeSettings(BuildRequest request, File tmpFile, String buildVersion,
+            List<String> watchSources)
             throws BuildException {
         File hooksDir = new File(tmpFile, "hooks");
         hooksDir.mkdir();
         File scriptFile = new File(hooksDir, "apply_watch_native_settings.rb");
+        String script = buildXcodeScript(request, tmpFile, buildVersion, watchSources);
+        String watchTargetName = translationRoot(request.getMainClass());
+        try {
+            owner.createFile(scriptFile, script.getBytes(StandardCharsets.UTF_8));
+            owner.exec(hooksDir, "chmod", "0755", scriptFile.getAbsolutePath());
+            if (!owner.exec(hooksDir, scriptFile.getAbsolutePath())) {
+                throw new BuildException("Failed to apply watchNative Xcode settings via xcodeproj");
+            }
+            owner.log("[watchNative] Added watchOS target " + watchTargetName
+                    + " (" + (isStandalone() ? "standalone" : "companion") + ", "
+                    + (watchSources.isEmpty()
+                            ? "sharing the phone translation"
+                            : watchSources.size() + " own translated sources") + ")");
+        } catch (BuildException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BuildException("Failed to apply watchNative Xcode settings", ex);
+        }
+    }
+
+    /// The xcodeproj script, separated from running it so the decisions in it can be tested.
+    ///
+    /// Running it needs a real generated project and the xcodeproj gem; the CHOICES -- which
+    /// sources the watch target compiles, whether the phone stub's main is defined away -- are
+    /// what the tests need to pin, and they are all here.
+    String buildXcodeScript(BuildRequest request, File tmpFile, String buildVersion,
+            List<String> watchSources) {
         String mainClass = request.getMainClass();
         String watchTargetName = mainClass + "Watch";
         String projectFile = new File(tmpFile, "dist/" + mainClass + ".xcodeproj").getAbsolutePath();
@@ -997,8 +1168,31 @@ class WatchNativeBuilder {
                 // Compile the shared ParparVM sources for the watch, minus the
                 // GL/Metal-only files. Reuse the app target's compile sources so
                 // we track exactly what was generated.
-                .append("excluded = %w[").append(excluded).append("]\n")
-                .append("app_target.source_build_phase.files.to_a.each do |bf|\n")
+                .append("excluded = %w[").append(excluded).append("]\n");
+        if (!watchSources.isEmpty()) {
+            // The watch compiles its OWN translation, rooted at watchMain and shaken down to what
+            // that entry point reaches. Nothing of the phone's tree is added: sharing it is what
+            // made the watch binary carry the phone's whole graph, and the phone Stub's main then
+            // had to be defined away to stop the two entry points colliding.
+            StringBuilder names = new StringBuilder();
+            for (String name : watchSources) {
+                if (names.length() > 0) {
+                    names.append(' ');
+                }
+                names.append(name);
+            }
+            s.append("watch_sources = %w[").append(names).append("]\n")
+                    .append("watch_group_path = '").append(WATCH_SRC_DIR).append("'\n")
+                    .append("watch_existing = watch_target.source_build_phase.files.to_a.map { |bf| bf.file_ref && bf.file_ref.path ? File.basename(bf.file_ref.path) : nil }\n")
+                    .append("watch_sources.each do |name|\n")
+                    .append("  next if watch_existing.include?(name)\n")
+                    .append("  ref = xcproj.main_group.new_reference(watch_group_path + '/' + name)\n")
+                    .append("  watch_target.source_build_phase.add_file_reference(ref)\n")
+                    .append("end\n");
+        } else {
+            // Same entry point on both slices, so there is one translation and the watch shares it.
+            // The phone Stub's main is neutralised below in exactly that case.
+            s.append("app_target.source_build_phase.files.to_a.each do |bf|\n")
                 .append("  ref = bf.file_ref\n")
                 .append("  next unless ref && ref.path\n")
                 .append("  base = File.basename(ref.path)\n")
@@ -1011,7 +1205,9 @@ class WatchNativeBuilder {
                 // watch slice failed with "requires ARC (-fobjc-arc)".
                 .append("    added.settings = bf.settings.dup if added && bf.settings\n")
                 .append("  end\n")
-                .append("end\n")
+                .append("end\n");
+        }
+        s
                 // Add the generated watch entry point (SwiftUI @main shell +
                 // bootstrap). These live in <mainClass>-src/ next to the
                 // translated sources.
@@ -1095,12 +1291,19 @@ class WatchNativeBuilder {
         String stubFqn = (request.getPackageName() == null || request.getPackageName().isEmpty())
                 ? mainClass : (request.getPackageName() + "." + mainClass);
         String phoneStubName = mangle(stubFqn) + "Stub";
-        s.append("stub_name = '").append(phoneStubName).append(".m'\n")
-                .append("watch_target.source_build_phase.files.to_a.each do |bf|\n")
-                .append("  ref = bf.file_ref\n")
-                .append("  next unless ref && ref.path && File.basename(ref.path) == stub_name\n")
-                .append("  bf.settings = { 'COMPILER_FLAGS' => '-Dmain=cn1_watch_phone_main_unused -Wno-error=return-type -Wno-return-type' }\n")
-                .append("end\n");
+        if (watchSources.isEmpty()) {
+            // ONLY when the watch shares the phone's translation. Two entry points would otherwise
+            // define main twice in one binary, so the phone's is defined away.
+            //
+            // With a translation of its own the watch has a real main -- its own stub's -- and
+            // defining it away here would leave the watch binary with no entry point at all.
+            s.append("stub_name = '").append(phoneStubName).append(".m'\n")
+                    .append("watch_target.source_build_phase.files.to_a.each do |bf|\n")
+                    .append("  ref = bf.file_ref\n")
+                    .append("  next unless ref && ref.path && File.basename(ref.path) == stub_name\n")
+                    .append("  bf.settings = { 'COMPILER_FLAGS' => '-Dmain=cn1_watch_phone_main_unused -Wno-error=return-type -Wno-return-type' }\n")
+                    .append("end\n");
+        }
 
         // watchOS frameworks auto-link via modules; remove GL/Metal framework
         // refs that the template added for iOS so the watch target doesn't try
@@ -1233,30 +1436,16 @@ class WatchNativeBuilder {
                 .append("end\n");
 
         s.append("xcproj.save\n");
-
-        try {
-            owner.createFile(scriptFile, s.toString().getBytes(StandardCharsets.UTF_8));
-            owner.exec(hooksDir, "chmod", "0755", scriptFile.getAbsolutePath());
-            if (!owner.exec(hooksDir, scriptFile.getAbsolutePath())) {
-                throw new BuildException("Failed to apply watchNative Xcode settings via xcodeproj");
-            }
-            owner.log("[watchNative] Added watchOS target " + watchTargetName
-                    + " (" + (isStandalone() ? "standalone" : "companion") + ", "
-                    + "watchOS " + MIN_DEPLOYMENT_TARGET + ", arm64_32)");
-            if (isStandalone()) {
-                // Said out loud at build time. The target is detached from the phone app and
-                // installable, but the archive step still selects the phone scheme, so the IPA this
-                // build returns is the phone app -- and a developer who asked for a watch-only
-                // product would otherwise discover that by inspecting the artifact.
-                owner.log("[watchNative] NOTE: codename1.watchStandalone builds " + watchTargetName
-                        + " as a detached, installable product, but this build archives the phone "
-                        + "scheme. To submit the watch app, open the generated Xcode project and "
-                        + "archive the " + watchTargetName + " scheme directly.");
-            }
-        } catch (BuildException ex) {
-            throw ex;
-        } catch (Exception ex) {
-            throw new BuildException("Failed to apply watchNative Xcode settings", ex);
+        if (isStandalone()) {
+            // Said out loud at build time. The target is detached from the phone app and
+            // installable, but the archive step still selects the phone scheme, so the IPA this
+            // build returns is the phone app -- and a developer who asked for a watch-only product
+            // would otherwise discover that by inspecting the artifact.
+            owner.log("[watchNative] NOTE: codename1.watchStandalone builds " + watchTargetName
+                    + " as a detached, installable product, but this build archives the phone "
+                    + "scheme. To submit the watch app, open the generated Xcode project and "
+                    + "archive the " + watchTargetName + " scheme directly.");
         }
+        return s.toString();
     }
 }

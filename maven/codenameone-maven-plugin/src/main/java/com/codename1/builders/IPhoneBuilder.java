@@ -2148,6 +2148,18 @@ public class IPhoneBuilder extends Executor {
                     + "}\n";
 
             stubSourceStream.write(stubSourceCode.getBytes(StandardCharsets.UTF_8));
+            // The watch gets a stub of its OWN when it boots a different class, written into the
+            // same source folder so the one javac pass below compiles both. Its translation is
+            // rooted here rather than at the phone stub, which is what finally makes watchMain the
+            // watch's entry point and lets the watch binary be shaken down to what that entry
+            // point actually reaches.
+            if (watchNativeBuilder.needsOwnTranslation()) {
+                watchNativeBuilder.writeWatchStubSource(request, stubSource, buildVersion,
+                        registerNativeImplementationsAndCreateStubs(
+                                new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}),
+                                stubSource, classesDir),
+                        iosMode);
+            }
         } catch (IOException ex) {
             throw new BuildException("Failed to write stub source", ex);
         }
@@ -3644,6 +3656,33 @@ public class IPhoneBuilder extends Executor {
                 if (!exec(userDir, env, 420000, parparCmd.toArray(new String[0]))) {
                     return false;
                 }
+                // A SECOND pass for the watch, rooted at its own stub.
+                //
+                // Same classes, different root: the translator walks out from the entry point it is
+                // given, so the watch tree contains what the watch lifecycle class reaches and
+                // nothing else. Sharing the phone's translation -- what this used to do -- meant
+                // the watch binary carried the phone's entire graph with its main defined away.
+                //
+                // Skipped when the two entry points are the same class, because then the two passes
+                // would produce the same tree twice.
+                if (watchNativeBuilder.needsOwnTranslation()) {
+                    File watchOut = WatchNativeBuilder.translationDir(tmpFile);
+                    watchOut.mkdirs();
+                    List<String> watchCmd = new ArrayList<String>(parparCmd);
+                    // The tail of the command is positional: <classpath> <out> <main> <package>
+                    // <display> <version> <projectType> <addLibs>. Replace the output root and the
+                    // main class; everything before them -- the JVM flags, the jar, the "ios" mode
+                    // and the classpath -- is shared with the phone pass by construction.
+                    int outIndex = watchCmd.size() - 7;
+                    watchCmd.set(outIndex, watchOut.getAbsolutePath());
+                    watchCmd.set(outIndex + 1,
+                            WatchNativeBuilder.translationRoot(request.getMainClass()));
+                    log("[watchNative] Translating the watch slice from "
+                            + watchNativeBuilder.getWatchMain());
+                    if (!exec(userDir, env, 420000, watchCmd.toArray(new String[0]))) {
+                        return false;
+                    }
+                }
             } catch (Exception ex) {
                 throw new BuildException("Failure while trying to run ByteCodeTranslator of ParparVM", ex);
             }
@@ -4349,7 +4388,11 @@ public class IPhoneBuilder extends Executor {
                     watchNativeBuilder.writeWatchInfoPlist(request, appSrcDir);
                     watchNativeBuilder.writeWatchEntry(request, appSrcDir);
                     watchNativeBuilder.writeStubHeaders(appSrcDir);
-                    watchNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
+                    // Empty when the watch shares the phone's translation, which is what tells
+                    // applyXcodeSettings to reuse the app target's sources and neutralise the
+                    // phone stub's main instead.
+                    watchNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion,
+                            watchNativeBuilder.stageWatchTranslation(request, tmpFile, appSrcDir));
                 }
 
                 if (tvNativeBuilder.isEnabled()) {
