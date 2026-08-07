@@ -242,13 +242,6 @@ class JavaSEWearableBridge implements WearableBridge {
         // every observable ordering converges on the replacement.
         File tomb = new File(dataDir, encodePath(path) + TOMB_SUFFIX);
         boolean hadTombstone = tomb.isFile();
-        // The acknowledgement goes with it. It describes a tombstone that is about to stop
-        // existing, and leaving it behind is what let a later removal at the same path inherit it.
-        // Genuinely best-effort, and it has to stay that way: acknowledges() compares stamps and
-        // accepts nothing it cannot parse, so a leftover file confirms no tombstone and is deleted
-        // by the next scan that looks at it. Aborting the publication over a bookkeeping file
-        // would be the worse failure -- a value refused because a stale marker would not delete.
-        new File(dataDir, tomb.getName() + ACK_SUFFIX).delete();
         if (hadTombstone && !tomb.delete()) {
             // A delete that FAILED is not the same as a tombstone that was not there, and the
             // previous boolean could not tell them apart. Publishing anyway would leave both
@@ -259,6 +252,16 @@ class JavaSEWearableBridge implements WearableBridge {
                     + "; not publishing over it");
             return;
         }
+        // The acknowledgement goes only once the tombstone it describes is actually gone, and
+        // never on the abort path above. Deleting it first stranded the tombstone for good when the
+        // publication then failed -- Windows holding the file, say: the peer has already marked the
+        // unchanged tombstone as seen and will not acknowledge it a second time, so once the
+        // filesystem recovers, housekeeping under the cap has no acknowledgement to retire it with.
+        //
+        // Best-effort in the other direction, deliberately: acknowledges() compares stamps and
+        // accepts nothing it cannot parse, so a leftover file confirms no tombstone and the next
+        // scan discards it.
+        new File(dataDir, tomb.getName() + ACK_SUFFIX).delete();
         if (hadTombstone) {
             synchronized (seenData) {
                 seenData.remove(tomb.getName());

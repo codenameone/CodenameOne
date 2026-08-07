@@ -594,7 +594,7 @@ public final class WearableConnection {
     }
 
     private static void deliverTagged(String path, Runnable delivery, boolean removal) {
-        deliver(delivery, dataListeners, pendingData, null, false, path, removal);
+        deliver(delivery, dataListeners, pendingData, null, false, path, removal, true);
     }
 
     /// Runs a delivery on the EDT, or parks it until a listener exists.
@@ -622,6 +622,13 @@ public final class WearableConnection {
 
     private static boolean deliver(Runnable delivery, List<?> listeners, List<Runnable> queue,
             Runnable onDropped, boolean oneShot, String path, boolean removal) {
+        return deliver(delivery, listeners, queue, onDropped, oneShot, path, removal, false);
+    }
+
+    /// @param dataQueue whether this is the replicated-data queue, whose drain has a tail of
+    ///                  recovery work that must not be overtaken
+    private static boolean deliver(Runnable delivery, List<?> listeners, List<Runnable> queue,
+            Runnable onDropped, boolean oneShot, String path, boolean removal, boolean dataQueue) {
         List<Runnable> release = null;
         boolean parked;
         // The listener check and the enqueue share the queue's monitor with drainPending, so a
@@ -636,7 +643,7 @@ public final class WearableConnection {
             // getData returned the value. Queueing behind an existing backlog makes that ordering
             // structural instead of a matter of timing, and it also routes the update through the
             // park path, which is where a superseded recovery record is cancelled.
-            parked = listeners.isEmpty() || !queue.isEmpty();
+            parked = listeners.isEmpty() || !queue.isEmpty() || (dataQueue && drainingData);
             if (parked) {
                 while (queue.size() >= MAX_PENDING) {
                     Runnable evicted = evictOne(queue, path);
@@ -857,7 +864,7 @@ public final class WearableConnection {
                     onDelivered.run();
                 }
             }
-        }, dataListeners, pendingData, onRelinquished, onDelivered != null, path);
+        }, dataListeners, pendingData, onRelinquished, onDelivered != null, path, false, true);
     }
 
     /// What a port does about a replicated delivery the cap had to discard, or null when it has
@@ -983,6 +990,30 @@ public final class WearableConnection {
         }
     }
 
+    /// True while a data drain is between taking its recovery records and announcing them.
+    ///
+    /// Those records are copied out and cleared under the monitor, then announced with it released
+    /// -- so a publication arriving in that gap saw an empty queue, dispatched straight to the EDT,
+    /// and could not cancel a record already copied into the drain's own list. The stale removal
+    /// was then announced after the newer value, which is the failure the cancellation exists to
+    /// prevent, reached by a different route. While this is set, deliveries park and are drained in
+    /// order behind the recovery work.
+    ///
+    /// Guarded by the pendingData monitor.
+    private static boolean drainingData;
+
+    /// Sets the draining flag under the monitor that guards it, named rather than aliased.
+    ///
+    /// The callers hold that monitor already -- both run while draining pendingData itself, so the
+    /// acquisition is reentrant -- but they reach it through a parameter, and a guard that holds
+    /// only through an alias is one neither a reader nor an analyzer can check. Same reasoning as
+    /// takeRescanRequest.
+    private static void setDrainingData(boolean draining) {
+        synchronized (pendingData) {
+            drainingData = draining;
+        }
+    }
+
     private static boolean rescanRequested;
 
     /// Actions a port asked to run once deliveries can actually reach a listener, keyed so repeated
@@ -1046,6 +1077,11 @@ public final class WearableConnection {
         List<String> dropped = null;
         List<String> removals = null;
         synchronized (queue) {
+            if (dataQueue) {
+                // Held across the recovery announcements below, which run with the monitor
+                // released. Anything arriving meanwhile parks rather than overtaking them.
+                setDrainingData(true);
+            }
             // Only taken when a port can actually act on them. Clearing the set with no handler
             // registered would discard the one record that a path needs re-offering -- and iOS,
             // which registers late in its bridge's construction, would lose whatever arrived first.
@@ -1103,6 +1139,12 @@ public final class WearableConnection {
             for (Runnable replay : replays) {
                 replay.run();
             }
+        }
+        if (dataQueue) {
+            // Cleared only now that every recovery announcement has been made. The drain loop
+            // re-checks the queue immediately after, so anything that parked while this was held
+            // is drained in the next pass rather than waiting for a listener registration.
+            setDrainingData(false);
         }
     }
 
