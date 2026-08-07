@@ -92,146 +92,46 @@ class KotlinUiTest : BaseTest() {
         step("prefs-container")
         val preferences = Container(BoxLayout.y())
         preferences.addAll(check, prefSwitch, note)
-        // Bisect: addContent("Preferences", ...) is where the Windows port throws.
-        // The container and all three children construct fine (the steps above all
-        // print), so the failure is in what addContent does to one of them --
-        // setHidden(true), which caches margins and forces a zero preferred size.
-        // One probe section per child says which.
-        // Probed on a throwaway Accordion that is never added to the form. The
-        // first version of this put the probes into the real one, which changed
-        // the rendered "kotlin" screenshot and failed the golden comparison on
-        // every other port -- a diagnostic is not worth breaking six jobs for.
-        // addContent does its work in the AccordionContent constructor, so an
-        // unparented Accordion exercises exactly the same path and renders nothing.
+        // A component that paints a drop shadow blurs an image and then draws
+        // ON TOP of the blur result -- Switch does exactly this for its ON thumb.
+        // A port whose blur hands back something undrawable therefore cannot
+        // render a Switch at all, and on Windows it did not: gaussianBlurImage
+        // returned an ARGB-backed image with no render target, getGraphics wrapped
+        // a null native peer, and the first call that read through it faulted. The
+        // fault surfaced as a bare NullPointerException with no message and no
+        // frames, because the port maps a null-address access violation to one.
+        // Nothing in the suite covered "draw on a blur result", so this is the
+        // check that would have caught it. Run on a throwaway Accordion that is
+        // never added to the form: an earlier version probed the rendered one and
+        // changed the kotlin golden on every other port.
         val probe = Accordion()
-        step("probe-checkbox")
-        probe.addContent("ProbeCheck", Container(BoxLayout.y()).apply { add(CheckBox("probe")) })
-        step("probe-switch")
-        probe.addContent("ProbeSwitch", Container(BoxLayout.y()).apply { add(Switch()) })
-        step("probe-textarea")
-        probe.addContent("ProbeText", Container(BoxLayout.y()).apply { add(TextArea(3, 20)) })
-        // Round one: all three plain children passed, so the difference is what the
-        // real container does beyond constructing them -- setOn() on the Switch, a
-        // hint on the TextArea, or simply holding three children at once.
-        // Split to the statement, because the composite probe cannot distinguish
-        // constructing an on-switch from adding one to an Accordion -- and the
-        // real test already shows Switch()+setOn() on its own is fine.
-        step("probe-so-ctor")
-        val soSwitch = Switch()
-        step("probe-so-seton")
-        soSwitch.setOn()
-        step("probe-so-container")
-        val soContainer = Container(BoxLayout.y())
-        soContainer.add(soSwitch)
-        // addContent on a container holding an ON switch is the failing statement.
-        // The only state the ON path reaches that the OFF path does not is
-        // getSelectedStyle() (getThumbOnImage uses it; getThumbOffImage uses the
-        // unselected style), and calcPreferredSize is what asks for the thumb.
-        // Both are public, so the accessor that throws can be named from here
-        // without probes in Switch itself.
-        step("probe-so-unselectedstyle")
-        soSwitch.unselectedStyle
-        step("probe-so-selectedstyle")
-        soSwitch.selectedStyle
-        // The track image is sized from the font height, and a zero height made
-        // createMutableImage hand back a broken peer. Report the number.
-        val f = soSwitch.style.font
-        step("probe-so-fontheight=" + (if (f == null) "null-font" else f.height.toString()))
-        // Switch sizes its thumb by building an image, blurring it for the drop
-        // shadow, and drawing on the result. Font height and styles are healthy on
-        // Windows (20 and non-null), so the failure is in one of those primitives.
-        // Walk the same sequence through the public API, which names the one that
-        // breaks; a platform whose blur returns something undrawable cannot render
-        // a Switch at all, so this earns its place as a standing check.
-        step("probe-img-create")
-        val probeImg = com.codename1.ui.Image.createImage(32, 24, 0)
-        step("probe-img-null=" + (probeImg == null))
-        step("probe-img-graphics")
-        val probeG = probeImg.graphics
-        step("probe-img-g-null=" + (probeG == null))
-        step("probe-img-antialias")
-        probeG.isAntiAliased = true
-        step("probe-blur-supported=" + com.codename1.ui.Display.getInstance().isGaussianBlurSupported)
+        step("probe-blur-drawable")
         if (com.codename1.ui.Display.getInstance().isGaussianBlurSupported) {
-            step("probe-blur-call")
-            val blurred = com.codename1.ui.Display.getInstance().gaussianBlurImage(probeImg, 5f)
-            step("probe-blur-null=" + (blurred == null))
-            if (blurred != null) {
-                step("probe-blur-graphics")
-                val bg = blurred.graphics
-                step("probe-blur-g-null=" + (bg == null))
-                step("probe-blur-antialias")
-                bg.isAntiAliased = true
-                step("probe-blur-ok")
-            }
+            val shadow = com.codename1.ui.ImageFactory.createImage(prefSwitch, 34, 34, 0)
+            val sg = shadow.graphics
+            sg.color = 0
+            sg.fillRoundRect(2, 2, 30, 30, 30, 30)
+            val blurred = com.codename1.ui.Display.getInstance().gaussianBlurImage(shadow, 5f)
+                    ?: throw IllegalStateException("gaussianBlurImage returned null")
+            // The calls Switch makes on the blur result, in its order. concatenateAlpha
+            // reads the graphics state and is the first one to dereference the peer.
+            val bg = blurred.graphics
+            bg.concatenateAlpha(255)
+            bg.color = 0xffffff
+            bg.fillRoundRect(2, 2, 30, 30, 30, 30)
+            step("probe-blur-drawable-ok=" + blurred.width + "x" + blurred.height)
         }
-        // Switch does not call Image.createImage directly -- it goes through
-        // ImageFactory with the component as context, which walks the parent chain
-        // for a per-component factory. Probe that exact call, at the size the
-        // switch computes from its font, before asking for the preferred size.
-        step("probe-factory-image")
-        val fh = if (f == null) 20 else f.height
-        val factoryImg = com.codename1.ui.ImageFactory.createImage(soSwitch, fh * 3 + 4, (fh * 0.9).toInt(), 0)
-        step("probe-factory-null=" + (factoryImg == null))
-        step("probe-factory-graphics")
-        val fg = factoryImg.graphics
-        step("probe-factory-g-null=" + (fg == null))
-        step("probe-factory-antialias")
-        fg.isAntiAliased = true
-        step("probe-factory-ok")
-        // Is the ON/OFF split real, or did the OFF probe simply never compute a
-        // preferred size? Ask an OFF switch for one.
-        step("probe-off-preferredsize")
-        Switch().preferredSize
-        step("probe-off-preferredsize-ok")
-        // OFF preferred size works, ON throws, and the ONLY thing the ON path does
-        // that the OFF path does not is getThumbOnImage -- which hard-codes a
-        // shadowSpread of 2, while the OFF thumb takes it from
-        // switchThumbShadowSpreadInt (Material 3 sets that to 0 for a flat thumb).
-        // A spread of 0 skips the drop-shadow/blur branch entirely, so the ON thumb
-        // is the only one that ever blurs. Report the constant, then walk the branch
-        // as it really runs: create through the factory, DRAW into it, blur the
-        // drawn image, and take graphics on the result. The earlier blur probe
-        // blurred a blank image, which is not the same thing on a Direct2D target
-        // that has an open draw batch.
-        val um = com.codename1.ui.plaf.UIManager.getInstance()
-        step("probe-shadowspread=" + um.getThemeConstant("switchThumbShadowSpreadInt", 2))
-        step("probe-drawn-create")
-        val drawn = com.codename1.ui.ImageFactory.createImage(soSwitch, 34, 34, 0)
-        val dg = drawn.graphics
-        dg.isAntiAliased = true
-        step("probe-drawn-fill")
-        dg.color = 0
-        dg.fillRoundRect(2, 2, 30, 30, 30, 30)
-        step("probe-drawn-blur")
-        val drawnBlur = com.codename1.ui.Display.getInstance().gaussianBlurImage(drawn, 5f)
-        step("probe-drawn-blur-null=" + (drawnBlur == null))
-        step("probe-drawn-blur-graphics")
-        val dbg = drawnBlur.graphics
-        step("probe-drawn-blur-g-null=" + (dbg == null))
-        dbg.isAntiAliased = true
-        // calcPreferredSize does not just draw on the blurred image -- it asks it
-        // for a width. That is the one call on the blur result never probed, and
-        // Windows builds its blur result from an ARGB array rather than the
-        // mutable surface, so its dimensions come from a different native path.
-        step("probe-drawn-blur-width")
-        val bw = drawnBlur.width
-        val bh = drawnBlur.height
-        step("probe-drawn-blur-size=" + bw + "x" + bh)
-        step("probe-drawn-ok")
-        step("probe-so-preferredsize")
+        // An ON switch inside a container is what first exposed the above: the OFF
+        // thumb takes its shadow spread from switchThumbShadowSpreadInt (0 for the
+        // flat Material 3 thumb) and so never blurs, while the ON thumb hard-codes
+        // a spread of 2. Keep both shapes covered.
+        step("probe-switch-on-preferred")
+        val soSwitch = Switch()
+        soSwitch.setOn()
+        probe.addContent("ProbeSwitchOn", Container(BoxLayout.y()).apply { add(soSwitch) })
         soSwitch.preferredSize
-        step("probe-so-addcontent")
-        probe.addContent("ProbeSwitchOn", soContainer)
-        step("probe-so-done")
-        step("probe-textarea-hint")
-        probe.addContent("ProbeTextHint", Container(BoxLayout.y()).apply {
-            add(TextArea(3, 20).apply { hint = "probe hint" })
-        })
-        step("probe-three-plain")
-        probe.addContent("ProbeThree", Container(BoxLayout.y()).apply {
-            add(CheckBox("a")); add(Switch()); add(TextArea(3, 20))
-        })
+        step("probe-switch-on-ok")
+
         step("accordion-prefs")
         accordion.addContent("Preferences", preferences)
 
