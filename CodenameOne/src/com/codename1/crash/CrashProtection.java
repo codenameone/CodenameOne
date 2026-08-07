@@ -260,10 +260,13 @@ public final class CrashProtection {
             // JavaScript engine's Error().stack on the JS port (where getStackTrace() has no
             // structured frames to offer). On the JVM ports it is the standard full trace.
             java.io.ByteArrayOutputStream bout = new java.io.ByteArrayOutputStream();
-            java.io.PrintStream ps = new java.io.PrintStream(bout);
+            // Encode explicitly as UTF-8 on both ends rather than relying on the platform default
+            // (which SpotBugs flags and which would garble a non-ASCII exception message differently
+            // per device); the pair must agree, so the PrintStream and the readback share the charset.
+            java.io.PrintStream ps = new java.io.PrintStream(bout, true, "UTF-8");
             t.printStackTrace(ps);
             ps.flush();
-            String s = bout.toString();
+            String s = bout.toString("UTF-8");
             return s.length() == 0 ? null : s;
         } catch (Throwable ignored) {
             return null;

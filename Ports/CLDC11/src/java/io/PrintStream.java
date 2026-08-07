@@ -32,6 +32,11 @@ public class PrintStream extends java.io.OutputStream{
          //TODO codavaj!!
     }
 
+    /// Create a new print stream that encodes with the named charset, optionally flushing automatically.
+    public PrintStream(java.io.OutputStream out, boolean autoFlush, java.lang.String charsetName) throws java.io.UnsupportedEncodingException {
+         //TODO codavaj!!
+    }
+
     /// Flush the stream and check its error state. The internal error state is set to true when the underlying output stream throws an IOException, and when the setError method is invoked.
     public boolean checkError(){
         return false; //TODO codavaj!!
