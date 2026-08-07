@@ -86,7 +86,8 @@
 
   <section class="cn1-port-status__legend" aria-label="Status legend">
     <span><i class="cn1-port-status__mark is-pass" aria-hidden="true">✓</i> Passed</span>
-    <span><i class="cn1-port-status__mark is-partial" aria-hidden="true">−</i> Partial or skipped</span>
+    <span><i class="cn1-port-status__mark is-pass" aria-hidden="true">✓</i><sup class="cn1-port-status__note" aria-hidden="true">*</sup> Passed, with a skip the <a href="#skip-errata-title">errata</a> account for</span>
+    <span><i class="cn1-port-status__mark is-partial" aria-hidden="true">−</i> Incomplete run or an unexplained skip</span>
     <span><i class="cn1-port-status__mark is-fail" aria-hidden="true">×</i> Failed</span>
     <span><i class="cn1-port-status__mark is-unknown" aria-hidden="true">?</i> No current report</span>
   </section>
@@ -143,7 +144,7 @@
           </th>
           {{- range $contract.ports }}
           {{- $report := index $reports .id -}}
-          {{- partial "port-status-feature-status.html" (dict "feature" $feature "port" . "report" $report "contract" $contract "now" $snapshotTime) -}}
+          {{- partial "port-status-feature-status.html" (dict "feature" $feature "port" . "report" $report "contract" $contract "supplement" $supplement "now" $snapshotTime) -}}
           {{- end }}
         </tr>
         {{- end }}
@@ -167,7 +168,35 @@
         {{- with $report -}}
           {{- $result := index .tests $erratum.test -}}
           {{- with $result -}}
-            {{- if eq .status "skip" -}}{{- $skippedPortNames = $skippedPortNames | append $port.name -}}{{- end -}}
+            {{- if eq .status "skip" -}}
+              {{- /* The same predicate the feature cell uses, not the test name
+                     alone. Listing every skip of this test made the erratum claim
+                     ports it does not cover: a VideoIORoundTripTest encoder
+                     failure on Linux was filed under an erratum that explains an
+                     Apple simulator limitation, which both misdiagnoses the
+                     failure and contradicts the cell beside it, where that skip
+                     is correctly left partial as unexplained. */ -}}
+              {{- $codes := $erratum.reason_codes -}}
+              {{- $reasons := slice -}}
+              {{- with .reasons -}}{{- $reasons = . -}}{{- end -}}
+              {{- $documented := true -}}
+              {{- if $codes -}}
+                {{- $documented = gt (len $reasons) 0 -}}
+                {{- range $reasons -}}
+                  {{- $reason := . -}}
+                  {{- $ok := false -}}
+                  {{- range $codes -}}
+                    {{- $portAllowed := true -}}
+                    {{- with .ports -}}
+                      {{- $portAllowed = in . $port.id -}}
+                    {{- end -}}
+                    {{- if and $portAllowed (hasPrefix $reason .prefix) -}}{{- $ok = true -}}{{- end -}}
+                  {{- end -}}
+                  {{- if not $ok -}}{{- $documented = false -}}{{- end -}}
+                {{- end -}}
+              {{- end -}}
+              {{- if $documented -}}{{- $skippedPortNames = $skippedPortNames | append $port.name -}}{{- end -}}
+            {{- end -}}
           {{- end -}}
         {{- end -}}
       {{- end -}}
@@ -260,10 +289,24 @@
             <th scope="row"><strong>{{ .name }}</strong><p>{{ .description }}</p><small>Best measured duration</small></th>
             {{- range $contract.ports }}
               {{- $report := index $reports .id -}}
+              {{- /* Only a complete benchmark run is presented as a measurement.
+                     A suite that crashed partway through CommonWorkloadBenchmarkTest
+                     publishes whatever workloads it reached -- that report is
+                     deliberately still published, because its fail / not-run counts
+                     are the evidence this page exists to show -- but rendering those
+                     partial timings identically to a finished run would put an
+                     unfinished measurement beside complete ones with nothing to tell
+                     them apart. */ -}}
+              {{- $measurement := "" -}}
+              {{- with $report -}}{{- with .performance -}}
+                {{- if eq .status "complete" -}}
+                  {{- with .benchmarks -}}{{- with (index . $benchmark.id) -}}
+                    {{- $measurement = printf "%.2f ms" (div (float .duration_ns) 1000000.0) -}}
+                  {{- end -}}{{- end -}}
+                {{- end -}}
+              {{- end -}}{{- end -}}
               <td data-performance-cell data-port="{{ .id }}" title="{{ .name }}: {{ $benchmark.name }} best measured duration">
-                {{- with $report -}}{{- with .performance -}}{{- with .benchmarks -}}{{- with (index . $benchmark.id) -}}
-                  {{- printf "%.2f ms" (div (float .duration_ns) 1000000.0) -}}
-                {{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}
+                {{- if $measurement -}}{{ $measurement }}{{- else -}}Awaiting nightly{{- end -}}
               </td>
             {{- end }}
           </tr>

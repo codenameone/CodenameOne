@@ -70,14 +70,22 @@ public class CameraApiTest extends BaseTest {
         // JavaSE uses its synthetic CameraImpl. The JavaScript Playwright runner
         // supplies Chromium's fake media device, which still exercises the real
         // HTML5 getUserMedia/video/canvas/JPEG path. Native mobile ports need an
-        // OS permission dialog, and Windows does not implement host webcam
-        // capture yet, so those remain outside this cross-port headless test.
+        // OS permission dialog, Windows does not implement host webcam capture
+        // yet, and the native Linux port drives real V4L2 devices through
+        // GStreamer -- a hosted runner has no camera to enumerate, so the
+        // assertion chain below would only ever report the absent hardware.
+        // Those ports stay outside this cross-port headless test and are
+        // covered by the camera erratum on the port status page.
         boolean isHeadlessCameraSupported = "HTML5".equals(platform)
                 || (!"ios".equals(platform)
                 && !"and".equals(platform)
-                && !"win".equals(platform));
+                && !"win".equals(platform)
+                && !"linux".equals(platform));
         if (!isHeadlessCameraSupported) {
-            System.out.println("CN1SS:INFO:test=CameraApiTest status=SKIPPED reason=needs-runtime-permission-on-" + platform);
+            String reason = "win".equals(platform) ? "no-host-webcam-capture-on-win"
+                    : ("linux".equals(platform) ? "no-camera-device-on-headless-runner"
+                    : "needs-runtime-permission-on-" + platform);
+            System.out.println("CN1SS:INFO:test=CameraApiTest status=SKIPPED reason=" + reason);
             done();
             return true;
         }

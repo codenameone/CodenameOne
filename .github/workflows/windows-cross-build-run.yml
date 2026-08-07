@@ -265,7 +265,17 @@ jobs:
   compare-comment:
     name: cross-compiled screenshot-comment
     needs: run-on-windows
-    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # !cancelled(), for the same reason as linux-build-run.yml: without it GitHub
+    # skips this job whenever run-on-windows fails, so the run that most needs
+    # reporting uploads raw evidence but no port-status artifact. The nightly
+    # sweep then falls back to an older run, and while that one is still inside
+    # the freshness window the public table keeps showing it -- the current
+    # Windows failure masked by a stale pass. The workflow still goes red because
+    # run-on-windows itself failed.
+    if: >-
+      !cancelled() &&
+      (github.event_name == 'pull_request' || github.event_name == 'push' ||
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -309,8 +319,18 @@ jobs:
             done
           fi
           if [ ${#entries[@]} -eq 0 ]; then
-            echo "No screenshots were produced; skipping PR comment."
-            exit 0
+            # A run that died before its first PNG still persists app-output.log,
+            # and that log is what normalization reads to produce the fail /
+            # not-run counts. Bailing out here left the failed capture with no
+            # port-status artifact at all, so the nightly sweep fell back to an
+            # older report and the table kept showing it. Carry on with an empty
+            # entry list when there is a log; only a run with neither has nothing
+            # to say. (Same handling as linux-build-run.yml.)
+            if [ ! -f "$ART/raw-x64/app-output.log" ]; then
+              echo "No screenshots and no app log; nothing to normalize."
+              exit 0
+            fi
+            echo "No screenshots were produced; normalizing from the app log so the failure reaches the table."
           fi
           echo "Posting ${#entries[@]} screenshot(s)"
           mkdir -p "$ART/previews"
@@ -334,12 +354,19 @@ jobs:
           export CN1SS_SUITE_LOG="$ART/raw-x64/app-output.log"
           export CN1SS_BINARY_PATH="$ART/raw-x64/benchmark-app.exe"
           if [ "${{ github.event_name }}" != "pull_request" ]; then export CN1SS_SKIP_COMMENT=1; fi
+          # Assertion-only failures count here as they do on every other producer.
+          # A test like CryptoApiTest can fail while the suite still emits its
+          # completion marker and every screenshot matches, and without this the
+          # step exited zero: the workflow stayed green and published a report
+          # containing failed tests. Linux, Android, JavaScript, iOS and Mac all
+          # set this; Windows was the one producer that did not.
+          export CN1SS_FAIL_ON_TEST_PROBLEMS=1
           set +e
           cn1ss_process_and_report \
             "Native Windows port (cross-compiled)" \
             "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
             "$REF_DIR" "$ART/previews" "$ART" \
-            "${entries[@]}"
+            ${entries[@]+"${entries[@]}"}
           gate_rc=$?
           set -e
           fail=0

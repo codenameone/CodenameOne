@@ -39,6 +39,7 @@ import com.codename1.ui.accessibility.AccessibilityAction;
 import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
 import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -1063,7 +1064,18 @@ public class WindowsImplementation extends CodenameOneImplementation {
             int b = Math.min(255, (p & 0xff) * 255 / a);
             px[i] = (a << 24) | (r << 16) | (g << 8) | b;
         }
-        return Image.createImage(px, w, h);
+        // Callers composite ON TOP of the blur result -- Switch blurs its thumb's
+        // drop shadow and then draws the knob onto the blurred image -- so the
+        // result has to be drawable. Image.createImage(int[], w, h) builds an
+        // ARGB-backed CN1Image with no Direct2D render target, and
+        // getImageGraphics then answers 0: Graphics wraps a null peer, and every
+        // subsequent draw either vanishes or dereferences it. Blit the pixels
+        // into a mutable image so the port matches JavaSE, where the blur result
+        // is a BufferedImage and getGraphics has always worked.
+        Image blurred = Image.createImage(px, w, h);
+        Image drawable = Image.createImage(w, h, 0);
+        drawable.getGraphics().drawImage(blurred, 0, 0);
+        return drawable;
     }
 
     /** One separable box-blur pass over premultiplied ARGB; edges clamp. */
@@ -2392,8 +2404,8 @@ public class WindowsImplementation extends CodenameOneImplementation {
     @Override
     public OutputStream openOutputStream(Object connection) throws IOException {
         if (connection instanceof String) {
-            long h = WindowsNative.fileOpenWrite(stripFileUrl((String) connection), false);
-            return new WindowsOutputStream(h, false);
+            String path = stripFileUrl((String) connection);
+            return new WindowsOutputStream(openForWrite(path, false), false);
         }
         return new WindowsOutputStream(((WindowsHttpConnection) connection).peer, true);
     }
@@ -2402,17 +2414,39 @@ public class WindowsImplementation extends CodenameOneImplementation {
     public OutputStream openOutputStream(Object connection, int offset) throws IOException {
         // offset-based writing maps to opening the file for append/seek; the
         // first cut appends, which covers the common resume-write case.
-        long h = WindowsNative.fileOpenWrite(stripFileUrl((String) connection), true);
-        return new WindowsOutputStream(h, false);
+        String path = stripFileUrl((String) connection);
+        return new WindowsOutputStream(openForWrite(path, true), false);
     }
 
     @Override
     public InputStream openInputStream(Object connection) throws IOException {
         if (connection instanceof String) {
-            long h = WindowsNative.fileOpenRead(stripFileUrl((String) connection));
+            String path = stripFileUrl((String) connection);
+            long h = WindowsNative.fileOpenRead(path);
+            if (h == 0) {
+                // A null handle otherwise produced a stream that read as a
+                // legitimately empty file, so callers could not tell a missing
+                // file from an empty one -- the exact defect issue #1502
+                // reported against iOS.
+                throw new FileNotFoundException("No such file: " + path
+                        + " (" + WindowsNative.lastIoError() + ")");
+            }
             return new WindowsInputStream(h, false);
         }
         return new WindowsInputStream(((WindowsHttpConnection) connection).peer, true);
+    }
+
+    /// Opens `path` for writing, failing loudly when the platform cannot. A
+    /// null handle otherwise yields a stream that discards every write and
+    /// closes cleanly, which turns an unwritable path into a file that simply
+    /// never appears.
+    private long openForWrite(String path, boolean append) throws IOException {
+        long h = WindowsNative.fileOpenWrite(path, append);
+        if (h == 0) {
+            throw new IOException("Unable to open " + path + " for writing ("
+                    + WindowsNative.lastIoError() + ")");
+        }
+        return h;
     }
 
     /**
@@ -2613,13 +2647,19 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public OutputStream createStorageOutputStream(String name) throws IOException {
-        long h = WindowsNative.fileOpenWrite(storagePath(name), false);
-        return new WindowsOutputStream(h, false);
+        // Same reason as openOutputStream: a discarded write that reports
+        // success loses the entry instead of reporting that it cannot be saved.
+        return new WindowsOutputStream(openForWrite(storagePath(name), false), false);
     }
 
     @Override
     public InputStream createStorageInputStream(String name) throws IOException {
-        long h = WindowsNative.fileOpenRead(storagePath(name));
+        String path = storagePath(name);
+        long h = WindowsNative.fileOpenRead(path);
+        if (h == 0) {
+            throw new FileNotFoundException("No such storage entry: " + name
+                    + " (" + WindowsNative.lastIoError() + ")");
+        }
         return new WindowsInputStream(h, false);
     }
 
@@ -2636,6 +2676,79 @@ public class WindowsImplementation extends CodenameOneImplementation {
     @Override
     public String[] listFilesystemRoots() {
         return WindowsNative.fileRoots();
+    }
+
+    /**
+     * Anchors the app home at the per-user storage directory, with the
+     * {@code file://} scheme Android, iOS and the Linux port also use.
+     *
+     * The inherited implementation builds {@code listFilesystemRoots()[0] +
+     * AppName}, which here is a drive root plus an app name that is literally
+     * "null" when neither the AppName property nor a package name is set --
+     * every path it produced pointed at an unwritable {@code C:\null\}. The
+     * scheme matters as well: {@link com.codename1.io.File} prepends the app
+     * home to any path that lacks it, so a bare path made
+     * {@code new File(fs.getAppHomePath() + "x")} resolve to the home
+     * directory joined to itself.
+     */
+    /// A stable, filesystem-safe directory name for THIS application.
+    ///
+    /// storageDir() names the Codename One directory shared by every CN1 app
+    /// under this user account, so returning it as the app home gave two
+    /// applications the same getAppHomePath(): each could read and overwrite
+    /// the other's files. The base implementation appends
+    /// getProperty("AppName", packageName) for exactly this reason; the reason
+    /// this override exists at all is that the base builds it on an unwritable
+    /// filesystem root, not that the per-app component was wrong.
+    ///
+    /// Never returns the literal "null": an unset AppName and packageName is
+    /// what made the base implementation produce "/null/" in the first place.
+    private String appHomeDirName() {
+        String name = getProperty("AppName", null);
+        if (name == null || name.length() == 0) {
+            name = getPackageName();
+        }
+        if (name == null || name.length() == 0 || "null".equals(name)) {
+            return "CN1App";
+        }
+        StringBuilder safe = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            // Reserved on Windows and awkward everywhere else; NTFS and ext4
+            // both accept the rest of the printable range.
+            if (c < ' ' || c == '\\' || c == '/' || c == ':' || c == '*' || c == '?'
+                    || c == '"' || c == '<' || c == '>' || c == '|') {
+                safe.append('_');
+            } else {
+                safe.append(c);
+            }
+        }
+        return safe.toString();
+    }
+
+    @Override
+    public String getAppHomePath() {
+        String dir = WindowsNative.storageDir();
+        if (dir == null || dir.length() == 0) {
+            dir = ".";
+        }
+        if (!dir.endsWith("\\") && !dir.endsWith("/")) {
+            dir += getFileSystemSeparator();
+        }
+        dir += appHomeDirName() + getFileSystemSeparator();
+        // com.codename1.io.File splits paths on '/' only, so a URL carrying
+        // backslashes would report the whole native path as a file's name and
+        // "file:/" as its parent. Native I/O accepts either separator.
+        String home = "file://" + dir.replace('\\', '/');
+        if (!exists(home)) {
+            mkdir(home);
+        }
+        return home;
+    }
+
+    @Override
+    public String toNativePath(String path) {
+        return stripFileUrl(path);
     }
 
     @Override
@@ -2696,6 +2809,180 @@ public class WindowsImplementation extends CodenameOneImplementation {
     @Override
     public char getFileSystemSeparator() {
         return '\\';
+    }
+
+    /* ------------------------------------------------------------ crypto */
+
+    /**
+     * The crypto bridge, backed by CNG. Every failure is reported as a
+     * RuntimeException carrying the provider status, which
+     * {@code com.codename1.security.Cipher} turns into a CryptoException --
+     * an authentication failure has to be an exception rather than an empty
+     * result, or a tampered message would read as an empty plaintext.
+     */
+    private static byte[] cryptoResult(byte[] value, String operation) {
+        if (value == null) {
+            throw new RuntimeException(operation + " failed: " + WindowsNative.lastCryptoError());
+        }
+        return value;
+    }
+
+    @Override
+    public void secureRandomBytes(byte[] out) {
+        // Fail loudly: KeyGenerator hands this buffer straight back as key
+        // material, so a quiet return after the platform RNG failed would mint
+        // a predictable key.
+        if (out != null && out.length > 0 && !WindowsNative.secureRandomBytes(out)) {
+            throw new RuntimeException("secure random failed: " + WindowsNative.lastCryptoError());
+        }
+    }
+
+    /// Rejects an initialization vector the mode cannot use. A GCM nonce that
+    /// is absent repeats across messages under one key, and a short CBC IV is
+    /// read as a whole block by the platform library.
+    /// AAD only binds to the ciphertext under an AEAD mode. CBC and ECB ignore it
+    /// entirely, so passing it here quietly dropped data the caller believed was
+    /// authenticated -- and produced ciphertext the other ports reject, because
+    /// JavaSE and Android route the same call through Cipher.updateAAD, which
+    /// refuses a non-AEAD mode. Refusing it keeps the ports answering alike and
+    /// keeps a caller from believing in a binding that was never made.
+    private static void checkAad(String transformation, byte[] aad) {
+        if (aad == null || aad.length == 0) {
+            return;
+        }
+        String mode = transformation == null ? "" : transformation;
+        if (mode.indexOf("/GCM/") < 0) {
+            throw new RuntimeException(
+                    "Additional authenticated data requires an AEAD mode; " + mode
+                            + " cannot bind it");
+        }
+    }
+
+    private static void checkIv(String transformation, byte[] iv) {
+        String mode = transformation == null ? "" : transformation;
+        if (mode.indexOf("/GCM/") >= 0) {
+            if (iv == null || iv.length == 0) {
+                throw new RuntimeException("AES-GCM requires a nonce");
+            }
+        } else if (mode.indexOf("/ECB/") >= 0) {
+            // ECB has no IV. The native ignores one, so passing it produced
+            // ciphertext while quietly discarding a parameter the caller thought
+            // mattered -- and JavaSE and Android reject the same call, because
+            // they hand a non-null iv to JCE as an IvParameterSpec and ECB
+            // refuses it. Refusing here keeps the ports answering alike.
+            // Any non-null array, including a zero-length one: JavaSE branches
+            // on iv != null rather than on its length, so new byte[0] builds an
+            // IvParameterSpec there and ECB throws. Accepting it here would have
+            // made the same call succeed on the desktop ports alone.
+            if (iv != null) {
+                throw new RuntimeException("AES-ECB cannot use an initialization vector");
+            }
+        } else if (iv == null || iv.length != 16) {
+            throw new RuntimeException("AES-CBC requires a 16 byte initialization vector");
+        }
+    }
+
+    @Override
+    public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
+        checkIv(transformation, iv);
+        checkAad(transformation, aad);
+        return cryptoResult(WindowsNative.aesCrypt(transformation, true, key, iv, aad, plaintext),
+                "AES encrypt");
+    }
+
+    @Override
+    public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
+        checkIv(transformation, iv);
+        checkAad(transformation, aad);
+        return cryptoResult(WindowsNative.aesCrypt(transformation, false, key, iv, aad, ciphertext),
+                "AES decrypt");
+    }
+
+    @Override
+    public byte[] rsaEncrypt(String transformation, byte[] publicKeyX509, byte[] plaintext) {
+        return cryptoResult(WindowsNative.rsaCrypt(transformation, true, publicKeyX509, plaintext),
+                "RSA encrypt");
+    }
+
+    @Override
+    public byte[] rsaDecrypt(String transformation, byte[] privateKeyPkcs8, byte[] ciphertext) {
+        return cryptoResult(WindowsNative.rsaCrypt(transformation, false, privateKeyPkcs8, ciphertext),
+                "RSA decrypt");
+    }
+
+    @Override
+    public byte[] cryptoSign(String algorithm, String keyAlgorithm, byte[] privateKeyPkcs8, byte[] data) {
+        checkKeyFamily(algorithm, keyAlgorithm);
+        return cryptoResult(WindowsNative.signData(algorithm, privateKeyPkcs8, data), "sign");
+    }
+
+    @Override
+    public boolean cryptoVerify(String algorithm, String keyAlgorithm, byte[] publicKeyX509,
+            byte[] data, byte[] signature) {
+        checkKeyFamily(algorithm, keyAlgorithm);
+        // An invalid signature and an unusable algorithm or key both come back
+        // as false from the native. Only the second is a configuration error,
+        // and JavaSE and Android raise it -- Signature.verify turns the throw
+        // into a CryptoException -- so answering plain false here would let a
+        // mistyped algorithm or malformed key read as "someone tampered with
+        // this". Clearing the slot first is what makes the two distinguishable.
+        WindowsNative.clearCryptoError();
+        boolean verified = WindowsNative.verifyData(algorithm, publicKeyX509, data, signature);
+        if (!verified) {
+            String failure = WindowsNative.lastCryptoError();
+            if (failure != null && failure.length() > 0
+                    && !"unknown crypto error".equals(failure)) {
+                throw new RuntimeException("verify failed: " + failure);
+            }
+        }
+        return verified;
+    }
+
+    /// The portable contract pairs an algorithm with a key of its own family,
+    /// and JavaSE rejects a mismatch when the Signature is initialised. The
+    /// native here reads the family off the DER key and takes only the digest
+    /// from the algorithm name, so `SHA256withRSA` handed an EC key would
+    /// quietly produce an ECDSA signature -- and the matching verify would
+    /// accept it, so nothing looks wrong until another port reads it. Refuse
+    /// the pairing rather than silently substituting the algorithm.
+    private static void checkKeyFamily(String algorithm, String keyAlgorithm) {
+        if (algorithm == null || keyAlgorithm == null) {
+            return;
+        }
+        // The label has to be one this runtime actually knows, not merely one
+        // whose prefix looks familiar. startsWith("EC") called "ECfoo" an EC key
+        // and every other string an RSA one, so PrivateKey.fromPkcs8("garbage",
+        // der) signed happily here while JavaSE and Android hand the same label
+        // to KeyFactory.getInstance and throw NoSuchAlgorithmException. Identical
+        // public API calls must not depend on the port.
+        String key = keyAlgorithm.toUpperCase();
+        if (!"RSA".equals(key) && !"EC".equals(key)) {
+            throw new RuntimeException("Unknown key algorithm: " + keyAlgorithm);
+        }
+        boolean wantsEc = algorithm.toUpperCase().indexOf("ECDSA") >= 0;
+        boolean keyIsEc = "EC".equals(key);
+        if (wantsEc != keyIsEc) {
+            throw new RuntimeException(algorithm + " cannot be used with a "
+                    + keyAlgorithm + " key");
+        }
+    }
+
+    @Override
+    public byte[][] generateRsaKeyPair(int bits) {
+        byte[] blob = cryptoResult(WindowsNative.generateRsaKeyPair(bits), "RSA key generation");
+        if (blob.length < 4) {
+            throw new RuntimeException("RSA key generation returned a truncated pair");
+        }
+        int publicLength = ((blob[0] & 0xff) << 24) | ((blob[1] & 0xff) << 16)
+                | ((blob[2] & 0xff) << 8) | (blob[3] & 0xff);
+        if (publicLength < 0 || publicLength > blob.length - 4) {
+            throw new RuntimeException("RSA key generation returned a malformed pair");
+        }
+        byte[] publicKey = new byte[publicLength];
+        byte[] privateKey = new byte[blob.length - 4 - publicLength];
+        System.arraycopy(blob, 4, publicKey, 0, publicKey.length);
+        System.arraycopy(blob, 4 + publicLength, privateKey, 0, privateKey.length);
+        return new byte[][] { publicKey, privateKey };
     }
 
     /* ------------------------------------------------------------ platform */

@@ -532,18 +532,9 @@ class LocalHealthPersistenceTest extends UITestBase {
                 "and the record this build cannot read must survive");
     }
 
+    /** Settles the resource and reads its failure; see {@link HealthAwait#errorOf}. */
     private static Throwable errorOf(AsyncResource<?> r) {
-        // Settled first. Results are delivered on the EDT on every backend
-        // now, so an off-EDT caller sees the error queued rather than already
-        // attached, and reading it without waiting found nothing.
-        HealthAwait.settled(r);
-        final Throwable[] err = new Throwable[1];
-        r.except(new com.codename1.util.SuccessCallback<Throwable>() {
-            public void onSucess(Throwable t) {
-                err[0] = t;
-            }
-        });
-        return err[0];
+        return HealthAwait.errorOf(r);
     }
 
     /** A store whose backing storage refuses to take anything. */

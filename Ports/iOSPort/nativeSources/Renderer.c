@@ -610,12 +610,22 @@ void Renderer_produceAlphas(Renderer *pRenderer, AlphaConsumer *pAC) {
 static jint sMaxAlpha = 0;
 static void setMaxAlpha(jint maxalpha) {
     jint i;
+    jbyte *map;
 
-    sMaxAlpha = maxalpha;
-    alphaMap = malloc(maxalpha+1);
+    // Fill the table before publishing it, and publish alphaMap before
+    // sMaxAlpha. produceAlphas reads both from whatever thread is painting:
+    // assigning alphaMap straight from malloc let a reader index a table that
+    // was still uninitialized (garbage coverage on antialiased edges), and
+    // setting sMaxAlpha first let a reader see a non-zero max while alphaMap
+    // was still NULL (a null dereference). The caller-side guard in
+    // IOSNative.m serializes setup properly; this ordering is the second line
+    // of defence.
+    map = malloc(maxalpha+1);
     for (i = 0; i <= maxalpha; i++) {
-        alphaMap[i] = (jbyte) ((i*255 + maxalpha/2)/maxalpha);
+        map[i] = (jbyte) ((i*255 + maxalpha/2)/maxalpha);
     }
+    alphaMap = map;
+    sMaxAlpha = maxalpha;
 }
 
 static void setAndClearRelativeAlphas(AlphaConsumer *pAC,

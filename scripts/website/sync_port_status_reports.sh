@@ -50,29 +50,51 @@ if ! git -C "${REPO_ROOT}" fetch --quiet --no-tags --depth=1 origin "${DATA_REF}
 fi
 
 synced=0
+unusable=0
+fallback=()
 while IFS= read -r port; do
   candidate="${tmp_dir}/${port}.json"
   if ! git -C "${REPO_ROOT}" show "FETCH_HEAD:ports/${port}.json" > "${candidate}" 2>/dev/null; then
     echo "No persisted ${port} report; keeping the checked-in report." >&2
+    fallback+=("${port} (never published)")
     continue
   fi
-  if ! jq -e --arg port "${port}" --slurpfile contract "${MANIFEST}" '
-      .schema_version == $contract[0].schema_version and
-      .port == $port and
-      ((.tests | keys | sort) == ([$contract[0].features[].tests[]] | sort)) and
-      .performance.status == "complete" and
-      ([.performance.benchmarks[].duration_ns | type] | all(. == "number")) and
-      ([.performance.benchmarks[].duration_ns] | all(. >= 0)) and
-      ((.performance.benchmarks | keys) == ($contract[0].performance_benchmarks | sort))
-    ' "${candidate}" >/dev/null; then
-    echo "Persisted ${port} report does not match the current contract; keeping the checked-in report." >&2
-    continue
-  fi
+  # One implementation of "may this report be published", shared with the
+  # normalizer's own unit tests. Duplicating it here as a jq expression is what
+  # silently rejected every iOS-family report: those runs legitimately skip
+  # three GC-footprint workloads, and the copy demanded a measurement for all
+  # ten, so the site quietly served the checked-in copy until it went stale.
+  set +e
+  python3 "${REPO_ROOT}/scripts/hellocodenameone/conformance/port_status.py" \
+    accept --port "${port}" --report "${candidate}"
+  accept_rc=$?
+  set -e
+  case "${accept_rc}" in
+    0) ;;
+    11)
+      echo "Persisted ${port} report predates the current test contract; keeping the checked-in report." >&2
+      fallback+=("${port} (waiting for a run on the current contract)")
+      continue
+      ;;
+    *)
+      echo "Persisted ${port} report is unusable; keeping the checked-in report." >&2
+      fallback+=("${port} (unusable report)")
+      unusable=$((unusable + 1))
+      continue
+      ;;
+  esac
   cp "${candidate}" "${REPORT_DIR}/${port}.json"
   synced=$((synced + 1))
 done < <(jq -r '.ports[].id' "${MANIFEST}")
 
 echo "Resolved ${synced} Port Status reports from ${DATA_REF}; remaining ports use checked-in reports."
+if [ ${#fallback[@]} -gt 0 ]; then
+  echo "Ports served from the checked-in fallback: ${fallback[*]}" >&2
+fi
+if [ "${unusable}" -gt 0 ]; then
+  echo "${unusable} persisted report(s) are unusable; fix the producing workflow." >&2
+  exit 1
+fi
 
 environment_candidate="${tmp_dir}/environment.json"
 environment_target="${REPO_ROOT}/docs/website/data/port_status_environment.json"

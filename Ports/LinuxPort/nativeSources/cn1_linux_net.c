@@ -197,16 +197,22 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_httpSetMethod___long_boolean(CODE
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_httpSetHeader___long_java_lang_String_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG connection, JAVA_OBJECT key, JAVA_OBJECT value) {
     CN1Http* c = (CN1Http*) (intptr_t) connection;
-    const char* k;
-    const char* v;
+    char* k;
+    char* v;
     char line[8192];
     if (!c || key == JAVA_NULL) {
         return;
     }
-    k = stringToUTF8(threadStateData, key);
-    v = value == JAVA_NULL ? "" : stringToUTF8(threadStateData, value);
-    snprintf(line, sizeof(line), "%s: %s", k, v);
-    c->reqHeaders = curl_slist_append(c->reqHeaders, line);
+    /* Copy the name: converting the value reuses stringToUTF8's per-thread
+     * buffer, which otherwise sent every header as "value: value". */
+    k = cn1LinuxJStrDup(threadStateData, key);
+    v = value == JAVA_NULL ? 0 : cn1LinuxJStrDup(threadStateData, value);
+    if (k != 0) {
+        snprintf(line, sizeof(line), "%s: %s", k, v == 0 ? "" : v);
+        c->reqHeaders = curl_slist_append(c->reqHeaders, line);
+    }
+    free(k);
+    free(v);
 }
 
 JAVA_INT com_codename1_impl_linux_LinuxNative_httpResponseCode___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG connection) {

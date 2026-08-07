@@ -58,6 +58,27 @@ public abstract class BaseTest extends AbstractTest {
         return true;
     }
 
+    /// Whether the runner's one-shot silent-timeout retry may re-run this test.
+    ///
+    /// Override to false in any test that starts work which OUTLIVES runTest()
+    /// -- a `new Thread(...).start()` or a `Display.startThread(...)`. The
+    /// retry calls resetForRetry() and runs the test again on the same
+    /// instance, so a late done() from the first attempt's worker would
+    /// complete the SECOND attempt, advance the suite before it had really
+    /// finished, and let that worker's side effects bleed into later tests --
+    /// masking exactly the timeout the retry was meant to survive.
+    ///
+    /// CN.callSerially work does not count: finalizeTest runs on the EDT, so
+    /// anything queued by an earlier attempt has already been drained by the
+    /// time a retry is decided.
+    ///
+    /// Find the tests that must override this with:
+    ///   grep -lE 'new Thread[[:space:]]*\(' *Test.java   (that also call .start())
+    ///   grep -l  'startThread[[:space:]]*('  *Test.java
+    public boolean isRetrySafe() {
+        return true;
+    }
+
     public synchronized void fail(String message) {
         this.failed = true;
         this.failMessage = message;

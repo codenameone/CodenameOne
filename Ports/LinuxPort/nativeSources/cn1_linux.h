@@ -145,6 +145,15 @@ void cn1LinuxLog(const char* message);
  */
 JAVA_OBJECT cn1LinuxNewByteArray(CODENAME_ONE_THREAD_STATE, const void* src, int n);
 
+/* Copy of a Java String's UTF-8 bytes, owned by the caller (free it).
+ *
+ * stringToUTF8 hands back one buffer per thread and overwrites it on every
+ * call, so a native that converts a second String silently repoints the first
+ * result at the second string. That is not theoretical: it made fileRename
+ * rename a file onto itself and sent every HTTP request header as
+ * "value: value". Any native converting more than one String must use this. */
+char* cn1LinuxJStrDup(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT value);
+
 #ifdef __cplusplus
 }
 #endif

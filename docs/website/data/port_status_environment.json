@@ -1,19 +1,19 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-16T15:45:26Z",
-  "commit": "9df6f7a1ea0e10a19c84b8994725d9c9d9dd9899",
+  "generated_at": "2026-07-30T05:51:23Z",
+  "commit": "9c7affa41291e328b08a21d823737f581f1b7d3e",
   "browsers": [
     {
       "id": "chromium",
       "name": "Chromium",
-      "engine_version": "149.0.7827.55",
+      "engine_version": "151.0.7922.34",
       "status": "pass",
       "coverage": "Full compliance suite plus nightly lifecycle validation"
     },
     {
       "id": "firefox",
       "name": "Firefox",
-      "engine_version": "151.0",
+      "engine_version": "153.0",
       "status": "pass",
       "coverage": "Nightly lifecycle validation"
     },

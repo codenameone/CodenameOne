@@ -202,18 +202,8 @@ class HealthFallbackTest extends UITestBase {
         assertEquals(expected, ((HealthException) err).getError());
     }
 
-    /**
-     * An {@code except} callback registered on an already-failed resource
-     * fires synchronously, so the error can be read out without waiting --
-     * the same trick {@code BtTestUtil} uses.
-     */
+    /** Settles the resource and reads its failure; see {@link HealthAwait#errorOf}. */
     private static Throwable errorOf(AsyncResource<?> r) {
-        final Throwable[] err = new Throwable[1];
-        r.except(new com.codename1.util.SuccessCallback<Throwable>() {
-            public void onSucess(Throwable t) {
-                err[0] = t;
-            }
-        });
-        return err[0];
+        return HealthAwait.errorOf(r);
     }
 }

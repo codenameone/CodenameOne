@@ -167,6 +167,49 @@ function validate() {
         fail("the generated page does not contain exhaustive skipped-test errata");
     }
 
+    // A cell may only read as a pass while carrying a skip when the errata name
+    // that exact test, so a green mark can never outrun its explanation.
+    //
+    // Whether any such cell exists at all depends on what the live reports
+    // skipped this round: a round in which every port ran everything is a good
+    // outcome, not a page defect, so requiring at least one would fail the
+    // website build for the best possible reason. What must hold instead is
+    // that the marker and the cell's own label agree. Stale cells are exempt
+    // because staleness drops the marker while keeping the label it replaced.
+    const notedCells = primaryCellTags.filter((cell) => /\bhas-documented-skip\b/.test(cell));
+    const labelledSkipCells = primaryCellTags.filter((cell) =>
+        !/\bis-stale\b/.test(attribute(cell, "class")) &&
+        /skipped by the CI environment/i.test(attribute(cell, "title")));
+    if (notedCells.length !== labelledSkipCells.length) {
+        fail(`documented-skip markers and cell labels disagree: ${notedCells.length} marked, `
+            + `${labelledSkipCells.length} labelled`);
+    }
+    for (const cell of notedCells) {
+        const skips = attribute(cell, "data-documented-skip").split(/\s+/).filter(Boolean);
+        if (!/\bis-pass\b/.test(attribute(cell, "class")) || skips.length === 0 ||
+            !skips.every((test) => errata.includes(test))) {
+            fail(`a cell claims a documented skip the errata do not cover: ${cell}`);
+        }
+    }
+    // Counted inside each documented-skip cell, not across the whole page. A
+    // page-wide tally also picks up the legend's own marker, so a cell that had
+    // lost its <sup> was masked by the legend and the check passed while the
+    // reader saw a green cell with nothing pointing at its explanation.
+    //
+    // The production build minifies, which drops the quotes around attribute
+    // values, so match the class without assuming them.
+    const notedCellBodies = Array.from(
+        page.matchAll(/<td\b(?=[^>]*\bdata-feature-cell\b)(?=[^>]*\bhas-documented-skip\b)[^>]*>([\s\S]*?)<\/td>/gi),
+        (match) => match[1]);
+    if (notedCellBodies.length !== notedCells.length) {
+        fail(`could not read the body of every documented-skip cell: ${notedCellBodies.length} of ${notedCells.length}`);
+    }
+    const unmarked = notedCellBodies.filter(
+        (body) => !/<sup\b[^>]*\bcn1-port-status__note\b/.test(body)).length;
+    if (unmarked > 0) {
+        fail(`${unmarked} documented-skip cell(s) carry no visible note marker`);
+    }
+
     const manualRows = countMatches(page, /\bdata-manual-feature-row(?:=|\s|>)/g);
     const manualCells = countMatches(page, /\bdata-manual-feature-cell(?:=|\s|>)/g);
     if (manualRows < 20 || manualCells !== manualRows * portCards) {

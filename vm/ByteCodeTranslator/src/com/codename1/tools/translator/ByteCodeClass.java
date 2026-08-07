@@ -1146,7 +1146,26 @@ public class ByteCodeClass {
                     clInitMethod = clsName + "_" + m.getMethodName() + "__";
                 }
                 if(m.isMain()) {
-                    b.append("\nint main(int argc, char *argv[]) {\n    initConstantPool();\n");
+                    b.append("\nint main(int argc, char *argv[]) {\n");
+                    // Line-buffer stdout/stderr. C streams block-buffer when they are
+                    // not a tty, so everything an app logs into a pipe -- which is
+                    // how CI captures it -- arrives in 4KB chunks. A run that is
+                    // killed mid-flight then shows a log ending thousands of lines
+                    // behind where the process actually was, and every diagnosis
+                    // made from that tail names the wrong place. Three separate
+                    // "the suite hangs in X" readings of the Linux job came from
+                    // exactly this. Costs a flush per line; buys logs that mean
+                    // what they say.
+                    // _IONBF, not _IOLBF: the MSVC CRT rejects a line-buffered
+                    // request with a NULL buffer and size 0 -- it demands a size of
+                    // at least 2 -- and answers the invalid parameter by fail-fasting
+                    // the process (0xC0000409), so every Windows clean-target binary
+                    // died on its first instruction. _IONBF ignores the size argument
+                    // and is valid on every CRT, and unbuffered is what the
+                    // diagnostics actually want.
+                    b.append("    setvbuf(stdout, NULL, _IONBF, 0);\n");
+                    b.append("    setvbuf(stderr, NULL, _IONBF, 0);\n");
+                    b.append("    initConstantPool();\n");
                     // With the nursery, the main thread allocates and must cooperate with
                     // the concurrent GC's stop-the-world pause (so the GC never scans its
                     // nursery while a minor collection runs). Lightweight threads are the
