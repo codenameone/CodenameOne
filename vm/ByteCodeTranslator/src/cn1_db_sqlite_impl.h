@@ -106,6 +106,18 @@ static int cn1DbProbeKey(sqlite3* db) {
     return sqlite3_exec(db, "SELECT count(*) FROM sqlite_master", NULL, NULL, NULL);
 }
 
+/** Raises when a bind fails. SQLite unbinds the old value first, so ignoring this leaves the
+ * parameter as SQL NULL and the statement runs with something the caller never supplied. */
+static void cn1DbCheckBind(CODENAME_ONE_THREAD_STATE, sqlite3_stmt* stmt, int rc, int index) {
+    char buffer[256];
+    if (rc == SQLITE_OK) {
+        return;
+    }
+    snprintf(buffer, sizeof(buffer), "Parameter %d could not be bound: %s", index,
+            sqlite3_errstr(rc));
+    cn1DbThrow(threadStateData, buffer);
+}
+
 static JAVA_OBJECT cn1DbBlobToByteArray(CODENAME_ONE_THREAD_STATE, const void* bytes, int length) {
     JAVA_OBJECT arr;
     JAVA_ARRAY_BYTE* data;
@@ -197,6 +209,26 @@ JAVA_BOOLEAN PREFIX##_sqlDbApplyKey___long_java_lang_String_R_boolean(CODENAME_O
     return PREFIX##_sqlDbApplyKey___long_java_lang_String(threadStateData, dbPeer, key);            \
 }                                                                                                   \
                                                                                                    \
+/* Reports the SQLite result rather than a pass or fail, so the caller can tell a key that did not \
+ * decrypt the file (SQLITE_NOTADB) from a corrupt image or a read error, which no key repairs. */  \
+JAVA_INT PREFIX##_sqlDbApplyKeyStatus___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG dbPeer, JAVA_OBJECT key) { \
+    sqlite3* db = (sqlite3*)(intptr_t)dbPeer;                                                       \
+    const char* k;                                                                                  \
+    int rc;                                                                                         \
+    if (cn1DbApplyCipherProfile(db) != SQLITE_OK) {                                                 \
+        return SQLITE_ERROR;                                                                        \
+    }                                                                                               \
+    k = stringToUTF8(threadStateData, key);                                                         \
+    rc = sqlite3_key(db, k, (int)strlen(k));                                                        \
+    if (rc != SQLITE_OK) {                                                                          \
+        return rc;                                                                                  \
+    }                                                                                               \
+    return cn1DbProbeKey(db);                                                                       \
+}                                                                                                   \
+JAVA_INT PREFIX##_sqlDbApplyKeyStatus___long_java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG dbPeer, JAVA_OBJECT key) { \
+    return PREFIX##_sqlDbApplyKeyStatus___long_java_lang_String(threadStateData, dbPeer, key);      \
+}                                                                                                   \
+                                                                                                   \
 JAVA_VOID PREFIX##_sqlDbRekey___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG dbPeer, JAVA_OBJECT key) { \
     sqlite3* db = (sqlite3*)(intptr_t)dbPeer;                                                       \
     int rc;                                                                                         \
@@ -262,35 +294,41 @@ JAVA_INT PREFIX##_sqlStmtParameterCount___long_R_int(CODENAME_ONE_THREAD_STATE, 
 }                                                                                                   \
                                                                                                    \
 JAVA_VOID PREFIX##_sqlStmtBindNull___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT index) { \
-    sqlite3_bind_null((sqlite3_stmt*)(intptr_t)stmtPeer, index);                                    \
+    cn1DbCheckBind(threadStateData, (sqlite3_stmt*)(intptr_t)stmtPeer,                              \
+            sqlite3_bind_null((sqlite3_stmt*)(intptr_t)stmtPeer, index), index);                    \
 }                                                                                                   \
                                                                                                    \
 JAVA_VOID PREFIX##_sqlStmtBindString___long_int_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT index, JAVA_OBJECT value) { \
     sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtPeer;                                         \
     if (value == JAVA_NULL) {                                                                       \
-        sqlite3_bind_null(stmt, index);                                                             \
+        cn1DbCheckBind(threadStateData, stmt, sqlite3_bind_null(stmt, index), index);                \
         return;                                                                                     \
     }                                                                                               \
-    sqlite3_bind_text(stmt, index, stringToUTF8(threadStateData, value), -1, SQLITE_TRANSIENT);     \
+    cn1DbCheckBind(threadStateData, stmt,                                                           \
+            sqlite3_bind_text(stmt, index, stringToUTF8(threadStateData, value), -1,                \
+                    SQLITE_TRANSIENT), index);                                                      \
 }                                                                                                   \
                                                                                                    \
 JAVA_VOID PREFIX##_sqlStmtBindBlob___long_int_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT index, JAVA_OBJECT value) { \
     sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtPeer;                                         \
     JAVA_ARRAY arr;                                                                                 \
     if (value == JAVA_NULL) {                                                                       \
-        sqlite3_bind_null(stmt, index);                                                             \
+        cn1DbCheckBind(threadStateData, stmt, sqlite3_bind_null(stmt, index), index);                \
         return;                                                                                     \
     }                                                                                               \
     arr = (JAVA_ARRAY)value;                                                                        \
-    sqlite3_bind_blob(stmt, index, arr->data, arr->length, SQLITE_TRANSIENT);                       \
+    cn1DbCheckBind(threadStateData, stmt,                                                           \
+            sqlite3_bind_blob(stmt, index, arr->data, arr->length, SQLITE_TRANSIENT), index);       \
 }                                                                                                   \
                                                                                                    \
 JAVA_VOID PREFIX##_sqlStmtBindLong___long_int_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT index, JAVA_LONG value) { \
-    sqlite3_bind_int64((sqlite3_stmt*)(intptr_t)stmtPeer, index, value);                            \
+    cn1DbCheckBind(threadStateData, (sqlite3_stmt*)(intptr_t)stmtPeer,                              \
+            sqlite3_bind_int64((sqlite3_stmt*)(intptr_t)stmtPeer, index, value), index);            \
 }                                                                                                   \
                                                                                                    \
 JAVA_VOID PREFIX##_sqlStmtBindDouble___long_int_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer, JAVA_INT index, JAVA_DOUBLE value) { \
-    sqlite3_bind_double((sqlite3_stmt*)(intptr_t)stmtPeer, index, value);                           \
+    cn1DbCheckBind(threadStateData, (sqlite3_stmt*)(intptr_t)stmtPeer,                              \
+            sqlite3_bind_double((sqlite3_stmt*)(intptr_t)stmtPeer, index, value), index);           \
 }                                                                                                   \
                                                                                                    \
 JAVA_BOOLEAN PREFIX##_sqlStmtStep___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtPeer) {           \
@@ -417,6 +455,8 @@ JAVA_LONG PREFIX##_sqlDbOpen___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_
 JAVA_LONG PREFIX##_sqlDbOpen___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT p) { cn1DbThrowUnavailable(threadStateData); return 0; } \
 JAVA_BOOLEAN PREFIX##_sqlDbApplyKey___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG d, JAVA_OBJECT k) { return JAVA_FALSE; } \
 JAVA_BOOLEAN PREFIX##_sqlDbApplyKey___long_java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG d, JAVA_OBJECT k) { return JAVA_FALSE; } \
+JAVA_INT PREFIX##_sqlDbApplyKeyStatus___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG d, JAVA_OBJECT k) { return 1; } \
+JAVA_INT PREFIX##_sqlDbApplyKeyStatus___long_java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG d, JAVA_OBJECT k) { return 1; } \
 JAVA_VOID PREFIX##_sqlDbRekey___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG d, JAVA_OBJECT k) { cn1DbThrowUnavailable(threadStateData); } \
 JAVA_BOOLEAN PREFIX##_sqlDbIsCipherAvailable__(CODENAME_ONE_THREAD_STATE) { return JAVA_FALSE; }    \
 JAVA_BOOLEAN PREFIX##_sqlDbIsCipherAvailable___R_boolean(CODENAME_ONE_THREAD_STATE) { return JAVA_FALSE; } \

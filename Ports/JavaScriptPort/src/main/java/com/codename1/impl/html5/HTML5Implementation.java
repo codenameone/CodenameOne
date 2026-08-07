@@ -11511,8 +11511,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void deleteDB(String databaseName) throws IOException {
-        if (com.codename1.impl.html5.database.SQLiteNative.init()) {
-            com.codename1.impl.html5.database.SQLiteNative.delete(databaseName);
+        if (com.codename1.impl.html5.database.SQLiteNative.init()
+                && !com.codename1.impl.html5.database.SQLiteNative.delete(databaseName)) {
+            throw new IOException("The database " + databaseName + " could not be deleted: "
+                    + com.codename1.impl.html5.database.SQLiteNative.lastError());
         }
     }
 

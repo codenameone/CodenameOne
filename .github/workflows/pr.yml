@@ -355,6 +355,8 @@ jobs:
             -pl android,ios,codenameone-maven-plugin -am verify
       - name: Type-check the SQLCipher-backed database package
         if: ${{ matrix.java-version == 8 }}
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
         # That package is excluded from the port build on purpose, so nothing above compiles it
         # and a member of com.codename1.impl.android it reaches can stop being public without
         # anything noticing until an Android app build forty minutes later. Runs after the port

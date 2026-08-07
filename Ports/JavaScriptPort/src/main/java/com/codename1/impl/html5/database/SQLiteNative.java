@@ -55,7 +55,8 @@ public class SQLiteNative {
 
     public static native boolean exists(String name);
 
-    public static native void delete(String name);
+    /** Deletes a database, returning false and recording {@link #lastError()} on failure. */
+    public static native boolean delete(String name);
 
     /**
      * Opens or creates a database.

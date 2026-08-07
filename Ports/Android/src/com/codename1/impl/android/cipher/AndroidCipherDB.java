@@ -319,8 +319,15 @@ class AndroidCipherDB extends Database {
                     + "left as it was and not converted");
         }
         if (!target.renameTo(original)) {
-            // Put it back exactly as it was.
-            backup.renameTo(original);
+            if (!backup.renameTo(original)) {
+                // Do not reopen. openAt creates what it cannot find, so it would put an empty
+                // database at the live name, and the next recovery would then see both files,
+                // read that as a completed conversion, and delete the backup holding the data.
+                throw new IOException("The converted database could not replace " + path
+                        + " and the original could not be put back either. The original is intact "
+                        + "at " + backup + " and the database was left closed rather than opening "
+                        + "an empty one over it.");
+            }
             target.delete();
             db = openAt(path, currentKey);
             throw new IOException("The converted database could not replace " + path

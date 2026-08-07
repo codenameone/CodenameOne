@@ -859,6 +859,14 @@ public final class WindowsNative {
      * Reporting rather than throwing keeps a wrong key distinguishable from a failure to open.
      */
     public static native boolean sqlDbApplyKey(long dbPeer, String key) throws java.io.IOException;
+
+    /// Applies the key and probes it, reporting the SQLite result rather than a bare pass or fail.
+    ///
+    /// 0 is SQLITE_OK. 26 is SQLITE_NOTADB, which is what a key that did not decrypt the file
+    /// looks like, because the plaintext it produces has no valid header. Anything else is a
+    /// corrupt image or a read error, which no key repairs, so those must not be reported as a
+    /// wrong key.
+    public static native int sqlDbApplyKeyStatus(long dbPeer, String key) throws java.io.IOException;
     /** Re-keys an open database, or removes the key when passed null. */
     public static native void sqlDbRekey(long dbPeer, String key) throws java.io.IOException;
     /** True when the linked engine supports encryption. */

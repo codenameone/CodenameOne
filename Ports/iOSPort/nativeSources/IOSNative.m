@@ -8986,7 +8986,20 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbExists___java_lang_String(CN1
 void com_codename1_impl_ios_IOSNative_sqlDbDelete___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
     POOL_BEGIN();
     NSString* nsPath = toNSString(CN1_THREAD_STATE_PASS_ARG path);
-    [[NSFileManager defaultManager] removeItemAtPath:nsPath error:nil];
+    NSFileManager* files = [NSFileManager defaultManager];
+    // Deleting what is not there is the documented no-op. Anything else -- file protection, a
+    // filesystem error -- has to be reported, or delete() returns and the database is still
+    // sitting there, which is neither the contract nor what this binding claims to do.
+    if ([files fileExistsAtPath:nsPath]) {
+        NSError* err = nil;
+        if (![files removeItemAtPath:nsPath error:&err]) {
+            NSString* failure = [NSString stringWithFormat:@"The database %@ could not be "
+                    "deleted: %@", nsPath, err != nil ? [err localizedDescription] : @"unknown error"];
+            cn1ThrowSqlMessage(CN1_THREAD_STATE_PASS_ARG [failure UTF8String]);
+            POOL_END();
+            return;
+        }
+    }
     POOL_END();
 }
 
@@ -9029,10 +9042,15 @@ static JAVA_LONG cn1SqlOpen(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_OB
     int rc = sqlite3_open_v2([nsPath UTF8String], &db,
             SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, NULL);
     if (rc != SQLITE_OK) {
-        cn1ThrowSqlError(CN1_THREAD_STATE_PASS_ARG db, "Failed to open the database");
+        // Copy the message out and close before raising. throwException longjmps, so nothing
+        // after it runs, and SQLite hands back a usable handle even from a failed open -- which
+        // then leaks a connection and its descriptor once per caught failure.
+        NSString* failure = [NSString stringWithFormat:@"Failed to open the database: %s",
+                db != NULL ? sqlite3_errmsg(db) : "unknown SQLite error"];
         if (db != NULL) {
             sqlite3_close_v2(db);
         }
+        cn1ThrowSqlMessage(CN1_THREAD_STATE_PASS_ARG [failure UTF8String]);
         POOL_END();
         return 0;
     }

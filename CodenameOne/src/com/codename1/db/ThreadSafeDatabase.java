@@ -270,10 +270,17 @@ public class ThreadSafeDatabase extends Database {
                 public Object run() {
                     try {
                         underlying.close();
-                    } catch (IOException err) {
-                        // close() cannot report a failure through its signature, so log it rather
-                        // than dropping it silently.
+                    } catch (Exception err) {
+                        // close() cannot report a failure through its signature, so log it.
                         Log.e(err);
+                    } catch (Error err) {
+                        // Caught for the same reason as the Exception above, and separately
+                        // because PMD forbids sorting a single catch out by instanceof. Letting
+                        // either escape is far worse than losing it: the worker's own loop would
+                        // swallow it without delivering a result, and this call is synchronous
+                        // and holds dispatchLock, so close() would block forever, never reach
+                        // et.kill(), and wedge every later call behind it.
+                        Log.e(new RuntimeException(err));
                     }
                     return null;
                 }

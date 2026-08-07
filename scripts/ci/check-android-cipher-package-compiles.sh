@@ -26,9 +26,20 @@ fail() {
 JAVAC="${JAVA_HOME:+$JAVA_HOME/bin/}javac"
 command -v "$JAVAC" >/dev/null 2>&1 || JAVAC=javac
 
-ANDROID_JAR="$(find "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}/platforms" \
-    -name 'android.jar' 2>/dev/null | sort | tail -1 || true)"
-[ -n "$ANDROID_JAR" ] || fail "no android.jar found; set ANDROID_HOME"
+# cn1-binaries first: that is the android.jar the port itself is compiled against, so it is the
+# faithful one, and it is present wherever the port builds -- including CI containers with no
+# Android SDK installed. An installed SDK is the fallback for a working copy without the binaries.
+CN1_BINARIES="${CN1_BINARIES:-$REPO_ROOT/../cn1-binaries}"
+ANDROID_JAR=""
+if [ -f "$CN1_BINARIES/android/android.jar" ]; then
+    ANDROID_JAR="$CN1_BINARIES/android/android.jar"
+else
+    ANDROID_JAR="$(find "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}/platforms" \
+        -name 'android.jar' 2>/dev/null | sort | tail -1 || true)"
+fi
+[ -n "$ANDROID_JAR" ] || fail "no android.jar found. Expected it at
+  \$CN1_BINARIES/android/android.jar (currently $CN1_BINARIES), or an installed SDK via
+  ANDROID_HOME."
 
 CIPHER_DIR="$REPO_ROOT/Ports/Android/src/com/codename1/impl/android/cipher"
 [ -d "$CIPHER_DIR" ] || fail "the cipher package is missing from $CIPHER_DIR"

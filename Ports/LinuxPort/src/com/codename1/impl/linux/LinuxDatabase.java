@@ -52,15 +52,28 @@ class LinuxDatabase extends Database {
 
     private final List<CursorImpl> openCursors = new ArrayList<CursorImpl>();
 
+    /// SQLite's success code.
+    private static final int SQLITE_OK = 0;
+
+    /// SQLite's "this is not a database file", which is what a wrong key looks like.
+    private static final int SQLITE_NOTADB = 26;
+
     LinuxDatabase(String databaseName, String path, String key) throws IOException {
         this.databaseName = databaseName;
         peer = LinuxNative.sqlDbOpen(path);
         if (key != null) {
-            if (!LinuxNative.sqlDbApplyKey(peer, key)) {
+            int status = LinuxNative.sqlDbApplyKeyStatus(peer, key);
+            if (status != SQLITE_OK) {
                 LinuxNative.sqlDbClose(peer);
                 peer = 0;
-                throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
-                        "The supplied key does not decrypt this database");
+                if (status == SQLITE_NOTADB) {
+                    throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
+                            "The supplied key does not decrypt this database");
+                }
+                // A corrupt image or a read error, which no key repairs. Reporting it as a wrong
+                // key would have an application prompting for a passphrase that cannot help.
+                throw new IOException("The database " + databaseName + " could not be read, "
+                        + "SQLite result " + status);
             }
         }
     }

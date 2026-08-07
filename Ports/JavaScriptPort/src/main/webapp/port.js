@@ -6781,27 +6781,31 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_isCipherAvailabl
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_exists_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_exists___java_lang_String_R_boolean"],
   function(name) {
-    const n = jvm.toNativeString(name);
-    if (!cn1SqlitePool) {
-      return cn1SqliteMemoryAnchors.has(n);
-    }
-    return cn1SqlitePool.getFileNames().indexOf(cn1SqliteDbPath(n)) >= 0;
+    return cn1SqliteGuard(function() {
+      const n = jvm.toNativeString(name);
+      if (!cn1SqlitePool) {
+        return cn1SqliteMemoryAnchors.has(n);
+      }
+      return cn1SqlitePool.getFileNames().indexOf(cn1SqliteDbPath(n)) >= 0;
+    }, false);
   });
 
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_delete___java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang_String_R_void", "cn1_com_codename1_impl_html5_database_SQLiteNative_delete___java_lang_String_R_void"],
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_delete___java_lang_String_R_boolean"],
   function(name) {
-    const n = jvm.toNativeString(name);
-    if (cn1SqlitePool) {
-      cn1SqlitePool.unlink(cn1SqliteDbPath(n));
-    } else {
-      const anchor = cn1SqliteMemoryAnchors.get(n);
-      if (anchor) {
-        // Dropping the anchor releases the store once every other connection to it has closed.
-        anchor.close();
-        cn1SqliteMemoryAnchors.delete(n);
+    return cn1SqliteGuard(function() {
+      const n = jvm.toNativeString(name);
+      if (cn1SqlitePool) {
+        cn1SqlitePool.unlink(cn1SqliteDbPath(n));
+      } else {
+        const anchor = cn1SqliteMemoryAnchors.get(n);
+        if (anchor) {
+          // Dropping the anchor releases the store once every other connection to it has closed.
+          anchor.close();
+          cn1SqliteMemoryAnchors.delete(n);
+        }
       }
-    }
-    return null;
+      return true;
+    }, false);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_open_java_lang_String_java_lang_String_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_open___java_lang_String_java_lang_String_R_long"],
