@@ -402,15 +402,29 @@ class JavaSEWearableBridge implements WearableBridge {
 
     private void removeDataLocked(String path) {
         File f = dataFile(path);
-        if (f.isFile() && !f.delete()) {
-            // The value is still there. Publishing the tombstone anyway would leave BOTH durable,
-            // and a peer reading them in whatever order listFiles() gives could settle in the
-            // removed state while getData still returns the value -- and once the tombstone
-            // expires, the value has long been marked seen and is never re-delivered. A delete
-            // that failed is not a removal, so nothing is recorded as one.
-            com.codename1.io.Log.p("Wearable simulator: could not delete " + path
-                    + "; the removal was not published");
+        File tomb = new File(dataDir, encodePath(path) + TOMB_SUFFIX);
+        // The TOMBSTONE goes first, and the value is deleted only once it is safely on disk.
+        //
+        // The other order destroyed the only durable record before writing its replacement: a
+        // writeValue that failed -- a full disk, a directory gone read-only -- left the value
+        // deleted and nothing saying it ever existed, so a peer that was offline for the call came
+        // back to no value and no removal and kept its stale copy for good. Nothing is destroyed
+        // now until the record that replaces it exists.
+        //
+        // Writing it first was previously avoided because both records can then be on disk at once.
+        // That is no longer a durable state: a value and a tombstone for the same path are
+        // reconciled by embedded stamp, and this tombstone is newer than the value it replaces.
+        if (!writeValue(tomb, new byte[0], path)) {
+            com.codename1.io.Log.p("Wearable simulator: could not record the removal of " + path
+                    + "; nothing was deleted and the value still stands");
             return;
+        }
+        if (f.isFile() && !f.delete()) {
+            // The tombstone is already published and it is the newer record, so the reconciliation
+            // below -- and every later scan -- drops this value. Logged because a value that will
+            // not delete is worth knowing about, not because the state is wrong.
+            com.codename1.io.Log.p("Wearable simulator: removed " + path
+                    + " but its value file would not delete; the tombstone supersedes it");
         }
         synchronized (seenData) {
             seenData.remove(f.getName());
@@ -420,8 +434,7 @@ class JavaSEWearableBridge implements WearableBridge {
         // never learns the value was removed -- so an app that persisted it stays stale forever.
         // The other two platforms both keep a tombstone for exactly this; the simulator was the
         // odd one out.
-        writeValue(new File(dataDir, encodePath(path) + TOMB_SUFFIX), new byte[0], path);
-        // The other JVM may have published a replacement between the delete above and this write,
+        // The other JVM may have published a replacement between the write above and the delete,
         // in which case BOTH records now exist durably. writeLock cannot prevent that -- it is
         // process-local and the peer is a separate process -- so the records are reconciled instead
         // of pretended away.
@@ -580,6 +593,18 @@ class JavaSEWearableBridge implements WearableBridge {
     /// never delivered to a listener and never enumerated as a path.
     private static final String ACK_SUFFIX = ".ack";
 
+    /// Marks a one-shot transfer this side has already handed to the app but could not delete.
+    ///
+    /// The seen-marker is memory only, and primeSeenData deliberately restores nothing -- that is
+    /// what lets a value published while this side was down still replay. So a transfer whose
+    /// delete was refused survived the restart looking new, and a one-shot file was delivered a
+    /// second time. This record is durable, so the next run knows.
+    private static final String CONSUMED_SUFFIX = ".consumed";
+
+    private static boolean isConsumedMarker(String storageName) {
+        return storageName.endsWith(CONSUMED_SUFFIX);
+    }
+
     private static boolean isTombstoneAck(String storageName) {
         return storageName.endsWith(ACK_SUFFIX);
     }
@@ -617,7 +642,8 @@ class JavaSEWearableBridge implements WearableBridge {
             // A transfer is not a readable replicated path -- getData() on its storage name is not
             // part of the API -- so it is left out, matching the device ports.
             if (f.isFile() && !f.getName().endsWith(".tmp") && !isTransfer(f.getName())
-                    && !isTombstone(f.getName()) && !isTombstoneAck(f.getName())) {
+                    && !isTombstone(f.getName()) && !isTombstoneAck(f.getName())
+                    && !isConsumedMarker(f.getName())) {
                 out.add(decodePath(f.getName()));
             }
         }
@@ -1137,6 +1163,20 @@ class JavaSEWearableBridge implements WearableBridge {
                 synchronized (seenData) {
                     seenData.put(f.getName(), Long.valueOf(seenKey));
                 }
+                if (isTransfer(f.getName())
+                        && new File(dataDir, f.getName() + CONSUMED_SUFFIX).isFile()) {
+                    // Handed to the app by THIS side already -- in this run or an earlier one --
+                    // and its delete was refused. Retry that here rather than delivering it again:
+                    // the marker is the only thing standing between a surviving one-shot file and a
+                    // second delivery after a restart, since primeSeenData restores no markers.
+                    if (f.delete()) {
+                        new File(dataDir, f.getName() + CONSUMED_SUFFIX).delete();
+                        synchronized (seenData) {
+                            seenData.remove(f.getName());
+                        }
+                    }
+                    continue;
+                }
                 if (isTransfer(f.getName()) && !isInboundTransfer(f.getName())) {
                     // Our own outbound transfer, seen again because primeSeenData() deliberately
                     // records nothing at startup. It is not an inbound delivery: reporting it would
@@ -1188,9 +1228,9 @@ class JavaSEWearableBridge implements WearableBridge {
                     }
                     continue;
                 }
-                if (isTombstoneAck(f.getName())) {
+                if (isTombstoneAck(f.getName()) || isConsumedMarker(f.getName())) {
                     // Bookkeeping between the two simulators. Delivering it would announce a path
-                    // ending in ".tomb.ack" that no app ever published.
+                    // ending in ".tomb.ack" or ".consumed" that no app ever published.
                     continue;
                 }
                 if (isTombstone(f.getName())
@@ -1266,6 +1306,18 @@ class JavaSEWearableBridge implements WearableBridge {
                                         synchronized (seenData) {
                                             seenData.remove(delivered.getName());
                                         }
+                                        // Nothing left to protect, so the durable marker goes too.
+                                        new File(dataDir,
+                                                delivered.getName() + CONSUMED_SUFFIX).delete();
+                                    } else {
+                                        // The file survived. The in-memory marker keeps THIS
+                                        // process from re-offering it, but that dies with the
+                                        // process and primeSeenData restores nothing -- so without
+                                        // a durable record the next run would deliver this one-shot
+                                        // file again. The delete is retried on each scan.
+                                        writeValue(new File(dataDir,
+                                                delivered.getName() + CONSUMED_SUFFIX),
+                                                new byte[0], deliveryPath(delivered.getName()));
                                     }
                                 }
                             } : null, inbound ? new Runnable() {
@@ -1299,8 +1351,9 @@ class JavaSEWearableBridge implements WearableBridge {
                 // path may well still hold an unrelated replicated value.
                 continue;
             }
-            if (isTombstone(name) || isTombstoneAck(name)) {
-                // A tombstone or its acknowledgement expiring is housekeeping, not a removal.
+            if (isTombstone(name) || isTombstoneAck(name) || isConsumedMarker(name)) {
+                // A tombstone, its acknowledgement or a consumed marker expiring is housekeeping,
+                // not a removal.
                 continue;
             }
             if (new File(dataDir, name + TOMB_SUFFIX).isFile()) {
