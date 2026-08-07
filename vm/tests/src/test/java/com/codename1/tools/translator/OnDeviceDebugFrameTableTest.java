@@ -39,8 +39,10 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -261,6 +263,60 @@ class OnDeviceDebugFrameTableTest {
             assertTrue(row.liveAt(INT_SCOPE_LINE) && row.liveAt(REF_SCOPE_LINE),
                     "slot " + slot + " should be live throughout, was:\n" + table);
         }
+    }
+
+    /**
+     * The device's frame table and the symbol table the IDE reads describe the
+     * same local the same way.
+     *
+     * <p>They are produced at different times — the frame side-table during
+     * code generation, the symbol table after every class has been generated —
+     * and {@code optimize()} rewrites the instruction list in between, which
+     * is what a scope is resolved against. The optimizer does preserve the
+     * label and line-number instructions that walk depends on, so this holds
+     * today either way; it is pinned because nothing else states that, and the
+     * two disagreeing would not fail loudly. The IDE would ask for a slot the
+     * device considers out of scope and the local would simply be missing from
+     * the variables view.</p>
+     */
+    @Test
+    void scopesAreResolvedBeforeTheOptimizerRewritesTheInstructionList() throws Exception {
+        Parser.parse(writeHostClass().toFile());
+        ByteCodeClass objectClass =
+                new ByteCodeClass("java_lang_Object", "java/lang/Object");
+        ByteCodeClass host = Parser.getClassObject("com_example_DbgHost");
+        host.setBaseClassObject(objectClass);
+        host.setBaseInterfacesObject(Collections.<ByteCodeClass>emptyList());
+        host.updateAllDependencies();
+
+        BytecodeMethod handler = null;
+        for (BytecodeMethod m : host.getMethods()) {
+            if ("handler".equals(m.getMethodName())) {
+                handler = m;
+            }
+        }
+        assertNotNull(handler, "the fixture should carry a handler method");
+
+        List<int[]> beforeGeneration = handler.debugVarScopes(handler.debugVarEntries());
+        // generateCCode runs optimize(), which rewrites the instruction list
+        // the scopes would otherwise be resolved against.
+        host.generateCCode(Arrays.asList(objectClass, host));
+        List<int[]> afterGeneration = handler.debugVarScopes(handler.debugVarEntries());
+
+        assertEquals(beforeGeneration.size(), afterGeneration.size());
+        for (int i = 0; i < beforeGeneration.size(); i++) {
+            assertArrayEquals(beforeGeneration.get(i), afterGeneration.get(i),
+                    "scope " + i + " changed across code generation: "
+                            + Arrays.toString(beforeGeneration.get(i)) + " -> "
+                            + Arrays.toString(afterGeneration.get(i)));
+        }
+        // And they are real scopes, not a table of always-live pairs that
+        // would agree trivially.
+        boolean anyScoped = false;
+        for (int[] scope : afterGeneration) {
+            anyScoped |= scope[0] > 0;
+        }
+        assertTrue(anyScoped, "the fixture should produce at least one scoped local");
     }
 
     // ---- parsing the generated C ------------------------------------------

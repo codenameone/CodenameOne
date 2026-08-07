@@ -1322,6 +1322,18 @@ public class BytecodeMethod implements SignatureSet {
         // at their CALL sites, in other classes. Same rule as the plans above --
         // recognize the shape on the raw list, never on the live one.
         analyzeTrivialGetterRaw();
+        // ON-DEVICE DEBUG: a local's declaring scope is a pair of labels, and
+        // turning those into source lines means walking the instruction list.
+        // Two consumers read the result at different times -- the frame
+        // side-table during code generation, the symbol table the IDE reads
+        // after every class has been generated -- with optimize() in between.
+        // It happens to preserve the label and line-number instructions this
+        // walk depends on, so resolving on demand would agree today; nothing
+        // states or enforces that, and the two disagreeing would silently drop
+        // locals from the IDE's variables view. Snapshotting off the raw list
+        // removes the dependence, and costs one walk per method instead of one
+        // per method per consumer.
+        snapshotDebugVarScopes();
     }
 
     public com.codename1.tools.translator.bytecodes.InlinableConstructor getInlinableConstructorPlan() {
@@ -1435,20 +1447,45 @@ public class BytecodeMethod implements SignatureSet {
     private static final int[] ALWAYS_LIVE = { 0, 0 };
 
     /**
-     * Resolves every local's scope in one pass, keyed the same way
-     * {@link #debugVarEntries()} orders them, so a caller emitting a whole
-     * method's locals walks the instruction list once rather than per local.
+     * Scopes resolved at parse time, keyed by local. Null until
+     * {@link #computeRawMethodPlans()} has run — methods built by hand rather
+     * than by the parser fall back to resolving on demand.
+     */
+    private Map<LocalVariable, int[]> debugVarScopeSnapshot;
+
+    /** Resolves every local's scope against the raw instruction list, once. */
+    private void snapshotDebugVarScopes() {
+        if (localVariables.isEmpty()) {
+            return;
+        }
+        Map<Label, Integer> lineByLabel = lineByLabel();
+        Map<LocalVariable, int[]> snapshot = new HashMap<LocalVariable, int[]>();
+        for (LocalVariable lv : localVariables) {
+            snapshot.put(lv, resolveDebugVarScope(lv, lineByLabel));
+        }
+        debugVarScopeSnapshot = snapshot;
+    }
+
+    /**
+     * The source-line ranges for {@code rows}, in the same order.
+     *
+     * Served from the parse-time snapshot so that the frame side-table emitted
+     * during code generation and the symbol table written after it describe
+     * the same local the same way.
      */
     public List<int[]> debugVarScopes(List<LocalVariable> rows) {
-        Map<Label, Integer> lineByLabel = lineByLabel();
         List<int[]> scopes = new ArrayList<int[]>(rows.size());
+        Map<LocalVariable, int[]> snapshot = debugVarScopeSnapshot;
+        Map<Label, Integer> lineByLabel = snapshot == null ? lineByLabel() : null;
         for (LocalVariable lv : rows) {
-            scopes.add(debugVarScope(lv, lineByLabel));
+            int[] scope = snapshot == null ? null : snapshot.get(lv);
+            scopes.add(scope != null ? scope : resolveDebugVarScope(lv, lineByLabel == null
+                    ? lineByLabel() : lineByLabel));
         }
         return scopes;
     }
 
-    private int[] debugVarScope(LocalVariable lv, Map<Label, Integer> lineByLabel) {
+    private int[] resolveDebugVarScope(LocalVariable lv, Map<Label, Integer> lineByLabel) {
         Label start = lv.getScopeStart();
         Label end = lv.getScopeEnd();
         if (start == null || end == null) {
@@ -1550,10 +1587,11 @@ public class BytecodeMethod implements SignatureSet {
             b.append("    ").append(classId).append(", ").append(methodId).append(", ").append(maxLocals).append(", 0, 0\n");
             b.append("};\n");
         } else {
-            Map<Label, Integer> lineByLabel = lineByLabel();
+            List<int[]> scopes = debugVarScopes(rows);
             b.append("static const struct cn1_var_entry __cn1_vars_").append(id).append("[] = {\n");
-            for (LocalVariable lv : rows) {
-                int[] scope = debugVarScope(lv, lineByLabel);
+            for (int ri = 0; ri < rows.size(); ri++) {
+                LocalVariable lv = rows.get(ri);
+                int[] scope = scopes.get(ri);
                 b.append("    { ").append(scope[0]).append(", ").append(scope[1])
                  .append(", ").append(lv.getIndex())
                  .append(", '").append(lv.getTypeCode()).append("' },\n");
