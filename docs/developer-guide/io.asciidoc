@@ -259,6 +259,34 @@ software derived key in your desktop user profile. It's fine for development, an
 that real user data is protected. `DatabaseConfig.isKeyHardwareBacked()` reports the
 difference, and the simulator logs a warning the first time you use a managed key.
 
+===== What encryption costs your build
+
+Nothing is added to an application that doesn't use it. The build scans your own classes -- not the
+framework's -- and decides from what they reference:
+
+[cols="1,2",options="header"]
+|===
+| What your code references | What the build adds
+
+| nothing in `com.codename1.db`
+| Nothing at all. No SQLite engine on the platforms that bundle one, no browser payload.
+
+| `com.codename1.db`, but never `DatabaseConfig`
+| The plain SQLite engine where the platform needs one: compiled into the native Windows and Linux
+  binaries, and about 1.5MB of WebAssembly in a JavaScript build. Android and iOS use the engine
+  already in the operating system.
+
+| `DatabaseConfig`
+| The cipher as well. On Android that's `net.zetetic:sqlcipher-android` and `androidx.sqlite`; on
+  iOS a bundled SQLCipher build that replaces the system `libsqlite3`.
+|===
+
+IMPORTANT: On Android, encryption raises `android.min_sdk_version` to *23* and requires
+`android.useAndroidX=true`, because that's SQLCipher's floor. If your application targets an older
+API level the build will raise it for you, and devices below API 23 will no longer see your app in
+the store. This applies as soon as anything in your code mentions `DatabaseConfig`, so a build hint
+alone won't opt out of it -- remove the reference if you need the lower floor.
+
 ===== Converting an existing database
 
 An application that already ships a plaintext database can convert it in place:
