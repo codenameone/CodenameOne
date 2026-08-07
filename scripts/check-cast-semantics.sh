@@ -4,10 +4,16 @@
 # ParparVM's CHECKCAST is unchecked, so such a handler never runs on iOS and the
 # wrong object is used instead (issue #5531). See CastSemanticsVerifier.
 #
-#   scripts/check-cast-semantics.sh [--write-baseline] [class-dir-or-jar ...]
+#   scripts/check-cast-semantics.sh [--write-baseline] [--require-all] [class-dir-or-jar ...]
 #
-# With no paths, checks every module that is already built; a module that has not
-# been compiled is skipped with a note rather than silently passing.
+# With no paths, checks every module that is already built. A module that has not
+# been compiled is skipped with a note, so a partial local tree still gives a
+# useful answer -- but CI passes --require-all, because there a missing module
+# means the gate silently stopped covering it.
+#
+# NOTE: regenerate the baseline only against a FRESH build of every module. A
+# stale target/classes produces a baseline that is missing methods, and the gate
+# then fails on CI for code that was never new.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
@@ -16,8 +22,12 @@ BASELINE="$SCRIPT_DIR/cast-semantics-baseline.txt"
 TRANSLATOR="$REPO_ROOT/vm/ByteCodeTranslator/target/classes"
 ASM_CP_FILE="$REPO_ROOT/vm/ByteCodeTranslator/target/cast-semantics-asm-classpath.txt"
 
-# The modules whose bytecode ParparVM translates and that we own. Ports/retro is
-# excluded on purpose: it is vendored retroweaver code, not ours to restyle.
+# The modules whose bytecode ParparVM translates and that we own. Deliberately
+# NOT covered:
+#   - maven/java-runtime (Ports/CLDC11) runs on a real JVM -- the simulator and
+#     desktop -- where a failed cast does throw, so its catch(ClassCastException)
+#     handlers are live and correct. ParparVM's runtime is vm/JavaAPI.
+#   - Ports/retro is vendored retroweaver code, not ours to restyle.
 DEFAULT_ROOTS=(
   "vm/JavaAPI/target/classes"
   "maven/core/target/classes"
@@ -26,13 +36,14 @@ DEFAULT_ROOTS=(
 )
 
 write_baseline=0
+require_all=0
 roots=()
 for arg in "$@"; do
-  if [[ "$arg" == "--write-baseline" ]]; then
-    write_baseline=1
-  else
-    roots+=("$arg")
-  fi
+  case "$arg" in
+    --write-baseline) write_baseline=1 ;;
+    --require-all) require_all=1 ;;
+    *) roots+=("$arg") ;;
+  esac
 done
 
 if [[ ! -f "$TRANSLATOR/com/codename1/tools/translator/CastSemanticsVerifier.class" ]]; then
@@ -45,13 +56,20 @@ if [[ ! -f "$ASM_CP_FILE" ]]; then
 fi
 
 if [[ ${#roots[@]} -eq 0 ]]; then
+  missing=0
   for candidate in "${DEFAULT_ROOTS[@]}"; do
     if [[ -d "$REPO_ROOT/$candidate" ]]; then
       roots+=("$REPO_ROOT/$candidate")
     else
       echo "check-cast-semantics: skipping $candidate (not built)" >&2
+      missing=1
     fi
   done
+  if [[ "$require_all" -eq 1 && "$missing" -eq 1 ]]; then
+    echo "check-cast-semantics: --require-all was passed but a module is not built;" >&2
+    echo "  the gate would have covered less than it claims. Build it and re-run." >&2
+    exit 2
+  fi
 fi
 
 if [[ ${#roots[@]} -eq 0 ]]; then

@@ -355,7 +355,7 @@ jobs:
         if: ${{ matrix.java-version == 8 }}
         run: |
           mvn -B -q -f vm/pom.xml -pl JavaAPI -am package -DskipTests
-          scripts/check-cast-semantics.sh
+          scripts/check-cast-semantics.sh --require-all
       - name: Run JavaScript Port smoke integration
         if: ${{ matrix.java-version == 8 }}
         working-directory: vm
