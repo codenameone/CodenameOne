@@ -230,11 +230,29 @@ static BOOL cn1WearableMarkInFlight(NSString *name) {
 /// file finally goes.
 static NSString *const kCN1ConsumedInboxKey = @"cn1.wearable.consumedInbox";
 
+/// Serialises the read-modify-write of the consumed list.
+///
+/// NSUserDefaults is thread-safe per ACCESS, which is not the same as per update: note and forget
+/// each read the array, change it and write it back, and the activation drain runs those on a
+/// different thread from the EDT confirmation. Whichever wrote last silently discarded the other's
+/// change -- and losing a note means a file that is still on disk has no durable claim, so the next
+/// launch delivers it again.
+static NSLock *cn1WearableConsumedLock(void) {
+    static dispatch_once_t once;
+    static NSLock *lock = nil;
+    dispatch_once(&once, ^{
+        lock = [[NSLock alloc] init];
+    });
+    return lock;
+}
+
 /// Marks an inbox entry as consumed across process restarts.
 static void cn1WearableNoteConsumed(NSString *name) {
     if (name.length == 0) {
         return;
     }
+    NSLock *lock = cn1WearableConsumedLock();
+    [lock lock];
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     NSMutableArray *consumed = [[d arrayForKey:kCN1ConsumedInboxKey] mutableCopy];
     if (consumed == nil) {
@@ -250,25 +268,32 @@ static void cn1WearableNoteConsumed(NSString *name) {
         [d setObject:consumed forKey:kCN1ConsumedInboxKey];
     }
     [consumed release];
+    [lock unlock];
 }
 
 /// Whether this entry was already consumed by some earlier run.
 static BOOL cn1WearableWasConsumed(NSString *name) {
+    NSLock *lock = cn1WearableConsumedLock();
+    [lock lock];
     NSArray *consumed = [[NSUserDefaults standardUserDefaults] arrayForKey:kCN1ConsumedInboxKey];
-    return consumed != nil && [consumed containsObject:name];
+    BOOL was = consumed != nil && [consumed containsObject:name];
+    [lock unlock];
+    return was;
 }
 
 /// Forgets the consumed record once the file it protects is gone.
 static void cn1WearableForgetConsumed(NSString *name) {
+    NSLock *lock = cn1WearableConsumedLock();
+    [lock lock];
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     NSArray *consumed = [d arrayForKey:kCN1ConsumedInboxKey];
-    if (consumed == nil || ![consumed containsObject:name]) {
-        return;
+    if (consumed != nil && [consumed containsObject:name]) {
+        NSMutableArray *rest = [consumed mutableCopy];
+        [rest removeObject:name];
+        [d setObject:rest forKey:kCN1ConsumedInboxKey];
+        [rest release];
     }
-    NSMutableArray *rest = [consumed mutableCopy];
-    [rest removeObject:name];
-    [d setObject:rest forKey:kCN1ConsumedInboxKey];
-    [rest release];
+    [lock unlock];
 }
 
 static void cn1WearableClearInFlight(NSString *name) {

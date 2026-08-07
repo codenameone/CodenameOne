@@ -436,16 +436,35 @@ class JavaSEWearableBridge implements WearableBridge {
         }
         long valueStamp = versionOf(value);
         long tombStamp = versionOf(tomb);
-        File loser = valueStamp > tombStamp ? tomb : value;
-        if (loser.delete()) {
+        boolean tombLost = valueStamp > tombStamp;
+        File loser = tombLost ? tomb : value;
+        // Only while the loser is still the version this decision was made about. The other process
+        // can replace it at the same file name between the read above and the delete -- the value
+        // loses to a tombstone and is then republished with a newer stamp -- and deleting on the
+        // strength of the old reading would discard the actual winner. retireTombstone already
+        // works this way; this path was written without it.
+        if (deleteIfVersionUnchanged(loser, tombLost ? tombStamp : valueStamp)) {
             synchronized (seenData) {
                 seenData.remove(loser.getName());
             }
-            if (loser == tomb) {
+            if (tombLost) {
                 // The tombstone lost, so its acknowledgement describes nothing.
                 new File(dataDir, tomb.getName() + ACK_SUFFIX).delete();
             }
         }
+    }
+
+    /// Deletes a record only while it still carries the version the caller decided about.
+    ///
+    /// Not atomic -- POSIX offers no compare-and-delete -- but it narrows the window from "since
+    /// the enumeration" to "between this check and the unlink", and it is the same guard the
+    /// tombstone retirement uses. A file that has already vanished counts as deleted, so a
+    /// concurrent removal does not leave the caller thinking its record survived.
+    private boolean deleteIfVersionUnchanged(File f, long expected) {
+        if (versionOf(f) != expected) {
+            return false;
+        }
+        return f.delete() || !f.isFile();
     }
 
     /// A record's version: the stamp inside it, falling back to its mtime when it carries no frame.
