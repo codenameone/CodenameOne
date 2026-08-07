@@ -24,6 +24,10 @@ package com.codename1.health;
 
 import com.codename1.ui.CN;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -67,6 +71,69 @@ final class HealthAwait {
         assertTrue(res.isDone(),
                 "the operation must settle rather than hang");
         return res;
+    }
+
+    /**
+     * Settles `res` and returns the failure it carries, or null if it
+     * succeeded.
+     *
+     * <p>Five test classes each had their own copy of this, all of them
+     * registering an {@code except} callback and reading the result straight
+     * back on the assumption that a callback attached to an already-failed
+     * resource fires inline on the registering thread. That assumption no
+     * longer holds: health results are delivered on the EDT whether the
+     * listener arrives before the outcome or after it, so an off-EDT caller
+     * gets the failure queued. Waiting for it is the same thing {@link
+     * #settled} does one step earlier, and having one copy means the next
+     * change to the delivery rule has one place to land.</p>
+     */
+    static <T> Throwable errorOf(AsyncResource<T> res) {
+        settled(res);
+        // Atomics rather than a one-element array: the callback runs on the
+        // EDT and the value is read from the test thread, so an unguarded
+        // field would be a data race that only misbehaves under CI timing.
+        final AtomicReference<Throwable> err = new AtomicReference<Throwable>();
+        final AtomicBoolean delivered = new AtomicBoolean();
+        res.except(new SuccessCallback<Throwable>() {
+            public void onSucess(Throwable t) {
+                err.set(t);
+                delivered.set(true);
+            }
+        });
+        // Both sides, because plenty of callers ask this of a resource that
+        // succeeded and expect null back. Only one of the two ever fires, so
+        // waiting on `except` alone would wait out the whole limit on every
+        // successful call.
+        res.ready(new SuccessCallback<T>() {
+            public void onSucess(T value) {
+                delivered.set(true);
+            }
+        });
+        if (!delivered.get()) {
+            if (CN.isEdt()) {
+                CN.invokeAndBlock(new Runnable() {
+                    public void run() {
+                        pollDelivered(delivered);
+                    }
+                });
+            } else {
+                pollDelivered(delivered);
+            }
+        }
+        assertTrue(delivered.get(),
+                "the failure must be delivered rather than hang");
+        return err.get();
+    }
+
+    private static void pollDelivered(AtomicBoolean delivered) {
+        long deadline = System.currentTimeMillis() + LIMIT_MILLIS;
+        while (!delivered.get() && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(5L);
+            } catch (InterruptedException ex) {
+                return;
+            }
+        }
     }
 
     private static void poll(AsyncResource<?> res) {

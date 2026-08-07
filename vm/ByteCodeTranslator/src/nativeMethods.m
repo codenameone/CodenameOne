@@ -2031,12 +2031,32 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
         struct timeval   tv;
         gettimeofday(&tv, NULL);
         struct timespec   ts;
-        ts.tv_sec = tv.tv_sec + (long)(timeout / 1000);
-        ts.tv_nsec = tv.tv_usec * 1000 + (timeout % 1000) * 1000000 + nanos;
-        if ( ts.tv_nsec > 1000000000 ){
-            ts.tv_nsec -= 1000000000;
-            ts.tv_sec++;
+        /* Built in 64-bit throughout. `timeout` is a JAVA_LONG and time_t is
+           64-bit everywhere we run, but `long` is only 32 bits on Windows
+           (LLP64) -- so casting the seconds through it truncated
+           Long.MAX_VALUE / 1000 (9223372036854775) to -1511828489, putting the
+           deadline about 48 years in the PAST. wait(Long.MAX_VALUE), the
+           ordinary park-until-notified idiom, therefore returned immediately
+           instead of blocking until notified. LP64 platforms were unaffected,
+           which is why this only ever showed up on Windows.
+
+           The addend is capped so the deadline cannot overflow time_t on any
+           platform; ~34,000 years is indistinguishable from never for a wait,
+           and the condition-variable wrapper chunks it down to timeouts the
+           host API can express. */
+        JAVA_LONG addSeconds = timeout / 1000;
+        if (addSeconds > ((JAVA_LONG)1 << 40)) {
+            addSeconds = ((JAVA_LONG)1 << 40);
         }
+        /* Normalized in 64-bit as well: tv_usec * 1000 plus the sub-second part
+           of the timeout plus nanos can exceed 2e9, which no longer fits a
+           32-bit tv_nsec, and a single subtract-one-second could not normalize
+           it anyway. */
+        JAVA_LONG nsec = (JAVA_LONG)tv.tv_usec * 1000
+                       + (timeout % 1000) * 1000000
+                       + (JAVA_LONG)nanos;
+        ts.tv_sec = (time_t)((JAVA_LONG)tv.tv_sec + addSeconds + nsec / 1000000000);
+        ts.tv_nsec = (long)(nsec % 1000000000);
         pthread_cond_timedwait(&data->__codenameOneCondition, &data->__codenameOneMutex, &ts);
     }
 
@@ -2648,6 +2668,46 @@ static void cn1_with_timezone(const char* zoneId, void (*func)(void*), void* ctx
     pthread_mutex_unlock(&cn1_timezone_mutex);
 }
 
+/*
+ * Windows named-zone support.
+ *
+ * The POSIX path below sets TZ and reads tm_gmtoff back. Neither half works
+ * here: the Microsoft C runtime only understands the "EST5EDT" form of TZ, not
+ * an IANA identifier, and its struct tm carries no GMT offset at all -- so
+ * every named zone resolved to an offset of zero and, for instance,
+ * America/New_York reported UTC. Windows ships ICU (icu.dll, Windows 10 1703
+ * and later), whose calendar speaks IANA identifiers directly and knows the
+ * daylight rules for the instant being asked about.
+ *
+ * cn1WinZoneOffsetMillis answers the total offset (zone + daylight) at an
+ * instant, or reports failure so the caller can fall back.
+ */
+#ifdef _WIN32
+/* Total offset (zone plus daylight) for a zone at an instant, 0 when the
+ * platform cannot answer -- the caller then keeps the C runtime's reply.
+ * The lookup itself lives in cn1_win_compat.c, the one translation unit that
+ * may include <windows.h>; keeping it out of here is what lets the clean
+ * target compile this file against a minimal SDK layout. */
+static int cn1WinZoneOffsetMillis(const char* zoneId, long long millis, int* offsetOut,
+                                  int* dstOut, int* rawOut) {
+    return cn1_win_zone_offset_millis(zoneId, millis, offsetOut, dstOut, rawOut);
+}
+
+/* Milliseconds since the epoch for a set of UTC calendar fields. */
+static long long cn1WinUtcMillis(int year, int month, int day, int millisOfDay) {
+    struct tm utc;
+    memset(&utc, 0, sizeof(utc));
+    utc.tm_year = year - 1900;
+    utc.tm_mon = month - 1;
+    utc.tm_mday = day;
+    utc.tm_hour = millisOfDay / 3600000;
+    utc.tm_min = (millisOfDay / 60000) % 60;
+    utc.tm_sec = (millisOfDay / 1000) % 60;
+    utc.tm_isdst = 0;
+    return (long long) timegm(&utc) * 1000LL;
+}
+#endif
+
 typedef struct {
     int year;
     int month;
@@ -2754,6 +2814,21 @@ JAVA_OBJECT java_util_TimeZone_getTimezoneId___R_java_lang_String(CODENAME_ONE_T
 JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name, JAVA_INT year, JAVA_INT month, JAVA_INT day, JAVA_INT timeOfDayMillis) {
     const char* buffer = stringToUTF8(threadStateData, name);
     cn1_timezone_offset_ctx ctx;
+#ifdef _WIN32
+    {
+        /* The fields are UTC, matching the POSIX path below (timegm) and every
+         * other port. Reading them as local standard time instead -- which is
+         * what java.util.TimeZone.getOffset's signature suggests -- moves the
+         * instant by the raw offset and jumps DST transitions: TimeApiTest
+         * resolves 2020-03-08T01:30 EST as 02:30 EDT. The contract this native
+         * actually has is the one its callers and that test rely on. */
+        int offset = 0;
+        if (cn1WinZoneOffsetMillis(buffer, cn1WinUtcMillis(year, month, day, timeOfDayMillis),
+                                   &offset, 0, 0)) {
+            return offset;
+        }
+    }
+#endif
     ctx.year = year;
     ctx.month = month;
     ctx.day = day;
@@ -2766,6 +2841,25 @@ JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int
 JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
     const char* buffer = stringToUTF8(threadStateData, name);
     cn1_timezone_raw_ctx ctx;
+#ifdef _WIN32
+    {
+        /* The raw offset is the standard-time one in force right now. ICU keeps
+         * the base offset and the daylight adjustment in separate calendar
+         * fields, so asking at the current instant answers it directly.
+         *
+         * This used to sample both solstices of the current year and prefer
+         * July's when neither was in daylight saving, which is wrong whenever
+         * the base offset changes mid-year: with the clock in February 2024,
+         * Asia/Almaty was still UTC+6 but July's reading is the UTC+5 rule that
+         * had not taken effect yet, and a change landing after July stayed
+         * invisible for the rest of the year. */
+        int rawOffset = 0;
+        long long nowMillis = (long long) time(NULL) * 1000LL;
+        if (cn1WinZoneOffsetMillis(buffer, nowMillis, 0, 0, &rawOffset)) {
+            return rawOffset;
+        }
+    }
+#endif
     ctx.januaryOffset = 0;
     ctx.januaryIsDst = 0;
     ctx.julyOffset = 0;
@@ -2783,6 +2877,14 @@ JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String_R_int(CODENA
 JAVA_BOOLEAN java_util_TimeZone_isTimezoneDST___java_lang_String_long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name, JAVA_LONG millis) {
     const char* buffer = stringToUTF8(threadStateData, name);
     cn1_timezone_dst_ctx ctx;
+#ifdef _WIN32
+    {
+        int dst = 0;
+        if (cn1WinZoneOffsetMillis(buffer, (long long) millis, 0, &dst, 0)) {
+            return dst ? JAVA_TRUE : JAVA_FALSE;
+        }
+    }
+#endif
     ctx.millis = millis;
     ctx.result = JAVA_FALSE;
     cn1_with_timezone(buffer, cn1_compute_timezone_dst, &ctx);

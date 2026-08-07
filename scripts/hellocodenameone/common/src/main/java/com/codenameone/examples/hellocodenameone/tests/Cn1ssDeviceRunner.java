@@ -26,6 +26,7 @@ import com.codename1.testing.DeviceRunner;
 import com.codename1.testing.TestReporting;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
+import com.codename1.ui.Font;
 import com.codename1.ui.Form;
 import com.codename1.util.StringUtil;
 import com.codenameone.examples.hellocodenameone.NativeInterfaceLanguageValidator;
@@ -504,6 +505,23 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         runNextTest(0);
     }
 
+    /// Which test wedged the suite is reported by the capture harness, not from
+    /// in here.
+    ///
+    /// This used to be an in-process watchdog thread. It could not do the job and
+    /// it caused a worse one. A test that blocks the event dispatch thread in a
+    /// tight compute loop also stops the collector, so the watchdog's own log
+    /// call -- which allocates, to build its message -- parks waiting for a
+    /// collection that cannot happen until the EDT yields. It reported nothing
+    /// across a 47 minute wedge for exactly that reason. Worse, merely asking to
+    /// allocate from a second thread during Base64NativePerformanceTest's
+    /// benchmark loops was enough to deadlock the pair, and the Linux suite --
+    /// which completes on master -- stopped dead on that test.
+    ///
+    /// The harness reads the suite's output from outside the process, so it can
+    /// name the last announced test whatever state the app is in, and cannot
+    /// perturb it. See lastStarted in CleanTargetLinuxIntegrationTest.
+
     private void runNextTest(int index) {
         int offset = prependedTest != null ? 1 : 0;
         boolean includeJavaSeReferences = "SE".equals(
@@ -539,15 +557,24 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         CN.callSerially(() -> {
             Cn1ssDeviceRunnerHelper.clearTransportFailure();
             log("CN1SS:INFO:suite starting test=" + testName);
+            // Stage markers. When a suite stops dead the log ends on the
+            // "starting" line and says nothing about which call did not come
+            // back -- prepare(), runTest(), or the poll that follows. Naming
+            // each boundary costs one line per test and turns "stopped in X"
+            // into "stopped inside X's runTest", which is the difference
+            // between reading a stack and guessing at one.
             try {
                 testClass.prepare();
+                log("CN1SS:INFO:stage=prepared test=" + testName);
                 testClass.runTest();
+                log("CN1SS:INFO:stage=ran test=" + testName);
             } catch (Throwable t) {
                 log("CN1SS:ERR:suite test=" + testName + " failed=" + t);
                 t.printStackTrace();
                 logThrowable("runTest:" + testName, t);
                 testClass.fail(String.valueOf(t));
             }
+            log("CN1SS:INFO:stage=awaiting test=" + testName);
             awaitTestCompletion(index, testClass, testName, System.currentTimeMillis() + testTimeoutMs(testClass));
         });
     }
@@ -652,12 +679,32 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     /// - the test actually takes a screenshot (non-screenshot tests may have
     ///   side effects that aren't safe to repeat, and a missing tile is the
     ///   only failure mode this retry exists to prevent).
+    /// One retry for a test that timed out having neither failed nor started a
+    /// capture -- the show -> settle-timer -> DONE chain was swallowed.
+    ///
+    /// Deliberately NOT conditioned on shouldTakeScreenshot(). It used to be, on
+    /// the reasoning that the retry existed to recover a missing screenshot, but
+    /// the stall is in the show/EDT chain and hits any test: AccessibilityTest and
+    /// MutableImageClipReadbackTest capture nothing, so a transient stall that a
+    /// screenshot test shrugs off failed them outright, on a different test each
+    /// run. A test that is genuinely broken still fails -- it times out the second
+    /// time too, and the retry is one-shot per index.
+    ///
+    /// It IS conditioned on isRetrySafe(). Dropping the screenshot gate without
+    /// putting anything in its place made the retry reachable for tests whose
+    /// runTest() starts a worker and returns: resetForRetry() clears the shared
+    /// completion state, so a late done() from the first attempt's thread would
+    /// complete the second attempt, advance the suite before it had finished and
+    /// let that worker's side effects bleed into later tests. Screenshot-taking
+    /// was never the property that made a retry safe -- having no work in flight
+    /// is -- and VideoIODecodedFramesScreenshotTest takes a screenshot AND starts
+    /// a thread, so the old gate did not establish it either.
     private boolean shouldRetryAfterSilentTimeout(int index, BaseTest testClass) {
         return retriedTestIndex != index
                 && !"HTML5".equals(Display.getInstance().getPlatformName())
                 && !testClass.isFailed()
                 && !testClass.isCaptureStarted()
-                && testClass.shouldTakeScreenshot();
+                && testClass.isRetrySafe();
     }
 
     private boolean shouldRetryAfterTransportFailure(int index, BaseTest testClass) {
@@ -759,15 +806,90 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         log("CN1SS:ERR:throwable context=" + context + " message=" + String.valueOf(t.getMessage()));
         String stack = Display.getInstance().getStackTrace(Thread.currentThread(), t);
         if (stack == null) {
-            log("CN1SS:ERR:throwable context=" + context + " stack=null");
-            return;
+            stack = "";
         }
         log("CN1SS:ERR:throwable context=" + context + " stackLength=" + stack.length());
+        logPlatformState(context);
+        if (stack.length() == 0) {
+            // The implementation's own capture comes back empty on some ports --
+            // ParparVM Windows reports stackLength=0 for every throwable -- which
+            // leaves a NullPointerException with no location at all, and CI is the
+            // only place these run. Throwable's own frames are worth asking for
+            // before giving up; on a port that fills them in this is the difference
+            // between naming the line and guessing at it.
+            logThrowableFrames(context, t);
+        }
         for (String line : StringUtil.tokenize(stack, '\n')) {
             if (line.length() > 200) {
                 line = line.substring(0, 200);
             }
             log("CN1SS:ERR:throwable context=" + context + " stack=" + line);
+        }
+    }
+
+    /// Platform state alongside every reported throwable.
+    ///
+    /// Some ports report an exception with no stack at all -- ParparVM Windows
+    /// answers empty for both Display.getStackTrace and Throwable.getStackTrace --
+    /// so a NullPointerException arrives as a bare type name and CI is the only
+    /// place it reproduces. The numbers below are the ones that turn such a
+    /// report into a lead: a zero font height or a zero display extent is how a
+    /// component ends up asking for a zero-sized image, whose graphics come back
+    /// null. Cheap, printed only on failure, and it costs nothing to leave in.
+    private static void logPlatformState(String context) {
+        StringBuilder sb = new StringBuilder("CN1SS:ERR:platform context=");
+        sb.append(context);
+        try {
+            Display d = Display.getInstance();
+            sb.append(" display=").append(d.getDisplayWidth()).append('x').append(d.getDisplayHeight());
+            sb.append(" density=").append(d.getDeviceDensity());
+            sb.append(" edt=").append(d.isEdt());
+        } catch (Throwable unavailable) {
+            sb.append(" display=unavailable");
+        }
+        try {
+            Font def = Font.getDefaultFont();
+            sb.append(" defaultFontHeight=").append(def == null ? "null-font" : String.valueOf(def.getHeight()));
+        } catch (Throwable unavailable) {
+            sb.append(" defaultFontHeight=unavailable");
+        }
+        try {
+            Font sys = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
+            sb.append(" systemFontHeight=").append(sys == null ? "null-font" : String.valueOf(sys.getHeight()));
+        } catch (Throwable unavailable) {
+            sb.append(" systemFontHeight=unavailable");
+        }
+        log(sb.toString());
+    }
+
+    private static void logThrowableFrames(String context, Throwable t) {
+        StackTraceElement[] frames;
+        try {
+            frames = t.getStackTrace();
+        } catch (Throwable unsupported) {
+            log("CN1SS:ERR:throwable context=" + context + " frames=unsupported");
+            return;
+        }
+        if (frames == null || frames.length == 0) {
+            log("CN1SS:ERR:throwable context=" + context + " frames=none");
+            // ParparVM's Throwable.getStackTrace() is a stub that always answers
+            // an empty array, but the VM does record frames: the native
+            // fillInStack walks threadStateData->callStack when the throwable is
+            // constructed and stores the rendered text, which printStackTrace is
+            // the only accessor for. Asking getStackTrace and stopping there is
+            // why a NullPointerException on Windows arrived with no location at
+            // all and took several CI rounds to place. Costs nothing on the JVM
+            // ports, where the frames above are non-empty and this never runs.
+            log("CN1SS:ERR:throwable context=" + context + " printing the VM's own stack:");
+            try {
+                t.printStackTrace();
+            } catch (Throwable unsupported) {
+                log("CN1SS:ERR:throwable context=" + context + " printStackTrace=unsupported");
+            }
+            return;
+        }
+        for (int i = 0; i < frames.length && i < 24; i++) {
+            log("CN1SS:ERR:throwable context=" + context + " frame=" + String.valueOf(frames[i]));
         }
     }
 

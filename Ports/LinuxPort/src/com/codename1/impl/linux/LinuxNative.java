@@ -388,6 +388,44 @@ public final class LinuxNative {
 
     public static native long fileOpenWrite(String path, boolean append);
 
+    /** Why the most recent open failed, for the exception the port raises. */
+    public static native String lastIoError();
+
+    /* ---------------------------------------------------------- crypto */
+
+    /** Fills {@code out} with fresh entropy; false when the platform RNG failed. */
+    public static native boolean secureRandomBytes(byte[] out);
+
+    /**
+     * AES in the mode named by {@code transformation}. For GCM the
+     * authentication tag is appended to the ciphertext, which is the
+     * convention the portable API documents.
+     */
+    public static native byte[] aesCrypt(String transformation, boolean encrypt,
+            byte[] key, byte[] iv, byte[] aad, byte[] data);
+
+    /** RSA with an X.509 public key when encrypting, PKCS#8 when decrypting. */
+    public static native byte[] rsaCrypt(String transformation, boolean encrypt,
+            byte[] key, byte[] data);
+
+    public static native byte[] signData(String algorithm, byte[] privateKeyPkcs8, byte[] data);
+
+    public static native boolean verifyData(String algorithm, byte[] publicKeyX509,
+            byte[] data, byte[] signature);
+
+    /**
+     * A fresh RSA pair as one array: a four-byte big-endian public-key length,
+     * the X.509 public key, then the PKCS#8 private key.
+     */
+    public static native byte[] generateRsaKeyPair(int bits);
+
+    /** Why the most recent crypto call failed, for the CryptoException message. */
+    public static native String lastCryptoError();
+
+    /// Empties the last-error slot so a following call's failure can be told
+    /// apart from a stale message.
+    public static native void clearCryptoError();
+
     public static native int fileRead(long handle, byte[] buffer, int offset, int length);
 
     public static native int fileWrite(long handle, byte[] buffer, int offset, int length);

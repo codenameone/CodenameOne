@@ -71,6 +71,18 @@ public final class Cipher {
 
     /// `RSA/ECB/OAEPWithSHA-256AndMGF1Padding` -- recommended RSA encryption
     /// transformation.
+    ///
+    /// SHA-256 is used for the label hash **and** for MGF1. That is worth stating
+    /// because the JCE reading of this name leaves MGF1 on SHA-1, and this API
+    /// deliberately does not: Web Crypto's `RSA-OAEP` takes a single hash and
+    /// applies it to both, as does Apple's SecKey, so the split pairing is not
+    /// expressible on the JavaScript or iOS ports at all. SHA-256 for both is the
+    /// only choice every port can produce, so it is the one that lets ciphertext
+    /// cross between them. The JavaSE and Android ports pass an explicit
+    /// `OAEPParameterSpec` rather than inheriting their provider's default.
+    ///
+    /// Interoperating with an external system that uses the JCE default (SHA-1
+    /// MGF1) therefore needs that system to name SHA-256 for the mask as well.
     public static final String RSA_OAEP_SHA256 = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding";
 
     /// `RSA/ECB/PKCS1Padding` -- legacy RSA padding, kept for interop.

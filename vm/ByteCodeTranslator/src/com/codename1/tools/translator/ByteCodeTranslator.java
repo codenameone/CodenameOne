@@ -970,7 +970,7 @@ public class ByteCodeTranslator {
                 // dbghelp: lets the last-resort unhandled-exception handler symbolize its
                 // own native backtrace in-process (SymFromAddr against the /Zi .pdb), so a
                 // native crash logs Java/C function names instead of bare RVAs.
-                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 oleaut32 uuid mf mfplat mfreadwrite mfuuid shell32 comdlg32 crypt32 winmm runtimeobject dbghelp)\n");
+                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 oleaut32 uuid mf mfplat mfreadwrite mfuuid shell32 comdlg32 crypt32 bcrypt ncrypt winmm runtimeobject dbghelp)\n");
                 // BrowserComponent is backed by WebView2 (cn1_windows_browser.cpp),
                 // gated on the SDK being present: when WEBVIEW2_SDK_DIR points at a
                 // Microsoft.Web.WebView2 build/native folder we link the static
@@ -1100,7 +1100,10 @@ public class ByteCodeTranslator {
         writer.append("pkg_check_modules(CN1DEPS REQUIRED\n");
         writer.append("    gtk+-3.0 cairo pango pangocairo gdk-pixbuf-2.0 glib-2.0 gobject-2.0 gio-2.0\n");
         writer.append("    fontconfig freetype2\n");
-        writer.append("    libcurl)\n");
+        // libcrypto backs the port's crypto bridge (cn1_linux_crypto.c). It is
+        // already present wherever libcurl is: the OpenSSL-flavoured curl links
+        // it, and the -dev package pulls in the headers.
+        writer.append("    libcurl libcrypto)\n");
         writer.append("pkg_check_modules(CN1GL REQUIRED epoxy egl glesv2)\n");
         // Optional feature libs (browser/media/secure-storage/notifications/
         // location). The port dlopen()s these lazily at first use (see

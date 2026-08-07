@@ -39,6 +39,11 @@
 
 #include "cn1_win_compat.h"
 
+/* Longest single SleepConditionVariableSRW timeout, ~24.8 days. Comfortably
+   below INFINITE (0xFFFFFFFF), so a long wait is never mistaken for one that
+   must not expire. */
+#define CN1_WIN_MAX_WAIT_CHUNK_MS 0x7FFFFFFFu
+
 /* The mirror structs in the header must match the real Win32 types exactly. */
 _Static_assert(sizeof(cn1_srwlock_t) == sizeof(SRWLOCK), "SRWLOCK layout mismatch");
 _Static_assert(sizeof(cn1_condvar_t) == sizeof(CONDITION_VARIABLE), "CONDITION_VARIABLE layout mismatch");
@@ -98,21 +103,38 @@ int pthread_cond_wait(pthread_cond_t* cond, pthread_mutex_t* mutex) {
 int pthread_cond_timedwait(pthread_cond_t* cond, pthread_mutex_t* mutex, const struct timespec* abstime) {
     /* pthread passes an absolute CLOCK_REALTIME deadline; Win32 wants a
        relative millisecond timeout, so convert against the current time. */
+    /* The deadline is 64-bit milliseconds and the Win32 timeout is a 32-bit
+       DWORD, so it cannot simply be narrowed. Object.wait(Long.MAX_VALUE) -- the
+       usual "park until notified" idiom -- produces a wait of ~292 million
+       years; truncating that to 32 bits yields an arbitrary short timeout, and a
+       value whose low word happens to be 0xFFFFFFFF becomes Win32's INFINITE
+       sentinel, so the wait either returns early or never expires at all. Wait
+       in bounded chunks instead and only report a timeout once the ABSOLUTE
+       deadline has genuinely passed. */
     struct timeval now;
     long long now_ms, abs_ms, wait_ms;
-    gettimeofday(&now, NULL);
-    now_ms = (long long)now.tv_sec * 1000 + now.tv_usec / 1000;
     abs_ms = (long long)abstime->tv_sec * 1000 + abstime->tv_nsec / 1000000;
-    wait_ms = abs_ms - now_ms;
-    if (wait_ms < 0) {
-        wait_ms = 0;
-    }
-    if (!SleepConditionVariableSRW((PCONDITION_VARIABLE)&cond->cond, (PSRWLOCK)&mutex->lock, (DWORD)wait_ms, 0)) {
-        if (GetLastError() == ERROR_TIMEOUT) {
+    for (;;) {
+        DWORD chunk;
+        gettimeofday(&now, NULL);
+        now_ms = (long long)now.tv_sec * 1000 + now.tv_usec / 1000;
+        wait_ms = abs_ms - now_ms;
+        if (wait_ms <= 0) {
             return ETIMEDOUT;
         }
+        chunk = wait_ms > (long long)CN1_WIN_MAX_WAIT_CHUNK_MS
+                ? CN1_WIN_MAX_WAIT_CHUNK_MS : (DWORD)wait_ms;
+        if (SleepConditionVariableSRW((PCONDITION_VARIABLE)&cond->cond,
+                                      (PSRWLOCK)&mutex->lock, chunk, 0)) {
+            /* Signalled. A spurious wake reports success too, which is correct:
+               every caller re-tests its predicate. */
+            return 0;
+        }
+        if (GetLastError() != ERROR_TIMEOUT) {
+            return 0;
+        }
+        /* A chunk expired. Loop to find out whether the real deadline did. */
     }
-    return 0;
 }
 
 int pthread_cond_signal(pthread_cond_t* cond) {
@@ -286,6 +308,103 @@ int gettimeofday(struct timeval* tv, void* tz) {
     tv->tv_sec = (long)(t / 10000000ULL);
     tv->tv_usec = (long)((t % 10000000ULL) / 10);
     return 0;
+}
+
+/*
+ * IANA time zone offsets.
+ *
+ * The Microsoft C runtime only understands the "EST5EDT" form of TZ, not an
+ * IANA identifier, and its struct tm carries no GMT offset at all -- so the
+ * POSIX path the runtime uses elsewhere reports zero for every named zone.
+ * Windows ships ICU as icu.dll (Windows 10 1703 and later), whose calendar
+ * speaks IANA identifiers directly and knows the daylight rules for the
+ * instant being asked about.
+ *
+ * ICU is resolved at runtime rather than linked: the clean target builds
+ * against a minimal SDK layout that need not carry icu.lib or <icu.h>, and a
+ * host without ICU degrades to the caller's fallback instead of failing to
+ * load. The two enum values used here are fixed by ICU's stable C API --
+ * UCAL_GREGORIAN, and the ZONE_OFFSET / DST_OFFSET calendar fields.
+ */
+#define CN1_UCAL_GREGORIAN 1
+#define CN1_UCAL_ZONE_OFFSET 15
+#define CN1_UCAL_DST_OFFSET 16
+
+typedef void* CN1UCalendar;
+
+static CN1UCalendar (__cdecl *cn1_ucal_open)(const WCHAR*, int32_t, const char*, int32_t, int32_t*);
+static void (__cdecl *cn1_ucal_setMillis)(CN1UCalendar, double, int32_t*);
+static int32_t (__cdecl *cn1_ucal_get)(const CN1UCalendar, int32_t, int32_t*);
+static void (__cdecl *cn1_ucal_close)(CN1UCalendar);
+static int cn1IcuResolved;
+/* Resolution runs under a lock, and cn1IcuResolved is written only once the
+ * function pointers are in place. Publishing "in progress" first, as a plain
+ * flag test would, lets a second thread asking for a zone at startup see a
+ * nonzero value, conclude ICU is unavailable and fall through to the CRT --
+ * which cannot read IANA identifiers, so that one query intermittently
+ * answers UTC. */
+static SRWLOCK cn1IcuLock = SRWLOCK_INIT;
+
+static int cn1IcuAvailable(void) {
+    int resolved;
+    AcquireSRWLockExclusive(&cn1IcuLock);
+    if (cn1IcuResolved == 0) {
+        HMODULE icu = LoadLibraryA("icu.dll");
+        int ok = 0;
+        if (icu != NULL) {
+            cn1_ucal_open = (CN1UCalendar (__cdecl *)(const WCHAR*, int32_t, const char*, int32_t, int32_t*))
+                    GetProcAddress(icu, "ucal_open");
+            cn1_ucal_setMillis = (void (__cdecl *)(CN1UCalendar, double, int32_t*))
+                    GetProcAddress(icu, "ucal_setMillis");
+            cn1_ucal_get = (int32_t (__cdecl *)(const CN1UCalendar, int32_t, int32_t*))
+                    GetProcAddress(icu, "ucal_get");
+            cn1_ucal_close = (void (__cdecl *)(CN1UCalendar)) GetProcAddress(icu, "ucal_close");
+            ok = cn1_ucal_open != 0 && cn1_ucal_setMillis != 0
+                    && cn1_ucal_get != 0 && cn1_ucal_close != 0;
+        }
+        cn1IcuResolved = ok ? 1 : -1;
+    }
+    resolved = cn1IcuResolved;
+    ReleaseSRWLockExclusive(&cn1IcuLock);
+    return resolved > 0;
+}
+
+int cn1_win_zone_offset_millis(const char* zoneId, long long millis, int* offsetOut,
+                               int* dstOut, int* rawOut) {
+    WCHAR zone[128];
+    CN1UCalendar cal;
+    int32_t status = 0;
+    int32_t zoneOffset, dstOffset;
+    if (zoneId == 0 || zoneId[0] == 0 || !cn1IcuAvailable()) {
+        return 0;
+    }
+    if (MultiByteToWideChar(CP_UTF8, 0, zoneId, -1, zone,
+                            (int) (sizeof(zone) / sizeof(zone[0]))) == 0) {
+        return 0;
+    }
+    cal = cn1_ucal_open(zone, -1, "en_US", CN1_UCAL_GREGORIAN, &status);
+    if (status > 0 || cal == 0) {
+        return 0;
+    }
+    cn1_ucal_setMillis(cal, (double) millis, &status);
+    zoneOffset = cn1_ucal_get(cal, CN1_UCAL_ZONE_OFFSET, &status);
+    dstOffset = cn1_ucal_get(cal, CN1_UCAL_DST_OFFSET, &status);
+    cn1_ucal_close(cal);
+    if (status > 0) {
+        return 0;
+    }
+    if (offsetOut != 0) {
+        *offsetOut = (int) (zoneOffset + dstOffset);
+    }
+    if (dstOut != 0) {
+        *dstOut = dstOffset != 0;
+    }
+    if (rawOut != 0) {
+        /* UCAL_ZONE_OFFSET is the standard-time offset on its own; the daylight
+         * adjustment is the separate UCAL_DST_OFFSET field. */
+        *rawOut = (int) zoneOffset;
+    }
+    return 1;
 }
 
 #endif /* _WIN32 */

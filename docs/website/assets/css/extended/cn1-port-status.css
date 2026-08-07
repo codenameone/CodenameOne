@@ -271,6 +271,17 @@
 .cn1-port-status__mark.is-fallback { color: #3976c5; }
 .cn1-port-status__mark.is-unavailable { color: #7d8791; }
 
+/* Marks a pass whose only non-passing test is a skip the errata explain, so
+   the cell reads as green without hiding that something was not executed. */
+.cn1-port-status__note {
+    color: #27955b;
+    font-size: .8rem;
+    font-weight: 800;
+    line-height: 1;
+    margin-left: .1rem;
+    vertical-align: super;
+}
+
 .cn1-port-status__ports {
     display: grid;
     gap: .75rem;

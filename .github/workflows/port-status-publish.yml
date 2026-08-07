@@ -18,8 +18,18 @@ permissions:
 
 jobs:
   publish:
+    # A FAILED producer's report is the one that matters most: the strict gate
+    # fails the workflow precisely when a test failed or never ran, so demanding
+    # conclusion == 'success' here published only the good news. The Linux
+    # producer can run for 90 minutes from 01:45 while the nightly sweep
+    # snapshots completed runs at 02:35, so a failure finishing after that
+    # snapshot left the previous GREEN report public for a further day. Publish
+    # whatever normalized artifacts a completed run uploaded and let the
+    # acceptance gate judge them; cancelled runs are excluded because a
+    # superseded run's evidence is not current.
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.conclusion != 'cancelled' &&
+      github.event.workflow_run.conclusion != 'skipped' &&
       (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'schedule') &&
       github.event.workflow_run.head_branch == 'master'
     runs-on: ubuntu-latest
@@ -41,6 +51,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PORT_STATUS_PUBLISH: '1'
+          WORKFLOW_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |
           set -euo pipefail
           found=0
@@ -49,8 +60,16 @@ jobs:
             ./scripts/hellocodenameone/conformance/publish_port_status.sh "$report"
           done < <(find reports -type f -name 'port-status-*.json' | sort)
           if [ "$found" -eq 0 ]; then
-            echo "No normalized port reports were found in workflow artifacts." >&2
-            exit 1
+            # A producer that died before normalization uploads nothing. That is
+            # a real defect for a successful run, but an expected outcome for a
+            # failed one -- the job may have crashed before the normalize step --
+            # and failing here would turn every such run into a second red X
+            # that says nothing the producer's own failure did not already say.
+            if [ "${WORKFLOW_CONCLUSION}" = "success" ]; then
+              echo "No normalized port reports were found in workflow artifacts." >&2
+              exit 1
+            fi
+            echo "No normalized reports from a ${WORKFLOW_CONCLUSION} run; nothing to publish."
           fi
 
       - name: Rebuild the static Port Status snapshot

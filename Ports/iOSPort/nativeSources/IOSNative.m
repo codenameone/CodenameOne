@@ -27,6 +27,7 @@
 // end Pisces imports
 #include "xmlvm.h"
 #include "java_lang_String.h"
+#include <pthread.h>
 #import "CN1ES2compat.h"
 #import "CN1JailbreakDetector.h"
 #if TARGET_OS_WATCH
@@ -10254,8 +10255,18 @@ JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int
     [comps setDay:day];
     [comps setYear:year];
     [comps setMonth:month];
-    [comps setMinute:timeOfDayMillis/60000];
-    NSCalendar* cal = [NSCalendar currentCalendar];
+    [comps setHour:timeOfDayMillis/3600000];
+    [comps setMinute:(timeOfDayMillis/60000)%60];
+    [comps setSecond:(timeOfDayMillis/1000)%60];
+    // The fields are UTC, not local standard time. That is this native's contract
+    // across every port -- the POSIX implementation resolves them with timegm()
+    // and the JavaScript and Android ports match -- and TimeApiTest pins it:
+    // asking about the local-standard instant instead resolves 2020-03-08T01:30
+    // EST as 02:30 EDT, jumping the spring transition. Reading them in the
+    // device's own zone (currentCalendar) is wrong for a different reason: it
+    // moves the instant by the device offset.
+    NSCalendar* cal = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
+    [cal setTimeZone:[NSTimeZone timeZoneWithAbbreviation:@"UTC"]];
     NSDate *date = [cal dateFromComponents:comps];
     JAVA_INT result = [tzone secondsFromGMTForDate:date] * 1000;
     [comps release];
@@ -11374,12 +11385,31 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathStrokerGetConsumer___long(J
 
 
 static BOOL rendererIsSetup = NO;
+static pthread_mutex_t rendererSetupLock = PTHREAD_MUTEX_INITIALIZER;
+
+// Renderer_setup installs process-wide globals (the subpixel constants and the
+// coverage->alpha table alphaMap) that every subsequent rasterisation reads.
+// The original guard set rendererIsSetup *before* calling it, so a second
+// thread entering here mid-setup saw the flag already raised, skipped the
+// initialisation and went straight to rasterising against half-built globals:
+// an alphaMap that was allocated but not yet filled, or still NULL. That
+// corrupts exactly the antialiased edge samples of a shape while leaving its
+// saturated interior correct.
+//
+// Serialise instead, and raise the flag only once setup has completed, so a
+// racing caller blocks until the globals are whole.
+static void cn1EnsureRendererSetup(JAVA_INT lgPositionsX, JAVA_INT lgPositionsY) {
+    pthread_mutex_lock(&rendererSetupLock);
+    if (!rendererIsSetup) {
+        Renderer_setup(lgPositionsX, lgPositionsY);
+        rendererIsSetup = YES;
+    }
+    pthread_mutex_unlock(&rendererSetupLock);
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreate___int_int_int_int_int(JAVA_OBJECT instanceObject, JAVA_INT pix_boundsX, JAVA_INT pix_boundsY, JAVA_INT pix_boundsWidth, JAVA_INT pix_boundsHeight, JAVA_INT windingRule)
 {
-    if ( !rendererIsSetup ){
-        rendererIsSetup = YES;
-        Renderer_setup(1,1);
-    }
+    cn1EnsureRendererSetup(1, 1);
     Renderer *renderer = (Renderer*)malloc(sizeof(Renderer));
     Renderer_init(renderer);
     Renderer_reset(renderer, pix_boundsX, pix_boundsY, pix_boundsWidth, pix_boundsHeight, windingRule);
@@ -11389,11 +11419,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreate___int_int_in
 //native void nativePathRendererSetup(int subpixelLgPositionsX, int subpixelLgPositionsY);
 void com_codename1_impl_ios_IOSNative_nativePathRendererSetup___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT subpixelLgPositionsX, JAVA_INT subpixelLgPositionsY)
 {
-    if ( !rendererIsSetup ){
-        rendererIsSetup = YES;
-        
-        Renderer_setup(subpixelLgPositionsX, subpixelLgPositionsY);
-    }
+    cn1EnsureRendererSetup(subpixelLgPositionsX, subpixelLgPositionsY);
 }
 //native void nativePathRendererCleanup(long ptr);
 void com_codename1_impl_ios_IOSNative_nativePathRendererCleanup___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr)

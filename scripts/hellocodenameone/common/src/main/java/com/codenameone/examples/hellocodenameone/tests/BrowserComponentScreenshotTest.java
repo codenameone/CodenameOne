@@ -81,6 +81,10 @@ public class BrowserComponentScreenshotTest extends BaseTest {
         return "HTML5".equals(Display.getInstance().getPlatformName());
     }
 
+    private static boolean isLinux() {
+        return "linux".equals(Display.getInstance().getPlatformName());
+    }
+
     private void checkReady() {
         if (!loaded || readyRunnable == null) {
             return;
@@ -106,11 +110,15 @@ public class BrowserComponentScreenshotTest extends BaseTest {
             return;
         }
 
-        if (isHtml5() || CN.isDesktop()) {
+        if (isHtml5() || CN.isDesktop() || isLinux()) {
             // Desktop screenshots intentionally cannot include the native web
             // peer (the committed Mac/JavaSE baselines contain its black
-            // placeholder). The execute() assertion above validates the real
-            // DOM; use the normal harness capture for the surrounding form.
+            // placeholder), and the Linux port cannot either: its
+            // browserCapturePng is a documented stub pending the async WebKit
+            // snapshot bridge, so generatePeerImage always answers null and the
+            // peer never reaches the capture. The execute() assertion above
+            // validates the real DOM; use the normal harness capture for the
+            // surrounding form.
             UITimer.timer(2000, false, form, readyRunnable);
         } else {
             // DOM readiness and even WebKit's first meaningful paint do not
@@ -210,6 +218,13 @@ public class BrowserComponentScreenshotTest extends BaseTest {
                         || (g > 120 && b > 160 && b > r + 30)) {
                     brightPixels++;
                 } else if (r < 48 && g < 48 && b < 48) {
+                    // The fixture's #0e1116 backdrop. Requiring it as well as
+                    // the text is what stops a blank frame from passing: a peer
+                    // that never composited leaves the form's plain white
+                    // background, which is bright everywhere and would satisfy
+                    // the text test on its own -- which is exactly how the
+                    // Linux port, whose peer capture is still a stub, recorded
+                    // an empty rectangle as a rendered page.
                     darkPixels++;
                 }
                 if (brightPixels >= requiredBrightPixels && darkPixels >= requiredDarkPixels) {

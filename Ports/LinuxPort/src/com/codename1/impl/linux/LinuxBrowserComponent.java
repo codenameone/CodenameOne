@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.impl.linux;
 
 import com.codename1.ui.BrowserComponent;
@@ -9,15 +31,22 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.util.UITimer;
 
-/// Native Linux BrowserComponent peer backed by a WebView2 instance (the
-/// native lifecycle lives in cn1_linux_browser.cpp). The component is rendered
-/// from a cached image: the native side CapturePreview's the WebView2 to PNG
-/// bytes after each navigation, which `generatePeerImage()` turns into the peer
-/// image that `PeerComponent.paint()` draws (so it appears in the offscreen
-/// Direct2D screenshot, where the live WebView2 visual would not). The peer polls
-/// the native event queue to fire `onLoad` and to route the JS return-value
-/// bridge (a cancelled navigation to a `/!cn1return/` URL) into the
+/// Native Linux BrowserComponent peer backed by a WebKitGTK WebView (the native
+/// lifecycle lives in cn1_linux_browser.c). The peer polls the native event
+/// queue to fire `onLoad` and to route the JS return-value bridge into the
 /// BrowserComponent's navigation callbacks.
+///
+/// `generatePeerImage()` is wired to a native PNG capture so the view can be
+/// drawn into an offscreen screenshot, where the live WebKit widget would not
+/// appear. That capture is **not implemented yet**: WebKit snapshots are async
+/// (webkit_web_view_get_snapshot) and `browserCapturePng` currently returns
+/// null pending that bridge, so `generatePeerImage()` returns null and the peer
+/// falls back to the live widget. Do not read this as a description of working
+/// behaviour -- it is the shape the capture will take once the snapshot bridge
+/// lands.
+///
+/// (This description previously named WebView2, Direct2D and a .cpp file, none
+/// of which exist here -- it had been copied from the Windows port.)
 class LinuxBrowserComponent extends PeerComponent {
     private final long peer;
     private final BrowserComponent browser;
@@ -116,6 +145,15 @@ class LinuxBrowserComponent extends PeerComponent {
                 }
                 browser.fireWebEvent(BrowserComponent.onLoad, new ActionEvent(""));
             } else if (ev.startsWith("NAV|")) {
+                browser.fireBrowserNavigationCallbacks(ev.substring(4));
+            } else if (ev.startsWith("MSG|")) {
+                // The JS->Java bridge. The page's cn1application.shouldNavigate
+                // posts here rather than assigning window.location, so an
+                // execute() return value comes back through the message handler
+                // instead of a navigation to codenameone.com -- which needed
+                // working egress to deliver a callback and took the page under
+                // test away with it. Same sink as a navigation callback: the
+                // portable layer decodes the return-value URL either way.
                 browser.fireBrowserNavigationCallbacks(ev.substring(4));
             }
         }

@@ -20308,13 +20308,50 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    /// The RSA transformations this port implements, matched exactly.
+    ///
+    /// A substring test for "OAEP" would answer every OAEP name -- including
+    /// RSA/ECB/OAEPWithSHA-1AndMGF1Padding -- with the SHA-256 parameters below,
+    /// producing ciphertext no standards-compliant peer could read under the name
+    /// it asked for. The native ports already accept only these two, so refusing
+    /// anything else here keeps every port answering the same question.
+    private static boolean cn1IsOaepTransformation(String transformation) {
+        return com.codename1.security.Cipher.RSA_OAEP_SHA256.equals(transformation);
+    }
+
+    private static void cn1CheckRsaTransformation(String transformation) {
+        if (!cn1IsOaepTransformation(transformation)
+                && !com.codename1.security.Cipher.RSA_PKCS1.equals(transformation)) {
+            throw new RuntimeException("unsupported cipher transformation: " + transformation);
+        }
+    }
+
+    /// The OAEP parameters every port agrees on.
+    ///
+    /// The JCE transformation name "OAEPWithSHA-256AndMGF1Padding" leaves MGF1 on
+    /// SHA-1 by default, which no other backend here can reproduce: Web Crypto's
+    /// RSA-OAEP uses one hash for the label and the mask, and so does Apple's
+    /// SecKey. Naming SHA-256 for both is the only pairing all six ports can
+    /// produce, so it is what the portable constant means -- stated explicitly
+    /// rather than inherited from a provider default.
+    private static javax.crypto.spec.OAEPParameterSpec cn1OaepParameters() {
+        return new javax.crypto.spec.OAEPParameterSpec("SHA-256", "MGF1",
+                java.security.spec.MGF1ParameterSpec.SHA256,
+                javax.crypto.spec.PSource.PSpecified.DEFAULT);
+    }
+
     @Override
     public byte[] rsaEncrypt(String transformation, byte[] publicKeyX509, byte[] plaintext) {
         try {
             javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(transformation);
             java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
             java.security.PublicKey key = kf.generatePublic(new java.security.spec.X509EncodedKeySpec(publicKeyX509));
-            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key);
+            cn1CheckRsaTransformation(transformation);
+            if (cn1IsOaepTransformation(transformation)) {
+                cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key, cn1OaepParameters());
+            } else {
+                cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key);
+            }
             return cipher.doFinal(plaintext);
         } catch (java.security.GeneralSecurityException e) {
             throw new RuntimeException("RSA encrypt failed: " + e.getMessage());
@@ -20327,7 +20364,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(transformation);
             java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
             java.security.PrivateKey key = kf.generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(privateKeyPkcs8));
-            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, key);
+            cn1CheckRsaTransformation(transformation);
+            if (cn1IsOaepTransformation(transformation)) {
+                cipher.init(javax.crypto.Cipher.DECRYPT_MODE, key, cn1OaepParameters());
+            } else {
+                cipher.init(javax.crypto.Cipher.DECRYPT_MODE, key);
+            }
             return cipher.doFinal(ciphertext);
         } catch (java.security.GeneralSecurityException e) {
             throw new RuntimeException("RSA decrypt failed: " + e.getMessage());

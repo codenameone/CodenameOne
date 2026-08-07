@@ -10,7 +10,7 @@ import os
 import re
 import sys
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -25,6 +25,16 @@ RUNNER = REPO_ROOT / (
 )
 COMMON_SOURCES = REPO_ROOT / "scripts/hellocodenameone/common/src/main"
 STRICT_GATE_FAILED = 10
+# "accept" exit codes: the caller keeps the checked-in fallback for both, but
+# only an unusable report is a defect worth failing the website build over.
+ACCEPT_CONTRACT_DRIFT = 11
+ACCEPT_UNUSABLE = 12
+
+# Producers and this checker can disagree by a little without anything
+# being wrong -- runner clocks drift, and a report is stamped slightly
+# before it is published. An hour absorbs that; a skewed clock or a
+# mistyped --generated-at lands far outside it.
+FUTURE_STAMP_TOLERANCE = timedelta(hours=1)
 
 START_RE = re.compile(r"suite starting test=([A-Za-z0-9_]+)")
 FINISH_RE = re.compile(r"suite finished test=([A-Za-z0-9_]+)")
@@ -581,6 +591,252 @@ def strict_report_errors(report: dict) -> list[str]:
     return errors
 
 
+def describe_workload_gap(seen: list[str], expected: list[str]) -> str:
+    """Name what is missing or extra, not what happens to be fine.
+
+    Printing the workloads that *are* covered leaves the reader to diff two
+    ten-item lists by eye to find the one that is not.
+    """
+    absent = sorted(set(expected) - set(seen))
+    unexpected = sorted(set(seen) - set(expected))
+    parts = []
+    if absent:
+        parts.append("missing " + ", ".join(absent))
+    if unexpected:
+        parts.append("unexpected " + ", ".join(unexpected))
+    return "; ".join(parts) if parts else "counts differ"
+
+
+def publishable_report_problems(
+    manifest: dict, port_id: str, report: dict
+) -> tuple[list[str], list[str]]:
+    """Decide whether a persisted report may replace the checked-in fallback.
+
+    Returns (drift, malformed). Drift means the report is well formed but was
+    produced against a different revision of the test contract, which happens
+    for every port between the commit that registers a test and that port's
+    next master run; the caller keeps the checked-in report and waits. Anything
+    in malformed is a defect in the report or in the producer and must be loud:
+    silently falling back for those is what lets a whole column of the public
+    table rot into "stale" while the port itself is healthy.
+    """
+    drift: list[str] = []
+    malformed: list[str] = []
+
+    if report.get("schema_version") != manifest.get("schema_version"):
+        malformed.append(
+            f"schema version {report.get('schema_version')!r} is not "
+            f"{manifest.get('schema_version')!r}"
+        )
+    if report.get("port") != port_id:
+        malformed.append(f"report identifies port {report.get('port')!r}")
+    generated_at = report.get("generated_at")
+    if not isinstance(generated_at, str) or not generated_at:
+        malformed.append("report has no generated_at timestamp")
+    else:
+        # Anything unparseable ("unknown") would sail through publication and
+        # then break both the freshness sweep and the page's own time
+        # rendering, so classify it as unusable here instead.
+        try:
+            stamp = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+        except ValueError:
+            malformed.append(f"generated_at {generated_at!r} is not a timestamp")
+        else:
+            if stamp.tzinfo is None:
+                malformed.append(f"generated_at {generated_at!r} has no time zone")
+            elif stamp - datetime.now(timezone.utc) > FUTURE_STAMP_TOLERANCE:
+                # A clock skewed far ahead poisons the data branch rather than
+                # just looking odd: the page reads the report as permanently
+                # fresh, and the sweep's lexical "is this newer" comparison
+                # then refuses every later, correct timestamp. Nothing
+                # downstream can recover from that, so refuse it at the gate.
+                malformed.append(
+                    f"generated_at {generated_at!r} is in the future"
+                )
+
+    mapped = test_to_feature(manifest)
+    tests = report.get("tests")
+    if not isinstance(tests, dict):
+        malformed.append("report has no test result map")
+        tests = {}
+    else:
+        missing = sorted(set(mapped) - set(tests))
+        unknown = sorted(set(tests) - set(mapped))
+        if missing:
+            drift.append("report predates tests: " + ", ".join(missing))
+        if unknown:
+            drift.append("report carries retired tests: " + ", ".join(unknown))
+
+    statuses = Counter()
+    for test, result in tests.items():
+        # isinstance before membership, not just membership. An unhashable
+        # status -- a producer writing a list or an object -- raises TypeError
+        # out of the `in` test, and main() catches only ContractError, so the
+        # gate died with a status the sweep does not read as unusable and fell
+        # back to an older report while finishing green.
+        if not isinstance(result, dict) or not isinstance(result.get("status"), str) \
+                or result["status"] not in {"pass", "fail", "skip", "not-run"}:
+            malformed.append(f"invalid result for {test}")
+            continue
+        # The reason list is optional, but when present the feature template
+        # calls len, range and hasPrefix on it. A producer emitting "reasons":
+        # true or an object would pass the status check here, reach the data
+        # branch, and then fail the Hugo build -- taking the whole site down
+        # rather than being classified as one unusable report.
+        reasons = result.get("reasons")
+        if reasons is not None and (
+            not isinstance(reasons, list)
+            or not all(isinstance(item, str) for item in reasons)
+        ):
+            malformed.append(f"{test} reasons is not an array of strings")
+            continue
+        statuses[result["status"]] += 1
+    expected_summary = {
+        key: statuses.get(key, 0) for key in ("pass", "fail", "skip", "not-run")
+    }
+    # Checked even under drift. The summary counts the results the report
+    # actually carries, so it stays self-consistent whether or not the report
+    # predates a test -- suppressing this whenever any drift was seen let a
+    # genuinely malformed report be filed as mere drift and fall back quietly,
+    # which is the outcome the loud/quiet split exists to avoid.
+    # Types before values. Python treats True as equal to 1, so a summary count
+    # serialized as a JSON boolean compared equal to a genuine count of one and
+    # sailed through the equality below -- Android's "skip": 1 becoming "skip":
+    # true is accepted, published, and rendered by Hugo as "true skipped".
+    summary = report.get("summary")
+    if not isinstance(summary, dict):
+        malformed.append("report has no summary")
+    elif any(
+        isinstance(summary.get(key), bool)
+        or not isinstance(summary.get(key), int)
+        or summary.get(key) < 0
+        for key in ("pass", "fail", "skip", "not-run")
+    ):
+        malformed.append("summary counts are not non-negative integers")
+    elif summary != expected_summary:
+        malformed.append("summary does not match the test results")
+
+    expected_benchmarks = manifest.get("performance_benchmarks", [])
+    performance = report.get("performance")
+    if not isinstance(performance, dict):
+        malformed.append("report has no performance section")
+        return drift, malformed
+    # CommonWorkloadBenchmarkTest runs late in Cn1ssDeviceRunner, so a suite that
+    # crashed or timed out never reaches it and its performance section is
+    # partial by construction. Rejecting the report for that would throw away the
+    # very evidence the page needs -- the fail / not-run counts -- and leave the
+    # table serving the last green run, which is the failure-masked-as-pass shape
+    # this gate exists to prevent. Completeness is therefore only required of a
+    # suite that actually finished; a partial section simply is not presentable
+    # as performance. Structural defects below stay loud either way, because
+    # those are producer bugs whatever the suite did.
+    # An actual boolean, not anything truthy. bool() accepted the string "false"
+    # and the integer 1 as a completed suite, and Hugo reads the same value as
+    # truthy in port-status-port-state.html -- so a report with no failures but a
+    # pile of not-run tests rendered a green "Suite completed" card.
+    suite_finished_raw = report.get("suite_finished")
+    if not isinstance(suite_finished_raw, bool):
+        malformed.append(
+            f"suite_finished is {type(suite_finished_raw).__name__}, not a boolean"
+        )
+        suite_finished_raw = False
+    suite_finished = suite_finished_raw
+
+    # Validated before anything joins or iterates it. A producer emitting
+    # "missing": true or a number raised TypeError out of the join below, and
+    # main() only catches ContractError -- so the gate crashed instead of
+    # answering ACCEPT_UNUSABLE, the sweep saw a status it does not treat as
+    # unusable, fell back to an older report and finished green.
+    declared_missing = performance.get("missing")
+    if declared_missing is None:
+        declared_missing = []
+    if not isinstance(declared_missing, list) or not all(
+        isinstance(item, str) for item in declared_missing
+    ):
+        malformed.append("performance missing list is not an array of workload names")
+        declared_missing = []
+
+    # Validated for every report, not only finished ones. port-status.html does
+    # `eq .status "complete"`, and Hugo aborts the whole site build with an
+    # incompatible-types error when that compares a map against a string -- so a
+    # malformed status on an UNFINISHED report used to skip validation entirely
+    # (the workload keys still accounted for) and take the build down.
+    perf_status = performance.get("status")
+    if perf_status not in ("complete", "partial"):
+        malformed.append(f"performance status is {perf_status!r}")
+    if suite_finished:
+        if perf_status != "complete":
+            malformed.append(f"performance run is {perf_status!r}")
+        if declared_missing:
+            malformed.append(
+                "performance workloads never reported: " + ", ".join(declared_missing)
+            )
+
+    benchmarks = performance.get("benchmarks")
+    skipped = performance.get("skipped")
+    if skipped is None:
+        # Absent is tolerated; a wrong type is not. `or {}` coerced a falsy
+        # non-dict -- "skipped": [] -- into {} and walked it straight past the
+        # isinstance check below.
+        skipped = {}
+    if not isinstance(benchmarks, dict) or not isinstance(skipped, dict):
+        malformed.append("performance results are not objects")
+        return drift, malformed
+
+    # A workload is measured or skipped, never both. Unioning the keys let a
+    # report claim both for the same workload and still look complete, which
+    # hides the producer bug that wrote it twice.
+    both = sorted(set(benchmarks) & set(skipped))
+    if both:
+        malformed.append(
+            "performance workloads both measured and skipped: " + ", ".join(both)
+        )
+
+    # A port may legitimately skip a workload (the iOS simulator skips the
+    # GC-footprint workloads); measured plus skipped has to cover the contract.
+    accounted = sorted(set(benchmarks) | set(skipped))
+    if suite_finished:
+        if accounted != sorted(expected_benchmarks):
+            malformed.append(
+                "performance workloads do not match the contract: "
+                + describe_workload_gap(accounted, expected_benchmarks)
+            )
+    else:
+        # A crashed suite is allowed to leave workloads unrun, but not to lose
+        # them silently: normalize computes `missing` as the contract minus what
+        # was measured or skipped, so measured + skipped + missing still has to
+        # name every workload. Dropping that check entirely would let a
+        # structurally broken section through unnoticed.
+        covered = sorted(set(accounted) | set(declared_missing))
+        if covered != sorted(expected_benchmarks):
+            malformed.append(
+                "performance workloads unaccounted for: "
+                + describe_workload_gap(covered, expected_benchmarks)
+            )
+        # A report that names workloads it never ran cannot also call the run
+        # complete. normalize never writes that pair, but nothing downstream
+        # re-derives the status: port-status.html renders the timings of any
+        # benchmark whose status is "complete", so the partial set that a
+        # crashed suite did manage to measure would be presented as a finished
+        # measurement run. accounted | missing can still cover the contract, so
+        # the check above does not catch it.
+        if declared_missing and performance.get("status") != "partial":
+            malformed.append(
+                "performance run is "
+                f"{performance.get('status')!r} but declares missing workloads: "
+                + ", ".join(declared_missing)
+            )
+    for name, measurement in benchmarks.items():
+        duration = measurement.get("duration_ns") if isinstance(measurement, dict) else None
+        if isinstance(duration, bool) or not isinstance(duration, int) or duration < 0:
+            malformed.append(f"{name} has no measured duration")
+    for name, reason in skipped.items():
+        if not isinstance(reason, str) or not reason:
+            malformed.append(f"skipped workload {name} has no reason")
+
+    return drift, malformed
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -591,6 +847,13 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("validate", help="validate feature and screenshot coverage")
+
+    accept_parser = subparsers.add_parser(
+        "accept",
+        help="decide whether a persisted report may replace the checked-in fallback",
+    )
+    accept_parser.add_argument("--port", required=True)
+    accept_parser.add_argument("--report", required=True, type=Path)
 
     normalize_parser = subparsers.add_parser("normalize", help="write a normalized port report")
     normalize_parser.add_argument("--port", required=True)
@@ -620,6 +883,20 @@ def main() -> int:
                 f"{counts['tests']} tests, {counts['features']} features, "
                 f"{counts['ports']} ports, {counts['goldens']} golden names."
             )
+            return 0
+        if args.command == "accept":
+            drift, malformed = publishable_report_problems(
+                manifest, args.port, read_json(args.report)
+            )
+            for problem in malformed:
+                print(f"port-status: {args.port} report is unusable: {problem}", file=sys.stderr)
+            for problem in drift:
+                print(f"port-status: {args.port} {problem}", file=sys.stderr)
+            if malformed:
+                return ACCEPT_UNUSABLE
+            if drift:
+                return ACCEPT_CONTRACT_DRIFT
+            print(f"{args.port} report accepted.")
             return 0
         report = normalize(
             manifest=manifest,
