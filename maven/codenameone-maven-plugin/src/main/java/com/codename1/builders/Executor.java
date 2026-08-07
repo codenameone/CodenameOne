@@ -2480,8 +2480,13 @@ public abstract class Executor {
             log("cn1-hardening: forced off for this local build; building unhardened");
             return sourceZip;
         }
-        if (isAlreadyHardened(sourceZip)) {
-            log("cn1-hardening: input already hardened; skipping");
+        // Idempotence via trusted build state, not an input-jar marker: a META-INF/CN1-HARDENED
+        // resource could be added under src/main/resources or inherited from a dependency without the
+        // classes actually being hardened, which would silently skip the transform. cn1.hardened is
+        // set by this method only after it really hardens, so this suppresses only a second call in
+        // the same build.
+        if ("true".equals(request.getArg("cn1.hardened", "false"))) {
+            log("cn1-hardening: already hardened in this build; skipping");
             return sourceZip;
         }
         try {
@@ -2520,13 +2525,13 @@ public abstract class Executor {
                 lastHardeningMappingId = readMappingId(mapping);
                 lastHardeningR8Keep = r8Keep.isFile() ? readFileToString(r8Keep) : "";
                 // On Android the engine does not rename (R8 is the sole renamer), so its mapping --
-                // and thus its mapping id -- is empty. R8 still produces a real mapping.txt later,
-                // uploaded for this build+platform. Give the crash report a stable, build-scoped id
-                // derived from the build key so a report can be tied to that R8 mapping; an empty id
-                // would leave hardened Android crashes unretraceable.
+                // and thus its mapping id -- is empty. Derive a per-build id regardless of
+                // harden.rename: R8 still renames whenever minification is on (independent of the
+                // engine's rename), and when minification is off an identity map is uploaded -- both
+                // need a non-empty id to key the mapping the app carries. An empty id would leave
+                // hardened Android crashes unretraceable.
                 if ((lastHardeningMappingId == null || lastHardeningMappingId.length() == 0)
-                        && !hardeningRenameSupported()
-                        && hardenBoolArg(request, "harden.rename", true)) {
+                        && !hardeningRenameSupported()) {
                     lastHardeningMappingId = downstreamMappingId(request, hardened);
                 }
                 // Propagate the mapping id / hardened flag / level into the request BEFORE the
@@ -2713,14 +2718,15 @@ public abstract class Executor {
      */
     // The id is necessarily fixed BEFORE R8 runs -- the app carries it as a compile-time constant,
     // and R8's own mapping.txt does not exist until after the app is compiled, so the id cannot be a
-    // hash of that mapping. It is therefore a build-INPUT identifier (build key + platform + hardened
-    // jar bytes): unique per build content, deterministic for a byte-identical rebuild. Correctness
-    // against R8 non-determinism does not come from the id's inputs but from the upload: the daemon
-    // uploads the produced R8 mapping.txt keyed by THIS same id, so a crash report's id selects the
-    // exact mapping that build shipped even if a reused build key or a different R8 result produced a
-    // different mapping.
+    // hash of that mapping. It is a per-BUILD nonce (build key + platform + hardened jar bytes + a
+    // unique run stamp), so every build -- even a byte-identical rebuild, or two builds that reuse a
+    // build key but produce different R8 mappings because android.proguardKeep or the R8 version
+    // changed -- gets a distinct id. The daemon uploads that build's R8 mapping.txt keyed by THIS id,
+    // so a crash report's id selects the exact mapping that build shipped and no upload overwrites
+    // another build's mapping in the same slot.
     private String downstreamMappingId(BuildRequest request, File hardenedJar) {
-        String seed = resolveBuildKey(request) + ":" + hardeningPlatform(request);
+        String seed = resolveBuildKey(request) + ":" + hardeningPlatform(request)
+                + ":" + System.nanoTime() + ":" + System.identityHashCode(hardenedJar);
         try {
             java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
             md.update(seed.getBytes("UTF-8"));
