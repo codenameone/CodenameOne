@@ -143,6 +143,13 @@ static JAVA_OBJECT cn1DbBlobToByteArray(CODENAME_ONE_THREAD_STATE, const void* b
 #ifdef CN1_DB_ENGINE_PRESENT
 
 #ifdef _WIN32
+/* Without this, windows.h drags in the original winsock.h, whose struct timeval collides with
+ * the one winsock2.h has already defined for anything else in the translation unit that needed
+ * sockets -- a hard redefinition error, and the reason this include has to be spelled out rather
+ * than dropped in. Guarded because the bundled engine defines it the same way. */
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #include <wchar.h>
 
@@ -177,6 +184,16 @@ static wchar_t* cn1DbWidePath(const char* utf8) {
     return wide;
 }
 
+/** The message for an errno value, into the caller's buffer. */
+static const char* cn1DbErrorText(int code, char* buffer, size_t length) {
+    /* strerror is deprecated on this toolchain, and the deprecation is a warning on every build
+     * of this file rather than a one-off. strerror_s is the replacement it names. */
+    if (strerror_s(buffer, length, code) != 0) {
+        return "unknown error";
+    }
+    return buffer;
+}
+
 /** Whether a file exists, by a path the engine and the filesystem agree on. */
 static int cn1DbFileExists(const char* utf8) {
     wchar_t* wide = cn1DbWidePath(utf8);
@@ -204,6 +221,13 @@ static int cn1DbFileRemove(const char* utf8) {
 }
 
 #else
+
+/** The message for an errno value. The buffer is unused here and kept for one signature. */
+static const char* cn1DbErrorText(int code, char* buffer, size_t length) {
+    (void)buffer;
+    (void)length;
+    return strerror(code);
+}
 
 /** Whether a file exists. Everywhere but Windows the narrow path is already the right bytes. */
 static int cn1DbFileExists(const char* utf8) {
@@ -237,8 +261,10 @@ JAVA_VOID PREFIX##_sqlDbDelete___java_lang_String(CODENAME_ONE_THREAD_STATE, JAV
      * database is still sitting there. */                                                         \
     if (cn1DbFileRemove(target) != 0 && errno != ENOENT) {                                          \
         char cn1DbDeleteMessage[512];                                                               \
+        char cn1DbDeleteReason[128];                                                                \
         snprintf(cn1DbDeleteMessage, sizeof(cn1DbDeleteMessage),                                    \
-                "The database %s could not be deleted: %s", target, strerror(errno));               \
+                "The database %s could not be deleted: %s", target,                                 \
+                cn1DbErrorText(errno, cn1DbDeleteReason, sizeof(cn1DbDeleteReason)));               \
         cn1DbThrow(threadStateData, cn1DbDeleteMessage);                                            \
     }                                                                                               \
 }                                                                                                   \
