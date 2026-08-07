@@ -335,11 +335,23 @@ class JavaSEWearableBridge implements WearableBridge {
                 java.nio.file.Files.move(tmp.toPath(), f.toPath(),
                         java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             } catch (java.io.IOException | RuntimeException noAtomicMove) {
-                // Some filesystems cannot do it. Keep the old path as a fallback rather than
-                // failing the publish, but it carries the race described above.
+                // Some filesystems cannot replace in one step -- Windows renameTo over an existing
+                // file being the usual one. The fallback unlinks first, and it must never unlink a
+                // version it has not looked at: the peer can publish between the failed rename and
+                // the delete, and destroying THAT installs this side's older staging file as the
+                // current value with nothing left to correct it.
                 if (!tmp.renameTo(f)) {
-                    f.delete();
-                    if (!tmp.renameTo(f)) {
+                    long existing = versionOf(f);
+                    if (existing > versionOf(tmp)) {
+                        // The peer's value is NEWER than the one being written. Ours is superseded,
+                        // so there is nothing to publish -- dropping it is the same outcome the
+                        // ordering rules produce everywhere else, and clobbering would be a lost
+                        // write. Reported as published because the path does hold a value: the
+                        // caller must not resurrect a tombstone over it.
+                        tmp.delete();
+                        return true;
+                    }
+                    if (!deleteIfVersionUnchanged(f, existing) || !tmp.renameTo(f)) {
                         throw new IOException("could not replace " + f, noAtomicMove);
                     }
                 }
