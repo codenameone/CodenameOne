@@ -627,7 +627,16 @@ public final class WearableConnection {
         // The listener check and the enqueue share the queue's monitor with drainPending, so a
         // delivery can never be parked after the drain that would have replayed it.
         synchronized (queue) {
-            parked = listeners.isEmpty();
+            // Parked when there is no listener OR when anything is already parked for this queue.
+            //
+            // The second half is what keeps ORDER. A listener is registered and the backlog drained
+            // as two steps, and an update arriving between them saw a listener, dispatched straight
+            // to the EDT, and landed AHEAD of older state that was still parked -- a republished
+            // value followed by the stale removal it replaced, leaving the listener removed while
+            // getData returned the value. Queueing behind an existing backlog makes that ordering
+            // structural instead of a matter of timing, and it also routes the update through the
+            // park path, which is where a superseded recovery record is cancelled.
+            parked = listeners.isEmpty() || !queue.isEmpty();
             if (parked) {
                 while (queue.size() >= MAX_PENDING) {
                     Runnable evicted = evictOne(queue, path);
@@ -1016,7 +1025,23 @@ public final class WearableConnection {
     /// @param dataQueue whether this is the replicated-data queue, which carries the recovery
     ///                  bookkeeping the message queue has none of
     private static void drainPending(List<Runnable> queue, boolean dataQueue) {
-        List<Runnable> drained;
+        // Until the queue is genuinely empty, not once.
+        //
+        // Deliveries now park behind an existing backlog, and the tail of a drain calls out to the
+        // port -- recovery hand-backs and replays -- with the monitor released. Anything arriving
+        // in that window parks, and without this loop it would sit there until the next listener
+        // registration, which for a single-listener app never comes.
+        for (;;) {
+            drainPendingOnce(queue, dataQueue);
+            synchronized (queue) {
+                if (queue.isEmpty()) {
+                    return;
+                }
+            }
+        }
+    }
+
+    private static void drainPendingOnce(List<Runnable> queue, boolean dataQueue) {
         List<Runnable> replays = null;
         List<String> dropped = null;
         List<String> removals = null;
@@ -1042,15 +1067,17 @@ public final class WearableConnection {
                 replayRequests.clear();
             }
             if (!queue.isEmpty()) {
-                drained = new ArrayList<Runnable>(queue);
+                List<Runnable> drained = new ArrayList<Runnable>(queue);
                 queue.clear();
-            } else {
-                drained = null;
-            }
-        }
-        if (drained != null) {
-            for (Runnable r : drained) {
-                Display.getInstance().callSerially(r);
+                // Handed to the EDT while the monitor is STILL held. Clearing the queue and then
+                // dispatching outside it reopened the same gap from the other side: a delivery
+                // arriving in between saw an empty queue, dispatched itself, and overtook the batch
+                // that had already been taken out. callSerially only enqueues -- it runs no
+                // listener code on this thread -- so holding the lock across it is safe, and the
+                // same reasoning is already documented on deliverIfOutranks.
+                for (Runnable r : drained) {
+                    Display.getInstance().callSerially(r);
+                }
             }
         }
         // Discarded REMOVALS are simply re-announced. The path is the whole of a removal, so this
