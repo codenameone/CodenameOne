@@ -94,7 +94,7 @@ class AndroidCipherDB extends Database {
         if (isLegacyBehavior()) {
             return;
         }
-        int declared = SQLStatementSplitter.countPositionalParameters(sql);
+        int declared = SQLStatementSplitter.countParameters(sql);
         if (declared != SQLStatementSplitter.PARAMETER_COUNT_UNKNOWN && declared != supplied) {
             throw new IOException("The statement has " + declared + " parameters but "
                     + supplied + " were supplied");

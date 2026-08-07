@@ -187,22 +187,35 @@ public final class SQLStatementSplitter {
         return countStatements(sql) > 1;
     }
 
-    /// Reported by `#countPositionalParameters(String)` for a statement whose parameters cannot be
-    /// counted by reading the text.
+    /// Reported by `#countParameters(String)` for a statement whose parameters cannot be counted
+    /// by reading the text.
     public static final int PARAMETER_COUNT_UNKNOWN = -1;
 
-    /// Counts the `?` placeholders in a statement.
+    /// Counts the parameters a statement declares, the way `sqlite3_bind_parameter_count` does.
     ///
-    /// For ports whose engine cannot be asked. The SQLite C API answers this directly through
-    /// `sqlite3_bind_parameter_count`, and JDBC through `ParameterMetaData`, but the Android
-    /// engine exposes no equivalent, so the count has to come from the text. Quoted strings,
-    /// quoted identifiers, bracketed identifiers and comments are skipped, so a literal `?` inside
-    /// any of them is not miscounted.
+    /// For ports whose engine cannot be asked. The SQLite C API answers this directly and JDBC
+    /// answers it through `ParameterMetaData`, but the Android engine exposes no equivalent, so
+    /// the count has to come from the text. Quoted strings, quoted identifiers, bracketed
+    /// identifiers and comments are skipped, so a marker inside any of them is not counted.
     ///
-    /// SQLite also accepts numbered and named placeholders -- `?NNN`, `:name`, `@name` and
-    /// `$name` -- whose count is not the number of markers, because one may repeat and `?NNN` may
-    /// skip indices. Rather than guess, this reports `#PARAMETER_COUNT_UNKNOWN` when it sees one,
-    /// and the caller skips the check instead of rejecting a valid statement.
+    /// #### What the count is
+    ///
+    /// It is the **largest index assigned**, not the number of markers, because SQLite assigns
+    /// indices rather than counting occurrences:
+    ///
+    /// - `?` takes the next index, one past the largest assigned so far.
+    /// - `?NNN` takes index NNN, and raises the largest if NNN is above it. That is what makes
+    ///   `SELECT ?3` a three parameter statement with two unbound slots.
+    /// - `:name`, `@name` and `$name` take the next index the first time the name appears and
+    ///   reuse that index every time after, so `WHERE a = :x OR b = :x` declares one parameter.
+    ///
+    /// Reading these as one-per-marker is what would let a caller supply one argument to a two
+    /// parameter statement and have the second silently stay SQL NULL, which is the outcome this
+    /// exists to prevent.
+    ///
+    /// `#PARAMETER_COUNT_UNKNOWN` is reported only for a form no count is defined for -- `?0`,
+    /// which SQLite rejects, and an index too large to be meaningful. The caller skips the check
+    /// there rather than rejecting a statement it cannot judge.
     ///
     /// #### Parameters
     ///
@@ -210,13 +223,17 @@ public final class SQLStatementSplitter {
     ///
     /// #### Returns
     ///
-    /// the number of `?` placeholders, or `#PARAMETER_COUNT_UNKNOWN` if the statement uses a form
-    /// this cannot count
-    public static int countPositionalParameters(String sql) {
+    /// the number of parameters, or `#PARAMETER_COUNT_UNKNOWN` if no count is defined
+    public static int countParameters(String sql) {
         if (sql == null) {
             return 0;
         }
-        int count = 0;
+        // Names already seen. Only whether a name has appeared before matters -- if it has, it
+        // reuses the index it was given and adds nothing to the count, and if it has not, it takes
+        // the next one. Kept as a list because a statement has a handful of parameters, not
+        // thousands, and core targets a Java without generics.
+        List names = new ArrayList();
+        int largest = 0;
         int length = sql.length();
         int iter = 0;
         while (iter < length) {
@@ -238,23 +255,84 @@ public final class SQLStatementSplitter {
                 continue;
             }
             if (c == ':' || c == '@' || c == '$') {
-                // A named parameter, but only when a name actually follows: "::" and a bare "@"
-                // are not, and neither is the ":" of a cast or an assignment.
-                if (iter + 1 < length && isWordPart(sql.charAt(iter + 1))) {
-                    return PARAMETER_COUNT_UNKNOWN;
+                // Only a parameter when a name actually follows: "::" is not one, nor a bare "@",
+                // nor the ":" of an assignment.
+                int nameEnd = iter + 1;
+                while (nameEnd < length && isParameterNamePart(sql.charAt(nameEnd))) {
+                    nameEnd++;
                 }
-                iter++;
+                if (nameEnd == iter + 1) {
+                    iter++;
+                    continue;
+                }
+                String name = sql.substring(iter, nameEnd);
+                if (!containsName(names, name)) {
+                    largest++;
+                    names.add(name);
+                }
+                iter = nameEnd;
                 continue;
             }
             if (c == '?') {
-                if (iter + 1 < length && sql.charAt(iter + 1) >= '0' && sql.charAt(iter + 1) <= '9') {
+                int digitsEnd = iter + 1;
+                while (digitsEnd < length && sql.charAt(digitsEnd) >= '0'
+                        && sql.charAt(digitsEnd) <= '9') {
+                    digitsEnd++;
+                }
+                if (digitsEnd == iter + 1) {
+                    largest++;
+                    iter++;
+                    continue;
+                }
+                int explicit = parseIndex(sql.substring(iter + 1, digitsEnd));
+                if (explicit <= 0) {
+                    // "?0" is not a parameter SQLite will accept, and an index this cannot
+                    // represent is not one it is worth guessing at.
                     return PARAMETER_COUNT_UNKNOWN;
                 }
-                count++;
+                if (explicit > largest) {
+                    largest = explicit;
+                }
+                iter = digitsEnd;
+                continue;
             }
             iter++;
         }
-        return count;
+        return largest;
+    }
+
+    /// Whether a parameter name has already been seen.
+    ///
+    /// Names are compared exactly, including the leading sigil: SQLite treats `:x` and `@x` as
+    /// different parameters, and it is case sensitive about the rest.
+    private static boolean containsName(List names, String name) {
+        for (Object seen : names) {
+            if (name.equals(seen)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Parses a numbered placeholder's index, or -1 if it is zero or too large to be one.
+    private static int parseIndex(String digits) {
+        int value = 0;
+        for (int iter = 0; iter < digits.length(); iter++) {
+            value = value * 10 + (digits.charAt(iter) - '0');
+            if (value > MAX_PARAMETER_INDEX) {
+                return -1;
+            }
+        }
+        return value == 0 ? -1 : value;
+    }
+
+    /// SQLite's own default ceiling on a parameter index. Above it the engine rejects the
+    /// statement, so there is no count to report.
+    private static final int MAX_PARAMETER_INDEX = 32766;
+
+    /// Whether a character continues a named parameter, matching SQLite's own rule.
+    private static boolean isParameterNamePart(char c) {
+        return isWordPart(c) || c == '$' || c > 127;
     }
 
     private static void addIfNotBlank(List statements, String candidate) {

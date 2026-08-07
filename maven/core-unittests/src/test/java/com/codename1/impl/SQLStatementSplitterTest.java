@@ -132,43 +132,91 @@ class SQLStatementSplitterTest {
 
     @Test
     void countsPositionalPlaceholders() {
-        assertEquals(0, SQLStatementSplitter.countPositionalParameters("SELECT 1"));
-        assertEquals(1, SQLStatementSplitter.countPositionalParameters("SELECT * FROM t WHERE a=?"));
-        assertEquals(2, SQLStatementSplitter.countPositionalParameters(
+        assertEquals(0, SQLStatementSplitter.countParameters("SELECT 1"));
+        assertEquals(1, SQLStatementSplitter.countParameters("SELECT * FROM t WHERE a=?"));
+        assertEquals(2, SQLStatementSplitter.countParameters(
                 "INSERT INTO t (a, b) VALUES (?, ?)"));
-        assertEquals(0, SQLStatementSplitter.countPositionalParameters(null));
+        assertEquals(0, SQLStatementSplitter.countParameters(null));
     }
 
     @Test
     void doesNotCountAQuestionMarkThatIsNotAPlaceholder() {
-        assertEquals(0, SQLStatementSplitter.countPositionalParameters(
+        assertEquals(0, SQLStatementSplitter.countParameters(
                 "INSERT INTO t VALUES ('is it? yes')"));
-        assertEquals(1, SQLStatementSplitter.countPositionalParameters(
+        assertEquals(1, SQLStatementSplitter.countParameters(
                 "INSERT INTO t VALUES ('is it? yes', ?)"));
-        assertEquals(0, SQLStatementSplitter.countPositionalParameters("SELECT \"a?b\" FROM t"));
-        assertEquals(0, SQLStatementSplitter.countPositionalParameters("SELECT [a?b] FROM t"));
-        assertEquals(0, SQLStatementSplitter.countPositionalParameters("SELECT 1 -- why? \n"));
-        assertEquals(0, SQLStatementSplitter.countPositionalParameters("SELECT /* why? */ 1"));
+        assertEquals(0, SQLStatementSplitter.countParameters("SELECT \"a?b\" FROM t"));
+        assertEquals(0, SQLStatementSplitter.countParameters("SELECT [a?b] FROM t"));
+        assertEquals(0, SQLStatementSplitter.countParameters("SELECT 1 -- why? \n"));
+        assertEquals(0, SQLStatementSplitter.countParameters("SELECT /* why? */ 1"));
     }
 
     @Test
-    void refusesToGuessAtNamedOrNumberedPlaceholders() {
-        // One name can repeat and a ?NNN can skip an index, so the marker count is not the
-        // parameter count. Reporting that plainly beats rejecting a valid statement.
+    void countsANamedPlaceholderOncePerName() {
+        // The count is the number of distinct names, not of markers, which is what
+        // sqlite3_bind_parameter_count reports. Counting markers would demand two arguments for
+        // one parameter; counting nothing at all would let one argument satisfy two.
+        assertEquals(1, SQLStatementSplitter.countParameters(
+                "SELECT * FROM t WHERE a=:x OR b=:x"));
+        assertEquals(2, SQLStatementSplitter.countParameters(
+                "INSERT INTO t (a, b) VALUES (:a, :b)"));
+        assertEquals(2, SQLStatementSplitter.countParameters(
+                "INSERT INTO t (a, b) VALUES (@a, @b)"));
+        assertEquals(2, SQLStatementSplitter.countParameters(
+                "INSERT INTO t (a, b) VALUES ($a, $b)"));
+        // Different sigils are different parameters, and names are case sensitive.
+        assertEquals(2, SQLStatementSplitter.countParameters(
+                "SELECT * FROM t WHERE a=:x OR b=@x"));
+        assertEquals(2, SQLStatementSplitter.countParameters(
+                "SELECT * FROM t WHERE a=:x OR b=:X"));
+    }
+
+    @Test
+    void countsANumberedPlaceholderByItsIndex() {
+        // ?NNN takes that index outright, so the count is the largest index and not the number of
+        // markers: "?3" alone is a three parameter statement with two slots nobody binds.
+        assertEquals(1, SQLStatementSplitter.countParameters(
+                "SELECT * FROM t WHERE a=?1 AND b=?1"));
+        assertEquals(3, SQLStatementSplitter.countParameters("SELECT ?3"));
+        assertEquals(3, SQLStatementSplitter.countParameters(
+                "SELECT * FROM t WHERE a=?1 AND b=?3"));
+        // A bare ? takes the next index after the largest so far.
+        assertEquals(4, SQLStatementSplitter.countParameters("SELECT ?3, ?"));
+    }
+
+    @Test
+    void mixesTheThreeFormsTheWayTheEngineDoes() {
+        // A name takes the next free index just as a bare ? does, so these interleave.
+        assertEquals(3, SQLStatementSplitter.countParameters(
+                "SELECT * FROM t WHERE a=? AND b=:name AND c=?"));
+        assertEquals(2, SQLStatementSplitter.countParameters(
+                "SELECT * FROM t WHERE a=? AND b=:name AND c=:name"));
+    }
+
+    @Test
+    void refusesToGuessAtAnIndexTheEngineWouldReject() {
+        // ?0 is not a parameter SQLite accepts, so there is no count to report and the caller
+        // skips the check rather than rejecting a statement it cannot judge.
         assertEquals(SQLStatementSplitter.PARAMETER_COUNT_UNKNOWN,
-                SQLStatementSplitter.countPositionalParameters("SELECT * FROM t WHERE a=?1 AND b=?1"));
+                SQLStatementSplitter.countParameters("SELECT ?0"));
         assertEquals(SQLStatementSplitter.PARAMETER_COUNT_UNKNOWN,
-                SQLStatementSplitter.countPositionalParameters("SELECT * FROM t WHERE a=:name"));
-        assertEquals(SQLStatementSplitter.PARAMETER_COUNT_UNKNOWN,
-                SQLStatementSplitter.countPositionalParameters("SELECT * FROM t WHERE a=@name"));
-        assertEquals(SQLStatementSplitter.PARAMETER_COUNT_UNKNOWN,
-                SQLStatementSplitter.countPositionalParameters("SELECT * FROM t WHERE a=$name"));
+                SQLStatementSplitter.countParameters("SELECT ?999999999"));
+    }
+
+    @Test
+    void doesNotCountANamedPlaceholderInsideAStringOrComment() {
+        assertEquals(0, SQLStatementSplitter.countParameters(
+                "INSERT INTO t VALUES ('call me :name')"));
+        assertEquals(0, SQLStatementSplitter.countParameters("SELECT 1 -- :name \n"));
+        assertEquals(0, SQLStatementSplitter.countParameters("SELECT /* :name */ 1"));
+        assertEquals(1, SQLStatementSplitter.countParameters(
+                "INSERT INTO t VALUES ('call me :name', :real)"));
     }
 
     @Test
     void treatsAStandaloneColonAsOrdinarySyntax() {
         // A colon with no name after it is not a parameter, so this stays countable.
-        assertEquals(1, SQLStatementSplitter.countPositionalParameters(
+        assertEquals(1, SQLStatementSplitter.countParameters(
                 "SELECT CAST(a AS TEXT) FROM t WHERE b=? AND c IN ('x:')"));
     }
 }

@@ -456,6 +456,45 @@ public final class DatabaseConformanceSuite {
             r.check(threwAtQuery, "executeQuery reports malformed SQL rather than deferring to next()");
         }
 
+        // ---- a named or numbered placeholder is still a parameter
+        // The API binds positionally, but SQLite lets a statement name its slots, and a port that
+        // counts only "?" markers sees no parameters at all in ":a, :b" and lets a call through
+        // with one argument -- leaving the second slot as SQL NULL, silently. The count SQLite
+        // reports is the largest index it assigned, so a repeated name counts once and "?3" alone
+        // counts three.
+        if (mode == MODE_STRICT) {
+            db.execute("DELETE FROM conf_stmt");
+            boolean tooFewRejected = false;
+            try {
+                db.execute("INSERT INTO conf_stmt (id, t) VALUES (:id, :t)",
+                        new Object[] {Integer.valueOf(7)});
+            } catch (IOException expected) {
+                tooFewRejected = true;
+            }
+            r.check(tooFewRejected, "a named placeholder counts as a parameter, so one argument "
+                    + "for two of them is rejected rather than left as NULL");
+
+            boolean bothBound = false;
+            try {
+                db.execute("INSERT INTO conf_stmt (id, t) VALUES (:id, :t)",
+                        new Object[] {Integer.valueOf(7), "named"});
+                bothBound = true;
+            } catch (IOException err) {
+                r.check(false, "named placeholders bind positionally: " + err.getMessage());
+            }
+            if (bothBound) {
+                Cursor named = null;
+                try {
+                    named = db.executeQuery("SELECT t FROM conf_stmt WHERE id = 7");
+                    r.check(named.next() && "named".equals(named.getRow().getString(0)),
+                            "both named placeholders received their argument");
+                } finally {
+                    closeQuietly(named);
+                }
+            }
+            db.execute("DELETE FROM conf_stmt");
+        }
+
         // ---- text survives a round trip byte for byte
         // SQLite stores TEXT as UTF-8 and measures it in bytes, so a port that hands its engine a
         // C string agrees with it on neither: anything outside ASCII comes back one character per
