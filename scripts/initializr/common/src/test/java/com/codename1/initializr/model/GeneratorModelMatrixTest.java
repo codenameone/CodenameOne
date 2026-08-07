@@ -208,6 +208,32 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String rootPom = getText(entries, "pom.xml");
         assertContains(rootPom, "<id>win</id>",
                 "Java 17 root pom should retain the win32 module activation profile");
+        assertCodenameOneRepository(rootPom, "Java 17");
+    }
+
+    /**
+     * Codename One releases are moving off Maven Central to repo.codenameone.com, so a
+     * generated project must declare that repository. Losing it is invisible at
+     * generation time -- Central still serves every already-published version -- and
+     * only surfaces after the cutover, as a project that never sees a new release.
+     *
+     * Both lists are asserted because Maven resolves dependencies through
+     * &lt;repositories&gt; and build plugins through &lt;pluginRepositories&gt;: a
+     * project holding only the first downloads codenameone-core and still fails to find
+     * a newer codenameone-maven-plugin.
+     */
+    private void assertCodenameOneRepository(String rootPom, String label) {
+        int repositories = rootPom.indexOf("<repositories>");
+        int pluginRepositories = rootPom.indexOf("<pluginRepositories>");
+        assertTrue(repositories >= 0, label + " root pom should declare <repositories>");
+        assertTrue(pluginRepositories > repositories,
+                label + " root pom should declare <pluginRepositories> after <repositories>");
+        assertContains(rootPom.substring(repositories, pluginRepositories),
+                "https://repo.codenameone.com/maven2",
+                label + " root pom should resolve dependencies from the Codename One repository");
+        assertContains(rootPom.substring(pluginRepositories),
+                "https://repo.codenameone.com/maven2",
+                label + " root pom should resolve plugins from the Codename One repository");
     }
 
     private void validateLegacyJava8Generation() throws Exception {
@@ -248,6 +274,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String rootPom = getText(entries, "pom.xml");
         assertContains(rootPom, "<id>win</id>",
                 "Java 8 root pom should retain the win32 module activation profile");
+        assertCodenameOneRepository(rootPom, "Java 8");
     }
 
     private void validateCoordinateGuardRejectsBrokenArtifacts() throws Exception {

@@ -3618,28 +3618,21 @@ public class IPhoneBuilder extends Executor {
                 // -Xmx) from the CN1_TRANSLATOR_OPTS environment variable. The
                 // forked JVM does not inherit the Maven process's -D properties,
                 // so this is the only way to reach the translator for tuning.
-                String translatorOpts = System.getenv("CN1_TRANSLATOR_OPTS");
-                boolean heapOverridden = false;
-                if (translatorOpts != null && !translatorOpts.trim().isEmpty()) {
-                    for (String opt : translatorOpts.trim().split("\\s+")) {
-                        if (!opt.isEmpty()) {
-                            parparCmd.add(opt);
-                            if (opt.startsWith("-Xmx")) {
-                                heapOverridden = true;
-                            }
-                        }
-                    }
-                }
-                // Default heap; a -Xmx in CN1_TRANSLATOR_OPTS takes precedence.
-                // The dead-code cull builds an in-memory suffix automaton over
-                // all native symbols (NativeSymbolIndex, from #5236) to avoid the
-                // old O(N^2) substring scan that timed out on large apps -- that
-                // index trades time for memory, so the historical 384m cap now
-                // OOMs local iOS builds as the CN1 class count grows (issue
-                // #5344). The cloud builder already runs the same translator at
-                // 1024m; match it here so local and server builds behave alike.
+                java.util.List<String> translatorOpts = TranslatorHeap.extraJvmOptions();
+                parparCmd.addAll(translatorOpts);
+                boolean heapOverridden = TranslatorHeap.specifiesHeap(translatorOpts);
+                // Heap sized from the machine (see TranslatorHeap), floored at the
+                // 1024m the cloud builder has always used; a -Xmx in
+                // CN1_TRANSLATOR_OPTS still takes precedence. The dead-code cull
+                // builds an in-memory suffix automaton over all native symbols
+                // (NativeSymbolIndex, from #5236) to avoid the old O(N^2) substring
+                // scan that timed out on large apps -- that index trades time for
+                // memory, so the historical 384m cap OOMed local iOS builds as the
+                // CN1 class count grew (issue #5344) and even 1024m is not enough
+                // for a large app (issue #5511).
+                int heapMB = TranslatorHeap.maxHeapMB(1024);
                 if (!heapOverridden) {
-                    parparCmd.add("-Xmx1024m");
+                    parparCmd.add("-Xmx" + heapMB + "m");
                 }
                 parparCmd.add("-jar");
                 parparCmd.add(parparVMCompilerJar);
@@ -3653,7 +3646,19 @@ public class IPhoneBuilder extends Executor {
                 parparCmd.add(buildVersion);
                 parparCmd.add(request.getArg("ios.project_type", "ios")); // ios, iphone, ipad
                 parparCmd.add(addLibs);
-                if (!exec(userDir, env, 420000, parparCmd.toArray(new String[0]))) {
+                int outputMark = message.length();
+                // 600s, matching the cloud builder running the identical translator
+                // over the identical input. Translation time grows with app size, so
+                // the lower local 420s cap meant a large app could translate fine on
+                // the build server yet be killed mid-run on the developer's own
+                // machine -- which is usually the slower of the two.
+                if (!exec(userDir, env, 600000, parparCmd.toArray(new String[0]))) {
+                    // Name the failure rather than leaving the build to report a
+                    // bare "translator failed" -- an out-of-memory death is
+                    // fixable by the developer, but only if we say so.
+                    if (!heapOverridden && TranslatorHeap.looksOutOfMemory(message.substring(outputMark))) {
+                        error(TranslatorHeap.outOfMemoryAdvice(heapMB, true), null);
+                    }
                     return false;
                 }
                 // A SECOND pass for the watch, rooted at its own stub.

@@ -227,8 +227,14 @@ final class JavascriptBundleWriter {
         // identifiers (avg ~45 chars, the largest single contributor to bundle
         // size) ship verbatim at every definition and call site.
         java.util.List<String> chunkStrings = new java.util.ArrayList<String>(chunks.size());
-        for (StringBuilder c : chunks) {
-            chunkStrings.add(c.toString());
+        for (int i = 0; i < chunks.size(); i++) {
+            // Drop each builder as it materialises. Holding the whole bundle
+            // simultaneously as StringBuilders and as Strings doubles the
+            // translator's peak for no benefit, and on a large app that
+            // doubling is the difference between finishing and dying with
+            // OutOfMemoryError (issue #5511).
+            chunkStrings.add(chunks.get(i).toString());
+            chunks.set(i, null);
         }
         minifyGeneratedIdentifiers(chunkStrings);
         aliasHotCn1Identifiers(chunkStrings);
@@ -249,6 +255,12 @@ final class JavascriptBundleWriter {
             String suffix = leadCount >= 10 ? String.format("_%02d", i + 1) : String.format("_%d", i + 1);
             Files.write(new File(outputDirectory, "translated_app" + suffix + ".js").toPath(),
                     minifyJs(hoistStringConstants(chunkStrings.get(i), aliasCounter)).getBytes(StandardCharsets.UTF_8));
+            // Once a chunk is on disk nothing reads it again, so release it
+            // rather than keeping the entire bundle resident until the last
+            // write. hoistStringConstants and minifyJs each materialise another
+            // copy of the chunk they are given, so this is where the emit phase
+            // is at its most memory-hungry.
+            chunkStrings.set(i, null);
         }
         Files.write(new File(outputDirectory, "translated_app.js").toPath(),
                 minifyJs(hoistStringConstants(chunkStrings.get(chunkStrings.size() - 1), aliasCounter)).getBytes(StandardCharsets.UTF_8));

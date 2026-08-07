@@ -4728,32 +4728,6 @@ function runtimeBoxedPrimitiveValue(value) {
       return null;
   }
 }
-function* runtimeFormatTokenValue(token, value) {
-  if (token === "%s") {
-    return yield* runtimeToNativeString(value);
-  }
-  if (token === "%c") {
-    const primitive = runtimeBoxedPrimitiveValue(value);
-    if (primitive != null) {
-      return String.fromCharCode(primitive | 0);
-    }
-    return String.fromCharCode((value == null ? 0 : value) | 0);
-  }
-  if (token === "%d" || token === "%i") {
-    const primitive = runtimeBoxedPrimitiveValue(value);
-    const numeric = primitive != null ? primitive : (value == null ? 0 : value);
-    // A long is a BigInt -- print it exactly; Number(bigint) would lose >2^53.
-    return (numeric && numeric.__l === 1) ? _LtoStr(numeric) : String(Math.trunc(Number(numeric)));
-  }
-  if (token === "%f") {
-    const primitive = runtimeBoxedPrimitiveValue(value);
-    if (primitive != null) {
-      return String(Number(primitive));
-    }
-    return String(Number(value == null ? 0 : value));
-  }
-  return yield* runtimeToNativeString(value);
-}
 function sbEnsureCapacity(sb, size) {
   let data = sb[CN1_SB_VALUE];
   if (!data) {
@@ -5622,59 +5596,6 @@ bindNative(["cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1A
     out[i] = encoded[i];
   }
   return out;
-});
-bindNative(["cn1_java_lang_String_format_java_lang_String_java_lang_Object_1ARRAY_R_java_lang_String"], function*(format, args) {
-  const text = jvm.toNativeString(format);
-  const values = [];
-  if (args && args.__array) {
-    for (let i = 0; i < args.length; i++) {
-      values.push(args[i]);
-    }
-  }
-
-  const nextArgString = function*(token) {
-    const arg = values.length ? values.shift() : null;
-    return yield* runtimeFormatTokenValue("%" + token, arg);
-  };
-
-  let out = "";
-  for (let i = 0; i < text.length; i++) {
-    const ch = text.charAt(i);
-    if (ch !== "%" || i === text.length - 1) {
-      out += ch;
-      continue;
-    }
-
-    const next = text.charAt(i + 1);
-    if (next === "%") {
-      out += "%";
-      i++;
-      continue;
-    }
-
-    let j = i + 1;
-    while (j < text.length && "-#+ 0,(".indexOf(text.charAt(j)) >= 0) {
-      j++;
-    }
-    while (j < text.length && text.charAt(j) >= "0" && text.charAt(j) <= "9") {
-      j++;
-    }
-    if (j < text.length && text.charAt(j) === ".") {
-      j++;
-      while (j < text.length && text.charAt(j) >= "0" && text.charAt(j) <= "9") {
-        j++;
-      }
-    }
-    const token = j < text.length ? text.charAt(j) : "";
-    if ("sdifc".indexOf(token) >= 0) {
-      out += yield* nextArgString(token);
-      i = j;
-    } else {
-      out += "%";
-    }
-  }
-
-  return createJavaString(out);
 });
 bindNative(["cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_double"], function(value, exponentIndex) {
   // Contract (per Apache Harmony StringToReal.parseDblImpl): the input string

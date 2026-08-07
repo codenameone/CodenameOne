@@ -1,15 +1,65 @@
 {
-  "commit": "4a3f5807e0850131483b20b45d3802c9c42f7fd7",
-  "generated_at": "2026-07-16T14:48:44Z",
+  "commit": "12ecf37a1e695b71794b5243e1525328f7304e51",
+  "generated_at": "2026-08-04T07:46:37Z",
+  "performance": {
+    "benchmark_version": 1,
+    "benchmarks": {
+      "arrayRandom": {
+        "checksum": "-2288487891715278",
+        "duration_ns": 936000000
+      },
+      "arraySequential": {
+        "checksum": "0",
+        "duration_ns": 746100000
+      },
+      "hashMapChurn": {
+        "checksum": "49941",
+        "duration_ns": 7677700000
+      },
+      "intArithmetic": {
+        "checksum": "1313580095284",
+        "duration_ns": 511500000
+      },
+      "longArithmetic": {
+        "checksum": "6887886960473257608",
+        "duration_ns": 2492100000
+      },
+      "mathTranscendental": {
+        "checksum": "4729652805076374709",
+        "duration_ns": 284400000
+      },
+      "objectAllocation": {
+        "checksum": "2999790376128",
+        "duration_ns": 1673800000
+      },
+      "quicksort": {
+        "checksum": "786886890168670967",
+        "duration_ns": 427800000
+      },
+      "recursion": {
+        "checksum": "33385282",
+        "duration_ns": 754600000
+      },
+      "stringBuilding": {
+        "checksum": "-609121604069",
+        "duration_ns": 699500000
+      }
+    },
+    "method": "minimum of five measured runs after three in-process warm-ups",
+    "missing": [],
+    "skipped": {},
+    "status": "complete",
+    "suite_checksum": 0
+  },
   "port": "javascript",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29505603266",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30887242508",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
-    "not-run": 5,
-    "pass": 164,
-    "skip": 1
+    "not-run": 0,
+    "pass": 171,
+    "skip": 0
   },
   "tests": {
     "ARApiTest": {
@@ -72,16 +122,17 @@
       "feature": "bytecode-runtime",
       "status": "pass"
     },
+    "CalendarApiTest": {
+      "feature": "calendar-integration",
+      "status": "pass"
+    },
     "CallDetectionAPITest": {
       "feature": "device-security-signals",
       "status": "pass"
     },
     "CameraApiTest": {
       "feature": "camera-access",
-      "reasons": [
-        "needs-runtime-permission-on-HTML5"
-      ],
-      "status": "skip"
+      "status": "pass"
     },
     "CenteredDialogTitleScreenshotTest": {
       "feature": "dialogs-and-labels",
@@ -167,11 +218,11 @@
       "feature": "graphics-clipping",
       "status": "pass"
     },
-    "CodeEditorScreenshotTest": {
-      "feature": "pure-text-editing",
+    "ClipboardRoundTripTest": {
+      "feature": "clipboard",
       "status": "pass"
     },
-    "PureEditorScreenshotTest": {
+    "CodeEditorScreenshotTest": {
       "feature": "pure-text-editing",
       "status": "pass"
     },
@@ -339,6 +390,10 @@
       "feature": "text-input",
       "status": "pass"
     },
+    "InferenceOnDeviceApiTest": {
+      "feature": "on-device-inference",
+      "status": "pass"
+    },
     "InscribedTriangleGrid": {
       "feature": "graphics-shapes-strokes",
       "status": "pass"
@@ -349,6 +404,10 @@
     },
     "KotlinUiTest": {
       "feature": "application-bootstrap",
+      "status": "pass"
+    },
+    "LanguageOnDeviceApiTest": {
+      "feature": "on-device-language",
       "status": "pass"
     },
     "LargeStrokeDirtyClipTest": {
@@ -455,6 +514,10 @@
       "feature": "scrolling-and-pull",
       "status": "pass"
     },
+    "PureEditorScreenshotTest": {
+      "feature": "pure-text-editing",
+      "status": "pass"
+    },
     "RealOsmVectorScreenshotTest": {
       "feature": "vector-maps",
       "status": "pass"
@@ -548,6 +611,10 @@
       "status": "pass"
     },
     "StringApiTest": {
+      "feature": "java-standard-apis",
+      "status": "pass"
+    },
+    "StringFormatTest": {
       "feature": "java-standard-apis",
       "status": "pass"
     },
@@ -675,76 +742,9 @@
       "feature": "video-round-trip",
       "status": "pass"
     },
-    "CalendarApiTest": {
-      "feature": "calendar-integration",
-      "status": "not-run"
-    },
-    "ClipboardRoundTripTest": {
-      "feature": "clipboard",
-      "status": "not-run"
-    },
-    "InferenceOnDeviceApiTest": {
-      "feature": "on-device-inference",
-      "status": "not-run"
-    },
-    "LanguageOnDeviceApiTest": {
-      "feature": "on-device-language",
-      "status": "not-run"
-    },
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",
-      "status": "not-run"
+      "status": "pass"
     }
-  },
-  "bootstrap_source": "successful-master-workflow",
-  "workflow_conclusion": "success",
-  "performance": {
-    "benchmark_version": 1,
-    "benchmarks": {
-      "arrayRandom": {
-        "checksum": "-2288487891715278",
-        "duration_ns": 1454299999
-      },
-      "arraySequential": {
-        "checksum": "0",
-        "duration_ns": 956000000
-      },
-      "hashMapChurn": {
-        "checksum": "49941",
-        "duration_ns": 15788000000
-      },
-      "intArithmetic": {
-        "checksum": "1313580095284",
-        "duration_ns": 721800001
-      },
-      "longArithmetic": {
-        "checksum": "6887886960473257608",
-        "duration_ns": 3997400000
-      },
-      "mathTranscendental": {
-        "checksum": "4729652805076374709",
-        "duration_ns": 300100000
-      },
-      "objectAllocation": {
-        "checksum": "2999790376128",
-        "duration_ns": 3617099999
-      },
-      "quicksort": {
-        "checksum": "786886890168670967",
-        "duration_ns": 577900001
-      },
-      "recursion": {
-        "checksum": "33385282",
-        "duration_ns": 1071299999
-      },
-      "stringBuilding": {
-        "checksum": "-609121604069",
-        "duration_ns": 1333500000
-      }
-    },
-    "method": "minimum of five measured runs after three in-process warm-ups",
-    "missing": [],
-    "status": "complete",
-    "suite_checksum": 0
   }
 }

@@ -1511,6 +1511,15 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-08-05T02:41:11+00:00"
+      },
+      "devto": {
+        "id": 4323779,
+        "url": "https://dev.to/codenameone/compact-strings-cut-character-storage-in-half-542h",
+        "syndicated_at": "2026-08-05T15:10:15+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/compact-strings-cut-character-storage-in-half-d957eb397105?postPublishedType=initial",
+        "syndicated_at": "2026-08-05T17:01:58+00:00"
       }
     }
   }

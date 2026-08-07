@@ -110,7 +110,6 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_String_cn1FusedConcat5_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String",
             "cn1_java_lang_String_equalsIgnoreCase_java_lang_String_R_boolean",
             "cn1_java_lang_String_equals_java_lang_Object_R_boolean",
-            "cn1_java_lang_String_format_java_lang_String_java_lang_Object_1ARRAY_R_java_lang_String",
             "cn1_java_lang_String_getChars_int_int_char_1ARRAY_int",
             "cn1_java_lang_String_hashCode_R_int",
             "cn1_java_lang_String_indexOf_int_int_R_int",

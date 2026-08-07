@@ -206,6 +206,20 @@
         </Or>
     </Match>
 
+    <!--
+    TranslatorHeap reads the container memory limit so a build inside a cgroup
+    sizes the translator heap against that limit rather than the host's RAM.
+    The two paths it probes (/sys/fs/cgroup/memory.max for cgroup v2 and
+    /sys/fs/cgroup/memory/memory.limit_in_bytes for v1) are fixed locations in
+    the Linux kernel's pseudo-filesystem. There is nothing to make relative or
+    configurable, and both reads are guarded by isFile() so a non-Linux host
+    simply falls through to physical RAM.
+    -->
+    <Match>
+        <Class name="com.codename1.builders.TranslatorHeap" />
+        <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
+    </Match>
+
     <!-- RichPropertiesReader wraps a properties file with helper lookups. -->
     <Match>
         <Class name="com.codename1.util.RichPropertiesReader" />

@@ -288,13 +288,23 @@ public class LinuxNativeBuilder extends Executor {
 
         List<String> parparCmd = new ArrayList<String>();
         parparCmd.add("java");
-        // 2g: the clean target's readNativeFiles loads both .m and .c (clean's
+        // Extra translator JVM options from CN1_TRANSLATOR_OPTS, honoured on every
+        // target so the escape hatch does not work on some and silently do nothing
+        // on others.
+        List<String> translatorOpts = TranslatorHeap.extraJvmOptions();
+        parparCmd.addAll(translatorOpts);
+        // Heap sized from the machine (see TranslatorHeap), floored at 2g: the
+        // clean target's readNativeFiles loads both .m and .c (clean's
         // extension), so the in-memory native-source set is ~2x what the iOS
         // target loads, and the markDependencies/NativeSymbolIndex pass needs
         // headroom on top of that. Without the JavaAPI in classesDir the
         // translator never reaches that stage at scale; once JavaAPI is added
-        // the older 768m cap GC-thrashes.
-        parparCmd.add("-Xmx2g");
+        // the older 768m cap GC-thrashes. A -Xmx in CN1_TRANSLATOR_OPTS wins.
+        boolean heapOverridden = TranslatorHeap.specifiesHeap(translatorOpts);
+        int heapMB = TranslatorHeap.maxHeapMB(2048);
+        if (!heapOverridden) {
+            parparCmd.add("-Xmx" + heapMB + "m");
+        }
         parparCmd.add("-jar");
         parparCmd.add(parparVMCompilerJar.getAbsolutePath());
         parparCmd.add("clean");
@@ -310,7 +320,14 @@ public class LinuxNativeBuilder extends Executor {
         parparCmd.add("linux"); // project type
         parparCmd.add("none");  // additional native frameworks (none on Linux)
         try {
+            int outputMark = message.length();
             if (!exec(tmpFile, 600000, parparCmd.toArray(new String[0]))) {
+                // Name the failure rather than leaving the build to report a bare
+                // "translator failed" -- an out-of-memory death is fixable by the
+                // developer, but only if we say so.
+                if (!heapOverridden && TranslatorHeap.looksOutOfMemory(message.substring(outputMark))) {
+                    error(TranslatorHeap.outOfMemoryAdvice(heapMB, true), null);
+                }
                 return false;
             }
         } catch (Exception ex) {
