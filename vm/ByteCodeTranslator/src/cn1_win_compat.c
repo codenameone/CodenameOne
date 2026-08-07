@@ -39,6 +39,11 @@
 
 #include "cn1_win_compat.h"
 
+/* Longest single SleepConditionVariableSRW timeout, ~24.8 days. Comfortably
+   below INFINITE (0xFFFFFFFF), so a long wait is never mistaken for one that
+   must not expire. */
+#define CN1_WIN_MAX_WAIT_CHUNK_MS 0x7FFFFFFFu
+
 /* The mirror structs in the header must match the real Win32 types exactly. */
 _Static_assert(sizeof(cn1_srwlock_t) == sizeof(SRWLOCK), "SRWLOCK layout mismatch");
 _Static_assert(sizeof(cn1_condvar_t) == sizeof(CONDITION_VARIABLE), "CONDITION_VARIABLE layout mismatch");
@@ -98,21 +103,38 @@ int pthread_cond_wait(pthread_cond_t* cond, pthread_mutex_t* mutex) {
 int pthread_cond_timedwait(pthread_cond_t* cond, pthread_mutex_t* mutex, const struct timespec* abstime) {
     /* pthread passes an absolute CLOCK_REALTIME deadline; Win32 wants a
        relative millisecond timeout, so convert against the current time. */
+    /* The deadline is 64-bit milliseconds and the Win32 timeout is a 32-bit
+       DWORD, so it cannot simply be narrowed. Object.wait(Long.MAX_VALUE) -- the
+       usual "park until notified" idiom -- produces a wait of ~292 million
+       years; truncating that to 32 bits yields an arbitrary short timeout, and a
+       value whose low word happens to be 0xFFFFFFFF becomes Win32's INFINITE
+       sentinel, so the wait either returns early or never expires at all. Wait
+       in bounded chunks instead and only report a timeout once the ABSOLUTE
+       deadline has genuinely passed. */
     struct timeval now;
     long long now_ms, abs_ms, wait_ms;
-    gettimeofday(&now, NULL);
-    now_ms = (long long)now.tv_sec * 1000 + now.tv_usec / 1000;
     abs_ms = (long long)abstime->tv_sec * 1000 + abstime->tv_nsec / 1000000;
-    wait_ms = abs_ms - now_ms;
-    if (wait_ms < 0) {
-        wait_ms = 0;
-    }
-    if (!SleepConditionVariableSRW((PCONDITION_VARIABLE)&cond->cond, (PSRWLOCK)&mutex->lock, (DWORD)wait_ms, 0)) {
-        if (GetLastError() == ERROR_TIMEOUT) {
+    for (;;) {
+        DWORD chunk;
+        gettimeofday(&now, NULL);
+        now_ms = (long long)now.tv_sec * 1000 + now.tv_usec / 1000;
+        wait_ms = abs_ms - now_ms;
+        if (wait_ms <= 0) {
             return ETIMEDOUT;
         }
+        chunk = wait_ms > (long long)CN1_WIN_MAX_WAIT_CHUNK_MS
+                ? CN1_WIN_MAX_WAIT_CHUNK_MS : (DWORD)wait_ms;
+        if (SleepConditionVariableSRW((PCONDITION_VARIABLE)&cond->cond,
+                                      (PSRWLOCK)&mutex->lock, chunk, 0)) {
+            /* Signalled. A spurious wake reports success too, which is correct:
+               every caller re-tests its predicate. */
+            return 0;
+        }
+        if (GetLastError() != ERROR_TIMEOUT) {
+            return 0;
+        }
+        /* A chunk expired. Loop to find out whether the real deadline did. */
     }
-    return 0;
 }
 
 int pthread_cond_signal(pthread_cond_t* cond) {

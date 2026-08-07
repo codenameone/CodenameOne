@@ -50,7 +50,18 @@ public class CustomTimeZoneApp {
         "GMTZ", "UTCZ", "UTZ",
         // Bare prefixes: only exact uppercase UTC names a zone of its own; the
         // rest take the unknown-id fallback and answer GMT.
-        "UTC", "UT", "utc", "ut", "gmt", "Utc"
+        "UTC", "UT", "utc", "ut", "gmt", "Utc",
+        // An OFFSET suffix is accepted only after exact uppercase "GMT". The
+        // JDK's parseCustomTimeZone tests `id.indexOf("GMT") != 0`, which is
+        // case-sensitive, and the zone-name lookup ahead of it is case-sensitive
+        // too -- so every spelling below answers plain GMT with a zero offset,
+        // NOT the offset it appears to name. Reviewed as an inconsistency
+        // (the port tests the prefix case-insensitively when deciding whether an
+        // id is an offset attempt at all, and case-sensitively when deciding
+        // whether to honour it), so it is pinned here against the real JDK
+        // rather than left to argument.
+        "gmt+05:00", "Gmt+05:00", "gMt+05:00", "gmt+5", "gmt-08:00",
+        "utc+05:00", "ut+5"
     };
 
     public static void main(String[] args) {
