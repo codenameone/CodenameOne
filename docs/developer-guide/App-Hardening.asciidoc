@@ -27,6 +27,8 @@ The transform runs on the merged application jar, at the bytecode level, before 
 
 One caveat: an encrypted app literal is a different object from an equal *un-encrypted* literal elsewhere -- for example a literal of the same value returned by the framework, which isn't hardened. Reference (`==`) comparison of string literals across that boundary can therefore change. Compare strings with `.equals()`, which is unaffected; `==` on distinct string values was never a guarantee to rely on.
 
+One exclusion: a string used as an *annotation value* (or an annotation-method default) is stored by javac in the annotation metadata, not as an `LDC` or a field constant, so it's not encrypted and remains readable in the binary. Codename One has no runtime reflection, so your app can't read that value back anyway -- but don't place a secret in an annotation and expect it hidden.
+
 |Control-flow obfuscation
 |Android, desktop
 |An opaque predicate guarded by a value the decompiler can't fold. Left off the ParparVM native ports, where it fights the translator's optimizer and the arithmetic reducer, and off JavaScript, where it inflates the bundle. Never applied to constructors.
@@ -113,7 +115,7 @@ Hardening and Crash Protection are designed together. The build server retains t
 
 === Local and source builds aren't hardened
 
-Hardening runs on the Codename One build server, and only there. Running it server-side keeps the hardening implementation itself off the client: the exact transforms, the decoder shapes and the dictionary stay on infrastructure the attacker doesn't have, which is part of what makes a hardened binary harder to reverse engineer -- an attacker can't study the tool that produced it.
+Hardening runs on the Codename One build server, and only there. The engine itself is open source -- it lives in this repository and ships inside the Maven plugin -- so its protection isn't the secrecy of the algorithm. What the server boundary provides is enforcement and custody: the Enterprise entitlement is checked where the account lives (a client can't grant itself the feature), the renaming dictionary and decoder keys are seeded per build so the exact obfuscation differs each time and can't be predicted without the build key, and the obfuscation mapping is retained server-side for symbolication rather than handed to the client.
 
 A local or source-project target (`*-source`, `local-*`) never reaches the server, so its output isn't hardened; the build fails the pre-flight rather than mislead you, unless you set `harden.allowUnhardenedLocalBuild=true`. The simulator is never obfuscated either -- it runs your `target/classes` directly. App code can read `com.codename1.security.hardening.Hardening.isHardened()` to tell a hardened build apart from one of these.
 
