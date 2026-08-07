@@ -125,7 +125,7 @@ menu:
 
 * *Build for iOS On-Device Debug* runs `cn1:buildIosOnDeviceDebug`,
   which forces `codename1.arg.ios.onDeviceDebug=true` for that one
-  build. You do not need to edit
+  build. You don't need to edit
   `common/codenameone_settings.properties` first — the goal sets the
   hint itself, so a release build stays a release build.
 * *Start iOS Debug Proxy* runs `cn1:ios-on-device-debugging`, which
@@ -212,16 +212,16 @@ prefer plain files, extract it once and point at the directory.
   console (the IntelliJ *CN1 Debug Proxy* Run window when launched
   via the run config) prefixed with `[device]`.
 * Thread list — every live Java thread appears in the IDE's Threads
-  panel, whether or not it has stopped anywhere, named after the
+  panel, whether it has stopped anywhere or not, named after the
   `java.lang.Thread` it belongs to (`EDT`, `main`, ...). Suspension
   is reported per thread, so with several parked at once the panel
   shows which is which.
-* Scoped locals — a local is listed only on the source lines it is
+* Scoped locals — a local is listed only on the source lines it's
   actually in scope for. That matters where two variables share a JVM
   slot in disjoint blocks: only the one the code has reached is
   shown, rather than both, one of them displaying the other's
   storage.
-* Deferred breakpoints — a breakpoint set in a class the IDE has not
+* Deferred breakpoints — a breakpoint set in a class the IDE hasn't
   seen yet (an anonymous listener, say) resolves via the ClassPrepare
   events the proxy raises for every matching class.
 * Pause and resume from the IDE.
@@ -279,8 +279,8 @@ in the IDE editor when stepping into framework code.
   compile with debug info by default; if a variable shows up as
   `v1`, `v2`, ... that's because that particular class was
   compiled without debug info. Such a local also has no declaring
-  scope, so it is listed for the whole method rather than only
-  where it is live.
+  scope, so the debugger lists it for the whole method rather than
+  only where it's live.
 * *Two locals of the same type sharing a slot* are reported as one.
   Where disjoint blocks reuse a JVM slot for, say, two different
   `int` variables, the debugger keeps the later declaration's name
