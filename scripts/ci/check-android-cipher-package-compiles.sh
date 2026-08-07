@@ -117,11 +117,17 @@ JAVA
 # no business assembling, and compiled classes are also the more faithful target: they carry the
 # exact member visibility the application build links against, which is the thing that keeps
 # breaking.
-# The framework classes the port and the cipher package are written against.
-CORE_JAR="$(find "${CN1_LOCAL_REPO:-/tmp/cn1-local-repo}" "$HOME/.m2/repository" \
-    -path '*com/codenameone/codenameone-core/*' -name 'codenameone-core-*.jar' \
-    ! -name '*sources*' ! -name '*javadoc*' 2>/dev/null | sort | tail -1 || true)"
-[ -n "$CORE_JAR" ] || fail "no codenameone-core jar found; build the core first"
+# The framework classes the port and the cipher package are written against. Taken from the
+# reactor's own output rather than a repository, which lives in a different place in every
+# environment - and the reactor copy is the one the port beside it was compiled against.
+CORE_CLASSES="$REPO_ROOT/maven/core/target/classes"
+if [ ! -f "$CORE_CLASSES/com/codename1/db/Database.class" ]; then
+    CORE_CLASSES="$(find "${CN1_LOCAL_REPO:-/tmp/cn1-local-repo}" "$HOME/.m2/repository" \
+        -path '*com/codenameone/codenameone-core/*' -name 'codenameone-core-*.jar' \
+        ! -name '*sources*' ! -name '*javadoc*' 2>/dev/null | sort | tail -1 || true)"
+fi
+[ -n "$CORE_CLASSES" ] || fail "no compiled core found. Expected
+  \$REPO_ROOT/maven/core/target/classes, or a codenameone-core jar in a local repository."
 
 PORT_CLASSES="$REPO_ROOT/maven/android/target/classes"
 [ -d "$PORT_CLASSES" ] || fail "no compiled Android port at $PORT_CLASSES; run
@@ -147,7 +153,7 @@ set +e
 "$JAVAC" -nowarn -proc:none -d "$OUT" \
     -source 8 -target 8 \
     -bootclasspath "$ANDROID_JAR" \
-    -cp "$ANDROID_JAR:$PORT_CLASSES:$CORE_JAR" \
+    -cp "$ANDROID_JAR:$PORT_CLASSES:$CORE_CLASSES" \
     -sourcepath "$WORK_DIR/stubs" \
     "$WORK_DIR/stubs/net/zetetic/database/sqlcipher"/*.java \
     "$CIPHER_DIR"/*.java 2>"$WORK_DIR/javac.log"
