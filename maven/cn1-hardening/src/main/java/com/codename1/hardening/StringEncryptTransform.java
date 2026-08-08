@@ -549,24 +549,42 @@ public final class StringEncryptTransform {
 
     /**
      * Counts the distinct string values the current mode would encrypt that live in annotation element
-     * values or defaults (see {@link #getAnnotationLiteralCount()}). Walks class, field, method and
-     * parameter annotations plus method annotation defaults, recursing into nested annotations and array
-     * values; skips enum references ({@code String[]}) and {@code Type}, which are not string literals.
+     * values or defaults (see {@link #getAnnotationLiteralCount()}). Walks EVERY annotation collection
+     * ASM exposes -- ordinary and type-use annotations on the class, its fields, methods, method
+     * parameters and local variables, plus record-component annotations and method annotation defaults
+     * -- recursing into nested annotations and array values; skips enum references ({@code String[]}) and
+     * {@code Type}, which are not string literals.
      */
     private int countAnnotationStrings(ClassNode cn) {
         java.util.Set<String> found = new java.util.HashSet<String>();
         collectAnnotations(cn.visibleAnnotations, found);
         collectAnnotations(cn.invisibleAnnotations, found);
+        collectAnnotations(cn.visibleTypeAnnotations, found);
+        collectAnnotations(cn.invisibleTypeAnnotations, found);
+        if (cn.recordComponents != null) {
+            for (org.objectweb.asm.tree.RecordComponentNode rc : cn.recordComponents) {
+                collectAnnotations(rc.visibleAnnotations, found);
+                collectAnnotations(rc.invisibleAnnotations, found);
+                collectAnnotations(rc.visibleTypeAnnotations, found);
+                collectAnnotations(rc.invisibleTypeAnnotations, found);
+            }
+        }
         if (cn.fields != null) {
             for (FieldNode f : cn.fields) {
                 collectAnnotations(f.visibleAnnotations, found);
                 collectAnnotations(f.invisibleAnnotations, found);
+                collectAnnotations(f.visibleTypeAnnotations, found);
+                collectAnnotations(f.invisibleTypeAnnotations, found);
             }
         }
         if (cn.methods != null) {
             for (MethodNode m : cn.methods) {
                 collectAnnotations(m.visibleAnnotations, found);
                 collectAnnotations(m.invisibleAnnotations, found);
+                collectAnnotations(m.visibleTypeAnnotations, found);
+                collectAnnotations(m.invisibleTypeAnnotations, found);
+                collectAnnotations(m.visibleLocalVariableAnnotations, found);
+                collectAnnotations(m.invisibleLocalVariableAnnotations, found);
                 collectParameterAnnotations(m.visibleParameterAnnotations, found);
                 collectParameterAnnotations(m.invisibleParameterAnnotations, found);
                 collectAnnotationValue(m.annotationDefault, found);
@@ -575,7 +593,8 @@ public final class StringEncryptTransform {
         return found.size();
     }
 
-    private void collectAnnotations(java.util.List<AnnotationNode> list, java.util.Set<String> out) {
+    private void collectAnnotations(java.util.List<? extends AnnotationNode> list,
+                                    java.util.Set<String> out) {
         if (list == null) {
             return;
         }
@@ -755,6 +774,30 @@ public final class StringEncryptTransform {
         }
         if (valueToField.size() > budget) {
             return encryptAllMethodsPerAccess(cn, base, decoderName, false);
+        }
+        // Preflight the LDC -> GETSTATIC growth: GETSTATIC is always 3 bytes, but an LDC whose
+        // constant-pool index is below 256 is only 2, so replacing hoisted LDCs can grow a method that
+        // is already near the 65535-byte limit. MethodSize charges an LDC as 3 (= GETSTATIC), so
+        // estimateBytes(mn) already equals the post-hoist size; if a method would exceed the safe bound,
+        // exclude its selected values jar-wide -- their LDCs then stay plaintext, so the method is
+        // unchanged -- rather than let ASM throw MethodTooLargeException.
+        for (MethodNode mn : cn.methods) {
+            if (mn.instructions == null || decoderName.equals(mn.name)
+                    || MethodSize.estimateBytes(mn) <= MethodSize.SAFE_LIMIT) {
+                continue;
+            }
+            for (AbstractInsnNode insn = mn.instructions.getFirst(); insn != null; insn = insn.getNext()) {
+                if (insn instanceof LdcInsnNode && ((LdcInsnNode) insn).cst instanceof String
+                        && valueToField.containsKey((String) ((LdcInsnNode) insn).cst)) {
+                    newlyExcluded.add((String) ((LdcInsnNode) insn).cst);
+                }
+            }
+        }
+        if (!newlyExcluded.isEmpty()) {
+            valueToField.keySet().removeAll(newlyExcluded);
+            if (valueToField.isEmpty()) {
+                return false;
+            }
         }
         // 2. Build the initializer BEFORE mutating anything.
         InsnList init = new InsnList();

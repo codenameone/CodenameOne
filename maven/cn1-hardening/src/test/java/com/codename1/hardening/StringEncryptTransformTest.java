@@ -410,12 +410,22 @@ public class StringEncryptTransformTest {
         fav.visit("fieldSecret", "a field annotation secret value");
         fav.visitEnd();
         fv.visitEnd();
+        // A type-use annotation on a field type (visibleTypeAnnotations) also carries a string.
+        org.objectweb.asm.FieldVisitor tv = w.visitField(org.objectweb.asm.Opcodes.ACC_PRIVATE,
+                "typed", "Ljava/lang/String;", null, null);
+        org.objectweb.asm.AnnotationVisitor tav = tv.visitTypeAnnotation(
+                org.objectweb.asm.TypeReference.newTypeReference(
+                        org.objectweb.asm.TypeReference.FIELD).getValue(),
+                null, "Lapp/TypeAnno;", true);
+        tav.visit("typeSecret", "a type-use annotation secret value");
+        tav.visitEnd();
+        tv.visitEnd();
         w.visitEnd();
 
         StringEncryptTransform t = new StringEncryptTransform(true, 9);
         byte[] out = t.transform(w.toByteArray());
-        assertEquals("the three distinct annotation strings are counted, the enum ref is not",
-                3, t.getAnnotationLiteralCount());
+        assertEquals("the four distinct annotation strings are counted, the enum ref is not",
+                4, t.getAnnotationLiteralCount());
         // The annotation string survives verbatim in the constant pool (no channel encrypts it).
         assertTrue("annotation strings stay plaintext (no channel reaches them)",
                 containsRawBytes(out, "a class annotation secret value"));
@@ -433,6 +443,43 @@ public class StringEncryptTransformTest {
             return true;
         }
         return false;
+    }
+
+    @Test
+    public void nearLimitMethodExcludesHoistedLiteralsInsteadOfOverflowing() throws Exception {
+        // Replacing an LDC (2 bytes for a small pool index) with GETSTATIC (3 bytes) grows a method, so
+        // hoisting a literal in a method already near the 65535-byte limit could overflow it. Those
+        // values are excluded jar-wide (their LDCs stay plaintext, method unchanged); a literal in a
+        // normal method is still encrypted.
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/NearLimit", null, "java/lang/Object", null);
+        // A method already ~60 KB with three encryptable literals.
+        org.objectweb.asm.MethodVisitor big = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "big", "()V", null, null);
+        big.visitCode();
+        for (int i = 0; i < 30100; i++) {
+            big.visitInsn(org.objectweb.asm.Opcodes.ICONST_0);
+            big.visitInsn(org.objectweb.asm.Opcodes.POP);
+        }
+        for (int i = 0; i < 3; i++) {
+            big.visitLdcInsn("a near-limit hoisted secret literal " + i);
+            big.visitInsn(org.objectweb.asm.Opcodes.POP);
+        }
+        big.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        big.visitMaxs(1, 0);
+        big.visitEnd();
+        addStringGetter(w, "small", "a normal hoisted secret literal");
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 3);
+        byte[] out = t.transform(w.toByteArray());
+        assertEquals("the near-limit method's three literals are excluded", 3, t.getNewlyExcluded().size());
+        assertTrue("the normal method's literal is still encrypted", t.getEncryptedCount() >= 1);
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        assertTrue("an excluded literal stays plaintext",
+                StringEncryptTransform.containsStringLiteral(out, "a near-limit hoisted secret literal 0"));
     }
 
     @Test
