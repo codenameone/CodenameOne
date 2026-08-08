@@ -694,6 +694,23 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         editor.addChangeListener(e -> editor.getText(text -> editorBuffer = text));
     }
 
+    /**
+     * The text to open a pane with: the live buffer when this pane is the one already on screen,
+     * otherwise null so the caller reads the file.
+     *
+     * <p>Re-invoking the action for the pane you are already editing must not cost you the edit.
+     * The canvas-rebuild reopen goes through the same path, which is why {@code reopeningEditor}
+     * counts as well.
+     *
+     * @param kind the pane being opened: "source", "model" or "css"
+     * @return the buffer to reuse, or null to load from disk
+     */
+    private String keptBuffer(String kind) {
+        if (editorBuffer == null) return null;
+        if (reopeningEditor) return editorBuffer;
+        return kind != null && kind.equals(editorBufferKind) ? editorBuffer : null;
+    }
+
     /** True when the open editor holds text that is not on disk. */
     private boolean editorBufferIsDirty() {
         return editorBuffer != null && !editorBuffer.equals(editorBufferOnDisk);
@@ -708,9 +725,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @return true when the caller may proceed
      */
     private boolean confirmDiscardEditorBuffer(String what, String opening) {
-        // Reopening the pane already on screen is not a discard -- it reloads the same file, and
-        // prompting there made openCss() bail out while activeCodeEditor still referenced the
-        // previous editor, so typing went into a detached one and live restyling stopped.
+        // Reopening the pane already on screen is not a discard, but only because the caller keeps
+        // the buffer instead of re-reading the file -- see keptBuffer(). Skipping the prompt here
+        // without that would silently drop unsaved text when the user clicks Code, Model or CSS
+        // while that same pane is already open and dirty.
         if (reopeningEditor || !editorBufferIsDirty()) return true;
         if (opening != null && opening.equals(editorBufferKind)) return true;
         if (com.codename1.ui.Dialog.show("Unsaved changes",
@@ -3291,6 +3309,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String sourcePath = companionSourcePath();
         String modelPath = sourcePath.substring(0, sourcePath.length() - 5) + "Model.java";
         if ("none".equals(strategy)) {
+            // Supersedes any pending rewrite: leaving it armed meant Save regenerated the model
+            // under strategy "none" and replaced the developer's file with an empty disabled class,
+            // while the status line said only that it was no longer referenced.
+            regenerateModelFor = null;
             if (ProjectIO.exists(modelPath)) {
                 setStatus("Binding disabled; " + modelPath.substring(modelPath.lastIndexOf('/') + 1)
                         + " is no longer referenced and can be deleted");
@@ -4437,7 +4459,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         try {
             refreshEditor();
             String css = ProjectIO.read(binding.cssFile());
-            if (reopeningEditor && editorBuffer != null) css = editorBuffer;
+            String keptCss = keptBuffer("css");
+            if (keptCss != null) css = keptCss;
             CodeEditor editor = new CodeEditor("css", css);
             activeCodeEditor = editor;
             lastObservedCss = css;
@@ -4509,7 +4532,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // split panes and push the design surface out of reach.
             refreshEditor();
             String source = ProjectIO.exists(modelPath) ? ProjectIO.read(modelPath) : generatedModelSource();
-            if (reopeningEditor && editorBuffer != null) source = editorBuffer;
+            String keptModel = keptBuffer("model");
+            if (keptModel != null) source = keptModel;
             CodeEditor editor = new CodeEditor("java", source);
             activeCodeEditor = editor;
             trackEditorBuffer(editor, source, "model");
@@ -4552,7 +4576,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             String source = ProjectIO.exists(sourcePath) ? mergeGeneratedSource(ProjectIO.read(sourcePath), generated) : generated;
             // A rebuild must not cost the user their unsaved text; the mirror is what they were
             // actually looking at, the file is merely what was last written.
-            if (reopeningEditor && editorBuffer != null) source = editorBuffer;
+            String keptSource = keptBuffer("source");
+            if (keptSource != null) source = keptSource;
             for (String generatedHandler : generatedHandlers()) source = ensureHandler(source, generatedHandler);
             // Normalized, because the stub and the listener are both generated from the normalized
             // name. Passing the raw Events value here appended a second, invalid declaration for
