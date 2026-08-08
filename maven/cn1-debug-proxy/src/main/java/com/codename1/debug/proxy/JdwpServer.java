@@ -31,9 +31,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -72,6 +74,11 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     private static final int CS_STACK_FRAME         = 16;
     private static final int CS_CLASS_OBJECT_REF    = 17;
     private static final int CS_EVENT               = 64;
+
+    /** JDWP error: the requested debug information was not compiled in. */
+    private static final int ERR_ABSENT_INFORMATION = 101;
+    /** JDWP error: the command is not supported by this VM. */
+    private static final int ERR_NOT_IMPLEMENTED    = 100;
 
     // Event kinds (subset)
     private static final int EK_SINGLE_STEP   = 1;
@@ -532,7 +539,38 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
 
     private static final boolean LOG_JDWP = Boolean.getBoolean("cn1.debug.logJdwp");
 
+    /**
+     * Command set of the request being served, for diagnostics. Requests are
+     * read and dispatched one at a time on the connection's reader thread.
+     */
+    private int currentCmdSet;
+
+    /** Command-set/command pairs already reported as unimplemented. */
+    private final Set<Integer> reportedUnimplemented = new HashSet<>();
+
+    /**
+     * Declines a command this proxy does not implement, and says so once.
+     *
+     * <p>Declining in silence is what made {@code Unexpected JDWP Error: 100}
+     * -- which a debugger reports without naming the command it asked for --
+     * impossible to act on from either side of the connection.</p>
+     */
+    private void writeNotImplemented(int id, int cmd) throws IOException {
+        Integer key = (currentCmdSet << 16) | (cmd & 0xFFFF);
+        boolean firstTime;
+        synchronized (reportedUnimplemented) {
+            firstTime = reportedUnimplemented.add(key);
+        }
+        if (firstTime) {
+            System.err.println("[jdwp] declining unimplemented command set="
+                    + currentCmdSet + " cmd=" + cmd
+                    + "; the debugger may report \"Unexpected JDWP Error: 100\"");
+        }
+        writeReply(id, ERR_NOT_IMPLEMENTED, empty());
+    }
+
     private void dispatchCommand(int id, int cmdSet, int cmd, byte[] p) throws IOException {
+        currentCmdSet = cmdSet;
         if (LOG_JDWP) System.out.println("[jdwp<-] cmdSet=" + cmdSet + " cmd=" + cmd + " len=" + p.length);
         try {
             switch (cmdSet) {
@@ -550,10 +588,10 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 case CS_CLASS_LOADER_REF:
                 case CS_CLASS_OBJECT_REF:
                     // Reply with NOT_IMPLEMENTED (100) so jdb falls back gracefully.
-                    writeReply(id, 100, empty());
+                    writeNotImplemented(id, cmd);
                     return;
                 default:
-                    writeReply(id, 100, empty());
+                    writeNotImplemented(id, cmd);
             }
         } catch (Throwable t) {
             t.printStackTrace();
@@ -684,7 +722,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 return;
             }
             default:
-                writeReply(id, 100, empty());
+                writeNotImplemented(id, cmd);
         }
     }
 
@@ -792,11 +830,36 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 Buf b = new Buf(); b.writeLong(typeID); writeReply(id, 0, b.bytes()); return;
             }
             default:
-                writeReply(id, 100, empty());
+                writeNotImplemented(id, cmd);
         }
     }
 
     // -------- Method --------------------------------------------------------
+
+    /**
+     * The code index to report for a frame stopped at {@code line}.
+     *
+     * <p>ParparVM's code index is the source line, so the two are normally the
+     * same number. They come apart for a frame the device reports a line we
+     * have no table entry for -- a line the optimiser moved, or 0 for a frame
+     * that has not reached a tracked line yet. A debugger resolves a location
+     * strictly against the table it was given, so an index missing from it is
+     * not merely displayed oddly: jdb raises {@code InternalError: Location
+     * with invalid code index} and the stack view stops there.</p>
+     *
+     * <p>Snapping down to the nearest line the method really has keeps the
+     * frame both displayable and honest -- it names the last line known to
+     * have started -- and a frame with no line yet shows the method's first.</p>
+     */
+    private static long frameCodeIndex(SymbolTable.MethodInfo m, int line) {
+        if (m == null || m.lines.isEmpty()) {
+            // No table to be consistent with; LineTable reports the absence.
+            return line;
+        }
+        if (m.lines.contains(line)) return line;
+        Integer atOrBefore = m.lines.floor(line);
+        return atOrBefore != null ? atOrBefore : m.lines.first();
+    }
 
     private void handleMethod(int id, int cmd, byte[] p) throws IOException {
         long typeID = readLong(p, 0);
@@ -804,16 +867,25 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         SymbolTable.MethodInfo m = symbols.methodById(fromJdwpRef(methodID));
         switch (cmd) {
             case 1: { // LineTable
-                Buf b = new Buf();
                 if (m == null || m.lines.isEmpty()) {
-                    b.writeLong(0); b.writeLong(0); b.writeInt(0);
-                } else {
-                    long start = m.lines.first();
-                    long end = m.lines.last();
-                    b.writeLong(start); b.writeLong(end); b.writeInt(m.lines.size());
-                    for (int line : m.lines) {
-                        b.writeLong(line); b.writeInt(line);
-                    }
+                    // A method we have no lines for has to say so. Answering
+                    // "success, zero entries" instead leaves the debugger
+                    // holding an empty table it still believes is authoritative,
+                    // and the first frame in such a method takes down the whole
+                    // stack view: jdb turns it into
+                    //   InternalError: Location with invalid code index
+                    // out of `where`, killing the session. ABSENT_INFORMATION is
+                    // what the spec reserves for this and every debugger already
+                    // handles it -- the frame just shows no line number.
+                    writeReply(id, ERR_ABSENT_INFORMATION, empty());
+                    return;
+                }
+                Buf b = new Buf();
+                long start = m.lines.first();
+                long end = m.lines.last();
+                b.writeLong(start); b.writeLong(end); b.writeInt(m.lines.size());
+                for (int line : m.lines) {
+                    b.writeLong(line); b.writeInt(line);
                 }
                 writeReply(id, 0, b.bytes());
                 return;
@@ -873,7 +945,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 Buf b = new Buf(); b.writeByte(0); writeReply(id, 0, b.bytes()); return;
             }
             default:
-                writeReply(id, 100, empty());
+                writeNotImplemented(id, cmd);
         }
     }
 
@@ -923,7 +995,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 return;
             }
             default:
-                writeReply(id, 100, empty());
+                writeNotImplemented(id, cmd);
         }
     }
 
@@ -1056,7 +1128,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     b.writeByte(TYPE_TAG_CLASS);
                     b.writeLong(toJdwpRef(classId));
                     b.writeLong(toJdwpRef(mids[idx]));
-                    b.writeLong(lines[idx]);
+                    b.writeLong(frameCodeIndex(m, lines[idx]));
                 }
                 writeReply(id, 0, b.bytes()); return;
             }
@@ -1071,7 +1143,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 writeReply(id, 0, b.bytes()); return;
             }
             default:
-                writeReply(id, 100, empty());
+                writeNotImplemented(id, cmd);
         }
     }
 
@@ -1088,7 +1160,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 writeReply(id, 0, b.bytes()); return;
             }
             default:
-                writeReply(id, 100, empty());
+                writeNotImplemented(id, cmd);
         }
     }
 
@@ -1183,7 +1255,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 return;
             }
             default:
-                writeReply(id, 100, empty());
+                writeNotImplemented(id, cmd);
         }
     }
 
@@ -1404,7 +1476,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 return;
             }
             default:
-                writeReply(id, 100, empty());
+                writeNotImplemented(id, cmd);
         }
     }
 
@@ -1584,7 +1656,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 Buf b = new Buf(); b.writeByte(0); writeReply(id, 0, b.bytes()); return;
             }
             default:
-                writeReply(id, 100, empty());
+                writeNotImplemented(id, cmd);
         }
     }
 
@@ -1599,7 +1671,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 return;
             }
             default:
-                writeReply(id, 100, empty());
+                writeNotImplemented(id, cmd);
         }
     }
 
@@ -1654,7 +1726,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 return;
             }
             default:
-                writeReply(id, 100, empty());
+                writeNotImplemented(id, cmd);
         }
     }
 
