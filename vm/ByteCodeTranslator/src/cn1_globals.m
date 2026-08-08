@@ -29,6 +29,15 @@
 #include "cn1_globals.h"
 #include <assert.h>
 #include <time.h>   // clock_gettime: paces the low-memory allocation throttle
+#ifndef _WIN32
+#include <unistd.h>    // getpagesize: sizes the BiBOP page-release window
+#include <sys/mman.h>  // madvise: hands surplus empty BiBOP pages back to the OS
+#include <errno.h>
+#endif
+#if defined(__APPLE__)
+#include <mach/mach.h>
+#include <mach/task_info.h>
+#endif
 #include "java_lang_Class.h"
 #include "java_lang_Object.h"
 #include "java_lang_Boolean.h"
@@ -2261,6 +2270,15 @@ _Atomic long bibopGcTriggerBytes = CN1_BIBOP_GC_TRIGGER_BYTES;
 _Atomic int bibopGcEpoch = 1;
 _Atomic int bibopBypassGeneration[CN1_BIBOP_NUM_CLASSES];
 static long bibopCycleAllocatedBytes = 0;
+// LEGACY bytes charged to the cycle that is starting -- the twin of
+// bibopCycleAllocatedBytes for allocations above CN1_BIBOP_MAX_OBJECT. The
+// exchange result used to be discarded, which made a large-array workload look
+// QUIET to the major-sweep test below however hard it was allocating (its bytes
+// never reach bibopBytesSinceGc). That is the one shape where splicing every
+// partial page into every sweep is worst: heavy legacy churn driving the cycles
+// while a large BiBOP survivor set supplies the pages to walk -- precisely the
+// issue-5425 workload. GC-thread only, published at cycle begin.
+static long legacyCycleAllocatedBytes = 0;
 static long bibopLastCycleOccupiedBytes = 0;
 static long bibopLastCycleLiveBytes = 0;
 static long bibopLastCycleReclaimedBytes = 0;
@@ -2323,6 +2341,16 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     p->freeList = 0;
     p->freeCount = 0;
     p->owned = JAVA_FALSE;
+    // Page-release state. Both MUST be initialized here: a page from
+    // cn1BibopRawPage is indeterminate memory, and cn1BibopTrimFreePool READS
+    // gcPageReleased before anything has written it. A stale nonzero value would
+    // make the trim skip the madvise, mark the page released anyway and file it
+    // under bibopReleasedPool -- the release silently doing nothing for that page
+    // -- while a stale gcMajorSpliced would drop an ordinary page out of the
+    // adaptive-trigger statistics. Reformatting a recycled page also lands here,
+    // where both are already false, so the writes are idempotent.
+    p->gcPageReleased = JAVA_FALSE;
+    p->gcMajorSpliced = JAVA_FALSE;
 #ifdef CN1_GC_VERIFY
     // QA: a recycled page still holds the DEAD previous occupants' headers, so a
     // reference that dangles into it would resolve to a plausible-looking object
@@ -2378,7 +2406,8 @@ void cn1BibopBeginGcCycle(void) {
     // Same atomic-exchange idiom as the BiBOP reset above: a racing fetch_add
     // lands either before the swap (covered by the cycle that is starting) or
     // after it (charged to the next cycle) -- never dropped.
-    (void)atomic_exchange_explicit(&cn1LegacyBytesSinceGc, 0, memory_order_acq_rel);
+    legacyCycleAllocatedBytes = (long)atomic_exchange_explicit(&cn1LegacyBytesSinceGc, 0,
+                                                               memory_order_acq_rel);
     // Latch AFTER the counter: an allocator racing between the two exchanges
     // still sees the old latch and skips, so the fresh latch can never be
     // consumed by bytes just charged to the cycle that is starting.
@@ -2451,12 +2480,300 @@ static void* cn1BibopRawPage(void) {
 #endif
 }
 
+// ===================== PAGE RELEASE (issue 5537) =====================
+// A swept-empty page used to stay resident forever: it went to bibopFreePool and
+// BiBOP had no munmap/madvise/free path at all. Because pages are ALSO
+// size-class segregated, that memory was not merely idle, it was unusable by
+// anything except a future block of CN1_BIBOP_MAX_OBJECT bytes or less -- a
+// large array, an image buffer or a native texture could not touch it. So a
+// transient small-object peak permanently subtracted its own size from the
+// process budget, which on iOS is a jetsam ceiling of roughly 1.4GB rather than
+// a desktop's many gigabytes. BibopPageFloorIntegrationTest measures it: after
+// holding then dropping 192MB of small objects and forcing six collection
+// cycles, allocating a 192MB texture set cost the full 192MB again, while the
+// identical allocation over a legacy-freed hole cost nothing.
+//
+// The fix hands the slot region of surplus empty pages back to the OS. Three
+// properties keep it cheap and safe:
+//
+//  - ONLY fully-empty pages, and only the ones beyond a warm cache of
+//    CN1_BIBOP_FREE_POOL_KEEP. Steady-state churn cycles pages through the warm
+//    cache and never calls madvise at all; a workload whose small-object demand
+//    SHRINKS is the only one that pays, which is exactly the 5537 shape.
+//  - The page HEADER stays resident. Only the slot region is released, starting
+//    at the first system-page boundary at or after sizeof(CN1BibopPage), so the
+//    pool links, the class index and the bump cursor survive. BiBOP pages are
+//    CN1_BIBOP_PAGE_SIZE-aligned and that is a multiple of every system page
+//    size we run on, so the page base is always system-page-aligned.
+//  - Reads of a released region cannot fault -- the mapping is still there, they
+//    return zero or stale bytes. That matters because the conservative root
+//    resolver can still probe such a page from a stale stack word. It rejects
+//    what it finds either way: a zeroed slot has __heapPosition 0, which is
+//    neither CN1_BIBOP_HEAP_POS nor CN1_BIBOP_ADOPTED. Nothing live can be lost
+//    because a page only reaches this path with liveCount == 0, which the sweep
+//    established AFTER the mark that the conservative scan feeds.
+#ifndef CN1_BIBOP_FREE_POOL_KEEP
+#define CN1_BIBOP_FREE_POOL_KEEP 64   /* 64 * 64KB = 4MB kept warm, never released */
+#endif
+// Bound on the madvise work one sweep may do, so a collapse from a huge pool
+// cannot turn a single cycle into a syscall storm. The remainder is released by
+// the following sweeps.
+#ifndef CN1_BIBOP_RELEASE_PER_SWEEP
+#define CN1_BIBOP_RELEASE_PER_SWEEP 1024  /* up to 64MB per cycle */
+#endif
+// A cycle that allocated less than this is treated as QUIET: the app is not
+// churning, so the major sweep below is both cheap (no mutator contending for
+// the pages) and exactly what is wanted (a burst has just ended and its memory
+// should go back). A quarter of the base trigger is comfortably below any
+// allocation-driven cycle, which by construction crosses the whole trigger.
+#ifndef CN1_BIBOP_MAJOR_SWEEP_QUIET_BYTES
+#define CN1_BIBOP_MAJOR_SWEEP_QUIET_BYTES (CN1_BIBOP_GC_TRIGGER_BYTES / 4)
+#endif
+// Backstop cadence for an app that never goes quiet, so a long-running churn
+// still eventually returns pages. Every cycle would make the sweep O(all pages),
+// which is the regression issue 5425 fixed.
+#ifndef CN1_BIBOP_MAJOR_SWEEP_CYCLES
+#define CN1_BIBOP_MAJOR_SWEEP_CYCLES 16
+#endif
+// Cycles since the last major sweep. GC-thread only.
+static int bibopCyclesSinceMajorSweep = 0;
+
+// Env-gated tracer, same pattern as CN1_LOG_LOWMEM_PARKS: one line per sweep
+// that actually released pages. Costs a cached getenv when disabled.
+static _Atomic int cn1PageReleaseTrace = -1;
+static int cn1PageReleaseTraceOn(void) {
+    int on = atomic_load_explicit(&cn1PageReleaseTrace, memory_order_relaxed);
+    if(on < 0) {
+        on = getenv("CN1_LOG_PAGE_RELEASE") ? 1 : 0;
+        atomic_store_explicit(&cn1PageReleaseTrace, on, memory_order_relaxed);
+    }
+    return on;
+}
+
+// Last errno from a rejected MADV_FREE_REUSABLE, surfaced by the tracer. Only
+// MADV_FREE_REUSABLE decrements phys_footprint; the MADV_FREE fallback leaves
+// the pages charged to the process, so a nonzero value here means the release
+// ran but bought nothing.
+static int cn1PageReleaseReusableErrno = 0;
+
+// Empty pages whose slot region has been given back to the OS. Kept OFF
+// bibopFreePool so the acquire path always prefers a warm page and only pays the
+// re-acquire plus refault when no warm page is left. bibopMutex.
+static CN1BibopPage* bibopReleasedPool = 0;
+
+#if defined(CN1_GC_INSTRUMENT) && !defined(CN1_BIBOP_NO_PAGE_RELEASE)
+static _Atomic long cn1BibopPagesReleased = 0;
+static _Atomic long cn1BibopPagesReacquired = 0;
+#endif
+
+// Byte offset within a page at which the releasable slot region begins, or 0 if
+// releasing is impossible on this configuration (system page so large that the
+// header plus one system page would not fit).
+static size_t cn1BibopReleaseOffset(void) {
+#if defined(CN1_BIBOP_NO_PAGE_RELEASE) || defined(_WIN32)
+    return 0;
+#elif defined(CN1_GC_VERIFY)
+    // The heap verifier works by INSPECTING memory the allocator has logically
+    // freed: cn1BibopFormatPage poisons every recycled slot and the verifier
+    // classifies a reference that lands on one as a violation. Handing those
+    // pages back to the OS erases that evidence -- they fault back in as zeroes,
+    // the conservative resolver rejects a zeroed slot on __heapPosition, and a
+    // genuine dangling reference reads as "no such object" instead of being
+    // reported. GcHeapIntegrityIntegrationTest catches this directly: with page
+    // release on, its deliberately re-injected grace-pass defect (issue 5425)
+    // stops being detected and the gate goes inert. QA builds therefore keep
+    // pages resident; shipping builds, which is where footprint matters, do not
+    // define CN1_GC_VERIFY.
+    return 0;
+#else
+    static size_t cached = (size_t)-1;
+    if(cached == (size_t)-1) {
+        size_t ps = (size_t)getpagesize();
+        if(ps == 0 || (ps & (ps - 1)) != 0) {
+            cached = 0;
+        } else {
+            size_t hdr = (sizeof(CN1BibopPage) + ps - 1) & ~(ps - 1);
+            cached = (hdr + ps > (size_t)CN1_BIBOP_PAGE_SIZE) ? 0 : hdr;
+        }
+    }
+    return cached;
+#endif
+}
+
+// Hand a fully-empty page's slot region back to the OS. Returns whether the
+// advice was actually accepted: madvise can fail (a transient EAGAIN from
+// Linux MADV_DONTNEED, or a range Darwin refuses), and a page whose memory was
+// NOT handed back must not be recorded as released -- it would be filed under
+// bibopReleasedPool and never retried, so the footprint would stay up forever
+// with nothing to show that anything went wrong. The caller keeps a rejected
+// page in bibopFreePool so the next sweep tries it again.
+// The caller must have made the page unreachable from every pool first.
+static JAVA_BOOLEAN cn1BibopReleasePageMemory(CN1BibopPage* p) {
+#if !defined(CN1_BIBOP_NO_PAGE_RELEASE) && !defined(_WIN32)
+    size_t off = cn1BibopReleaseOffset();
+    if(off == 0) {
+        return JAVA_FALSE;
+    }
+    void* addr = (char*)p + off;
+    size_t len = (size_t)CN1_BIBOP_PAGE_SIZE - off;
+    JAVA_BOOLEAN ok = JAVA_FALSE;
+#if defined(__APPLE__)
+    // MADV_FREE_REUSABLE is what libmalloc uses to return large blocks, and
+    // unlike plain MADV_FREE it decrements phys_footprint immediately -- which
+    // is the figure iOS jetsam meters, so it is the one that has to move.
+    // MADV_FREE is kept as a fallback: it still lets the kernel take the pages
+    // under pressure, just without moving the accounting. Pairing MADV_FREE_REUSE
+    // with a range that only got MADV_FREE is harmless (it is rejected and there
+    // is no accounting to restore), so one released flag covers both.
+    if(madvise(addr, len, MADV_FREE_REUSABLE) == 0) {
+        ok = JAVA_TRUE;
+    } else {
+        cn1PageReleaseReusableErrno = errno;
+        ok = (madvise(addr, len, MADV_FREE) == 0) ? JAVA_TRUE : JAVA_FALSE;
+    }
+#elif defined(MADV_DONTNEED)
+    // Linux: drops the pages and re-faults them as zero, which is exactly the
+    // contract the acquire-path format expects.
+    ok = (madvise(addr, len, MADV_DONTNEED) == 0) ? JAVA_TRUE : JAVA_FALSE;
+#endif
+#if defined(CN1_GC_INSTRUMENT)
+    if(ok) {
+        atomic_fetch_add_explicit(&cn1BibopPagesReleased, 1, memory_order_relaxed);
+    }
+#endif
+    return ok;
+#else
+    (void)p;
+    return JAVA_FALSE;
+#endif
+}
+
+// Take a released page back into service. On Darwin the REUSE call is what
+// restores the footprint accounting MADV_FREE_REUSABLE removed; skipping it
+// would leave the process under-reporting memory it is genuinely using again.
+static void cn1BibopReusePageMemory(CN1BibopPage* p) {
+#if !defined(CN1_BIBOP_NO_PAGE_RELEASE) && !defined(_WIN32)
+    size_t off = cn1BibopReleaseOffset();
+    if(off == 0) {
+        return;
+    }
+#if defined(__APPLE__)
+    madvise((char*)p + off, (size_t)CN1_BIBOP_PAGE_SIZE - off, MADV_FREE_REUSE);
+#endif
+#if defined(CN1_GC_INSTRUMENT)
+    atomic_fetch_add_explicit(&cn1BibopPagesReacquired, 1, memory_order_relaxed);
+#endif
+#endif
+    p->gcPageReleased = JAVA_FALSE;
+}
+
+// Release the surplus of bibopFreePool. Called at the end of a sweep, on the GC
+// thread. The surplus is UNLINKED under the mutex before any madvise runs, so an
+// allocator can never acquire a page while its slot region is being dropped; the
+// pages are then published onto bibopReleasedPool in one O(1) splice.
+static void cn1BibopTrimFreePool(void) {
+#if !defined(CN1_BIBOP_NO_PAGE_RELEASE) && !defined(_WIN32)
+    if(cn1BibopReleaseOffset() == 0) {
+        return;
+    }
+    pthread_mutex_lock(&bibopMutex);
+    CN1BibopPage* keepTail = 0;
+    CN1BibopPage* p = bibopFreePool;
+    int kept = 0;
+    while(p != 0 && kept < CN1_BIBOP_FREE_POOL_KEEP) {
+        keepTail = p;
+        p = p->nextPool;
+        kept++;
+    }
+    // p is the head of the surplus; bound how much of it this sweep takes.
+    CN1BibopPage* surplus = p;
+    CN1BibopPage* surplusTail = 0;
+    int taken = 0;
+    while(p != 0 && taken < CN1_BIBOP_RELEASE_PER_SWEEP) {
+        surplusTail = p;
+        p = p->nextPool;
+        taken++;
+    }
+    if(surplusTail != 0) {
+        surplusTail->nextPool = 0;          // detach the taken run
+        if(keepTail != 0) {
+            keepTail->nextPool = p;         // splice any untaken remainder back
+        } else {
+            bibopFreePool = p;
+        }
+    }
+    pthread_mutex_unlock(&bibopMutex);
+
+    if(surplusTail == 0) {
+        return;                             // nothing above the warm cache
+    }
+    // Partition the detached run: pages whose memory the kernel actually took go
+    // to bibopReleasedPool, pages it rejected go back to bibopFreePool. The
+    // rejected ones are still perfectly good empty pages -- they simply have not
+    // been handed back yet -- so returning them to the free pool both keeps them
+    // allocatable and lets a later sweep retry the release.
+    CN1BibopPage* relHead = 0;
+    CN1BibopPage* relTail = 0;
+    CN1BibopPage* retryHead = 0;
+    CN1BibopPage* retryTail = 0;
+    int releasedNow = 0;
+    int rejected = 0;
+    CN1BibopPage* q = surplus;
+    while(q != 0) {
+        CN1BibopPage* next = q->nextPool;
+        JAVA_BOOLEAN released = q->gcPageReleased;
+        if(!released) {
+            released = cn1BibopReleasePageMemory(q);
+            if(released) {
+                q->gcPageReleased = JAVA_TRUE;
+                releasedNow++;
+            } else {
+                rejected++;
+            }
+        }
+        if(released) {
+            q->nextPool = relHead;
+            relHead = q;
+            if(relTail == 0) relTail = q;
+        } else {
+            q->nextPool = retryHead;
+            retryHead = q;
+            if(retryTail == 0) retryTail = q;
+        }
+        q = next;
+    }
+    if(cn1PageReleaseTraceOn()) {
+        fprintf(stderr, "[PAGE-RELEASE] kept=%d taken=%d released=%d rejected=%d "
+                "headerBytes=%zu reusableErrno=%d\n",
+                kept, taken, releasedNow, rejected, cn1BibopReleaseOffset(),
+                cn1PageReleaseReusableErrno);
+    }
+    pthread_mutex_lock(&bibopMutex);
+    if(relTail != 0) {
+        relTail->nextPool = bibopReleasedPool;
+        bibopReleasedPool = relHead;
+    }
+    if(retryTail != 0) {
+        retryTail->nextPool = bibopFreePool;
+        bibopFreePool = retryHead;
+    }
+    pthread_mutex_unlock(&bibopMutex);
+#endif
+}
+
 static CN1BibopPage* cn1BibopNewPage(int ci) {
     void* mem = cn1BibopRawPage();
     if(mem == 0) {
         return 0;
     }
     CN1BibopPage* p = (CN1BibopPage*)mem;
+    // cn1BibopRawPage hands back indeterminate memory (an arena carved from
+    // posix_memalign, which malloc may have recycled from its own free list), so
+    // every header field is garbage until written. cn1BibopFormatPage sets the
+    // ones it knows about; zeroing first means a field added later cannot be
+    // silently read before its first assignment, which is the defect this guards
+    // against. Once per NEW page only -- the pool hit path never reaches here.
+    memset(p, 0, sizeof(CN1BibopPage));
     cn1BibopFormatPage(p, ci);
     // Publish into the append-only registry: set nextAll (release) BEFORE the
     // head CAS so a concurrent rescan that reads the new head (acquire) sees a
@@ -2663,6 +2980,14 @@ static CN1BibopPage* cn1BibopAcquirePage(int ci) {
     } else if(bibopFreePool != 0) {
         np = bibopFreePool;
         bibopFreePool = np->nextPool;
+        cn1BibopFormatPage(np, ci);
+    } else if(bibopReleasedPool != 0) {
+        // Warm pages are gone; take one whose slot region was handed back to the
+        // OS. The REUSE call must precede the format, which writes into that
+        // region (and under CN1_GC_VERIFY writes every slot).
+        np = bibopReleasedPool;
+        bibopReleasedPool = np->nextPool;
+        cn1BibopReusePageMemory(np);
         cn1BibopFormatPage(np, ci);
     }
     pthread_mutex_unlock(&bibopMutex);
@@ -3150,6 +3475,70 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     const int cn1GcFaultEarlyFree = 0;
 #endif
     CN1BibopPage* list = atomic_exchange_explicit(&bibopSweepStack, (CN1BibopPage*)0, memory_order_acquire);
+#if !defined(CN1_BIBOP_NO_PAGE_RELEASE)
+    // MAJOR SWEEP (issue 5537). The ordinary sweep only ever sees RETIRED pages
+    // -- ones a thread filled and handed back. A page that was swept while it
+    // still held live objects goes to bibopPartialPool and is never looked at
+    // again until some later allocation happens to re-acquire it. So when a big
+    // live set dies during a quiet period, its pages keep every dead slot: they
+    // are never re-swept, never become empty, never reach bibopFreePool, and the
+    // trim below has nothing to hand back. That is why the free pool measured
+    // empty on the very workload this was meant to fix.
+    //
+    // Splicing the partial pools onto the sweep list re-examines them. It is
+    // correct at any time -- marking reaches an object through its header
+    // wherever the object lives, so live slots on a partial page carry the
+    // current epoch exactly as retired pages do, and the full walk rebuilds
+    // freeList/freeCount from scratch, so re-walking a page is idempotent.
+    //
+    // It is NOT free, though: it makes the sweep O(all pages) instead of
+    // O(retired pages), which is the cost issue 5425 was about. So it runs only
+    // on a cadence, or immediately when the OS has told us memory is short --
+    // the moment actually worth paying for.
+    if(cn1BibopReleaseOffset() != 0) {
+        // Run a major sweep when the OS says memory is short, when the app has
+        // gone QUIET (a burst just ended -- the case that matters, and the case
+        // where the extra walk costs least), or as a periodic backstop for an app
+        // that never goes quiet. A cycle driven by allocation volume is none of
+        // those and keeps the O(retired pages) fast path.
+        bibopCyclesSinceMajorSweep++;
+        // "Quiet" has to mean quiet on BOTH allocation paths. A cycle driven by
+        // legacy volume allocates nothing through BiBOP, so testing
+        // bibopCycleAllocatedBytes alone would call it quiet and splice every
+        // partial page in every sweep -- the O(all pages) regression issue 5425
+        // fixed, reintroduced for exactly the workload that reported it.
+        JAVA_BOOLEAN quiet =
+                (bibopCycleAllocatedBytes + legacyCycleAllocatedBytes)
+                        < CN1_BIBOP_MAJOR_SWEEP_QUIET_BYTES;
+        int major = atomic_load_explicit(&lowMemoryMode, memory_order_relaxed)
+                || quiet
+                || bibopCyclesSinceMajorSweep >= CN1_BIBOP_MAJOR_SWEEP_CYCLES;
+        if(major) {
+            bibopCyclesSinceMajorSweep = 0;
+            int spliced = 0;
+            pthread_mutex_lock(&bibopMutex);
+            for(int ci = 0 ; ci < CN1_BIBOP_NUM_CLASSES ; ci++) {
+                CN1BibopPage* p = bibopPartialPool[ci];
+                while(p != 0) {
+                    CN1BibopPage* next = p->nextPool;
+                    p->gcMajorSpliced = JAVA_TRUE;
+                    p->nextPool = list;
+                    list = p;
+                    p = next;
+                    spliced++;
+                }
+                bibopPartialPool[ci] = 0;
+            }
+            pthread_mutex_unlock(&bibopMutex);
+            if(cn1PageReleaseTraceOn()) {
+                fprintf(stderr, "[MAJOR-SWEEP] cycle=%d spliced=%d bibopKb=%ld legacyKb=%ld\n",
+                        currentGcMarkValue, spliced,
+                        (long)(bibopCycleAllocatedBytes / 1024),
+                        (long)(legacyCycleAllocatedBytes / 1024));
+            }
+        }
+    }
+#endif
     int V = currentGcMarkValue;  // stable during the sweep (mark done, not yet incremented)
     long occupiedBytes = 0;
     long liveBytes = 0;
@@ -3167,6 +3556,16 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     while(list != 0) {
         CN1BibopPage* page = list;
         list = page->nextPool;
+        // A page the major sweep pulled out of a PARTIAL pool is a one-off deep
+        // sample: mostly-dead slots that the ordinary sweep would never have
+        // looked at again. Feeding it to cn1BibopAdaptAfterSweep drags the
+        // measured survival ratio down, which halves bibopGcTriggerBytes toward
+        // its base and buys more collection cycles for no reason -- measured 5
+        // cycles to 8 on the issue-5425 workload, eating most of that guard's
+        // headroom. The page is still swept and still reclaimed; only its
+        // contribution to the trigger POLICY is withheld.
+        JAVA_BOOLEAN statsExcluded = page->gcMajorSpliced;
+        page->gcMajorSpliced = JAVA_FALSE;
 #ifdef CN1_BIBOP_VALIDATE
         // INVARIANT: only RETIRED (non-owned) pages reach the sweep. If an OWNED
         // page (some thread's live bibopCurrent[ci]) is on the sweep stack, the
@@ -3232,8 +3631,10 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 page->nextPool = bibopPartialPool[page->classIndex];
                 bibopPartialPool[page->classIndex] = page;
                 pthread_mutex_unlock(&bibopMutex);
-                occupiedBytes += (long)n * page->slotSize;
-                classSlots[page->classIndex] += n;
+                if(!statsExcluded) {
+                    occupiedBytes += (long)n * page->slotSize;
+                    classSlots[page->classIndex] += n;
+                }
                 continue;
             } else if(!page->gcHasMonitors) {
                 // AGED PAST GRACE (even the youngest survivor at gcGraceEpoch < V-1 is
@@ -3294,9 +3695,11 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 page->nextPool = bibopFreePool;
                 bibopFreePool = page;
                 pthread_mutex_unlock(&bibopMutex);
-                occupiedBytes += (long)n * page->slotSize;
-                reclaimedBytes += (long)n * page->slotSize;
-                classSlots[page->classIndex] += n;
+                if(!statsExcluded) {
+                    occupiedBytes += (long)n * page->slotSize;
+                    reclaimedBytes += (long)n * page->slotSize;
+                    classSlots[page->classIndex] += n;
+                }
                 continue;
             }
             // else: all-dead but a BiBOP monitor is live -> fall through to the full walk
@@ -3371,11 +3774,13 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         page->freeList = fl;
         page->freeCount = freeCount;
         int sampledSlots = n - oldFreeCount;
-        occupiedBytes += (long)sampledSlots * page->slotSize;
-        liveBytes += (long)policyLiveCount * page->slotSize;
-        reclaimedBytes += (long)(sampledSlots - liveCount) * page->slotSize;
-        classSlots[page->classIndex] += sampledSlots;
-        classLive[page->classIndex] += policyLiveCount;
+        if(!statsExcluded) {
+            occupiedBytes += (long)sampledSlots * page->slotSize;
+            liveBytes += (long)policyLiveCount * page->slotSize;
+            reclaimedBytes += (long)(sampledSlots - liveCount) * page->slotSize;
+            classSlots[page->classIndex] += sampledSlots;
+            classLive[page->classIndex] += policyLiveCount;
+        }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
         // The monitor (CN1ThreadData) no longer lives in the object header, so the
         // per-slot "has a monitor" test is gone. Conservatively flag any page that still
@@ -3403,6 +3808,10 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     }
     cn1BibopAdaptAfterSweep(occupiedBytes, liveBytes, reclaimedBytes,
                             classSlots, classLive);
+    // Hand surplus empty pages back to the OS (issue 5537). Last, so it sees the
+    // pool this sweep just refilled, and outside the per-page loop so the madvise
+    // work is batched rather than interleaved with the walk.
+    cn1BibopTrimFreePool();
 }
 
 #ifdef CN1_GRACE_AUDIT
