@@ -189,8 +189,14 @@ public class DatabaseImpl extends Database {
     @Override
     public void execute(String sql) throws IOException {
         checkOpen();
-        checkNative(SQLiteNative.execScript(peer, sql));
-        noteScriptTransactionControl(sql);
+        // The engine runs the whole script; see the iOS port for why the failure path matters.
+        boolean completed = false;
+        try {
+            checkNative(SQLiteNative.execScript(peer, sql));
+            completed = true;
+        } finally {
+            noteScriptTransactionControl(sql, completed);
+        }
     }
 
     @Override

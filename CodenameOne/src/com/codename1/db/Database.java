@@ -659,7 +659,37 @@ public abstract class Database {
     ///
     /// - `sql`: the script that was just run
     protected void noteScriptTransactionControl(String sql) {
+        noteScriptTransactionControl(sql, true);
+    }
+
+    /// Records a transaction that a script opened or closed, when the script may not have finished.
+    ///
+    /// A script that fails partway has already run everything before the statement that failed,
+    /// and the engine does not undo it: `BEGIN; INSERT INTO missing_table VALUES(1)` opens a real
+    /// transaction and then throws, and nothing here can see how far it got.
+    ///
+    /// So a failed script that contains a `BEGIN` is treated as having opened one. That is the
+    /// safe half of the uncertainty: it refuses a key change, which would otherwise replace the
+    /// database underneath an open transaction and install uncommitted rows, and it still lets a
+    /// rollback through, which is what the caller needs in order to recover. Assuming the other
+    /// way round buys nothing and loses data.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: the script that was run
+    ///
+    /// - `completed`: false if it failed partway
+    protected void noteScriptTransactionControl(String sql, boolean completed) {
         if (sql == null) {
+            return;
+        }
+        if (!completed) {
+            for (String statement : SQLStatementSplitter.split(sql)) {
+                if ("BEGIN".equals(leadingKeyword(statement))) {
+                    inTransaction = true;
+                    return;
+                }
+            }
             return;
         }
         for (String statement : SQLStatementSplitter.split(sql)) {
@@ -678,12 +708,14 @@ public abstract class Database {
     }
 
     /// The first word of a statement, upper cased, or an empty string.
+    ///
+    /// Comments count as whitespace here, because they do to the engine: `/* migration */ BEGIN`
+    /// opens a transaction, and reading the keyword as empty would leave this believing none was
+    /// opened. The Android port relies on the same fact deliberately, prefixing a comment to a
+    /// ROLLBACK to get it past a statement classifier that reads the first three characters.
     private static String leadingKeyword(String statement) {
-        int start = 0;
+        int start = skipLeadingTrivia(statement, 0);
         int length = statement.length();
-        while (start < length && statement.charAt(start) <= ' ') {
-            start++;
-        }
         int end = start;
         while (end < length && isKeywordChar(statement.charAt(end))) {
             end++;
@@ -693,6 +725,34 @@ public abstract class Database {
 
     private static boolean isKeywordChar(char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    }
+
+    /// Skips whitespace and comments, which is what stands between a statement's start and its
+    /// first keyword.
+    private static int skipLeadingTrivia(String statement, int from) {
+        int length = statement.length();
+        int iter = from;
+        while (iter < length) {
+            char c = statement.charAt(iter);
+            if (c <= ' ') {
+                iter++;
+            } else if (c == '-' && iter + 1 < length && statement.charAt(iter + 1) == '-') {
+                iter += 2;
+                while (iter < length && statement.charAt(iter) != '\n') {
+                    iter++;
+                }
+            } else if (c == '/' && iter + 1 < length && statement.charAt(iter + 1) == '*') {
+                iter += 2;
+                while (iter + 1 < length
+                        && !(statement.charAt(iter) == '*' && statement.charAt(iter + 1) == '/')) {
+                    iter++;
+                }
+                iter = iter + 1 < length ? iter + 2 : length;
+            } else {
+                return iter;
+            }
+        }
+        return length;
     }
 
     /// Whether a ROLLBACK names a savepoint, which unwinds to it rather than ending anything.

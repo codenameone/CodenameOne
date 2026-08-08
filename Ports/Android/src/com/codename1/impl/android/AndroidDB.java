@@ -48,8 +48,16 @@ public class AndroidDB extends Database {
     /** Cursors created from this database, invalidated when it closes. */
     private final List<AndroidCursor> openCursors = new ArrayList<AndroidCursor>();
 
+    /** The path this connection is open on, for the shared registry a conversion consults. */
+    private final String openPath;
+
     public AndroidDB(SQLiteDatabase db) {
         this.db = db;
+        // Registered even though this implementation never converts anything: the conversion that
+        // consults the registry is usually being asked for by an application that has one of
+        // these open, and a conversion that cannot see it replaces the file underneath it.
+        this.openPath = db == null ? null : db.getPath();
+        AndroidImplementation.databaseConnectionOpened(this.openPath);
     }
 
     private void checkOpen() throws IOException {
@@ -175,6 +183,7 @@ public class AndroidDB extends Database {
             cursors[iter].invalidate();
         }
         closing.close();
+        AndroidImplementation.databaseConnectionClosed(openPath);
     }
 
     @Override
@@ -190,11 +199,14 @@ public class AndroidDB extends Database {
             String[] statements = SQLStatementSplitter.split(sql);
             for (int iter = 0; iter < statements.length; iter++) {
                 db.execSQL(statements[iter]);
+                // Recorded as each one succeeds, not once at the end: a script that throws
+                // partway has already run everything before the statement that failed, and a
+                // transaction it opened is still open.
+                noteScriptTransactionControl(statements[iter]);
             }
         } catch (Exception e) {
             throw new IOException(e.getMessage(), e);
         }
-        noteScriptTransactionControl(sql);
     }
 
     @Override

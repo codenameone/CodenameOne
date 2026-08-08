@@ -11170,6 +11170,53 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return new File(databaseMigrationMarker(path).getParentFile(), entry[1]);
     }
 
+    /// Every database connection this port has open, by the file it is open on.
+    ///
+    /// Shared by both implementations on purpose. Only a conversion needs it, and a conversion is
+    /// not a statement: it renames a new file over the database while the process is running, and
+    /// Android lets that succeed while another connection holds the old one. That connection goes
+    /// on writing to a file that is no longer the database, is told each write succeeded, and
+    /// loses all of it when the backup is deleted.
+    ///
+    /// The connection it collides with is usually not another encrypted one -- the ordinary case
+    /// is an application holding `Database.openOrCreate(name)` open, which is a plaintext
+    /// connection, and then calling `Database.encrypt(name, ...)`. Counting only the encrypted
+    /// ones would miss exactly the case that happens.
+    private static final java.util.Map<String, Integer> OPEN_DATABASE_CONNECTIONS =
+            new java.util.HashMap<String, Integer>();
+
+    /// Records a connection opened on a database file.
+    public static synchronized void databaseConnectionOpened(String path) {
+        if (path == null) {
+            return;
+        }
+        Integer count = OPEN_DATABASE_CONNECTIONS.get(path);
+        OPEN_DATABASE_CONNECTIONS.put(path,
+                Integer.valueOf(count == null ? 1 : count.intValue() + 1));
+    }
+
+    /// Records a connection closed on a database file.
+    public static synchronized void databaseConnectionClosed(String path) {
+        if (path == null) {
+            return;
+        }
+        Integer count = OPEN_DATABASE_CONNECTIONS.get(path);
+        if (count == null) {
+            return;
+        }
+        if (count.intValue() <= 1) {
+            OPEN_DATABASE_CONNECTIONS.remove(path);
+        } else {
+            OPEN_DATABASE_CONNECTIONS.put(path, Integer.valueOf(count.intValue() - 1));
+        }
+    }
+
+    /// How many connections are open on a database file, encrypted or not.
+    public static synchronized int openDatabaseConnections(String path) {
+        Integer count = OPEN_DATABASE_CONNECTIONS.get(path);
+        return count == null ? 0 : count.intValue();
+    }
+
     /// Disposes of an export, and reports anything that survived.
     ///
     /// If the file cannot be unlinked it is truncated instead, which removes the contents even

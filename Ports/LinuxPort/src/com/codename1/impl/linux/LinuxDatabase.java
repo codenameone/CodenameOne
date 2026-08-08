@@ -177,8 +177,14 @@ class LinuxDatabase extends Database {
     @Override
     public void execute(String sql) throws IOException {
         checkOpen();
-        LinuxNative.sqlDbExecScript(peer, sql);
-        noteScriptTransactionControl(sql);
+        // The engine runs the whole script; see WindowsDatabase.execute(String).
+        boolean completed = false;
+        try {
+            LinuxNative.sqlDbExecScript(peer, sql);
+            completed = true;
+        } finally {
+            noteScriptTransactionControl(sql, completed);
+        }
     }
 
     @Override

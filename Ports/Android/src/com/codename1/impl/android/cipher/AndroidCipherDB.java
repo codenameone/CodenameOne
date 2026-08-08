@@ -74,42 +74,7 @@ class AndroidCipherDB extends Database {
      */
     private String currentKey;
 
-    /**
-     * Every connection this port has open, by the file it is open on.
-     *
-     * Only a conversion needs this. A conversion is not a statement: it renames a new file over
-     * the database while the process is running, and on Android that rename succeeds even while
-     * another connection holds the old file open. That connection keeps writing to the file that
-     * has just been replaced -- its writes are accepted, and then the backup they landed in is
-     * deleted -- so the caller is told its data was saved and it is not there. Counting the
-     * connections is what lets a conversion refuse rather than do that.
-     */
-    private static final java.util.Map<String, Integer> OPEN_CONNECTIONS =
-            new java.util.HashMap<String, Integer>();
-
-    private static synchronized void connectionOpened(String path) {
-        Integer count = OPEN_CONNECTIONS.get(path);
-        OPEN_CONNECTIONS.put(path, Integer.valueOf(count == null ? 1 : count.intValue() + 1));
-    }
-
-    private static synchronized void connectionClosed(String path) {
-        Integer count = OPEN_CONNECTIONS.get(path);
-        if (count == null) {
-            return;
-        }
-        if (count.intValue() <= 1) {
-            OPEN_CONNECTIONS.remove(path);
-        } else {
-            OPEN_CONNECTIONS.put(path, Integer.valueOf(count.intValue() - 1));
-        }
-    }
-
-    private static synchronized int openConnections(String path) {
-        Integer count = OPEN_CONNECTIONS.get(path);
-        return count == null ? 0 : count.intValue();
-    }
-
-    /** The path this connection is open on, for the registry above. */
+    /** The path this connection is open on, for the shared registry a conversion consults. */
     private final String openPath;
 
     AndroidCipherDB(SQLiteDatabase db, String databaseName, String key) {
@@ -117,7 +82,7 @@ class AndroidCipherDB extends Database {
         this.databaseName = databaseName;
         this.currentKey = key == null ? "" : key;
         this.openPath = db.getPath();
-        connectionOpened(this.openPath);
+        AndroidImplementation.databaseConnectionOpened(this.openPath);
     }
 
     private void checkOpen() throws IOException {
@@ -245,7 +210,7 @@ class AndroidCipherDB extends Database {
             cursors[iter].invalidate();
         }
         closing.close();
-        connectionClosed(openPath);
+        AndroidImplementation.databaseConnectionClosed(openPath);
     }
 
     @Override
@@ -354,7 +319,7 @@ class AndroidCipherDB extends Database {
 
     private void migrateThroughExport(String targetKey) throws IOException {
         String path = db.getPath();
-        if (openConnections(path) > 1) {
+        if (AndroidImplementation.openDatabaseConnections(path) > 1) {
             // Refused rather than raced. The swap renames a new file over this one, and Android
             // lets that succeed while another connection still holds the old file open -- that
             // connection keeps writing to a file that is no longer the database, is told each
@@ -546,11 +511,12 @@ class AndroidCipherDB extends Database {
             String[] statements = SQLStatementSplitter.split(sql);
             for (int iter = 0; iter < statements.length; iter++) {
                 db.execSQL(statements[iter]);
+                // Recorded as each one succeeds; see AndroidDB.execute(String).
+                noteScriptTransactionControl(statements[iter]);
             }
         } catch (Exception e) {
             throw new IOException(e.getMessage(), e);
         }
-        noteScriptTransactionControl(sql);
     }
 
     @Override

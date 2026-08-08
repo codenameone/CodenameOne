@@ -226,13 +226,15 @@ public class SEDatabase extends Database {
             s = conn.createStatement();
             for (int iter = 0; iter < statements.length; iter++) {
                 s.execute(statements[iter]);
+                // Recorded as each one succeeds, so a script that throws partway leaves the
+                // state describing what actually ran.
+                noteScriptTransactionControl(statements[iter]);
             }
         } catch (SQLException ex) {
             throw new IOException(ex.getMessage(), ex);
         } finally {
             cleanup(s);
         }
-        noteScriptTransactionControl(sql);
     }
 
     /// Rejects a call that supplies the wrong number of bind arguments.

@@ -177,8 +177,15 @@ class WindowsDatabase extends Database {
     @Override
     public void execute(String sql) throws IOException {
         checkOpen();
-        WindowsNative.sqlDbExecScript(peer, sql);
-        noteScriptTransactionControl(sql);
+        // The engine runs the whole script, so a failure partway leaves everything before the
+        // failing statement done and nothing here able to see how far it got.
+        boolean completed = false;
+        try {
+            WindowsNative.sqlDbExecScript(peer, sql);
+            completed = true;
+        } finally {
+            noteScriptTransactionControl(sql, completed);
+        }
     }
 
     @Override

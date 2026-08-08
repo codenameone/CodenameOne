@@ -194,9 +194,15 @@ class DatabaseImpl extends Database {
     @Override
     public void execute(String sql) throws IOException {
         checkOpen();
-        // sqlite3_exec runs a whole script, which is the portable contract.
-        executeScript(sql);
-        noteScriptTransactionControl(sql);
+        // sqlite3_exec runs a whole script, which is the portable contract -- and which means a
+        // failure partway leaves everything before the failing statement done.
+        boolean completed = false;
+        try {
+            executeScript(sql);
+            completed = true;
+        } finally {
+            noteScriptTransactionControl(sql, completed);
+        }
     }
 
     @Override
