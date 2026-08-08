@@ -4591,7 +4591,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private boolean writeCompanionSource(String path, String userSource) {
         try {
             String generated = defaultCompanionSource();
-            ProjectIO.write(path, userSource == null ? generated : mergeGeneratedSource(userSource, generated));
+            String merged = userSource == null ? generated : mergeGeneratedSource(userSource, generated);
+            // buildUI() emits addActionListener(this::handler) for every configured event, so a
+            // handler added since the file was last written needs its stub adding here too. Without
+            // it, assigning an event and pressing Save left the companion referring to a method
+            // that did not exist until the source editor happened to be opened, which is the only
+            // other place ensureHandler() ran.
+            for (String handler : generatedHandlers()) merged = ensureHandler(merged, handler);
+            ProjectIO.write(path, merged);
             return true;
         } catch (IOException ex) {
             ToastBar.showErrorMessage("Source save failed: " + ex.getMessage());
