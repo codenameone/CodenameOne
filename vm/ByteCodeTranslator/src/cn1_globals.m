@@ -2591,34 +2591,51 @@ static size_t cn1BibopReleaseOffset(void) {
 #endif
 }
 
-// Hand a fully-empty page's slot region back to the OS. The caller must have
-// made the page unreachable from every pool first.
-static void cn1BibopReleasePageMemory(CN1BibopPage* p) {
+// Hand a fully-empty page's slot region back to the OS. Returns whether the
+// advice was actually accepted: madvise can fail (a transient EAGAIN from
+// Linux MADV_DONTNEED, or a range Darwin refuses), and a page whose memory was
+// NOT handed back must not be recorded as released -- it would be filed under
+// bibopReleasedPool and never retried, so the footprint would stay up forever
+// with nothing to show that anything went wrong. The caller keeps a rejected
+// page in bibopFreePool so the next sweep tries it again.
+// The caller must have made the page unreachable from every pool first.
+static JAVA_BOOLEAN cn1BibopReleasePageMemory(CN1BibopPage* p) {
 #if !defined(CN1_BIBOP_NO_PAGE_RELEASE) && !defined(_WIN32)
     size_t off = cn1BibopReleaseOffset();
     if(off == 0) {
-        return;
+        return JAVA_FALSE;
     }
     void* addr = (char*)p + off;
     size_t len = (size_t)CN1_BIBOP_PAGE_SIZE - off;
+    JAVA_BOOLEAN ok = JAVA_FALSE;
 #if defined(__APPLE__)
     // MADV_FREE_REUSABLE is what libmalloc uses to return large blocks, and
     // unlike plain MADV_FREE it decrements phys_footprint immediately -- which
-    // is the figure iOS jetsam meters, so it is the one that has to move. Fall
-    // back to MADV_FREE if the kernel rejects it (it is EINVAL on a range that
-    // is already reusable).
-    if(madvise(addr, len, MADV_FREE_REUSABLE) != 0) {
+    // is the figure iOS jetsam meters, so it is the one that has to move.
+    // MADV_FREE is kept as a fallback: it still lets the kernel take the pages
+    // under pressure, just without moving the accounting. Pairing MADV_FREE_REUSE
+    // with a range that only got MADV_FREE is harmless (it is rejected and there
+    // is no accounting to restore), so one released flag covers both.
+    if(madvise(addr, len, MADV_FREE_REUSABLE) == 0) {
+        ok = JAVA_TRUE;
+    } else {
         cn1PageReleaseReusableErrno = errno;
-        madvise(addr, len, MADV_FREE);
+        ok = (madvise(addr, len, MADV_FREE) == 0) ? JAVA_TRUE : JAVA_FALSE;
     }
 #elif defined(MADV_DONTNEED)
     // Linux: drops the pages and re-faults them as zero, which is exactly the
     // contract the acquire-path format expects.
-    madvise(addr, len, MADV_DONTNEED);
+    ok = (madvise(addr, len, MADV_DONTNEED) == 0) ? JAVA_TRUE : JAVA_FALSE;
 #endif
 #if defined(CN1_GC_INSTRUMENT)
-    atomic_fetch_add_explicit(&cn1BibopPagesReleased, 1, memory_order_relaxed);
+    if(ok) {
+        atomic_fetch_add_explicit(&cn1BibopPagesReleased, 1, memory_order_relaxed);
+    }
 #endif
+    return ok;
+#else
+    (void)p;
+    return JAVA_FALSE;
 #endif
 }
 
@@ -2681,27 +2698,56 @@ static void cn1BibopTrimFreePool(void) {
     if(surplusTail == 0) {
         return;                             // nothing above the warm cache
     }
+    // Partition the detached run: pages whose memory the kernel actually took go
+    // to bibopReleasedPool, pages it rejected go back to bibopFreePool. The
+    // rejected ones are still perfectly good empty pages -- they simply have not
+    // been handed back yet -- so returning them to the free pool both keeps them
+    // allocatable and lets a later sweep retry the release.
+    CN1BibopPage* relHead = 0;
+    CN1BibopPage* relTail = 0;
+    CN1BibopPage* retryHead = 0;
+    CN1BibopPage* retryTail = 0;
     int releasedNow = 0;
-    for(CN1BibopPage* q = surplus ; q != 0 ; q = q->nextPool) {
-        if(!q->gcPageReleased) {
-            cn1BibopReleasePageMemory(q);
-            q->gcPageReleased = JAVA_TRUE;
-            releasedNow++;
+    int rejected = 0;
+    CN1BibopPage* q = surplus;
+    while(q != 0) {
+        CN1BibopPage* next = q->nextPool;
+        JAVA_BOOLEAN released = q->gcPageReleased;
+        if(!released) {
+            released = cn1BibopReleasePageMemory(q);
+            if(released) {
+                q->gcPageReleased = JAVA_TRUE;
+                releasedNow++;
+            } else {
+                rejected++;
+            }
         }
+        if(released) {
+            q->nextPool = relHead;
+            relHead = q;
+            if(relTail == 0) relTail = q;
+        } else {
+            q->nextPool = retryHead;
+            retryHead = q;
+            if(retryTail == 0) retryTail = q;
+        }
+        q = next;
     }
     if(cn1PageReleaseTraceOn()) {
-        long fpAfter = -1;
-#if defined(__APPLE__)
-        { task_vm_info_data_t __i; mach_msg_type_number_t __c = TASK_VM_INFO_COUNT;
-          if(task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&__i, &__c) == KERN_SUCCESS)
-              fpAfter = (long)(__i.phys_footprint / 1024); }
-#endif
-        fprintf(stderr, "[PAGE-RELEASE] kept=%d taken=%d released=%d headerBytes=%zu footprintKbAfter=%ld reusableErrno=%d\n",
-                kept, taken, releasedNow, cn1BibopReleaseOffset(), fpAfter, cn1PageReleaseReusableErrno);
+        fprintf(stderr, "[PAGE-RELEASE] kept=%d taken=%d released=%d rejected=%d "
+                "headerBytes=%zu reusableErrno=%d\n",
+                kept, taken, releasedNow, rejected, cn1BibopReleaseOffset(),
+                cn1PageReleaseReusableErrno);
     }
     pthread_mutex_lock(&bibopMutex);
-    surplusTail->nextPool = bibopReleasedPool;
-    bibopReleasedPool = surplus;
+    if(relTail != 0) {
+        relTail->nextPool = bibopReleasedPool;
+        bibopReleasedPool = relHead;
+    }
+    if(retryTail != 0) {
+        retryTail->nextPool = bibopFreePool;
+        bibopFreePool = retryHead;
+    }
     pthread_mutex_unlock(&bibopMutex);
 #endif
 }
