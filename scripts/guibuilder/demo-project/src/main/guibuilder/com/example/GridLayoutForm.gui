@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="Form" layout="GridLayout" gridLayoutRows="2" gridLayoutColumns="2" title="GridLayout — reorder cells" name="GridLayoutForm">
+    <component type="Button" name="cellA" text="Cell A" />
+    <component type="Button" name="cellB" text="Cell B" />
+    <component type="Button" name="cellC" text="Cell C" />
+    <component type="Button" name="cellD" text="Cell D" />
+</component>

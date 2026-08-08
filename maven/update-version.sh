@@ -114,6 +114,19 @@ if [ -f "$settingsParent" ]; then
   perl -pi -e "s{<cn1\.plugin\.version>\Q$oldVersion\E</cn1\.plugin\.version>}{<cn1.plugin.version>$version</cn1.plugin.version>}g" "$settingsParent"
 fi
 
+# GUI Builder editor is a standalone Maven-first desktop app distributed alongside
+# the plugin, matching Settings and Game Builder.
+for f in ../scripts/guibuilder/pom.xml \
+         ../scripts/guibuilder/common/pom.xml \
+         ../scripts/guibuilder/javase/pom.xml; do
+  [ -f "$f" ] && perl -pi -e "s{<version>\Q$oldVersion\E</version>}{<version>$version</version>}g" "$f"
+done
+guiBuilderParent=../scripts/guibuilder/pom.xml
+if [ -f "$guiBuilderParent" ]; then
+  perl -pi -e "s{<cn1\.version>\Q$oldVersion\E</cn1\.version>}{<cn1.version>$version</cn1.version>}g" "$guiBuilderParent"
+  perl -pi -e "s{<cn1\.plugin\.version>\Q$oldVersion\E</cn1\.plugin\.version>}{<cn1.plugin.version>$version</cn1.plugin.version>}g" "$guiBuilderParent"
+fi
+
 echo "Committing version change in git"
 git add -u .
 # Note: the -u is to prevent adding files that aren't added to git yet.  Only changed
@@ -121,6 +134,7 @@ git add -u .
 git add -u ../scripts/gamebuilder
 git add -u ../scripts/certificatewizard
 git add -u ../scripts/settings
+git add -u ../scripts/guibuilder
 git commit -m "Updated version to $version"
 if [[ "$version" == *-SNAPSHOT ]]; then
   echo "This is a snapshot version so not adding a tag"

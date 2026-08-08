@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="Form" layout="BorderLayout" title="Every layout, nested" name="MixedNestedLayoutsForm">
+    <component type="Label" name="mixedHeader" text="Move a component through every layout in turn" layoutConstraint="North" />
+    <component type="Container" name="mixedColumns" layout="BoxLayout" boxLayoutAxis="X" layoutConstraint="Center">
+        <component type="Container" name="boxColumn" layout="BoxLayout" boxLayoutAxis="Y">
+            <component type="Label" name="boxTitle" text="BoxLayout Y" />
+            <component type="Button" name="traveller" text="Drag me anywhere" />
+            <component type="Button" name="boxSecond" text="Box second" />
+        </component>
+        <component type="Container" name="gridColumn" layout="GridLayout" gridLayoutRows="2" gridLayoutColumns="2">
+            <component type="Button" name="gridOne" text="Grid 1" />
+            <component type="Button" name="gridTwo" text="Grid 2" />
+            <component type="Button" name="gridThree" text="Grid 3" />
+        </component>
+        <component type="Container" name="tableColumn" layout="TableLayout" tableLayoutRows="2" tableLayoutColumns="2">
+            <component type="Label" name="tableLabel" text="Cell 0,0" tableRow="0" tableColumn="0" />
+            <component type="Button" name="tableButton" text="Cell 1,1" tableRow="1" tableColumn="1" />
+        </component>
+    </component>
+    <component type="Container" name="bottomRow" layout="FlowLayout" layoutConstraint="South">
+        <component type="Button" name="flowFirst" text="Flow first" />
+        <component type="Button" name="flowSecond" text="Flow second" />
+        <component type="Container" name="emptyDropZone" layout="BoxLayout" boxLayoutAxis="Y" />
+    </component>
+</component>
