@@ -40,6 +40,7 @@ public class Throwable{
     private java.util.List<Throwable> suppressed;
     private StackTraceElement[] parsedStack;
     private boolean stackParsed;
+    private boolean stackReplaced;
     
     
     /**
@@ -99,15 +100,15 @@ public class Throwable{
      * The format of the backtrace information depends on the implementation.
      */
     public void printStackTrace(){
-        System.out.println(stack);
+        System.out.println(renderedStack());
         if (cause != null) {
             System.out.println("Caused by ");
             cause.printStackTrace();
         }
     }
-    
+
     public void printStackTrace(java.io.PrintStream s) {
-        s.println(stack);
+        s.println(renderedStack());
         if (cause != null) {
             s.println("Caused by ");
             cause.printStackTrace(s);
@@ -115,11 +116,35 @@ public class Throwable{
     }
 
     public void printStackTrace(PrintWriter s) {
-        s.println(stack);
+        s.println(renderedStack());
         if (cause != null) {
             s.println("Caused by ");
             cause.printStackTrace(s);
         }
+    }
+
+    /**
+     * The text to print for this throwable's own frames. By default this is the native
+     * pre-rendered stack string. Once setStackTrace() has replaced the frames (an app
+     * sanitizing or clearing its trace), the native string is stale and no longer matches
+     * getStackTrace(), so render the replacement frames instead -- in the same
+     * "    at &lt;fqcn&gt;.&lt;method&gt;:&lt;line&gt;" shape parseStackString reads back, so a
+     * captured rawStack stays consistent with the structured frames.
+     */
+    private String renderedStack() {
+        if(!stackReplaced) {
+            return stack;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(toString());
+        if(parsedStack != null) {
+            for(int i = 0 ; i < parsedStack.length ; i++) {
+                StackTraceElement e = parsedStack[i];
+                sb.append('\n').append("    at ").append(e.getClassName())
+                        .append('.').append(e.getMethodName()).append(':').append(e.getLineNumber());
+            }
+        }
+        return sb.toString();
     }
     
     
@@ -149,6 +174,7 @@ public class Throwable{
         }
         parsedStack = copy;
         stackParsed = true;
+        stackReplaced = true;
     }
 
     /**

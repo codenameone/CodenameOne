@@ -124,15 +124,48 @@ public class PiiScrubber {
 
     /// True for a stack-trace line whose numeric tokens are source coordinates,
     /// not PII: the JVM/ParparVM `at <class>.<method>(...)` / `at <class>.<method>:<line>`
-    /// form, and the JavaScript engine forms (Chrome `at fn (url:line:col)`,
-    /// Firefox `fn@url:line:col`). Matching the location shape rather than a
-    /// specific engine keeps a real column offset from being masked.
+    /// form (which every V8/Chrome JavaScript frame also uses), and the
+    /// Firefox/Safari `fn@url:line:column` form.
+    ///
+    /// The `at ` prefix is a strong frame signal. For the `@` form the prefix
+    /// is absent, so a bare substring test such as `.js:` would also match a
+    /// free-form message that merely mentions a file (`account 123456 failed in
+    /// app.js: retry`) and let its id through. So the non-`at` case requires an
+    /// `@` *and* an actual terminal `:<line>:<column>` location, which a message
+    /// does not carry.
     private static boolean isFrameLine(String line) {
         String t = line.trim();
         if (t.startsWith("at ")) {
             return true;
         }
-        return t.indexOf(".js:") >= 0 || t.indexOf("@http") >= 0 || t.indexOf("@file") >= 0;
+        return t.indexOf('@') >= 0 && endsWithLineColumn(t);
+    }
+
+    /// True when `t` ends with a `:<line>:<column>` location: two colon-separated
+    /// runs of digits, allowing a single trailing `)` (a wrapped frame). This is
+    /// the JavaScript engine frame location; a free-form message ending in text
+    /// (or a lone number) does not match, so its digits stay subject to scrubbing.
+    private static boolean endsWithLineColumn(String t) {
+        int end = t.length();
+        if (end > 0 && t.charAt(end - 1) == ')') {
+            end--;
+        }
+        int i = end - 1;
+        int col = 0;
+        while (i >= 0 && t.charAt(i) >= '0' && t.charAt(i) <= '9') {
+            i--;
+            col++;
+        }
+        if (col == 0 || i < 0 || t.charAt(i) != ':') {
+            return false;
+        }
+        i--;
+        int lineDigits = 0;
+        while (i >= 0 && t.charAt(i) >= '0' && t.charAt(i) <= '9') {
+            i--;
+            lineDigits++;
+        }
+        return lineDigits > 0 && i >= 0 && t.charAt(i) == ':';
     }
 
     /// Replaces all occurrences of an email-like substring with the form

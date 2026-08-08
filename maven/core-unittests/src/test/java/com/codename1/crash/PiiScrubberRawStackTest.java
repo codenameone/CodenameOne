@@ -64,6 +64,19 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
+    void messageMentioningAFileIsNotAFrame() {
+        // A free-form message can mention a file and an id; it is not a frame just because it contains
+        // ".js:", so its long id must still be masked. (No terminal :line:column, no leading "at ".)
+        String stack = "Error: account 123456 failed in app.js: retry\n"
+                + "    at run (http://host/app.js:1:98765)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account [num] failed") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        // ...while the real frame below keeps its coordinate.
+        assertTrue(scrubbed.indexOf("app.js:1:98765") >= 0, scrubbed);
+    }
+
+    @Test
     void messageDigitsAndEmailsStillScrubbed() {
         // The leading message line is free-form and can carry PII: a long id/phone is masked and an
         // email is partially redacted, even though frame coordinates below are preserved.
