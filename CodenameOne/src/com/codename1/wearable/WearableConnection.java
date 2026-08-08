@@ -925,11 +925,39 @@ public final class WearableConnection {
                     }
                     return;
                 }
+                // One listener's failure must not decide the payload's fate. A throw used to skip
+                // BOTH terminal callbacks, which for a transfer is the worst of the two outcomes:
+                // the port has already marked the payload handed over -- JavaSE recorded the file
+                // as seen, Android holds the in-memory claim -- so nothing offered it again for the
+                // rest of the process, and the confirmation that would have retired the durable
+                // copy never ran either.
+                //
+                // So each listener is isolated, and exactly one terminal callback always runs:
+                // confirmed when at least one listener took the message, handed back when every
+                // one of them threw -- the same reasoning as the no-listener case above, since a
+                // payload nobody consumed has reached nobody.
+                boolean reached = false;
+                RuntimeException failure = null;
                 for (WearableDataListener l : copy) {
-                    l.dataChanged(m);
+                    try {
+                        l.dataChanged(m);
+                        reached = true;
+                    } catch (RuntimeException listenerFailed) {
+                        if (failure == null) {
+                            failure = listenerFailed;
+                        }
+                    }
                 }
-                if (onDelivered != null) {
+                if (!reached) {
+                    if (onRelinquished != null) {
+                        onRelinquished.run();
+                    }
+                } else if (onDelivered != null) {
                     onDelivered.run();
+                }
+                // Reported, not swallowed -- but only once the payload is accounted for.
+                if (failure != null) {
+                    throw failure;
                 }
             }
         }, dataListeners, pendingData, onRelinquished, onDelivered != null, path, false, true);
@@ -987,7 +1015,35 @@ public final class WearableConnection {
     /// Only the simulator calls this. On a device the process dies instead, which is why nothing
     /// needed it before.
     public static void resetForReload() {
+        List<Runnable> release = new ArrayList<Runnable>();
         synchronized (pendingData) {
+            // A reload discards every PARKED delivery, and a parked delivery is by definition one
+            // no listener has seen. Dropping the runnables alone stranded them: the ports record a
+            // delivery as made before it is queued, so their own replay skips those paths, and the
+            // replacement app instance was never told about state the previous one had never been
+            // told about either.
+            //
+            // So a reload retires the queue exactly as an eviction does. A transfer's claim is
+            // released -- outside this monitor, below -- so the payload is offered again on the
+            // next scan; a replicated update is remembered as a hand-back request, which the next
+            // listener's drain turns into a re-offer through the port's retained handler.
+            List<String> unseenPaths = new ArrayList<String>();
+            List<String> unseenRemovals = new ArrayList<String>();
+            for (Runnable parked : pendingData) {
+                if (parked instanceof OneShot) {
+                    Runnable onDropped = ((OneShot) parked).onDropped;
+                    if (onDropped != null) {
+                        release.add(onDropped);
+                    }
+                } else if (parked instanceof Replicated) {
+                    Replicated rep = (Replicated) parked;
+                    if (rep.removal) {
+                        unseenRemovals.add(rep.path);
+                    } else {
+                        unseenPaths.add(rep.path);
+                    }
+                }
+            }
             dataListeners.clear();
             pendingData.clear();
             droppedPaths.clear();
@@ -995,6 +1051,12 @@ public final class WearableConnection {
             replayRequests.clear();
             rescanRequested = false;
             drainingData = 0;
+            // Re-recorded after the clears, deliberately, and after rescanRequested is reset: what
+            // the clears drop is the hand-back owed to the listeners being replaced, what goes back
+            // in is work that never reached anybody -- and if enough of it overflows the bound, the
+            // set raises the rescan flag, which resetting it afterwards would have erased.
+            droppedPaths.addAll(unseenPaths);
+            droppedRemovals.addAll(unseenRemovals);
             // droppedDeliveries is deliberately KEPT. It belongs to the port, not to the app
             // instance being replaced: the bridge registers it once from its constructor, and the
             // simulator caches that bridge across reloads -- so clearing it here removed the
@@ -1011,6 +1073,11 @@ public final class WearableConnection {
         }
         synchronized (pendingReplies) {
             pendingReplies.clear();
+        }
+        // Outside every monitor: these call back into the port, and holding a queue lock across
+        // foreign code is what the drain path avoids for the same reason.
+        for (Runnable r : release) {
+            r.run();
         }
     }
 
