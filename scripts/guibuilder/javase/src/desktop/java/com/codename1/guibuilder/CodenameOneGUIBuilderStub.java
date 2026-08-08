@@ -625,7 +625,7 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
         CodenameOneGUIBuilder.redoActiveEdit();
     }
 
-    private static void editFocusedTextOrForm(String operation) {
+    private static void editFocusedTextOrForm(final String operation) {
         // A menu accelerator consumes the keystroke before Codename One ever sees it, and the AWT
         // focus owner is always the canvas rather than a Swing text component, so without this the
         // Edit menu treated Cmd+V inside the code editor as "paste a component into the design".
@@ -639,9 +639,17 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
             else text.paste();
             return;
         }
-        if ("cut".equals(operation)) CodenameOneGUIBuilder.cutActiveSelection();
-        else if ("copy".equals(operation)) CodenameOneGUIBuilder.copyActiveSelection();
-        else CodenameOneGUIBuilder.pasteActiveSelection();
+        // Only the Swing branch above has to stay on the AWT thread. This fallback mutates the
+        // GuiDocument and rebuilds Codename One components, so it belongs on the Codename One EDT
+        // like every other menu command; excluding the whole clipboard entry from onCn1Edt left it
+        // running here on the wrong thread.
+        com.codename1.ui.CN.callSerially(new Runnable() {
+            @Override public void run() {
+                if ("cut".equals(operation)) CodenameOneGUIBuilder.cutActiveSelection();
+                else if ("copy".equals(operation)) CodenameOneGUIBuilder.copyActiveSelection();
+                else CodenameOneGUIBuilder.pasteActiveSelection();
+            }
+        });
     }
 
     /** True while a Codename One code editor holds the focus and should own the keyboard. */

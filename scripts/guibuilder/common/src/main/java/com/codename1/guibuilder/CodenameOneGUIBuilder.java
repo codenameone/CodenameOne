@@ -609,8 +609,18 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             }
         };
         device.setUIID(desktop ? "BuilderDesktopSurface" : "BuilderDevice");
-        formToolbarPreview = buildFormToolbarPreview();
-        device.add(BorderLayout.NORTH, formToolbarPreview);
+        // A Container root generates a class extending Container, with no toolbar at runtime.
+        // Drawing one anyway cost design height and offered an editable title that writes root text
+        // the generated source ignores, so the canvas misrepresented the reusable component.
+        if (isFormLike(value(document.root(), "type", "Form"))) {
+            formToolbarPreview = buildFormToolbarPreview();
+            device.add(BorderLayout.NORTH, formToolbarPreview);
+        } else {
+            // Cleared together, or a stale title label from a previously opened Form root would
+            // still be updated by attribute edits that no longer have anything on screen.
+            formToolbarPreview = null;
+            formTitlePreview = null;
+        }
         Component preview = ComponentPreviewFactory.create(document.root(), document.selected(), new ComponentPreviewFactory.SelectionHandler() {
             @Override public void selected(Element element) {
                 selectElement(element, false, "preview");
@@ -703,6 +713,18 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
         setStatus("Kept your unsaved editor changes");
         return false;
+    }
+
+    /** Rebuilds the open editor pane from what is now on disk. */
+    private void reopenActiveEditor() {
+        Runnable reopen = activeEditorReopen;
+        if (reopen == null || reopeningEditor) return;
+        reopeningEditor = true;
+        try {
+            reopen.run();
+        } finally {
+            reopeningEditor = false;
+        }
     }
 
     /**
@@ -3230,7 +3252,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             return;
         }
         try {
-            ProjectIO.write(modelPath, generatedModelSource());
+            String regenerated = generatedModelSource();
+            ProjectIO.write(modelPath, regenerated);
+            // An open model pane still shows the previous strategy and its clean baseline still
+            // refers to the old text, so the next Save there would write the stale model back over
+            // what was just generated. Reopen it on the new content.
+            if (activeCodeEditor != null && activeEditorReopen != null) {
+                editorBuffer = regenerated;
+                editorBufferOnDisk = regenerated;
+                reopenActiveEditor();
+            }
             setStatus("Regenerated the binding model for the new strategy");
         } catch (IOException ex) {
             ToastBar.showErrorMessage("Model regeneration failed: " + ex.getMessage());
@@ -3294,8 +3325,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 fields.add(numericPropertyField("Grid rows", "gridLayoutRows", "1", 1, 100));
                 fields.add(numericPropertyField("Grid columns", "gridLayoutColumns", "2", 1, 100));
             } else if ("TableLayout".equals(document.attribute("layout", "BoxLayout"))) {
-                fields.add(numericPropertyField("Table rows", "tableLayoutRows", "2", 1, 100));
-                fields.add(numericPropertyField("Table columns", "tableLayoutColumns", "2", 1, 100));
+                // Shrinking below an existing child's cell leaves coordinates the rebuild still
+                // hands to TableLayout: an out-of-range row grows the table only once and a column
+                // not at all, so addLayoutComponent() indexes past tablePositions and the form
+                // stops rendering. The floor is whatever is already occupied.
+                fields.add(numericPropertyField("Table rows", "tableLayoutRows", "2",
+                        Math.max(1, occupiedTableExtent(element, "tableRow", "tableVerticalSpan")), 100));
+                fields.add(numericPropertyField("Table columns", "tableLayoutColumns", "2",
+                        Math.max(1, occupiedTableExtent(element, "tableColumn", "tableHorizontalSpan")), 100));
             }
         }
         Picker constraint = stringPicker(new String[]{"", "North", "South", "East", "West", "Center"}, document.attribute("layoutConstraint", ""));
@@ -3823,6 +3860,25 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param parent the table the child belongs to
      * @return the greatest valid row index
      */
+    /**
+     * The number of rows or columns a table's existing children already require.
+     *
+     * @param parent the table
+     * @param cellAttribute {@code tableRow} or {@code tableColumn}
+     * @param spanAttribute the matching span attribute
+     * @return the smallest declared size that still contains every child
+     */
+    private int occupiedTableExtent(Element parent, String cellAttribute, String spanAttribute) {
+        int extent = 0;
+        for (Element child : componentChildren(parent)) {
+            Integer cell = parseInteger(child.getAttribute(cellAttribute));
+            if (cell == null) continue;
+            int span = Math.max(1, integer(child.getAttribute(spanAttribute), 1));
+            extent = Math.max(extent, cell.intValue() + span);
+        }
+        return extent;
+    }
+
     private int tableRowLimit(Element parent) {
         if (parent == null) return 99;
         return Math.max(0, integer(parent.getAttribute("tableLayoutRows"), 2) - 1);
