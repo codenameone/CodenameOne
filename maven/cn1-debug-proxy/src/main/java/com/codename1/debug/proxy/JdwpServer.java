@@ -1819,16 +1819,21 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         switch (cmd) {
             case 1: { // ReferenceType — get class
                 int classId = blockingGetObjectClass(objectId);
+                // Both under one acquisition: they describe the same reply, and
+                // a second object's answer landing between two reads would pair
+                // one object's array flag with another's depth.
                 boolean isArr;
-                synchronized (objectClassLock) { isArr = lastObjectIsArray; }
+                int dims;
+                synchronized (objectClassLock) {
+                    isArr = lastObjectIsArray;
+                    dims = lastObjectArrayDims;
+                }
                 Buf b = new Buf();
                 if (classId < 0) {
                     b.writeByte(TYPE_TAG_CLASS);
                     b.writeLong(0);
                 } else {
                     b.writeByte(isArr ? TYPE_TAG_ARRAY : TYPE_TAG_CLASS);
-                    int dims;
-                    synchronized (objectClassLock) { dims = lastObjectArrayDims; }
                     b.writeLong(isArr ? toJdwpArrayRef(classId, dims) : toJdwpRef(classId));
                 }
                 writeReply(id, 0, b.bytes());
