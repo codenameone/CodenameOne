@@ -30,7 +30,7 @@ public class DatabaseTransactionTest extends DatabaseConformanceTest {
 
     @Override
     protected String testName() {
-        return "DatabaseTransaction";
+        return "DatabaseTransactionTest";
     }
 
     @Override

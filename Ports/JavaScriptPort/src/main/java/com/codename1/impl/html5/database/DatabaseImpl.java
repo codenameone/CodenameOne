@@ -67,6 +67,7 @@ public class DatabaseImpl extends Database {
             throw new IOException("The database " + name + " could not be opened: "
                     + SQLiteNative.lastError());
         }
+        registerOpenDatabase(databaseName);
     }
 
     /**
@@ -155,6 +156,7 @@ public class DatabaseImpl extends Database {
         if (peer == 0) {
             return;
         }
+        releaseOpenDatabase(databaseName);
         if (inTransaction) {
             inTransaction = false;
             try {
@@ -179,6 +181,9 @@ public class DatabaseImpl extends Database {
     public void changeKey(DatabaseConfig config) throws IOException {
         checkOpen();
         checkNoTransactionForKeyChange();
+        // Rotating a key rewrites the file under the new one for this connection only; another
+        // connection keeps the old key and fails at the first rewritten page it reads.
+        requireSoleConnectionForKeyChange(databaseName);
         String key = null;
         if (config != null && config.isEncrypted()) {
             key = config.resolveKeyMaterial(databaseName);

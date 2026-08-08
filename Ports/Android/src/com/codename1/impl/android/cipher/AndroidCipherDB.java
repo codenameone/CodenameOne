@@ -77,6 +77,9 @@ class AndroidCipherDB extends Database {
     /** The path this connection is open on, for the shared registry a conversion consults. */
     private final String openPath;
 
+    /** Whether this connection still holds its slot in that registry. */
+    private boolean slotHeld = true;
+
     AndroidCipherDB(SQLiteDatabase db, String databaseName, String key) {
         this.db = db;
         this.databaseName = databaseName;
@@ -194,6 +197,11 @@ class AndroidCipherDB extends Database {
     @Override
     public void close() throws IOException {
         if (db == null) {
+            // A conversion that could neither restore nor validate the live file leaves the handle
+            // closed on purpose, and the caller still calls close(). Returning here without giving
+            // the slot back left a connection in the registry that nothing could ever release, so
+            // every later conversion of that database refused until the process restarted.
+            releaseConnectionSlot();
             return;
         }
         SQLiteDatabase closing = db;
@@ -212,7 +220,15 @@ class AndroidCipherDB extends Database {
             cursors[iter].invalidate();
         }
         closing.close();
-        AndroidImplementation.databaseConnectionClosed(openPath);
+        releaseConnectionSlot();
+    }
+
+    /** Gives the connection slot back, once. */
+    private void releaseConnectionSlot() {
+        if (slotHeld) {
+            slotHeld = false;
+            AndroidImplementation.databaseConnectionClosed(openPath);
+        }
     }
 
     @Override

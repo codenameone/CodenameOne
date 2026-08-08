@@ -958,6 +958,25 @@ public final class DatabaseConformanceSuite {
                 db.execute("DELETE FROM conf_tx");
             }
 
+            // BEGIN IMMEDIATE takes its write lock up front, which is the whole reason to write
+            // it. It has to be a transaction like any other here; a port that reduced it to a
+            // deferred BEGIN would still pass this, but one that rejected it or lost track of it
+            // would not.
+            boolean immediateWorked = false;
+            try {
+                db.execute("BEGIN IMMEDIATE");
+                immediateWorked = db.isInTransaction();
+                db.execute("INSERT INTO conf_tx (id) VALUES (93)");
+                db.commitTransaction();
+            } catch (IOException err) {
+                r.check(false, "BEGIN IMMEDIATE opens a transaction: " + err.getMessage());
+            }
+            r.check(immediateWorked, "execute(\"BEGIN IMMEDIATE\") opens a transaction");
+            if (immediateWorked) {
+                r.check(rowCount(db, "conf_tx") == 1, "and its insert committed");
+                db.execute("DELETE FROM conf_tx");
+            }
+
             db.beginTransaction();
             db.execute("COMMIT");
             r.check(!db.isInTransaction(),

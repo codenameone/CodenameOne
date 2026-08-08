@@ -6566,8 +6566,14 @@ function cn1SqliteStartInit() {
     try {
       // Classic worker, so importScripts is the load mechanism and is synchronous.
       importScripts("js/sqlite3mc.js");
-      cn1Sqlite = await cn1SqliteWithin(sqlite3InitModule(), CN1_SQLITE_INIT_TIMEOUT_MS,
-        "loading the SQLite WebAssembly module");
+      // locateFile is not optional here. importScripts does not change the worker's base URL, so
+      // the loader resolves its .wasm against the worker script's directory rather than its own
+      // and fetches /sqlite3.wasm from the site root - a 404, and then a fifteen second wait for
+      // the init timeout before the engine reports itself unavailable. The bundle keeps both
+      // files together under js/, so that is where the payload is.
+      cn1Sqlite = await cn1SqliteWithin(sqlite3InitModule({
+        locateFile: function(path) { return "js/" + path; }
+      }), CN1_SQLITE_INIT_TIMEOUT_MS, "loading the SQLite WebAssembly module");
     } catch (err) {
       console.warn("Codename One: the SQLite engine could not be loaded, so databases are "
         + "unavailable in this build. Reported cause: " + err);

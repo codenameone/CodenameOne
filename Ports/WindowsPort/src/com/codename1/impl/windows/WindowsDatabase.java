@@ -59,8 +59,12 @@ class WindowsDatabase extends Database {
     /// SQLite's "this is not a database file", which is what a wrong key looks like.
     private static final int SQLITE_NOTADB = 26;
 
+    /** The file this connection is open on, for the shared registry a key change consults. */
+    private final String openKey;
+
     WindowsDatabase(String databaseName, String path, String key) throws IOException {
         this.databaseName = databaseName;
+        this.openKey = path;
         peer = WindowsNative.sqlDbOpen(path);
         if (key != null) {
             int status = WindowsNative.sqlDbApplyKeyStatus(peer, key);
@@ -77,6 +81,7 @@ class WindowsDatabase extends Database {
                         + "SQLite result " + status);
             }
         }
+        registerOpenDatabase(openKey);
     }
 
     private void checkOpen() throws IOException {
@@ -145,6 +150,7 @@ class WindowsDatabase extends Database {
         if (peer == 0) {
             return;
         }
+        releaseOpenDatabase(openKey);
         if (inTransaction) {
             inTransaction = false;
             try {
@@ -167,6 +173,9 @@ class WindowsDatabase extends Database {
     public void changeKey(DatabaseConfig config) throws IOException {
         checkOpen();
         checkNoTransactionForKeyChange();
+        // Rotating a key rewrites the file under the new one for this connection only; another
+        // connection keeps the old key and fails at the first rewritten page it reads.
+        requireSoleConnectionForKeyChange(openKey);
         String key = null;
         if (config != null && config.isEncrypted()) {
             key = config.resolveKeyMaterial(databaseName);

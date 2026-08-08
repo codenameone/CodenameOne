@@ -64,6 +64,7 @@ public class SEDatabase extends Database {
     public SEDatabase(java.sql.Connection conn, String databaseName) {
         this.databaseName = databaseName;
         this.conn = conn;
+        registerOpenDatabase(databaseName);
         try {
             conn.setAutoCommit(true);
         } catch (SQLException err) {
@@ -112,6 +113,29 @@ public class SEDatabase extends Database {
         return true;
     }
 
+    /// Puts the connection into the locking mode a BEGIN asked for.
+    ///
+    /// Restored to the driver's default once the transaction ends, so a later plain `BEGIN` is
+    /// deferred again rather than inheriting a mode from the statement before it.
+    private void applyBeginMode(String statement) {
+        String rest = statement.toUpperCase();
+        org.sqlite.SQLiteConfig.TransactionMode mode =
+                org.sqlite.SQLiteConfig.TransactionMode.DEFERRED;
+        if (rest.indexOf("IMMEDIATE") >= 0) {
+            mode = org.sqlite.SQLiteConfig.TransactionMode.IMMEDIATE;
+        } else if (rest.indexOf("EXCLUSIVE") >= 0) {
+            mode = org.sqlite.SQLiteConfig.TransactionMode.EXCLUSIVE;
+        }
+        setTransactionMode(mode);
+    }
+
+    /// Sets the driver's transaction mode, where the driver in use has one.
+    private void setTransactionMode(org.sqlite.SQLiteConfig.TransactionMode mode) {
+        if (conn instanceof org.sqlite.SQLiteConnection) {
+            ((org.sqlite.SQLiteConnection) conn).setCurrentTransactionMode(mode);
+        }
+    }
+
     /// Runs a transaction-control statement through JDBC, or reports that it is not one.
     ///
     /// `execute("BEGIN")` and `beginTransaction()` mean the same thing to the caller and have to
@@ -127,17 +151,25 @@ public class SEDatabase extends Database {
     private boolean executeTransactionControl(String statement) throws SQLException {
         String keyword = transactionControlKeyword(statement);
         if ("BEGIN".equals(keyword)) {
+            // BEGIN IMMEDIATE and BEGIN EXCLUSIVE take their write locks up front, which is the
+            // whole reason to write them; reducing every variant to setAutoCommit(false) would
+            // start a deferred transaction and let another writer take the lock first. The driver
+            // issues the BEGIN itself, so the mode is set on the connection rather than sent as
+            // SQL -- sending it would open a transaction JDBC's autocommit flag knows nothing of.
+            applyBeginMode(statement);
             conn.setAutoCommit(false);
             return true;
         }
         if ("COMMIT".equals(keyword) || "END".equals(keyword)) {
             conn.commit();
             conn.setAutoCommit(true);
+            setTransactionMode(org.sqlite.SQLiteConfig.TransactionMode.DEFERRED);
             return true;
         }
         if ("ROLLBACK".equals(keyword)) {
             conn.rollback();
             conn.setAutoCommit(true);
+            setTransactionMode(org.sqlite.SQLiteConfig.TransactionMode.DEFERRED);
             return true;
         }
         return false;
@@ -210,6 +242,7 @@ public class SEDatabase extends Database {
         if (conn == null) {
             return;
         }
+        releaseOpenDatabase(databaseName);
         java.sql.Connection closing = conn;
         conn = null;
         if (inTransaction) {
@@ -460,6 +493,9 @@ public class SEDatabase extends Database {
     public void changeKey(DatabaseConfig config) throws IOException {
         checkOpen();
         checkNoTransactionForKeyChange();
+        // Rotating a key rewrites the file under the new one for this connection only; another
+        // connection keeps the old key and fails at the first rewritten page it reads.
+        requireSoleConnectionForKeyChange(databaseName);
         Statement s = null;
         try {
             s = conn.createStatement();

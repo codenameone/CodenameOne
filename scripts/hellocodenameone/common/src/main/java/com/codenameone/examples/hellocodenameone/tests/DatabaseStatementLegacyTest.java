@@ -30,7 +30,7 @@ public class DatabaseStatementLegacyTest extends DatabaseConformanceTest {
 
     @Override
     protected String testName() {
-        return "DatabaseStatementLegacy";
+        return "DatabaseStatementLegacyTest";
     }
 
     @Override

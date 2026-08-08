@@ -813,6 +813,77 @@ public abstract class Database {
         return statement.substring(start, end).toUpperCase();
     }
 
+    /// Connections open on each database file, by a key the port supplies.
+    ///
+    /// Only a key change needs this, and every port needs it: rotating a key rewrites the file's
+    /// pages under a new key and updates only the connection that asked. Another connection to the
+    /// same file keeps the old one, and its next read of a rewritten page fails -- on the engines
+    /// that convert by export and rename, that connection is left writing to a file that is no
+    /// longer the database at all. There is no way to rotate a key underneath a second connection,
+    /// so the ports refuse instead.
+    private static final java.util.Hashtable OPEN_DATABASES = new java.util.Hashtable();
+
+    /// Records that a connection to a database file has been opened.
+    ///
+    /// Ports call this once they have a connection, and `#releaseOpenDatabase(String)` when they
+    /// let it go. A port whose engine cannot be given two connections to one file need not call
+    /// either.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: identifies the file, canonically enough that two spellings of one path agree
+    protected static synchronized void registerOpenDatabase(String key) {
+        if (key == null) {
+            return;
+        }
+        Integer count = (Integer) OPEN_DATABASES.get(key);
+        OPEN_DATABASES.put(key, Integer.valueOf(count == null ? 1 : count.intValue() + 1));
+    }
+
+    /// Records that a connection to a database file has been closed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key the connection was registered under
+    protected static synchronized void releaseOpenDatabase(String key) {
+        if (key == null) {
+            return;
+        }
+        Integer count = (Integer) OPEN_DATABASES.get(key);
+        if (count == null) {
+            return;
+        }
+        if (count.intValue() <= 1) {
+            OPEN_DATABASES.remove(key);
+        } else {
+            OPEN_DATABASES.put(key, Integer.valueOf(count.intValue() - 1));
+        }
+    }
+
+    /// Rejects a key change while the same file is open more than once.
+    ///
+    /// Ports call this from `#changeKey(DatabaseConfig)`, after
+    /// `#checkNoTransactionForKeyChange()`. The count includes the connection asking, so more than
+    /// one means somebody else holds the file too.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key this connection was registered under
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if another connection has the same file open
+    protected static synchronized void requireSoleConnectionForKeyChange(String key)
+            throws IOException {
+        Integer count = key == null ? null : (Integer) OPEN_DATABASES.get(key);
+        if (count != null && count.intValue() > 1) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    "The database " + key + " is open more than once, and changing its key rewrites"
+                    + " it under the new one for this connection only. Close the others first;"
+                    + " reads through them would fail once they reached a rewritten page.");
+        }
+    }
+
     /// Rejects a key change while a transaction is open.
     ///
     /// Ports call this at the top of `#changeKey(DatabaseConfig)`. Re-keying is not a statement

@@ -47,7 +47,7 @@ public class DatabaseEncryptionTest extends DatabaseConformanceTest {
 
     @Override
     protected String testName() {
-        return "DatabaseEncryption";
+        return "DatabaseEncryptionTest";
     }
 
     @Override

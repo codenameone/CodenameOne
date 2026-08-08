@@ -30,7 +30,7 @@ public class DatabaseCursorTest extends DatabaseConformanceTest {
 
     @Override
     protected String testName() {
-        return "DatabaseCursor";
+        return "DatabaseCursorTest";
     }
 
     @Override

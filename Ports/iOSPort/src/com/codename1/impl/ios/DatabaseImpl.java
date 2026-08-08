@@ -54,9 +54,14 @@ class DatabaseImpl extends Database {
      */
     private final Vector openCursors = new Vector();
 
+    /** The file this connection is open on, for the shared registry a key change consults. */
+    private final String openKey;
+
     public DatabaseImpl(String databaseName, String path) {
         this.databaseName = databaseName;
+        this.openKey = path;
         peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(path);
+        registerOpenDatabase(openKey);
     }
 
     /// SQLite's success code.
@@ -67,6 +72,7 @@ class DatabaseImpl extends Database {
 
     public DatabaseImpl(String databaseName, String path, String key) throws IOException {
         this.databaseName = databaseName;
+        this.openKey = path;
         peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(path);
         int status = IOSImplementation.nativeInstance.sqlDbApplyKeyStatus(peer, key);
         if (status != SQLITE_OK) {
@@ -81,6 +87,7 @@ class DatabaseImpl extends Database {
             throw new IOException("The database " + databaseName + " could not be read, SQLite "
                     + "result " + status);
         }
+        registerOpenDatabase(openKey);
     }
 
     public static long getPeer(Object db) {
@@ -156,6 +163,7 @@ class DatabaseImpl extends Database {
         if (peer == 0) {
             return;
         }
+        releaseOpenDatabase(openKey);
         if (inTransaction) {
             inTransaction = false;
             try {
@@ -180,6 +188,9 @@ class DatabaseImpl extends Database {
     public void changeKey(DatabaseConfig config) throws IOException {
         checkOpen();
         checkNoTransactionForKeyChange();
+        // Rotating a key rewrites the file under the new one for this connection only; another
+        // connection keeps the old key and fails at the first rewritten page it reads.
+        requireSoleConnectionForKeyChange(openKey);
         String key = null;
         if (config != null && config.isEncrypted()) {
             key = config.resolveKeyMaterial(databaseName);
