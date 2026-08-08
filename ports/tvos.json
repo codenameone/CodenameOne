@@ -1,36 +1,36 @@
 {
-  "commit": "0e57ebe1cfbf770ee621f4c17e8d017e3c545196",
-  "generated_at": "2026-08-08T07:02:12Z",
+  "commit": "30fef6d5620d26fd89b296a2a84de43be11da44a",
+  "generated_at": "2026-08-08T14:56:24Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 452327000
+        "duration_ns": 351871000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 210795000
+        "duration_ns": 151659000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 240325000
+        "duration_ns": 212435000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 140156000
+        "duration_ns": 117752000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 538509000
+        "duration_ns": 407496000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 465424000
+        "duration_ns": 331333000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 1030651000
+        "duration_ns": 713455000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,14 +44,14 @@
     "suite_checksum": 0
   },
   "port": "tvos",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31236206724",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31252409393",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 169,
-    "skip": 2
+    "pass": 163,
+    "skip": 8
   },
   "tests": {
     "ARApiTest": {
@@ -359,7 +359,10 @@
     },
     "GoogleWebMapScreenshotTest": {
       "feature": "native-web-maps",
-      "status": "pass"
+      "reasons": [
+        "tv-no-webview"
+      ],
+      "status": "skip"
     },
     "Gpu3DAnimationTest": {
       "feature": "gpu-3d",
@@ -483,7 +486,10 @@
     },
     "NativeMapFallbackScreenshotTest": {
       "feature": "vector-maps",
-      "status": "pass"
+      "reasons": [
+        "native-provider-active"
+      ],
+      "status": "skip"
     },
     "OrientationLockScreenshotTest": {
       "feature": "orientation",
@@ -627,11 +633,17 @@
     },
     "SurfacesRasterizerScreenshotTest": {
       "feature": "surfaces",
-      "status": "pass"
+      "reasons": [
+        "surfaces-not-on-tv-or-watch"
+      ],
+      "status": "skip"
     },
     "SurfacesRemoteViewsScreenshotTest": {
       "feature": "surfaces",
-      "status": "pass"
+      "reasons": [
+        "android-only-remoteviews-lowering"
+      ],
+      "status": "skip"
     },
     "SurfacesSerializerRoundTripTest": {
       "feature": "surfaces",
@@ -711,7 +723,10 @@
     },
     "VRStereoSceneScreenshotTest": {
       "feature": "immersive-media",
-      "status": "pass"
+      "reasons": [
+        "tv-no-stereo-vr"
+      ],
+      "status": "skip"
     },
     "ValidatorLightweightPickerScreenshotTest": {
       "feature": "pickers-validation",
@@ -731,7 +746,10 @@
     },
     "VideoIODecodedFramesScreenshotTest": {
       "feature": "video-decoding",
-      "status": "pass"
+      "reasons": [
+        "videoio-unavailable-on-ios"
+      ],
+      "status": "skip"
     },
     "VideoIORoundTripTest": {
       "feature": "video-round-trip",
