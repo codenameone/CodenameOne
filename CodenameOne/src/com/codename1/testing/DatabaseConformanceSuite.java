@@ -1247,7 +1247,15 @@ public final class DatabaseConformanceSuite {
                     + DatabaseConfig.managed().isKeyHardwareBacked());
         } catch (DatabaseEncryptionException err) {
             if (err.getErrorCode() == DatabaseEncryptionException.KEY_UNAVAILABLE) {
-                r.skip("managed-keys-unavailable: " + err.getMessage());
+                // A note rather than a skip. Managed keys need a non-prompting secure store, which
+                // not every port has, but everything else in this group -- passphrases, raw keys,
+                // re-keying, conversion, ciphertext on disk -- has already run and been asserted
+                // by the time we get here. Reporting the group as skipped would hide all of that
+                // behind one unavailable sub-feature and read as "encryption is untested on this
+                // port" when the opposite is true. The missing capability is SecureStorage's, and
+                // it is reported under SecureStorage.
+                r.info("managed keys are unavailable here, so only the generated-key case is "
+                        + "untested: " + err.getMessage());
             } else {
                 r.check(false, "managed key open failed: " + err.getMessage());
             }
