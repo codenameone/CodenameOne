@@ -575,6 +575,12 @@ static void markSuspendedBeforeEvent(struct ThreadLocalData* tsd) {
     struct sus_state* s = susForThread((int64_t)tsd->threadId);
     pthread_mutex_lock(&s->mu);
     s->suspended = 1;
+    // The whole parked state, not just the flag: the proxy sends GET_STACK and
+    // GET_LOCALS as soon as it sees the event, and those read tsd out of here.
+    // Publishing them only once the thread reaches suspendCurrent left a window
+    // where the first stack request after a breakpoint answered empty.
+    s->stepFromDepth = tsd->callStackOffset;
+    s->tsd = tsd;
     pthread_mutex_unlock(&s->mu);
 }
 
@@ -582,10 +588,12 @@ static void suspendCurrent(struct ThreadLocalData* tsd) {
     int64_t threadId = (int64_t)tsd->threadId;
     struct sus_state* s = susForThread(threadId);
     pthread_mutex_lock(&s->mu);
-    // Normally already set by markSuspendedBeforeEvent; setting it again is
-    // harmless, and a resume that arrived in between legitimately cleared it,
-    // in which case the wait below falls straight through.
-    s->suspended = 1;
+    // Deliberately does NOT set s->suspended. markSuspendedBeforeEvent already
+    // published it, and a CMD_RESUME can arrive in the window between that and
+    // this call -- the listener runs on its own thread and the event has
+    // already gone out. Re-asserting the flag would swallow that resume and
+    // then wait for a signal that has been and gone, parking the thread (often
+    // the EDT) until some later resume happened along.
     s->stepFromDepth = tsd->callStackOffset;
     s->tsd = tsd;
     // Mark thread inactive so the concurrent GC can mark/sweep freely.
@@ -1121,8 +1129,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
             struct clazz* objCls = cn1_debugger_class_of_wire_id(obj);
             // Anything reached through this object belongs to whichever
-            // suspension produced it, so it is invalidated at the same time.
-            int64_t owner = cn1_debugger_owner_of(obj);
+            // suspensions produced it, so it is invalidated with them.
             int classId = objCls != NULL ? objCls->classId : -1;
             // An unverifiable reference yields no fields rather than a read
             // at obj+offset, which is where a bogus objectID used to fault.
@@ -1162,7 +1169,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                     if (tc == 'L') {
                         JAVA_OBJECT ref = (JAVA_OBJECT)(uintptr_t)val;
                         if (!cn1_debugger_is_valid_object(ref)
-                                || !cn1_debugger_note_issued_for(ref, owner)) {
+                                || !cn1_debugger_note_issued_inheriting(ref, obj)) {
                             val = 0;
                         }
                     }
@@ -1345,7 +1352,6 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                 sendEvent(EVT_ARRAY_VALUES, err, 5);
                 return 0;
             }
-            int64_t arrayOwner = cn1_debugger_owner_of(obj);
             JAVA_ARRAY arr = (JAVA_ARRAY)obj;
             int arrLen = arr->length;
             if (firstIdx < 0) firstIdx = 0;
@@ -1438,7 +1444,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                         // objectID the IDE expects us to dereference.
                         JAVA_OBJECT v = ((JAVA_OBJECT*)arr->data)[idx];
                         if (!cn1_debugger_is_valid_object(v)
-                                || !cn1_debugger_note_issued_for(v, arrayOwner)) {
+                                || !cn1_debugger_note_issued_inheriting(v, obj)) {
                             v = JAVA_NULL;
                         }
                         writeBE64(p, (uint64_t)(uintptr_t)v);

@@ -30,6 +30,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -1915,9 +1916,18 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     @Override public void onThreads(long[] threadIds, boolean[] suspended, long[] threadObjects) {
         // Rebuild rather than merge: a thread absent from the device's list has
         // died, and keeping it would leave a phantom row in the IDE.
+        // A snapshot can be sampled just before a thread stops and arrive just
+        // after the stop event, which would otherwise report the thread the IDE
+        // has only now stopped at as running. The proxy is the only source of
+        // resumes, so its own belief is authoritative in that direction: a
+        // thread it thinks is suspended stays suspended until it resumes it.
+        // A snapshot may only ever add a suspension, never withdraw one.
+        Map<Long, ThreadInfo> previous = new HashMap<>(deviceThreads);
         deviceThreads.clear();
         for (int i = 0; i < threadIds.length; i++) {
-            deviceThreads.put(threadIds[i], new ThreadInfo(suspended[i], threadObjects[i]));
+            ThreadInfo was = previous.get(threadIds[i]);
+            boolean stillSuspended = suspended[i] || (was != null && was.suspended);
+            deviceThreads.put(threadIds[i], new ThreadInfo(stillSuspended, threadObjects[i]));
         }
         threadNames.keySet().retainAll(deviceThreads.keySet());
         // The device's list is authoritative whenever it arrives, so a thread

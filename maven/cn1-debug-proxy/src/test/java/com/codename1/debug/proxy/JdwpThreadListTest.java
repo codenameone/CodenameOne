@@ -115,6 +115,51 @@ public class JdwpThreadListTest {
         }
     }
 
+    /**
+     * A thread list sampled before a stop cannot undo the stop.
+     *
+     * <p>The device samples a thread, the thread stops and sends its event,
+     * and the sampled list arrives second — so the proxy would apply
+     * {@code suspended=false} on top of the stop it had just processed and
+     * report the thread the IDE is sitting at as running. The proxy issues
+     * every resume itself, so its own belief wins in that direction: a
+     * snapshot may add a suspension but never withdraw one.</p>
+     */
+    @Test
+    public void aStaleSnapshotCannotUndoASuspendEvent() throws Exception {
+        int port = JdwpTestClient.freePort();
+        JdwpServer server = new JdwpServer(port);
+        try (JdwpTestClient client = JdwpTestClient.attach(server, port)) {
+            primeSymbols(server);
+            server.onThreads(new long[] { 7 }, new boolean[] { false }, new long[] { 0 });
+            server.onBreakpointHit(7, 0, 12);
+            assertEquals(1, suspendStatus(client, 7));
+
+            // Sampled before the stop, delivered after it.
+            server.onThreads(new long[] { 7 }, new boolean[] { false }, new long[] { 0 });
+
+            assertEquals("the stop still stands", 1, suspendStatus(client, 7));
+        }
+    }
+
+    /** But a resume the proxy issued does clear it, so it cannot stick. */
+    @Test
+    public void aResumeStillClearsItAfterwards() throws Exception {
+        int port = JdwpTestClient.freePort();
+        JdwpServer server = new JdwpServer(port);
+        try (JdwpTestClient client = JdwpTestClient.attach(server, port)) {
+            primeSymbols(server);
+            server.onBreakpointHit(7, 0, 12);
+            server.onThreads(new long[] { 7 }, new boolean[] { false }, new long[] { 0 });
+            assertEquals(1, suspendStatus(client, 7));
+
+            assertEquals(0, client.send(JdwpTestClient.CS_VIRTUAL_MACHINE, 9, new byte[0]).errorCode);
+            server.onThreads(new long[] { 7 }, new boolean[] { false }, new long[] { 0 });
+
+            assertEquals("a resumed thread is running again", 0, suspendStatus(client, 7));
+        }
+    }
+
     /** A thread the device no longer reports must leave the list. */
     @Test
     public void deadThreadsDropOutOfTheList() throws Exception {

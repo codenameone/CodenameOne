@@ -136,6 +136,13 @@ extern void cn1_debugger_forget_issued(void);
  */
 extern int cn1_debugger_note_issued_for(JAVA_OBJECT obj, int64_t owner);
 extern int64_t cn1_debugger_owner_of(JAVA_OBJECT obj);
+
+/**
+ * Records a reference reached through another, inheriting the parent's whole
+ * claim. Used by the field and array commands, which arrive with only an
+ * objectID and so have no thread of their own to attribute to.
+ */
+extern int cn1_debugger_note_issued_inheriting(JAVA_OBJECT obj, JAVA_OBJECT parent);
 extern void cn1_debugger_forget_issued_for(int64_t owner);
 
 /** Resolves an objectID that arrived from the IDE, or NULL to refuse it. */

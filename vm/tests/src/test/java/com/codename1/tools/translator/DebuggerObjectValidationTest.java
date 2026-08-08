@@ -259,6 +259,33 @@ class DebuggerObjectValidationTest {
         assertEquals("not-marked", probe("ROOTS_TAGGED_NOT_MARKED"));
     }
 
+    /**
+     * A reference reached through a shared object inherits every owner.
+     *
+     * <p>Taking only the parent's first owner meant resuming that thread
+     * deleted the nested ids while a second thread was still parked and able
+     * to reach the same tree, so an object the IDE had already expanded went
+     * unavailable underneath it.</p>
+     */
+    @Test
+    void derivedReferencesInheritEveryOwnerOfTheirParent() throws Exception {
+        assertEquals("kept", probe("DERIVED_INHERITS_ALL_OWNERS"));
+    }
+
+    /**
+     * An id claimed both by a suspension and by the thread list survives that
+     * suspension ending.
+     *
+     * <p>A java.lang.Thread object can be exposed first through a stopped
+     * thread's locals and later by the thread list, which is tied to no
+     * suspension. Recording only the first claim meant resuming that thread
+     * rejected an id the live thread list was still advertising.</p>
+     */
+    @Test
+    void anUnownedClaimSurvivesThreadInvalidation() throws Exception {
+        assertEquals("kept", probe("UNOWNED_CLAIM_SURVIVES"));
+    }
+
     /** A zeroed object has no class word to check. */
     @Test
     void anObjectWithNoClassWordIsRejected() throws Exception {
@@ -282,7 +309,8 @@ class DebuggerObjectValidationTest {
                 "OWNER_UNOWNED_DROPPED_BY_FULL_RESUME",
                 "SHARED_SURVIVES_FIRST_RESUME", "SHARED_DROPPED_BY_LAST_RESUME",
                 "ROOTS_MARK_ISSUED", "ROOTS_MARK_AFTER_GROWTH",
-                "ROOTS_RELEASED_NOT_MARKED", "ROOTS_TAGGED_NOT_MARKED");
+                "ROOTS_RELEASED_NOT_MARKED", "ROOTS_TAGGED_NOT_MARKED",
+                "DERIVED_INHERITS_ALL_OWNERS", "UNOWNED_CLAIM_SURVIVES");
         for (String candidate : cases) {
             NativeDebuggerHarness.Result result = harness().run(candidate);
             assertEquals(0, result.exitCode,
@@ -381,6 +409,25 @@ class DebuggerObjectValidationTest {
             "        cn1MarkedRootCount = 0;\n" +
             "        cn1_debugger_mark_issued_roots(NULL);\n" +
             "        printf(\"%s\\n\", cn1MarkRootTargetSeen ? \"marked\" : \"not-marked\");\n" +
+            "        return 0;\n" +
+            "    } else if (strcmp(which, \"DERIVED_INHERITS_ALL_OWNERS\") == 0) {\n" +
+            "        /* A parent both parked threads expose, and a child reached\n" +
+            "         * through it; thread 7 then resumes. */\n" +
+            "        JAVA_OBJECT parent = (JAVA_OBJECT)(uintptr_t)0xE000;\n" +
+            "        JAVA_OBJECT child  = (JAVA_OBJECT)(uintptr_t)0xE008;\n" +
+            "        cn1_debugger_note_issued_for(parent, 7);\n" +
+            "        cn1_debugger_note_issued_for(parent, 9);\n" +
+            "        cn1_debugger_note_issued_inheriting(child, parent);\n" +
+            "        cn1_debugger_forget_issued_for(7);\n" +
+            "        printf(\"%s\\n\", cn1_debugger_was_issued(child) ? \"kept\" : \"gone\");\n" +
+            "        return 0;\n" +
+            "    } else if (strcmp(which, \"UNOWNED_CLAIM_SURVIVES\") == 0) {\n" +
+            "        /* Exposed through a stopped thread, then by the thread list. */\n" +
+            "        JAVA_OBJECT threadObj = (JAVA_OBJECT)(uintptr_t)0xF000;\n" +
+            "        cn1_debugger_note_issued_for(threadObj, 7);\n" +
+            "        cn1_debugger_note_issued_for(threadObj, 0);\n" +
+            "        cn1_debugger_forget_issued_for(7);\n" +
+            "        printf(\"%s\\n\", cn1_debugger_was_issued(threadObj) ? \"kept\" : \"gone\");\n" +
             "        return 0;\n" +
             "    } else if (strncmp(which, \"SHARED_\", 7) == 0) {\n" +
             "        /* One reference exposed by both parked threads. */\n" +

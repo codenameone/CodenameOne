@@ -223,6 +223,15 @@ struct issued_entry {
     int64_t owners[CN1_ISSUED_MAX_OWNERS];
     unsigned char ownerCount;
     /*
+     * Claimed by something not tied to a suspension -- the thread list's
+     * java.lang.Thread objects. Recorded separately from the owner set because
+     * the same reference can hold both claims: a Thread object can be exposed
+     * first through a stopped thread's locals and later by the thread list.
+     * Dropping the entry when that thread resumes would then reject an id the
+     * live thread list still advertises.
+     */
+    unsigned char unowned;
+    /*
      * Set when more owners appeared than there are slots. Such an entry is
      * dropped as soon as any owner resumes, because we can no longer prove
      * another still holds it: reporting a reference as unavailable is a
@@ -244,9 +253,11 @@ static unsigned issued_slot(uintptr_t key, unsigned cap) {
     return (unsigned)(h & (cap - 1));
 }
 
+static struct issued_entry* issued_find(uintptr_t key);
+
 /* Adds an owner to an entry, ignoring duplicates. */
 static void entry_add_owner(struct issued_entry* e, int64_t owner) {
-    if (owner == 0) return;   /* unowned: nothing to record */
+    if (owner == 0) { e->unowned = 1; return; }
     for (unsigned i = 0; i < e->ownerCount; i++) {
         if (e->owners[i] == owner) return;
     }
@@ -326,6 +337,42 @@ int cn1_debugger_note_issued(JAVA_OBJECT obj) {
     return cn1_debugger_note_issued_for(obj, 0);
 }
 
+/**
+ * Records a reference reached through another, giving it the parent's whole
+ * claim rather than one owner of it.
+ *
+ * Two stopped threads can own the object the IDE is expanding. Attributing the
+ * nested references to only the first meant resuming that thread deleted them
+ * while the second was still parked and able to reach the same tree, so an
+ * already-expanded object went unavailable underneath it.
+ */
+int cn1_debugger_note_issued_inheriting(JAVA_OBJECT obj, JAVA_OBJECT parent) {
+    if (obj == JAVA_NULL) return 1;
+    int ok;
+    pthread_mutex_lock(&g_issuedMutex);
+    ok = issued_reserve();
+    if (ok) {
+        struct issued_entry* from = issued_find((uintptr_t)parent);
+        int created = 0;
+        struct issued_entry* e =
+            issued_put(g_issued, g_issuedCap, (uintptr_t)obj, &created);
+        if (e) {
+            g_issuedCount += (unsigned)created;
+            if (from != NULL) {
+                for (unsigned i = 0; i < from->ownerCount; i++) {
+                    entry_add_owner(e, from->owners[i]);
+                }
+                if (from->unowned) e->unowned = 1;
+                if (from->ownerOverflow) e->ownerOverflow = 1;
+            }
+        } else {
+            ok = 0;
+        }
+    }
+    pthread_mutex_unlock(&g_issuedMutex);
+    return ok;
+}
+
 /* Locates an entry, or NULL. Caller holds the mutex. */
 static struct issued_entry* issued_find(uintptr_t key) {
     if (g_issued == NULL) return NULL;
@@ -366,7 +413,8 @@ void cn1_debugger_forget_issued(void) {
 
 /* Whether an entry survives the given owner resuming. */
 static int entry_survives_resume(struct issued_entry* e, int64_t owner) {
-    if (e->ownerCount == 0) return 1;      /* unowned: only a full clear drops it */
+    if (e->unowned) return 1;              /* only a full clear drops it */
+    if (e->ownerCount == 0) return 1;
     if (e->ownerOverflow) return 0;        /* cannot prove another owner remains */
     unsigned remaining = 0;
     for (unsigned i = 0; i < e->ownerCount; i++) {
