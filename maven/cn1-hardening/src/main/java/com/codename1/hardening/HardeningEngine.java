@@ -182,6 +182,7 @@ public final class HardeningEngine {
 
         int seed = deriveSeed(cfg, req.getBuildKey());
         int encryptedStrings = 0;
+        int concatLiterals = 0;
         boolean stringsApplied = cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform());
         if (stringsApplied) {
             // In "constants" mode, first collect the values declared as static-final String
@@ -202,6 +203,7 @@ public final class HardeningEngine {
                     e.setValue(out);
                 }
                 encryptedStrings += t.getEncryptedCount();
+                concatLiterals += t.getConcatLiteralCount();
             }
         }
 
@@ -283,6 +285,16 @@ public final class HardeningEngine {
         if (cfg.isAnyStringEncryption() && !stringsApplied) {
             result.getWarnings().add("string encryption is not applied on platform '"
                     + cfg.getPlatform() + "' (would break the JavaScript native bridge); skipped");
+        }
+        if (stringsApplied && concatLiterals > 0) {
+            // javac from JDK 9 compiles string concatenation to an invokedynamic whose literal
+            // fragments live in the StringConcatFactory recipe, not in an LDC or a ConstantValue, so
+            // the string channels cannot reach them. Report it rather than let a build believe it is
+            // fully string-encrypted; -XDstringConcat=inline (or an older -target) emits StringBuilder
+            // the engine does encrypt.
+            result.getWarnings().add(concatLiterals + " string-concatenation literal group(s) compiled "
+                    + "to invokedynamic (JDK 9+ javac) were not encrypted; compile with "
+                    + "-XDstringConcat=inline or an older -target to encrypt concatenation literals");
         }
         if (req.getReportFile() != null) {
             writeReport(req.getReportFile(), cfg, result);

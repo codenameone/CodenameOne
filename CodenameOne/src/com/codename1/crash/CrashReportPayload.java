@@ -163,7 +163,7 @@ final class CrashReportPayload {
             return false;
         }
         String p = platform.toLowerCase();
-        return p.indexOf("html") >= 0 || p.indexOf("javascript") >= 0 || p.equals("js");
+        return p.indexOf("html") >= 0 || p.indexOf("javascript") >= 0 || "js".equals(p);
     }
 
     static final class Frame {

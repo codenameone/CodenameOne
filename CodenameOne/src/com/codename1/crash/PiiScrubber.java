@@ -79,10 +79,19 @@ public class PiiScrubber {
     }
 
     /// Scrubs a pre-rendered stack string. On the ParparVM ports the whole
-    /// Java trace arrives as one string rather than structured frames, so a
-    /// stricter application can override this to redact aggressively. The
-    /// default applies the same message scrubbing (emails, long digit runs),
-    /// which is harmless on class/method/line text.
+    /// Java trace arrives as one string rather than structured frames, and on
+    /// the JavaScript port it is the engine's `Error().stack`. A stricter
+    /// application can override this to redact aggressively.
+    ///
+    /// The default scrubs emails everywhere, but applies long-digit-run masking
+    /// only to non-frame lines. A frame/location line carries no PII -- it is
+    /// class, method, file and line/column text -- and its numbers are exactly
+    /// what the server needs to symbolicate. In particular a minified
+    /// JavaScript bundle is often one line, so a `Error().stack` frame reads
+    /// `app.js:1:123456` where the six-plus-digit column would otherwise be
+    /// masked to `[num]`, destroying the location. Free-form lines (the leading
+    /// `ExceptionClass: message` line and any non-frame text) are still scrubbed,
+    /// since a message can carry a phone number or long id.
     ///
     /// #### Parameters
     ///
@@ -92,7 +101,38 @@ public class PiiScrubber {
     ///
     /// the scrubbed stack string, or `null` if `rawStack` is `null`.
     public String scrubRawStack(String rawStack) {
-        return scrubMessage(rawStack);
+        if (rawStack == null) {
+            return null;
+        }
+        int len = rawStack.length();
+        StringBuilder out = new StringBuilder(len);
+        int i = 0;
+        while (i < len) {
+            int nl = rawStack.indexOf('\n', i);
+            int lineEnd = nl < 0 ? len : nl;
+            String line = rawStack.substring(i, lineEnd);
+            String emailScrubbed = scrubEmails(line);
+            out.append(isFrameLine(line) ? emailScrubbed : scrubDigitRuns(emailScrubbed));
+            if (nl < 0) {
+                break;
+            }
+            out.append('\n');
+            i = nl + 1;
+        }
+        return out.toString();
+    }
+
+    /// True for a stack-trace line whose numeric tokens are source coordinates,
+    /// not PII: the JVM/ParparVM `at <class>.<method>(...)` / `at <class>.<method>:<line>`
+    /// form, and the JavaScript engine forms (Chrome `at fn (url:line:col)`,
+    /// Firefox `fn@url:line:col`). Matching the location shape rather than a
+    /// specific engine keeps a real column offset from being masked.
+    private static boolean isFrameLine(String line) {
+        String t = line.trim();
+        if (t.startsWith("at ")) {
+            return true;
+        }
+        return t.indexOf(".js:") >= 0 || t.indexOf("@http") >= 0 || t.indexOf("@file") >= 0;
     }
 
     /// Replaces all occurrences of an email-like substring with the form

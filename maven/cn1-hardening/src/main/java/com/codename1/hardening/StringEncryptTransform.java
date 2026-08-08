@@ -25,6 +25,7 @@ package com.codename1.hardening;
 import java.util.List;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -34,6 +35,7 @@ import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
+import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -63,11 +65,16 @@ public final class StringEncryptTransform {
     private static final String HOISTED_FIELD_PREFIX = "zqL$";
     static final String DECODER_DESC = "(Ljava/lang/String;)Ljava/lang/String;";
 
+    /** {@code StringConcatFactory} recipe markers: an ordinary argument slot and a constant slot. */
+    private static final char TAG_ARG = '\u0001';
+    private static final char TAG_CONST = '\u0002';
+
     private final boolean encryptAllStrings;
     private final int seed;
     private final ClassLoader hierarchy;
     private final java.util.Set<String> constantValues;
     private int encryptedCount;
+    private int concatLiteralCount;
 
     public StringEncryptTransform(boolean encryptAllStrings, int seed) {
         this(encryptAllStrings, seed, null, null);
@@ -114,6 +121,22 @@ public final class StringEncryptTransform {
         return encryptedCount;
     }
 
+    /**
+     * The number of {@code invokedynamic} string-concatenation sites carrying plaintext literal text
+     * that this transform did NOT encrypt. javac from JDK 9 on compiles {@code "a" + b} to an
+     * {@code invokedynamic} bound to {@link java.lang.invoke.StringConcatFactory}, storing the literal
+     * fragments in the bootstrap recipe/constant arguments rather than as {@code LDC} instructions.
+     * The engine encrypts {@code LDC} and {@code ConstantValue} channels; a recipe cannot be rewritten
+     * to a decode call because {@code StringConcatFactory} interprets it at link time, so those
+     * fragments would ship in cleartext. They are counted and reported rather than silently left,
+     * so a build compiled that way is not believed fully string-encrypted. Compiling with
+     * {@code -XDstringConcat=inline} (or an older {@code -target}) emits {@code StringBuilder} the
+     * engine encrypts.
+     */
+    public int getConcatLiteralCount() {
+        return concatLiteralCount;
+    }
+
     /** Encrypts {@code classBytes}, returning the transformed bytes (or the input if nothing changed). */
     public byte[] transform(byte[] classBytes) {
         ClassNode cn = new ClassNode();
@@ -136,6 +159,12 @@ public final class StringEncryptTransform {
         // Never skipping keeps encryption applied by-value across the whole jar, so all occurrences of
         // a value are decoded through the shared intern pool and stay reference-equal.
         String decoderName = resolveDecoderName(cn);
+
+        // Count invokedynamic string-concatenation literals we cannot encrypt (see
+        // getConcatLiteralCount). Done before the mutating passes so it is independent of them; the
+        // engine turns a non-zero total into a build warning so plaintext concat fragments are never
+        // silently shipped.
+        concatLiteralCount += countConcatLiterals(cn);
 
         int base = keyBase(cn.name);
         boolean changed = false;
@@ -205,6 +234,69 @@ public final class StringEncryptTransform {
             insn = next;
         }
         return changed;
+    }
+
+    /**
+     * Counts the {@code invokedynamic} string-concatenation sites in {@code cn} that carry plaintext
+     * the engine cannot reach. A {@code makeConcatWithConstants} recipe embeds the literal fragments of
+     * {@code "a" + b} directly (any character other than the U+0001 argument marker and the
+     * U+0002 constant marker), and additional constant fragments arrive as String bootstrap
+     * arguments after the recipe. Either form leaves cleartext in the constant pool that no
+     * {@code LDC}/{@code ConstantValue} pass touches. Counts the site once when it bears any literal
+     * text, so the reported number tracks concat sites rather than characters.
+     */
+    private static int countConcatLiterals(ClassNode cn) {
+        if (cn.methods == null) {
+            return 0;
+        }
+        int count = 0;
+        for (MethodNode mn : cn.methods) {
+            if (mn.instructions == null) {
+                continue;
+            }
+            for (AbstractInsnNode insn = mn.instructions.getFirst(); insn != null; insn = insn.getNext()) {
+                if (!(insn instanceof InvokeDynamicInsnNode)) {
+                    continue;
+                }
+                InvokeDynamicInsnNode indy = (InvokeDynamicInsnNode) insn;
+                Handle bsm = indy.bsm;
+                if (bsm == null
+                        || !"java/lang/invoke/StringConcatFactory".equals(bsm.getOwner())
+                        || !"makeConcatWithConstants".equals(bsm.getName())) {
+                    continue;
+                }
+                if (concatSiteHasLiteral(indy.bsmArgs)) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    /**
+     * True when a {@code makeConcatWithConstants} site carries any plaintext: a recipe (the first
+     * bootstrap argument) with a character that is neither the U+0001 argument marker nor the
+     * U+0002 constant marker, or any String constant among the later bootstrap arguments.
+     */
+    private static boolean concatSiteHasLiteral(Object[] bsmArgs) {
+        if (bsmArgs == null || bsmArgs.length == 0) {
+            return false;
+        }
+        if (bsmArgs[0] instanceof String) {
+            String recipe = (String) bsmArgs[0];
+            for (int i = 0; i < recipe.length(); i++) {
+                char c = recipe.charAt(i);
+                if (c != TAG_ARG && c != TAG_CONST) {
+                    return true;
+                }
+            }
+        }
+        for (int i = 1; i < bsmArgs.length; i++) {
+            if (bsmArgs[i] instanceof String) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

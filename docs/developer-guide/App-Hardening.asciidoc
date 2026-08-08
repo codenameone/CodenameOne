@@ -29,6 +29,8 @@ One caveat: an encrypted app literal is a different object from an equal *un-enc
 
 One exclusion: a string used as an *annotation value* (or an annotation-method default) is stored by javac in the annotation metadata, not as an `LDC` or a field constant, so it's not encrypted and remains readable in the binary. Codename One has no runtime reflection, so your app can't read that value back anyway -- but don't place a secret in an annotation and expect it hidden.
 
+Another exclusion: string concatenation such as `"prefix=" + value`, compiled by a JDK 9 or newer javac, becomes an `invokedynamic` whose literal fragments live in the concatenation recipe rather than an `LDC` or a field constant, so the encryption can't reach them and they stay readable. The engine counts these sites and the build report lists them, so a build that ships such literals says so rather than claiming complete string encryption. Compiling with `-XDstringConcat=inline` (or an older `-target`) makes javac emit `StringBuilder` calls whose literals the engine does encrypt.
+
 |Control-flow obfuscation
 |Android, desktop
 |An opaque predicate guarded by a value the decompiler can't fold. Left off the ParparVM native ports, where it fights the translator's optimizer and the arithmetic reducer, and off JavaScript, where it inflates the bundle. Never applied to constructors.
