@@ -403,12 +403,18 @@ public class CN1WearableListenerService extends WearableListenerService {
                         // replica leaves the same item winning, and re-announcing a value the app
                         // already holds is a spurious change -- listeners re-render, and anything
                         // that treats a change as an event would act on it twice.
-                        if (!started) {
+                        // AFTER the delivery, and only if it happened. This helper declines when
+                        // another publication advanced the stamp while the query above was
+                        // blocked -- the race the comments here already describe -- and starting
+                        // the app for a callback that was never emitted foregrounds the UI for
+                        // nothing. The queue is drained whenever a listener registers, so starting
+                        // second costs the delivery nothing.
+                        if (CN1WearableBridge.deliverIfStampUnchanged(appPath, beforeQuery,
+                                remaining.sequence, remaining.node, remaining.payload)
+                                && !started) {
                             ensureAppRunning();
                             started = true;
                         }
-                        CN1WearableBridge.deliverIfStampUnchanged(appPath, beforeQuery,
-                                remaining.sequence, remaining.node, remaining.payload);
                     } else {
                         // Genuinely empty, so the stamp can go: a value republished here later
                         // with a lower stamp than the removed one carried must not be filtered as
@@ -491,13 +497,12 @@ public class CN1WearableListenerService extends WearableListenerService {
                         if (CN1WearableBridge.isLocallyAuthored(this, winner.node)) {
                             CN1WearableBridge.recordLocalEcho(appPath, winner.sequence,
                                     winner.node, winner.payload);
-                        } else {
-                            if (!started) {
-                                ensureAppRunning();
-                                started = true;
-                            }
-                            CN1WearableBridge.deliverIfOutranks(appPath, winner.sequence,
-                                    winner.node, winner.payload);
+                        } else if (CN1WearableBridge.deliverIfOutranks(appPath, winner.sequence,
+                                winner.node, winner.payload) && !started) {
+                            // Same ordering as above: deliverIfOutranks declines a replica an
+                            // earlier publication already beat, and that is not worth a launch.
+                            ensureAppRunning();
+                            started = true;
                         }
                     }
                     continue;
@@ -534,13 +539,12 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // answering with them while the delivery stamp already tracked the newer value.
                 CN1WearableBridge.recordLocalEcho(appPath, CN1WearableBridge.sequenceOf(value),
                         uri.getHost(), CN1WearableBridge.payloadOf(value));
-            } else {
-                if (!started) {
-                    ensureAppRunning();
-                    started = true;
-                }
-                CN1WearableBridge.deliverIfOutranks(appPath, CN1WearableBridge.sequenceOf(value),
-                        uri.getHost(), CN1WearableBridge.payloadOf(value));
+            } else if (CN1WearableBridge.deliverIfOutranks(appPath,
+                    CN1WearableBridge.sequenceOf(value), uri.getHost(),
+                    CN1WearableBridge.payloadOf(value)) && !started) {
+                // Same ordering again: a stale replica is declined and does not deserve a launch.
+                ensureAppRunning();
+                started = true;
             }
         }
     }

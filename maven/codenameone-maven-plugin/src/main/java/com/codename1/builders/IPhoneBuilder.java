@@ -297,7 +297,16 @@ public class IPhoneBuilder extends Executor {
     /// Whether the class graph rooted here reaches the health API at all.
     private boolean reachesHealth(java.util.List<File> roots, String rootInternal) {
         for (String name : reachableClasses(roots, rootInternal)) {
-            if (name.startsWith("com/codename1/health/")) {
+            // The SAME distinction the scanner draws, and for the same reason. The umbrella
+            // package is not evidence of HealthKit: com.codename1.health.sensors is pure BLE, and
+            // the shared model types (a HealthSample, a QuantitySample) are named by sensor code
+            // that never touches the store. Counting those here marked a BLE-only phone root as
+            // health-reaching and re-entitled it -- the exact release-signing failure this
+            // attribution exists to prevent.
+            if (name.startsWith("com/codename1/health/")
+                    && !name.startsWith("com/codename1/health/sensors/")
+                    && !"com/codename1/health/Health".equals(name)
+                    && !isSharedHealthModel(name)) {
                 return true;
             }
         }

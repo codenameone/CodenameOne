@@ -2883,6 +2883,12 @@ public class CN1WearableBridge implements WearableBridge {
             if (before == null) {
                 if (markRemovalAnnounced(path)) {
                     rememberValue(path, null);
+                    // The stamped branch below reaches deliverRemovalIfStampUnchanged, which starts
+                    // the app; this one dispatches directly and did not. A cold process whose FIRST
+                    // event for a path is its deletion took exactly this branch, so the removal was
+                    // queued with no lifecycle to drain it -- and the deleted item is absent from
+                    // startup replay, so the app's persisted state kept a value the peer removed.
+                    ensureAppRunning();
                     WearableConnection.deliverDataRemoved(path);
                 }
             } else if (!isRemovalAnnounced(before)) {
