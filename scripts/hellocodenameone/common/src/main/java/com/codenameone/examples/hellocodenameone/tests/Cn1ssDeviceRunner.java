@@ -122,18 +122,24 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 && testClass instanceof ToastBarTopPositionScreenshotTest) {
             return 45000;
         }
-        if (!"HTML5".equals(Display.getInstance().getPlatformName())
-                && testClass instanceof VectorMapScreenshotBaseTest) {
+        if (testClass instanceof VectorMapScreenshotBaseTest) {
             // VectorMapScreenshotBaseTest polls for rendered tiles up to its own
             // MAX_WAIT_MS and then captures anyway, so that a map which never
             // reports ready still produces an image to look at. That escape
             // hatch only works if the poll cap is strictly INSIDE this budget,
-            // and at the default the two were both 30s: the runner declared the
-            // timeout first, every time, so the fallback was unreachable and a
-            // slow map leg failed with no screenshot at all rather than a
-            // screenshot showing what went wrong. Keep the outer budget clear of
-            // the poll cap. See MAX_WAIT_MS in VectorMapScreenshotBaseTest.
-            return TEST_TIMEOUT_MS_NATIVE * 2;
+            // and it was not: 30s against the 30s native default and against the
+            // 10s HTML5 one. The runner declared the timeout first every time,
+            // so the fallback was unreachable and a slow map leg failed with no
+            // screenshot at all rather than one showing what it had rendered.
+            //
+            // Derived from the poll cap rather than restated as a number, so the
+            // ordering cannot drift when either side is tuned: the tile wait,
+            // plus a whole ordinary test's worth of time to do the capture that
+            // follows it. Every platform, because the inversion was not specific
+            // to one -- it was widest on HTML5.
+            return VectorMapScreenshotBaseTest.MAX_WAIT_MS
+                    + ("HTML5".equals(Display.getInstance().getPlatformName())
+                            ? TEST_TIMEOUT_MS_HTML5 : TEST_TIMEOUT_MS_NATIVE);
         }
         if (!"HTML5".equals(Display.getInstance().getPlatformName())
                 && testClass instanceof BrowserComponentScreenshotTest) {
