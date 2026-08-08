@@ -93,6 +93,9 @@ public class SQLiteNative {
      */
     public static native boolean execScript(long dbPeer, String sql);
 
+    /** Whether the engine reports a transaction in progress, which is sqlite3_get_autocommit. */
+    public static native boolean inTransaction(long dbPeer);
+
     /** Prepares a statement, returning 0 and recording {@link #lastError()} on failure. */
     public static native long prepare(long dbPeer, String sql);
 

@@ -360,6 +360,15 @@ JAVA_VOID PREFIX##_sqlDbClose___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG dbPeer
     }                                                                                               \
 }                                                                                                   \
                                                                                                    \
+JAVA_BOOLEAN PREFIX##_sqlDbInTransaction___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG dbPeer) {      \
+    /* The engine's own answer, which is the only reliable one after a script failed partway:     \
+     * SQLite stops at the failing statement, and nothing outside can see which one that was. */  \
+    return sqlite3_get_autocommit((sqlite3*)(intptr_t)dbPeer) ? JAVA_FALSE : JAVA_TRUE;           \
+}                                                                                                   \
+JAVA_BOOLEAN PREFIX##_sqlDbInTransaction___long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG dbPeer) { \
+    return PREFIX##_sqlDbInTransaction___long(threadStateData, dbPeer);                             \
+}                                                                                                   \
+                                                                                                   \
 JAVA_VOID PREFIX##_sqlDbExecScript___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG dbPeer, JAVA_OBJECT sql) { \
     sqlite3* db = (sqlite3*)(intptr_t)dbPeer;                                                       \
     char* err = NULL;                                                                               \
@@ -576,6 +585,8 @@ JAVA_VOID PREFIX##_sqlDbRekey___long_java_lang_String(CODENAME_ONE_THREAD_STATE,
 JAVA_BOOLEAN PREFIX##_sqlDbIsCipherAvailable__(CODENAME_ONE_THREAD_STATE) { return JAVA_FALSE; }    \
 JAVA_BOOLEAN PREFIX##_sqlDbIsCipherAvailable___R_boolean(CODENAME_ONE_THREAD_STATE) { return JAVA_FALSE; } \
 JAVA_VOID PREFIX##_sqlDbClose___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG d) { }                    \
+JAVA_BOOLEAN PREFIX##_sqlDbInTransaction___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG d) { return JAVA_FALSE; } \
+JAVA_BOOLEAN PREFIX##_sqlDbInTransaction___long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG d) { return JAVA_FALSE; } \
 JAVA_VOID PREFIX##_sqlDbExecScript___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG d, JAVA_OBJECT s) { cn1DbThrowUnavailable(threadStateData); } \
 JAVA_LONG PREFIX##_sqlStmtPrepare___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG d, JAVA_OBJECT s) { cn1DbThrowUnavailable(threadStateData); return 0; } \
 JAVA_LONG PREFIX##_sqlStmtPrepare___long_java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG d, JAVA_OBJECT s) { cn1DbThrowUnavailable(threadStateData); return 0; } \

@@ -6872,6 +6872,17 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenWasWrong
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastError_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_lastError___R_java_lang_String"],
   function() { return jvm.createStringLiteral(String(cn1SqliteLastError)); });
 
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_inTransaction_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_inTransaction___long_R_boolean"],
+  function(dbId) {
+    // The engine's own answer. A script that fails partway stops at the failing statement, and
+    // nothing outside can see which one that was, so reading the script cannot tell an unexecuted
+    // trailing COMMIT from an executed one.
+    return cn1SqliteGuard(function() {
+      const db = cn1SqliteHandles.get(Number(dbId));
+      return db ? !cn1Sqlite.capi.sqlite3_get_autocommit(db.pointer) : false;
+    }, false);
+  });
+
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_close_long_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_close___long_R_boolean"],
   function(dbId) {
     // Reports failure rather than swallowing it. A close that fails on an OPFS flush has not

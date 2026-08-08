@@ -911,6 +911,9 @@ public final class WindowsNative {
     public static native boolean sqlDbIsCipherAvailable();
     public static native void sqlDbClose(long dbPeer) throws java.io.IOException;
     /** Runs a whole script, which may contain several statements. */
+    /** Whether the engine reports a transaction in progress, which is sqlite3_get_autocommit. */
+    public static native boolean sqlDbInTransaction(long dbPeer) throws java.io.IOException;
+
     public static native void sqlDbExecScript(long dbPeer, String sql) throws java.io.IOException;
 
     public static native long sqlStmtPrepare(long dbPeer, String sql) throws java.io.IOException;

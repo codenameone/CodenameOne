@@ -143,6 +143,28 @@ class ScriptTransactionTrackingTest {
     }
 
     @Test
+    void anOptionalTransactionKeywordDoesNotHideTheSavepoint() {
+        // SQLite accepts ROLLBACK TRANSACTION TO [SAVEPOINT] name. Reading only the second word
+        // sees TRANSACTION, calls it a bare rollback, and clears the flag while SQLite stays
+        // inside the transaction -- and on the simulator discards the whole transaction with it.
+        String[] savepointRollbacks = {
+            "ROLLBACK TRANSACTION TO one",
+            "ROLLBACK TRANSACTION TO SAVEPOINT one",
+            "ROLLBACK  TRANSACTION\n TO one",
+        };
+        for (String statement : savepointRollbacks) {
+            db.ran("BEGIN");
+            db.ran(statement);
+            assertTrue(db.isInTransaction(), "still inside the transaction after: " + statement);
+            db.ran("ROLLBACK");
+        }
+        // But a bare ROLLBACK TRANSACTION does end it.
+        db.ran("BEGIN");
+        db.ran("ROLLBACK TRANSACTION");
+        assertFalse(db.isInTransaction());
+    }
+
+    @Test
     void aSavepointRollbackIsRecognisedAcrossAnyWhitespace() {
         // SQL separates words with any whitespace or a comment, so these are all the same
         // statement to the engine. Reading only " TO" would clear the flag on all but the first

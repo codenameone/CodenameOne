@@ -11517,6 +11517,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             opened = open.invoke(null,
                     resolveNativeDatabasePath(databaseName), databaseName, "");
         } catch (java.lang.reflect.InvocationTargetException err) {
+            // The open threw, so no connection exists to release the slot later. A rekey open of
+            // a file that turns out to be encrypted lands here, and leaving the slot behind would
+            // make every later conversion of that database see a connection that is not there.
+            releaseUnusedDatabaseConnection(nativePath);
             Throwable cause = err.getCause();
             if (cause instanceof IOException) {
                 throw (IOException) cause;

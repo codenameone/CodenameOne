@@ -681,6 +681,22 @@ public abstract class Database {
         }
     }
 
+    /// Records the transaction state a port read back from its engine.
+    ///
+    /// The reliable answer where a script runs as a whole. SQLite stops at the first statement
+    /// that fails and nothing outside can see which one that was, so reading the script cannot
+    /// tell an unexecuted trailing `COMMIT` from an executed one -- and getting that wrong either
+    /// clears the flag over a live transaction, which lets a key change replace the database
+    /// underneath uncommitted work, or holds it over a finished one, which blocks every key change
+    /// until the connection closes. The engine knows; ports that can ask it should.
+    ///
+    /// #### Parameters
+    ///
+    /// - `open`: whether the engine reports a transaction in progress
+    protected void noteEngineTransactionState(boolean open) {
+        inTransaction = open;
+    }
+
     /// The transaction-control keyword a statement starts with, or null if it is not one.
     ///
     /// Shared so that a port which has to act on transaction control -- the simulator routes it
@@ -762,29 +778,39 @@ public abstract class Database {
 
     /// Whether a ROLLBACK names a savepoint, which unwinds to it rather than ending anything.
     ///
-    /// Reads the next keyword rather than searching for the text " TO": SQL separates words with
-    /// any whitespace or a comment, so `ROLLBACK\nTO checkpoint` and `ROLLBACK /* here */ TO x`
-    /// are the same statement to the engine. Missing one of those would clear the flag while
-    /// SQLite stayed inside the transaction -- the caller's own commit would then be rejected as
-    /// having nothing to commit, and a key change would be allowed underneath it.
+    /// Reads keywords rather than searching for the text " TO". SQL separates words with any
+    /// whitespace or a comment, so `ROLLBACK\nTO x` and `ROLLBACK /* here */ TO x` are the same
+    /// statement to the engine -- and `TRANSACTION` is optional in between, so
+    /// `ROLLBACK TRANSACTION TO x` is that statement too. Missing any of them clears the flag
+    /// while SQLite stays inside the transaction: the caller's own commit is then rejected as
+    /// having nothing to commit, a key change is allowed underneath it, and on the simulator the
+    /// whole transaction is discarded by a `conn.rollback()` that should have been a savepoint
+    /// unwind.
     private static boolean hasToSavepoint(String statement) {
-        return "TO".equals(keywordAfterFirst(statement));
+        int after = endOfKeyword(statement, skipLeadingTrivia(statement, 0));
+        String next = keywordAt(statement, after);
+        if ("TRANSACTION".equals(next)) {
+            after = endOfKeyword(statement, skipLeadingTrivia(statement, after));
+            next = keywordAt(statement, after);
+        }
+        return "TO".equals(next);
     }
 
-    /// The second keyword of a statement, upper cased, or an empty string.
-    private static String keywordAfterFirst(String statement) {
-        int start = skipLeadingTrivia(statement, 0);
+    /// The index one past the keyword starting at `from`.
+    private static int endOfKeyword(String statement, int from) {
         int length = statement.length();
-        int end = start;
+        int end = from;
         while (end < length && isKeywordChar(statement.charAt(end))) {
             end++;
         }
-        int secondStart = skipLeadingTrivia(statement, end);
-        int secondEnd = secondStart;
-        while (secondEnd < length && isKeywordChar(statement.charAt(secondEnd))) {
-            secondEnd++;
-        }
-        return statement.substring(secondStart, secondEnd).toUpperCase();
+        return end;
+    }
+
+    /// The keyword following `from`, upper cased, or an empty string.
+    private static String keywordAt(String statement, int from) {
+        int start = skipLeadingTrivia(statement, from);
+        int end = endOfKeyword(statement, start);
+        return statement.substring(start, end).toUpperCase();
     }
 
     /// Rejects a key change while a transaction is open.

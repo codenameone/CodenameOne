@@ -722,6 +722,9 @@ public final class IOSNative {
     native String sqlDbPath(String name);
 
     native void sqlDbExec(long dbPeer, String sql, String[] args);
+    /** Whether the engine reports a transaction in progress, which is sqlite3_get_autocommit. */
+    native boolean sqlDbInTransaction(long dbPeer);
+
     /** Runs an entire script through sqlite3_exec, which handles multiple statements. */
     native void sqlDbExecScript(long dbPeer, String sql);
 

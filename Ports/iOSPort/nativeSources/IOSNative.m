@@ -9151,6 +9151,13 @@ void com_codename1_impl_ios_IOSNative_sqlDbClose___long(CN1_THREAD_STATE_MULTI_A
     }
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbInTransaction___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer) {
+    // The engine's own answer. After a script fails partway SQLite stops at the failing statement,
+    // and nothing outside can see which one that was, so reading the script cannot tell an
+    // unexecuted trailing COMMIT from an executed one.
+    return sqlite3_get_autocommit((sqlite3*)dbPeer) ? JAVA_FALSE : JAVA_TRUE;
+}
+
 void com_codename1_impl_ios_IOSNative_sqlDbExecScript___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT sql) {
     sqlite3* db = (sqlite3*)dbPeer;
     const char* chrs = stringToUTF8(CN1_THREAD_STATE_PASS_ARG sql);
@@ -12759,6 +12766,10 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_sqlCursorValueAtColumnText___long_i
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNullValueAtColumn___long_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
     return com_codename1_impl_ios_IOSNative_sqlCursorNullValueAtColumn___long_int(CN1_THREAD_STATE_PASS_ARG instanceObject, statement, col);
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbInTransaction___long_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer) {
+    return com_codename1_impl_ios_IOSNative_sqlDbInTransaction___long(CN1_THREAD_STATE_PASS_ARG instanceObject, dbPeer);
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement) {

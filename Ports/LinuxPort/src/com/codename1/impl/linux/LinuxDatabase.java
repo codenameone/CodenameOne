@@ -181,9 +181,9 @@ class LinuxDatabase extends Database {
         try {
             LinuxNative.sqlDbExecScript(peer, sql);
         } finally {
-            // In a finally: a script that failed partway had already run everything before the
-            // statement that failed, and the engine does not undo it.
-            noteScriptTransactionControl(sql);
+            // Read back from the engine rather than inferred from the script. SQLite stops at the
+            // statement that failed, so a trailing COMMIT in the text may never have run.
+            noteEngineTransactionState(LinuxNative.sqlDbInTransaction(peer));
         }
     }
 
