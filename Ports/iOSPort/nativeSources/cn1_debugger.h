@@ -158,6 +158,13 @@ extern void cn1_debugger_begin_thread_list(void);
  */
 extern void cn1_debugger_end_thread_list(void);
 
+/**
+ * The scalar component of an array class and its dimension count, or NULL if
+ * the chain cannot be read. An array's own class is synthetic and absent from
+ * the symbol table, so the component is what the proxy can actually name.
+ */
+extern struct clazz* cn1_debugger_array_component(struct clazz* arrayClass, int* dimsOut);
+
 /** Resolves an objectID that arrived from the IDE, or NULL to refuse it. */
 extern struct clazz* cn1_debugger_class_of_wire_id(JAVA_OBJECT obj);
 

@@ -224,20 +224,29 @@ public class JdwpLineTableTest {
         try (JdwpTestClient client = JdwpTestClient.attach(server, port)) {
             primeSymbols(server);
 
-            String plain = signatureOf(client, refTypeOf(0, false));
-            String array = signatureOf(client, refTypeOf(0, true));
+            String plain = signatureOf(client, refTypeOf(0, 0));
+            String array = signatureOf(client, refTypeOf(0, 1));
+            String twoDimensional = signatureOf(client, refTypeOf(0, 2));
 
             assertEquals("Lcom/example/Main;", plain);
             assertEquals("[Lcom/example/Main;", array);
             assertEquals("the component type is what remains after the '['",
                     plain, array.substring(1));
+            // The runtime's own array classes are synthetic and carry no symbol
+            // entry, so the depth has to travel with the component or every
+            // array reads as a one-dimensional Object[].
+            assertEquals("[[Lcom/example/Main;", twoDimensional);
         }
     }
 
-    /** Reference-type id for a class, as an array type or as itself. */
-    private long refTypeOf(int classId, boolean array) {
+    /**
+     * Reference-type id for a class: as itself when {@code dimensions} is 0,
+     * otherwise as an array of it that many levels deep.
+     */
+    private long refTypeOf(int classId, int dimensions) {
         long ref = classId + 1L;
-        return array ? (0x2000000000000000L | ref) : ref;
+        if (dimensions == 0) return ref;
+        return 0x2000000000000000L | ((long) dimensions << 48) | ref;
     }
 
     private String signatureOf(JdwpTestClient client, long refType) throws Exception {

@@ -83,8 +83,9 @@ public final class LoggingListener implements DeviceConnection.DeviceListener {
 
     @Override public void onVmDeath() { System.out.println("[event] VM_DEATH"); }
     @Override public void onStringValue(String value) { System.out.println("[event] STRING_VALUE=" + value); }
-    @Override public void onObjectClass(int classId, boolean isArray) {
-        System.out.println("[event] OBJECT_CLASS=" + classId + (isArray ? " (array)" : ""));
+    @Override public void onObjectClass(int classId, boolean isArray, int dimensions) {
+        System.out.println("[event] OBJECT_CLASS=" + classId
+                + (isArray ? " (array, " + dimensions + "d)" : ""));
     }
     @Override public void onObjectFields(byte[] typeCodes, long[] values) {
         System.out.println("[event] OBJECT_FIELDS count=" + typeCodes.length);

@@ -336,12 +336,28 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
      */
     private static final long ARRAY_REF_TAG = 0x2000000000000000L;
 
+    /*
+     * Array depth rides in bits 48-55 of the reference-type ID, clear of both
+     * the tag at bit 61 and the component ID in the low 32. An array's own
+     * runtime class is synthetic and absent from the symbol table, so the
+     * component plus a depth is the only way to name int[][] as anything other
+     * than the Object[] a lone flag reduced every array to.
+     */
+    private static final int ARRAY_DIMS_SHIFT = 48;
+    private static final long ARRAY_DIMS_MASK = 0xFFL;
+    private static final long ARRAY_REF_ID_MASK = 0x0000FFFFFFFFFFFFL;
+
     private static boolean isArrayRef(long jdwpId) {
         return (jdwpId & ARRAY_REF_TAG) != 0;
     }
 
-    private static long toJdwpArrayRef(int componentClassId) {
-        return ARRAY_REF_TAG | toJdwpRef(componentClassId);
+    private static long toJdwpArrayRef(int componentClassId, int dimensions) {
+        long dims = Math.max(1, Math.min(dimensions, (int) ARRAY_DIMS_MASK));
+        return ARRAY_REF_TAG | (dims << ARRAY_DIMS_SHIFT) | toJdwpRef(componentClassId);
+    }
+
+    private static int arrayRefDimensions(long jdwpId) {
+        return (int) ((jdwpId >>> ARRAY_DIMS_SHIFT) & ARRAY_DIMS_MASK);
     }
 
     private static boolean isThreadId(long jdwpId) {
@@ -882,20 +898,25 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
      * <p>An array's is its component's with a {@code [} in front, which is
      * also how a debugger reads the component back out of it.</p>
      */
-    private static String signatureOf(SymbolTable.ClassInfo c, boolean array) {
-        String component = c != null ? c.jvmSignature() : "Ljava/lang/Object;";
-        return array ? "[" + component : component;
+    private static String signatureOf(SymbolTable.ClassInfo c, int arrayDimensions) {
+        StringBuilder sig = new StringBuilder();
+        for (int i = 0; i < arrayDimensions; i++) {
+            sig.append('[');
+        }
+        sig.append(c != null ? c.jvmSignature() : "Ljava/lang/Object;");
+        return sig.toString();
     }
 
     private void handleRefType(int id, int cmd, byte[] p) throws IOException {
         long typeID = readLong(p, 0);
         boolean array = isArrayRef(typeID);
-        SymbolTable.ClassInfo c =
-                symbols.classById(fromJdwpRef(typeID & ~ARRAY_REF_TAG));
+        int arrayDims = array ? arrayRefDimensions(typeID) : 0;
+        SymbolTable.ClassInfo c = symbols.classById(
+                fromJdwpRef(array ? (typeID & ARRAY_REF_ID_MASK) : typeID));
         switch (cmd) {
             case 1: { // Signature
                 Buf b = new Buf();
-                b.writeString(signatureOf(c, array));
+                b.writeString(signatureOf(c, arrayDims));
                 writeReply(id, 0, b.bytes());
                 return;
             }
@@ -917,7 +938,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 // of showing it, taking the rest of that locals listing with
                 // it.
                 Buf b = new Buf();
-                b.writeString(signatureOf(c, array));
+                b.writeString(signatureOf(c, arrayDims));
                 b.writeString("");
                 writeReply(id, 0, b.bytes());
                 return;
@@ -1806,7 +1827,9 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     b.writeLong(0);
                 } else {
                     b.writeByte(isArr ? TYPE_TAG_ARRAY : TYPE_TAG_CLASS);
-                    b.writeLong(isArr ? toJdwpArrayRef(classId) : toJdwpRef(classId));
+                    int dims;
+                    synchronized (objectClassLock) { dims = lastObjectArrayDims; }
+                    b.writeLong(isArr ? toJdwpArrayRef(classId, dims) : toJdwpRef(classId));
                 }
                 writeReply(id, 0, b.bytes());
                 return;
@@ -2002,6 +2025,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     private boolean pendingObjectClass = false;
     private int lastObjectClass = -1;
     private boolean lastObjectIsArray = false;
+    /** Array depth reported with the last object class; 0 when not an array. */
+    private int lastObjectArrayDims = 0;
 
     private int blockingGetObjectClass(long objectId) {
         if (device == null) return -1;
@@ -2009,6 +2034,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             pendingObjectClass = true;
             lastObjectClass = -1;
             lastObjectIsArray = false;
+            lastObjectArrayDims = 0;
             try { device.getObjectClass(objectId); } catch (IOException io) { return -1; }
             long deadline = System.currentTimeMillis() + 2000;
             while (pendingObjectClass && System.currentTimeMillis() < deadline) {
@@ -2470,10 +2496,11 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             stringLock.notifyAll();
         }
     }
-    @Override public void onObjectClass(int classId, boolean isArray) {
+    @Override public void onObjectClass(int classId, boolean isArray, int dimensions) {
         synchronized (objectClassLock) {
             lastObjectClass = classId;
             lastObjectIsArray = isArray;
+            lastObjectArrayDims = dimensions;
             pendingObjectClass = false;
             objectClassLock.notifyAll();
         }

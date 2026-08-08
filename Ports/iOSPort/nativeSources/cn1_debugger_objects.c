@@ -154,6 +154,41 @@ struct clazz* cn1_debugger_class_of(JAVA_OBJECT obj) {
     return NULL;
 }
 
+/**
+ * The scalar component of an array class, and how many dimensions deep it is.
+ *
+ * The runtime gives an array its own synthetic class, which carries no entry
+ * in the symbol table -- that table describes the classes the translator
+ * compiled, and the array classes are made up as needed. Reporting that
+ * synthetic ID to the proxy left it with nothing to resolve, so every array
+ * came back as Object[] whatever it held, and a flag saying "this is an array"
+ * could not say how deeply.
+ *
+ * Walks arrayType down to the first class that is not itself an array, which
+ * is the one the symbol table knows, counting the hops. Returns NULL if the
+ * chain cannot be read or bottoms out somewhere unregistered.
+ */
+struct clazz* cn1_debugger_array_component(struct clazz* arrayClass, int* dimsOut) {
+    int dims = 0;
+    struct clazz* at = arrayClass;
+    /* Bounded rather than while(1): the chain is read out of the target's
+     * memory and a corrupt arrayType must not spin here. */
+    for (int hop = 0; hop < 16 && at != NULL; hop++) {
+        _Alignas(struct clazz) unsigned char raw[sizeof(struct clazz)];
+        if (!cn1_debugger_safe_read(at, raw, sizeof(raw))) return NULL;
+        const struct clazz* header = (const struct clazz*)raw;
+        if (!header->isArray) {
+            if (!cn1_is_registered_class(at, header->classId)) return NULL;
+            if (dimsOut != NULL) *dimsOut = dims;
+            return at;
+        }
+        if (header->arrayType == NULL) return NULL;
+        at = header->arrayType;
+        dims++;
+    }
+    return NULL;
+}
+
 int cn1_debugger_is_valid_object(JAVA_OBJECT obj) {
     return cn1_debugger_class_of(obj) != NULL;
 }

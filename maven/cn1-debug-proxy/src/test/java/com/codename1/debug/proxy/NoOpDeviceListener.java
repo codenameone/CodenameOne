@@ -36,7 +36,7 @@ class NoOpDeviceListener implements DeviceConnection.DeviceListener {
     @Override public void onLocals(int[] slots, byte[] typeCodes, long[] values) {}
     @Override public void onVmDeath() {}
     @Override public void onStringValue(String value) {}
-    @Override public void onObjectClass(int classId, boolean isArray) {}
+    @Override public void onObjectClass(int classId, boolean isArray, int dimensions) {}
     @Override public void onObjectFields(byte[] typeCodes, long[] values) {}
     @Override public void onInvokeResult(byte type, long value) {}
     @Override public void onArrayLength(int length) {}

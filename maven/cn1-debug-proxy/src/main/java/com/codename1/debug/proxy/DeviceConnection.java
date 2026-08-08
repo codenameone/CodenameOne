@@ -70,7 +70,12 @@ public final class DeviceConnection implements AutoCloseable {
         void onLocals(int[] slots, byte[] typeCodes, long[] values);
         void onVmDeath();
         void onStringValue(String value);
-        void onObjectClass(int classId, boolean isArray);
+        /**
+         * @param dimensions array depth when {@code isArray}; {@code classId}
+         *                   then names the scalar component, since an array's
+         *                   own class is synthetic and has no symbol entry.
+         */
+        void onObjectClass(int classId, boolean isArray, int dimensions);
         void onObjectFields(byte[] typeCodes, long[] values);
         void onInvokeResult(byte type, long value);
         void onArrayLength(int length);
@@ -238,7 +243,11 @@ public final class DeviceConnection implements AutoCloseable {
                 int cid = p.length >= 4 ? readInt(p, 0) : -1;
                 // 5th byte is isArray flag; older devices omit it.
                 boolean isArr = p.length >= 5 && p[4] != 0;
-                listener.onObjectClass(cid, isArr);
+                // 6th byte is the array depth; devices before it sent none,
+                // and a depth of 1 is what those could only have meant.
+                int dims = p.length >= 6 ? (p[5] & 0xff) : (isArr ? 1 : 0);
+                if (isArr && dims == 0) dims = 1;
+                listener.onObjectClass(cid, isArr, dims);
                 return;
             }
             case WireProtocol.EVT_OBJECT_FIELDS: {

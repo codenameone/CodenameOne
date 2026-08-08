@@ -1120,19 +1120,35 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             uint64_t ptr = ((uint64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
             int classId = -1;
             uint8_t isArray = 0;
+            uint8_t dimensions = 0;
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
             struct clazz* cls = cn1_debugger_class_of_wire_id(obj);
             if (cls != NULL) {
                 classId = cls->classId;
                 isArray = cls->isArray ? 1 : 0;
+                if (isArray) {
+                    // An array's own class is synthetic -- the runtime makes
+                    // one per element type as needed -- so it has no entry in
+                    // the symbol table and its id resolves to nothing at the
+                    // other end. Every array therefore read as Object[]. Send
+                    // the component the table does know, and the depth, so the
+                    // proxy can name the type it actually is.
+                    int dims = 0;
+                    struct clazz* component = cn1_debugger_array_component(cls, &dims);
+                    if (component != NULL && dims > 0 && dims < 256) {
+                        classId = component->classId;
+                        dimensions = (uint8_t)dims;
+                    }
+                }
             }
-            // Reply: classId(4) + isArray(1). Older proxies that only read
-            // 4 bytes still work.
-            uint8_t reply[5];
+            // Reply: classId(4) + isArray(1) + dimensions(1). Older proxies
+            // reading 4 or 5 bytes are unaffected.
+            uint8_t reply[6];
             uint32_t cidBE = htonl((uint32_t)classId);
             memcpy(reply, &cidBE, 4);
             reply[4] = isArray;
-            sendEvent(EVT_OBJECT_CLASS, reply, 5);
+            reply[5] = dimensions;
+            sendEvent(EVT_OBJECT_CLASS, reply, 6);
             return 0;
         }
         case CMD_GET_STRING: {
