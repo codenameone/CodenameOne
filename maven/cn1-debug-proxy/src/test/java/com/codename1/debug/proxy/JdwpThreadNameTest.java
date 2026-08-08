@@ -108,6 +108,39 @@ public class JdwpThreadNameTest {
         }
     }
 
+    /**
+     * Object questions about a thread reach its java.lang.Thread, not the
+     * thread id read as a pointer.
+     *
+     * <p>ParparVM thread ids are small integers and travel to the IDE as-is.
+     * jdb asks {@code ObjectReference.ReferenceType} on them to render the
+     * Threads panel, so forwarding the id to the device as an object pointer
+     * both addresses nothing and — for an odd id — is indistinguishable from a
+     * tagged int. Every odd-numbered thread showed as a java.lang.Integer.</p>
+     */
+    @Test
+    public void objectQueriesAboutAThreadResolveToItsThreadObject() throws Exception {
+        try (Harness h = new Harness("EDT")) {
+            h.refreshThreadList();
+
+            // ObjectReference.ReferenceType on the thread id.
+            JdwpTestClient.Reply reply = h.client.send(
+                    9 /* ObjectReference */, 1, JdwpTestClient.threadId(THREAD_ID));
+            assertEquals(0, reply.errorCode);
+            DataInputStream body = reply.stream();
+            body.readByte();                       // refTypeTag
+            long refType = body.readLong();
+
+            // The fake device answers GET_OBJECT_CLASS with java.lang.Thread
+            // (classId 0), which travels as JDWP reference id 1. Getting that
+            // back means the thread object was asked about, not the raw id.
+            assertEquals("the Thread object's class, not the id read as a pointer",
+                    1L, refType);
+            assertEquals("and the device was asked about the thread object",
+                    THREAD_OBJECT, h.device.lastObjectClassQuery);
+        }
+    }
+
     // ---- harness -----------------------------------------------------------
 
     private final class Harness implements AutoCloseable {
@@ -164,6 +197,7 @@ public class JdwpThreadNameTest {
     private static final class FakeDevice {
         volatile String threadName;
         volatile long threadObject = THREAD_OBJECT;
+        volatile long lastObjectClassQuery = -1;
         private final Socket socket;
         private final DataInputStream in;
         private final DataOutputStream out;
@@ -243,6 +277,8 @@ public class JdwpThreadNameTest {
                     return;
                 }
                 case WireProtocol.CMD_GET_OBJECT_CLASS: {
+                    lastObjectClassQuery = ((long) readInt(p, 0) << 32)
+                            | (readInt(p, 4) & 0xffffffffL);
                     // Thread object -> java.lang.Thread (classId 0).
                     ByteArrayOutputStream b = new ByteArrayOutputStream();
                     DataOutputStream d = new DataOutputStream(b);
@@ -276,6 +312,11 @@ public class JdwpThreadNameTest {
             out.writeByte(code);
             out.write(payload);
             out.flush();
+        }
+
+        private static int readInt(byte[] b, int off) {
+            return ((b[off] & 0xff) << 24) | ((b[off + 1] & 0xff) << 16)
+                 | ((b[off + 2] & 0xff) << 8) | (b[off + 3] & 0xff);
         }
 
         private static byte[] gzip(byte[] raw) throws IOException {

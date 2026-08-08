@@ -1473,8 +1473,30 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 + (cpr.sourceNames.isEmpty() ? "" : " in " + cpr.sourceNames));
     }
 
+    /**
+     * Maps a JDWP id that is really a thread to the java.lang.Thread behind it.
+     *
+     * ParparVM's thread ids are small integers and this proxy hands them
+     * straight to the IDE as thread ids, so an IDE asking object questions
+     * about a thread — jdb does, to render the Threads panel — arrives here
+     * with 1, 3, 5 rather than a heap address. Passing those to the device as
+     * object pointers is wrong twice over: they address nothing, and an odd one
+     * is indistinguishable from a tagged int, which is why every
+     * odd-numbered thread displayed as a java.lang.Integer.
+     *
+     * Heap references are page-aligned addresses well above the thread-id
+     * range, so there is no ambiguity to resolve here.
+     */
+    private long resolveObjectId(long objectId) {
+        ThreadInfo info = deviceThreads.get(objectId);
+        if (info != null && info.threadObject != 0) {
+            return info.threadObject;
+        }
+        return objectId;
+    }
+
     private void handleObject(int id, int cmd, byte[] p) throws IOException {
-        long objectId = readLong(p, 0);
+        long objectId = resolveObjectId(readLong(p, 0));
         switch (cmd) {
             case 1: { // ReferenceType — get class
                 int classId = blockingGetObjectClass(objectId);
