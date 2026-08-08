@@ -765,24 +765,24 @@ public class AndroidGradleBuilder extends Executor {
      * changes JSON/DB schema) must be handed to R8 here. Empty when hardening is off.
      */
     private String hardeningR8Keep(BuildRequest request) {
-        String level = request.getArg("harden.level", "off");
-        if (level == null || level.trim().length() == 0 || "off".equalsIgnoreCase(level.trim())) {
+        // Gate on the VERIFIED cn1.hardened output (set only after a successful, entitled engine run),
+        // not harden.level: an Android opt-out (harden.and.enabled=off/0/false, or a level whose
+        // transforms are all disabled) makes the engine decline, and these keep rules must not then
+        // change which names R8 obfuscates.
+        if (!"true".equals(request.getArg("cn1.hardened", "false"))) {
             return "";
         }
-        // Prefer the full keep set the engine derived from the input jar: besides the name-bound
-        // property-object rule and the user's harden.keep, it covers the classes the ASM scanner
-        // found reflectively (Class.forName targets, META-INF/services providers, GUI-builder
-        // references). Those are invisible to R8, so without them R8 would rename a reflectively
-        // referenced class and the hardened release would fail to resolve its original name.
+        // Prefer the full keep set the engine derived from the input jar: the native-interface peers
+        // it found, plus the user's harden.keep. Those the automatic R8 analysis can't see, so without
+        // them R8 would rename a name-resolved class and the hardened release wouldn't resolve it.
         String engineKeep = getLastHardeningR8Keep();
         if (engineKeep != null && engineKeep.trim().length() > 0) {
             return engineKeep.endsWith("\n") ? engineKeep : engineKeep + "\n";
         }
-        // Fallback when the engine emitted no keep file (e.g. build() invoked without runBuild):
-        // keep at least the load-bearing rules so a hardened build still resolves.
+        // Fallback when the engine emitted no keep file (e.g. build() invoked without runBuild): the
+        // user's harden.keep. PropertyBusinessObject needs no keep -- its JSON/DB keys come from the
+        // string passed to its Property, not the field name, so renaming the field is safe.
         StringBuilder sb = new StringBuilder();
-        sb.append("-keepclassmembernames class * implements "
-                + "com.codename1.properties.PropertyBusinessObject { *; }\n");
         String keep = request.getArg("harden.keep", "");
         if (keep != null && keep.trim().length() > 0) {
             // Newlines only: a ';' is legal inside a ProGuard rule body.
