@@ -142,9 +142,29 @@ public class PiiScrubber {
     private static boolean isFrameLine(String line) {
         String t = line.trim();
         if (t.startsWith("at ")) {
-            return (t.endsWith(")") && t.indexOf('(') >= 0) || endsWithColonNumber(t);
+            return hasParenLocation(t) || endsWithColonNumber(t);
         }
         return t.indexOf('@') >= 0 && endsWithLineColumn(t);
+    }
+
+    /// True when `t` ends with a genuine parenthesized frame location, not just any parentheses:
+    /// `(File.java:42)` / `(url:line:col)` (content ending in `:<digits>`), or the JVM literals
+    /// `(Native Method)` / `(Unknown Source)`. A message wrapped onto an `at ...` line with an
+    /// incidental parenthetical (`at account 123456 failed (retry)`) does not match, so its digits
+    /// stay subject to scrubbing.
+    private static boolean hasParenLocation(String t) {
+        if (!t.endsWith(")")) {
+            return false;
+        }
+        int open = t.lastIndexOf('(');
+        if (open < 0) {
+            return false;
+        }
+        String inside = t.substring(open + 1, t.length() - 1);
+        if ("Native Method".equals(inside) || "Unknown Source".equals(inside)) {
+            return true;
+        }
+        return endsWithColonNumber(inside);
     }
 
     /// True when `t` ends with a `:<digits>` run (a trailing `)` allowed): the

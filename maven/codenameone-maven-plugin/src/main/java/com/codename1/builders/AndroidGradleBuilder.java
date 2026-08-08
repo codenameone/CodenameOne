@@ -340,6 +340,18 @@ public class AndroidGradleBuilder extends Executor {
                         && hasFirebaseConfiguration);
     }
 
+    /**
+     * True when a rename-delivering hardening profile is requested but Android R8 -- the only renamer
+     * on Android -- is not enabled to deliver it. R8 minification is emitted only when
+     * {@code android.enableProguard} is exactly {@code "true"} (the {@code minifyEnabled} gate), so any
+     * other value ({@code off}, {@code 0}, {@code False}, {@code no}, ...) leaves the rename unfulfilled;
+     * the check must mirror that predicate, not just reject the literal {@code "false"}, or a rename
+     * profile would be stamped {@code rename:r8}/hardened and ship without renaming.
+     */
+    static boolean r8RenameRequiredButDisabled(boolean renameRequested, String enableProguardArg) {
+        return renameRequested && !"true".equals(enableProguardArg);
+    }
+
     static boolean usesHuaweiPush(int detectedPushVersion, String messagingService,
             boolean hasHuaweiConfiguration) {
         return detectedPushVersion == 3
@@ -848,10 +860,16 @@ public class AndroidGradleBuilder extends Executor {
                 && hardenLevel != null && !"off".equalsIgnoreCase(hardenLevel.trim())
                 && hardenLevel.trim().length() > 0
                 && hardenBoolArg(request, "harden.rename", true);
-        if (hardenRenames && request.getArg("android.enableProguard", "true").equals("false")) {
+        // R8 minification is emitted only when android.enableProguard is exactly "true" (see the
+        // minifyEnabled gate below), so any other value -- off, 0, False, no -- leaves R8 off. Gate on
+        // that same predicate, not just the literal "false", or a rename profile would be stamped
+        // rename:r8/hardened and ship without renaming.
+        String enableProguard = request.getArg("android.enableProguard", "true");
+        if (r8RenameRequiredButDisabled(hardenRenames, enableProguard)) {
             throw new BuildException("harden.level=" + hardenLevel + " requires Android's R8/ProGuard "
-                    + "renaming, but android.enableProguard=false disables it. Enable R8, set "
-                    + "harden.rename=false, or set harden.level=off.");
+                    + "renaming, but android.enableProguard=" + enableProguard + " disables it (R8 runs "
+                    + "only when android.enableProguard=true). Enable R8, set harden.rename=false, or "
+                    + "set harden.level=off.");
         }
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set

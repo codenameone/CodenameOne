@@ -38,6 +38,21 @@ class AndroidGradleBuilderVersionTest {
     }
 
     @Test
+    void renameHardeningRejectsEveryValueThatLeavesR8Off() {
+        // R8 renames only when android.enableProguard is exactly "true"; every other value leaves it
+        // off. A rename profile must be rejected for all of them, not only the literal "false".
+        for (String off : new String[] {"false", "off", "0", "no", "False", "OFF", "", "yes"}) {
+            assertTrue(AndroidGradleBuilder.r8RenameRequiredButDisabled(true, off),
+                    "rename requested + enableProguard=" + off + " must be rejected");
+        }
+        // Exactly "true" enables R8, so a rename profile is fine.
+        assertFalse(AndroidGradleBuilder.r8RenameRequiredButDisabled(true, "true"));
+        // When rename is not requested, R8 being off is irrelevant.
+        assertFalse(AndroidGradleBuilder.r8RenameRequiredButDisabled(false, "off"));
+        assertFalse(AndroidGradleBuilder.r8RenameRequiredButDisabled(false, "true"));
+    }
+
+    @Test
     void typedPushAutoDetectsBothAndroidProviderConfigurations() {
         assertTrue(AndroidGradleBuilder.usesFcmPush(3, "auto", true));
         assertFalse(AndroidGradleBuilder.usesFcmPush(3, "auto", false));

@@ -90,6 +90,21 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
+    void messageWithIncidentalParenthesesIsNotAFrame() {
+        // A message wrapped onto an "at ..." line can carry incidental parentheses that are not a frame
+        // location; its id must still be scrubbed. Real parenthesized locations below survive.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "at account 123456 failed (retry)\n"
+                + "\tat com.foo.Bar.baz(Bar.java:4242)\n"
+                + "\tat com.foo.Qux.run(Native Method)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account [num] failed (retry)") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("Bar.java:4242") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("(Native Method)") >= 0, scrubbed);
+    }
+
+    @Test
     void customScrubMessageOverrideReachesRawStack() {
         // An app that redacts an app-specific token by overriding scrubMessage must have it redacted
         // in rawStack too, not only in the separately-scrubbed message. Frame lines stay untouched by
