@@ -124,6 +124,17 @@ volatile int cn1DebuggerActive = 0;
 static int g_proxyFd = -1;
 static pthread_mutex_t g_writeMutex = PTHREAD_MUTEX_INITIALIZER;
 
+// The listener thread's own ThreadLocalData, if ParparVM ever built one for it.
+//
+// It is a raw pthread, not a Java thread, but servicing CMD_GET_STRING calls
+// toNSString(getThreadLocalData(), ...), and getThreadLocalData() registers
+// whatever thread asks into allThreads. Nothing ever unregisters it, so
+// without this the debugger's own plumbing shows up in the IDE's Threads panel
+// as a permanent synthetic entry with no java.lang.Thread behind it — and it
+// only appears once the IDE resolves a thread name, i.e. as a side effect of
+// the very feature this change added.
+static struct ThreadLocalData* g_listenerTsd = NULL;
+
 // Wait-for-attach state. cn1_debugger_run_when_ready stashes the VM-callback
 // block here; the listener thread invokes it on the main queue once the
 // proxy has acked the IDE attach (the first CMD_RESUME). Releasing the wait
@@ -542,10 +553,30 @@ static void sendEvent(uint8_t cmd, const void* payload, uint32_t len) {
 /* doesn't block collection. resumeThread signals the condvar.          */
 /* --------------------------------------------------------------------- */
 
+/**
+ * Publishes a thread as suspended before the event announcing it goes out.
+ *
+ * The proxy can have a thread-list request in flight, and the reply is built
+ * from this flag. Emitting the stop first left a window where the listener
+ * sampled the thread as running and the proxy applied that reply *after* the
+ * stop event, putting the IDE back to showing the thread it had just stopped
+ * at as running. Marking first closes it: any snapshot taken after the event
+ * necessarily sees the suspension.
+ */
+static void markSuspendedBeforeEvent(struct ThreadLocalData* tsd) {
+    struct sus_state* s = susForThread((int64_t)tsd->threadId);
+    pthread_mutex_lock(&s->mu);
+    s->suspended = 1;
+    pthread_mutex_unlock(&s->mu);
+}
+
 static void suspendCurrent(struct ThreadLocalData* tsd) {
     int64_t threadId = (int64_t)tsd->threadId;
     struct sus_state* s = susForThread(threadId);
     pthread_mutex_lock(&s->mu);
+    // Normally already set by markSuspendedBeforeEvent; setting it again is
+    // harmless, and a resume that arrived in between legitimately cleared it,
+    // in which case the wait below falls straight through.
     s->suspended = 1;
     s->stepFromDepth = tsd->callStackOffset;
     s->tsd = tsd;
@@ -689,12 +720,14 @@ void cn1_debugger_check(struct ThreadLocalData* tsd, int line) {
             pthread_mutex_lock(&s->mu);
             s->stepKind = -1;
             pthread_mutex_unlock(&s->mu);
+            markSuspendedBeforeEvent(tsd);
             emitLocationEvent(EVT_STEP_COMPLETE, threadId, methodId, line);
             suspendCurrent(tsd);
             return;
         }
     }
     if (bp_contains(methodId, line)) {
+        markSuspendedBeforeEvent(tsd);
         emitLocationEvent(EVT_BP_HIT, threadId, methodId, line);
         suspendCurrent(tsd);
     }
@@ -768,7 +801,8 @@ static void handleGetThreads(void) {
     int count = 0;
     if (allThreads != NULL) {
         for (int i = 0; i < NUMBER_OF_SUPPORTED_THREADS; i++) {
-            if (allThreads[i] != NULL && !allThreads[i]->threadKilled) count++;
+            if (allThreads[i] != NULL && !allThreads[i]->threadKilled
+                    && allThreads[i] != g_listenerTsd) count++;
         }
     }
     size_t sz = 4 + (size_t)count * 17;
@@ -786,10 +820,14 @@ static void handleGetThreads(void) {
         for (int i = 0; i < NUMBER_OF_SUPPORTED_THREADS && emitted < count; i++) {
             struct ThreadLocalData* t = allThreads[i];
             if (t == NULL || t->threadKilled) continue;
+            if (t == g_listenerTsd) continue;   // the debugger's own listener
             int64_t tid = (int64_t)t->threadId;
             struct sus_state* s = susForThread(tid);
+            pthread_mutex_lock(&s->mu);
+            int suspended = s->suspended;
+            pthread_mutex_unlock(&s->mu);
             uint8_t flags = 0;
-            if (s->suspended) flags |= 0x01;
+            if (suspended) flags |= 0x01;
             if (t->threadActive) flags |= 0x02;
             JAVA_OBJECT threadObj = t->currentThreadObject;
             if (!cn1_debugger_is_valid_object(threadObj)) threadObj = JAVA_NULL;
@@ -1456,6 +1494,9 @@ static int cn1_debugger_is_attach_ready(void) {
 
 static void* listenerThreadMain(void* arg) {
     @autoreleasepool {
+        // Register up front and remember it, rather than discovering it later
+        // when a command handler happens to need a Java context.
+        g_listenerTsd = getThreadLocalData();
         NSDictionary* info = [[NSBundle mainBundle] infoDictionary];
         NSString* host = info[@"CN1ProxyHost"];
         NSNumber* portN = info[@"CN1ProxyPort"];
