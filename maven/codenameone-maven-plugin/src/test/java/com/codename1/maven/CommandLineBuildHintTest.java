@@ -105,17 +105,13 @@ class CommandLineBuildHintTest {
     private void overlay(Properties settings, Properties userProperties) throws Exception {
         CN1BuildMojo mojo = new CN1BuildMojo();
 
-        Field propsField = findField(mojo.getClass(), "properties");
-        propsField.setAccessible(true);
-        propsField.set(mojo, settings);
-
         Field sessionField = findField(mojo.getClass(), "session");
         sessionField.setAccessible(true);
         sessionField.set(mojo, new StubSession(userProperties));
 
-        Method overlay = findMethod(mojo.getClass(), "overlayCommandLineBuildHints");
+        Method overlay = findMethod(mojo.getClass(), "overlayCommandLineBuildHints", Properties.class);
         overlay.setAccessible(true);
-        overlay.invoke(mojo);
+        overlay.invoke(mojo, settings);
     }
 
     private static Field findField(Class<?> type, String name) throws NoSuchFieldException {
@@ -129,10 +125,11 @@ class CommandLineBuildHintTest {
         throw new NoSuchFieldException(name);
     }
 
-    private static Method findMethod(Class<?> type, String name) throws NoSuchMethodException {
+    private static Method findMethod(Class<?> type, String name, Class<?>... args)
+            throws NoSuchMethodException {
         for (Class<?> c = type; c != null; c = c.getSuperclass()) {
             try {
-                return c.getDeclaredMethod(name);
+                return c.getDeclaredMethod(name, args);
             } catch (NoSuchMethodException keepLooking) {
                 // up the chain
             }

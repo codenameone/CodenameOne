@@ -229,8 +229,8 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * set by an invoking build — not the whole system property table, so
      * unrelated JVM properties cannot become build hints.
      */
-    private void overlayCommandLineBuildHints() {
-        if (session == null) {
+    protected void overlayCommandLineBuildHints(Properties target) {
+        if (session == null || target == null) {
             return;
         }
         Properties userProperties = session.getUserProperties();
@@ -239,7 +239,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         }
         for (String key : userProperties.stringPropertyNames()) {
             if (key.startsWith("codename1.")) {
-                properties.setProperty(key, userProperties.getProperty(key));
+                target.setProperty(key, userProperties.getProperty(key));
             }
         }
     }
@@ -256,7 +256,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                     throw new MojoExecutionException("Failed to find codenameone_settings.properties file.", ex);
                 }
             }
-            overlayCommandLineBuildHints();
+            overlayCommandLineBuildHints(properties);
         } else {
             getLog().warn("Failed to find CN1 Project directory.  codenameone_settings.properties will not be loaded");
             if (project.getCompileSourceRoots() != null && !project.getCompileSourceRoots().isEmpty()) {

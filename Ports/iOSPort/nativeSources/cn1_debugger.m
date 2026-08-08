@@ -157,7 +157,14 @@ static pthread_mutex_t g_attachMutex = PTHREAD_MUTEX_INITIALIZER;
 // attached. Installed as a subview of the app's keyWindow root view rather
 // than as a separate UIWindow because iOS 13+ scene-based apps (which
 // Codename One is by default) refuse to display non-scene UIWindows.
+//
+// UIKit is unavailable on watchOS, so the whole overlay is compiled out for
+// that slice. The watch app has no debugger UI to show and its own runtime
+// still connects; without this, enabling on-device debugging on any project
+// that has a watch target failed to compile the watch slice outright.
+#if !TARGET_OS_WATCH
 static UIView* g_waitOverlay = nil;
+#endif
 
 // Forward declaration; callers in the command dispatch sit above the
 // definition further down the file.
@@ -1637,6 +1644,7 @@ static void* listenerThreadMain(void* arg) {
 /* attached (via CMD_RESUME).                                           */
 /* --------------------------------------------------------------------- */
 
+#if !TARGET_OS_WATCH
 static UIView* cn1_debugger_active_host_view(void) {
     UIWindow* w = nil;
     if (@available(iOS 13.0, *)) {
@@ -1749,6 +1757,11 @@ static void cn1_debugger_dismiss_wait_overlay(void) {
         g_waitOverlay = nil;
     });
 }
+#else
+// watchOS: no UIKit, so nothing to show and nothing to take down.
+static void cn1_debugger_install_wait_overlay(void) {}
+static void cn1_debugger_dismiss_wait_overlay(void) {}
+#endif
 
 /*
  * Invoked when the proxy confirms the IDE is ready. Fires the pending
