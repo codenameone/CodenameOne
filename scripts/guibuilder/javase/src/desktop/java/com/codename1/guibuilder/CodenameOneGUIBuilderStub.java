@@ -502,7 +502,9 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
             com.codename1.ui.Form form = com.codename1.ui.CN.getCurrentForm();
             com.codename1.ui.Component focused = form == null ? null : form.getFocused();
             if (focused instanceof com.codename1.ui.editor.EditorView) {
-                ((com.codename1.ui.editor.EditorView) focused).deleteSurroundingText(1, 0);
+                // deleteBackward, not deleteSurroundingText: the latter is the IME oriented API and
+                // ignores the selection, and would split a surrogate pair after an emoji.
+                ((com.codename1.ui.editor.EditorView) focused).deleteBackward();
                 return;
             }
             CodenameOneGUIBuilder.deleteActiveSelection();

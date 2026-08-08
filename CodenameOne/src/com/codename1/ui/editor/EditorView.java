@@ -950,7 +950,11 @@ public class EditorView extends Component implements TextInputClient {
         return host;
     }
 
-    private void deleteBackward() {
+    /// Deletes the selection, or the character before the caret when there is none. This is what
+    /// Backspace does, including its handling of a surrogate pair, and it is public so a host that
+    /// has swallowed the keystroke -- a desktop menu accelerator, for instance -- can hand it back
+    /// rather than approximating it with the IME oriented `#deleteSurroundingText(int, int)`.
+    public void deleteBackward() {
         if (!editable) {
             return;
         }
