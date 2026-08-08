@@ -1153,6 +1153,14 @@ public final class DatabaseConformanceSuite {
         deleteQuietly(databaseName);
         String passphrase = "correct horse battery staple";
 
+        // Whether the bytes behind a database can be read at all, established against a database
+        // known to be plaintext rather than assumed from the platform. A port can hand back a path
+        // that opens and still is not the database file: the browser keeps its databases in a
+        // storage pool whose slots begin with the pool's own metadata, so a read there succeeds and
+        // never looks like SQLite -- which silently satisfies every "this is not plaintext" check
+        // and fails only the one that wants the opposite.
+        boolean storedBytesVisible = storedBytesAreVisible(r, databaseName);
+
         // ---- round trip
         Database db = Database.openOrCreate(databaseName, DatabaseConfig.passphrase(passphrase));
         try {
@@ -1174,9 +1182,28 @@ public final class DatabaseConformanceSuite {
         }
 
         // ---- the single most valuable assertion here: the bytes on disk are not plaintext
-        checkStoredBytes(r, databaseName, false,
+        checkStoredBytes(r, storedBytesVisible, databaseName, false,
                 "the encrypted database does not begin with a plaintext SQLite header");
         r.check(Database.isEncrypted(databaseName), "isEncrypted reports true for it");
+
+        // ---- no key at all is rejected
+        //
+        // The proof of encryption that needs no access to the bytes. Where a port keeps its
+        // databases somewhere the checks above cannot read, this is what is left to say the
+        // contents are not simply sitting there for anyone who opens the database.
+        boolean noKeyRejected = false;
+        Database unkeyed = null;
+        try {
+            unkeyed = Database.openOrCreate(databaseName);
+            Cursor probe = unkeyed.executeQuery("SELECT v FROM secret");
+            probe.next();
+            probe.close();
+        } catch (IOException err) {
+            noKeyRejected = true;
+        } finally {
+            closeQuietly(unkeyed);
+        }
+        r.check(noKeyRejected, "an encrypted database does not open without a key");
 
         // ---- the wrong passphrase is rejected
         boolean wrongKeyRejected = false;
@@ -1276,7 +1303,8 @@ public final class DatabaseConformanceSuite {
             closeQuietly(plain);
         }
         Database.encrypt(migrateName, DatabaseConfig.passphrase(passphrase));
-        checkStoredBytes(r, migrateName, false, "encrypt() leaves ciphertext on disk");
+        checkStoredBytes(r, storedBytesVisible, migrateName, false,
+                "encrypt() leaves ciphertext on disk");
         Database migrated = Database.openOrCreate(migrateName,
                 DatabaseConfig.passphrase(passphrase));
         cur = null;
@@ -1289,7 +1317,12 @@ public final class DatabaseConformanceSuite {
             closeQuietly(migrated);
         }
         Database.decrypt(migrateName, DatabaseConfig.passphrase(passphrase));
-        checkStoredBytes(r, migrateName, true, "decrypt() restores a plaintext SQLite file");
+        checkStoredBytes(r, storedBytesVisible, migrateName, true,
+                "decrypt() restores a plaintext SQLite file");
+        // Asked of the port as well as of the bytes. Where the bytes cannot be read this is the
+        // only thing left that says the conversion happened, and it was the missing half: the
+        // encrypted side has been asserted since the beginning and the decrypted side never was.
+        r.check(!Database.isEncrypted(migrateName), "isEncrypted is false again after decrypt()");
         deleteQuietly(migrateName);
     }
 
@@ -1439,15 +1472,52 @@ public final class DatabaseConformanceSuite {
     /// - `databaseName`: the database whose file to look at
     /// - `expectPlaintext`: whether the file should begin with the plaintext header
     /// - `message`: what is being asserted
-    private static void checkStoredBytes(Reporter r, String databaseName, boolean expectPlaintext,
-            String message) {
-        int state = plaintextHeaderState(databaseName);
-        if (state == HEADER_UNREADABLE) {
+    private static void checkStoredBytes(Reporter r, boolean storedBytesVisible,
+            String databaseName, boolean expectPlaintext, String message) {
+        if (!storedBytesVisible) {
             r.info("the stored bytes are not reachable on this platform, so this was not"
                     + " checked: " + message);
             return;
         }
-        r.check((state == HEADER_PLAINTEXT) == expectPlaintext, message);
+        r.check((plaintextHeaderState(databaseName) == HEADER_PLAINTEXT) == expectPlaintext,
+                message);
+    }
+
+    /// Whether reading a database's stored bytes gives back the database.
+    ///
+    /// Calibrated against a plaintext database rather than assumed, because the failure it guards
+    /// against looks exactly like success: a port whose path is not the database file still reads
+    /// something, and that something is never an SQLite header, so every "this is not plaintext"
+    /// assertion passes without a database having been read at all.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the reporter, told once when the checks cannot run
+    /// - `databaseName`: the database under test, whose name the probe borrows
+    private static boolean storedBytesAreVisible(Reporter r, String databaseName) {
+        String probeName = databaseName + "-bytes-probe";
+        deleteQuietly(probeName);
+        try {
+            Database probe = Database.openOrCreate(probeName);
+            try {
+                probe.execute("CREATE TABLE probe (id INTEGER PRIMARY KEY)");
+            } finally {
+                closeQuietly(probe);
+            }
+            boolean visible = plaintextHeaderState(probeName) == HEADER_PLAINTEXT;
+            if (!visible) {
+                r.info("a plaintext database does not read back as one here, so this platform does "
+                        + "not expose its databases as files and the ciphertext-on-disk checks "
+                        + "cannot run");
+            }
+            return visible;
+        } catch (IOException err) {
+            r.info("a probe database could not be created, so the ciphertext-on-disk checks cannot "
+                    + "run: " + err.getMessage());
+            return false;
+        } finally {
+            deleteQuietly(probeName);
+        }
     }
 
     private static int countTables(Database db, String first, String second) throws IOException {

@@ -272,6 +272,35 @@ class ScriptTransactionTrackingTest {
     }
 
     @Test
+    void theSameSavepointNameStacks() {
+        // SQLite allows the name twice and RELEASE takes the nearest one, so the first release
+        // leaves the outer savepoint -- and the transaction -- in place.
+        db.ran("SAVEPOINT s");
+        db.ran("SAVEPOINT s");
+        db.ran("RELEASE s");
+        assertTrue(db.isInTransaction(), "the outer savepoint of the same name is still open");
+        db.ran("RELEASE s");
+        assertFalse(db.isInTransaction(), "now both are released");
+    }
+
+    @Test
+    void aTypedEndingForgetsTheSavepoint() throws IOException {
+        // The savepoint opened it and commitTransaction() ended it. Remembering the name past that
+        // makes the next transaction end at the first release of a name that has nothing to do
+        // with it.
+        db.ran("SAVEPOINT s");
+        db.commitTransaction();
+        assertFalse(db.isInTransaction());
+
+        db.beginTransaction();
+        db.ran("SAVEPOINT s");
+        db.ran("RELEASE s");
+        assertTrue(db.isInTransaction(), "the BEGIN owns this one, not the savepoint");
+        db.commitTransaction();
+        assertFalse(db.isInTransaction());
+    }
+
+    @Test
     void releasingSomethingElseLeavesTheTransactionOpen() {
         db.ran("SAVEPOINT outer");
         db.ran("RELEASE unrelated");

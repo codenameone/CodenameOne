@@ -178,6 +178,17 @@ public class SEDatabase extends Database {
         setTransactionMode(mode);
     }
 
+    /// Ends a transaction the driver does not know it is in.
+    private void endTransactionThroughSql(String statement) throws SQLException {
+        Statement s = null;
+        try {
+            s = conn.createStatement();
+            s.execute(statement);
+        } finally {
+            cleanup(s);
+        }
+    }
+
     /// Sets the driver's transaction mode, where the driver in use has one.
     private void setTransactionMode(org.sqlite.SQLiteConfig.TransactionMode mode) {
         if (conn instanceof org.sqlite.SQLiteConnection) {
@@ -241,6 +252,14 @@ public class SEDatabase extends Database {
         checkOpen();
         checkEndTransaction();
         try {
+            if (conn.getAutoCommit()) {
+                // Opened by SAVEPOINT rather than by this API, so JDBC never left autocommit and
+                // conn.commit() would throw. SQLite ends a savepoint-started transaction with an
+                // ordinary COMMIT, releasing every savepoint inside it.
+                endTransactionThroughSql("COMMIT");
+                markTransactionEnded();
+                return;
+            }
             conn.commit();
             conn.setAutoCommit(true);
             // The mode belongs to the transaction that just ended, not to the connection. Leaving
@@ -271,6 +290,12 @@ public class SEDatabase extends Database {
         checkOpen();
         checkEndTransaction();
         try {
+            if (conn.getAutoCommit()) {
+                // See commitTransaction(): a savepoint opened this, so it ends in SQL.
+                endTransactionThroughSql("ROLLBACK");
+                markTransactionEnded();
+                return;
+            }
             conn.rollback();
             if (!isLegacyBehavior()) {
                 // Without this the connection stays outside autocommit, so every subsequent

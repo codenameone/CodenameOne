@@ -66,7 +66,7 @@ class WindowsDatabase extends Database {
         this.databaseName = databaseName;
         // Normalized, so two spellings of one path are one registry entry: the claim a key
         // change takes is worth nothing if the other connection is filed under "/a/./b".
-        this.openKey = normalizeDatabasePathKey(path);
+        this.openKey = windowsPathKey(path);
         // Registration first, because it is also the refusal: a key change in progress is rewriting
         // this file, and opening it before asking would touch it mid-rewrite and leave the handle
         // behind when the refusal arrived.
@@ -95,6 +95,21 @@ class WindowsDatabase extends Database {
                 releaseOpenDatabase(openKey);
             }
         }
+    }
+
+    /// The registry key for a Windows path.
+    ///
+    /// Two things the shared normalizer cannot assume elsewhere. Windows accepts either separator,
+    /// and this port's own path resolution passes both through, so a backslash has to count as one
+    /// here -- while on the other ports a backslash is an ordinary character in a file name.
+    /// And the default filesystem is case insensitive, so "C:/Data/App.db" and "c:/data/app.db"
+    /// are one file: registering them apart would have each connection believe it was the only
+    /// one and let either rekey the file underneath the other.
+    private static String windowsPathKey(String path) {
+        if (path == null) {
+            return null;
+        }
+        return normalizeDatabasePathKey(path.replace('\\', '/')).toLowerCase();
     }
 
     private void checkOpen() throws IOException {

@@ -95,6 +95,13 @@ public abstract class Database {
     /// ends the transaction; releasing any other leaves it open.
     private String outermostSavepoint;
 
+    /// How many savepoints of that name are stacked up.
+    ///
+    /// SQLite allows the same name twice, and `RELEASE` takes the nearest one, so
+    /// `SAVEPOINT s; SAVEPOINT s; RELEASE s` leaves the transaction open. Counting is what keeps
+    /// the first release from ending it.
+    private int outermostSavepointDepth;
+
     /// Checks if this platform supports custom database paths.  On platforms that
     /// support this, you can pass a file path to `#openOrCreate(java.lang.String)`, `#exists(java.lang.String)`,
     /// `#delete(java.lang.String)`, and `#getDatabasePath(java.lang.String)`.
@@ -679,12 +686,12 @@ public abstract class Database {
             String keyword = transactionControlKeyword(statement);
             if ("BEGIN".equals(keyword)) {
                 inTransaction = true;
-                outermostSavepoint = null;
+                forgetSavepoints();
                 continue;
             }
             if (keyword != null) {
                 inTransaction = false;
-                outermostSavepoint = null;
+                forgetSavepoints();
                 continue;
             }
             noteSavepointControl(statement);
@@ -700,19 +707,35 @@ public abstract class Database {
     ///
     /// Only the outermost name ends it: releasing an inner savepoint leaves the transaction open,
     /// and a `RELEASE` naming something else entirely is not this transaction's ending.
+    ///
+    /// Releasing an intermediate savepoint also releases everything above it, including any reuse
+    /// of the outermost name, which this does not follow -- so a transaction can be reported open
+    /// after SQLite has ended it. That is the direction that refuses a key change rather than
+    /// allowing one over live work, and the ports that can ask their engine correct it on the next
+    /// statement anyway.
     private void noteSavepointControl(String statement) {
         String keyword = leadingKeyword(statement);
         if ("SAVEPOINT".equals(keyword)) {
+            String name = savepointName(statement, false);
             if (!inTransaction) {
                 inTransaction = true;
-                outermostSavepoint = savepointName(statement, false);
+                outermostSavepoint = name;
+                outermostSavepointDepth = 1;
+            } else if (outermostSavepoint != null && outermostSavepoint.equals(name)) {
+                // The same name again, which SQLite allows and stacks. The release below takes the
+                // nearest one, so without counting the first release would end a transaction that
+                // is still open.
+                outermostSavepointDepth++;
             }
             return;
         }
         if ("RELEASE".equals(keyword) && outermostSavepoint != null
                 && outermostSavepoint.equals(savepointName(statement, true))) {
-            inTransaction = false;
-            outermostSavepoint = null;
+            outermostSavepointDepth--;
+            if (outermostSavepointDepth <= 0) {
+                inTransaction = false;
+                forgetSavepoints();
+            }
         }
     }
 
@@ -1140,6 +1163,7 @@ public abstract class Database {
                     + "Transactions do not nest; commit or roll back the current one first.");
         }
         inTransaction = true;
+        forgetSavepoints();
     }
 
     /// Rejects a commit or rollback with no open transaction.
@@ -1164,6 +1188,13 @@ public abstract class Database {
     /// rolled back successfully.
     protected void markTransactionEnded() {
         inTransaction = false;
+        forgetSavepoints();
+    }
+
+    /// Drops what is remembered about savepoints, for a transaction that has ended by other means.
+    private void forgetSavepoints() {
+        outermostSavepoint = null;
+        outermostSavepointDepth = 0;
     }
 
     /// Discards a transaction whose commit failed, and builds the exception to report it with.
